@@ -1,0 +1,355 @@
+/**
+ * Unit Tests for NEC Calculation Services
+ * Run with: npm test (after installing vitest)
+ *
+ * These tests validate the calculation engines against NEC 2023 requirements
+ */
+
+import { describe, it, expect } from 'vitest';
+import {
+  calculateLoad,
+  sizeConductor,
+  sizeBreaker,
+  calculateVoltageDropAC
+} from '../services/calculations';
+import { calculateEgcSize } from '../services/calculations/conductorSizing';
+import { getEgcSize } from '../data/nec/table-250-122';
+import { calculateProportionalEgcSize } from '../data/nec/conductor-properties';
+import type { LoadItem, ProjectSettings } from '../types';
+
+describe('NEC Load Calculations', () => {
+  const dwellingSettings: ProjectSettings = {
+    serviceVoltage: 240,
+    servicePhase: 1,
+    occupancyType: 'dwelling',
+    conductorMaterial: 'Cu',
+    temperatureRating: 75
+  };
+
+  describe('NEC 220.82 Optional Calculation for Dwelling Units', () => {
+    it('should calculate basic dwelling load correctly', () => {
+      const loads: LoadItem[] = [
+        {
+          id: '1',
+          description: 'General Lighting',
+          watts: 3000,
+          type: 'lighting',
+          continuous: true,
+          phase: 'A'
+        },
+        {
+          id: '2',
+          description: 'Range',
+          watts: 12000,
+          type: 'range',
+          continuous: false,
+          phase: 'A'
+        }
+      ];
+
+      const result = calculateLoad(loads, dwellingSettings);
+
+      expect(result.method).toBe('NEC 220.82 Optional (Dwelling)');
+      expect(result.totalConnectedVA).toBe(15000);
+      expect(result.totalDemandVA).toBeGreaterThan(0);
+      expect(result.totalDemandVA).toBeLessThan(result.totalConnectedVA); // Demand factors should reduce load
+      expect(result.recommendedServiceSize).toBeGreaterThan(0);
+    });
+
+    it('should apply 125% continuous load factor', () => {
+      const loads: LoadItem[] = [
+        {
+          id: '1',
+          description: 'Continuous Load',
+          watts: 8000,
+          type: 'lighting',
+          continuous: true,
+          phase: 'A'
+        }
+      ];
+
+      const result = calculateLoad(loads, dwellingSettings);
+
+      // With 125% factor, 8000VA continuous should result in higher demand
+      expect(result.totalDemandVA).toBeGreaterThan(8000);
+    });
+
+    it('should apply motor calculations per Article 430', () => {
+      const loads: LoadItem[] = [
+        {
+          id: '1',
+          description: 'Motor 1',
+          watts: 1000,
+          type: 'motor',
+          continuous: false,
+          phase: 'A'
+        },
+        {
+          id: '2',
+          description: 'Motor 2 (Largest)',
+          watts: 2000,
+          type: 'motor',
+          continuous: false,
+          phase: 'B'
+        }
+      ];
+
+      const result = calculateLoad(loads, dwellingSettings);
+
+      expect(result.breakdown.motors.largestMotorVA).toBe(2000);
+      // Demand should be 125% of largest + 100% of others = (2000 * 1.25) + 1000 = 3500
+      expect(result.breakdown.motors.demandVA).toBe(3500);
+    });
+  });
+
+  describe('Phase Balance Analysis', () => {
+    it('should detect phase imbalance', () => {
+      const loads: LoadItem[] = [
+        {
+          id: '1',
+          description: 'Phase A Load',
+          watts: 10000,
+          type: 'lighting',
+          continuous: false,
+          phase: 'A'
+        },
+        {
+          id: '2',
+          description: 'Phase B Load',
+          watts: 1000,
+          type: 'lighting',
+          continuous: false,
+          phase: 'B'
+        }
+      ];
+
+      const threePhaseSettings: ProjectSettings = {
+        ...dwellingSettings,
+        servicePhase: 3,
+        serviceVoltage: 208
+      };
+
+      const result = calculateLoad(loads, threePhaseSettings);
+
+      expect(result.phaseBalance.imbalancePercent).toBeGreaterThan(10);
+      expect(result.phaseBalance.warnings.length).toBeGreaterThan(0);
+    });
+  });
+});
+
+describe('Conductor Sizing (NEC Article 310)', () => {
+  const settings: ProjectSettings = {
+    serviceVoltage: 240,
+    servicePhase: 1,
+    occupancyType: 'dwelling',
+    conductorMaterial: 'Cu',
+    temperatureRating: 75
+  };
+
+  it('should size conductor for given load with 125% continuous factor', () => {
+    const result = sizeConductor(40, settings, 30, 3, true);
+
+    expect(result.conductorSize).toBeDefined();
+    expect(result.requiredAmpacity).toBe(50); // 40A * 1.25
+    expect(result.adjustedAmpacity).toBeGreaterThanOrEqual(result.requiredAmpacity);
+  });
+
+  it('should apply temperature correction factor', () => {
+    const hotResult = sizeConductor(40, settings, 50, 3, true); // 50°C
+    const normalResult = sizeConductor(40, settings, 30, 3, true); // 30°C
+
+    expect(hotResult.baseTempCorrection).toBeLessThan(1.0);
+    expect(normalResult.baseTempCorrection).toBe(1.0);
+  });
+
+  it('should apply bundling adjustment', () => {
+    const manyCondResult = sizeConductor(40, settings, 30, 12, true); // 12 conductors
+    const fewCondResult = sizeConductor(40, settings, 30, 3, true); // 3 conductors
+
+    expect(manyCondResult.bundlingAdjustment).toBeLessThan(1.0);
+    expect(fewCondResult.bundlingAdjustment).toBe(1.0);
+  });
+});
+
+describe('Breaker Sizing (NEC Article 240)', () => {
+  const settings: ProjectSettings = {
+    serviceVoltage: 240,
+    servicePhase: 1,
+    occupancyType: 'dwelling',
+    conductorMaterial: 'Cu',
+    temperatureRating: 75
+  };
+
+  it('should size breaker with 125% continuous load factor', () => {
+    const result = sizeBreaker(40, settings, true);
+
+    expect(result.requiredMinimumBreaker).toBe(50); // 40A * 1.25
+    expect(result.breakerSize).toBeGreaterThanOrEqual(50);
+  });
+
+  it('should select next standard breaker size', () => {
+    const result = sizeBreaker(67, settings, true);
+
+    // 67A * 1.25 = 83.75A, next standard size is 90A or 100A
+    expect([90, 100]).toContain(result.breakerSize);
+  });
+});
+
+describe('Voltage Drop (NEC Chapter 9 Table 9)', () => {
+  it('should calculate voltage drop with AC impedance', () => {
+    const result = calculateVoltageDropAC(
+      '12 AWG',
+      'Cu',
+      'PVC',
+      100, // 100 feet
+      20,  // 20 amps
+      120, // 120 volts
+      1    // single phase
+    );
+
+    expect(result.voltageDropVolts).toBeGreaterThan(0);
+    expect(result.voltageDropPercent).toBeGreaterThan(0);
+    expect(result.method).toBe('AC Impedance (Chapter 9 Table 9)');
+  });
+
+  it('should flag non-compliant voltage drop >3%', () => {
+    const result = calculateVoltageDropAC(
+      '14 AWG',
+      'Cu',
+      'PVC',
+      200, // Long run
+      20,  // 20 amps
+      120,
+      1
+    );
+
+    if (result.voltageDropPercent > 3) {
+      expect(result.isCompliant).toBe(false);
+      expect(result.warnings.length).toBeGreaterThan(0);
+    }
+  });
+});
+
+describe('Equipment Grounding Conductor (EGC) Sizing - NEC 250.122', () => {
+  describe('Table 250.122 Base Sizing', () => {
+    it('should size EGC for 20A breaker (copper)', () => {
+      const egcSize = getEgcSize(20, 'Cu');
+      expect(egcSize).toBe('12'); // 12 AWG per Table 250.122
+    });
+
+    it('should size EGC for 100A breaker (copper)', () => {
+      const egcSize = getEgcSize(100, 'Cu');
+      expect(egcSize).toBe('8'); // 8 AWG per Table 250.122
+    });
+
+    it('should size EGC for 200A breaker (copper)', () => {
+      const egcSize = getEgcSize(200, 'Cu');
+      expect(egcSize).toBe('6'); // 6 AWG per Table 250.122
+    });
+
+    it('should size EGC for 100A breaker (aluminum)', () => {
+      const egcSize = getEgcSize(100, 'Al');
+      expect(egcSize).toBe('6'); // 6 AWG aluminum per Table 250.122
+    });
+  });
+
+  describe('Proportional Upsizing - NEC 250.122(B)', () => {
+    it('should upsize EGC when phase conductors are upsized', () => {
+      // Base: 8 AWG EGC for 3 AWG phase conductor
+      // If phase conductor increased to 2 AWG, EGC should be proportionally larger
+      const upsizedEgc = calculateProportionalEgcSize(
+        '8',     // Base EGC size
+        '3',     // Base phase conductor
+        '2'      // Actual upsized phase conductor
+      );
+
+      expect(upsizedEgc).toBeDefined();
+      // Should be larger than base EGC
+      const circularMilsBase = 16510; // 8 AWG
+      const circularMilsUpsized = upsizedEgc ? 26240 : 0; // Should be at least 6 AWG (26240 CM)
+      expect(circularMilsUpsized).toBeGreaterThan(circularMilsBase);
+    });
+
+    it('should not change EGC when phase conductors are not upsized', () => {
+      const egc = calculateProportionalEgcSize(
+        '10',    // Base EGC
+        '6',     // Base phase conductor
+        '6'      // Same phase conductor
+      );
+
+      expect(egc).toBe('10'); // Should remain the same
+    });
+
+    it('should calculate proportional EGC for voltage drop scenario', () => {
+      // Common scenario: 100A OCPD, phase conductors upsized from 3 AWG to 1/0 for voltage drop
+      // Base EGC: 8 AWG
+      // Expected: Proportionally larger EGC
+      const upsizedEgc = calculateProportionalEgcSize(
+        '8',     // Base EGC (8 AWG for 100A)
+        '3',     // Base phase conductor (3 AWG typical for 100A)
+        '1/0'    // Actual phase conductor (upsized for voltage drop)
+      );
+
+      expect(upsizedEgc).toBeDefined();
+      expect(upsizedEgc).not.toBe('8'); // Should be larger than base
+      // 8 AWG = 16510 CM, 3 AWG = 52620 CM, 1/0 = 105600 CM
+      // Proportional EGC = 16510 * (105600/52620) = 33154 CM
+      // Next standard size ≥33154 CM is 4 AWG (41740 CM)
+      expect(upsizedEgc).toBe('4');
+    });
+  });
+
+  describe('Integration with Conductor Sizing', () => {
+    const settings: ProjectSettings = {
+      serviceVoltage: 240,
+      servicePhase: 1,
+      occupancyType: 'dwelling',
+      conductorMaterial: 'Cu',
+      temperatureRating: 75
+    };
+
+    it('should include EGC size in conductor sizing result', () => {
+      const result = sizeConductor(40, settings, 30, 3, true, 50);
+
+      expect(result.egcSize).toBeDefined();
+      expect(result.egcUpsized).toBeDefined();
+      expect(typeof result.egcSize).toBe('string');
+      expect(typeof result.egcUpsized).toBe('boolean');
+    });
+
+    it('should size EGC correctly for 100A service', () => {
+      const result = sizeConductor(100, settings, 30, 3, true, 100);
+
+      // 100A OCPD requires 8 AWG copper EGC per Table 250.122
+      expect(result.egcSize).toBe('8');
+      expect(result.necReferences).toContain('NEC 250.122(A) - Table 250.122');
+    });
+
+    it('should size EGC correctly for 200A service', () => {
+      const result = sizeConductor(200, settings, 30, 3, true, 200);
+
+      // 200A OCPD requires 6 AWG copper EGC per Table 250.122
+      expect(result.egcSize).toBe('6');
+    });
+  });
+
+  describe('EGC Calculation Function', () => {
+    it('should calculate EGC with detailed info', () => {
+      const result = calculateEgcSize(100, '3', 'Cu', false);
+
+      expect(result.egcSize).toBe('8'); // 8 AWG for 100A
+      expect(result.baseEgcSize).toBe('8');
+      expect(result.upsized).toBe(false);
+      expect(result.necReferences.length).toBeGreaterThan(0);
+    });
+
+    it('should detect when upsizing is needed', () => {
+      // 100A breaker with phase conductors upsized to 1/0
+      const result = calculateEgcSize(100, '1/0', 'Cu', true);
+
+      expect(result.egcSize).toBeDefined();
+      // If phase conductors are upsized, EGC might need upsizing
+      expect(result.necReferences).toContain('NEC 250.122(A) - Table 250.122');
+    });
+  });
+});

@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { HashRouter, Routes, Route, Navigate, useParams } from 'react-router-dom';
+import { HashRouter, Routes, Route, Navigate, useParams, useNavigate } from 'react-router-dom';
 import { Layout } from './components/Layout';
 import { Dashboard } from './components/Dashboard';
 import { LoadCalculator } from './components/LoadCalculator';
@@ -16,65 +16,16 @@ import { IssuesLog } from './components/IssuesLog';
 import { Project, ProjectStatus, ProjectType } from './types';
 import { askNecAssistant } from './services/geminiService';
 import { Send, MessageSquare } from 'lucide-react';
+import { nanoid } from 'nanoid';
+import { useAuthContext } from './components/Auth/AuthProvider';
+import { Login } from './components/Auth/Login';
+import { Signup } from './components/Auth/Signup';
+import { ProtectedRoute } from './components/Auth/ProtectedRoute';
+import { useProjects } from './hooks/useProjects';
 
-// Mock Initial Data
-const INITIAL_PROJECTS: Project[] = [
-  {
-    id: '1',
-    name: 'Skyline Lofts Renovation',
-    address: '1200 Market St, San Francisco, CA',
-    type: ProjectType.RESIDENTIAL,
-    necEdition: '2023',
-    status: ProjectStatus.IN_PROGRESS,
-    progress: 45,
-    serviceVoltage: 240,
-    servicePhase: 1,
-    settings: {
-        serviceVoltage: 240,
-        servicePhase: 1,
-        conductorMaterial: 'Cu',
-        temperatureRating: 75
-    },
-    loads: [
-        { id: 'l1', description: 'General Lighting', watts: 3000, type: 'lighting', continuous: true, phase: 'A' },
-        { id: 'l2', description: 'Kitchen Appliances', watts: 4500, type: 'appliance', continuous: false, phase: 'B' },
-        { id: 'l3', description: 'HVAC Unit', watts: 5000, type: 'hvac', continuous: true, phase: 'A' }
-    ],
-    circuits: [
-        { id: 'c1', circuitNumber: 1, description: 'Lighting Zone A', breakerAmps: 15, pole: 1, loadWatts: 1200, conductorSize: '14 AWG' },
-        { id: 'c2', circuitNumber: 3, description: 'Kitchen Receptacles', breakerAmps: 20, pole: 1, loadWatts: 1500, conductorSize: '12 AWG' }
-    ],
-    issues: [
-        { id: 'i1', description: 'Missing AFCI protection in Bedroom 2', article: '210.12', status: 'Open', severity: 'Critical', assignedTo: 'John', createdAt: Date.now() }
-    ],
-    inspectionList: [],
-    grounding: { electrodes: ["Metal Underground Water Pipe"], gecSize: "6 AWG", bonding: ["Interior Water Piping"], notes: "" }
-  },
-  {
-    id: '2',
-    name: 'TechFlow Server Room',
-    address: '800 Innovation Dr, Austin, TX',
-    type: ProjectType.COMMERCIAL,
-    necEdition: '2023',
-    status: ProjectStatus.PLANNING,
-    progress: 15,
-    serviceVoltage: 208,
-    servicePhase: 3,
-    settings: {
-        serviceVoltage: 208,
-        servicePhase: 3,
-        conductorMaterial: 'Cu',
-        temperatureRating: 75
-    },
-    loads: [],
-    circuits: [],
-    issues: [],
-    inspectionList: [],
-    grounding: { electrodes: [], gecSize: "4 AWG", bonding: [], notes: "" }
-  }
-];
+// Note: Mock data removed - now using Supabase database
 
-const ProjectWrapper = ({ projects, updateProject, onSignOut }: { projects: Project[], updateProject: (p: Project) => void, onSignOut: () => void }) => {
+const ProjectWrapper = ({ projects, updateProject, deleteProject, onSignOut }: { projects: Project[], updateProject: (p: Project) => void, deleteProject: (id: string) => void, onSignOut: () => void }) => {
     const { id } = useParams();
     const project = projects.find(p => p.id === id);
 
@@ -83,7 +34,7 @@ const ProjectWrapper = ({ projects, updateProject, onSignOut }: { projects: Proj
     return (
         <Layout title={project.name} showBack onSignOut={onSignOut}>
             <Routes>
-                <Route path="/" element={<ProjectSetup project={project} updateProject={updateProject} />} />
+                <Route path="/" element={<ProjectSetup project={project} updateProject={updateProject} deleteProject={deleteProject} />} />
                 <Route path="/load-calc" element={<LoadCalculator project={project} updateProject={updateProject} />} />
                 <Route path="/circuits" element={<OneLineDiagram project={project} updateProject={updateProject} />} />
                 <Route path="/tools" element={<Calculators />} />
@@ -165,60 +116,110 @@ const NecAssistant = () => {
     );
 };
 
-export default function App() {
-  const [projects, setProjects] = useState<Project[]>(INITIAL_PROJECTS);
-  const [showLanding, setShowLanding] = useState(true);
+function AppContent() {
+  const navigate = useNavigate();
+  const { user, loading, signOut } = useAuthContext();
+  const { projects, createProject, updateProject: updateProjectDB, deleteProject, error: projectsError } = useProjects();
 
-  const createNewProject = () => {
-    const newProject: Project = {
-        id: Math.random().toString(36).substr(2, 9),
-        name: 'New Project ' + (projects.length + 1),
-        address: 'TBD',
-        type: ProjectType.RESIDENTIAL,
-        necEdition: '2023',
-        status: ProjectStatus.PLANNING,
-        progress: 0,
-        settings: { serviceVoltage: 120, servicePhase: 1, conductorMaterial: 'Cu', temperatureRating: 75 },
-        serviceVoltage: 120, // keep legacy for safety
-        servicePhase: 1, // keep legacy for safety
-        loads: [],
-        circuits: [],
-        issues: [],
-        inspectionList: [],
-        grounding: { electrodes: [], gecSize: '6 AWG', bonding: [], notes: '' }
+  const createNewProject = async () => {
+    const newProject: Partial<Project> = {
+      name: 'New Project ' + (projects.length + 1),
+      address: 'TBD',
+      type: ProjectType.RESIDENTIAL,
+      necEdition: '2023',
+      status: ProjectStatus.PLANNING,
+      progress: 0,
+      serviceVoltage: 120,
+      servicePhase: 1,
+      settings: { serviceVoltage: 120, servicePhase: 1, conductorMaterial: 'Cu', temperatureRating: 75 }
     };
-    setProjects([newProject, ...projects]);
+
+    const created = await createProject(newProject);
+
+    // Navigate to new project immediately
+    if (created) {
+      navigate(`/project/${created.id}`);
+    }
   };
 
-  const updateProject = (updated: Project) => {
-    setProjects(projects.map(p => p.id === updated.id ? updated : p));
+  const updateProject = async (updated: Project) => {
+    await updateProjectDB(updated);
   };
 
-  const handleSignOut = () => {
-    setShowLanding(true);
+  const handleDeleteProject = async (id: string) => {
+    if (confirm('Are you sure you want to delete this project? This action cannot be undone.')) {
+      await deleteProject(id);
+      // Navigate back to dashboard if we're on the deleted project
+      if (window.location.hash.includes(id)) {
+        navigate('/');
+      }
+    }
   };
 
-  if (showLanding) {
-    return <LandingPage onStart={() => setShowLanding(false)} />;
+  const handleSignOut = async () => {
+    await signOut();
+  };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-slate-50">
+        <div className="text-center">
+          <div className="w-16 h-16 border-4 border-electric border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+          <p className="text-slate-600">Loading...</p>
+        </div>
+      </div>
+    );
   }
 
   return (
-    <HashRouter>
+    <>
       <Routes>
+        {/* Landing page - shows only if not authenticated */}
         <Route path="/" element={
+          user ? (
             <Layout title="Dashboard" onSignOut={handleSignOut}>
-                <Dashboard projects={projects} createNewProject={createNewProject} />
+              {projectsError && (
+                <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg mb-4">
+                  <strong>Error:</strong> {projectsError}
+                  <p className="text-sm mt-1">Check browser console for details. Have you set up Supabase?</p>
+                </div>
+              )}
+              <Dashboard projects={projects} createNewProject={createNewProject} deleteProject={handleDeleteProject} />
             </Layout>
+          ) : (
+            <LandingPage />
+          )
         } />
+
+        {/* Authentication routes */}
+        <Route path="/login" element={
+          user ? <Navigate to="/" replace /> : <Login onSuccess={() => {}} />
+        } />
+        <Route path="/signup" element={
+          user ? <Navigate to="/" replace /> : <Signup onSuccess={() => {}} />
+        } />
+
+        {/* Protected project routes */}
         <Route path="/project/:id/*" element={
-            <ProjectWrapper 
-                projects={projects} 
-                updateProject={updateProject} 
-                onSignOut={handleSignOut} 
+          <ProtectedRoute>
+            <ProjectWrapper
+              projects={projects}
+              updateProject={updateProject}
+              deleteProject={handleDeleteProject}
+              onSignOut={handleSignOut}
             />
+          </ProtectedRoute>
         } />
       </Routes>
-      <NecAssistant />
+      {user && <NecAssistant />}
+    </>
+  );
+}
+
+export default function App() {
+  return (
+    <HashRouter>
+      <AppContent />
     </HashRouter>
   );
 }

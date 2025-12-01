@@ -1,21 +1,19 @@
 import React, { useState } from 'react';
-import { 
-  ArrowRight, 
-  Check, 
-  Bolt, 
-  ListChecks, 
-  ShieldCheck, 
-  FolderKanban, 
+import { useNavigate } from 'react-router-dom';
+import {
+  ArrowRight,
+  Check,
+  Bolt,
+  ListChecks,
+  ShieldCheck,
+  FolderKanban,
   ChevronDown,
   Menu,
   X
 } from 'lucide-react';
 
-interface LandingPageProps {
-  onStart: () => void;
-}
-
-export const LandingPage: React.FC<LandingPageProps> = ({ onStart }) => {
+export const LandingPage: React.FC = () => {
+  const navigate = useNavigate();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   const scrollTo = (id: string) => {
@@ -46,12 +44,18 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onStart }) => {
         </div>
 
         {/* Desktop CTA */}
-        <div className="hidden md:block">
-          <button 
-            onClick={onStart}
+        <div className="hidden md:flex items-center gap-3">
+          <button
+            onClick={() => navigate('/login')}
+            className="text-gray-600 hover:text-gray-900 px-4 py-2 text-sm font-medium transition-colors"
+          >
+            Sign In
+          </button>
+          <button
+            onClick={() => navigate('/signup')}
             className="bg-electric-400 hover:bg-electric-500 text-gray-900 px-5 py-2 text-sm font-medium rounded-sm transition-colors shadow-sm"
           >
-            Get Started
+            Sign Up
           </button>
         </div>
 
@@ -67,7 +71,8 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onStart }) => {
            <button onClick={() => scrollTo('features')} className="text-lg font-medium text-gray-900">Features</button>
            <button onClick={() => scrollTo('pricing')} className="text-lg font-medium text-gray-900">Pricing</button>
            <button onClick={() => scrollTo('faq')} className="text-lg font-medium text-gray-900">FAQ</button>
-           <button onClick={onStart} className="bg-electric-400 text-gray-900 py-3 rounded-sm font-bold text-center">Get Started</button>
+           <button onClick={() => navigate('/login')} className="border border-gray-200 text-gray-900 py-3 rounded-sm font-bold text-center">Sign In</button>
+           <button onClick={() => navigate('/signup')} className="bg-electric-400 text-gray-900 py-3 rounded-sm font-bold text-center">Sign Up</button>
         </div>
       )}
 
@@ -81,17 +86,17 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onStart }) => {
           The modern way to plan, verify, and document electrical installations. Get guided through every NEC step — from load calculations to inspection readiness.
         </p>
         <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
-          <button 
-            onClick={onStart}
+          <button
+            onClick={() => navigate('/signup')}
             className="w-full sm:w-auto bg-electric-400 hover:bg-electric-500 text-gray-900 px-8 py-4 text-base font-semibold rounded-sm shadow-lg shadow-electric-200 transition-all hover:-translate-y-1"
           >
-            Sign In
+            Get Started Free
           </button>
-          <button 
-            onClick={onStart}
+          <button
+            onClick={() => navigate('/login')}
             className="w-full sm:w-auto bg-white border border-gray-200 hover:border-gray-400 text-gray-900 px-8 py-4 text-base font-medium rounded-sm transition-all"
           >
-            Start Today
+            Sign In
           </button>
         </div>
       </section>
@@ -171,7 +176,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onStart }) => {
                   </li>
                 ))}
               </ul>
-              <button onClick={onStart} className="w-full bg-white text-gray-900 hover:bg-gray-100 py-3 rounded-sm font-semibold transition-colors">
+              <button onClick={() => navigate('/signup')} className="w-full bg-white text-gray-900 hover:bg-gray-100 py-3 rounded-sm font-semibold transition-colors">
                 Get Started
               </button>
             </div>
@@ -191,7 +196,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onStart }) => {
                   </li>
                 ))}
               </ul>
-              <button onClick={onStart} className="w-full bg-electric-400 hover:bg-electric-500 text-gray-900 py-3 rounded-sm font-semibold transition-colors">
+              <button onClick={() => navigate('/signup')} className="w-full bg-electric-400 hover:bg-electric-500 text-gray-900 py-3 rounded-sm font-semibold transition-colors">
                 Start Pro Trial
               </button>
             </div>

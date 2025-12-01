@@ -1,30 +1,76 @@
 
-import React from 'react';
+import React, { useState, useEffect, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Project, ProjectType, ProjectStatus } from '../types';
-import { Save, AlertTriangle, Building, Zap } from 'lucide-react';
+import { Save, AlertTriangle, Building, Zap, Trash2 } from 'lucide-react';
 
 interface ProjectSetupProps {
   project: Project;
   updateProject: (p: Project) => void;
+  deleteProject?: (id: string) => void;
 }
 
-export const ProjectSetup: React.FC<ProjectSetupProps> = ({ project, updateProject }) => {
-  
-  const handleSettingChange = (field: keyof typeof project.settings, value: any) => {
-    updateProject({
-      ...project,
+export const ProjectSetup: React.FC<ProjectSetupProps> = ({ project, updateProject, deleteProject }) => {
+  const navigate = useNavigate();
+
+  // Local state for immediate UI updates
+  const [localProject, setLocalProject] = useState<Project>(project);
+  const updateTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Sync local state when project prop changes from database
+  useEffect(() => {
+    setLocalProject(project);
+  }, [project.id]); // Only update when project ID changes, not on every prop update
+
+  // Debounced update to database (saves after 500ms of no typing)
+  const debouncedUpdate = (updatedProject: Project) => {
+    // Update local state immediately for responsive UI
+    setLocalProject(updatedProject);
+
+    // Clear existing timeout
+    if (updateTimeoutRef.current) {
+      clearTimeout(updateTimeoutRef.current);
+    }
+
+    // Set new timeout to save to database
+    updateTimeoutRef.current = setTimeout(() => {
+      updateProject(updatedProject);
+    }, 500);
+  };
+
+  // Cleanup timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (updateTimeoutRef.current) {
+        clearTimeout(updateTimeoutRef.current);
+      }
+    };
+  }, []);
+
+  const handleDelete = () => {
+    if (deleteProject && confirm('Are you sure you want to delete this project? All data will be permanently removed.')) {
+      deleteProject(localProject.id);
+      navigate('/');
+    }
+  };
+
+  const handleSettingChange = (field: keyof typeof localProject.settings, value: any) => {
+    const updated = {
+      ...localProject,
       settings: {
-        ...project.settings,
+        ...localProject.settings,
         [field]: value
       },
       // specific sync for top level props to maintain compatibility
-      serviceVoltage: field === 'serviceVoltage' ? value : project.serviceVoltage,
-      servicePhase: field === 'servicePhase' ? value : project.servicePhase
-    });
+      serviceVoltage: field === 'serviceVoltage' ? value : localProject.serviceVoltage,
+      servicePhase: field === 'servicePhase' ? value : localProject.servicePhase
+    };
+    debouncedUpdate(updated);
   };
 
   const handleMetaChange = (field: keyof Project, value: any) => {
-    updateProject({ ...project, [field]: value });
+    const updated = { ...localProject, [field]: value };
+    debouncedUpdate(updated);
   };
 
   return (
@@ -32,11 +78,16 @@ export const ProjectSetup: React.FC<ProjectSetupProps> = ({ project, updateProje
       <div className="flex justify-between items-center">
         <div>
           <h2 className="text-2xl font-light text-gray-900">Project Configuration</h2>
-          <p className="text-gray-500 mt-1">Define site parameters and electrical characteristics.</p>
+          <p className="text-gray-500 mt-1">Define site parameters and electrical characteristics. Changes save automatically.</p>
         </div>
-        <button className="bg-electric-400 hover:bg-electric-500 text-black px-6 py-2 rounded-md font-medium flex items-center gap-2 transition-colors">
-          <Save className="w-4 h-4" /> Save Changes
-        </button>
+        {deleteProject && (
+          <button
+            onClick={handleDelete}
+            className="border border-red-200 text-red-600 hover:bg-red-50 px-6 py-2 rounded-md font-medium flex items-center gap-2 transition-colors"
+          >
+            <Trash2 className="w-4 h-4" /> Delete Project
+          </button>
+        )}
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
@@ -49,18 +100,18 @@ export const ProjectSetup: React.FC<ProjectSetupProps> = ({ project, updateProje
           <div className="space-y-4">
             <div>
               <label className="block text-xs font-semibold text-gray-500 uppercase mb-1">Project Name</label>
-              <input 
-                type="text" 
-                value={project.name} 
+              <input
+                type="text"
+                value={localProject.name}
                 onChange={e => handleMetaChange('name', e.target.value)}
                 className="w-full border-gray-200 rounded-md text-sm focus:border-electric-500 focus:ring-electric-500"
               />
             </div>
             <div>
               <label className="block text-xs font-semibold text-gray-500 uppercase mb-1">Address</label>
-              <input 
-                type="text" 
-                value={project.address} 
+              <input
+                type="text"
+                value={localProject.address}
                 onChange={e => handleMetaChange('address', e.target.value)}
                 className="w-full border-gray-200 rounded-md text-sm focus:border-electric-500 focus:ring-electric-500"
               />
@@ -68,8 +119,8 @@ export const ProjectSetup: React.FC<ProjectSetupProps> = ({ project, updateProje
             <div className="grid grid-cols-2 gap-4">
                <div>
                 <label className="block text-xs font-semibold text-gray-500 uppercase mb-1">Building Type</label>
-                <select 
-                  value={project.type}
+                <select
+                  value={localProject.type}
                   onChange={e => handleMetaChange('type', e.target.value)}
                   className="w-full border-gray-200 rounded-md text-sm"
                 >
@@ -80,8 +131,8 @@ export const ProjectSetup: React.FC<ProjectSetupProps> = ({ project, updateProje
                </div>
                <div>
                 <label className="block text-xs font-semibold text-gray-500 uppercase mb-1">NEC Edition</label>
-                <select 
-                  value={project.necEdition}
+                <select
+                  value={localProject.necEdition}
                   onChange={e => handleMetaChange('necEdition', e.target.value)}
                   className="w-full border-gray-200 rounded-md text-sm"
                 >
@@ -93,9 +144,9 @@ export const ProjectSetup: React.FC<ProjectSetupProps> = ({ project, updateProje
             <div className="grid grid-cols-2 gap-4">
                <div>
                   <label className="block text-xs font-semibold text-gray-500 uppercase mb-1">Permit Number</label>
-                  <input 
-                    type="text" 
-                    value={project.settings.permitNumber || ''} 
+                  <input
+                    type="text"
+                    value={localProject.settings.permitNumber || ''}
                     onChange={e => handleSettingChange('permitNumber', e.target.value)}
                     className="w-full border-gray-200 rounded-md text-sm"
                     placeholder="Optional"
@@ -103,9 +154,9 @@ export const ProjectSetup: React.FC<ProjectSetupProps> = ({ project, updateProje
                </div>
                <div>
                   <label className="block text-xs font-semibold text-gray-500 uppercase mb-1">Utility Provider</label>
-                  <input 
-                    type="text" 
-                    value={project.settings.utilityProvider || ''} 
+                  <input
+                    type="text"
+                    value={localProject.settings.utilityProvider || ''}
                     onChange={e => handleSettingChange('utilityProvider', e.target.value)}
                     className="w-full border-gray-200 rounded-md text-sm"
                     placeholder="e.g. PG&E"
@@ -132,8 +183,8 @@ export const ProjectSetup: React.FC<ProjectSetupProps> = ({ project, updateProje
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <label className="block text-xs font-semibold text-gray-500 uppercase mb-1">Service Voltage</label>
-                <select 
-                  value={project.settings.serviceVoltage}
+                <select
+                  value={localProject.settings.serviceVoltage}
                   onChange={e => handleSettingChange('serviceVoltage', Number(e.target.value))}
                   className="w-full border-gray-200 rounded-md text-sm font-mono"
                 >
@@ -146,8 +197,8 @@ export const ProjectSetup: React.FC<ProjectSetupProps> = ({ project, updateProje
               </div>
               <div>
                 <label className="block text-xs font-semibold text-gray-500 uppercase mb-1">Phase</label>
-                <select 
-                  value={project.settings.servicePhase}
+                <select
+                  value={localProject.settings.servicePhase}
                   onChange={e => handleSettingChange('servicePhase', Number(e.target.value))}
                   className="w-full border-gray-200 rounded-md text-sm font-mono"
                 >
@@ -162,8 +213,8 @@ export const ProjectSetup: React.FC<ProjectSetupProps> = ({ project, updateProje
                <div className="grid grid-cols-2 gap-4">
                  <div>
                     <label className="block text-xs font-semibold text-gray-500 uppercase mb-1">Material</label>
-                    <select 
-                      value={project.settings.conductorMaterial}
+                    <select
+                      value={localProject.settings.conductorMaterial}
                       onChange={e => handleSettingChange('conductorMaterial', e.target.value)}
                       className="w-full border-gray-200 rounded-md text-sm"
                     >
@@ -173,8 +224,8 @@ export const ProjectSetup: React.FC<ProjectSetupProps> = ({ project, updateProje
                  </div>
                  <div>
                     <label className="block text-xs font-semibold text-gray-500 uppercase mb-1">Temp Rating</label>
-                    <select 
-                      value={project.settings.temperatureRating}
+                    <select
+                      value={localProject.settings.temperatureRating}
                       onChange={e => handleSettingChange('temperatureRating', Number(e.target.value))}
                       className="w-full border-gray-200 rounded-md text-sm"
                     >

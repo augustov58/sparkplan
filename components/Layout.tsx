@@ -1,13 +1,13 @@
 
 import React from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { 
-  LayoutGrid, 
-  Zap, 
-  CircuitBoard, 
-  ShieldCheck, 
-  FileText, 
-  Settings, 
+import {
+  LayoutGrid,
+  Zap,
+  CircuitBoard,
+  ShieldCheck,
+  FileText,
+  Settings,
   CheckSquare,
   Activity,
   ArrowLeft,
@@ -15,6 +15,7 @@ import {
   Calculator,
   AlertOctagon
 } from 'lucide-react';
+import { useAuthContext } from './Auth/AuthProvider';
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -51,6 +52,19 @@ const SidebarItem: React.FC<SidebarItemProps> = ({ icon: Icon, label, path, acti
 export const Layout: React.FC<LayoutProps> = ({ children, title, showBack, onSignOut }) => {
   const navigate = useNavigate();
   const location = useLocation();
+  const { user } = useAuthContext();
+
+  // Extract user initials from email
+  const getUserInitials = () => {
+    if (!user?.email) return '??';
+    const name = user.email.split('@')[0];
+    return name.slice(0, 2).toUpperCase();
+  };
+
+  const getUserDisplayName = () => {
+    if (!user?.email) return 'User';
+    return user.email.split('@')[0];
+  };
 
   // Extract Project ID if in project route
   const isProjectRoute = location.pathname.includes('/project/');
@@ -114,16 +128,16 @@ export const Layout: React.FC<LayoutProps> = ({ children, title, showBack, onSig
 
         <div className="p-4 border-t border-gray-50">
           <div className="flex items-center gap-3 mb-3">
-            <div className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center text-xs font-bold text-gray-500">
-              JS
+            <div className="w-8 h-8 rounded-full bg-electric-100 flex items-center justify-center text-xs font-bold text-electric-700">
+              {getUserInitials()}
             </div>
-            <div className="text-xs">
-              <p className="font-medium text-gray-900">John Smith</p>
-              <p className="text-gray-400">Master Electrician</p>
+            <div className="text-xs overflow-hidden">
+              <p className="font-medium text-gray-900 truncate">{getUserDisplayName()}</p>
+              <p className="text-gray-400 truncate">{user?.email || 'No email'}</p>
             </div>
           </div>
           {onSignOut && (
-            <button 
+            <button
               onClick={onSignOut}
               className="w-full flex items-center gap-2 px-3 py-2 text-xs font-medium text-gray-500 hover:text-red-600 hover:bg-red-50 rounded transition-colors"
             >

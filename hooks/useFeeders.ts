@@ -1,0 +1,192 @@
+/**
+ * useFeeders Custom Hook
+ * Manages feeder data with real-time Supabase subscriptions
+ * Provides CRUD operations for NEC Article 215 feeder sizing
+ */
+
+import { useState, useEffect } from 'react';
+import { supabase } from '../lib/supabaseClient';
+import type { Feeder } from '../types';
+
+export function useFeeders(projectId: string | undefined) {
+  const [feeders, setFeeders] = useState<Feeder[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  /**
+   * Fetch all feeders for a project
+   */
+  const fetchFeeders = async () => {
+    if (!projectId) {
+      setFeeders([]);
+      setLoading(false);
+      return;
+    }
+
+    try {
+      const { data, error } = await supabase
+        .from('feeders')
+        .select('*')
+        .eq('project_id', projectId)
+        .order('created_at', { ascending: true });
+
+      if (error) throw error;
+      setFeeders(data || []);
+      setError(null);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to fetch feeders';
+      setError(message);
+      console.error('Error fetching feeders:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  /**
+   * Set up real-time subscription and initial fetch
+   */
+  useEffect(() => {
+    fetchFeeders();
+
+    if (!projectId) return;
+
+    // Subscribe to real-time changes
+    const subscription = supabase
+      .channel(`feeders_${projectId}`)
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'feeders',
+        filter: `project_id=eq.${projectId}`
+      }, () => {
+        fetchFeeders();
+      })
+      .subscribe();
+
+    return () => {
+      subscription.unsubscribe();
+    };
+  }, [projectId]);
+
+  /**
+   * Create a new feeder
+   */
+  const createFeeder = async (feeder: Omit<Feeder, 'id' | 'created_at' | 'updated_at'>) => {
+    try {
+      const { data, error } = await supabase
+        .from('feeders')
+        .insert([feeder])
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      // Optimistic update
+      setFeeders(prev => [...prev, data]);
+      setError(null);
+      return data;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to create feeder';
+      setError(message);
+      console.error('Error creating feeder:', err);
+      throw err;
+    }
+  };
+
+  /**
+   * Update an existing feeder
+   */
+  const updateFeeder = async (id: string, updates: Partial<Feeder>) => {
+    try {
+      const { data, error } = await supabase
+        .from('feeders')
+        .update(updates)
+        .eq('id', id)
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      // Optimistic update
+      setFeeders(prev => prev.map(f => f.id === id ? { ...f, ...data } : f));
+      setError(null);
+      return data;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to update feeder';
+      setError(message);
+      console.error('Error updating feeder:', err);
+      throw err;
+    }
+  };
+
+  /**
+   * Delete a feeder
+   */
+  const deleteFeeder = async (id: string) => {
+    try {
+      const { error } = await supabase
+        .from('feeders')
+        .delete()
+        .eq('id', id);
+
+      if (error) throw error;
+
+      // Optimistic update
+      setFeeders(prev => prev.filter(f => f.id !== id));
+      setError(null);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to delete feeder';
+      setError(message);
+      console.error('Error deleting feeder:', err);
+      throw err;
+    }
+  };
+
+  /**
+   * Get a specific feeder by ID
+   */
+  const getFeederById = (id: string): Feeder | undefined => {
+    return feeders.find(f => f.id === id);
+  };
+
+  /**
+   * Get feeders by source panel
+   */
+  const getFeedersBySourcePanel = (panelId: string): Feeder[] => {
+    return feeders.filter(f => f.source_panel_id === panelId);
+  };
+
+  /**
+   * Get feeders by destination panel
+   */
+  const getFeedersByDestinationPanel = (panelId: string): Feeder[] => {
+    return feeders.filter(f => f.destination_panel_id === panelId);
+  };
+
+  /**
+   * Get feeder supplying a specific panel or transformer
+   */
+  const getSupplyingFeeder = (panelId?: string, transformerId?: string): Feeder | undefined => {
+    if (panelId) {
+      return feeders.find(f => f.destination_panel_id === panelId);
+    }
+    if (transformerId) {
+      return feeders.find(f => f.destination_transformer_id === transformerId);
+    }
+    return undefined;
+  };
+
+  return {
+    feeders,
+    loading,
+    error,
+    createFeeder,
+    updateFeeder,
+    deleteFeeder,
+    getFeederById,
+    getFeedersBySourcePanel,
+    getFeedersByDestinationPanel,
+    getSupplyingFeeder,
+    refetch: fetchFeeders
+  };
+}

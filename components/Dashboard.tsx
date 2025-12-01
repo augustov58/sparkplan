@@ -2,15 +2,21 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Project, ProjectStatus } from '../types';
-import { Plus, ChevronRight, AlertCircle, CheckCircle2, Clock, AlertTriangle } from 'lucide-react';
+import { Plus, ChevronRight, AlertCircle, CheckCircle2, Clock, AlertTriangle, Trash2 } from 'lucide-react';
 
 interface DashboardProps {
   projects: Project[];
   createNewProject: () => void;
+  deleteProject: (id: string) => void;
 }
 
-export const Dashboard: React.FC<DashboardProps> = ({ projects, createNewProject }) => {
+export const Dashboard: React.FC<DashboardProps> = ({ projects, createNewProject, deleteProject }) => {
   const navigate = useNavigate();
+
+  const handleDeleteClick = (e: React.MouseEvent, projectId: string) => {
+    e.stopPropagation(); // Prevent navigation to project
+    deleteProject(projectId);
+  };
 
   return (
     <div className="space-y-8 animate-in fade-in duration-500">
@@ -34,13 +40,22 @@ export const Dashboard: React.FC<DashboardProps> = ({ projects, createNewProject
             const criticalIssues = project.issues.filter(i => i.status === 'Open' && i.severity === 'Critical').length;
             
             return (
-              <div 
+              <div
                 key={project.id}
                 onClick={() => navigate(`/project/${project.id}`)}
                 className="group bg-white border border-gray-100 hover:border-electric-400 rounded-lg p-6 cursor-pointer transition-all hover:shadow-lg relative overflow-hidden"
               >
                 <div className="absolute top-0 left-0 w-full h-1 bg-gray-100 group-hover:bg-electric-400 transition-colors"></div>
-                
+
+                {/* Delete button */}
+                <button
+                  onClick={(e) => handleDeleteClick(e, project.id)}
+                  className="absolute top-4 right-4 p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-md transition-colors opacity-0 group-hover:opacity-100"
+                  title="Delete project"
+                >
+                  <Trash2 className="w-4 h-4" />
+                </button>
+
                 <div className="flex justify-between items-start mb-4">
                   <div>
                     <div className="flex gap-2 mb-1">
@@ -51,10 +66,10 @@ export const Dashboard: React.FC<DashboardProps> = ({ projects, createNewProject
                     <p className="text-sm text-gray-500 mt-1">{project.address}</p>
                   </div>
                   <div className={`p-2 rounded-full ${
-                    project.status === ProjectStatus.COMPLIANT ? 'bg-green-50 text-green-600' : 
+                    project.status === ProjectStatus.COMPLIANT ? 'bg-green-50 text-green-600' :
                     project.status === ProjectStatus.IN_PROGRESS ? 'bg-blue-50 text-blue-600' : 'bg-gray-50 text-gray-400'
                   }`}>
-                    {project.status === ProjectStatus.COMPLIANT ? <CheckCircle2 className="w-5 h-5" /> : 
+                    {project.status === ProjectStatus.COMPLIANT ? <CheckCircle2 className="w-5 h-5" /> :
                      project.status === ProjectStatus.IN_PROGRESS ? <Clock className="w-5 h-5" /> : <AlertCircle className="w-5 h-5" />}
                   </div>
                 </div>
