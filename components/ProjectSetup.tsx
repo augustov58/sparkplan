@@ -3,6 +3,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Project, ProjectType, ProjectStatus } from '../types';
 import { Save, AlertTriangle, Building, Zap, Trash2 } from 'lucide-react';
+import { usePanels } from '../hooks/usePanels';
 
 interface ProjectSetupProps {
   project: Project;
@@ -12,6 +13,7 @@ interface ProjectSetupProps {
 
 export const ProjectSetup: React.FC<ProjectSetupProps> = ({ project, updateProject, deleteProject }) => {
   const navigate = useNavigate();
+  const { panels, updatePanel } = usePanels(project.id);
 
   // Local state for immediate UI updates
   const [localProject, setLocalProject] = useState<Project>(project);
@@ -66,6 +68,44 @@ export const ProjectSetup: React.FC<ProjectSetupProps> = ({ project, updateProje
       servicePhase: field === 'servicePhase' ? value : localProject.servicePhase
     };
     debouncedUpdate(updated);
+  };
+
+  // Handle system type selection (voltage + phase together)
+  const handleSystemTypeChange = async (systemType: string) => {
+    const systemConfigs: Record<string, { voltage: number; phase: 1 | 3 }> = {
+      '120/240-1': { voltage: 240, phase: 1 },
+      '120/208-3': { voltage: 208, phase: 3 },
+      '277/480-3': { voltage: 480, phase: 3 }
+    };
+
+    const config = systemConfigs[systemType];
+    if (!config) return;
+
+    const updated = {
+      ...localProject,
+      settings: {
+        ...localProject.settings,
+        serviceVoltage: config.voltage,
+        servicePhase: config.phase
+      },
+      // Sync top-level props
+      serviceVoltage: config.voltage,
+      servicePhase: config.phase
+    };
+    debouncedUpdate(updated);
+
+    // Update MDP (Main Distribution Panel) to match new service characteristics
+    const mdp = panels.find(panel => panel.is_main === true);
+    if (mdp && updatePanel) {
+      try {
+        await updatePanel(mdp.id, {
+          voltage: config.voltage,
+          phase: config.phase
+        });
+      } catch (error) {
+        console.error('Error updating MDP voltage:', error);
+      }
+    }
   };
 
   const handleMetaChange = (field: keyof Project, value: any) => {
@@ -180,32 +220,27 @@ export const ProjectSetup: React.FC<ProjectSetupProps> = ({ project, updateProje
           </div>
 
           <div className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="block text-xs font-semibold text-gray-500 uppercase mb-1">Service Voltage</label>
-                <select
-                  value={localProject.settings.serviceVoltage}
-                  onChange={e => handleSettingChange('serviceVoltage', Number(e.target.value))}
-                  className="w-full border-gray-200 rounded-md text-sm font-mono"
-                >
-                  <option value={120}>120V</option>
-                  <option value={208}>208V</option>
-                  <option value={240}>240V</option>
-                  <option value={277}>277V</option>
-                  <option value={480}>480V</option>
-                </select>
-              </div>
-              <div>
-                <label className="block text-xs font-semibold text-gray-500 uppercase mb-1">Phase</label>
-                <select
-                  value={localProject.settings.servicePhase}
-                  onChange={e => handleSettingChange('servicePhase', Number(e.target.value))}
-                  className="w-full border-gray-200 rounded-md text-sm font-mono"
-                >
-                  <option value={1}>Single-Phase (1Φ)</option>
-                  <option value={3}>Three-Phase (3Φ)</option>
-                </select>
-              </div>
+            <div>
+              <label className="block text-xs font-semibold text-gray-500 uppercase mb-1">Electrical System Type</label>
+              <select
+                value={(() => {
+                  const v = localProject.settings.serviceVoltage;
+                  const p = localProject.settings.servicePhase;
+                  if (v === 240 && p === 1) return '120/240-1';
+                  if (v === 208 && p === 3) return '120/208-3';
+                  if (v === 480 && p === 3) return '277/480-3';
+                  return '120/240-1'; // Default
+                })()}
+                onChange={e => handleSystemTypeChange(e.target.value)}
+                className="w-full border-gray-200 rounded-md text-sm font-mono"
+              >
+                <option value="120/240-1">120/240V Single-Phase (Residential)</option>
+                <option value="120/208-3">120/208V Three-Phase (Commercial)</option>
+                <option value="277/480-3">277/480V Three-Phase (Industrial)</option>
+              </select>
+              <p className="text-xs text-gray-500 mt-1">
+                Common electrical system configurations per NEC standards
+              </p>
             </div>
 
             <div className="pt-4 border-t border-gray-50">

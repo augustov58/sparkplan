@@ -3,6 +3,7 @@ import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Project, ProjectStatus } from '../types';
 import { Plus, ChevronRight, AlertCircle, CheckCircle2, Clock, AlertTriangle, Trash2 } from 'lucide-react';
+import { useAuth } from '../hooks/useAuth';
 
 interface DashboardProps {
   projects: Project[];
@@ -12,6 +13,19 @@ interface DashboardProps {
 
 export const Dashboard: React.FC<DashboardProps> = ({ projects, createNewProject, deleteProject }) => {
   const navigate = useNavigate();
+  const { user } = useAuth();
+
+  // Get user's display name from metadata or email
+  const getUserName = () => {
+    if (user?.user_metadata?.full_name) {
+      return user.user_metadata.full_name;
+    }
+    if (user?.email) {
+      // Extract first part of email before @
+      return user.email.split('@')[0];
+    }
+    return 'there';
+  };
 
   const handleDeleteClick = (e: React.MouseEvent, projectId: string) => {
     e.stopPropagation(); // Prevent navigation to project
@@ -22,7 +36,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ projects, createNewProject
     <div className="space-y-8 animate-in fade-in duration-500">
       <div className="flex justify-between items-end">
         <div>
-          <h2 className="text-2xl font-light text-gray-900">Welcome back, John</h2>
+          <h2 className="text-2xl font-light text-gray-900">Welcome back, {getUserName()}</h2>
           <p className="text-gray-500 mt-1">You have <span className="font-medium text-electric-600">{projects.length} active projects</span> requiring NEC compliance review.</p>
         </div>
         <button 

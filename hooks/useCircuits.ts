@@ -78,9 +78,29 @@ export function useCircuits(projectId: string | undefined): UseCircuitsReturn {
 
   const createCircuit = async (circuit: Omit<CircuitInsert, 'id'>): Promise<Circuit | null> => {
     try {
+      // OPTIMISTIC UPDATE: Add circuit to local state immediately
+      const tempId = `temp-${Date.now()}-${Math.random()}`;
+      const optimisticCircuit: Circuit = {
+        id: tempId,
+        created_at: new Date().toISOString(),
+        ...circuit,
+      } as Circuit;
+
+      // Add to local state before database insert
+      setCircuits(prev => [...prev, optimisticCircuit]);
+
+      // Insert to database
       const { data, error } = await supabase.from('circuits').insert(circuit).select().single();
 
-      if (error) throw error;
+      if (error) {
+        // ROLLBACK: Remove optimistic circuit on error
+        setCircuits(prev => prev.filter(c => c.id !== tempId));
+        throw error;
+      }
+
+      // REPLACE: Replace temp circuit with real one from database
+      setCircuits(prev => prev.map(c => c.id === tempId ? data : c));
+
       return data;
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to create circuit');
@@ -90,9 +110,18 @@ export function useCircuits(projectId: string | undefined): UseCircuitsReturn {
 
   const updateCircuit = async (id: string, updates: CircuitUpdate) => {
     try {
+      // OPTIMISTIC UPDATE: Update local state immediately
+      const previousCircuits = [...circuits];
+      setCircuits(prev => prev.map(c => c.id === id ? { ...c, ...updates } : c));
+
+      // Update in database
       const { error } = await supabase.from('circuits').update(updates).eq('id', id);
 
-      if (error) throw error;
+      if (error) {
+        // ROLLBACK: Restore previous state on error
+        setCircuits(previousCircuits);
+        throw error;
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to update circuit');
     }
@@ -100,9 +129,18 @@ export function useCircuits(projectId: string | undefined): UseCircuitsReturn {
 
   const deleteCircuit = async (id: string) => {
     try {
+      // OPTIMISTIC UPDATE: Remove from local state immediately
+      const previousCircuits = [...circuits];
+      setCircuits(prev => prev.filter(c => c.id !== id));
+
+      // Delete from database
       const { error } = await supabase.from('circuits').delete().eq('id', id);
 
-      if (error) throw error;
+      if (error) {
+        // ROLLBACK: Restore previous state on error
+        setCircuits(previousCircuits);
+        throw error;
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to delete circuit');
     }

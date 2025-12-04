@@ -1,12 +1,19 @@
 
 import React, { useState } from 'react';
-import { Calculator, ArrowRight, CheckCircle, XCircle, AlertTriangle } from 'lucide-react';
+import { Calculator, ArrowRight, CheckCircle, XCircle, AlertTriangle, Zap } from 'lucide-react';
 import { calculateVoltageDropAC, compareVoltageDropMethods, VoltageDropResult } from '../services/calculations';
 import { ConductorSizingTool } from './ConductorSizingTool';
 import { ProjectSettings } from '../types';
+import {
+  analyzeSystemFaultCurrents,
+  calculateServiceFaultCurrent,
+  calculateDownstreamFaultCurrent,
+  estimateUtilityTransformer,
+  STANDARD_AIC_RATINGS
+} from '../services/calculations/shortCircuit';
 
 export const Calculators: React.FC = () => {
-  const [activeTab, setActiveTab] = useState<'voltage-drop' | 'conduit-fill' | 'conductor-sizing'>('voltage-drop');
+  const [activeTab, setActiveTab] = useState<'voltage-drop' | 'conduit-fill' | 'conductor-sizing' | 'short-circuit'>('voltage-drop');
 
   // Default project settings for calculator mode
   const defaultSettings: ProjectSettings = {
@@ -43,12 +50,19 @@ export const Calculators: React.FC = () => {
         >
           Conduit Fill (Chapter 9)
         </button>
+        <button
+          onClick={() => setActiveTab('short-circuit')}
+          className={`px-6 py-3 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${activeTab === 'short-circuit' ? 'border-electric-500 text-gray-900' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
+        >
+          Short Circuit (NEC 110.9)
+        </button>
       </div>
 
       <div className="bg-white border border-gray-100 rounded-lg p-6 shadow-sm min-h-[400px]">
         {activeTab === 'voltage-drop' && <VoltageDropCalculator />}
         {activeTab === 'conductor-sizing' && <ConductorSizingTool projectSettings={defaultSettings} />}
         {activeTab === 'conduit-fill' && <ConduitFillCalculator />}
+        {activeTab === 'short-circuit' && <ShortCircuitCalculator />}
       </div>
     </div>
   );
@@ -362,4 +376,353 @@ const ConduitFillCalculator: React.FC = () => {
             </div>
         </div>
     );
-}
+};
+
+const ShortCircuitCalculator: React.FC = () => {
+  const [mode, setMode] = useState<'service' | 'panel'>('service');
+
+  // Service calculation inputs
+  const [serviceAmps, setServiceAmps] = useState(200);
+  const [serviceVoltage, setServiceVoltage] = useState(240);
+  const [servicePhase, setServicePhase] = useState<1 | 3>(1);
+  const [transformerKVA, setTransformerKVA] = useState<number | null>(null);
+  const [transformerImpedance, setTransformerImpedance] = useState(2.5);
+
+  // Panel/downstream calculation inputs
+  const [sourceFaultCurrent, setSourceFaultCurrent] = useState(10000);
+  const [feederLength, setFeederLength] = useState(50);
+  const [feederSize, setFeederSize] = useState('3/0 AWG');
+  const [feederVoltage, setFeederVoltage] = useState(240);
+  const [feederPhase, setFeederPhase] = useState<1 | 3>(1);
+
+  // Calculate results
+  let serviceResult = null;
+  let panelResult = null;
+
+  try {
+    if (mode === 'service') {
+      // Estimate or use specified transformer
+      const transformer = transformerKVA !== null
+        ? {
+            kva: transformerKVA,
+            primaryVoltage: servicePhase === 3 ? 12470 : 7200,
+            secondaryVoltage: serviceVoltage,
+            impedance: transformerImpedance
+          }
+        : estimateUtilityTransformer(serviceAmps, serviceVoltage, servicePhase);
+
+      serviceResult = calculateServiceFaultCurrent(transformer, serviceVoltage, servicePhase);
+    } else {
+      // Downstream panel calculation
+      panelResult = calculateDownstreamFaultCurrent(
+        {
+          length: feederLength,
+          conductorSize: feederSize,
+          material: 'Cu',
+          conduitType: 'Steel',
+          voltage: feederVoltage,
+          phase: feederPhase
+        },
+        sourceFaultCurrent
+      );
+    }
+  } catch (error) {
+    console.error('Short circuit calculation error:', error);
+  }
+
+  const result = mode === 'service' ? serviceResult : panelResult;
+
+  return (
+    <div className="space-y-6">
+      {/* Mode Selector */}
+      <div className="flex gap-2 bg-gray-100 p-1 rounded-lg w-fit">
+        <button
+          onClick={() => setMode('service')}
+          className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+            mode === 'service'
+              ? 'bg-white text-gray-900 shadow-sm'
+              : 'text-gray-600 hover:text-gray-900'
+          }`}
+        >
+          Service Entrance
+        </button>
+        <button
+          onClick={() => setMode('panel')}
+          className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+            mode === 'panel'
+              ? 'bg-white text-gray-900 shadow-sm'
+              : 'text-gray-600 hover:text-gray-900'
+          }`}
+        >
+          Downstream Panel
+        </button>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-12">
+        {/* Input Section */}
+        <div className="space-y-4">
+          <h3 className="font-bold text-gray-900">
+            {mode === 'service' ? 'Service Parameters' : 'Feeder Parameters'}
+          </h3>
+
+          {mode === 'service' ? (
+            <>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="label-xs">Service Amps</label>
+                  <input
+                    type="number"
+                    value={serviceAmps}
+                    onChange={(e) => setServiceAmps(Number(e.target.value))}
+                    className="input-std"
+                  />
+                </div>
+                <div>
+                  <label className="label-xs">Service Voltage</label>
+                  <select
+                    value={serviceVoltage}
+                    onChange={(e) => setServiceVoltage(Number(e.target.value))}
+                    className="input-std"
+                  >
+                    <option value={120}>120V</option>
+                    <option value={240}>240V</option>
+                    <option value={208}>208V</option>
+                    <option value={480}>480V</option>
+                  </select>
+                </div>
+                <div className="col-span-2">
+                  <label className="label-xs">Service Phase</label>
+                  <select
+                    value={servicePhase}
+                    onChange={(e) => setServicePhase(Number(e.target.value) as 1 | 3)}
+                    className="input-std"
+                  >
+                    <option value={1}>Single Phase</option>
+                    <option value={3}>Three Phase</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="pt-4 border-t border-gray-200">
+                <h4 className="text-xs font-bold text-gray-700 mb-3">Utility Transformer (Optional)</h4>
+                <p className="text-xs text-gray-500 mb-3">
+                  Leave blank to auto-estimate based on service size
+                </p>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="label-xs">Transformer kVA</label>
+                    <input
+                      type="number"
+                      value={transformerKVA || ''}
+                      onChange={(e) => setTransformerKVA(e.target.value ? Number(e.target.value) : null)}
+                      placeholder="Auto"
+                      className="input-std"
+                    />
+                  </div>
+                  <div>
+                    <label className="label-xs">Impedance (%)</label>
+                    <input
+                      type="number"
+                      step="0.1"
+                      value={transformerImpedance}
+                      onChange={(e) => setTransformerImpedance(Number(e.target.value))}
+                      className="input-std"
+                    />
+                  </div>
+                </div>
+                <p className="text-xs text-gray-400 mt-2">
+                  Typical: 2.5% (1φ), 5.75% (3φ)
+                </p>
+              </div>
+            </>
+          ) : (
+            <>
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
+                <div className="flex items-start gap-2">
+                  <AlertTriangle className="w-4 h-4 text-blue-700 flex-shrink-0 mt-0.5" />
+                  <div className="text-xs text-blue-700">
+                    <strong>Point-to-Point Method:</strong> Calculate fault current at downstream panel by accounting for conductor impedance from source.
+                  </div>
+                </div>
+              </div>
+
+              <div className="space-y-4">
+                <div>
+                  <label className="label-xs">Source Fault Current (A)</label>
+                  <input
+                    type="number"
+                    value={sourceFaultCurrent}
+                    onChange={(e) => setSourceFaultCurrent(Number(e.target.value))}
+                    className="input-std"
+                  />
+                  <p className="text-xs text-gray-400 mt-1">
+                    Available fault current at upstream panel/service
+                  </p>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="label-xs">Feeder Length (ft)</label>
+                    <input
+                      type="number"
+                      value={feederLength}
+                      onChange={(e) => setFeederLength(Number(e.target.value))}
+                      className="input-std"
+                    />
+                  </div>
+                  <div>
+                    <label className="label-xs">Conductor Size</label>
+                    <select
+                      value={feederSize}
+                      onChange={(e) => setFeederSize(e.target.value)}
+                      className="input-std"
+                    >
+                      <option value="12 AWG">12 AWG</option>
+                      <option value="10 AWG">10 AWG</option>
+                      <option value="8 AWG">8 AWG</option>
+                      <option value="6 AWG">6 AWG</option>
+                      <option value="4 AWG">4 AWG</option>
+                      <option value="3 AWG">3 AWG</option>
+                      <option value="2 AWG">2 AWG</option>
+                      <option value="1 AWG">1 AWG</option>
+                      <option value="1/0 AWG">1/0 AWG</option>
+                      <option value="2/0 AWG">2/0 AWG</option>
+                      <option value="3/0 AWG">3/0 AWG</option>
+                      <option value="4/0 AWG">4/0 AWG</option>
+                      <option value="250 kcmil">250 kcmil</option>
+                      <option value="300 kcmil">300 kcmil</option>
+                      <option value="350 kcmil">350 kcmil</option>
+                      <option value="500 kcmil">500 kcmil</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="label-xs">Voltage (V)</label>
+                    <select
+                      value={feederVoltage}
+                      onChange={(e) => setFeederVoltage(Number(e.target.value))}
+                      className="input-std"
+                    >
+                      <option value={120}>120V</option>
+                      <option value={240}>240V</option>
+                      <option value={208}>208V</option>
+                      <option value={480}>480V</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="label-xs">Phase</label>
+                    <select
+                      value={feederPhase}
+                      onChange={(e) => setFeederPhase(Number(e.target.value) as 1 | 3)}
+                      className="input-std"
+                    >
+                      <option value={1}>Single Phase</option>
+                      <option value={3}>Three Phase</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+            </>
+          )}
+        </div>
+
+        {/* Results Section */}
+        {result && (
+          <div className="bg-gray-50 rounded-lg p-8 flex flex-col justify-center">
+            <div className="text-center mb-6">
+              <div className="mb-2 text-sm text-gray-500 uppercase tracking-wide">
+                {mode === 'service' ? 'Service Fault Current' : 'Panel Fault Current'}
+              </div>
+              <div className="text-5xl font-light text-gray-900 mb-2">
+                {(result.faultCurrent / 1000).toFixed(1)} kA
+              </div>
+              <div className="text-xl text-gray-600 mb-4">
+                {result.faultCurrent.toLocaleString()} A RMS
+              </div>
+
+              <div className="flex justify-center mb-4">
+                <div className="flex items-center gap-2 text-orange-700 bg-orange-100 px-4 py-2 rounded-full text-sm font-bold">
+                  <Zap className="w-4 h-4" />
+                  Required AIC: {result.requiredAIC} kA
+                </div>
+              </div>
+
+              {/* Compliance Status */}
+              <div className={`text-sm px-4 py-3 rounded-lg border ${
+                result.compliance.compliant
+                  ? 'bg-green-50 border-green-200 text-green-800'
+                  : 'bg-red-50 border-red-200 text-red-800'
+              }`}>
+                <div className="font-semibold mb-1">{result.compliance.necArticle}</div>
+                <div className="text-xs">{result.compliance.message}</div>
+              </div>
+            </div>
+
+            {/* Calculation Details */}
+            <div className="text-xs text-gray-600 space-y-2 bg-white p-4 rounded border border-gray-200">
+              <div className="font-bold text-gray-700 mb-2">Calculation Details</div>
+              <div className="grid grid-cols-2 gap-2">
+                <span className="text-gray-500">Source If:</span>
+                <span className="font-mono text-right">{result.details.sourceFaultCurrent.toLocaleString()} A</span>
+
+                {mode === 'panel' && (
+                  <>
+                    <span className="text-gray-500">Conductor Z:</span>
+                    <span className="font-mono text-right">{result.details.conductorImpedance.toFixed(4)} Ω</span>
+                  </>
+                )}
+
+                <span className="text-gray-500">Total Z:</span>
+                <span className="font-mono text-right">{result.details.totalImpedance.toFixed(4)} Ω</span>
+
+                <span className="text-gray-500">Safety Factor:</span>
+                <span className="font-mono text-right">{result.details.safetyFactor}×</span>
+              </div>
+
+              <div className="text-gray-500 mt-3 pt-3 border-t border-gray-200 text-xs">
+                <strong>Standard AIC Ratings:</strong> {STANDARD_AIC_RATINGS.join(', ')} kA
+              </div>
+            </div>
+
+            {/* Important Notes */}
+            <div className="mt-4 bg-yellow-50 border border-yellow-200 rounded-lg p-3">
+              <div className="flex items-start gap-2">
+                <AlertTriangle className="w-4 h-4 text-yellow-700 flex-shrink-0 mt-0.5" />
+                <div className="text-xs text-yellow-800">
+                  <strong>Important:</strong> Verify actual utility fault current with local utility company. This calculator provides estimates for preliminary design only.
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Educational Information */}
+      <div className="bg-blue-50 border border-blue-200 rounded-lg p-6">
+        <h4 className="font-bold text-gray-900 mb-3 flex items-center gap-2">
+          <Calculator className="w-4 h-4" />
+          Understanding Short Circuit Calculations
+        </h4>
+        <div className="text-sm text-gray-700 space-y-3">
+          <p>
+            <strong>NEC 110.9 Interrupting Rating:</strong> Equipment must have adequate interrupting capacity (AIC) to safely interrupt fault currents. Undersized equipment can fail catastrophically during fault conditions.
+          </p>
+          <p>
+            <strong>Service Entrance:</strong> Fault current is highest at the service entrance, limited only by utility transformer impedance. Typical residential services: 10-22 kA. Commercial/industrial: 22-65 kA.
+          </p>
+          <p>
+            <strong>Downstream Panels:</strong> Fault current decreases with distance due to conductor impedance. Longer feeders and smaller conductors reduce available fault current.
+          </p>
+          <p>
+            <strong>Standard Breaker AIC Ratings:</strong>
+          </p>
+          <ul className="list-disc list-inside ml-4 space-y-1">
+            <li><strong>10 kA:</strong> Residential panels (standard)</li>
+            <li><strong>14 kA:</strong> Residential panels (enhanced)</li>
+            <li><strong>22 kA:</strong> Commercial panels (standard)</li>
+            <li><strong>42-65 kA:</strong> Industrial/high fault current applications</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  );
+};

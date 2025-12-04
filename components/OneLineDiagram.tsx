@@ -1,10 +1,139 @@
+/**
+ * One-Line Electrical Diagram Component
+ *
+ * Renders IEEE Std 315 compliant one-line diagram showing electrical system hierarchy
+ * from utility service entrance through transformers and panels.
+ *
+ * @module components/OneLineDiagram
+ *
+ * ## Architecture Decision (ADR-006)
+ *
+ * This component is **intentionally a 1614-line monolith** (see ADR-006).
+ * Splitting would introduce props drilling nightmare and make debugging harder.
+ *
+ * **Key Design Principles**:
+ * 1. **Tight coupling justified**: SVG rendering logic inseparable from hierarchy traversal
+ * 2. **All logic in one place**: Easier debugging of complex electrical relationships
+ * 3. **Performance**: Single React component = single reconciliation pass
+ *
+ * ## Rendering System
+ *
+ * ### Coordinate System (Y-axis hierarchy, top to bottom)
+ *
+ * ```
+ * Y=50    ┌──────────┐  Utility Service Entrance (circle symbol)
+ * Y=90    │  Meter   │  Service metering point
+ * Y=170   │   MDP    │  Main Distribution Panel (red border)
+ * Y=250   ═══════════  MDP Bus Bar (4px thick horizontal line)
+ * Y=320   │ Panel │ │Transformer│  Level 1: Fed from MDP
+ * Y=390   ═════════════  Level 1 Bus Bar (if 2+ downstream)
+ * Y=450   │ Panel │     Level 2: Fed from Level 1 panels
+ * Y=525   ═════════     Level 2 Bus Bar
+ * Y=580   │ Panel │     Level 3: Fed from Level 2 transformers
+ * ```
+ *
+ * **X-axis (horizontal)**: Elements spread around parent X coordinate
+ * - Service entrance: X=400 (center of viewBox 0 0 800 750)
+ * - Downstream elements: `parentX + (index - count/2) * spacing`
+ *
+ * ### Bus Bar Rendering (IEEE Std 315)
+ *
+ * **Decision Tree**:
+ * - **0 downstream elements**: No line
+ * - **1 downstream element**: Direct vertical line (2px)
+ * - **2+ downstream elements**: Horizontal bus bar (4px) + vertical drops (2px)
+ *
+ * **Example**:
+ * ```
+ * MDP (X=400)
+ *   │ (vertical feeder)
+ * ══┼══ (horizontal bus, Y=250)
+ *  │ │ │ (vertical drops)
+ * P1 P2 P3 (panels at Y=320, X=310, 400, 490)
+ * ```
+ *
+ * ### Color Coding
+ * - **Red (#DC2626)**: Main Distribution Panel (MDP)
+ * - **Blue (#3B82F6)**: Standard panels
+ * - **Orange (#F59E0B)**: Transformers
+ * - **Gray (#4B5563)**: Panel-fed connections
+ * - **Orange (#F59E0B)**: Transformer-fed connections
+ *
+ * ## Hierarchy Traversal
+ *
+ * **Algorithm**: Recursive depth-first rendering
+ *
+ * 1. **Render static elements** (Utility, Meter, MDP)
+ * 2. **Find Level 1 elements** (panels/transformers fed from MDP)
+ * 3. **For each Level 1 panel**:
+ *    - Render panel at Y=320
+ *    - Find downstream panels/transformers
+ *    - Render bus bar if 2+ downstream
+ *    - **Recursively render Level 2** (Y=450)
+ * 4. **For each Level 1 transformer**:
+ *    - Render transformer at Y=320
+ *    - Find panels fed from transformer
+ *    - Render bus bar if 2+ panels
+ *    - Render Level 3 panels (Y=580)
+ *
+ * **Performance**: O(n) where n = panels + transformers (single pass)
+ *
+ * ## Key Helper Functions
+ *
+ * - `DIAGRAM_CONSTANTS` (line 549): All coordinate constants in one place
+ * - `renderBusBar()` (line 587): Renders horizontal bus + vertical drops
+ * - `getDownstreamElements()` (line 1055): Finds panels/transformers fed from panel
+ *
+ * ## State Management
+ *
+ * **Data sources**: usePanels(), useCircuits(), useTransformers() hooks
+ * - Real-time subscriptions keep diagram synchronized across tabs
+ * - Optimistic updates for instant UI feedback
+ *
+ * **Local state**: Form data for creating panels/circuits/transformers
+ *
+ * ## IEEE Std 315 Compliance
+ *
+ * - **Symbols**: Circle (utility), Rectangle (panel), Trapezoid (transformer)
+ * - **Line weights**: Bus bars 4px, feeders 2px
+ * - **Horizontal buses**: Industry standard for distribution points
+ *
+ * ## Known Limitations
+ *
+ * 1. **Fixed viewBox height (750px)**: Systems >5 levels may render off-screen
+ * 2. **Horizontal crowding**: 10+ panels at one level may overlap text
+ * 3. **No collision detection**: Manual spacing only
+ *
+ * ## Future Enhancements (Not Implemented)
+ *
+ * - [ ] Dynamic viewBox sizing based on hierarchy depth
+ * - [ ] Pan/zoom for large systems
+ * - [ ] Collapsible branches (click to expand/collapse)
+ * - [ ] Export to PDF/SVG
+ *
+ * @see {@link /docs/adr/006-one-line-diagram-monolith.md} - Justification for monolith
+ * @see {@link /CASCADING_HIERARCHY_FIX.md} - Bus bar implementation details
+ */
+
 import React, { useState, useEffect } from 'react';
 import { Project, PanelCircuit } from '../types';
 import { generateOneLineDescription } from '../services/geminiService';
-import { RefreshCcw, Download, Zap, Plus, Trash2, Grid, Bolt } from 'lucide-react';
+import { RefreshCcw, Download, Zap, Plus, Trash2, Grid, Bolt, List } from 'lucide-react';
 import { useCircuits } from '../hooks/useCircuits';
 import { usePanels } from '../hooks/usePanels';
 import { useTransformers } from '../hooks/useTransformers';
+import { FeederManager } from './FeederManager';
+import { BulkCircuitCreator } from './BulkCircuitCreator';
+import {
+  validatePanelForm,
+  validateCircuitForm,
+  validateTransformerForm,
+  showValidationErrors
+} from '../lib/validation-utils';
+import {
+  validatePanelConnection,
+  getConnectionValidationHelp
+} from '../services/validation/panelConnectionValidation';
 
 interface OneLineDiagramProps {
   project: Project;
@@ -57,6 +186,10 @@ export const OneLineDiagram: React.FC<OneLineDiagramProps> = ({ project, updateP
     fedFromPanelId: ''
   });
 
+  // Bulk Circuit Creator State
+  const [showBulkCreator, setShowBulkCreator] = useState(false);
+  const [bulkCreatorPanelId, setBulkCreatorPanelId] = useState<string | null>(null);
+
   // Note: MDP is now added manually by user
   // This gives more control over when/how the main panel is created
 
@@ -80,6 +213,21 @@ export const OneLineDiagram: React.FC<OneLineDiagramProps> = ({ project, updateP
   const addPanel = async () => {
     if (!newPanel.name) return;
 
+    // Validate panel data
+    const validation = validatePanelForm({
+      name: newPanel.name,
+      voltage: newPanel.voltage,
+      phase: newPanel.phase,
+      bus_rating: newPanel.busRating,
+      main_breaker_amps: newPanel.mainBreakerAmps || null,
+      location: newPanel.location || null,
+    });
+
+    if (!validation.success) {
+      showValidationErrors(validation.errors);
+      return;
+    }
+
     // Determine fed_from values based on type
     let fedFrom = null;
     let fedFromTransformerId = null;
@@ -92,6 +240,64 @@ export const OneLineDiagram: React.FC<OneLineDiagramProps> = ({ project, updateP
       } else if (newPanel.fedFromType === 'transformer') {
         fedFromTransformerId = newPanel.fedFromId || null;
         fedFromType = 'transformer';
+      }
+    }
+
+    // Validate voltage/phase compatibility (Issue #5)
+    if (!newPanel.isMain) {
+      let sourceVoltage: number | null = null;
+      let sourcePhase: number | null = null;
+      let sourceDescription = '';
+
+      if (fedFromType === 'panel' && fedFrom) {
+        const sourcePanel = panels.find(p => p.id === fedFrom);
+        if (sourcePanel) {
+          sourceVoltage = sourcePanel.voltage;
+          sourcePhase = sourcePanel.phase;
+          sourceDescription = `panel "${sourcePanel.name}"`;
+        }
+      } else if (fedFromType === 'transformer' && fedFromTransformerId) {
+        const sourceTransformer = transformers.find(t => t.id === fedFromTransformerId);
+        if (sourceTransformer) {
+          sourceVoltage = sourceTransformer.secondary_voltage;
+          sourcePhase = sourceTransformer.secondary_phase;
+          sourceDescription = `transformer "${sourceTransformer.name}" secondary`;
+        }
+      }
+
+      // Perform compatibility validation
+      if (sourceVoltage !== null && sourcePhase !== null) {
+        const compatibilityResult = validatePanelConnection(
+          sourceVoltage,
+          sourcePhase,
+          newPanel.voltage,
+          newPanel.phase
+        );
+
+        if (compatibilityResult.severity === 'block') {
+          // BLOCK: Show error and prevent creation
+          const helpMessage = getConnectionValidationHelp(
+            sourceVoltage,
+            sourcePhase,
+            newPanel.voltage,
+            newPanel.phase
+          );
+          alert(`❌ Cannot create panel connection\n\nFrom: ${sourceDescription} (${sourceVoltage}V ${sourcePhase}φ)\nTo: "${newPanel.name}" (${newPanel.voltage}V ${newPanel.phase}φ)\n\n${helpMessage}`);
+          return;
+        } else if (compatibilityResult.severity === 'warn') {
+          // WARN: Show warning but allow creation if user confirms
+          const helpMessage = getConnectionValidationHelp(
+            sourceVoltage,
+            sourcePhase,
+            newPanel.voltage,
+            newPanel.phase
+          );
+          const confirmed = confirm(`⚠️ Unusual panel connection\n\nFrom: ${sourceDescription} (${sourceVoltage}V ${sourcePhase}φ)\nTo: "${newPanel.name}" (${newPanel.voltage}V ${newPanel.phase}φ)\n\n${helpMessage}\n\nDo you want to proceed?`);
+          if (!confirmed) {
+            return;
+          }
+        }
+        // 'allow' severity - proceed without warning
       }
     }
 
@@ -129,19 +335,148 @@ export const OneLineDiagram: React.FC<OneLineDiagramProps> = ({ project, updateP
     if (panel?.is_main) {
       const mainPanels = panels.filter(p => p.is_main);
 
-      // If there are multiple main panels (duplicate issue), allow deletion
-      if (mainPanels.length > 1) {
-        if (!confirm(`Delete "${panel.name}"? You have ${mainPanels.length} main panels - this appears to be a duplicate.`)) {
+      // Warn user if deleting the only main panel
+      if (mainPanels.length === 1) {
+        const confirmMessage = `Delete "${panel.name}" (Main Distribution Panel)?\n\n⚠️ WARNING: This is your only main panel. Deleting it will remove the service entrance.\n\nYou'll need to create a new MDP before adding any subpanels.\n\nAre you sure you want to delete it?`;
+        if (!confirm(confirmMessage)) {
           return;
         }
       } else {
-        // Only one main panel - protect it
-        alert('Cannot delete the only main distribution panel. Add another panel first or uncheck "Is Main" on another panel.');
+        // Multiple main panels - confirm deletion
+        if (!confirm(`Delete "${panel.name}"? (You have ${mainPanels.length} main panels)`)) {
+          return;
+        }
+      }
+    } else {
+      // Non-main panel - simple confirmation
+      if (!confirm(`Delete panel "${panel.name}"?`)) {
         return;
       }
     }
 
     await deletePanel(id);
+  };
+
+  // Helper to get all occupied slots for a panel (including multi-pole spans)
+  const getOccupiedSlots = (panelId: string) => {
+    const panelCircuits = circuits.filter(c => c.panel_id === panelId);
+    const occupied = new Set<number>();
+
+    for (const circuit of panelCircuits) {
+      if (circuit.pole === 1) {
+        occupied.add(circuit.circuit_number);
+      } else {
+        // Multi-pole circuit occupies multiple slots
+        for (let i = 0; i < circuit.pole; i++) {
+          occupied.add(circuit.circuit_number + (i * 2));
+        }
+      }
+    }
+
+    return occupied;
+  };
+
+  // Helper to find next available circuit number
+  const getNextAvailableCircuitNumber = (panelId: string, pole: number) => {
+    const occupied = getOccupiedSlots(panelId);
+
+    // Iterate through ALL circuit numbers (both odd and even)
+    // Odd = left side (1, 3, 5...), Even = right side (2, 4, 6...)
+    for (let candidateNumber = 1; candidateNumber <= 100; candidateNumber++) {
+      // Check if this candidate and all its multi-pole span slots are available
+      let allSlotsAvailable = true;
+      for (let i = 0; i < pole; i++) {
+        if (occupied.has(candidateNumber + (i * 2))) {
+          allSlotsAvailable = false;
+          break;
+        }
+      }
+
+      if (allSlotsAvailable) {
+        return candidateNumber;
+      }
+    }
+
+    return 1; // Fallback
+  };
+
+  // Helper to get valid circuit numbers for dropdown (based on pole count and panel size)
+  const getValidCircuitNumbers = (panelId: string, pole: number) => {
+    if (!panelId) return [];
+
+    const panel = panels.find(p => p.id === panelId);
+    if (!panel) return [];
+
+    const occupied = getOccupiedSlots(panelId);
+
+    // Calculate max circuit number based on panel bus rating
+    // Typical: 42 circuits for 200A panel, scale based on bus rating
+    const maxCircuits = Math.min(42, Math.ceil(panel.bus_rating / 10));
+
+    const validNumbers: number[] = [];
+
+    // Iterate through ALL circuit numbers (both odd and even)
+    // Odd = left side (1, 3, 5...), Even = right side (2, 4, 6...)
+    for (let candidateNumber = 1; candidateNumber <= maxCircuits; candidateNumber++) {
+      // For multi-pole circuits, ensure all span slots fit within panel
+      // Multi-pole circuits span consecutive slots on the SAME side (odd→odd or even→even)
+      const lastSlot = candidateNumber + ((pole - 1) * 2);
+      if (lastSlot > maxCircuits) {
+        continue; // Can't fit in panel, try next number
+      }
+
+      // Check if this candidate and all its multi-pole span slots are available
+      let allSlotsAvailable = true;
+      for (let i = 0; i < pole; i++) {
+        if (occupied.has(candidateNumber + (i * 2))) {
+          allSlotsAvailable = false;
+          break;
+        }
+      }
+
+      if (allSlotsAvailable) {
+        validNumbers.push(candidateNumber);
+      }
+    }
+
+    return validNumbers;
+  };
+
+  // Helper to check if circuit number conflicts with multi-pole circuits
+  const isCircuitNumberOccupied = (circuitNumber: number, panelId: string, pole: number) => {
+    const panelCircuits = circuits.filter(c => c.panel_id === panelId);
+
+    // Check if ANY existing multi-pole circuit would conflict with this new circuit
+    for (const existingCircuit of panelCircuits) {
+      if (existingCircuit.pole > 1) {
+        // Calculate which slots this existing circuit occupies
+        const startSlot = existingCircuit.circuit_number;
+        const occupiedSlots = [];
+        for (let i = 0; i < existingCircuit.pole; i++) {
+          occupiedSlots.push(startSlot + (i * 2));
+        }
+
+        // Check if our new circuit would conflict
+        // Calculate slots our new circuit would occupy
+        const newOccupiedSlots = [];
+        for (let i = 0; i < pole; i++) {
+          newOccupiedSlots.push(circuitNumber + (i * 2));
+        }
+
+        // Check for overlap
+        for (const newSlot of newOccupiedSlots) {
+          if (occupiedSlots.includes(newSlot)) {
+            return {
+              occupied: true,
+              conflictingCircuit: existingCircuit,
+              conflictingSlot: newSlot
+            };
+          }
+        }
+      }
+    }
+
+    return { occupied: false };
   };
 
   const addCircuit = async () => {
@@ -150,21 +485,54 @@ export const OneLineDiagram: React.FC<OneLineDiagramProps> = ({ project, updateP
     const panel = panels.find(p => p.id === newCircuit.panelId);
     const panelCircuits = circuits.filter(c => c.panel_id === newCircuit.panelId);
 
+    const pole = newCircuit.pole || 1;
+    // Smart circuit number: auto-skip occupied slots from multi-pole circuits
+    const circuitNumber = newCircuit.circuitNumber || getNextAvailableCircuitNumber(newCircuit.panelId, pole);
+    const breakerAmps = newCircuit.breakerAmps || 20;
+    const loadWatts = newCircuit.loadWatts || 0;
+    const conductorSize = newCircuit.conductorSize || '12 AWG';
+
+    // Check for multi-pole circuit conflicts
+    const conflict = isCircuitNumberOccupied(circuitNumber, newCircuit.panelId, pole);
+    if (conflict.occupied) {
+      alert(`Cannot create circuit at slot ${circuitNumber}.\n\nSlot ${conflict.conflictingSlot} is occupied by ${conflict.conflictingCircuit.pole}-pole circuit "${conflict.conflictingCircuit.description}" starting at slot ${conflict.conflictingCircuit.circuit_number}.\n\nPlease choose a different circuit number.`);
+      return;
+    }
+
+    // Validate circuit data
+    const validation = validateCircuitForm({
+      circuit_number: circuitNumber,
+      description: newCircuit.description,
+      breaker_amps: breakerAmps,
+      pole,
+      load_watts: loadWatts,
+      conductor_size: conductorSize,
+    });
+
+    if (!validation.success) {
+      showValidationErrors(validation.errors);
+      return;
+    }
+
     const circuitData = {
       project_id: project.id,
       panel_id: newCircuit.panelId,
-      circuit_number: newCircuit.circuitNumber || panelCircuits.length + 1,
+      circuit_number: circuitNumber,
       description: newCircuit.description,
-      breaker_amps: newCircuit.breakerAmps || 20,
-      pole: newCircuit.pole || 1,
-      load_watts: newCircuit.loadWatts || 0,
-      conductor_size: newCircuit.conductorSize || '12 AWG'
+      breaker_amps: breakerAmps,
+      pole,
+      load_watts: loadWatts,
+      conductor_size: conductorSize
     };
 
     await createCircuit(circuitData);
+
+    // Auto-calculate next available circuit number for the same pole type
+    const nextNumber = getNextAvailableCircuitNumber(newCircuit.panelId, pole);
+
     setNewCircuit({
       ...newCircuit,
-      circuitNumber: (newCircuit.circuitNumber || 0) + 1,
+      circuitNumber: nextNumber,
       description: '',
       loadWatts: 0
     });
@@ -174,8 +542,85 @@ export const OneLineDiagram: React.FC<OneLineDiagramProps> = ({ project, updateP
     await deleteCircuit(id);
   };
 
+  const openBulkCreator = () => {
+    if (!newCircuit.panelId) {
+      alert('Please select a panel first');
+      return;
+    }
+    const panelCircuits = circuits.filter(c => c.panel_id === newCircuit.panelId);
+    const nextCircuitNumber = panelCircuits.length > 0
+      ? Math.max(...panelCircuits.map(c => c.circuit_number)) + 1
+      : 1;
+
+    setBulkCreatorPanelId(newCircuit.panelId);
+    setShowBulkCreator(true);
+  };
+
+  const handleBulkCreateCircuits = async (bulkCircuits: any[]) => {
+    if (!bulkCreatorPanelId) return;
+
+    try {
+      // Validate all circuits for multi-pole conflicts BEFORE creating any
+      const conflicts = [];
+      for (const circuit of bulkCircuits) {
+        const conflict = isCircuitNumberOccupied(circuit.circuit_number, bulkCreatorPanelId, circuit.pole);
+        if (conflict.occupied) {
+          conflicts.push({
+            circuit,
+            conflict
+          });
+        }
+      }
+
+      if (conflicts.length > 0) {
+        const conflictMessages = conflicts.map(c =>
+          `Circuit ${c.circuit.circuit_number} (${c.circuit.description}): Slot ${c.conflict.conflictingSlot} occupied by ${c.conflict.conflictingCircuit.pole}P circuit "${c.conflict.conflictingCircuit.description}"`
+        ).join('\n');
+
+        alert(`Cannot create circuits due to multi-pole slot conflicts:\n\n${conflictMessages}\n\nPlease fix the circuit numbers and try again.`);
+        return;
+      }
+
+      // Create all circuits
+      for (const circuit of bulkCircuits) {
+        await createCircuit({
+          project_id: project.id,
+          panel_id: bulkCreatorPanelId,
+          circuit_number: circuit.circuit_number,
+          description: circuit.description,
+          breaker_amps: circuit.breaker_amps,
+          pole: circuit.pole,
+          load_watts: circuit.load_watts,
+          conductor_size: circuit.conductor_size,
+          egc_size: circuit.egc_size
+        });
+      }
+
+      alert(`Successfully created ${bulkCircuits.length} circuits`);
+    } catch (error) {
+      console.error('Error creating bulk circuits:', error);
+      throw error;
+    }
+  };
+
   const addTransformer = async () => {
     if (!newTransformer.name || !newTransformer.fedFromPanelId) return;
+
+    // Validate transformer data
+    const validation = validateTransformerForm({
+      name: newTransformer.name,
+      kva_rating: newTransformer.kvaRating,
+      primary_voltage: newTransformer.primaryVoltage,
+      secondary_voltage: newTransformer.secondaryVoltage,
+      primary_phase: newTransformer.primaryPhase,
+      secondary_phase: newTransformer.secondaryPhase,
+      connection_type: 'delta-wye',
+    });
+
+    if (!validation.success) {
+      showValidationErrors(validation.errors);
+      return;
+    }
 
     const transformerData = {
       project_id: project.id,
@@ -217,6 +662,115 @@ export const OneLineDiagram: React.FC<OneLineDiagramProps> = ({ project, updateP
 
   const serviceX = 400;
   const serviceY = 50;
+
+  // ✅ NEW: One-line diagram rendering constants
+  const DIAGRAM_CONSTANTS = {
+    // Vertical positions
+    UTILITY_Y: 50,
+    METER_Y: 90,
+    MDP_Y: 170,
+    MDP_BUS_Y: 250,
+    LEVEL1_PANEL_Y: 320,
+    LEVEL2_PANEL_Y: 450,  // Increased from 430 to accommodate bus
+    LEVEL3_PANEL_Y: 580,  // Increased from 540 to accommodate bus
+
+    // Bus bar offsets (distance below element bottom)
+    BUS_OFFSET: 40,
+
+    // Line styling
+    BUS_STROKE_WIDTH: 4,
+    FEEDER_STROKE_WIDTH: 2,
+    VERTICAL_DROP_STROKE_WIDTH: 2,
+
+    // Horizontal spacing
+    LEVEL1_SPACING: 140,
+    LEVEL2_SPACING: 90,
+    LEVEL3_SPACING: 70,
+
+    // Element dimensions
+    PANEL_HEIGHT: 30,
+    PANEL_WIDTH: 50,
+    TRANSFORMER_HEIGHT: 35,
+    TRANSFORMER_WIDTH: 60,
+    MDP_HEIGHT: 40,
+    MDP_WIDTH: 60
+  };
+
+  // ✅ NEW: Helper to determine if horizontal bus is needed (2+ downstream elements)
+  const needsHorizontalBus = (downstreamCount: number) => {
+    return downstreamCount >= 2;
+  };
+
+  // ✅ NEW: Helper to render horizontal bus with vertical drops
+  const renderBusBar = (
+    parentX: number,
+    parentBottomY: number,
+    downstreamElements: { x: number; topY: number }[],
+    strokeColor: string = "#4B5563"
+  ) => {
+    if (downstreamElements.length === 0) return null;
+
+    const busY = parentBottomY + DIAGRAM_CONSTANTS.BUS_OFFSET;
+    const needsBus = needsHorizontalBus(downstreamElements.length);
+
+    if (needsBus) {
+      // Calculate bus bar extents
+      const minX = Math.min(...downstreamElements.map(e => e.x));
+      const maxX = Math.max(...downstreamElements.map(e => e.x));
+
+      return (
+        <>
+          {/* Vertical line from parent to bus */}
+          <line
+            x1={parentX}
+            y1={parentBottomY}
+            x2={parentX}
+            y2={busY}
+            stroke={strokeColor}
+            strokeWidth={DIAGRAM_CONSTANTS.FEEDER_STROKE_WIDTH}
+          />
+
+          {/* Horizontal bus bar */}
+          <line
+            x1={minX}
+            y1={busY}
+            x2={maxX}
+            y2={busY}
+            stroke={strokeColor}
+            strokeWidth={DIAGRAM_CONSTANTS.BUS_STROKE_WIDTH}
+          />
+
+          {/* Vertical drops to downstream elements */}
+          {downstreamElements.map((element, idx) => (
+            <line
+              key={`drop-${idx}`}
+              x1={element.x}
+              y1={busY}
+              x2={element.x}
+              y2={element.topY}
+              stroke={strokeColor}
+              strokeWidth={DIAGRAM_CONSTANTS.VERTICAL_DROP_STROKE_WIDTH}
+            />
+          ))}
+        </>
+      );
+    } else if (downstreamElements.length === 1) {
+      // Direct vertical line (no bus needed)
+      const element = downstreamElements[0];
+      return (
+        <line
+          x1={parentX}
+          y1={parentBottomY}
+          x2={element.x}
+          y2={element.topY}
+          stroke={strokeColor}
+          strokeWidth={DIAGRAM_CONSTANTS.FEEDER_STROKE_WIDTH}
+        />
+      );
+    }
+
+    return null;
+  };
 
   return (
     <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
@@ -389,7 +943,10 @@ export const OneLineDiagram: React.FC<OneLineDiagramProps> = ({ project, updateP
                  <label className="text-xs font-semibold text-gray-500 uppercase">Assign to Panel</label>
                  <select
                     value={newCircuit.panelId || ''}
-                    onChange={e => setNewCircuit({...newCircuit, panelId: e.target.value})}
+                    onChange={e => {
+                      // Reset circuit number when panel changes (different panels have different occupied slots)
+                      setNewCircuit({...newCircuit, panelId: e.target.value, circuitNumber: undefined});
+                    }}
                     className="w-full border-gray-200 rounded text-sm py-2 focus:border-electric-500 focus:ring-electric-500"
                  >
                    {panels.length === 0 && <option value="">No panels available</option>}
@@ -409,6 +966,28 @@ export const OneLineDiagram: React.FC<OneLineDiagramProps> = ({ project, updateP
                     placeholder="e.g. Master Bedroom Plugs"
                     className="w-full border-gray-200 rounded text-sm py-2 focus:border-electric-500 focus:ring-electric-500"
                  />
+               </div>
+               <div>
+                 <label className="text-xs font-semibold text-gray-500 uppercase">
+                   Circuit Number (Starting Slot)
+                 </label>
+                 <select
+                    value={newCircuit.circuitNumber || ''}
+                    onChange={e => setNewCircuit({...newCircuit, circuitNumber: Number(e.target.value)})}
+                    className="w-full border-gray-200 rounded text-sm py-2 focus:border-electric-500 focus:ring-electric-500"
+                    disabled={!newCircuit.panelId}
+                 >
+                   <option value="">Auto (next available)</option>
+                   {getValidCircuitNumbers(newCircuit.panelId || '', newCircuit.pole || 1).map(num => {
+                     const pole = newCircuit.pole || 1;
+                     const spanSlots = pole > 1 ? ` (spans ${[...Array(pole)].map((_, i) => num + (i * 2)).join(', ')})` : '';
+                     return (
+                       <option key={num} value={num}>
+                         Slot {num}{spanSlots}
+                       </option>
+                     );
+                   })}
+                 </select>
                </div>
                <div className="grid grid-cols-4 gap-3">
                  <div>
@@ -441,7 +1020,11 @@ export const OneLineDiagram: React.FC<OneLineDiagramProps> = ({ project, updateP
                    <label className="text-xs font-semibold text-gray-500 uppercase">Poles</label>
                    <select
                       value={newCircuit.pole}
-                      onChange={e => setNewCircuit({...newCircuit, pole: Number(e.target.value) as 1|2|3})}
+                      onChange={e => {
+                        const newPole = Number(e.target.value) as 1|2|3;
+                        // Reset circuit number when pole changes so dropdown recalculates
+                        setNewCircuit({...newCircuit, pole: newPole, circuitNumber: undefined});
+                      }}
                       className="w-full border-gray-200 rounded text-sm py-2"
                    >
                      <option value="1">1P</option>
@@ -460,13 +1043,24 @@ export const OneLineDiagram: React.FC<OneLineDiagramProps> = ({ project, updateP
                    />
                  </div>
                </div>
-               <button
-                  onClick={addCircuit}
-                  disabled={!newCircuit.panelId}
-                  className="w-full bg-gray-900 text-white text-sm font-medium py-2 rounded hover:bg-black transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-               >
-                 Add Circuit
-               </button>
+               <div className="flex gap-2">
+                 <button
+                    onClick={addCircuit}
+                    disabled={!newCircuit.panelId}
+                    className="flex-1 bg-gray-900 text-white text-sm font-medium py-2 rounded hover:bg-black transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                 >
+                   Add Circuit
+                 </button>
+                 <button
+                    onClick={openBulkCreator}
+                    disabled={!newCircuit.panelId}
+                    className="flex-1 bg-electric-400 text-black text-sm font-medium py-2 rounded hover:bg-electric-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                    title="Add multiple circuits at once"
+                 >
+                   <List className="w-4 h-4" />
+                   Bulk Add
+                 </button>
+               </div>
              </div>
            </div>
 
@@ -651,7 +1245,7 @@ export const OneLineDiagram: React.FC<OneLineDiagramProps> = ({ project, updateP
                {project.serviceVoltage}V {project.servicePhase}Φ Service
             </div>
             
-            <svg className="w-full h-full bg-white flex-1" viewBox="0 0 800 600" preserveAspectRatio="xMidYMid meet">
+            <svg className="w-full h-full bg-white flex-1" viewBox="0 0 800 750" preserveAspectRatio="xMidYMid meet">
                 <defs>
                     <marker id="arrow" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto" markerUnits="strokeWidth">
                         <path d="M0,0 L0,6 L9,3 z" fill="#9CA3AF" />
@@ -684,6 +1278,16 @@ export const OneLineDiagram: React.FC<OneLineDiagramProps> = ({ project, updateP
                 {(() => {
                   const mainPanel = panels.find(p => p.is_main);
 
+                  // ✅ NEW: Recursive function to get all downstream elements for a panel
+                  const getDownstreamElements = (panelId: string) => {
+                    const downstreamPanels = panels.filter(p =>
+                      (p.fed_from_type === 'panel' && p.fed_from === panelId) ||
+                      (p.fed_from_type === 'transformer' && panels.find(tp => tp.id === panelId && tp.fed_from_transformer_id))
+                    );
+                    const downstreamTransformers = transformers.filter(t => t.fed_from_panel_id === panelId);
+                    return { panels: downstreamPanels, transformers: downstreamTransformers };
+                  };
+
                   // Build hierarchy: panels fed from main, transformers, panels fed from transformers
                   const panelsFedFromMain = panels.filter(p => !p.is_main && p.fed_from_type === 'panel' && p.fed_from === mainPanel?.id);
                   const transformersFedFromMain = transformers.filter(t => t.fed_from_panel_id === mainPanel?.id);
@@ -696,38 +1300,43 @@ export const OneLineDiagram: React.FC<OneLineDiagramProps> = ({ project, updateP
                       {/* Main Distribution Panel (MDP) */}
                       {mainPanel && (
                         <>
+                          {/* MDP Box - Smaller */}
                           <rect
-                            x={serviceX - 60}
-                            y={160}
-                            width="120"
-                            height="80"
-                            rx="4"
+                            x={serviceX - 30}
+                            y={170}
+                            width="60"
+                            height="40"
+                            rx="3"
                             stroke="#DC2626"
                             strokeWidth="2"
                             fill="#FEF2F2"
                           />
-                          <text x={serviceX} y={180} textAnchor="middle" className="text-sm font-bold fill-gray-900">
+                          <text x={serviceX} y={195} textAnchor="middle" className="text-xs font-bold fill-red-700">
+                            MDP
+                          </text>
+
+                          {/* MDP Labels - Outside Box Above */}
+                          <text x={serviceX} y={155} textAnchor="middle" className="text-xs font-bold fill-gray-900">
                             {mainPanel.name}
                           </text>
-                          <text x={serviceX} y={195} textAnchor="middle" className="text-[10px] fill-gray-600">
-                            {mainPanel.voltage}V {mainPanel.phase}Φ
+
+                          {/* MDP Labels - Outside Box Below */}
+                          <text x={serviceX} y={223} textAnchor="middle" className="text-[9px] fill-gray-600">
+                            {mainPanel.voltage}V {mainPanel.phase}Φ • {mainPanel.bus_rating}A Bus • {mainPanel.main_breaker_amps}A Main
                           </text>
-                          <text x={serviceX} y={208} textAnchor="middle" className="text-[9px] fill-gray-500">
-                            {mainPanel.bus_rating}A Bus • {mainPanel.main_breaker_amps}A Main
-                          </text>
-                          <text x={serviceX} y={220} textAnchor="middle" className="text-[8px] fill-electric-600">
-                            ({circuits.filter(c => c.panel_id === mainPanel.id).length} circuits)
+                          <text x={serviceX} y={235} textAnchor="middle" className="text-[8px] fill-electric-600">
+                            {circuits.filter(c => c.panel_id === mainPanel.id).length} circuits
                           </text>
 
                           {/* Bus from MDP */}
                           {totalElements > 0 && (
                             <>
-                              <line x1={serviceX} y1={240} x2={serviceX} y2={280} stroke="#111827" strokeWidth="3" />
+                              <line x1={serviceX} y1={210} x2={serviceX} y2={250} stroke="#111827" strokeWidth="3" />
                               <line
                                 x1={Math.max(150, serviceX - (totalElements * 70))}
-                                y1={280}
+                                y1={250}
                                 x2={Math.min(650, serviceX + (totalElements * 70))}
-                                y2={280}
+                                y2={250}
                                 stroke="#111827"
                                 strokeWidth="4"
                               />
@@ -741,36 +1350,228 @@ export const OneLineDiagram: React.FC<OneLineDiagramProps> = ({ project, updateP
                             const xPos = startX + (index * spacing);
                             const panelCircuits = circuits.filter(c => c.panel_id === panel.id);
 
+                            // ✅ NEW: Get downstream elements for this panel
+                            const downstream = getDownstreamElements(panel.id);
+                            const downstreamPanelsFed = panels.filter(p => p.fed_from_type === 'panel' && p.fed_from === panel.id);
+                            const downstreamTransformersFed = transformers.filter(t => t.fed_from_panel_id === panel.id);
+
+                            // ✅ FIX: Calculate total downstream elements to avoid overlap
+                            const totalDownstream = downstreamPanelsFed.length + downstreamTransformersFed.length;
+
+                            // ✅ NEW: Build downstream position array for bus bar rendering
+                            const downstreamPositions: { x: number; topY: number }[] = [];
+
+                            // Panels come first
+                            downstreamPanelsFed.forEach((_, downIndex) => {
+                              downstreamPositions.push({
+                                x: xPos + (downIndex - (totalDownstream - 1) / 2) * DIAGRAM_CONSTANTS.LEVEL2_SPACING,
+                                topY: DIAGRAM_CONSTANTS.LEVEL2_PANEL_Y
+                              });
+                            });
+
+                            // Transformers come after
+                            downstreamTransformersFed.forEach((_, downIndex) => {
+                              const transformerIndex = downstreamPanelsFed.length + downIndex;
+                              downstreamPositions.push({
+                                x: xPos + (transformerIndex - (totalDownstream - 1) / 2) * DIAGRAM_CONSTANTS.LEVEL2_SPACING,
+                                topY: DIAGRAM_CONSTANTS.LEVEL2_PANEL_Y
+                              });
+                            });
+
                             return (
                               <g key={`panel-${panel.id}`}>
-                                <line x1={xPos} y1={280} x2={xPos} y2={350} stroke="#4B5563" strokeWidth="2" />
+                                {/* Panel Label - Above Box */}
+                                <text x={xPos} y={308} textAnchor="middle" className="text-xs font-bold fill-gray-900">
+                                  {panel.name}
+                                </text>
+
+                                {/* Connection Line */}
+                                <line x1={xPos} y1={250} x2={xPos} y2={320} stroke="#4B5563" strokeWidth="2" />
+
+                                {/* Panel Box - Smaller */}
                                 <rect
-                                  x={xPos - 50}
-                                  y={350}
-                                  width="100"
-                                  height="70"
-                                  rx="4"
+                                  x={xPos - 25}
+                                  y={320}
+                                  width="50"
+                                  height="30"
+                                  rx="3"
                                   stroke="#3B82F6"
                                   strokeWidth="2"
                                   fill="#EFF6FF"
                                 />
-                                <text x={xPos} y={368} textAnchor="middle" className="text-sm font-bold fill-gray-900">
-                                  {panel.name}
+                                <text x={xPos} y={340} textAnchor="middle" className="text-xs font-bold fill-blue-700">
+                                  P
                                 </text>
-                                <text x={xPos} y={382} textAnchor="middle" className="text-[9px] fill-gray-600">
-                                  {panel.voltage}V {panel.phase}Φ
+
+                                {/* Panel Info - Below Box */}
+                                <text x={xPos} y={363} textAnchor="middle" className="text-[9px] fill-gray-600">
+                                  {panel.voltage}V {panel.phase}Φ • {panel.bus_rating}A
                                 </text>
-                                <text x={xPos} y={394} textAnchor="middle" className="text-[8px] fill-gray-500">
-                                  {panel.bus_rating}A Bus • {panel.main_breaker_amps ? `${panel.main_breaker_amps}A Main` : 'MLO'}
+                                <text x={xPos} y={373} textAnchor="middle" className="text-[8px] fill-gray-500">
+                                  {panel.main_breaker_amps ? `${panel.main_breaker_amps}A Main` : 'MLO'}
                                 </text>
-                                <text x={xPos} y={406} textAnchor="middle" className="text-[7px] fill-electric-600">
-                                  ({panelCircuits.length} ckt, {(panelCircuits.reduce((sum, c) => sum + (c.load_watts || 0), 0) / 1000).toFixed(1)}kVA)
+                                <text x={xPos} y={383} textAnchor="middle" className="text-[7px] fill-electric-600">
+                                  {panelCircuits.length} ckt • {(panelCircuits.reduce((sum, c) => sum + (c.load_watts || 0), 0) / 1000).toFixed(1)}kVA
                                 </text>
                                 {panel.location && (
-                                  <text x={xPos} y={434} textAnchor="middle" className="text-[7px] fill-gray-400 italic">
+                                  <text x={xPos} y={393} textAnchor="middle" className="text-[7px] fill-gray-400 italic">
                                     {panel.location}
                                   </text>
                                 )}
+
+                                {/* ✅ NEW: Render bus bar for downstream elements (horizontal bus + vertical drops) */}
+                                {totalDownstream > 0 && renderBusBar(
+                                  xPos,
+                                  DIAGRAM_CONSTANTS.LEVEL1_PANEL_Y + DIAGRAM_CONSTANTS.PANEL_HEIGHT,
+                                  downstreamPositions,
+                                  "#4B5563"
+                                )}
+
+                                {/* ✅ NEW: Render downstream panels fed from this panel */}
+                                {downstreamPanelsFed.map((downPanel, downIndex) => {
+                                  const downPanelCircuits = circuits.filter(c => c.panel_id === downPanel.id);
+                                  // ✅ FIX: Position based on total downstream elements (panels come first)
+                                  const downPanelX = xPos + (downIndex - (totalDownstream - 1) / 2) * DIAGRAM_CONSTANTS.LEVEL2_SPACING;
+                                  const downPanelY = DIAGRAM_CONSTANTS.LEVEL2_PANEL_Y;
+
+                                  return (
+                                    <g key={`panel-down-${downPanel.id}`}>
+                                      {/* Panel Label - Above Box */}
+                                      <text x={downPanelX} y={downPanelY - 12} textAnchor="middle" className="text-xs font-bold fill-gray-900">
+                                        {downPanel.name}
+                                      </text>
+
+                                      {/* ❌ REMOVED: Diagonal connection line (now handled by bus bar above) */}
+
+                                      {/* Panel Box */}
+                                      <rect
+                                        x={downPanelX - 25}
+                                        y={downPanelY}
+                                        width="50"
+                                        height="30"
+                                        rx="3"
+                                        stroke="#3B82F6"
+                                        strokeWidth="2"
+                                        fill="#EFF6FF"
+                                      />
+                                      <text x={downPanelX} y={downPanelY + 20} textAnchor="middle" className="text-xs font-bold fill-blue-700">
+                                        P
+                                      </text>
+
+                                      {/* Panel Info */}
+                                      <text x={downPanelX} y={downPanelY + 43} textAnchor="middle" className="text-[9px] fill-gray-600">
+                                        {downPanel.voltage}V {downPanel.phase}Φ • {downPanel.bus_rating}A
+                                      </text>
+                                      <text x={downPanelX} y={downPanelY + 53} textAnchor="middle" className="text-[8px] fill-gray-500">
+                                        {downPanel.main_breaker_amps ? `${downPanel.main_breaker_amps}A` : 'MLO'}
+                                      </text>
+                                      <text x={downPanelX} y={downPanelY + 63} textAnchor="middle" className="text-[7px] fill-electric-600">
+                                        {downPanelCircuits.length} ckt • {(downPanelCircuits.reduce((sum, c) => sum + (c.load_watts || 0), 0) / 1000).toFixed(1)}kVA
+                                      </text>
+                                    </g>
+                                  );
+                                })}
+
+                                {/* ✅ NEW: Render downstream transformers fed from this panel */}
+                                {downstreamTransformersFed.map((downXfmr, downIndex) => {
+                                  // ✅ FIX: Position transformers after panels (add panel count to index)
+                                  const transformerIndex = downstreamPanelsFed.length + downIndex;
+                                  const downXfmrX = xPos + (transformerIndex - (totalDownstream - 1) / 2) * DIAGRAM_CONSTANTS.LEVEL2_SPACING;
+                                  const downXfmrY = DIAGRAM_CONSTANTS.LEVEL2_PANEL_Y;
+                                  const transformerFedPanels = panels.filter(p => p.fed_from_transformer_id === downXfmr.id);
+
+                                  // Build positions for panels fed from this transformer
+                                  const transformerDownstreamPositions = transformerFedPanels.map((_, tfIndex) => ({
+                                    x: downXfmrX + (tfIndex - (transformerFedPanels.length - 1) / 2) * DIAGRAM_CONSTANTS.LEVEL3_SPACING,
+                                    topY: DIAGRAM_CONSTANTS.LEVEL3_PANEL_Y
+                                  }));
+
+                                  return (
+                                    <g key={`xfmr-down-${downXfmr.id}`}>
+                                      {/* Transformer Label */}
+                                      <text x={downXfmrX} y={downXfmrY - 12} textAnchor="middle" className="text-xs font-bold fill-gray-900">
+                                        {downXfmr.name}
+                                      </text>
+
+                                      {/* ❌ REMOVED: Diagonal connection line (now handled by bus bar above) */}
+
+                                      {/* Transformer Box */}
+                                      <rect
+                                        x={downXfmrX - 30}
+                                        y={downXfmrY}
+                                        width="60"
+                                        height="35"
+                                        rx="3"
+                                        stroke="#F59E0B"
+                                        strokeWidth="2"
+                                        fill="#FEF3C7"
+                                      />
+                                      <text x={downXfmrX} y={downXfmrY + 22} textAnchor="middle" className="text-xs font-bold fill-orange-800">
+                                        XFMR
+                                      </text>
+
+                                      {/* Transformer Info */}
+                                      <text x={downXfmrX} y={downXfmrY + 48} textAnchor="middle" className="text-[9px] fill-orange-700">
+                                        {downXfmr.kva_rating} kVA
+                                      </text>
+                                      <text x={downXfmrX} y={downXfmrY + 58} textAnchor="middle" className="text-[8px] fill-orange-700">
+                                        {downXfmr.primary_voltage}V → {downXfmr.secondary_voltage}V
+                                      </text>
+
+                                      {/* ✅ NEW: Render bus bar for transformer-fed panels (orange for transformer) */}
+                                      {transformerFedPanels.length > 0 && renderBusBar(
+                                        downXfmrX,
+                                        downXfmrY + DIAGRAM_CONSTANTS.TRANSFORMER_HEIGHT,
+                                        transformerDownstreamPositions,
+                                        "#F59E0B"
+                                      )}
+
+                                      {/* Panels fed from this downstream transformer */}
+                                      {transformerFedPanels.map((tfPanel, tfIndex) => {
+                                        const tfPanelCircuits = circuits.filter(c => c.panel_id === tfPanel.id);
+                                        const tfPanelX = downXfmrX + (tfIndex - (transformerFedPanels.length - 1) / 2) * DIAGRAM_CONSTANTS.LEVEL3_SPACING;
+                                        const tfPanelY = DIAGRAM_CONSTANTS.LEVEL3_PANEL_Y;
+
+                                        return (
+                                          <g key={`panel-tf-${tfPanel.id}`}>
+                                            {/* Panel Label */}
+                                            <text x={tfPanelX} y={tfPanelY - 12} textAnchor="middle" className="text-xs font-bold fill-gray-900">
+                                              {tfPanel.name}
+                                            </text>
+
+                                            {/* ❌ REMOVED: Diagonal connection line (now handled by bus bar above) */}
+
+                                            {/* Panel Box */}
+                                            <rect
+                                              x={tfPanelX - 25}
+                                              y={tfPanelY}
+                                              width="50"
+                                              height="30"
+                                              rx="3"
+                                              stroke="#3B82F6"
+                                              strokeWidth="2"
+                                              fill="#EFF6FF"
+                                            />
+                                            <text x={tfPanelX} y={tfPanelY + 20} textAnchor="middle" className="text-xs font-bold fill-blue-700">
+                                              P
+                                            </text>
+
+                                            {/* Panel Info */}
+                                            <text x={tfPanelX} y={tfPanelY + 43} textAnchor="middle" className="text-[9px] fill-gray-600">
+                                              {tfPanel.voltage}V {tfPanel.phase}Φ • {tfPanel.bus_rating}A
+                                            </text>
+                                            <text x={tfPanelX} y={tfPanelY + 53} textAnchor="middle" className="text-[8px] fill-gray-500">
+                                              {tfPanel.main_breaker_amps ? `${tfPanel.main_breaker_amps}A` : 'MLO'}
+                                            </text>
+                                            <text x={tfPanelX} y={tfPanelY + 63} textAnchor="middle" className="text-[7px] fill-electric-600">
+                                              {tfPanelCircuits.length} ckt • {(tfPanelCircuits.reduce((sum, c) => sum + (c.load_watts || 0), 0) / 1000).toFixed(1)}kVA
+                                            </text>
+                                          </g>
+                                        );
+                                      })}
+                                    </g>
+                                  );
+                                })}
                               </g>
                             );
                           })}
@@ -785,62 +1586,92 @@ export const OneLineDiagram: React.FC<OneLineDiagramProps> = ({ project, updateP
                             // Find panels fed from this transformer
                             const downstreamPanels = panels.filter(p => p.fed_from_transformer_id === xfmr.id);
 
+                            // ✅ NEW: Build downstream position array for bus bar rendering
+                            const mdpTransformerDownstreamPositions = downstreamPanels.map((_, pIndex) => ({
+                              x: xPos + (pIndex - (downstreamPanels.length - 1) / 2) * DIAGRAM_CONSTANTS.LEVEL2_SPACING,
+                              topY: DIAGRAM_CONSTANTS.LEVEL2_PANEL_Y
+                            }));
+
                             return (
                               <g key={`xfmr-${xfmr.id}`}>
-                                {/* Line from bus to transformer */}
-                                <line x1={xPos} y1={280} x2={xPos} y2={310} stroke="#4B5563" strokeWidth="2" />
+                                {/* Transformer Label - Above Box */}
+                                <text x={xPos} y={308} textAnchor="middle" className="text-xs font-bold fill-gray-900">
+                                  {xfmr.name}
+                                </text>
 
-                                {/* Transformer Box */}
+                                {/* Line from bus to transformer */}
+                                <line x1={xPos} y1={250} x2={xPos} y2={320} stroke="#4B5563" strokeWidth="2" />
+
+                                {/* Transformer Box - Smaller */}
                                 <rect
-                                  x={xPos - 40}
-                                  y={310}
-                                  width="80"
-                                  height="50"
-                                  rx="4"
+                                  x={xPos - 30}
+                                  y={320}
+                                  width="60"
+                                  height="35"
+                                  rx="3"
                                   stroke="#F59E0B"
                                   strokeWidth="2"
                                   fill="#FEF3C7"
                                 />
-                                <text x={xPos} y={328} textAnchor="middle" className="text-sm font-bold fill-orange-900">
-                                  {xfmr.name}
+                                <text x={xPos} y={342} textAnchor="middle" className="text-xs font-bold fill-orange-800">
+                                  XFMR
                                 </text>
-                                <text x={xPos} y={340} textAnchor="middle" className="text-[8px] fill-orange-700">
+
+                                {/* Transformer Info - Below Box */}
+                                <text x={xPos} y={368} textAnchor="middle" className="text-[9px] fill-orange-700">
                                   {xfmr.kva_rating} kVA
                                 </text>
-                                <text x={xPos} y={350} textAnchor="middle" className="text-[8px] fill-orange-700">
+                                <text x={xPos} y={378} textAnchor="middle" className="text-[8px] fill-orange-700">
                                   {xfmr.primary_voltage}V → {xfmr.secondary_voltage}V
                                 </text>
+
+                                {/* ✅ NEW: Render bus bar for transformer-fed panels (orange for transformer) */}
+                                {downstreamPanels.length > 0 && renderBusBar(
+                                  xPos,
+                                  DIAGRAM_CONSTANTS.LEVEL1_PANEL_Y + DIAGRAM_CONSTANTS.TRANSFORMER_HEIGHT,
+                                  mdpTransformerDownstreamPositions,
+                                  "#F59E0B"
+                                )}
 
                                 {/* Downstream panels from transformer */}
                                 {downstreamPanels.map((panel, pIndex) => {
                                   const panelCircuits = circuits.filter(c => c.panel_id === panel.id);
-                                  const panelX = xPos + (pIndex - (downstreamPanels.length - 1) / 2) * 90;
-                                  const panelY = 440;
+                                  const panelX = xPos + (pIndex - (downstreamPanels.length - 1) / 2) * DIAGRAM_CONSTANTS.LEVEL2_SPACING;
+                                  const panelY = DIAGRAM_CONSTANTS.LEVEL2_PANEL_Y;
 
                                   return (
                                     <g key={`panel-xfmr-${panel.id}`}>
-                                      <line x1={xPos} y1={360} x2={panelX} y2={panelY} stroke="#F59E0B" strokeWidth="2" />
+                                      {/* Panel Label - Above Box */}
+                                      <text x={panelX} y={panelY - 12} textAnchor="middle" className="text-xs font-bold fill-gray-900">
+                                        {panel.name}
+                                      </text>
+
+                                      {/* ❌ REMOVED: Diagonal connection line (now handled by bus bar above) */}
+
+                                      {/* Panel Box - Smaller */}
                                       <rect
-                                        x={panelX - 40}
+                                        x={panelX - 25}
                                         y={panelY}
-                                        width="80"
-                                        height="60"
-                                        rx="4"
+                                        width="50"
+                                        height="30"
+                                        rx="3"
                                         stroke="#3B82F6"
                                         strokeWidth="2"
                                         fill="#EFF6FF"
                                       />
-                                      <text x={panelX} y={panelY + 15} textAnchor="middle" className="text-xs font-bold fill-gray-900">
-                                        {panel.name}
+                                      <text x={panelX} y={panelY + 20} textAnchor="middle" className="text-xs font-bold fill-blue-700">
+                                        P
                                       </text>
-                                      <text x={panelX} y={panelY + 27} textAnchor="middle" className="text-[8px] fill-gray-600">
-                                        {panel.voltage}V {panel.phase}Φ
+
+                                      {/* Panel Info - Below Box */}
+                                      <text x={panelX} y={panelY + 43} textAnchor="middle" className="text-[9px] fill-gray-600">
+                                        {panel.voltage}V {panel.phase}Φ • {panel.bus_rating}A
                                       </text>
-                                      <text x={panelX} y={panelY + 37} textAnchor="middle" className="text-[7px] fill-gray-500">
-                                        {panel.bus_rating}A • {panel.main_breaker_amps ? `${panel.main_breaker_amps}A` : 'MLO'}
+                                      <text x={panelX} y={panelY + 53} textAnchor="middle" className="text-[8px] fill-gray-500">
+                                        {panel.main_breaker_amps ? `${panel.main_breaker_amps}A` : 'MLO'}
                                       </text>
-                                      <text x={panelX} y={panelY + 47} textAnchor="middle" className="text-[6px] fill-electric-600">
-                                        ({panelCircuits.length} ckt, {(panelCircuits.reduce((sum, c) => sum + (c.load_watts || 0), 0) / 1000).toFixed(1)}kVA)
+                                      <text x={panelX} y={panelY + 63} textAnchor="middle" className="text-[7px] fill-electric-600">
+                                        {panelCircuits.length} ckt • {(panelCircuits.reduce((sum, c) => sum + (c.load_watts || 0), 0) / 1000).toFixed(1)}kVA
                                       </text>
                                     </g>
                                   );
@@ -870,6 +1701,30 @@ export const OneLineDiagram: React.FC<OneLineDiagramProps> = ({ project, updateP
             )}
         </div>
       </div>
+
+      {/* Feeder Management Section */}
+      <div className="mt-8 pt-8 border-t border-gray-200">
+        <FeederManager
+          projectId={project.id}
+          projectVoltage={project.serviceVoltage}
+          projectPhase={project.servicePhase}
+        />
+      </div>
+
+      {/* Bulk Circuit Creator Modal */}
+      {bulkCreatorPanelId && (
+        <BulkCircuitCreator
+          isOpen={showBulkCreator}
+          onClose={() => setShowBulkCreator(false)}
+          panelId={bulkCreatorPanelId}
+          startingCircuitNumber={
+            circuits.filter(c => c.panel_id === bulkCreatorPanelId).length > 0
+              ? Math.max(...circuits.filter(c => c.panel_id === bulkCreatorPanelId).map(c => c.circuit_number)) + 1
+              : 1
+          }
+          onCreateCircuits={handleBulkCreateCircuits}
+        />
+      )}
     </div>
   );
 };

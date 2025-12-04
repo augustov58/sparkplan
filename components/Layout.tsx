@@ -13,7 +13,8 @@ import {
   ArrowLeft,
   LogOut,
   Calculator,
-  AlertOctagon
+  AlertOctagon,
+  Cable
 } from 'lucide-react';
 import { useAuthContext } from './Auth/AuthProvider';
 
@@ -77,6 +78,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, title, showBack, onSig
     { label: 'Tools & Calculators', icon: Calculator, path: `/project/${projectId}/tools` },
     { label: 'Grounding & Bonding', icon: Zap, path: `/project/${projectId}/grounding` },
     { label: 'Panel Schedules', icon: LayoutGrid, path: `/project/${projectId}/panel` },
+    { label: 'Feeder Sizing', icon: Cable, path: `/project/${projectId}/feeders` },
     { label: 'Inspection & Issues', icon: AlertOctagon, path: `/project/${projectId}/issues` },
     { label: 'Pre-Inspection Check', icon: CheckSquare, path: `/project/${projectId}/check` },
     { label: 'Compliance Reports', icon: FileText, path: `/project/${projectId}/reports` },

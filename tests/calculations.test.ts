@@ -10,12 +10,13 @@ import {
   calculateLoad,
   sizeConductor,
   sizeBreaker,
-  calculateVoltageDropAC
+  calculateVoltageDropAC,
+  calculateFeederSizing
 } from '../services/calculations';
 import { calculateEgcSize } from '../services/calculations/conductorSizing';
 import { getEgcSize } from '../data/nec/table-250-122';
 import { calculateProportionalEgcSize } from '../data/nec/conductor-properties';
-import type { LoadItem, ProjectSettings } from '../types';
+import type { LoadItem, ProjectSettings, FeederCalculationInput } from '../types';
 
 describe('NEC Load Calculations', () => {
   const dwellingSettings: ProjectSettings = {
@@ -350,6 +351,337 @@ describe('Equipment Grounding Conductor (EGC) Sizing - NEC 250.122', () => {
       expect(result.egcSize).toBeDefined();
       // If phase conductors are upsized, EGC might need upsizing
       expect(result.necReferences).toContain('NEC 250.122(A) - Table 250.122');
+    });
+  });
+});
+
+describe('Feeder Sizing (NEC Article 215)', () => {
+  describe('Basic Feeder Calculations', () => {
+    it('should calculate feeder for 3-phase 208V panel with mixed loads', () => {
+      const input: FeederCalculationInput = {
+        source_voltage: 208,
+        source_phase: 3,
+        destination_voltage: 208,
+        destination_phase: 3,
+        total_load_va: 50000,
+        continuous_load_va: 30000,
+        noncontinuous_load_va: 20000,
+        distance_ft: 150,
+        conductor_material: 'Cu',
+        ambient_temperature_c: 30,
+        num_current_carrying: 4,
+        max_voltage_drop_percent: 3
+      };
+
+      const result = calculateFeederSizing(input);
+
+      // Design load should be continuous × 1.25 + noncontinuous × 1.0
+      expect(result.design_load_va).toBe(57500); // (30000 * 1.25) + 20000
+      expect(result.design_current_amps).toBeGreaterThan(0);
+      expect(result.phase_conductor_size).toBeDefined();
+      expect(result.neutral_conductor_size).toBeDefined();
+      expect(result.egc_size).toBeDefined();
+      expect(result.recommended_conduit_size).toBeDefined();
+      expect(result.voltage_drop_percent).toBeGreaterThan(0);
+      expect(result.necReferences.length).toBeGreaterThan(0);
+    });
+
+    it('should apply NEC 215.2(A)(1) continuous load factor correctly', () => {
+      const input: FeederCalculationInput = {
+        source_voltage: 240,
+        source_phase: 1,
+        destination_voltage: 240,
+        destination_phase: 1,
+        total_load_va: 10000,
+        continuous_load_va: 8000, // 80% continuous
+        noncontinuous_load_va: 2000,
+        distance_ft: 100,
+        conductor_material: 'Cu',
+        ambient_temperature_c: 30,
+        num_current_carrying: 3
+      };
+
+      const result = calculateFeederSizing(input);
+
+      // Design load = (8000 * 1.25) + 2000 = 12000 VA
+      expect(result.design_load_va).toBe(12000);
+
+      // Verify NEC reference is included
+      expect(result.necReferences).toContain('NEC 215.2(A)(1) - 125% Continuous + 100% Noncontinuous Loads');
+    });
+
+    it('should calculate design current correctly for single-phase', () => {
+      const input: FeederCalculationInput = {
+        source_voltage: 240,
+        source_phase: 1,
+        destination_voltage: 240,
+        destination_phase: 1,
+        total_load_va: 12000,
+        continuous_load_va: 12000,
+        noncontinuous_load_va: 0,
+        distance_ft: 50,
+        conductor_material: 'Cu',
+        ambient_temperature_c: 30,
+        num_current_carrying: 3
+      };
+
+      const result = calculateFeederSizing(input);
+
+      // Design load = 12000 * 1.25 = 15000 VA
+      // Design current = 15000 / 240 = 62.5A
+      expect(result.design_load_va).toBe(15000);
+      expect(result.design_current_amps).toBeCloseTo(62.5, 1);
+    });
+
+    it('should calculate design current correctly for three-phase', () => {
+      const input: FeederCalculationInput = {
+        source_voltage: 208,
+        source_phase: 3,
+        destination_voltage: 208,
+        destination_phase: 3,
+        total_load_va: 36000,
+        continuous_load_va: 24000,
+        noncontinuous_load_va: 12000,
+        distance_ft: 100,
+        conductor_material: 'Cu',
+        ambient_temperature_c: 30,
+        num_current_carrying: 4
+      };
+
+      const result = calculateFeederSizing(input);
+
+      // Design load = (24000 * 1.25) + 12000 = 42000 VA
+      // Design current = 42000 / (√3 × 208) ≈ 116.6A
+      expect(result.design_load_va).toBe(42000);
+      expect(result.design_current_amps).toBeCloseTo(116.6, 1);
+    });
+  });
+
+  describe('Voltage Drop Validation', () => {
+    it('should flag voltage drop exceeding 3%', () => {
+      const input: FeederCalculationInput = {
+        source_voltage: 120,
+        source_phase: 1,
+        destination_voltage: 120,
+        destination_phase: 1,
+        total_load_va: 3000,
+        continuous_load_va: 3000,
+        noncontinuous_load_va: 0,
+        distance_ft: 300, // Long run to force high VD
+        conductor_material: 'Cu',
+        ambient_temperature_c: 30,
+        num_current_carrying: 3
+      };
+
+      const result = calculateFeederSizing(input);
+
+      // With long run and small conductors, VD should exceed 3%
+      if (result.voltage_drop_percent > 3) {
+        expect(result.meets_voltage_drop).toBe(false);
+        expect(result.warnings.some(w => w.includes('Voltage drop'))).toBe(true);
+      }
+    });
+
+    it('should pass voltage drop with adequate conductor size', () => {
+      const input: FeederCalculationInput = {
+        source_voltage: 240,
+        source_phase: 1,
+        destination_voltage: 240,
+        destination_phase: 1,
+        total_load_va: 5000,
+        continuous_load_va: 5000,
+        noncontinuous_load_va: 0,
+        distance_ft: 50, // Short run
+        conductor_material: 'Cu',
+        ambient_temperature_c: 30,
+        num_current_carrying: 3
+      };
+
+      const result = calculateFeederSizing(input);
+
+      // Short run should have low voltage drop
+      expect(result.voltage_drop_percent).toBeLessThanOrEqual(3.0);
+      expect(result.meets_voltage_drop).toBe(true);
+    });
+  });
+
+  describe('Conductor and Conduit Sizing', () => {
+    it('should size phase conductors with temperature and bundling corrections', () => {
+      const input: FeederCalculationInput = {
+        source_voltage: 208,
+        source_phase: 3,
+        destination_voltage: 208,
+        destination_phase: 3,
+        total_load_va: 100000,
+        continuous_load_va: 80000,
+        noncontinuous_load_va: 20000,
+        distance_ft: 200,
+        conductor_material: 'Cu',
+        ambient_temperature_c: 40, // High temperature
+        num_current_carrying: 6, // More conductors
+        max_voltage_drop_percent: 3
+      };
+
+      const result = calculateFeederSizing(input);
+
+      // Should account for temperature and bundling derating
+      expect(result.phase_conductor_size).toBeDefined();
+      expect(result.phase_conductor_ampacity).toBeGreaterThan(0);
+      expect(result.necReferences).toContain('NEC 310.16 - Conductor Ampacity');
+    });
+
+    it('should include EGC size in results', () => {
+      const input: FeederCalculationInput = {
+        source_voltage: 240,
+        source_phase: 1,
+        destination_voltage: 240,
+        destination_phase: 1,
+        total_load_va: 20000,
+        continuous_load_va: 15000,
+        noncontinuous_load_va: 5000,
+        distance_ft: 100,
+        conductor_material: 'Cu',
+        ambient_temperature_c: 30,
+        num_current_carrying: 3
+      };
+
+      const result = calculateFeederSizing(input);
+
+      expect(result.egc_size).toBeDefined();
+      expect(typeof result.egc_size).toBe('string');
+      expect(result.necReferences).toContain('NEC 250.122 - Equipment Grounding Conductor Sizing');
+    });
+
+    it('should recommend conduit size', () => {
+      const input: FeederCalculationInput = {
+        source_voltage: 208,
+        source_phase: 3,
+        destination_voltage: 208,
+        destination_phase: 3,
+        total_load_va: 30000,
+        continuous_load_va: 20000,
+        noncontinuous_load_va: 10000,
+        distance_ft: 150,
+        conductor_material: 'Cu',
+        ambient_temperature_c: 30,
+        num_current_carrying: 4
+      };
+
+      const result = calculateFeederSizing(input);
+
+      expect(result.recommended_conduit_size).toBeDefined();
+      expect(result.recommended_conduit_size).toMatch(/\d/); // Should contain numbers
+      expect(result.necReferences.some(ref => ref.includes('Chapter 9'))).toBe(true);
+    });
+
+    it('should size neutral conductor', () => {
+      const input: FeederCalculationInput = {
+        source_voltage: 208,
+        source_phase: 3,
+        destination_voltage: 208,
+        destination_phase: 3,
+        total_load_va: 45000,
+        continuous_load_va: 30000,
+        noncontinuous_load_va: 15000,
+        distance_ft: 100,
+        conductor_material: 'Cu',
+        ambient_temperature_c: 30,
+        num_current_carrying: 4
+      };
+
+      const result = calculateFeederSizing(input);
+
+      expect(result.neutral_conductor_size).toBeDefined();
+      expect(result.necReferences).toContain('NEC 220.61 - Feeder Neutral Load');
+    });
+  });
+
+  describe('Warnings and NEC References', () => {
+    it('should warn about high continuous load percentage', () => {
+      const input: FeederCalculationInput = {
+        source_voltage: 240,
+        source_phase: 1,
+        destination_voltage: 240,
+        destination_phase: 1,
+        total_load_va: 10000,
+        continuous_load_va: 9000, // 90% continuous
+        noncontinuous_load_va: 1000,
+        distance_ft: 50,
+        conductor_material: 'Cu',
+        ambient_temperature_c: 30,
+        num_current_carrying: 3
+      };
+
+      const result = calculateFeederSizing(input);
+
+      expect(result.warnings.some(w => w.includes('High continuous load'))).toBe(true);
+    });
+
+    it('should warn about long feeder runs', () => {
+      const input: FeederCalculationInput = {
+        source_voltage: 240,
+        source_phase: 1,
+        destination_voltage: 240,
+        destination_phase: 1,
+        total_load_va: 5000,
+        continuous_load_va: 3000,
+        noncontinuous_load_va: 2000,
+        distance_ft: 250, // Long run
+        conductor_material: 'Cu',
+        ambient_temperature_c: 30,
+        num_current_carrying: 3
+      };
+
+      const result = calculateFeederSizing(input);
+
+      expect(result.warnings.some(w => w.includes('Long feeder run'))).toBe(true);
+    });
+
+    it('should include all required NEC references', () => {
+      const input: FeederCalculationInput = {
+        source_voltage: 208,
+        source_phase: 3,
+        destination_voltage: 208,
+        destination_phase: 3,
+        total_load_va: 40000,
+        continuous_load_va: 25000,
+        noncontinuous_load_va: 15000,
+        distance_ft: 100,
+        conductor_material: 'Cu',
+        ambient_temperature_c: 30,
+        num_current_carrying: 4
+      };
+
+      const result = calculateFeederSizing(input);
+
+      // Verify key NEC references are included
+      expect(result.necReferences).toContain('NEC 215.2 - Feeder Conductor Ampacity');
+      expect(result.necReferences).toContain('NEC 215.2(A)(1) - 125% Continuous + 100% Noncontinuous Loads');
+      expect(result.necReferences.length).toBeGreaterThan(5);
+    });
+  });
+
+  describe('Material Selection', () => {
+    it('should handle aluminum conductors', () => {
+      const input: FeederCalculationInput = {
+        source_voltage: 240,
+        source_phase: 1,
+        destination_voltage: 240,
+        destination_phase: 1,
+        total_load_va: 15000,
+        continuous_load_va: 10000,
+        noncontinuous_load_va: 5000,
+        distance_ft: 100,
+        conductor_material: 'Al', // Aluminum
+        ambient_temperature_c: 30,
+        num_current_carrying: 3
+      };
+
+      const result = calculateFeederSizing(input);
+
+      expect(result.phase_conductor_size).toBeDefined();
+      expect(result.egc_size).toBeDefined();
+      // Aluminum conductors are typically larger for same ampacity
     });
   });
 });

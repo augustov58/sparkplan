@@ -13,6 +13,8 @@ import { LandingPage } from './components/LandingPage';
 import { ProjectSetup } from './components/ProjectSetup';
 import { Calculators } from './components/Calculators';
 import { IssuesLog } from './components/IssuesLog';
+import { MaterialTakeOff } from './components/MaterialTakeOff';
+import { FeederManager } from './components/FeederManager';
 import { Project, ProjectStatus, ProjectType } from './types';
 import { askNecAssistant } from './services/geminiService';
 import { Send, MessageSquare } from 'lucide-react';
@@ -22,6 +24,9 @@ import { Login } from './components/Auth/Login';
 import { Signup } from './components/Auth/Signup';
 import { ProtectedRoute } from './components/Auth/ProtectedRoute';
 import { useProjects } from './hooks/useProjects';
+import { ErrorBoundary, FeatureErrorBoundary } from './components/ErrorBoundary';
+import { TemplateSelector } from './components/TemplateSelector';
+import type { ProjectTemplate } from './data/project-templates';
 
 // Note: Mock data removed - now using Supabase database
 
@@ -34,15 +39,65 @@ const ProjectWrapper = ({ projects, updateProject, deleteProject, onSignOut }: {
     return (
         <Layout title={project.name} showBack onSignOut={onSignOut}>
             <Routes>
-                <Route path="/" element={<ProjectSetup project={project} updateProject={updateProject} deleteProject={deleteProject} />} />
-                <Route path="/load-calc" element={<LoadCalculator project={project} updateProject={updateProject} />} />
-                <Route path="/circuits" element={<OneLineDiagram project={project} updateProject={updateProject} />} />
-                <Route path="/tools" element={<Calculators />} />
-                <Route path="/grounding" element={<GroundingBonding project={project} updateProject={updateProject} />} />
-                <Route path="/panel" element={<PanelSchedule project={project} />} />
-                <Route path="/issues" element={<IssuesLog project={project} updateProject={updateProject} />} />
-                <Route path="/check" element={<PreInspection project={project} updateProject={updateProject} />} />
-                <Route path="/reports" element={<ComplianceReport project={project} />} />
+                <Route path="/" element={
+                    <FeatureErrorBoundary>
+                        <ProjectSetup project={project} updateProject={updateProject} deleteProject={deleteProject} />
+                    </FeatureErrorBoundary>
+                } />
+                <Route path="/load-calc" element={
+                    <FeatureErrorBoundary>
+                        <LoadCalculator project={project} updateProject={updateProject} />
+                    </FeatureErrorBoundary>
+                } />
+                <Route path="/circuits" element={
+                    <FeatureErrorBoundary>
+                        <OneLineDiagram project={project} updateProject={updateProject} />
+                    </FeatureErrorBoundary>
+                } />
+                <Route path="/tools" element={
+                    <FeatureErrorBoundary>
+                        <Calculators />
+                    </FeatureErrorBoundary>
+                } />
+                <Route path="/grounding" element={
+                    <FeatureErrorBoundary>
+                        <GroundingBonding project={project} updateProject={updateProject} />
+                    </FeatureErrorBoundary>
+                } />
+                <Route path="/panel" element={
+                    <FeatureErrorBoundary>
+                        <PanelSchedule project={project} />
+                    </FeatureErrorBoundary>
+                } />
+                <Route path="/issues" element={
+                    <FeatureErrorBoundary>
+                        <IssuesLog project={project} updateProject={updateProject} />
+                    </FeatureErrorBoundary>
+                } />
+                <Route path="/check" element={
+                    <FeatureErrorBoundary>
+                        <PreInspection project={project} updateProject={updateProject} />
+                    </FeatureErrorBoundary>
+                } />
+                <Route path="/reports" element={
+                    <FeatureErrorBoundary>
+                        <ComplianceReport project={project} />
+                    </FeatureErrorBoundary>
+                } />
+                <Route path="/materials" element={
+                    <FeatureErrorBoundary>
+                        <MaterialTakeOff project={project} />
+                    </FeatureErrorBoundary>
+                } />
+                <Route path="/feeders" element={
+                    <FeatureErrorBoundary>
+                        <FeederManager
+                            projectId={project.id}
+                            projectVoltage={project.serviceVoltage}
+                            projectPhase={project.servicePhase}
+                        />
+                    </FeatureErrorBoundary>
+                } />
             </Routes>
         </Layout>
     );
@@ -121,23 +176,48 @@ function AppContent() {
   const { user, loading, signOut } = useAuthContext();
   const { projects, createProject, updateProject: updateProjectDB, deleteProject, error: projectsError } = useProjects();
 
+  // Template selector state
+  const [showTemplateSelector, setShowTemplateSelector] = useState(false);
+
   const createNewProject = async () => {
+    // Show template selector instead of creating immediately
+    setShowTemplateSelector(true);
+  };
+
+  const handleTemplateSelection = async (template: ProjectTemplate | null) => {
     const newProject: Partial<Project> = {
-      name: 'New Project ' + (projects.length + 1),
+      name: template ? template.name : `New Project ${projects.length + 1}`,
       address: 'TBD',
-      type: ProjectType.RESIDENTIAL,
+      type: template ? template.type : ProjectType.RESIDENTIAL,
       necEdition: '2023',
       status: ProjectStatus.PLANNING,
       progress: 0,
-      serviceVoltage: 120,
-      servicePhase: 1,
-      settings: { serviceVoltage: 120, servicePhase: 1, conductorMaterial: 'Cu', temperatureRating: 75 }
+      serviceVoltage: template ? template.serviceVoltage : 120,
+      servicePhase: template ? template.servicePhase : 1,
+      settings: {
+        serviceVoltage: template ? template.serviceVoltage : 120,
+        servicePhase: template ? template.servicePhase : 1,
+        conductorMaterial: 'Cu',
+        temperatureRating: 75
+      }
     };
 
     const created = await createProject(newProject);
 
-    // Navigate to new project immediately
     if (created) {
+      // If template selected, apply it
+      if (template) {
+        try {
+          const { applyTemplate } = await import('./services/templateService');
+          await applyTemplate(created.id, template);
+          console.log('Template applied successfully');
+        } catch (error) {
+          console.error('Failed to apply template:', error);
+          alert('Project created but template application failed. You can add panels manually.');
+        }
+      }
+
+      // Navigate to new project
       navigate(`/project/${created.id}`);
     }
   };
@@ -211,6 +291,14 @@ function AppContent() {
           </ProtectedRoute>
         } />
       </Routes>
+
+      {/* Template Selector Modal */}
+      <TemplateSelector
+        isOpen={showTemplateSelector}
+        onClose={() => setShowTemplateSelector(false)}
+        onSelectTemplate={handleTemplateSelection}
+      />
+
       {user && <NecAssistant />}
     </>
   );
@@ -218,8 +306,10 @@ function AppContent() {
 
 export default function App() {
   return (
-    <HashRouter>
-      <AppContent />
-    </HashRouter>
+    <ErrorBoundary>
+      <HashRouter>
+        <AppContent />
+      </HashRouter>
+    </ErrorBoundary>
   );
 }
