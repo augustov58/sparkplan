@@ -115,10 +115,10 @@
  * @see {@link /CASCADING_HIERARCHY_FIX.md} - Bus bar implementation details
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Project, PanelCircuit } from '../types';
 import { generateOneLineDescription } from '../services/geminiService';
-import { RefreshCcw, Download, Zap, Plus, Trash2, Grid, Bolt, List } from 'lucide-react';
+import { RefreshCcw, Download, Zap, Plus, Trash2, Grid, Bolt, List, Image, FileCode } from 'lucide-react';
 import { useCircuits } from '../hooks/useCircuits';
 import { usePanels } from '../hooks/usePanels';
 import { useTransformers } from '../hooks/useTransformers';
@@ -134,6 +134,8 @@ import {
   validatePanelConnection,
   getConnectionValidationHelp
 } from '../services/validation/panelConnectionValidation';
+import { DiagramPanZoom } from './DiagramPanZoom';
+import { exportDiagram, DiagramExportOptions } from '../services/pdfExport/oneLineDiagramExport';
 
 interface OneLineDiagramProps {
   project: Project;
@@ -148,6 +150,8 @@ export const OneLineDiagram: React.FC<OneLineDiagramProps> = ({ project, updateP
 
   const [description, setDescription] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [exporting, setExporting] = useState(false);
+  const diagramRef = useRef<SVGSVGElement>(null);
 
   // Panel Editor State
   const [newPanel, setNewPanel] = useState({
@@ -540,6 +544,30 @@ export const OneLineDiagram: React.FC<OneLineDiagramProps> = ({ project, updateP
 
   const removeCircuit = async (id: string) => {
     await deleteCircuit(id);
+  };
+
+  // Handle diagram export
+  const handleExportDiagram = async (format: 'svg' | 'png' | 'pdf') => {
+    if (!diagramRef.current) {
+      alert('No diagram to export. Please add panels first.');
+      return;
+    }
+    setExporting(true);
+    try {
+      await exportDiagram(
+        diagramRef.current,
+        project.name,
+        project.address,
+        project.serviceVoltage,
+        project.servicePhase,
+        { format, scale: 2 }
+      );
+    } catch (error) {
+      console.error('Export failed:', error);
+      alert(`Export failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    } finally {
+      setExporting(false);
+    }
   };
 
   const openBulkCreator = () => {
@@ -1241,11 +1269,43 @@ export const OneLineDiagram: React.FC<OneLineDiagramProps> = ({ project, updateP
 
         {/* Right Col: Diagram */}
         <div className="lg:col-span-2 bg-white border border-gray-100 rounded-lg h-[600px] overflow-hidden relative shadow-inner flex flex-col">
-            <div className="absolute top-4 left-4 z-10 bg-white/90 backdrop-blur px-3 py-1 text-xs font-mono border border-gray-200 rounded">
+            <div className="absolute top-4 left-4 z-20 bg-white/90 backdrop-blur px-3 py-1 text-xs font-mono border border-gray-200 rounded">
                {project.serviceVoltage}V {project.servicePhase}Φ Service
             </div>
             
-            <svg className="w-full h-full bg-white flex-1" viewBox="0 0 800 750" preserveAspectRatio="xMidYMid meet">
+            {/* Export Buttons */}
+            <div className="absolute top-4 left-1/2 transform -translate-x-1/2 z-20 flex gap-2">
+              <button
+                onClick={() => handleExportDiagram('pdf')}
+                disabled={exporting || panels.length === 0}
+                className="bg-electric-500 hover:bg-electric-600 disabled:bg-gray-300 text-black px-3 py-1 rounded text-xs font-medium flex items-center gap-1 transition-colors shadow-sm"
+                title="Export as PDF (Print)"
+              >
+                <Download className="w-3 h-3" />
+                {exporting ? 'Exporting...' : 'PDF'}
+              </button>
+              <button
+                onClick={() => handleExportDiagram('png')}
+                disabled={exporting || panels.length === 0}
+                className="bg-white hover:bg-gray-50 disabled:bg-gray-100 text-gray-700 px-3 py-1 rounded text-xs font-medium border border-gray-200 flex items-center gap-1 transition-colors shadow-sm"
+                title="Export as PNG Image"
+              >
+                <Image className="w-3 h-3" />
+                PNG
+              </button>
+              <button
+                onClick={() => handleExportDiagram('svg')}
+                disabled={exporting || panels.length === 0}
+                className="bg-white hover:bg-gray-50 disabled:bg-gray-100 text-gray-700 px-3 py-1 rounded text-xs font-medium border border-gray-200 flex items-center gap-1 transition-colors shadow-sm"
+                title="Export as SVG Vector"
+              >
+                <FileCode className="w-3 h-3" />
+                SVG
+              </button>
+            </div>
+            
+            <DiagramPanZoom className="w-full h-full flex-1">
+            <svg ref={diagramRef} className="w-full bg-white" viewBox="0 0 800 750" preserveAspectRatio="xMidYMid meet" style={{ minWidth: '800px', minHeight: '750px' }}>
                 <defs>
                     <marker id="arrow" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto" markerUnits="strokeWidth">
                         <path d="M0,0 L0,6 L9,3 z" fill="#9CA3AF" />
@@ -1692,6 +1752,7 @@ export const OneLineDiagram: React.FC<OneLineDiagramProps> = ({ project, updateP
                   );
                 })()}
             </svg>
+            </DiagramPanZoom>
 
             {description && (
                 <div className="p-4 bg-gray-50 border-t border-gray-100 text-xs text-gray-600 max-h-32 overflow-y-auto">

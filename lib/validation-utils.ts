@@ -123,6 +123,23 @@ export function validateProjectForm(data: {
 }
 
 /**
+ * Validate feeder form data
+ */
+export function validateFeederForm(data: {
+  name: string;
+  source_panel_id: string | null;
+  destination_panel_id?: string | null;
+  destination_transformer_id?: string | null;
+  distance_ft: number;
+  conductor_material: string;
+  conduit_type?: string;
+  ambient_temperature_c?: number;
+  num_current_carrying?: number;
+}): ValidationResult {
+  return validateForm(schemas.feederSchema, data);
+}
+
+/**
  * Display validation errors in a user-friendly alert
  */
 export function showValidationErrors(errors: Record<string, string>): void {

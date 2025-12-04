@@ -298,3 +298,58 @@ export const conductorSizingSchema = z.object({
 });
 
 export type ConductorSizingFormData = z.infer<typeof conductorSizingSchema>;
+
+// ============================================
+// Feeder Schemas
+// ============================================
+
+export const feederSchema = z.object({
+  name: z.string()
+    .min(1, 'Feeder name is required')
+    .max(50, 'Feeder name must be less than 50 characters'),
+
+  source_panel_id: z.string()
+    .min(1, 'Source panel is required')
+    .uuid('Invalid source panel ID'),
+
+  destination_panel_id: z.string()
+    .uuid('Invalid destination panel ID')
+    .nullable()
+    .optional(),
+
+  destination_transformer_id: z.string()
+    .uuid('Invalid destination transformer ID')
+    .nullable()
+    .optional(),
+
+  distance_ft: z.number()
+    .positive('Distance must be positive')
+    .max(10000, 'Distance must be less than 10,000 feet'),
+
+  conductor_material: z.enum(['Cu', 'Al'], {
+    errorMap: () => ({ message: 'Conductor material must be Cu (Copper) or Al (Aluminum)' })
+  }),
+
+  conduit_type: z.enum(['EMT', 'PVC', 'IMC', 'RMC'], {
+    errorMap: () => ({ message: 'Invalid conduit type' })
+  }).optional().default('PVC'),
+
+  ambient_temperature_c: z.number()
+    .int('Temperature must be a whole number')
+    .min(10, 'Ambient temperature must be at least 10°C')
+    .max(80, 'Ambient temperature must be less than 80°C')
+    .optional()
+    .default(30),
+
+  num_current_carrying: z.number()
+    .int('Number of conductors must be a whole number')
+    .positive('Number of conductors must be positive')
+    .max(50, 'Number of conductors must be less than 50')
+    .optional()
+    .default(4),
+}).refine(
+  (data) => data.destination_panel_id || data.destination_transformer_id,
+  { message: 'Either destination panel or transformer must be selected' }
+);
+
+export type FeederFormData = z.infer<typeof feederSchema>;

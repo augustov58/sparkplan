@@ -1,6 +1,6 @@
 
 import React, { useState } from 'react';
-import { Calculator, ArrowRight, CheckCircle, XCircle, AlertTriangle, Zap } from 'lucide-react';
+import { Calculator, ArrowRight, CheckCircle, XCircle, AlertTriangle, Zap, Car, Sun } from 'lucide-react';
 import { calculateVoltageDropAC, compareVoltageDropMethods, VoltageDropResult } from '../services/calculations';
 import { ConductorSizingTool } from './ConductorSizingTool';
 import { ProjectSettings } from '../types';
@@ -11,9 +11,24 @@ import {
   estimateUtilityTransformer,
   STANDARD_AIC_RATINGS
 } from '../services/calculations/shortCircuit';
+import {
+  calculateEVCharging,
+  EVChargingInput,
+  EVChargingResult,
+  EV_CHARGER_SPECS,
+  EVChargerLevel,
+  estimateChargingTime
+} from '../services/calculations/evCharging';
+import {
+  calculateSolarPV,
+  SolarPVInput,
+  SolarPVResult,
+  COMMON_PV_PANELS,
+  calculateMaxPanelsPerString
+} from '../services/calculations/solarPV';
 
 export const Calculators: React.FC = () => {
-  const [activeTab, setActiveTab] = useState<'voltage-drop' | 'conduit-fill' | 'conductor-sizing' | 'short-circuit'>('voltage-drop');
+  const [activeTab, setActiveTab] = useState<'voltage-drop' | 'conduit-fill' | 'conductor-sizing' | 'short-circuit' | 'ev-charging' | 'solar-pv'>('voltage-drop');
 
   // Default project settings for calculator mode
   const defaultSettings: ProjectSettings = {
@@ -56,6 +71,18 @@ export const Calculators: React.FC = () => {
         >
           Short Circuit (NEC 110.9)
         </button>
+        <button
+          onClick={() => setActiveTab('ev-charging')}
+          className={`px-6 py-3 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${activeTab === 'ev-charging' ? 'border-electric-500 text-gray-900' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
+        >
+          <span className="flex items-center gap-1"><Car className="w-4 h-4" /> EV Charging (NEC 625)</span>
+        </button>
+        <button
+          onClick={() => setActiveTab('solar-pv')}
+          className={`px-6 py-3 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${activeTab === 'solar-pv' ? 'border-electric-500 text-gray-900' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
+        >
+          <span className="flex items-center gap-1"><Sun className="w-4 h-4" /> Solar PV (NEC 690)</span>
+        </button>
       </div>
 
       <div className="bg-white border border-gray-100 rounded-lg p-6 shadow-sm min-h-[400px]">
@@ -63,6 +90,8 @@ export const Calculators: React.FC = () => {
         {activeTab === 'conductor-sizing' && <ConductorSizingTool projectSettings={defaultSettings} />}
         {activeTab === 'conduit-fill' && <ConduitFillCalculator />}
         {activeTab === 'short-circuit' && <ShortCircuitCalculator />}
+        {activeTab === 'ev-charging' && <EVChargingCalculator />}
+        {activeTab === 'solar-pv' && <SolarPVCalculator />}
       </div>
     </div>
   );
@@ -721,6 +750,576 @@ const ShortCircuitCalculator: React.FC = () => {
             <li><strong>22 kA:</strong> Commercial panels (standard)</li>
             <li><strong>42-65 kA:</strong> Industrial/high fault current applications</li>
           </ul>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// ============================================
+// EV CHARGING CALCULATOR - NEC Article 625
+// ============================================
+const EVChargingCalculator: React.FC = () => {
+  const [chargerLevel, setChargerLevel] = useState<EVChargerLevel>('Level2');
+  const [chargerAmps, setChargerAmps] = useState(32);
+  const [voltage, setVoltage] = useState(240);
+  const [phase, setPhase] = useState<1 | 3>(1);
+  const [numChargers, setNumChargers] = useState(1);
+  const [simultaneousUse, setSimultaneousUse] = useState(100);
+  const [circuitLength, setCircuitLength] = useState(50);
+  const [material, setMaterial] = useState<'Cu' | 'Al'>('Cu');
+  
+  // Battery estimation
+  const [batteryCapacity, setBatteryCapacity] = useState(75);
+  const [currentSOC, setCurrentSOC] = useState(20);
+  const [targetSOC, setTargetSOC] = useState(80);
+  
+  const chargerOptions = EV_CHARGER_SPECS[chargerLevel];
+  
+  let result: EVChargingResult | null = null;
+  try {
+    result = calculateEVCharging({
+      chargerLevel,
+      chargerAmps,
+      voltage,
+      phase,
+      numChargers,
+      simultaneousUse,
+      circuitLength_ft: circuitLength,
+      conductorMaterial: material
+    });
+  } catch (error) {
+    result = null;
+  }
+
+  const chargingTime = estimateChargingTime(
+    (voltage * chargerAmps) / 1000,
+    batteryCapacity,
+    currentSOC,
+    targetSOC
+  );
+
+  return (
+    <div className="space-y-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+        {/* Input Section */}
+        <div className="space-y-4">
+          <h3 className="font-bold text-gray-900 flex items-center gap-2">
+            <Car className="w-5 h-5 text-electric-500" /> Charger Configuration
+          </h3>
+          
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-xs font-semibold text-gray-500 uppercase mb-1">Charger Level</label>
+              <select
+                value={chargerLevel}
+                onChange={e => {
+                  const level = e.target.value as EVChargerLevel;
+                  setChargerLevel(level);
+                  // Set defaults based on level
+                  if (level === 'Level1') { setVoltage(120); setChargerAmps(16); setPhase(1); }
+                  if (level === 'Level2') { setVoltage(240); setChargerAmps(32); setPhase(1); }
+                  if (level === 'Level3_DCFC') { setVoltage(480); setChargerAmps(100); setPhase(3); }
+                }}
+                className="w-full border-gray-200 rounded text-sm py-2 focus:border-electric-500 focus:ring-electric-500"
+              >
+                <option value="Level1">Level 1 (120V)</option>
+                <option value="Level2">Level 2 (240V)</option>
+                <option value="Level3_DCFC">Level 3 DC Fast Charger</option>
+              </select>
+            </div>
+            
+            <div>
+              <label className="block text-xs font-semibold text-gray-500 uppercase mb-1">Charger Amps</label>
+              <select
+                value={chargerAmps}
+                onChange={e => setChargerAmps(Number(e.target.value))}
+                className="w-full border-gray-200 rounded text-sm py-2 focus:border-electric-500 focus:ring-electric-500"
+              >
+                {chargerOptions.map(opt => (
+                  <option key={opt.maxAmps} value={opt.maxAmps}>
+                    {opt.maxAmps}A ({opt.power_kw} kW)
+                  </option>
+                ))}
+              </select>
+            </div>
+            
+            <div>
+              <label className="block text-xs font-semibold text-gray-500 uppercase mb-1">Voltage</label>
+              <select
+                value={voltage}
+                onChange={e => setVoltage(Number(e.target.value))}
+                className="w-full border-gray-200 rounded text-sm py-2 focus:border-electric-500 focus:ring-electric-500"
+              >
+                <option value="120">120V</option>
+                <option value="208">208V</option>
+                <option value="240">240V</option>
+                <option value="480">480V</option>
+              </select>
+            </div>
+            
+            <div>
+              <label className="block text-xs font-semibold text-gray-500 uppercase mb-1">Phase</label>
+              <select
+                value={phase}
+                onChange={e => setPhase(Number(e.target.value) as 1 | 3)}
+                className="w-full border-gray-200 rounded text-sm py-2 focus:border-electric-500 focus:ring-electric-500"
+              >
+                <option value={1}>Single Phase</option>
+                <option value={3}>Three Phase</option>
+              </select>
+            </div>
+            
+            <div>
+              <label className="block text-xs font-semibold text-gray-500 uppercase mb-1">Number of Chargers</label>
+              <input
+                type="number"
+                min={1}
+                max={50}
+                value={numChargers}
+                onChange={e => setNumChargers(Number(e.target.value))}
+                className="w-full border-gray-200 rounded text-sm py-2 focus:border-electric-500 focus:ring-electric-500"
+              />
+            </div>
+            
+            <div>
+              <label className="block text-xs font-semibold text-gray-500 uppercase mb-1">Simultaneous Use %</label>
+              <input
+                type="number"
+                min={10}
+                max={100}
+                value={simultaneousUse}
+                onChange={e => setSimultaneousUse(Number(e.target.value))}
+                className="w-full border-gray-200 rounded text-sm py-2 focus:border-electric-500 focus:ring-electric-500"
+              />
+            </div>
+            
+            <div>
+              <label className="block text-xs font-semibold text-gray-500 uppercase mb-1">Circuit Length (ft)</label>
+              <input
+                type="number"
+                min={1}
+                value={circuitLength}
+                onChange={e => setCircuitLength(Number(e.target.value))}
+                className="w-full border-gray-200 rounded text-sm py-2 focus:border-electric-500 focus:ring-electric-500"
+              />
+            </div>
+            
+            <div>
+              <label className="block text-xs font-semibold text-gray-500 uppercase mb-1">Conductor Material</label>
+              <select
+                value={material}
+                onChange={e => setMaterial(e.target.value as 'Cu' | 'Al')}
+                className="w-full border-gray-200 rounded text-sm py-2 focus:border-electric-500 focus:ring-electric-500"
+              >
+                <option value="Cu">Copper</option>
+                <option value="Al">Aluminum</option>
+              </select>
+            </div>
+          </div>
+
+          {/* Charging Time Estimator */}
+          <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 mt-4">
+            <h4 className="font-medium text-gray-800 mb-3">Charging Time Estimator</h4>
+            <div className="grid grid-cols-3 gap-3">
+              <div>
+                <label className="block text-xs text-gray-500 mb-1">Battery (kWh)</label>
+                <input
+                  type="number"
+                  value={batteryCapacity}
+                  onChange={e => setBatteryCapacity(Number(e.target.value))}
+                  className="w-full border-gray-200 rounded text-sm py-1 focus:border-electric-500 focus:ring-electric-500"
+                />
+              </div>
+              <div>
+                <label className="block text-xs text-gray-500 mb-1">Start SOC %</label>
+                <input
+                  type="number"
+                  value={currentSOC}
+                  onChange={e => setCurrentSOC(Number(e.target.value))}
+                  className="w-full border-gray-200 rounded text-sm py-1 focus:border-electric-500 focus:ring-electric-500"
+                />
+              </div>
+              <div>
+                <label className="block text-xs text-gray-500 mb-1">Target SOC %</label>
+                <input
+                  type="number"
+                  value={targetSOC}
+                  onChange={e => setTargetSOC(Number(e.target.value))}
+                  className="w-full border-gray-200 rounded text-sm py-1 focus:border-electric-500 focus:ring-electric-500"
+                />
+              </div>
+            </div>
+            <div className="mt-3 text-center">
+              <span className="text-2xl font-bold text-electric-600">
+                {chargingTime.hours}h {chargingTime.minutes}m
+              </span>
+              <span className="text-gray-500 text-sm ml-2">estimated</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Results Section */}
+        <div className="space-y-4">
+          <h3 className="font-bold text-gray-900">Sizing Results (NEC 625)</h3>
+          
+          {result && (
+            <div className="space-y-4">
+              {/* Circuit Sizing */}
+              <div className="bg-electric-50 border border-electric-200 rounded-lg p-4">
+                <h4 className="font-medium text-electric-800 mb-2">Per-Circuit Requirements</h4>
+                <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
+                  <span className="text-gray-600">Circuit Breaker:</span>
+                  <span className="font-bold">{result.circuitBreakerAmps}A</span>
+                  <span className="text-gray-600">Conductor Size:</span>
+                  <span className="font-bold">{result.conductorSize}</span>
+                  <span className="text-gray-600">EGC Size:</span>
+                  <span className="font-bold">{result.egcSize}</span>
+                </div>
+              </div>
+
+              {/* System Load */}
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                <h4 className="font-medium text-blue-800 mb-2">System Load (per NEC 625.44)</h4>
+                <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
+                  <span className="text-gray-600">Total Connected Load:</span>
+                  <span className="font-bold">{result.totalConnectedLoad_kVA} kVA</span>
+                  <span className="text-gray-600">Demand Factor:</span>
+                  <span className="font-bold">{(result.demandFactor * 100).toFixed(0)}%</span>
+                  <span className="text-gray-600">Demand Load:</span>
+                  <span className="font-bold">{result.demandLoad_kVA} kVA</span>
+                </div>
+              </div>
+
+              {/* Voltage Drop */}
+              <div className={`rounded-lg p-4 ${result.meetsVoltageDrop ? 'bg-green-50 border-green-200' : 'bg-yellow-50 border-yellow-200'} border`}>
+                <div className="flex items-center gap-2 mb-2">
+                  {result.meetsVoltageDrop ? <CheckCircle className="w-4 h-4 text-green-600" /> : <AlertTriangle className="w-4 h-4 text-yellow-600" />}
+                  <h4 className={`font-medium ${result.meetsVoltageDrop ? 'text-green-800' : 'text-yellow-800'}`}>Voltage Drop</h4>
+                </div>
+                <span className="text-xl font-bold">{result.voltageDropPercent}%</span>
+                <span className="text-gray-500 text-sm ml-2">(≤3% recommended)</span>
+              </div>
+
+              {/* Warnings */}
+              {result.warnings.length > 0 && (
+                <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+                  <h4 className="font-medium text-red-800 mb-2">Warnings</h4>
+                  <ul className="text-sm text-red-700 space-y-1">
+                    {result.warnings.map((w, i) => <li key={i}>{w}</li>)}
+                  </ul>
+                </div>
+              )}
+
+              {/* NEC References */}
+              <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
+                <h4 className="font-medium text-gray-800 mb-2">NEC References</h4>
+                <ul className="text-xs text-gray-600 space-y-1">
+                  {result.necReferences.map((ref, i) => <li key={i}>• {ref}</li>)}
+                </ul>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// ============================================
+// SOLAR PV CALCULATOR - NEC Article 690
+// ============================================
+const SolarPVCalculator: React.FC = () => {
+  // Panel selection
+  const [selectedPanel, setSelectedPanel] = useState(COMMON_PV_PANELS[2]); // 400W default
+  const [numPanels, setNumPanels] = useState(20);
+  const [panelsPerString, setPanelsPerString] = useState(10);
+  
+  // Inverter
+  const [inverterType, setInverterType] = useState<'string' | 'microinverter' | 'dc_optimized'>('string');
+  const [inverterPower, setInverterPower] = useState(7.6);
+  const [inverterMaxVdc, setInverterMaxVdc] = useState(500);
+  
+  // AC Connection
+  const [acVoltage, setAcVoltage] = useState(240);
+  const [acPhase, setAcPhase] = useState<1 | 3>(1);
+  
+  // Installation
+  const [roofType, setRoofType] = useState<'flush_mount' | 'rack_mount' | 'ground_mount'>('flush_mount');
+  const [material, setMaterial] = useState<'Cu' | 'Al'>('Cu');
+  const [dcLength, setDcLength] = useState(50);
+  const [acLength, setAcLength] = useState(30);
+
+  const systemSize = (selectedPanel.watts * numPanels) / 1000;
+  const numStrings = Math.ceil(numPanels / panelsPerString);
+  const maxPanelsPerString = calculateMaxPanelsPerString(selectedPanel.voc, inverterMaxVdc);
+
+  let result: SolarPVResult | null = null;
+  try {
+    result = calculateSolarPV({
+      systemSize_kW: systemSize,
+      numPanels,
+      panelWatts: selectedPanel.watts,
+      panelVoc: selectedPanel.voc,
+      panelIsc: selectedPanel.isc,
+      panelsPerString,
+      numStrings,
+      inverterType,
+      inverterPower_kW: inverterPower,
+      inverterMaxVdc,
+      inverterMaxIdc: 15,
+      acVoltage,
+      acPhase,
+      roofType,
+      conductorMaterial: material,
+      dcCircuitLength_ft: dcLength,
+      acCircuitLength_ft: acLength
+    });
+  } catch (error) {
+    result = null;
+  }
+
+  return (
+    <div className="space-y-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+        {/* Input Section */}
+        <div className="space-y-4">
+          <h3 className="font-bold text-gray-900 flex items-center gap-2">
+            <Sun className="w-5 h-5 text-yellow-500" /> System Configuration
+          </h3>
+          
+          {/* Panel Selection */}
+          <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+            <h4 className="font-medium text-yellow-800 mb-3">PV Panel Selection</h4>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="col-span-2">
+                <label className="block text-xs text-gray-500 mb-1">Panel Type</label>
+                <select
+                  value={selectedPanel.watts}
+                  onChange={e => setSelectedPanel(COMMON_PV_PANELS.find(p => p.watts === Number(e.target.value)) || COMMON_PV_PANELS[2])}
+                  className="w-full border-gray-200 rounded text-sm py-2 focus:border-electric-500 focus:ring-electric-500"
+                >
+                  {COMMON_PV_PANELS.map(panel => (
+                    <option key={panel.watts} value={panel.watts}>
+                      {panel.name} - Voc: {panel.voc}V, Isc: {panel.isc}A
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs text-gray-500 mb-1">Number of Panels</label>
+                <input
+                  type="number"
+                  min={1}
+                  value={numPanels}
+                  onChange={e => setNumPanels(Number(e.target.value))}
+                  className="w-full border-gray-200 rounded text-sm py-2 focus:border-electric-500 focus:ring-electric-500"
+                />
+              </div>
+              <div>
+                <label className="block text-xs text-gray-500 mb-1">Panels per String</label>
+                <input
+                  type="number"
+                  min={1}
+                  max={maxPanelsPerString}
+                  value={panelsPerString}
+                  onChange={e => setPanelsPerString(Number(e.target.value))}
+                  className="w-full border-gray-200 rounded text-sm py-2 focus:border-electric-500 focus:ring-electric-500"
+                />
+              </div>
+            </div>
+            <div className="mt-2 text-xs text-gray-600">
+              System Size: <strong>{systemSize.toFixed(1)} kW DC</strong> • 
+              Strings: <strong>{numStrings}</strong> •
+              Max panels/string: <strong>{maxPanelsPerString}</strong>
+            </div>
+          </div>
+
+          {/* Inverter Configuration */}
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-xs font-semibold text-gray-500 uppercase mb-1">Inverter Type</label>
+              <select
+                value={inverterType}
+                onChange={e => setInverterType(e.target.value as any)}
+                className="w-full border-gray-200 rounded text-sm py-2 focus:border-electric-500 focus:ring-electric-500"
+              >
+                <option value="string">String Inverter</option>
+                <option value="microinverter">Microinverters</option>
+                <option value="dc_optimized">DC Optimizers</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-gray-500 uppercase mb-1">Inverter Power (kW)</label>
+              <input
+                type="number"
+                step={0.1}
+                value={inverterPower}
+                onChange={e => setInverterPower(Number(e.target.value))}
+                className="w-full border-gray-200 rounded text-sm py-2 focus:border-electric-500 focus:ring-electric-500"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-gray-500 uppercase mb-1">Max DC Voltage (V)</label>
+              <input
+                type="number"
+                value={inverterMaxVdc}
+                onChange={e => setInverterMaxVdc(Number(e.target.value))}
+                className="w-full border-gray-200 rounded text-sm py-2 focus:border-electric-500 focus:ring-electric-500"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-gray-500 uppercase mb-1">AC Voltage</label>
+              <select
+                value={acVoltage}
+                onChange={e => setAcVoltage(Number(e.target.value))}
+                className="w-full border-gray-200 rounded text-sm py-2 focus:border-electric-500 focus:ring-electric-500"
+              >
+                <option value="208">208V</option>
+                <option value="240">240V</option>
+                <option value="480">480V</option>
+              </select>
+            </div>
+          </div>
+
+          {/* Installation */}
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-xs font-semibold text-gray-500 uppercase mb-1">Mount Type</label>
+              <select
+                value={roofType}
+                onChange={e => setRoofType(e.target.value as any)}
+                className="w-full border-gray-200 rounded text-sm py-2 focus:border-electric-500 focus:ring-electric-500"
+              >
+                <option value="flush_mount">Flush Mount (Roof)</option>
+                <option value="rack_mount">Rack Mount</option>
+                <option value="ground_mount">Ground Mount</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-gray-500 uppercase mb-1">Conductor Material</label>
+              <select
+                value={material}
+                onChange={e => setMaterial(e.target.value as 'Cu' | 'Al')}
+                className="w-full border-gray-200 rounded text-sm py-2 focus:border-electric-500 focus:ring-electric-500"
+              >
+                <option value="Cu">Copper</option>
+                <option value="Al">Aluminum</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-gray-500 uppercase mb-1">DC Run Length (ft)</label>
+              <input
+                type="number"
+                value={dcLength}
+                onChange={e => setDcLength(Number(e.target.value))}
+                className="w-full border-gray-200 rounded text-sm py-2 focus:border-electric-500 focus:ring-electric-500"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-gray-500 uppercase mb-1">AC Run Length (ft)</label>
+              <input
+                type="number"
+                value={acLength}
+                onChange={e => setAcLength(Number(e.target.value))}
+                className="w-full border-gray-200 rounded text-sm py-2 focus:border-electric-500 focus:ring-electric-500"
+              />
+            </div>
+          </div>
+        </div>
+
+        {/* Results Section */}
+        <div className="space-y-4">
+          <h3 className="font-bold text-gray-900">Sizing Results (NEC 690)</h3>
+          
+          {result && (
+            <div className="space-y-4">
+              {/* DC Side */}
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                <h4 className="font-medium text-blue-800 mb-2">DC Side (String)</h4>
+                <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
+                  <span className="text-gray-600">String Voc:</span>
+                  <span className="font-bold">{result.stringVoc}V</span>
+                  <span className="text-gray-600">Corrected Voc:</span>
+                  <span className="font-bold">{result.stringVocCorrected}V</span>
+                  <span className="text-gray-600">String Isc:</span>
+                  <span className="font-bold">{result.stringIsc}A</span>
+                  <span className="text-gray-600">DC OCPD:</span>
+                  <span className="font-bold">{result.dcOcpdRating}A</span>
+                  <span className="text-gray-600">DC Conductor:</span>
+                  <span className="font-bold">{result.dcConductorSize}</span>
+                  <span className="text-gray-600">DC Voltage Drop:</span>
+                  <span className="font-bold">{result.dcVoltageDrop}%</span>
+                </div>
+              </div>
+
+              {/* AC Side */}
+              <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+                <h4 className="font-medium text-green-800 mb-2">AC Side (Inverter Output)</h4>
+                <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
+                  <span className="text-gray-600">AC Current:</span>
+                  <span className="font-bold">{result.acCurrent}A</span>
+                  <span className="text-gray-600">AC Breaker:</span>
+                  <span className="font-bold">{result.acOcpdRating}A</span>
+                  <span className="text-gray-600">AC Conductor:</span>
+                  <span className="font-bold">{result.acConductorSize}</span>
+                  <span className="text-gray-600">AC Voltage Drop:</span>
+                  <span className="font-bold">{result.acVoltageDrop}%</span>
+                </div>
+              </div>
+
+              {/* 120% Rule Check */}
+              <div className={`rounded-lg p-4 ${result.meetsNec120Rule ? 'bg-green-50 border-green-200' : 'bg-yellow-50 border-yellow-200'} border`}>
+                <div className="flex items-center gap-2 mb-2">
+                  {result.meetsNec120Rule ? <CheckCircle className="w-4 h-4 text-green-600" /> : <AlertTriangle className="w-4 h-4 text-yellow-600" />}
+                  <h4 className={`font-medium ${result.meetsNec120Rule ? 'text-green-800' : 'text-yellow-800'}`}>NEC 705.12 (120% Rule)</h4>
+                </div>
+                <p className="text-sm text-gray-600">
+                  Max backfeed for 200A panel: <strong>{result.maxBackfeedAmps}A</strong>
+                </p>
+                {!result.meetsNec120Rule && (
+                  <p className="text-sm text-yellow-700 mt-1">
+                    Consider supply-side connection per NEC 705.12(A)
+                  </p>
+                )}
+              </div>
+
+              {/* Production Estimate */}
+              <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+                <h4 className="font-medium text-yellow-800 mb-2">Production Estimate</h4>
+                <div className="text-center">
+                  <span className="text-3xl font-bold text-yellow-600">
+                    {(result.estimatedAnnualProduction_kWh / 1000).toFixed(1)} MWh
+                  </span>
+                  <span className="text-gray-500 text-sm ml-2">/year</span>
+                </div>
+                <div className="text-center mt-1">
+                  <span className="text-lg font-medium text-gray-700">
+                    {result.estimatedMonthlyProduction_kWh.toLocaleString()} kWh
+                  </span>
+                  <span className="text-gray-500 text-sm ml-2">/month avg</span>
+                </div>
+              </div>
+
+              {/* Warnings */}
+              {result.warnings.length > 0 && (
+                <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+                  <h4 className="font-medium text-red-800 mb-2">Warnings</h4>
+                  <ul className="text-sm text-red-700 space-y-1">
+                    {result.warnings.map((w, i) => <li key={i}>{w}</li>)}
+                  </ul>
+                </div>
+              )}
+
+              {/* NEC References */}
+              <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
+                <h4 className="font-medium text-gray-800 mb-2">NEC References</h4>
+                <ul className="text-xs text-gray-600 space-y-1">
+                  {result.necReferences.map((ref, i) => <li key={i}>• {ref}</li>)}
+                </ul>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </div>

@@ -9,3 +9,5 @@ export * from './conductorSizing';
 export * from './breakerSizing';
 export * from './voltageDrop';
 export * from './feederSizing';
+export * from './evCharging';
+export * from './solarPV';

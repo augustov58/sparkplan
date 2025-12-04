@@ -11,6 +11,7 @@ import { usePanels } from '../hooks/usePanels';
 import { useTransformers } from '../hooks/useTransformers';
 import { useCircuits } from '../hooks/useCircuits';
 import { calculateFeederSizing } from '../services/calculations';
+import { validateFeederForm, showValidationErrors } from '../lib/validation-utils';
 import type { Feeder, FeederCalculationResult } from '../types';
 
 interface FeederManagerProps {
@@ -69,6 +70,24 @@ export const FeederManager: React.FC<FeederManagerProps> = ({
 
   // Calculate feeder and update database
   const handleCalculateFeeder = async (feeder: Partial<Feeder>) => {
+    // Validate form data
+    const validation = validateFeederForm({
+      name: feeder.name || '',
+      source_panel_id: feeder.source_panel_id || '',
+      destination_panel_id: feeder.destination_panel_id,
+      destination_transformer_id: feeder.destination_transformer_id,
+      distance_ft: feeder.distance_ft || 0,
+      conductor_material: feeder.conductor_material || 'Cu',
+      conduit_type: feeder.conduit_type,
+      ambient_temperature_c: feeder.ambient_temperature_c,
+      num_current_carrying: feeder.num_current_carrying,
+    });
+
+    if (!validation.success) {
+      showValidationErrors(validation.errors);
+      return;
+    }
+
     if (!feeder.destination_panel_id && !feeder.destination_transformer_id) return;
     if (!feeder.distance_ft || !feeder.conductor_material) return;
 

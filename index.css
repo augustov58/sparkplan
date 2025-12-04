@@ -1,2 +1,57 @@
-/* Base styles for NEC Compliance App */
+/* Tailwind v4 Import */
+@import "tailwindcss";
 
+/* Custom Theme Configuration */
+@theme {
+  /* Electric Yellow Brand Color */
+  --color-electric-50: #FFFAE5;
+  --color-electric-100: #FFF5CC;
+  --color-electric-200: #FFEB99;
+  --color-electric-300: #FFE066;
+  --color-electric-400: #FFD633;
+  --color-electric-500: #FFCC00;
+  --color-electric-600: #CCA300;
+  --color-electric-700: #997A00;
+  --color-electric: #FFCC00;
+
+  /* Gray Scale */
+  --color-gray-50: #F9FAFB;
+  --color-gray-100: #F3F4F6;
+  --color-gray-200: #E5E7EB;
+  --color-gray-300: #D1D5DB;
+  --color-gray-400: #9CA3AF;
+  --color-gray-500: #6B7280;
+  --color-gray-600: #4B5563;
+  --color-gray-700: #374151;
+  --color-gray-800: #1F2937;
+  --color-gray-900: #111827;
+
+  /* Fonts */
+  --font-sans: 'Inter', system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, monospace;
+}
+
+/* Base styles */
+body {
+  font-family: var(--font-sans);
+  background-color: #ffffff;
+  color: #111827;
+}
+
+/* Custom scrollbar for ultra-minimalist look */
+::-webkit-scrollbar {
+  width: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #E5E7EB;
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #D1D5DB;
+}
