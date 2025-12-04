@@ -24,6 +24,8 @@
 - [x] **Quick Win 2**: Error boundaries (already implemented - verified)
 - [x] **Quick Win 3**: Compiled Tailwind locally (removed CDN, using Tailwind v4 + Vite plugin)
 - [x] **Feature**: Panel Schedule with NEC 220 Demand Factors and Load Types
+- [x] **Bugfix**: Grounding & Bonding checkboxes now persist to database
+- [x] **Feature**: Enhanced Grounding & Bonding with NEC 250 tables and auto-sizing
 
 #### In Progress
 - None
