@@ -4,6 +4,18 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ---
 
+## 🔄 ACTIVE SESSION LOG
+
+**⚠️ CHECK FIRST**: Before starting work, read `/docs/SESSION_LOG.md` for:
+- Current session status and in-progress work
+- Recent changes made by previous Claude instances
+- Pending tasks and context from last session
+
+**Current Branch**: `cursor-features`
+**Last Session**: 2025-12-04
+
+---
+
 ## ✅ SECURITY STATUS: PRODUCTION-READY
 
 **Status**: ✅ **SECURE** - Gemini API properly protected via backend proxy
