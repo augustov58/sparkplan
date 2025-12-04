@@ -12,3 +12,4 @@ export * from './feederSizing';
 export * from './evCharging';
 export * from './solarPV';
 export * from './demandFactor';
+export * from './residentialLoad';

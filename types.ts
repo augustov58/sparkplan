@@ -5,6 +5,99 @@ export enum ProjectType {
   INDUSTRIAL = 'Industrial',
 }
 
+/**
+ * Dwelling Type for Residential Projects
+ * Determines which NEC calculation method to use
+ */
+export enum DwellingType {
+  SINGLE_FAMILY = 'single_family',      // NEC 220.82 - Optional Calculation
+  MULTI_FAMILY = 'multi_family',        // NEC 220.84 - Multi-family Dwelling
+}
+
+/**
+ * Residential Appliances for Dwelling Unit Load Calculation
+ * Each appliance can be enabled/disabled with its kW rating
+ */
+export interface ResidentialAppliances {
+  // Major appliances
+  range?: { enabled: boolean; kw: number; type: 'electric' | 'gas' };
+  dryer?: { enabled: boolean; kw: number; type: 'electric' | 'gas' };
+  waterHeater?: { enabled: boolean; kw: number; type: 'electric' | 'gas' | 'tankless' };
+  
+  // HVAC - NEC 220.60 (non-coincident loads - use larger)
+  hvac?: {
+    enabled: boolean;
+    type: 'ac_only' | 'heat_pump' | 'electric_heat' | 'gas_heat';
+    coolingKw?: number;      // A/C load
+    heatingKw?: number;      // Electric heat load (if applicable)
+  };
+  
+  // Kitchen appliances
+  dishwasher?: { enabled: boolean; kw: number };
+  disposal?: { enabled: boolean; kw: number };
+  microwave?: { enabled: boolean; kw: number };
+  
+  // Other fixed appliances
+  evCharger?: { enabled: boolean; kw: number; level: 1 | 2 };
+  poolPump?: { enabled: boolean; hp: number };
+  poolHeater?: { enabled: boolean; kw: number };
+  hotTub?: { enabled: boolean; kw: number };
+  sauna?: { enabled: boolean; kw: number };
+  wellPump?: { enabled: boolean; hp: number };
+  
+  // Custom/other appliances
+  otherAppliances?: Array<{ description: string; kw: number }>;
+}
+
+/**
+ * Dwelling Unit Template for Multi-Family Projects
+ * Represents a "type" of unit (e.g., Studio, 1BR, 2BR)
+ */
+export interface DwellingUnitTemplate {
+  id: string;
+  name: string;                         // e.g., "Type A - Studio"
+  squareFootage: number;
+  unitCount: number;                    // How many of this type in the building
+  appliances: ResidentialAppliances;
+  
+  // Calculated values
+  calculatedLoadVA?: number;            // Per-unit demand load
+  panelSize?: number;                   // Recommended panel size (30A, 60A, etc.)
+  
+  // Optional: template panel schedule for this unit type
+  panelScheduleTemplate?: PanelCircuit[];
+}
+
+/**
+ * Residential-specific project settings
+ * Extends base ProjectSettings for dwelling unit calculations
+ */
+export interface ResidentialSettings {
+  dwellingType: DwellingType;
+  
+  // Single-family specific
+  squareFootage?: number;               // Heated area in sq ft
+  numBedrooms?: number;
+  numBathrooms?: number;
+  appliances?: ResidentialAppliances;
+  
+  // Multi-family specific
+  totalUnits?: number;                  // Total dwelling units in building
+  unitTemplates?: DwellingUnitTemplate[];
+  meteringType?: 'master' | 'individual' | 'submeter';
+  
+  // Standard circuit counts
+  smallApplianceCircuits: number;       // Minimum 2 required (NEC 210.11(C)(1))
+  laundryCircuit: boolean;              // Required (NEC 210.11(C)(2))
+  bathroomCircuits: number;             // NEC 210.11(C)(3)
+  garageCircuit: boolean;
+  outdoorCircuit: boolean;
+  
+  // Service
+  recommendedServiceAmps?: number;      // Calculated recommendation
+  selectedServiceAmps?: 100 | 150 | 200 | 400;
+}
+
 export enum ProjectStatus {
   PLANNING = 'Planning',
   IN_PROGRESS = 'In Progress',
@@ -86,6 +179,9 @@ export interface ProjectSettings {
   temperatureRating: 60 | 75 | 90;
   utilityProvider?: string;
   permitNumber?: string;
+  
+  // Residential-specific settings (only used when occupancyType === 'dwelling')
+  residential?: ResidentialSettings;
 }
 
 export interface Project {

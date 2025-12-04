@@ -14,15 +14,18 @@ import {
   LogOut,
   Calculator,
   AlertOctagon,
-  Cable
+  Cable,
+  Home
 } from 'lucide-react';
 import { useAuthContext } from './Auth/AuthProvider';
+import { ProjectType } from '../types';
 
 interface LayoutProps {
   children: React.ReactNode;
   title?: string;
   showBack?: boolean;
   onSignOut?: () => void;
+  projectType?: ProjectType; // Used to conditionally show/hide tabs
 }
 
 interface SidebarItemProps {
@@ -50,7 +53,7 @@ const SidebarItem: React.FC<SidebarItemProps> = ({ icon: Icon, label, path, acti
   );
 };
 
-export const Layout: React.FC<LayoutProps> = ({ children, title, showBack, onSignOut }) => {
+export const Layout: React.FC<LayoutProps> = ({ children, title, showBack, onSignOut, projectType }) => {
   const navigate = useNavigate();
   const location = useLocation();
   const { user } = useAuthContext();
@@ -71,18 +74,40 @@ export const Layout: React.FC<LayoutProps> = ({ children, title, showBack, onSig
   const isProjectRoute = location.pathname.includes('/project/');
   const projectId = isProjectRoute ? location.pathname.split('/')[2] : '';
 
+  // Determine which tabs to show based on project type
+  const isResidential = projectType === ProjectType.RESIDENTIAL;
+  const isCommercialOrIndustrial = projectType === ProjectType.COMMERCIAL || projectType === ProjectType.INDUSTRIAL;
+
+  // Build menu items based on project type
   const menuItems = isProjectRoute ? [
-    { label: 'Project Setup', icon: Settings, path: `/project/${projectId}` },
-    { label: 'Load Calculations', icon: Activity, path: `/project/${projectId}/load-calc` },
-    { label: 'Circuit Design', icon: CircuitBoard, path: `/project/${projectId}/circuits` },
-    { label: 'Tools & Calculators', icon: Calculator, path: `/project/${projectId}/tools` },
-    { label: 'Grounding & Bonding', icon: Zap, path: `/project/${projectId}/grounding` },
-    { label: 'Panel Schedules', icon: LayoutGrid, path: `/project/${projectId}/panel` },
-    { label: 'Feeder Sizing', icon: Cable, path: `/project/${projectId}/feeders` },
-    { label: 'Inspection & Issues', icon: AlertOctagon, path: `/project/${projectId}/issues` },
-    { label: 'Pre-Inspection Check', icon: CheckSquare, path: `/project/${projectId}/check` },
-    { label: 'Compliance Reports', icon: FileText, path: `/project/${projectId}/reports` },
-  ] : [];
+    // Always show
+    { label: 'Project Setup', icon: Settings, path: `/project/${projectId}`, show: true },
+    
+    // Residential: Show "Dwelling Calculator" (repurposed Load Calculations)
+    // Commercial/Industrial: Hide Load Calculations (use Circuit Design instead)
+    { 
+      label: isResidential ? 'Dwelling Calculator' : 'Load Calculations', 
+      icon: isResidential ? Home : Activity, 
+      path: `/project/${projectId}/load-calc`, 
+      show: isResidential // Only show for residential
+    },
+    
+    // Circuit Design: Only for Commercial/Industrial
+    { label: 'Circuit Design', icon: CircuitBoard, path: `/project/${projectId}/circuits`, show: isCommercialOrIndustrial },
+    
+    // Always show
+    { label: 'Tools & Calculators', icon: Calculator, path: `/project/${projectId}/tools`, show: true },
+    { label: 'Grounding & Bonding', icon: Zap, path: `/project/${projectId}/grounding`, show: true },
+    { label: 'Panel Schedules', icon: LayoutGrid, path: `/project/${projectId}/panel`, show: true },
+    
+    // Feeder Sizing: Only for Commercial/Industrial (residential is single service)
+    { label: 'Feeder Sizing', icon: Cable, path: `/project/${projectId}/feeders`, show: isCommercialOrIndustrial },
+    
+    // Always show
+    { label: 'Inspection & Issues', icon: AlertOctagon, path: `/project/${projectId}/issues`, show: true },
+    { label: 'Pre-Inspection Check', icon: CheckSquare, path: `/project/${projectId}/check`, show: true },
+    { label: 'Compliance Reports', icon: FileText, path: `/project/${projectId}/reports`, show: true },
+  ].filter(item => item.show) : [];
 
   return (
     <div className="min-h-screen bg-white flex flex-row font-sans">

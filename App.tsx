@@ -15,6 +15,7 @@ import { Calculators } from './components/Calculators';
 import { IssuesLog } from './components/IssuesLog';
 import { MaterialTakeOff } from './components/MaterialTakeOff';
 import { FeederManager } from './components/FeederManager';
+import { DwellingLoadCalculator } from './components/DwellingLoadCalculator';
 import { Project, ProjectStatus, ProjectType } from './types';
 import { askNecAssistant } from './services/geminiService';
 import { Send, MessageSquare } from 'lucide-react';
@@ -37,7 +38,7 @@ const ProjectWrapper = ({ projects, updateProject, deleteProject, onSignOut }: {
     if (!project) return <Navigate to="/" />;
 
     return (
-        <Layout title={project.name} showBack onSignOut={onSignOut}>
+        <Layout title={project.name} showBack onSignOut={onSignOut} projectType={project.type}>
             <Routes>
                 <Route path="/" element={
                     <FeatureErrorBoundary>
@@ -46,7 +47,12 @@ const ProjectWrapper = ({ projects, updateProject, deleteProject, onSignOut }: {
                 } />
                 <Route path="/load-calc" element={
                     <FeatureErrorBoundary>
-                        <LoadCalculator project={project} updateProject={updateProject} />
+                        {/* Residential projects use DwellingLoadCalculator, others use LoadCalculator */}
+                        {project.type === ProjectType.RESIDENTIAL ? (
+                            <DwellingLoadCalculator project={project} updateProject={updateProject} />
+                        ) : (
+                            <LoadCalculator project={project} updateProject={updateProject} />
+                        )}
                     </FeatureErrorBoundary>
                 } />
                 <Route path="/circuits" element={

@@ -1,8 +1,8 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Project, ProjectType, ProjectStatus } from '../types';
-import { Save, AlertTriangle, Building, Zap, Trash2 } from 'lucide-react';
+import { Project, ProjectType, ProjectStatus, DwellingType, ResidentialSettings } from '../types';
+import { Save, AlertTriangle, Building, Zap, Trash2, Home, Users, Lock } from 'lucide-react';
 import { usePanels } from '../hooks/usePanels';
 
 interface ProjectSetupProps {
@@ -109,9 +109,71 @@ export const ProjectSetup: React.FC<ProjectSetupProps> = ({ project, updateProje
   };
 
   const handleMetaChange = (field: keyof Project, value: any) => {
-    const updated = { ...localProject, [field]: value };
+    let updated = { ...localProject, [field]: value };
+    
+    // When changing to Residential, auto-lock to 120/240V single-phase
+    if (field === 'type' && value === ProjectType.RESIDENTIAL) {
+      updated = {
+        ...updated,
+        settings: {
+          ...updated.settings,
+          serviceVoltage: 240,
+          servicePhase: 1,
+          occupancyType: 'dwelling',
+          // Initialize residential settings if not present
+          residential: updated.settings.residential || {
+            dwellingType: DwellingType.SINGLE_FAMILY,
+            smallApplianceCircuits: 2,
+            laundryCircuit: true,
+            bathroomCircuits: 1,
+            garageCircuit: false,
+            outdoorCircuit: false,
+          }
+        },
+        serviceVoltage: 240,
+        servicePhase: 1
+      };
+    }
+    
+    // When changing away from Residential, update occupancyType
+    if (field === 'type' && value === ProjectType.COMMERCIAL) {
+      updated = {
+        ...updated,
+        settings: {
+          ...updated.settings,
+          occupancyType: 'commercial'
+        }
+      };
+    } else if (field === 'type' && value === ProjectType.INDUSTRIAL) {
+      updated = {
+        ...updated,
+        settings: {
+          ...updated.settings,
+          occupancyType: 'industrial'
+        }
+      };
+    }
+    
     debouncedUpdate(updated);
   };
+  
+  // Handle residential-specific settings
+  const handleResidentialChange = (field: keyof ResidentialSettings, value: any) => {
+    const updated = {
+      ...localProject,
+      settings: {
+        ...localProject.settings,
+        residential: {
+          ...localProject.settings.residential,
+          [field]: value
+        } as ResidentialSettings
+      }
+    };
+    debouncedUpdate(updated);
+  };
+
+  // Check if project is residential
+  const isResidential = localProject.type === ProjectType.RESIDENTIAL;
 
   return (
     <div className="space-y-8 animate-in fade-in duration-500 max-w-5xl">
@@ -222,24 +284,38 @@ export const ProjectSetup: React.FC<ProjectSetupProps> = ({ project, updateProje
           <div className="space-y-4">
             <div>
               <label className="block text-xs font-semibold text-gray-500 uppercase mb-1">Electrical System Type</label>
-              <select
-                value={(() => {
-                  const v = localProject.settings.serviceVoltage;
-                  const p = localProject.settings.servicePhase;
-                  if (v === 240 && p === 1) return '120/240-1';
-                  if (v === 208 && p === 3) return '120/208-3';
-                  if (v === 480 && p === 3) return '277/480-3';
-                  return '120/240-1'; // Default
-                })()}
-                onChange={e => handleSystemTypeChange(e.target.value)}
-                className="w-full border-gray-200 rounded-md text-sm font-mono"
-              >
-                <option value="120/240-1">120/240V Single-Phase (Residential)</option>
-                <option value="120/208-3">120/208V Three-Phase (Commercial)</option>
-                <option value="277/480-3">277/480V Three-Phase (Industrial)</option>
-              </select>
+              {isResidential ? (
+                // Locked for residential - always 120/240V single-phase
+                <div className="flex items-center gap-2">
+                  <div className="flex-1 px-3 py-2 bg-gray-50 border border-gray-200 rounded-md text-sm font-mono text-gray-700">
+                    <span className="flex items-center gap-2">
+                      <Lock className="w-3 h-3 text-gray-400" />
+                      120/240V Single-Phase
+                    </span>
+                  </div>
+                </div>
+              ) : (
+                <select
+                  value={(() => {
+                    const v = localProject.settings.serviceVoltage;
+                    const p = localProject.settings.servicePhase;
+                    if (v === 240 && p === 1) return '120/240-1';
+                    if (v === 208 && p === 3) return '120/208-3';
+                    if (v === 480 && p === 3) return '277/480-3';
+                    return '120/240-1'; // Default
+                  })()}
+                  onChange={e => handleSystemTypeChange(e.target.value)}
+                  className="w-full border-gray-200 rounded-md text-sm font-mono"
+                >
+                  <option value="120/240-1">120/240V Single-Phase (Residential)</option>
+                  <option value="120/208-3">120/208V Three-Phase (Commercial)</option>
+                  <option value="277/480-3">277/480V Three-Phase (Industrial)</option>
+                </select>
+              )}
               <p className="text-xs text-gray-500 mt-1">
-                Common electrical system configurations per NEC standards
+                {isResidential 
+                  ? 'Residential projects are limited to 120/240V single-phase per NEC' 
+                  : 'Common electrical system configurations per NEC standards'}
               </p>
             </div>
 
@@ -273,6 +349,158 @@ export const ProjectSetup: React.FC<ProjectSetupProps> = ({ project, updateProje
             </div>
           </div>
         </div>
+
+        {/* Residential Settings - Only shown for Residential projects */}
+        {isResidential && (
+          <div className="md:col-span-2 bg-gradient-to-br from-amber-50 to-orange-50 border border-amber-200 rounded-lg p-6 shadow-sm">
+            <h3 className="text-lg font-medium text-gray-900 mb-6 flex items-center gap-2">
+              <Home className="w-5 h-5 text-amber-600" /> Residential Settings
+            </h3>
+            
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              {/* Dwelling Type */}
+              <div>
+                <label className="block text-xs font-semibold text-gray-500 uppercase mb-1">Dwelling Type</label>
+                <select
+                  value={localProject.settings.residential?.dwellingType || DwellingType.SINGLE_FAMILY}
+                  onChange={e => handleResidentialChange('dwellingType', e.target.value)}
+                  className="w-full border-amber-200 rounded-md text-sm bg-white focus:border-amber-500 focus:ring-amber-500"
+                >
+                  <option value={DwellingType.SINGLE_FAMILY}>Single-Family (NEC 220.82)</option>
+                  <option value={DwellingType.MULTI_FAMILY}>Multi-Family (NEC 220.84)</option>
+                </select>
+                <p className="text-xs text-gray-500 mt-1">
+                  Determines calculation method
+                </p>
+              </div>
+              
+              {/* Square Footage - Single Family */}
+              {localProject.settings.residential?.dwellingType !== DwellingType.MULTI_FAMILY && (
+                <div>
+                  <label className="block text-xs font-semibold text-gray-500 uppercase mb-1">Heated Square Footage</label>
+                  <input
+                    type="number"
+                    value={localProject.settings.residential?.squareFootage || ''}
+                    onChange={e => handleResidentialChange('squareFootage', Number(e.target.value))}
+                    className="w-full border-amber-200 rounded-md text-sm bg-white focus:border-amber-500 focus:ring-amber-500"
+                    placeholder="e.g. 2500"
+                    min={0}
+                  />
+                  <p className="text-xs text-gray-500 mt-1">
+                    Used for general lighting load (3 VA/sq ft)
+                  </p>
+                </div>
+              )}
+              
+              {/* Total Units - Multi Family */}
+              {localProject.settings.residential?.dwellingType === DwellingType.MULTI_FAMILY && (
+                <div>
+                  <label className="block text-xs font-semibold text-gray-500 uppercase mb-1">Total Dwelling Units</label>
+                  <input
+                    type="number"
+                    value={localProject.settings.residential?.totalUnits || ''}
+                    onChange={e => handleResidentialChange('totalUnits', Number(e.target.value))}
+                    className="w-full border-amber-200 rounded-md text-sm bg-white focus:border-amber-500 focus:ring-amber-500"
+                    placeholder="e.g. 12"
+                    min={1}
+                  />
+                  <p className="text-xs text-gray-500 mt-1">
+                    Number of apartments/units
+                  </p>
+                </div>
+              )}
+
+              {/* Service Size Selector */}
+              <div>
+                <label className="block text-xs font-semibold text-gray-500 uppercase mb-1">Service Size</label>
+                <select
+                  value={localProject.settings.residential?.selectedServiceAmps || ''}
+                  onChange={e => handleResidentialChange('selectedServiceAmps', e.target.value ? Number(e.target.value) : undefined)}
+                  className="w-full border-amber-200 rounded-md text-sm bg-white focus:border-amber-500 focus:ring-amber-500"
+                >
+                  <option value="">Auto-Calculate</option>
+                  <option value="100">100A</option>
+                  <option value="150">150A</option>
+                  <option value="200">200A</option>
+                  <option value="400">400A (Multi-Family)</option>
+                </select>
+                <p className="text-xs text-gray-500 mt-1">
+                  Override calculated service
+                </p>
+              </div>
+            </div>
+
+            {/* Required Circuits Section */}
+            <div className="mt-6 pt-6 border-t border-amber-200">
+              <h4 className="text-sm font-medium text-gray-900 mb-4 flex items-center gap-2">
+                <Users className="w-4 h-4 text-amber-600" /> Required Branch Circuits (NEC 210.11)
+              </h4>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div>
+                  <label className="block text-xs font-semibold text-gray-500 uppercase mb-1">
+                    Small Appliance Circuits
+                  </label>
+                  <input
+                    type="number"
+                    value={localProject.settings.residential?.smallApplianceCircuits ?? 2}
+                    onChange={e => handleResidentialChange('smallApplianceCircuits', Math.max(2, Number(e.target.value)))}
+                    className="w-full border-amber-200 rounded-md text-sm bg-white"
+                    min={2}
+                  />
+                  <p className="text-xs text-gray-500 mt-1">Min: 2 required</p>
+                </div>
+                
+                <div>
+                  <label className="block text-xs font-semibold text-gray-500 uppercase mb-1">
+                    Bathroom Circuits
+                  </label>
+                  <input
+                    type="number"
+                    value={localProject.settings.residential?.bathroomCircuits ?? 1}
+                    onChange={e => handleResidentialChange('bathroomCircuits', Math.max(1, Number(e.target.value)))}
+                    className="w-full border-amber-200 rounded-md text-sm bg-white"
+                    min={1}
+                  />
+                  <p className="text-xs text-gray-500 mt-1">Min: 1 required</p>
+                </div>
+                
+                <div className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    id="laundryCircuit"
+                    checked={localProject.settings.residential?.laundryCircuit ?? true}
+                    onChange={e => handleResidentialChange('laundryCircuit', e.target.checked)}
+                    className="rounded border-amber-300 text-amber-600 focus:ring-amber-500"
+                  />
+                  <label htmlFor="laundryCircuit" className="text-sm text-gray-700">
+                    Laundry Circuit <span className="text-xs text-gray-500">(required)</span>
+                  </label>
+                </div>
+                
+                <div className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    id="garageCircuit"
+                    checked={localProject.settings.residential?.garageCircuit ?? false}
+                    onChange={e => handleResidentialChange('garageCircuit', e.target.checked)}
+                    className="rounded border-amber-300 text-amber-600 focus:ring-amber-500"
+                  />
+                  <label htmlFor="garageCircuit" className="text-sm text-gray-700">
+                    Garage/Accessory Building
+                  </label>
+                </div>
+              </div>
+            </div>
+
+            {/* Tip for Residential */}
+            <div className="mt-6 p-4 bg-amber-100/50 border border-amber-200 rounded-md">
+              <p className="text-xs text-amber-800">
+                <strong>💡 Next Step:</strong> Use the <strong>Dwelling Calculator</strong> tab to add appliances and calculate 
+                your total service load per NEC {localProject.settings.residential?.dwellingType === DwellingType.MULTI_FAMILY ? '220.84' : '220.82'}.
+              </p>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

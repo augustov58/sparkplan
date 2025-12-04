@@ -32,6 +32,101 @@
 
 #### Pending / Blocked
 - Run Supabase migration for `load_type` column (see `supabase/migration-circuit-load-type.sql`)
+- Run Supabase migration for `grounding_details` table (if not yet applied)
+
+---
+
+### 2025-12-04: Residential Workflow Implementation (NEW)
+
+**Summary**: Implemented a complete residential workflow with NEC 220.82/220.84 calculations, auto-generated panel schedules, and conditional tab visibility.
+
+**Phase 1: Project Type Detection & Constraints**
+- Added `DwellingType` enum (SINGLE_FAMILY, MULTI_FAMILY)
+- Added `ResidentialAppliances` interface for appliance configurations
+- Added `DwellingUnitTemplate` interface for multi-family unit types
+- Added `ResidentialSettings` interface to ProjectSettings
+- Modified `Layout.tsx`:
+  - Conditional tab visibility based on project type
+  - Residential: Shows "Dwelling Calculator" (hides "Load Calculations", "Circuit Design", "Feeder Sizing")
+  - Commercial/Industrial: Standard tabs
+- Modified `ProjectSetup.tsx`:
+  - Residential locked to 120/240V single-phase (NEC)
+  - Added residential-specific settings section (dwelling type, sq ft, service size)
+  - Added NEC 210.11 required circuit counts (small appliance, bathroom, laundry)
+  - Auto-initialization of residential settings when switching to Residential
+
+**Phase 2: NEC 220.82/220.84 Calculation Service**
+Created `services/calculations/residentialLoad.ts`:
+- **NEC 220.82 (Single-Family)**:
+  - General lighting load: 3 VA/sq ft × sq footage
+  - Small appliance circuits: 1,500 VA × count (min 2)
+  - Laundry circuit: 1,500 VA
+  - Table 220.42 tiered demand (100%/35%/25%)
+  - Table 220.55 range demand (8 kW for ≤12 kW)
+  - Table 220.54 dryer demand (5 kW min)
+  - Water heater at 100%
+  - NEC 220.60 non-coincident HVAC loads (larger of heat/cool)
+  - All other appliances at 100%
+- **NEC 220.84 (Multi-Family)**:
+  - Unit templates with individual calculations
+  - Table 220.84 demand factors (45% for 3 units down to 32% for 40+)
+  - House panel loads at 100%
+- **Panel Schedule Generation**:
+  - Auto-generates circuits based on appliance checklist
+  - Correct breaker sizing per NEC (125% for continuous loads)
+  - Load type classification (L, R, M, K, H, C, W, D, O)
+
+**Phase 3: DwellingLoadCalculator Component**
+Created `components/DwellingLoadCalculator.tsx`:
+- **Appliance Checklist UI**:
+  - Toggle cards for each major appliance (Range, Dryer, Water Heater, HVAC, etc.)
+  - Electric vs Gas selection
+  - kW/HP input with NEC defaults
+  - Custom "Other Appliances" with add/remove
+- **Multi-Family Support**:
+  - Unit template management (add, edit, remove)
+  - Square footage and unit count per template
+  - House panel load input
+- **Real-time Calculation**:
+  - Service load summary (Connected VA, Demand VA, Factor)
+  - Service sizing recommendation (100/150/200/400A)
+  - Detailed load breakdown table by category
+  - NEC references list
+  - Warnings for code violations
+- **Panel Schedule Generation**:
+  - "Generate Panel Schedule" button
+  - Preview modal with all circuits
+  - "Apply to Panel Schedule" creates circuits in database
+
+**Files Created**:
+- `services/calculations/residentialLoad.ts` - NEC 220.82/220.84 calculation service
+- `components/DwellingLoadCalculator.tsx` - Residential load calculator UI
+
+**Files Modified**:
+- `types.ts` - Added DwellingType, ResidentialAppliances, DwellingUnitTemplate, ResidentialSettings
+- `components/Layout.tsx` - Conditional tab visibility by project type
+- `components/ProjectSetup.tsx` - Residential settings section, voltage lock
+- `App.tsx` - Route to DwellingLoadCalculator for residential projects
+- `services/calculations/index.ts` - Export residentialLoad
+
+**Testing Done**:
+- [x] TypeScript compiles (no errors)
+- [x] Build succeeds
+- [ ] Manual testing with residential project (pending)
+
+**NEC References Implemented**:
+- NEC 220.82 - Standard Method for Single-Family
+- NEC 220.84 - Multi-Family Optional Calculation
+- NEC Table 220.12 - General Lighting Loads (3 VA/sq ft)
+- NEC Table 220.42 - Lighting Demand Factors
+- NEC Table 220.54 - Dryer Demand Factors
+- NEC Table 220.55 - Range Demand Factors
+- NEC 220.52(A) - Small Appliance Circuits
+- NEC 220.52(B) - Laundry Circuit
+- NEC 220.60 - Non-coincident Loads
+- NEC 210.11(C) - Required Branch Circuits
+- NEC 625 - EV Charging
+- NEC 680 - Swimming Pools/Hot Tubs
 
 ---
 
@@ -354,6 +449,12 @@ User identified: When MDP feeds Panel H1, the MDP panel schedule should show a c
 - Add more Zod validation to remaining forms
 - Unit tests for new calculation services
 - Integration tests for export functionality
+- **Residential workflow (DONE 2025-12-04)**:
+  - ✅ NEC 220.82 single-family calculations
+  - ✅ NEC 220.84 multi-family calculations
+  - ✅ Conditional tab visibility
+  - ✅ Auto-generated panel schedules
+  - ✅ Appliance checklist UI
 
 ---
 
