@@ -2,16 +2,25 @@
  * Feeder Manager Component
  * NEC Article 215 - Feeder Sizing and Management
  * Manages feeders between panels and transformers with automatic load calculations
+ * 
+ * Features:
+ * - Automatic load calculation with NEC 220 demand factors
+ * - Stale feeder detection when panel loads change
+ * - Panel connectivity validation (prevents invalid feeder connections)
+ * - Upstream load aggregation for cascaded panel systems
  */
 
-import React, { useState } from 'react';
-import { Cable, Plus, Trash2, Edit2, Save, X, AlertTriangle, CheckCircle } from 'lucide-react';
+import React, { useState, useMemo, useEffect } from 'react';
+import { Cable, Plus, Trash2, Edit2, Save, X, AlertTriangle, CheckCircle, RefreshCw, Info } from 'lucide-react';
 import { useFeeders } from '../hooks/useFeeders';
 import { usePanels } from '../hooks/usePanels';
 import { useTransformers } from '../hooks/useTransformers';
 import { useCircuits } from '../hooks/useCircuits';
 import { calculateFeederSizing } from '../services/calculations';
 import { validateFeederForm, showValidationErrors } from '../lib/validation-utils';
+import { validateFeederConnectivity, getValidFeederDestinations } from '../services/validation/panelConnectivityValidation';
+import { checkFeederLoadStatus, getStaleFeedersList } from '../services/feeder/feederLoadSync';
+import { calculateAggregatedLoad } from '../services/calculations/upstreamLoadAggregation';
 import type { Feeder, FeederCalculationResult } from '../types';
 
 interface FeederManagerProps {
@@ -44,28 +53,75 @@ export const FeederManager: React.FC<FeederManagerProps> = ({
     num_current_carrying: 4
   });
   const [destinationType, setDestinationType] = useState<'panel' | 'transformer'>('panel');
+  const [connectivityError, setConnectivityError] = useState<string | null>(null);
+  const [showStaleWarning, setShowStaleWarning] = useState(true);
 
-  // Calculate loads for a destination panel
+  // Detect stale feeders when circuit loads change
+  const staleFeeders = useMemo(() => {
+    return getStaleFeedersList(feeders, circuits, 5); // 5% threshold
+  }, [feeders, circuits]);
+
+  // Get valid destination panels based on selected source
+  const validDestinations = useMemo(() => {
+    if (!formData.source_panel_id) return [];
+    return getValidFeederDestinations(formData.source_panel_id, panels, transformers);
+  }, [formData.source_panel_id, panels, transformers]);
+
+  // Validate connectivity when destination changes
+  useEffect(() => {
+    if (formData.source_panel_id && formData.destination_panel_id) {
+      const validation = validateFeederConnectivity(
+        formData.source_panel_id,
+        formData.destination_panel_id,
+        panels,
+        transformers
+      );
+      if (!validation.isConnected) {
+        setConnectivityError(validation.message + (validation.technicalReason ? `\n\n${validation.technicalReason}` : ''));
+      } else {
+        setConnectivityError(null);
+      }
+    } else {
+      setConnectivityError(null);
+    }
+  }, [formData.source_panel_id, formData.destination_panel_id, panels, transformers]);
+
+  // Calculate loads for a destination panel (includes downstream aggregation per NEC 220.40)
   const calculatePanelLoads = (panelId: string) => {
+    // Use aggregated load calculation to include downstream panels
+    const aggregated = calculateAggregatedLoad(panelId, panels, circuits, transformers);
+    
+    // Calculate continuous vs non-continuous from direct circuits
     const panelCircuits = circuits.filter(c => c.panel_id === panelId);
-
-    let totalVA = 0;
     let continuousVA = 0;
     let noncontinuousVA = 0;
 
     panelCircuits.forEach(circuit => {
       const loadVA = circuit.load_watts || 0;
-      totalVA += loadVA;
-
-      // Assume circuits >20A or HVAC are continuous
-      if (circuit.breaker_amps >= 20) {
+      // Assume circuits >20A or HVAC/Motor are continuous
+      if (circuit.breaker_amps >= 20 || circuit.load_type === 'M' || circuit.load_type === 'H') {
         continuousVA += loadVA;
       } else {
         noncontinuousVA += loadVA;
       }
     });
 
-    return { totalVA, continuousVA, noncontinuousVA };
+    // Add downstream loads as non-continuous (already factored)
+    noncontinuousVA += aggregated.downstreamPanelsDemandVA + aggregated.transformerLoadVA;
+
+    return { 
+      totalVA: aggregated.totalConnectedVA, 
+      continuousVA, 
+      noncontinuousVA,
+      demandVA: aggregated.totalDemandVA,
+      hasDownstreamLoads: aggregated.downstreamPanelCount > 0 || aggregated.transformerCount > 0,
+      breakdown: aggregated.breakdown
+    };
+  };
+
+  // Recalculate a stale feeder
+  const handleRecalculateFeeder = async (feeder: Feeder) => {
+    await handleCalculateFeeder(feeder);
   };
 
   // Calculate feeder and update database
@@ -197,6 +253,52 @@ export const FeederManager: React.FC<FeederManagerProps> = ({
 
   return (
     <div className="space-y-6">
+      {/* Stale Feeders Warning Banner */}
+      {staleFeeders.length > 0 && showStaleWarning && (
+        <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
+          <div className="flex items-start justify-between">
+            <div className="flex items-start gap-3">
+              <AlertTriangle className="w-5 h-5 text-amber-600 mt-0.5" />
+              <div>
+                <h4 className="font-semibold text-amber-800">
+                  {staleFeeders.length} Feeder{staleFeeders.length > 1 ? 's' : ''} Need Recalculation
+                </h4>
+                <p className="text-sm text-amber-700 mt-1">
+                  Panel loads have changed since these feeders were calculated. Click the refresh button to update.
+                </p>
+                <ul className="mt-2 space-y-1">
+                  {staleFeeders.map(sf => (
+                    <li key={sf.feederId} className="text-sm text-amber-700 flex items-center gap-2">
+                      <span className="font-medium">{sf.feederName}:</span>
+                      <span>
+                        {sf.cachedConnectedVA.toLocaleString()} VA → {sf.currentConnectedVA.toLocaleString()} VA
+                        ({sf.loadDifferencePercent > 0 ? '+' : ''}{sf.loadDifferencePercent}%)
+                      </span>
+                      <button
+                        onClick={() => {
+                          const feeder = feeders.find(f => f.id === sf.feederId);
+                          if (feeder) handleRecalculateFeeder(feeder);
+                        }}
+                        className="p-1 text-amber-700 hover:text-amber-900 hover:bg-amber-100 rounded"
+                        title="Recalculate feeder"
+                      >
+                        <RefreshCw className="w-4 h-4" />
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            </div>
+            <button
+              onClick={() => setShowStaleWarning(false)}
+              className="text-amber-600 hover:text-amber-800"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
@@ -301,18 +403,43 @@ export const FeederManager: React.FC<FeederManagerProps> = ({
                 {destinationType === 'panel' ? 'Destination Panel' : 'Destination Transformer'}
               </label>
               {destinationType === 'panel' ? (
-                <select
-                  value={formData.destination_panel_id || ''}
-                  onChange={e => setFormData({ ...formData, destination_panel_id: e.target.value || null })}
-                  className="w-full border-gray-200 rounded-md focus:border-electric-500 focus:ring-electric-500 text-sm py-2"
-                >
-                  <option value="">Select Destination Panel</option>
-                  {panels.map(panel => (
-                    <option key={panel.id} value={panel.id}>
-                      {panel.name} ({panel.voltage}V, {panel.phase}-phase)
+                <>
+                  <select
+                    value={formData.destination_panel_id || ''}
+                    onChange={e => setFormData({ ...formData, destination_panel_id: e.target.value || null })}
+                    className={`w-full rounded-md focus:border-electric-500 focus:ring-electric-500 text-sm py-2 ${
+                      connectivityError ? 'border-red-300 bg-red-50' : 'border-gray-200'
+                    }`}
+                    disabled={!formData.source_panel_id}
+                  >
+                    <option value="">
+                      {formData.source_panel_id ? 'Select Destination Panel' : 'Select source panel first'}
                     </option>
-                  ))}
-                </select>
+                    {formData.source_panel_id && panels
+                      .filter(p => p.id !== formData.source_panel_id)
+                      .map(panel => {
+                        const isValid = validDestinations.some(vd => vd.id === panel.id);
+                        return (
+                          <option 
+                            key={panel.id} 
+                            value={panel.id}
+                            disabled={!isValid}
+                            className={!isValid ? 'text-gray-400' : ''}
+                          >
+                            {panel.name} ({panel.voltage}V, {panel.phase}φ)
+                            {!isValid ? ' ⚠ Not connected' : ''}
+                          </option>
+                        );
+                      })}
+                  </select>
+                  {/* Connectivity helper text */}
+                  {formData.source_panel_id && validDestinations.length === 0 && (
+                    <p className="text-xs text-amber-600 mt-1 flex items-center gap-1">
+                      <Info className="w-3 h-3" />
+                      No panels are directly connected to this source. Panels must be on the same electrical branch.
+                    </p>
+                  )}
+                </>
               ) : (
                 <select
                   value={formData.destination_transformer_id || ''}
@@ -328,6 +455,18 @@ export const FeederManager: React.FC<FeederManagerProps> = ({
                 </select>
               )}
             </div>
+
+            {/* Connectivity Error Display */}
+            {connectivityError && (
+              <div className="md:col-span-2 bg-red-50 border border-red-200 rounded-lg p-3">
+                <div className="flex items-start gap-2">
+                  <AlertTriangle className="w-4 h-4 text-red-600 mt-0.5 flex-shrink-0" />
+                  <div className="text-sm text-red-700 whitespace-pre-wrap">
+                    {connectivityError}
+                  </div>
+                </div>
+              </div>
+            )}
 
             {/* Distance */}
             <div>
@@ -388,8 +527,13 @@ export const FeederManager: React.FC<FeederManagerProps> = ({
           <div className="flex gap-3 mt-6">
             <button
               onClick={() => handleCalculateFeeder(formData)}
-              disabled={!formData.name || (!formData.destination_panel_id && !formData.destination_transformer_id)}
+              disabled={
+                !formData.name || 
+                (!formData.destination_panel_id && !formData.destination_transformer_id) ||
+                !!connectivityError
+              }
               className="flex items-center gap-2 px-4 py-2 bg-electric-500 text-white rounded-lg hover:bg-electric-600 transition-colors text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+              title={connectivityError ? 'Cannot save: panels are not properly connected' : undefined}
             >
               <Save className="w-4 h-4" />
               Calculate & Save
@@ -420,17 +564,22 @@ export const FeederManager: React.FC<FeederManagerProps> = ({
         </div>
       ) : (
         <div className="space-y-4">
-          {feeders.map(feeder => (
-            <FeederCard
-              key={feeder.id}
-              feeder={feeder}
-              panels={panels}
-              transformers={transformers}
-              onEdit={handleEdit}
-              onDelete={handleDelete}
-              isEditing={editingId === feeder.id}
-            />
-          ))}
+          {feeders.map(feeder => {
+            const staleStatus = checkFeederLoadStatus(feeder, circuits, 5);
+            return (
+              <FeederCard
+                key={feeder.id}
+                feeder={feeder}
+                panels={panels}
+                transformers={transformers}
+                onEdit={handleEdit}
+                onDelete={handleDelete}
+                onRecalculate={handleRecalculateFeeder}
+                isEditing={editingId === feeder.id}
+                staleStatus={staleStatus}
+              />
+            );
+          })}
         </div>
       )}
     </div>
@@ -444,7 +593,15 @@ interface FeederCardProps {
   transformers: any[];
   onEdit: (feeder: Feeder) => void;
   onDelete: (id: string) => void;
+  onRecalculate: (feeder: Feeder) => void;
   isEditing: boolean;
+  staleStatus: {
+    isStale: boolean;
+    currentConnectedVA: number;
+    cachedConnectedVA: number;
+    loadDifferencePercent: number;
+    message: string;
+  };
 }
 
 const FeederCard: React.FC<FeederCardProps> = ({
@@ -453,7 +610,9 @@ const FeederCard: React.FC<FeederCardProps> = ({
   transformers,
   onEdit,
   onDelete,
-  isEditing
+  onRecalculate,
+  isEditing,
+  staleStatus
 }) => {
   const sourcePanel = panels.find(p => p.id === feeder.source_panel_id);
   const destPanel = panels.find(p => p.id === feeder.destination_panel_id);
@@ -462,16 +621,54 @@ const FeederCard: React.FC<FeederCardProps> = ({
   const vdCompliant = (feeder.voltage_drop_percent || 0) <= 3.0;
 
   return (
-    <div className={`bg-white border rounded-lg p-6 ${isEditing ? 'border-electric-500 border-2' : 'border-gray-200'}`}>
+    <div className={`bg-white border rounded-lg p-6 ${
+      isEditing ? 'border-electric-500 border-2' : 
+      staleStatus.isStale ? 'border-amber-300 border-2' : 
+      'border-gray-200'
+    }`}>
+      {/* Stale Warning Badge */}
+      {staleStatus.isStale && (
+        <div className="flex items-center justify-between bg-amber-50 border border-amber-200 rounded-lg p-3 mb-4">
+          <div className="flex items-center gap-2">
+            <AlertTriangle className="w-4 h-4 text-amber-600" />
+            <span className="text-sm text-amber-800">
+              Load changed: {staleStatus.cachedConnectedVA.toLocaleString()} VA → {staleStatus.currentConnectedVA.toLocaleString()} VA 
+              ({staleStatus.loadDifferencePercent > 0 ? '+' : ''}{staleStatus.loadDifferencePercent}%)
+            </span>
+          </div>
+          <button
+            onClick={() => onRecalculate(feeder)}
+            className="flex items-center gap-1 px-3 py-1 bg-amber-100 text-amber-800 rounded hover:bg-amber-200 transition-colors text-sm font-medium"
+          >
+            <RefreshCw className="w-3 h-3" />
+            Recalculate
+          </button>
+        </div>
+      )}
+
       {/* Header */}
       <div className="flex items-start justify-between mb-4">
         <div>
-          <h4 className="font-bold text-gray-900 text-lg">{feeder.name}</h4>
+          <h4 className="font-bold text-gray-900 text-lg flex items-center gap-2">
+            {feeder.name}
+            {staleStatus.isStale && (
+              <span className="text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full">
+                Outdated
+              </span>
+            )}
+          </h4>
           <p className="text-sm text-gray-500 mt-1">
             {sourcePanel?.name || 'Unknown'} → {destPanel?.name || destTransformer?.name || 'Unknown'}
           </p>
         </div>
         <div className="flex gap-2">
+          <button
+            onClick={() => onRecalculate(feeder)}
+            className="p-2 text-gray-500 hover:text-electric-600 hover:bg-electric-50 rounded transition-colors"
+            title="Recalculate feeder sizing"
+          >
+            <RefreshCw className="w-4 h-4" />
+          </button>
           <button
             onClick={() => onEdit(feeder)}
             className="p-2 text-gray-500 hover:text-electric-600 hover:bg-electric-50 rounded transition-colors"

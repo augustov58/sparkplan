@@ -6,9 +6,10 @@
 
 import React, { useState, useMemo } from 'react';
 import { Project } from '../types';
-import { LayoutGrid, Download, Edit2, Save, X, Trash2, Settings, Calculator, Info } from 'lucide-react';
+import { LayoutGrid, Download, Edit2, Save, X, Trash2, Settings, Calculator, Info, ArrowDown } from 'lucide-react';
 import { usePanels } from '../hooks/usePanels';
 import { useCircuits } from '../hooks/useCircuits';
+import { useTransformers } from '../hooks/useTransformers';
 import { exportPanelSchedulePDF, exportAllPanelsPDF } from '../services/pdfExport/panelSchedulePDF';
 import { 
   calculatePanelDemand, 
@@ -16,6 +17,7 @@ import {
   getLoadTypeColor,
   type CircuitLoad 
 } from '../services/calculations/demandFactor';
+import { calculateAggregatedLoad } from '../services/calculations/upstreamLoadAggregation';
 import type { LoadTypeCode } from '../types';
 
 // Load type options for dropdown
@@ -38,6 +40,7 @@ interface PanelScheduleProps {
 export const PanelSchedule: React.FC<PanelScheduleProps> = ({ project }) => {
   const { panels } = usePanels(project.id);
   const { circuits, updateCircuit, deleteCircuit } = useCircuits(project.id);
+  const { transformers } = useTransformers(project.id);
 
   const [selectedPanelId, setSelectedPanelId] = useState<string | null>(null);
   const [editingCircuit, setEditingCircuit] = useState<string | null>(null);
@@ -75,6 +78,12 @@ export const PanelSchedule: React.FC<PanelScheduleProps> = ({ project }) => {
 
     return calculatePanelDemand(circuitLoads, selectedPanel.voltage, selectedPanel.phase);
   }, [selectedPanel, panelCircuits]);
+
+  // Calculate aggregated load including downstream panels
+  const aggregatedLoad = useMemo(() => {
+    if (!selectedPanel) return null;
+    return calculateAggregatedLoad(selectedPanel.id, panels, circuits, transformers);
+  }, [selectedPanel, panels, circuits, transformers]);
 
   // Generate slots based on panel bus rating
   const totalSlots = selectedPanel ? Math.min(42, Math.ceil(selectedPanel.bus_rating / 10)) : 42;
@@ -667,6 +676,57 @@ export const PanelSchedule: React.FC<PanelScheduleProps> = ({ project }) => {
                 </div>
               </div>
             </div>
+
+            {/* Upstream Load Aggregation (when panel has downstream loads) */}
+            {aggregatedLoad && aggregatedLoad.downstreamPanelCount > 0 && (
+              <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
+                <h4 className="font-semibold text-sm text-amber-800 mb-3 flex items-center gap-2">
+                  <ArrowDown className="w-4 h-4" /> AGGREGATED LOAD (NEC 220.40)
+                </h4>
+                <p className="text-xs text-amber-700 mb-3">
+                  This panel feeds {aggregatedLoad.downstreamPanelCount} downstream panel{aggregatedLoad.downstreamPanelCount > 1 ? 's' : ''}.
+                  The demand load below includes all downstream loads.
+                </p>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="bg-white/50 rounded p-2">
+                    <span className="text-[10px] uppercase text-amber-600 block">Direct Load</span>
+                    <span className="text-base font-bold text-gray-900">{(aggregatedLoad.directDemandVA / 1000).toFixed(1)} kVA</span>
+                  </div>
+                  <div className="bg-white/50 rounded p-2">
+                    <span className="text-[10px] uppercase text-amber-600 block">Downstream Panels</span>
+                    <span className="text-base font-bold text-amber-700">{(aggregatedLoad.downstreamPanelsDemandVA / 1000).toFixed(1)} kVA</span>
+                  </div>
+                  {aggregatedLoad.transformerCount > 0 && (
+                    <div className="bg-white/50 rounded p-2">
+                      <span className="text-[10px] uppercase text-amber-600 block">Transformers ({aggregatedLoad.transformerCount})</span>
+                      <span className="text-base font-bold text-purple-700">{(aggregatedLoad.transformerLoadVA / 1000).toFixed(1)} kVA</span>
+                    </div>
+                  )}
+                  <div className="bg-amber-100 rounded p-2">
+                    <span className="text-[10px] uppercase text-amber-700 block">Total Aggregated</span>
+                    <span className="text-base font-bold text-amber-900">{(aggregatedLoad.totalDemandVA / 1000).toFixed(1)} kVA</span>
+                  </div>
+                </div>
+                {aggregatedLoad.breakdown.length > 0 && (
+                  <div className="mt-3 pt-3 border-t border-amber-200">
+                    <span className="text-[10px] uppercase text-amber-600 block mb-2">Load Breakdown</span>
+                    <ul className="text-xs text-amber-800 space-y-1">
+                      {aggregatedLoad.breakdown.map((item, i) => (
+                        <li key={i} className="flex justify-between">
+                          <span className="flex items-center gap-1">
+                            {item.sourceType === 'panel' && <span className="text-amber-500">⬇</span>}
+                            {item.sourceType === 'transformer' && <span className="text-purple-500">⚡</span>}
+                            {item.sourceType === 'circuit' && <span className="text-gray-400">○</span>}
+                            {item.sourceName}
+                          </span>
+                          <span className="font-mono">{(item.demandVA / 1000).toFixed(1)} kVA</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+              </div>
+            )}
 
             {/* NEC References */}
             {demandResult.necReferences.length > 0 && (

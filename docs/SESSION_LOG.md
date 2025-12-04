@@ -216,10 +216,46 @@ When continuing this session, read these files first:
 - ~~No error boundaries~~ → Already implemented, verified
 - ~~Tailwind CSS via CDN~~ → Now compiled locally with Tailwind v4
 - ~~Missing Zod schemas~~ → Added feeder schema, pattern established
+- ~~Feeder staleness detection~~ → Fixed 2025-12-04, feeders now detect load changes
+- ~~Panel connectivity validation~~ → Fixed 2025-12-04, blocks invalid feeder connections
+- ~~Upstream load aggregation~~ → Fixed 2025-12-04, demand loads flow upstream
 
 *Remaining considerations:*
 - Bundle size is large (2.3MB / 720KB gzip) - could benefit from code splitting
 - Could add more form validation to remaining components (ProjectSetup, PanelSchedule)
+
+---
+
+### 2025-12-04: Feeder Issues Fix (3 issues)
+
+**What Changed**:
+- `services/validation/panelConnectivityValidation.ts`: NEW - Validates panel connectivity for feeders
+- `services/feeder/feederLoadSync.ts`: NEW - Detects stale feeders when panel loads change
+- `services/calculations/upstreamLoadAggregation.ts`: NEW - NEC 220.40 upstream load aggregation
+- `components/FeederManager.tsx`: Added stale feeder warnings, connectivity validation, aggregated loads
+- `components/PanelSchedule.tsx`: Added "Aggregated Load" section for panels with downstream children
+- `ISSUES.md`: Marked 3 issues as fixed
+
+**Why**:
+Per ISSUES.md, three related feeder issues needed fixing:
+1. Feeders should update when panel load changes → Now shows warning + recalculation button
+2. Prevent feeders between unconnected panels → Validates electrical connectivity
+3. Downstream panel load should translate upstream → Uses NEC 220.40 demand factors
+
+**Technical Details**:
+- Panel connectivity uses graph traversal (BFS) to determine valid feeder paths
+- Stale detection compares cached feeder load vs current panel circuits (5% threshold)
+- Upstream aggregation recursively calculates loads including downstream panels/transformers
+- Uses DEMAND load (not connected) per NEC for feeder sizing
+
+**Testing Done**:
+- [x] Lint passes (no errors)
+- [ ] Manual testing (pending user verification)
+- [ ] Build verification
+
+**Next Steps**:
+- Run `npm run build` to verify compilation
+- Test feeder creation UI with various panel configurations
 
 ---
 
@@ -229,6 +265,8 @@ When continuing this session, read these files first:
 
 - ✅ 3 Quick Wins implemented (Validation, Error Boundaries, Tailwind)
 - ✅ 3 Feature Enhancements (Pan/Zoom, EV/Solar Calcs, Diagram Export)
+- ✅ 3 Feeder Issues Fixed (Stale Detection, Connectivity, Upstream Aggregation)
+- ✅ Grounding & Bonding persistence fixed
 - ✅ All builds passing
 
 **Potential future enhancements:**
