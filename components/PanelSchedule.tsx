@@ -174,14 +174,19 @@ export const PanelSchedule: React.FC<PanelScheduleProps> = ({ project }) => {
       totalWithFeeders_kVA: (directTotalVA + feederTotalVA) / 1000,
       connectedWithFeeders_kVA: (directConnectedVA + feederTotalVA) / 1000,
     } : {
-      // Minimal result when only feeders exist
+      // Minimal result when only feeders exist (no direct circuits)
       totalConnectedLoad_kVA: feederTotalVA / 1000,
       totalDemandLoad_kVA: feederTotalVA / 1000,
       demandAmps: feederTotalVA / (selectedPanel.voltage * (selectedPanel.phase === 3 ? Math.sqrt(3) : 1)),
       percentImbalance: 0,
-      phaseLoads: { A: feederTotalVA / (selectedPanel.phase === 3 ? 3 : 2), B: feederTotalVA / (selectedPanel.phase === 3 ? 3 : 2), C: selectedPanel.phase === 3 ? feederTotalVA / 3 : 0 },
+      // phaseLoads must be an array with objects matching the expected structure
+      phaseLoads: [
+        { phase: 'A' as const, connectedLoad_kVA: feederTotalVA / 1000 / (selectedPanel.phase === 3 ? 3 : 2), demandLoad_kVA: feederTotalVA / 1000 / (selectedPanel.phase === 3 ? 3 : 2) },
+        { phase: 'B' as const, connectedLoad_kVA: feederTotalVA / 1000 / (selectedPanel.phase === 3 ? 3 : 2), demandLoad_kVA: feederTotalVA / 1000 / (selectedPanel.phase === 3 ? 3 : 2) },
+        { phase: 'C' as const, connectedLoad_kVA: selectedPanel.phase === 3 ? feederTotalVA / 1000 / 3 : 0, demandLoad_kVA: selectedPanel.phase === 3 ? feederTotalVA / 1000 / 3 : 0 },
+      ],
       necReferences: [],
-      loadBreakdown: [],
+      loadsByType: [], // Empty since no direct circuits
       feederTotalVA,
       totalWithFeeders_kVA: feederTotalVA / 1000,
       connectedWithFeeders_kVA: feederTotalVA / 1000,
@@ -809,7 +814,7 @@ export const PanelSchedule: React.FC<PanelScheduleProps> = ({ project }) => {
                 </tr>
               </thead>
               <tbody>
-                {demandResult.loadsByType.map(lt => (
+                {(demandResult.loadsByType || []).map(lt => (
                   <tr key={lt.type} className="border-t border-gray-100">
                     <td className="p-2">
                       <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold ${getLoadTypeColor(lt.type)} border mr-2`}>
@@ -952,13 +957,13 @@ export const PanelSchedule: React.FC<PanelScheduleProps> = ({ project }) => {
             )}
 
             {/* NEC References */}
-            {demandResult.necReferences.length > 0 && (
+            {(demandResult.necReferences?.length || 0) > 0 && (
               <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
                 <h4 className="font-semibold text-sm text-blue-800 mb-2 flex items-center gap-2">
                   <Info className="w-4 h-4" /> NEC References Applied
                 </h4>
                 <ul className="text-xs text-blue-700 space-y-1">
-                  {demandResult.necReferences.map((ref, i) => (
+                  {(demandResult.necReferences || []).map((ref, i) => (
                     <li key={i}>• {ref}</li>
                   ))}
                 </ul>
