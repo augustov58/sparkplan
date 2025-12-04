@@ -23,16 +23,70 @@
 - [x] **Quick Win 1**: Added Zod feeder validation schema + integration
 - [x] **Quick Win 2**: Error boundaries (already implemented - verified)
 - [x] **Quick Win 3**: Compiled Tailwind locally (removed CDN, using Tailwind v4 + Vite plugin)
+- [x] **Feature**: Panel Schedule with NEC 220 Demand Factors and Load Types
 
 #### In Progress
-- None (all tasks completed)
+- None
 
 #### Pending / Blocked
-- None
+- Run Supabase migration for `load_type` column (see `supabase/migration-circuit-load-type.sql`)
 
 ---
 
 ## 🔄 Change Log
+
+### 2025-12-04: Panel Schedule NEC 220 Demand Factor Enhancement
+
+**Summary**: Added comprehensive load type classification and NEC Article 220 demand factor calculations to the panel schedule.
+
+**Changes Made**:
+
+1. **Load Type Classification System**
+   - Added `LoadTypeCode` type: L, M, R, O, H, C, W, D, K
+   - Added `load_type` field to circuits table (with migration)
+   - Load types correspond to NEC Article 220 categories
+
+2. **NEC Article 220 Demand Factor Service** (`services/calculations/demandFactor.ts`)
+   - Lighting demand (NEC 220.42): 100% first 3kVA, 35% next 117kVA, 25% remainder
+   - Receptacle demand (NEC 220.44): 100% first 10kVA, 50% remainder
+   - Motor demand (NEC 430.24): Largest motor at 125%
+   - Dryer demand (NEC Table 220.54): Based on number of dryers
+   - Kitchen equipment demand (NEC Table 220.56): Based on equipment count
+   - Phase load distribution and imbalance calculation
+
+3. **Professional Panel Schedule UI** (`components/PanelSchedule.tsx`)
+   - Two-column circuit layout (odd/even like professional schedules)
+   - Load/Phase columns showing kVA per phase (A, B, C)
+   - CODE column with color-coded load type badges
+   - Demand factor summary table by load type
+   - Phase totals row at bottom
+   - Total connected vs demand load comparison
+   - Phase imbalance percentage
+   - NEC references applied list
+
+4. **Circuit Creation with Load Type**
+   - Added load type selector to OneLineDiagram circuit form
+   - Added load type to BulkCircuitCreator
+   - Load type included in circuit data when creating/editing
+
+**Files Modified**:
+- `types.ts` - Added LoadTypeCode type and LOAD_TYPE_LABELS
+- `lib/database.types.ts` - Added load_type field to circuits table
+- `supabase/migration-circuit-load-type.sql` - New migration file
+- `services/calculations/demandFactor.ts` - New NEC 220 calculation service
+- `services/calculations/index.ts` - Export new service
+- `components/PanelSchedule.tsx` - Complete rewrite with professional layout
+- `components/OneLineDiagram.tsx` - Added load type to circuit creation
+- `components/BulkCircuitCreator.tsx` - Added load type support
+
+**Testing Done**:
+- [x] Build succeeds
+- [x] All TypeScript compiles
+
+**Database Migration Required**:
+Run `supabase/migration-circuit-load-type.sql` to add the load_type column.
+
+---
 
 ### 2025-12-04: Quick Wins + Feature Enhancements
 

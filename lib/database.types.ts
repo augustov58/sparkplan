@@ -134,6 +134,7 @@ export interface Database {
           load_watts: number
           conductor_size: string
           egc_size: string | null
+          load_type: 'L' | 'M' | 'R' | 'O' | 'H' | 'C' | 'W' | 'D' | 'K' | null
           created_at: string
         }
         Insert: {
@@ -147,6 +148,7 @@ export interface Database {
           load_watts: number
           conductor_size: string
           egc_size?: string | null
+          load_type?: 'L' | 'M' | 'R' | 'O' | 'H' | 'C' | 'W' | 'D' | 'K' | null
           created_at?: string
         }
         Update: {
@@ -160,6 +162,7 @@ export interface Database {
           load_watts?: number
           conductor_size?: string
           egc_size?: string | null
+          load_type?: 'L' | 'M' | 'R' | 'O' | 'H' | 'C' | 'W' | 'D' | 'K' | null
           created_at?: string
         }
       }

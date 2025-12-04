@@ -167,14 +167,15 @@ export const OneLineDiagram: React.FC<OneLineDiagramProps> = ({ project, updateP
   });
 
   // Circuit Editor State
-  const [newCircuit, setNewCircuit] = useState<Partial<PanelCircuit> & { panelId?: string }>({
+  const [newCircuit, setNewCircuit] = useState<Partial<PanelCircuit> & { panelId?: string; loadType?: string }>({
     circuitNumber: 1,
     description: '',
     breakerAmps: 20,
     pole: 1,
     conductorSize: '12 AWG',
     loadWatts: 0,
-    panelId: undefined
+    panelId: undefined,
+    loadType: 'O' // Default to Other
   });
 
   // Transformer Editor State
@@ -526,7 +527,8 @@ export const OneLineDiagram: React.FC<OneLineDiagramProps> = ({ project, updateP
       breaker_amps: breakerAmps,
       pole,
       load_watts: loadWatts,
-      conductor_size: conductorSize
+      conductor_size: conductorSize,
+      load_type: newCircuit.loadType || 'O'
     };
 
     await createCircuit(circuitData);
@@ -538,7 +540,8 @@ export const OneLineDiagram: React.FC<OneLineDiagramProps> = ({ project, updateP
       ...newCircuit,
       circuitNumber: nextNumber,
       description: '',
-      loadWatts: 0
+      loadWatts: 0,
+      loadType: 'O'
     });
   };
 
@@ -1017,60 +1020,79 @@ export const OneLineDiagram: React.FC<OneLineDiagramProps> = ({ project, updateP
                    })}
                  </select>
                </div>
-               <div className="grid grid-cols-4 gap-3">
-                 <div>
-                   <label className="text-xs font-semibold text-gray-500 uppercase">Load (VA)</label>
+              <div className="grid grid-cols-5 gap-2">
+                <div>
+                  <label className="text-xs font-semibold text-gray-500 uppercase">Load (VA)</label>
+                  <input
+                     type="number"
+                     value={newCircuit.loadWatts || ''}
+                     onChange={e => setNewCircuit({...newCircuit, loadWatts: Number(e.target.value)})}
+                     placeholder="0"
+                     className="w-full border-gray-200 rounded text-sm py-2"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-semibold text-gray-500 uppercase">Type</label>
+                  <select
+                     value={newCircuit.loadType || 'O'}
+                     onChange={e => setNewCircuit({...newCircuit, loadType: e.target.value})}
+                     className="w-full border-gray-200 rounded text-sm py-2"
+                     title="Load Type for NEC 220 Demand Factor"
+                  >
+                    <option value="L">L - Lighting</option>
+                    <option value="M">M - Motor</option>
+                    <option value="R">R - Receptacle</option>
+                    <option value="O">O - Other</option>
+                    <option value="H">H - Heating</option>
+                    <option value="C">C - Cooling</option>
+                    <option value="W">W - Water Htr</option>
+                    <option value="D">D - Dryer</option>
+                    <option value="K">K - Kitchen</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="text-xs font-semibold text-gray-500 uppercase">Breaker</label>
+                  <select
+                     value={newCircuit.breakerAmps}
+                     onChange={e => setNewCircuit({...newCircuit, breakerAmps: Number(e.target.value)})}
+                     className="w-full border-gray-200 rounded text-sm py-2"
+                  >
+                    <option value="15">15A</option>
+                    <option value="20">20A</option>
+                    <option value="30">30A</option>
+                    <option value="40">40A</option>
+                    <option value="50">50A</option>
+                    <option value="60">60A</option>
+                    <option value="100">100A</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="text-xs font-semibold text-gray-500 uppercase">Poles</label>
+                  <select
+                     value={newCircuit.pole}
+                     onChange={e => {
+                       const newPole = Number(e.target.value) as 1|2|3;
+                       // Reset circuit number when pole changes so dropdown recalculates
+                       setNewCircuit({...newCircuit, pole: newPole, circuitNumber: undefined});
+                     }}
+                     className="w-full border-gray-200 rounded text-sm py-2"
+                  >
+                    <option value="1">1P</option>
+                    <option value="2">2P</option>
+                    <option value="3">3P</option>
+                  </select>
+                </div>
+                <div>
+                   <label className="text-xs font-semibold text-gray-500 uppercase">Wire</label>
                    <input
-                      type="number"
-                      value={newCircuit.loadWatts || ''}
-                      onChange={e => setNewCircuit({...newCircuit, loadWatts: Number(e.target.value)})}
-                      placeholder="0"
-                      className="w-full border-gray-200 rounded text-sm py-2"
-                   />
-                 </div>
-                 <div>
-                   <label className="text-xs font-semibold text-gray-500 uppercase">Breaker (A)</label>
-                   <select
-                      value={newCircuit.breakerAmps}
-                      onChange={e => setNewCircuit({...newCircuit, breakerAmps: Number(e.target.value)})}
-                      className="w-full border-gray-200 rounded text-sm py-2"
-                   >
-                     <option value="15">15A</option>
-                     <option value="20">20A</option>
-                     <option value="30">30A</option>
-                     <option value="40">40A</option>
-                     <option value="50">50A</option>
-                     <option value="60">60A</option>
-                     <option value="100">100A</option>
-                   </select>
-                 </div>
-                 <div>
-                   <label className="text-xs font-semibold text-gray-500 uppercase">Poles</label>
-                   <select
-                      value={newCircuit.pole}
-                      onChange={e => {
-                        const newPole = Number(e.target.value) as 1|2|3;
-                        // Reset circuit number when pole changes so dropdown recalculates
-                        setNewCircuit({...newCircuit, pole: newPole, circuitNumber: undefined});
-                      }}
-                      className="w-full border-gray-200 rounded text-sm py-2"
-                   >
-                     <option value="1">1P</option>
-                     <option value="2">2P</option>
-                     <option value="3">3P</option>
-                   </select>
-                 </div>
-                 <div>
-                    <label className="text-xs font-semibold text-gray-500 uppercase">Wire</label>
-                    <input
-                      type="text"
-                      value={newCircuit.conductorSize}
-                      onChange={e => setNewCircuit({...newCircuit, conductorSize: e.target.value})}
-                      placeholder="12 AWG"
-                      className="w-full border-gray-200 rounded text-sm py-2"
-                   />
-                 </div>
-               </div>
+                     type="text"
+                     value={newCircuit.conductorSize}
+                     onChange={e => setNewCircuit({...newCircuit, conductorSize: e.target.value})}
+                     placeholder="12 AWG"
+                     className="w-full border-gray-200 rounded text-sm py-2"
+                  />
+                </div>
+              </div>
                <div className="flex gap-2">
                  <button
                     onClick={addCircuit}

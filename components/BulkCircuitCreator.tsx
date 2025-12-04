@@ -8,6 +8,8 @@ import React, { useState } from 'react';
 import { X, Plus, Trash2, Copy, Check, AlertTriangle } from 'lucide-react';
 import { validateCircuitForm, showValidationErrors } from '../lib/validation-utils';
 
+type LoadTypeCode = 'L' | 'M' | 'R' | 'O' | 'H' | 'C' | 'W' | 'D' | 'K';
+
 interface BulkCircuit {
   id: string;
   circuit_number: number;
@@ -17,6 +19,7 @@ interface BulkCircuit {
   load_watts: number;
   conductor_size: string;
   egc_size: string;
+  load_type: LoadTypeCode;
 }
 
 interface BulkCircuitCreatorProps {
@@ -43,7 +46,8 @@ export const BulkCircuitCreator: React.FC<BulkCircuitCreatorProps> = ({
       pole: 1,
       load_watts: 1800,
       conductor_size: '12 AWG',
-      egc_size: '12 AWG'
+      egc_size: '12 AWG',
+      load_type: 'O'
     }
   ]);
 
@@ -57,7 +61,9 @@ export const BulkCircuitCreator: React.FC<BulkCircuitCreatorProps> = ({
     applyConductorSize: false,
     conductorSize: '12 AWG',
     applyEgcSize: false,
-    egcSize: '12 AWG'
+    egcSize: '12 AWG',
+    applyLoadType: false,
+    loadType: 'O' as LoadTypeCode
   });
 
   const addCircuit = () => {
@@ -74,7 +80,8 @@ export const BulkCircuitCreator: React.FC<BulkCircuitCreatorProps> = ({
         pole: 1,
         load_watts: 1800,
         conductor_size: '12 AWG',
-        egc_size: '12 AWG'
+        egc_size: '12 AWG',
+        load_type: 'O'
       }
     ]);
   };
@@ -97,7 +104,8 @@ export const BulkCircuitCreator: React.FC<BulkCircuitCreatorProps> = ({
       pole: commonSettings.applyPole ? commonSettings.pole : circuit.pole,
       load_watts: commonSettings.applyLoadWatts ? commonSettings.loadWatts : circuit.load_watts,
       conductor_size: commonSettings.applyConductorSize ? commonSettings.conductorSize : circuit.conductor_size,
-      egc_size: commonSettings.applyEgcSize ? commonSettings.egcSize : circuit.egc_size
+      egc_size: commonSettings.applyEgcSize ? commonSettings.egcSize : circuit.egc_size,
+      load_type: commonSettings.applyLoadType ? commonSettings.loadType : circuit.load_type
     })));
   };
 

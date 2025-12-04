@@ -21,6 +21,25 @@ export interface LoadItem {
   phase: 'A' | 'B' | 'C' | '3-Phase';
 }
 
+/**
+ * Load Type Classification for NEC Article 220 Demand Factors
+ * L = Lighting, M = Motor, R = Receptacles, O = Other
+ * H = Heating, C = Cooling, W = Water Heater, D = Dryer, K = Kitchen
+ */
+export type LoadTypeCode = 'L' | 'M' | 'R' | 'O' | 'H' | 'C' | 'W' | 'D' | 'K';
+
+export const LOAD_TYPE_LABELS: Record<LoadTypeCode, string> = {
+  'L': 'Lighting',
+  'M': 'Motor',
+  'R': 'Receptacles',
+  'O': 'Other',
+  'H': 'Heating',
+  'C': 'Cooling',
+  'W': 'Water Heater',
+  'D': 'Dryer',
+  'K': 'Kitchen',
+};
+
 export interface PanelCircuit {
   id: string;
   circuitNumber: number;
@@ -29,6 +48,7 @@ export interface PanelCircuit {
   pole: 1 | 2 | 3;
   loadWatts: number;
   conductorSize: string; // e.g., "12 AWG"
+  loadType?: LoadTypeCode; // NEC 220 load classification
 }
 
 export interface NecIssue {
