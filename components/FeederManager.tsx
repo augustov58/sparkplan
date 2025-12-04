@@ -27,12 +27,14 @@ interface FeederManagerProps {
   projectId: string;
   projectVoltage: number;
   projectPhase: number;
+  occupancyType?: 'dwelling' | 'commercial' | 'industrial';
 }
 
 export const FeederManager: React.FC<FeederManagerProps> = ({
   projectId,
   projectVoltage,
-  projectPhase
+  projectPhase,
+  occupancyType = 'commercial'
 }) => {
   const { feeders, loading, error, createFeeder, updateFeeder, deleteFeeder } = useFeeders(projectId);
   const { panels } = usePanels(projectId);
@@ -89,7 +91,8 @@ export const FeederManager: React.FC<FeederManagerProps> = ({
   // Calculate loads for a destination panel (includes downstream aggregation per NEC 220.40)
   const calculatePanelLoads = (panelId: string) => {
     // Use aggregated load calculation to include downstream panels
-    const aggregated = calculateAggregatedLoad(panelId, panels, circuits, transformers);
+    // Pass occupancyType for correct demand factor selection
+    const aggregated = calculateAggregatedLoad(panelId, panels, circuits, transformers, occupancyType);
     
     // Calculate continuous vs non-continuous from direct circuits
     const panelCircuits = circuits.filter(c => c.panel_id === panelId);

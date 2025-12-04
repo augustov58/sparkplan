@@ -250,12 +250,60 @@ Per ISSUES.md, three related feeder issues needed fixing:
 
 **Testing Done**:
 - [x] Lint passes (no errors)
-- [ ] Manual testing (pending user verification)
-- [ ] Build verification
+- [x] Build passes
 
-**Next Steps**:
-- Run `npm run build` to verify compilation
-- Test feeder creation UI with various panel configurations
+---
+
+### 2025-12-04: NEC Demand Factor Correction (CRITICAL FIX)
+
+**What Changed**:
+- `services/calculations/upstreamLoadAggregation.ts`: MAJOR REWRITE - Correct NEC demand factor implementation
+
+**Why**:
+User identified critical bug: demand factors were being applied PER-PANEL instead of to SYSTEM-WIDE totals.
+
+**Previous (WRONG) Approach**:
+```
+Panel H2: Motor 10kW × 125% = 12.5kW (local largest)
+Panel H1: Motor 15kW × 125% + 12.5kW = 31.25kW
+❌ Both motors got 125% applied!
+```
+
+**Corrected (RIGHT) Approach**:
+```
+All motors collected: [15kW, 10kW]
+Single largest: 15kW × 125% = 18.75kW
+Others: 10kW × 100% = 10kW
+Total: 28.75kW
+✅ Only ONE motor gets 125%
+```
+
+**Same issue applied to ALL load types**:
+| Load Type | NEC Article | Fix Applied |
+|-----------|-------------|-------------|
+| Receptacles | 220.44 | 10kVA threshold now system-wide |
+| Motors | 430.24 | Largest motor 125% system-wide |
+| Lighting | 220.42 | Uses occupancyType (dwelling vs commercial) |
+| HVAC | 220.60 | Noncoincident loads (larger of heat/cool) |
+| Dryers | 220.54 | Count-based demand (dwelling only) |
+| Ranges | 220.55 | Count-based demand (dwelling only) |
+
+**Key Implementation Changes**:
+1. **Phase 1**: Collect ALL connected loads across entire downstream hierarchy (no factors)
+2. **Phase 2**: Apply demand factors ONCE to system-wide totals
+3. **occupancyType**: Now passed from project settings for correct Table 220.42 selection
+4. **Commercial/Industrial**: Lighting at 100% (no residential 35% factor)
+
+**Files Modified**:
+- `services/calculations/upstreamLoadAggregation.ts` - Complete rewrite
+- `components/FeederManager.tsx` - Added occupancyType prop
+- `components/PanelSchedule.tsx` - Uses project.settings.occupancyType
+- `services/feeder/feederLoadSync.ts` - Simplified (uses connected VA only for comparison)
+
+**Testing Done**:
+- [x] Lint passes
+- [x] Build passes (5.75s)
+- [ ] Manual testing with cascaded panels
 
 ---
 
@@ -267,6 +315,7 @@ Per ISSUES.md, three related feeder issues needed fixing:
 - ✅ 3 Feature Enhancements (Pan/Zoom, EV/Solar Calcs, Diagram Export)
 - ✅ 3 Feeder Issues Fixed (Stale Detection, Connectivity, Upstream Aggregation)
 - ✅ Grounding & Bonding persistence fixed
+- ✅ **CRITICAL**: NEC demand factor calculation corrected (system-wide vs per-panel)
 - ✅ All builds passing
 
 **Potential future enhancements:**

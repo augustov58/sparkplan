@@ -80,10 +80,12 @@ export const PanelSchedule: React.FC<PanelScheduleProps> = ({ project }) => {
   }, [selectedPanel, panelCircuits]);
 
   // Calculate aggregated load including downstream panels
+  // Uses occupancyType from project settings for correct demand factor selection
   const aggregatedLoad = useMemo(() => {
     if (!selectedPanel) return null;
-    return calculateAggregatedLoad(selectedPanel.id, panels, circuits, transformers);
-  }, [selectedPanel, panels, circuits, transformers]);
+    const occupancy = project.settings?.occupancyType || 'commercial';
+    return calculateAggregatedLoad(selectedPanel.id, panels, circuits, transformers, occupancy);
+  }, [selectedPanel, panels, circuits, transformers, project.settings?.occupancyType]);
 
   // Generate slots based on panel bus rating
   const totalSlots = selectedPanel ? Math.min(42, Math.ceil(selectedPanel.bus_rating / 10)) : 42;
@@ -685,41 +687,56 @@ export const PanelSchedule: React.FC<PanelScheduleProps> = ({ project }) => {
                 </h4>
                 <p className="text-xs text-amber-700 mb-3">
                   This panel feeds {aggregatedLoad.downstreamPanelCount} downstream panel{aggregatedLoad.downstreamPanelCount > 1 ? 's' : ''}.
-                  The demand load below includes all downstream loads.
+                  Demand factors applied to system-wide totals ({aggregatedLoad.occupancyType} occupancy).
                 </p>
                 <div className="grid grid-cols-2 gap-3">
                   <div className="bg-white/50 rounded p-2">
-                    <span className="text-[10px] uppercase text-amber-600 block">Direct Load</span>
-                    <span className="text-base font-bold text-gray-900">{(aggregatedLoad.directDemandVA / 1000).toFixed(1)} kVA</span>
+                    <span className="text-[10px] uppercase text-amber-600 block">Total Connected</span>
+                    <span className="text-base font-bold text-gray-900">{(aggregatedLoad.totalConnectedVA / 1000).toFixed(1)} kVA</span>
                   </div>
-                  <div className="bg-white/50 rounded p-2">
-                    <span className="text-[10px] uppercase text-amber-600 block">Downstream Panels</span>
-                    <span className="text-base font-bold text-amber-700">{(aggregatedLoad.downstreamPanelsDemandVA / 1000).toFixed(1)} kVA</span>
-                  </div>
-                  {aggregatedLoad.transformerCount > 0 && (
-                    <div className="bg-white/50 rounded p-2">
-                      <span className="text-[10px] uppercase text-amber-600 block">Transformers ({aggregatedLoad.transformerCount})</span>
-                      <span className="text-base font-bold text-purple-700">{(aggregatedLoad.transformerLoadVA / 1000).toFixed(1)} kVA</span>
-                    </div>
-                  )}
                   <div className="bg-amber-100 rounded p-2">
-                    <span className="text-[10px] uppercase text-amber-700 block">Total Aggregated</span>
+                    <span className="text-[10px] uppercase text-amber-700 block">Total Demand</span>
                     <span className="text-base font-bold text-amber-900">{(aggregatedLoad.totalDemandVA / 1000).toFixed(1)} kVA</span>
                   </div>
+                  <div className="bg-white/50 rounded p-2 col-span-2">
+                    <span className="text-[10px] uppercase text-amber-600 block">Overall Demand Factor</span>
+                    <span className="text-base font-bold text-green-700">{(aggregatedLoad.overallDemandFactor * 100).toFixed(1)}%</span>
+                  </div>
                 </div>
-                {aggregatedLoad.breakdown.length > 0 && (
+
+                {/* Demand Breakdown by Load Type */}
+                {aggregatedLoad.demandBreakdown.length > 0 && (
                   <div className="mt-3 pt-3 border-t border-amber-200">
-                    <span className="text-[10px] uppercase text-amber-600 block mb-2">Load Breakdown</span>
+                    <span className="text-[10px] uppercase text-amber-600 block mb-2">Demand by Load Type (NEC Factors Applied)</span>
+                    <div className="space-y-1">
+                      {aggregatedLoad.demandBreakdown.map((item, i) => (
+                        <div key={i} className="flex justify-between items-center text-xs">
+                          <span className="text-amber-800 font-medium">{item.loadType}</span>
+                          <div className="flex items-center gap-2">
+                            <span className="text-gray-500">{(item.connectedVA / 1000).toFixed(1)} kVA →</span>
+                            <span className="font-bold text-amber-900">{(item.demandVA / 1000).toFixed(1)} kVA</span>
+                            <span className="text-green-600 text-[10px]">({(item.demandFactor * 100).toFixed(0)}%)</span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Source Breakdown */}
+                {aggregatedLoad.sourceBreakdown.length > 1 && (
+                  <div className="mt-3 pt-3 border-t border-amber-200">
+                    <span className="text-[10px] uppercase text-amber-600 block mb-2">Sources (Connected VA)</span>
                     <ul className="text-xs text-amber-800 space-y-1">
-                      {aggregatedLoad.breakdown.map((item, i) => (
+                      {aggregatedLoad.sourceBreakdown.map((item, i) => (
                         <li key={i} className="flex justify-between">
                           <span className="flex items-center gap-1">
                             {item.sourceType === 'panel' && <span className="text-amber-500">⬇</span>}
                             {item.sourceType === 'transformer' && <span className="text-purple-500">⚡</span>}
-                            {item.sourceType === 'circuit' && <span className="text-gray-400">○</span>}
+                            {item.sourceType === 'direct' && <span className="text-gray-400">○</span>}
                             {item.sourceName}
                           </span>
-                          <span className="font-mono">{(item.demandVA / 1000).toFixed(1)} kVA</span>
+                          <span className="font-mono">{(item.connectedVA / 1000).toFixed(1)} kVA</span>
                         </li>
                       ))}
                     </ul>
