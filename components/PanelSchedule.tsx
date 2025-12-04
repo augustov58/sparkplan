@@ -62,9 +62,89 @@ export const PanelSchedule: React.FC<PanelScheduleProps> = ({ project }) => {
   const selectedPanel = panels.find(p => p.id === selectedPanelId);
   const panelCircuits = circuits.filter(c => c.panel_id === selectedPanelId);
 
-  // Calculate demand factors
+  // Find downstream panels fed from this panel
+  const downstreamPanels = useMemo(() => {
+    if (!selectedPanelId) return [];
+    return panels.filter(p => p.fed_from_type === 'panel' && p.fed_from === selectedPanelId);
+  }, [selectedPanelId, panels]);
+
+  // Find transformers fed from this panel
+  const downstreamTransformers = useMemo(() => {
+    if (!selectedPanelId) return [];
+    return transformers.filter(t => t.fed_from_panel_id === selectedPanelId);
+  }, [selectedPanelId, transformers]);
+
+  // Create "virtual feeder circuits" for downstream equipment
+  // These represent the feeder breakers in this panel that feed downstream equipment
+  const feederCircuits = useMemo(() => {
+    const feeders: Array<{
+      id: string;
+      isFeeder: true;
+      type: 'panel' | 'transformer';
+      name: string;
+      loadVA: number;
+      breakerAmps: number;
+      pole: 1 | 2 | 3;
+      circuitNumber: number | null; // null = unassigned
+      targetId: string;
+    }> = [];
+
+    const occupancy = project.settings?.occupancyType || 'commercial';
+
+    // Add downstream panels as feeder circuits
+    downstreamPanels.forEach(panel => {
+      // Calculate the demand load for this downstream panel
+      const panelLoad = calculateAggregatedLoad(panel.id, panels, circuits, transformers, occupancy);
+      
+      feeders.push({
+        id: `feeder-panel-${panel.id}`,
+        isFeeder: true,
+        type: 'panel',
+        name: `→ PANEL ${panel.name}`,
+        loadVA: panelLoad.totalDemandVA,
+        breakerAmps: panel.feeder_breaker_amps || panel.main_breaker_amps || 100,
+        pole: panel.phase === 3 ? 3 : 2,
+        circuitNumber: null, // Could be assigned if panel stores feeder circuit number
+        targetId: panel.id,
+      });
+    });
+
+    // Add transformers as feeder circuits
+    downstreamTransformers.forEach(xfmr => {
+      // Find panels fed by this transformer to calculate load
+      const xfmrPanels = panels.filter(p => p.fed_from_transformer_id === xfmr.id);
+      let totalLoad = 0;
+      xfmrPanels.forEach(p => {
+        const pLoad = calculateAggregatedLoad(p.id, panels, circuits, transformers, occupancy);
+        totalLoad += pLoad.totalDemandVA;
+      });
+      // If no panels, use transformer kVA rating
+      if (xfmrPanels.length === 0 && xfmr.kva_rating) {
+        totalLoad = xfmr.kva_rating * 1000;
+      }
+
+      feeders.push({
+        id: `feeder-xfmr-${xfmr.id}`,
+        isFeeder: true,
+        type: 'transformer',
+        name: `→ XFMR ${xfmr.name || xfmr.kva_rating + 'kVA'}`,
+        loadVA: totalLoad,
+        breakerAmps: Math.ceil(totalLoad / (selectedPanel?.voltage || 480) / (selectedPanel?.phase === 3 ? Math.sqrt(3) : 1)),
+        pole: selectedPanel?.phase === 3 ? 3 : 2,
+        circuitNumber: null,
+        targetId: xfmr.id,
+      });
+    });
+
+    return feeders;
+  }, [downstreamPanels, downstreamTransformers, panels, circuits, transformers, selectedPanel, project.settings?.occupancyType]);
+
+  // Calculate demand factors (direct circuits only - feeders calculated separately)
   const demandResult = useMemo(() => {
-    if (!selectedPanel || panelCircuits.length === 0) return null;
+    if (!selectedPanel) return null;
+    
+    // If no direct circuits but has feeder circuits, return minimal result
+    if (panelCircuits.length === 0 && feederCircuits.length === 0) return null;
 
     const circuitLoads: CircuitLoad[] = panelCircuits.map(c => ({
       id: c.id,
@@ -76,8 +156,37 @@ export const PanelSchedule: React.FC<PanelScheduleProps> = ({ project }) => {
       phase: getCircuitPhase(c.circuit_number, selectedPanel.phase),
     }));
 
-    return calculatePanelDemand(circuitLoads, selectedPanel.voltage, selectedPanel.phase);
-  }, [selectedPanel, panelCircuits]);
+    // Calculate direct circuit demand
+    const directDemand = panelCircuits.length > 0 
+      ? calculatePanelDemand(circuitLoads, selectedPanel.voltage, selectedPanel.phase)
+      : null;
+
+    // Calculate total including feeders
+    const feederTotalVA = feederCircuits.reduce((sum, f) => sum + f.loadVA, 0);
+    const directTotalVA = directDemand?.totalDemandLoad_kVA ? directDemand.totalDemandLoad_kVA * 1000 : 0;
+    const directConnectedVA = directDemand?.totalConnectedLoad_kVA ? directDemand.totalConnectedLoad_kVA * 1000 : 0;
+
+    // Return enhanced result with feeder info
+    return directDemand ? {
+      ...directDemand,
+      // Add feeder totals
+      feederTotalVA,
+      totalWithFeeders_kVA: (directTotalVA + feederTotalVA) / 1000,
+      connectedWithFeeders_kVA: (directConnectedVA + feederTotalVA) / 1000,
+    } : {
+      // Minimal result when only feeders exist
+      totalConnectedLoad_kVA: feederTotalVA / 1000,
+      totalDemandLoad_kVA: feederTotalVA / 1000,
+      demandAmps: feederTotalVA / (selectedPanel.voltage * (selectedPanel.phase === 3 ? Math.sqrt(3) : 1)),
+      percentImbalance: 0,
+      phaseLoads: { A: feederTotalVA / (selectedPanel.phase === 3 ? 3 : 2), B: feederTotalVA / (selectedPanel.phase === 3 ? 3 : 2), C: selectedPanel.phase === 3 ? feederTotalVA / 3 : 0 },
+      necReferences: [],
+      loadBreakdown: [],
+      feederTotalVA,
+      totalWithFeeders_kVA: feederTotalVA / 1000,
+      connectedWithFeeders_kVA: feederTotalVA / 1000,
+    };
+  }, [selectedPanel, panelCircuits, feederCircuits]);
 
   // Calculate aggregated load including downstream panels
   // Uses occupancyType from project settings for correct demand factor selection
@@ -574,6 +683,83 @@ export const PanelSchedule: React.FC<PanelScheduleProps> = ({ project }) => {
             <tbody className="bg-white">
               {Array.from({ length: Math.ceil(totalSlots / 2) }).map((_, i) => renderRow(i + 1))}
               
+              {/* Feeder Circuits Section - Downstream Panels & Transformers */}
+              {feederCircuits.length > 0 && (
+                <>
+                  <tr className="bg-purple-50 border-t-2 border-purple-300">
+                    <td colSpan={17} className="p-2 text-xs font-bold text-purple-800">
+                      ⚡ FEEDER CIRCUITS (Downstream Equipment)
+                    </td>
+                  </tr>
+                  {feederCircuits.map((feeder, idx) => (
+                    <tr key={feeder.id} className={`${idx % 2 === 0 ? 'bg-purple-50/50' : 'bg-white'} hover:bg-purple-100/50`}>
+                      <td className="p-1 text-center text-xs font-mono text-purple-600">—</td>
+                      <td className="p-1 border-r border-gray-100">
+                        <span className="text-xs font-bold text-purple-800">{feeder.name}</span>
+                        <span className="text-[10px] text-purple-500 ml-1">
+                          ({feeder.type === 'panel' ? 'Panel' : 'Transformer'})
+                        </span>
+                      </td>
+                      <td className="p-1 text-center text-xs font-mono">{feeder.breakerAmps}A</td>
+                      {/* Phase loads - distributed evenly for feeders */}
+                      <td className="p-1 text-center text-xs font-mono bg-purple-50/30">
+                        {((feeder.loadVA / 1000) / (selectedPanel?.phase === 3 ? 3 : 2)).toFixed(2)}
+                      </td>
+                      <td className="p-1 text-center text-xs font-mono bg-purple-50/30">
+                        {((feeder.loadVA / 1000) / (selectedPanel?.phase === 3 ? 3 : 2)).toFixed(2)}
+                      </td>
+                      <td className="p-1 text-center text-xs font-mono bg-purple-50/30">
+                        {selectedPanel?.phase === 3 ? ((feeder.loadVA / 1000) / 3).toFixed(2) : ''}
+                      </td>
+                      <td className="p-1 text-center text-xs font-mono">{(feeder.loadVA / 1000).toFixed(1)}</td>
+                      <td className="p-1 text-center">
+                        <span className={`text-[10px] px-1 py-0.5 rounded ${feeder.type === 'panel' ? 'bg-blue-100 text-blue-700' : 'bg-orange-100 text-orange-700'}`}>
+                          {feeder.pole}P
+                        </span>
+                      </td>
+                      {/* Center bus bar section */}
+                      <td className="p-1 bg-electric-500 text-electric-100 text-center text-[10px] font-mono">
+                        FDR
+                      </td>
+                      <td className="p-1 text-center">
+                        <span className={`text-[10px] px-1 py-0.5 rounded ${feeder.type === 'panel' ? 'bg-blue-100 text-blue-700' : 'bg-orange-100 text-orange-700'}`}>
+                          {feeder.pole}P
+                        </span>
+                      </td>
+                      <td className="p-1 text-center text-xs font-mono">{(feeder.loadVA / 1000).toFixed(1)}</td>
+                      {/* Right phase loads */}
+                      <td className="p-1 text-center text-xs font-mono bg-purple-50/30">
+                        {selectedPanel?.phase === 3 ? ((feeder.loadVA / 1000) / 3).toFixed(2) : ''}
+                      </td>
+                      <td className="p-1 text-center text-xs font-mono bg-purple-50/30">
+                        {((feeder.loadVA / 1000) / (selectedPanel?.phase === 3 ? 3 : 2)).toFixed(2)}
+                      </td>
+                      <td className="p-1 text-center text-xs font-mono bg-purple-50/30">
+                        {((feeder.loadVA / 1000) / (selectedPanel?.phase === 3 ? 3 : 2)).toFixed(2)}
+                      </td>
+                      <td className="p-1 text-center text-xs font-mono">{feeder.breakerAmps}A</td>
+                      <td className="p-1 border-l border-gray-100">
+                        <span className="text-xs font-bold text-purple-800">{feeder.name}</span>
+                      </td>
+                      <td className="p-1 text-center text-xs font-mono text-purple-600">—</td>
+                    </tr>
+                  ))}
+                  <tr className="bg-purple-100 border-b border-purple-300">
+                    <td colSpan={6} className="p-2 text-right text-xs font-semibold text-purple-800">
+                      FEEDER TOTAL:
+                    </td>
+                    <td className="p-2 text-center text-xs font-mono font-bold text-purple-900">
+                      {(feederCircuits.reduce((sum, f) => sum + f.loadVA, 0) / 1000).toFixed(1)} kVA
+                    </td>
+                    <td colSpan={3}></td>
+                    <td className="p-2 text-center text-xs font-mono font-bold text-purple-900">
+                      {(feederCircuits.reduce((sum, f) => sum + f.loadVA, 0) / 1000).toFixed(1)} kVA
+                    </td>
+                    <td colSpan={6}></td>
+                  </tr>
+                </>
+              )}
+
               {/* Phase Totals Row */}
               <tr className="bg-gray-100 border-t-2 border-gray-300 font-semibold">
                 <td colSpan={3} className="p-2 text-right text-xs">PHASE TOTALS (KVA):</td>
@@ -658,14 +844,34 @@ export const PanelSchedule: React.FC<PanelScheduleProps> = ({ project }) => {
                 <Settings className="w-4 h-4" /> PANEL SUMMARY
               </h4>
               <div className="grid grid-cols-2 gap-4">
+                {/* Direct Circuits */}
                 <div className="bg-gray-50 rounded p-3">
-                  <span className="text-[10px] uppercase text-gray-500 block">Total Connected Load</span>
+                  <span className="text-[10px] uppercase text-gray-500 block">Direct Circuits Load</span>
                   <span className="text-xl font-bold text-gray-900">{demandResult.totalConnectedLoad_kVA.toFixed(1)} KVA</span>
                 </div>
                 <div className="bg-electric-50 rounded p-3">
-                  <span className="text-[10px] uppercase text-gray-500 block">Total Demand Load</span>
+                  <span className="text-[10px] uppercase text-gray-500 block">Direct Demand Load</span>
                   <span className="text-xl font-bold text-electric-600">{demandResult.totalDemandLoad_kVA.toFixed(1)} KVA</span>
                 </div>
+                
+                {/* Feeder Circuits (if any) */}
+                {feederCircuits.length > 0 && (
+                  <>
+                    <div className="bg-purple-50 rounded p-3">
+                      <span className="text-[10px] uppercase text-purple-600 block">Feeder Circuits ({feederCircuits.length})</span>
+                      <span className="text-xl font-bold text-purple-800">
+                        {((demandResult as any).feederTotalVA / 1000).toFixed(1)} KVA
+                      </span>
+                    </div>
+                    <div className="bg-purple-100 rounded p-3 border border-purple-300">
+                      <span className="text-[10px] uppercase text-purple-700 block font-semibold">TOTAL WITH FEEDERS</span>
+                      <span className="text-xl font-bold text-purple-900">
+                        {((demandResult as any).totalWithFeeders_kVA || demandResult.totalDemandLoad_kVA).toFixed(1)} KVA
+                      </span>
+                    </div>
+                  </>
+                )}
+                
                 <div className="bg-blue-50 rounded p-3">
                   <span className="text-[10px] uppercase text-gray-500 block">Demand Amps</span>
                   <span className="text-xl font-bold text-blue-600">{demandResult.demandAmps.toFixed(1)} A</span>

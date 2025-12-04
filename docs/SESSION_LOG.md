@@ -307,6 +307,36 @@ Total: 28.75kW
 
 ---
 
+### 2025-12-04: Feeder Circuits Display in Panel Schedule
+
+**What Changed**:
+- `components/PanelSchedule.tsx`: Panels now show downstream equipment as feeder circuits
+
+**Why**:
+User identified: When MDP feeds Panel H1, the MDP panel schedule should show a circuit/breaker for "Panel H1" with its aggregated load. Previously, only direct circuits were shown.
+
+**New Features**:
+1. **Feeder Circuits Section**: Purple-highlighted section below regular circuits
+2. **Shows downstream panels**: Each fed panel appears as a feeder circuit with:
+   - Name: "→ PANEL [name]"
+   - Load: Aggregated demand VA from that panel
+   - Breaker size: From panel's feeder_breaker_amps or main_breaker_amps
+   - Pole count: Based on panel phase (3P for 3-phase, 2P for single-phase)
+3. **Shows transformers**: Transformers fed from panel appear with their downstream loads
+4. **Updated Summary**: Shows "Direct Circuits" + "Feeder Circuits" + "Total with Feeders"
+5. **Load flows upstream**: MDP now shows full system load
+
+**Technical Details**:
+- `feederCircuits` computed from panels where `fed_from === selectedPanelId`
+- Uses `calculateAggregatedLoad()` to get demand load for each downstream panel
+- Virtual circuits rendered in separate section (not assigned to physical slots)
+
+**Testing Done**:
+- [x] Lint passes
+- [x] Build passes (6.04s)
+
+---
+
 ## 📝 Notes for Next Session
 
 **Session completed successfully with all tasks done:**
