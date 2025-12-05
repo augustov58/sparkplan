@@ -272,14 +272,28 @@ export const DwellingLoadCalculator: React.FC<DwellingLoadCalculatorProps> = ({
       // Create new circuits
       for (let i = 0; i < generatedCircuits.length; i++) {
         const circuit = generatedCircuits[i];
+        
+        // Calculate conductor size based on breaker amps (NEC Table 310.16)
+        const getConductorSize = (amps: number): string => {
+          if (amps <= 15) return '14 AWG';
+          if (amps <= 20) return '12 AWG';
+          if (amps <= 30) return '10 AWG';
+          if (amps <= 40) return '8 AWG';
+          if (amps <= 50) return '6 AWG';
+          if (amps <= 60) return '6 AWG';
+          if (amps <= 100) return '3 AWG';
+          return '1 AWG';
+        };
+        
         await createCircuit({
           project_id: project.id,
           panel_id: mainPanel.id,
           circuit_number: i + 1,
           description: circuit.description,
           breaker_amps: circuit.breakerAmps,
-          pole: circuit.pole,  // Fixed: was 'poles'
-          load_watts: circuit.loadWatts,  // Fixed: was 'load_va'
+          pole: circuit.pole,
+          load_watts: circuit.loadWatts,
+          conductor_size: getConductorSize(circuit.breakerAmps),  // Required field!
           load_type: circuit.loadType
         });
       }
