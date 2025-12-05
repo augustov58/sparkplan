@@ -23,7 +23,8 @@ import {
   AlertTriangle,
   CheckCircle,
   Download,
-  RefreshCw
+  RefreshCw,
+  Users
 } from 'lucide-react';
 import { 
   Project, 
@@ -459,69 +460,111 @@ export const DwellingLoadCalculator: React.FC<DwellingLoadCalculatorProps> = ({
             </div>
           )}
 
-          {/* Multi-Family: Unit Templates */}
+          {/* Multi-Family: Instructions & Unit Templates */}
           {!isSingleFamily && (
-            <div className="bg-white border border-gray-200 rounded-lg p-4">
-              <div className="flex justify-between items-center mb-4">
-                <h3 className="font-medium text-gray-900">Dwelling Unit Types</h3>
-                <button
-                  onClick={addUnitTemplate}
-                  className="text-sm text-electric-600 hover:text-electric-700 flex items-center gap-1"
-                >
-                  <Plus className="w-4 h-4" /> Add Unit Type
-                </button>
-              </div>
-              <div className="space-y-3">
-                {unitTemplates.map((template, idx) => (
-                  <div key={template.id} className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
-                    <input
-                      type="text"
-                      value={template.name}
-                      onChange={e => updateUnitTemplate(template.id, { name: e.target.value })}
-                      className="flex-1 border-gray-200 rounded text-sm"
-                      placeholder="Unit Type Name"
-                    />
-                    <div className="flex items-center gap-2">
-                      <label className="text-xs text-gray-500">Sq Ft:</label>
-                      <input
-                        type="number"
-                        value={template.squareFootage}
-                        onChange={e => updateUnitTemplate(template.id, { squareFootage: Number(e.target.value) })}
-                        className="w-20 border-gray-200 rounded text-sm"
-                      />
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <label className="text-xs text-gray-500">Count:</label>
-                      <input
-                        type="number"
-                        value={template.unitCount}
-                        onChange={e => updateUnitTemplate(template.id, { unitCount: Number(e.target.value) })}
-                        className="w-16 border-gray-200 rounded text-sm"
-                        min={1}
-                      />
-                    </div>
-                    <button
-                      onClick={() => removeUnitTemplate(template.id)}
-                      className="p-1 text-gray-400 hover:text-red-500"
-                      disabled={unitTemplates.length === 1}
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
-                  </div>
-                ))}
-              </div>
-              <div className="mt-4 pt-4 border-t border-gray-200">
-                <div className="flex items-center gap-4">
-                  <label className="text-sm font-medium text-gray-700">House Panel Load (VA):</label>
-                  <input
-                    type="number"
-                    value={housePanelLoad}
-                    onChange={e => setHousePanelLoad(Number(e.target.value))}
-                    className="w-32 border-gray-200 rounded text-sm"
-                    placeholder="Common areas"
-                  />
-                  <span className="text-xs text-gray-500">Parking, laundry, common areas</span>
+            <div className="space-y-4">
+              {/* Instructions Card */}
+              <div className="bg-purple-50 border border-purple-200 rounded-lg p-4">
+                <h3 className="font-medium text-purple-900 flex items-center gap-2 mb-2">
+                  <Users className="w-5 h-5" />
+                  Multi-Family Calculation (NEC 220.84)
+                </h3>
+                <div className="text-sm text-purple-800 space-y-2">
+                  <p><strong>How it works:</strong></p>
+                  <ol className="list-decimal list-inside space-y-1 text-purple-700">
+                    <li>Define unit types below (e.g., "Studio", "1BR", "2BR")</li>
+                    <li>Set square footage and count for each type</li>
+                    <li>Configure appliances using the section below (applies to ALL units)</li>
+                    <li>Add house panel load for common areas (hallways, parking, laundry)</li>
+                    <li>The calculator applies NEC Table 220.84 demand factors automatically</li>
+                  </ol>
                 </div>
+              </div>
+
+              {/* Unit Templates */}
+              <div className="bg-white border border-gray-200 rounded-lg p-4">
+                <div className="flex justify-between items-center mb-4">
+                  <h3 className="font-medium text-gray-900">Dwelling Unit Types</h3>
+                  <button
+                    onClick={addUnitTemplate}
+                    className="text-sm text-electric-600 hover:text-electric-700 flex items-center gap-1"
+                  >
+                    <Plus className="w-4 h-4" /> Add Unit Type
+                  </button>
+                </div>
+                <div className="space-y-3">
+                  {unitTemplates.map((template, idx) => (
+                    <div key={template.id} className="p-3 bg-gray-50 rounded-lg">
+                      <div className="flex items-center gap-3">
+                        <input
+                          type="text"
+                          value={template.name}
+                          onChange={e => updateUnitTemplate(template.id, { name: e.target.value })}
+                          className="flex-1 border-gray-200 rounded text-sm font-medium"
+                          placeholder="e.g., Type A - Studio"
+                        />
+                        <div className="flex items-center gap-2">
+                          <label className="text-xs text-gray-500">Sq Ft:</label>
+                          <input
+                            type="number"
+                            value={template.squareFootage}
+                            onChange={e => updateUnitTemplate(template.id, { squareFootage: Number(e.target.value) })}
+                            className="w-20 border-gray-200 rounded text-sm"
+                          />
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <label className="text-xs text-gray-500">Units:</label>
+                          <input
+                            type="number"
+                            value={template.unitCount}
+                            onChange={e => updateUnitTemplate(template.id, { unitCount: Number(e.target.value) })}
+                            className="w-16 border-gray-200 rounded text-sm"
+                            min={1}
+                          />
+                        </div>
+                        <button
+                          onClick={() => removeUnitTemplate(template.id)}
+                          className="p-1 text-gray-400 hover:text-red-500"
+                          disabled={unitTemplates.length === 1}
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                      {/* Unit load preview */}
+                      <div className="mt-2 text-xs text-gray-500 ml-1">
+                        Lighting: {(template.squareFootage * 3).toLocaleString()} VA × {template.unitCount} units = {(template.squareFootage * 3 * template.unitCount).toLocaleString()} VA
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                
+                {/* Summary */}
+                <div className="mt-4 pt-4 border-t border-gray-200 space-y-3">
+                  <div className="flex justify-between text-sm">
+                    <span className="text-gray-600">Total Dwelling Units:</span>
+                    <span className="font-medium">{unitTemplates.reduce((sum, t) => sum + t.unitCount, 0)}</span>
+                  </div>
+                  
+                  {/* House Panel Load */}
+                  <div className="flex items-center gap-4">
+                    <label className="text-sm font-medium text-gray-700">House Panel Load:</label>
+                    <input
+                      type="number"
+                      value={housePanelLoad}
+                      onChange={e => setHousePanelLoad(Number(e.target.value))}
+                      className="w-28 border-gray-200 rounded text-sm"
+                      placeholder="0"
+                    />
+                    <span className="text-xs text-gray-500">VA (common areas: parking, hallways, laundry room)</span>
+                  </div>
+                </div>
+              </div>
+              
+              {/* Note about appliances */}
+              <div className="bg-amber-50 border border-amber-200 rounded-lg p-3">
+                <p className="text-xs text-amber-800">
+                  <strong>💡 Appliances below apply to ALL unit types.</strong> Configure typical unit appliances (range, A/C, water heater) in the Appliances section below. The calculator assumes each dwelling unit has the same equipment.
+                </p>
               </div>
             </div>
           )}
