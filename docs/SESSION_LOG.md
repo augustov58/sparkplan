@@ -36,6 +36,51 @@
 
 ---
 
+### 2025-12-05: ISSUES.md Final Fixes (Issue #17 & #18)
+
+**Summary**: Fixed the last two remaining issues from ISSUES.md - residential system validation and MDP editing.
+
+**Issue #17: Residential System Validation**
+- **Problem**: Residential 120/240V systems were allowing 3-pole circuits (impossible) and incompatible MDP configurations like 208V 3-phase
+- **Solution**: 
+  1. Added validation in `addCircuit()` to block 3-pole circuits in single-phase panels
+  2. Added validation in `handleBulkCreateCircuits()` with clear error messages
+  3. Added validation in `addPanel()` to enforce 240V/1Φ for residential MDP
+  4. Modified UI: 3P option now disabled in pole dropdowns when panel is single-phase
+  5. Updated `BulkCircuitCreator.tsx` to accept `panelPhase` prop and disable 3P accordingly
+
+**Issue #18: MDP Cannot Be Edited**
+- **Problem**: After creating the MDP, users couldn't change its settings (name, voltage, phase, bus rating)
+- **Solution**:
+  1. Added `editingPanel` state for inline editing in panels list
+  2. Added `startEditPanel()`, `cancelEditPanel()`, `saveEditPanel()` functions
+  3. Added edit button (pencil icon) that appears on hover for all panels
+  4. Edit form includes all panel fields: name, voltage, phase, bus rating, main breaker, location
+  5. For residential projects, voltage/phase locked with warning message
+  6. Warns about downstream panel impact when changing voltage/phase
+  7. Uses existing `updatePanel()` from usePanels hook
+
+**Files Modified**:
+- `components/OneLineDiagram.tsx`:
+  - Added `editingPanel` state and edit functions
+  - Added inline edit form in panels list
+  - Added 3P validation in circuit creation
+  - Added residential MDP validation
+  - Added `panelPhase` prop to BulkCircuitCreator
+  - Disabled 3P option in pole dropdown for single-phase panels
+- `components/BulkCircuitCreator.tsx`:
+  - Added `panelPhase` and `panelName` props
+  - Disabled 3P option in both common settings and individual circuit dropdowns
+  - Shows "1Φ Panel" indicator when 3P is disabled
+- `ISSUES.md`: Marked both issues as FIXED
+
+**Testing Done**:
+- [x] TypeScript compiles (no linter errors)
+- [ ] Build passes (pending)
+- [ ] Manual testing (pending)
+
+---
+
 ### 2025-12-04: Residential Workflow Implementation (NEW)
 
 **Summary**: Implemented a complete residential workflow with NEC 220.82/220.84 calculations, auto-generated panel schedules, and conditional tab visibility.

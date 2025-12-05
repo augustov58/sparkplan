@@ -116,9 +116,9 @@
  */
 
 import React, { useState, useEffect, useRef } from 'react';
-import { Project, PanelCircuit } from '../types';
+import { Project, PanelCircuit, ProjectType } from '../types';
 import { generateOneLineDescription } from '../services/geminiService';
-import { RefreshCcw, Download, Zap, Plus, Trash2, Grid, Bolt, List, Image, FileCode } from 'lucide-react';
+import { RefreshCcw, Download, Zap, Plus, Trash2, Grid, Bolt, List, Image, FileCode, Edit2, X, Save } from 'lucide-react';
 import { useCircuits } from '../hooks/useCircuits';
 import { usePanels } from '../hooks/usePanels';
 import { useTransformers } from '../hooks/useTransformers';
@@ -144,7 +144,7 @@ interface OneLineDiagramProps {
 
 export const OneLineDiagram: React.FC<OneLineDiagramProps> = ({ project, updateProject }) => {
   // Use panels, circuits, and transformers from database
-  const { panels, createPanel, deletePanel, getMainPanel } = usePanels(project.id);
+  const { panels, createPanel, updatePanel, deletePanel, getMainPanel } = usePanels(project.id);
   const { circuits, createCircuit, deleteCircuit } = useCircuits(project.id);
   const { transformers, createTransformer, deleteTransformer } = useTransformers(project.id);
 
@@ -152,6 +152,20 @@ export const OneLineDiagram: React.FC<OneLineDiagramProps> = ({ project, updateP
   const [loading, setLoading] = useState(false);
   const [exporting, setExporting] = useState(false);
   const diagramRef = useRef<SVGSVGElement>(null);
+
+  // Panel Editor State (for editing existing panels including MDP)
+  const [editingPanel, setEditingPanel] = useState<{
+    id: string;
+    name: string;
+    busRating: number;
+    mainBreakerAmps: number;
+    location: string;
+    voltage: number;
+    phase: 1 | 3;
+  } | null>(null);
+
+  // Check if project is residential (affects allowed configurations)
+  const isResidentialProject = project.type === ProjectType.RESIDENTIAL;
 
   // Panel Editor State
   const [newPanel, setNewPanel] = useState({
@@ -231,6 +245,21 @@ export const OneLineDiagram: React.FC<OneLineDiagramProps> = ({ project, updateP
     if (!validation.success) {
       showValidationErrors(validation.errors);
       return;
+    }
+
+    // ISSUE #17 FIX: Validate MDP voltage/phase for residential projects
+    if (newPanel.isMain && isResidentialProject) {
+      // Residential projects must have 120/240V single-phase service
+      if (newPanel.voltage !== 240 || newPanel.phase !== 1) {
+        alert(
+          `❌ Invalid MDP Configuration for Residential Project\n\n` +
+          `Residential projects require 120/240V single-phase service.\n\n` +
+          `Current selection: ${newPanel.voltage}V ${newPanel.phase}-phase\n` +
+          `Required: 240V single-phase\n\n` +
+          `Please set the MDP to 240V Single-Phase, or change the project type to Commercial/Industrial for other voltage systems.`
+        );
+        return;
+      }
     }
 
     // Determine fed_from values based on type
@@ -360,6 +389,77 @@ export const OneLineDiagram: React.FC<OneLineDiagramProps> = ({ project, updateP
     }
 
     await deletePanel(id);
+  };
+
+  // ISSUE #18 FIX: Start editing a panel
+  const startEditPanel = (panelId: string) => {
+    const panel = panels.find(p => p.id === panelId);
+    if (!panel) return;
+
+    setEditingPanel({
+      id: panel.id,
+      name: panel.name,
+      busRating: panel.bus_rating,
+      mainBreakerAmps: panel.main_breaker_amps || panel.bus_rating,
+      location: panel.location || '',
+      voltage: panel.voltage,
+      phase: panel.phase
+    });
+  };
+
+  // ISSUE #18 FIX: Cancel editing
+  const cancelEditPanel = () => {
+    setEditingPanel(null);
+  };
+
+  // ISSUE #18 FIX: Save panel edits
+  const saveEditPanel = async () => {
+    if (!editingPanel) return;
+
+    const panel = panels.find(p => p.id === editingPanel.id);
+    if (!panel) return;
+
+    // Validate residential constraints if editing MDP
+    if (panel.is_main && isResidentialProject) {
+      if (editingPanel.voltage !== 240 || editingPanel.phase !== 1) {
+        alert(
+          `❌ Invalid MDP Configuration for Residential Project\n\n` +
+          `Residential projects require 120/240V single-phase service.\n\n` +
+          `Please set the MDP to 240V Single-Phase, or change the project type in Project Setup.`
+        );
+        return;
+      }
+    }
+
+    // Check if voltage/phase change would affect downstream panels
+    if (panel.voltage !== editingPanel.voltage || panel.phase !== editingPanel.phase) {
+      const downstreamPanels = panels.filter(p => p.fed_from === editingPanel.id);
+      if (downstreamPanels.length > 0) {
+        const confirmed = confirm(
+          `⚠️ Changing voltage/phase may affect ${downstreamPanels.length} downstream panel(s).\n\n` +
+          `Downstream panels: ${downstreamPanels.map(p => p.name).join(', ')}\n\n` +
+          `You may need to update or delete these panels after this change.\n\n` +
+          `Continue with the change?`
+        );
+        if (!confirmed) return;
+      }
+    }
+
+    try {
+      await updatePanel(editingPanel.id, {
+        name: editingPanel.name,
+        bus_rating: editingPanel.busRating,
+        main_breaker_amps: editingPanel.mainBreakerAmps,
+        location: editingPanel.location,
+        voltage: editingPanel.voltage,
+        phase: editingPanel.phase
+      });
+
+      setEditingPanel(null);
+    } catch (error) {
+      console.error('Failed to update panel:', error);
+      alert('Failed to update panel. Please try again.');
+    }
   };
 
   // Helper to get all occupied slots for a panel (including multi-pole spans)
@@ -497,6 +597,18 @@ export const OneLineDiagram: React.FC<OneLineDiagramProps> = ({ project, updateP
     const loadWatts = newCircuit.loadWatts || 0;
     const conductorSize = newCircuit.conductorSize || '12 AWG';
 
+    // ISSUE #17 FIX: Block 3-pole circuits in single-phase panels
+    if (panel && panel.phase === 1 && pole === 3) {
+      alert(
+        `❌ Invalid Circuit Configuration\n\n` +
+        `3-pole circuits cannot be installed in single-phase panels.\n\n` +
+        `Panel "${panel.name}" is single-phase (120/240V).\n` +
+        `Single-phase panels only support 1-pole or 2-pole breakers.\n\n` +
+        `For 3-phase loads, you need a 3-phase panel.`
+      );
+      return;
+    }
+
     // Check for multi-pole circuit conflicts
     const conflict = isCircuitNumberOccupied(circuitNumber, newCircuit.panelId, pole);
     if (conflict.occupied) {
@@ -590,7 +702,29 @@ export const OneLineDiagram: React.FC<OneLineDiagramProps> = ({ project, updateP
   const handleBulkCreateCircuits = async (bulkCircuits: any[]) => {
     if (!bulkCreatorPanelId) return;
 
+    // Get the target panel
+    const targetPanel = panels.find(p => p.id === bulkCreatorPanelId);
+
     try {
+      // ISSUE #17 FIX: Validate no 3-pole circuits in single-phase panels
+      if (targetPanel && targetPanel.phase === 1) {
+        const invalidCircuits = bulkCircuits.filter(c => c.pole === 3);
+        if (invalidCircuits.length > 0) {
+          const invalidNames = invalidCircuits.map(c => 
+            `Circuit ${c.circuit_number}: "${c.description}" (3-pole)`
+          ).join('\n');
+          
+          alert(
+            `❌ Invalid Circuit Configuration\n\n` +
+            `3-pole circuits cannot be installed in single-phase panels.\n\n` +
+            `Panel "${targetPanel.name}" is single-phase (120/240V).\n` +
+            `The following circuits are invalid:\n\n${invalidNames}\n\n` +
+            `Please change these to 1-pole or 2-pole breakers.`
+          );
+          return;
+        }
+      }
+
       // Validate all circuits for multi-pole conflicts BEFORE creating any
       const conflicts = [];
       for (const circuit of bulkCircuits) {
@@ -1068,19 +1202,28 @@ export const OneLineDiagram: React.FC<OneLineDiagramProps> = ({ project, updateP
                 </div>
                 <div>
                   <label className="text-xs font-semibold text-gray-500 uppercase">Poles</label>
-                  <select
-                     value={newCircuit.pole}
-                     onChange={e => {
-                       const newPole = Number(e.target.value) as 1|2|3;
-                       // Reset circuit number when pole changes so dropdown recalculates
-                       setNewCircuit({...newCircuit, pole: newPole, circuitNumber: undefined});
-                     }}
-                     className="w-full border-gray-200 rounded text-sm py-2"
-                  >
-                    <option value="1">1P</option>
-                    <option value="2">2P</option>
-                    <option value="3">3P</option>
-                  </select>
+                  {(() => {
+                    const selectedPanel = panels.find(p => p.id === newCircuit.panelId);
+                    const isSinglePhasePanel = selectedPanel?.phase === 1;
+                    return (
+                      <select
+                         value={newCircuit.pole}
+                         onChange={e => {
+                           const newPole = Number(e.target.value) as 1|2|3;
+                           // Reset circuit number when pole changes so dropdown recalculates
+                           setNewCircuit({...newCircuit, pole: newPole, circuitNumber: undefined});
+                         }}
+                         className="w-full border-gray-200 rounded text-sm py-2"
+                      >
+                        <option value="1">1P</option>
+                        <option value="2">2P</option>
+                        {/* ISSUE #17 FIX: Disable 3P for single-phase panels */}
+                        <option value="3" disabled={isSinglePhasePanel}>
+                          3P {isSinglePhasePanel && '(3Φ only)'}
+                        </option>
+                      </select>
+                    );
+                  })()}
                 </div>
                 <div>
                    <label className="text-xs font-semibold text-gray-500 uppercase">Wire</label>
@@ -1261,26 +1404,131 @@ export const OneLineDiagram: React.FC<OneLineDiagramProps> = ({ project, updateP
                {panels.map(panel => {
                  const mainPanelCount = panels.filter(p => p.is_main).length;
                  const canDelete = !panel.is_main || mainPanelCount > 1;
+                 const isEditing = editingPanel?.id === panel.id;
 
                  return (
-                   <div key={panel.id} className="p-3 flex justify-between items-center hover:bg-gray-50 group">
-                     <div>
-                       <div className="flex items-center gap-2">
-                          <Zap className={`w-4 h-4 ${panel.is_main ? 'text-red-500' : 'text-electric-500'}`} />
-                          <span className="text-sm font-medium text-gray-900">{panel.name}</span>
-                          {panel.is_main && <span className="text-[10px] bg-red-100 text-red-600 px-1.5 py-0.5 rounded font-bold">MAIN</span>}
-                          {panel.is_main && mainPanelCount > 1 && (
-                            <span className="text-[10px] bg-yellow-100 text-yellow-700 px-1.5 py-0.5 rounded font-bold">DUPLICATE</span>
-                          )}
+                   <div key={panel.id} className={`p-3 ${isEditing ? 'bg-blue-50 border-l-4 border-blue-500' : 'hover:bg-gray-50'} group`}>
+                     {isEditing ? (
+                       // ISSUE #18 FIX: Edit form for panel
+                       <div className="space-y-3">
+                         <div className="flex items-center justify-between">
+                           <span className="text-xs font-semibold text-blue-700 uppercase">Editing Panel</span>
+                           <button onClick={cancelEditPanel} className="text-gray-400 hover:text-gray-600">
+                             <X className="w-4 h-4" />
+                           </button>
+                         </div>
+                         <input
+                           type="text"
+                           value={editingPanel.name}
+                           onChange={e => setEditingPanel({ ...editingPanel, name: e.target.value })}
+                           className="w-full border-gray-200 rounded text-sm py-1.5 px-2"
+                           placeholder="Panel Name"
+                         />
+                         <div className="grid grid-cols-2 gap-2">
+                           <div>
+                             <label className="text-[10px] text-gray-500 uppercase">Voltage</label>
+                             <select
+                               value={editingPanel.voltage}
+                               onChange={e => setEditingPanel({ ...editingPanel, voltage: Number(e.target.value) })}
+                               className="w-full border-gray-200 rounded text-xs py-1"
+                               disabled={panel.is_main && isResidentialProject}
+                             >
+                               <option value="120">120V</option>
+                               <option value="208">208V</option>
+                               <option value="240">240V</option>
+                               <option value="277">277V</option>
+                               <option value="480">480V</option>
+                             </select>
+                           </div>
+                           <div>
+                             <label className="text-[10px] text-gray-500 uppercase">Phase</label>
+                             <select
+                               value={editingPanel.phase}
+                               onChange={e => setEditingPanel({ ...editingPanel, phase: Number(e.target.value) as 1 | 3 })}
+                               className="w-full border-gray-200 rounded text-xs py-1"
+                               disabled={panel.is_main && isResidentialProject}
+                             >
+                               <option value="1">1Φ</option>
+                               <option value="3">3Φ</option>
+                             </select>
+                           </div>
+                         </div>
+                         <div className="grid grid-cols-2 gap-2">
+                           <div>
+                             <label className="text-[10px] text-gray-500 uppercase">Bus Rating</label>
+                             <input
+                               type="number"
+                               value={editingPanel.busRating}
+                               onChange={e => setEditingPanel({ ...editingPanel, busRating: Number(e.target.value) })}
+                               className="w-full border-gray-200 rounded text-xs py-1 px-2"
+                             />
+                           </div>
+                           <div>
+                             <label className="text-[10px] text-gray-500 uppercase">Main Breaker</label>
+                             <input
+                               type="number"
+                               value={editingPanel.mainBreakerAmps}
+                               onChange={e => setEditingPanel({ ...editingPanel, mainBreakerAmps: Number(e.target.value) })}
+                               className="w-full border-gray-200 rounded text-xs py-1 px-2"
+                             />
+                           </div>
+                         </div>
+                         <input
+                           type="text"
+                           value={editingPanel.location}
+                           onChange={e => setEditingPanel({ ...editingPanel, location: e.target.value })}
+                           className="w-full border-gray-200 rounded text-xs py-1 px-2"
+                           placeholder="Location (optional)"
+                         />
+                         {panel.is_main && isResidentialProject && (
+                           <div className="text-[10px] text-amber-600 bg-amber-50 p-2 rounded">
+                             ⚠️ Residential: Voltage/Phase locked to 240V/1Φ
+                           </div>
+                         )}
+                         <button
+                           onClick={saveEditPanel}
+                           className="w-full bg-blue-500 text-white text-xs font-medium py-1.5 rounded hover:bg-blue-600 flex items-center justify-center gap-1"
+                         >
+                           <Save className="w-3 h-3" />
+                           Save Changes
+                         </button>
                        </div>
-                       <div className="text-xs text-gray-500 ml-6">
-                         {panel.bus_rating}A Bus • {panel.main_breaker_amps}A Main • {circuits.filter(c => c.panel_id === panel.id).length} circuits
+                     ) : (
+                       // Normal panel display
+                       <div className="flex justify-between items-center">
+                         <div>
+                           <div className="flex items-center gap-2">
+                              <Zap className={`w-4 h-4 ${panel.is_main ? 'text-red-500' : 'text-electric-500'}`} />
+                              <span className="text-sm font-medium text-gray-900">{panel.name}</span>
+                              {panel.is_main && <span className="text-[10px] bg-red-100 text-red-600 px-1.5 py-0.5 rounded font-bold">MAIN</span>}
+                              {panel.is_main && mainPanelCount > 1 && (
+                                <span className="text-[10px] bg-yellow-100 text-yellow-700 px-1.5 py-0.5 rounded font-bold">DUPLICATE</span>
+                              )}
+                           </div>
+                           <div className="text-xs text-gray-500 ml-6">
+                             {panel.bus_rating}A Bus • {panel.main_breaker_amps}A Main • {panel.voltage}V {panel.phase}Φ • {circuits.filter(c => c.panel_id === panel.id).length} ckts
+                           </div>
+                         </div>
+                         <div className="flex gap-1 opacity-0 group-hover:opacity-100">
+                           {/* ISSUE #18 FIX: Edit button for all panels including MDP */}
+                           <button 
+                             onClick={() => startEditPanel(panel.id)} 
+                             className="text-gray-300 hover:text-blue-500"
+                             title="Edit panel"
+                           >
+                             <Edit2 className="w-4 h-4" />
+                           </button>
+                           {canDelete && (
+                             <button 
+                               onClick={() => removePanel(panel.id)} 
+                               className="text-gray-300 hover:text-red-500"
+                               title="Delete panel"
+                             >
+                               <Trash2 className="w-4 h-4" />
+                             </button>
+                           )}
+                         </div>
                        </div>
-                     </div>
-                     {canDelete && (
-                       <button onClick={() => removePanel(panel.id)} className="text-gray-300 hover:text-red-500 opacity-0 group-hover:opacity-100">
-                         <Trash2 className="w-4 h-4" />
-                       </button>
                      )}
                    </div>
                  );
@@ -1795,19 +2043,24 @@ export const OneLineDiagram: React.FC<OneLineDiagramProps> = ({ project, updateP
       </div>
 
       {/* Bulk Circuit Creator Modal */}
-      {bulkCreatorPanelId && (
-        <BulkCircuitCreator
-          isOpen={showBulkCreator}
-          onClose={() => setShowBulkCreator(false)}
-          panelId={bulkCreatorPanelId}
-          startingCircuitNumber={
-            circuits.filter(c => c.panel_id === bulkCreatorPanelId).length > 0
-              ? Math.max(...circuits.filter(c => c.panel_id === bulkCreatorPanelId).map(c => c.circuit_number)) + 1
-              : 1
-          }
-          onCreateCircuits={handleBulkCreateCircuits}
-        />
-      )}
+      {bulkCreatorPanelId && (() => {
+        const bulkPanel = panels.find(p => p.id === bulkCreatorPanelId);
+        return (
+          <BulkCircuitCreator
+            isOpen={showBulkCreator}
+            onClose={() => setShowBulkCreator(false)}
+            panelId={bulkCreatorPanelId}
+            startingCircuitNumber={
+              circuits.filter(c => c.panel_id === bulkCreatorPanelId).length > 0
+                ? Math.max(...circuits.filter(c => c.panel_id === bulkCreatorPanelId).map(c => c.circuit_number)) + 1
+                : 1
+            }
+            onCreateCircuits={handleBulkCreateCircuits}
+            panelPhase={bulkPanel?.phase || 3}
+            panelName={bulkPanel?.name || 'Panel'}
+          />
+        );
+      })()}
     </div>
   );
 };

@@ -28,6 +28,10 @@ interface BulkCircuitCreatorProps {
   panelId: string;
   startingCircuitNumber: number;
   onCreateCircuits: (circuits: Omit<BulkCircuit, 'id'>[]) => Promise<void>;
+  /** Panel phase (1 or 3) - used to restrict pole options */
+  panelPhase?: 1 | 3;
+  /** Panel name - for error messages */
+  panelName?: string;
 }
 
 export const BulkCircuitCreator: React.FC<BulkCircuitCreatorProps> = ({
@@ -35,8 +39,12 @@ export const BulkCircuitCreator: React.FC<BulkCircuitCreatorProps> = ({
   onClose,
   panelId,
   startingCircuitNumber,
-  onCreateCircuits
+  onCreateCircuits,
+  panelPhase = 3,  // Default to 3-phase (allows all poles)
+  panelName = 'Panel'
 }) => {
+  // ISSUE #17 FIX: Check if 3-pole circuits are allowed
+  const is3PoleAllowed = panelPhase === 3;
   const [circuits, setCircuits] = useState<BulkCircuit[]>([
     {
       id: '1',
@@ -233,8 +241,12 @@ export const BulkCircuitCreator: React.FC<BulkCircuitCreatorProps> = ({
               >
                 <option value={1}>1P</option>
                 <option value={2}>2P</option>
-                <option value={3}>3P</option>
+                {/* ISSUE #17 FIX: Disable 3P for single-phase panels */}
+                <option value={3} disabled={!is3PoleAllowed}>3P {!is3PoleAllowed && '(3Φ only)'}</option>
               </select>
+              {!is3PoleAllowed && (
+                <span className="text-[10px] text-amber-600" title="Single-phase panel">1Φ Panel</span>
+              )}
             </label>
 
             <label className="flex items-center gap-2 text-sm">
@@ -345,11 +357,16 @@ export const BulkCircuitCreator: React.FC<BulkCircuitCreatorProps> = ({
                       <select
                         value={circuit.pole}
                         onChange={(e) => updateCircuit(circuit.id, 'pole', Number(e.target.value))}
-                        className="w-full px-2 py-1 border border-gray-300 rounded"
+                        className={`w-full px-2 py-1 border rounded ${
+                          circuit.pole === 3 && !is3PoleAllowed 
+                            ? 'border-red-300 bg-red-50' 
+                            : 'border-gray-300'
+                        }`}
                       >
                         <option value={1}>1P</option>
                         <option value={2}>2P</option>
-                        <option value={3}>3P</option>
+                        {/* ISSUE #17 FIX: Disable 3P for single-phase panels */}
+                        <option value={3} disabled={!is3PoleAllowed}>3P</option>
                       </select>
                     </td>
                     <td className="p-2">
