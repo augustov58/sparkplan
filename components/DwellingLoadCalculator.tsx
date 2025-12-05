@@ -273,11 +273,13 @@ export const DwellingLoadCalculator: React.FC<DwellingLoadCalculatorProps> = ({
       for (let i = 0; i < generatedCircuits.length; i++) {
         const circuit = generatedCircuits[i];
         await createCircuit({
+          project_id: project.id,
+          panel_id: mainPanel.id,
           circuit_number: i + 1,
           description: circuit.description,
           breaker_amps: circuit.breakerAmps,
-          poles: circuit.pole,
-          load_va: circuit.loadWatts,
+          pole: circuit.pole,  // Fixed: was 'poles'
+          load_watts: circuit.loadWatts,  // Fixed: was 'load_va'
           load_type: circuit.loadType
         });
       }
