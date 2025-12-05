@@ -231,11 +231,39 @@ export const DwellingLoadCalculator: React.FC<DwellingLoadCalculatorProps> = ({
 
   // Generate panel schedule
   const handleGeneratePanelSchedule = async () => {
-    if (!loadResult) return;
+    if (!loadResult) {
+      alert('Please configure appliances first to calculate the load.');
+      return;
+    }
+
+    // Check for main panel
+    if (!mainPanel) {
+      alert(
+        '❌ No Main Panel Found\n\n' +
+        'You need to create a Main Distribution Panel (MDP) first.\n\n' +
+        'Go to "Circuit Design" tab and create an MDP before generating a panel schedule.'
+      );
+      return;
+    }
+
+    // Multi-family: different workflow
+    if (!isSingleFamily) {
+      alert(
+        '📋 Multi-Family Service Calculation\n\n' +
+        'For multi-family projects, the calculator provides SERVICE SIZING only (shown on the right).\n\n' +
+        'Multi-family buildings typically have:\n' +
+        '• Meter stack/CT cabinet (not a traditional panel schedule)\n' +
+        '• Individual dwelling unit panels (managed separately per unit)\n' +
+        '• House panel for common areas\n\n' +
+        'Use the Load Breakdown and Service Calculation results for your service entrance design.\n\n' +
+        'Recommended Service: ' + loadResult.recommendedServiceSize + 'A'
+      );
+      return;
+    }
     
     setIsGenerating(true);
     try {
-      // Generate circuits
+      // Generate circuits (single-family only)
       const generated = generateResidentialPanelSchedule({
         squareFootage: residentialSettings?.squareFootage || 2000,
         smallApplianceCircuits: residentialSettings?.smallApplianceCircuits || 2,
@@ -252,7 +280,14 @@ export const DwellingLoadCalculator: React.FC<DwellingLoadCalculatorProps> = ({
 
   // Apply generated circuits to panel (clears existing circuits first)
   const handleApplyToPanelSchedule = async () => {
-    if (!mainPanel || generatedCircuits.length === 0) return;
+    if (!mainPanel) {
+      alert('No main panel found. Please create an MDP first.');
+      return;
+    }
+    if (generatedCircuits.length === 0) {
+      alert('No circuits to apply. Please generate the panel schedule first.');
+      return;
+    }
 
     // Confirm if circuits already exist
     if (mainPanelCircuits.length > 0) {
