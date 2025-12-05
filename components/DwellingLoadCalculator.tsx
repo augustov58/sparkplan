@@ -82,7 +82,10 @@ export const DwellingLoadCalculator: React.FC<DwellingLoadCalculatorProps> = ({
   // Hooks
   const { panels, createPanel, updatePanel } = usePanels(project.id);
   const mainPanel = panels.find(p => p.is_main);
-  const { createCircuit } = useCircuits(project.id, mainPanel?.id || '');
+  const { circuits, createCircuit, deleteCircuitsByPanel } = useCircuits(project.id);
+
+  // Get existing circuits for the main panel
+  const mainPanelCircuits = mainPanel ? circuits.filter(c => c.panel_id === mainPanel.id) : [];
 
   // Local state
   const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set(['appliances', 'results']));
@@ -246,11 +249,27 @@ export const DwellingLoadCalculator: React.FC<DwellingLoadCalculatorProps> = ({
     }
   };
 
-  // Apply generated circuits to panel
+  // Apply generated circuits to panel (clears existing circuits first)
   const handleApplyToPanelSchedule = async () => {
     if (!mainPanel || generatedCircuits.length === 0) return;
 
+    // Confirm if circuits already exist
+    if (mainPanelCircuits.length > 0) {
+      const confirmed = confirm(
+        `⚠️ The panel schedule already has ${mainPanelCircuits.length} circuit(s).\n\n` +
+        `Applying this generated schedule will DELETE all existing circuits and replace them with ${generatedCircuits.length} new circuits.\n\n` +
+        `Do you want to proceed?`
+      );
+      if (!confirmed) return;
+    }
+
     try {
+      // ISSUE FIX: Clear existing circuits before creating new ones
+      if (mainPanelCircuits.length > 0) {
+        await deleteCircuitsByPanel(mainPanel.id);
+      }
+
+      // Create new circuits
       for (let i = 0; i < generatedCircuits.length; i++) {
         const circuit = generatedCircuits[i];
         await createCircuit({
@@ -282,6 +301,25 @@ export const DwellingLoadCalculator: React.FC<DwellingLoadCalculatorProps> = ({
     } catch (error) {
       console.error('Error creating circuits:', error);
       alert('Error creating circuits. Check console for details.');
+    }
+  };
+
+  // Clear all circuits from main panel
+  const handleClearPanelSchedule = async () => {
+    if (!mainPanel || mainPanelCircuits.length === 0) return;
+
+    const confirmed = confirm(
+      `⚠️ Delete all ${mainPanelCircuits.length} circuit(s) from the panel schedule?\n\n` +
+      `This action cannot be undone.`
+    );
+    if (!confirmed) return;
+
+    try {
+      await deleteCircuitsByPanel(mainPanel.id);
+      alert('Panel schedule cleared successfully!');
+    } catch (error) {
+      console.error('Error clearing panel schedule:', error);
+      alert('Error clearing panel schedule. Check console for details.');
     }
   };
 
@@ -342,14 +380,42 @@ export const DwellingLoadCalculator: React.FC<DwellingLoadCalculatorProps> = ({
             }
           </p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex items-center gap-3">
+          {/* Show current panel status */}
+          {mainPanel && (
+            <div className="text-right">
+              <p className="text-sm text-gray-600">
+                Panel: <span className="font-medium">{mainPanel.name}</span>
+              </p>
+              <p className="text-xs text-gray-500">
+                {mainPanelCircuits.length === 0 
+                  ? 'No circuits created yet' 
+                  : `${mainPanelCircuits.length} circuit${mainPanelCircuits.length !== 1 ? 's' : ''} in schedule`
+                }
+              </p>
+            </div>
+          )}
+          
+          {/* Clear Panel Schedule Button - only show if circuits exist */}
+          {mainPanelCircuits.length > 0 && (
+            <button
+              onClick={handleClearPanelSchedule}
+              className="px-3 py-2 border border-red-200 text-red-600 rounded-md hover:bg-red-50 transition-colors flex items-center gap-2 text-sm"
+              title="Delete all circuits from panel"
+            >
+              <Trash2 className="w-4 h-4" />
+              Clear
+            </button>
+          )}
+          
+          {/* Generate Panel Schedule Button */}
           <button
             onClick={handleGeneratePanelSchedule}
             disabled={isGenerating || !loadResult}
             className="px-4 py-2 bg-electric-500 text-white rounded-md hover:bg-electric-600 transition-colors flex items-center gap-2 disabled:opacity-50"
           >
             <Calculator className="w-4 h-4" />
-            Generate Panel Schedule
+            {mainPanelCircuits.length > 0 ? 'Regenerate Schedule' : 'Generate Panel Schedule'}
           </button>
         </div>
       </div>

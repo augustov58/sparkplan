@@ -136,11 +136,18 @@ export function useProjects(): UseProjectsReturn {
   };
 
   const deleteProject = async (id: string) => {
+    // ISSUE FIX: Optimistically remove from local state immediately
+    // This prevents the need to refresh the page after deletion
+    const previousProjects = projects;
+    setProjects(prev => prev.filter(p => p.id !== id));
+
     try {
       const { error } = await supabase.from('projects').delete().eq('id', id);
 
       if (error) throw error;
     } catch (err) {
+      // Rollback optimistic update on error
+      setProjects(previousProjects);
       setError(err instanceof Error ? err.message : 'Failed to delete project');
     }
   };

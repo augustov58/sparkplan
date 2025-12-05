@@ -18,6 +18,8 @@ export interface UseCircuitsReturn {
   createCircuit: (circuit: Omit<CircuitInsert, 'id'>) => Promise<Circuit | null>;
   updateCircuit: (id: string, updates: CircuitUpdate) => Promise<void>;
   deleteCircuit: (id: string) => Promise<void>;
+  /** Delete all circuits for a specific panel - useful for regenerating panel schedules */
+  deleteCircuitsByPanel: (panelId: string) => Promise<void>;
 }
 
 export function useCircuits(projectId: string | undefined): UseCircuitsReturn {
@@ -146,6 +148,33 @@ export function useCircuits(projectId: string | undefined): UseCircuitsReturn {
     }
   };
 
+  /**
+   * Delete all circuits for a specific panel
+   * Used when regenerating panel schedules (e.g., from Dwelling Calculator)
+   */
+  const deleteCircuitsByPanel = async (panelId: string) => {
+    try {
+      // OPTIMISTIC UPDATE: Remove all panel circuits from local state immediately
+      const previousCircuits = [...circuits];
+      const panelCircuitIds = circuits.filter(c => c.panel_id === panelId).map(c => c.id);
+      setCircuits(prev => prev.filter(c => c.panel_id !== panelId));
+
+      // Delete from database - delete all circuits matching the panel
+      const { error } = await supabase
+        .from('circuits')
+        .delete()
+        .eq('panel_id', panelId);
+
+      if (error) {
+        // ROLLBACK: Restore previous state on error
+        setCircuits(previousCircuits);
+        throw error;
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to delete panel circuits');
+    }
+  };
+
   return {
     circuits,
     loading,
@@ -153,5 +182,6 @@ export function useCircuits(projectId: string | undefined): UseCircuitsReturn {
     createCircuit,
     updateCircuit,
     deleteCircuit,
+    deleteCircuitsByPanel,
   };
 }

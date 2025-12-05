@@ -76,12 +76,50 @@
 
 **Testing Done**:
 - [x] TypeScript compiles (no linter errors)
-- [ ] Build passes (pending)
+- [x] Build passes
 - [ ] Manual testing (pending)
 
 ---
 
-### 2025-12-04: Residential Workflow Implementation (NEW)
+### 2025-12-05: Dashboard & Dwelling Calculator Fixes (Issue #19 & #20)
+
+**Summary**: Fixed two UX issues - project delete not updating and residential panel schedule management.
+
+**Issue #19: Project Delete Requires Page Refresh**
+- **Problem**: After deleting a project, it remained visible until page refresh
+- **Solution**: Added optimistic update to `deleteProject()` in useProjects hook
+  - Immediately removes from local state
+  - Rolls back on error
+  - Real-time subscription provides backup sync
+
+**Issue #20: Dwelling Calculator Panel Schedule Management**
+- **Problem**: Generated residential panel schedules couldn't be deleted or regenerated
+- **Solution**:
+  1. Added `deleteCircuitsByPanel()` to useCircuits hook for bulk deletion
+  2. Updated DwellingLoadCalculator UI:
+     - Shows current panel name and circuit count
+     - "Clear" button (red, trash icon) when circuits exist
+     - Button text changes: "Generate Panel Schedule" → "Regenerate Schedule"
+     - Confirmation dialog explains override behavior
+  3. Auto-clears existing circuits before applying new generated schedule
+
+**Files Modified**:
+- `hooks/useProjects.ts`: Added optimistic update to deleteProject
+- `hooks/useCircuits.ts`: Added deleteCircuitsByPanel function
+- `components/DwellingLoadCalculator.tsx`:
+  - Added handleClearPanelSchedule function
+  - Added circuit count display
+  - Added Clear button
+  - Added override confirmation
+- `ISSUES.md`: Marked both issues as FIXED
+
+**Testing Done**:
+- [x] Build passes
+- [ ] Manual testing (pending)
+
+---
+
+### 2025-12-05: ISSUES.md Final Fixes (Issue #17 & #18)
 
 **Summary**: Implemented a complete residential workflow with NEC 220.82/220.84 calculations, auto-generated panel schedules, and conditional tab visibility.
 
