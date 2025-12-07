@@ -57,6 +57,9 @@ export const FeederManager: React.FC<FeederManagerProps> = ({
   const [destinationType, setDestinationType] = useState<'panel' | 'transformer'>('panel');
   const [connectivityError, setConnectivityError] = useState<string | null>(null);
   const [showStaleWarning, setShowStaleWarning] = useState(true);
+  
+  // ISSUE FIX: Add sizing basis option - 'load' uses calculated panel load, 'capacity' uses panel max capacity
+  const [sizingBasis, setSizingBasis] = useState<'load' | 'capacity'>('load');
 
   // Detect stale feeders when circuit loads change
   const staleFeeders = useMemo(() => {
@@ -151,12 +154,7 @@ export const FeederManager: React.FC<FeederManagerProps> = ({
     if (!feeder.distance_ft || !feeder.conductor_material) return;
 
     try {
-      // Get loads from destination panel
-      const loads = feeder.destination_panel_id
-        ? calculatePanelLoads(feeder.destination_panel_id)
-        : { totalVA: 0, continuousVA: 0, noncontinuousVA: 0 }; // For transformers, would need different logic
-
-      // Get source and destination voltages
+      // Get source and destination panels
       const sourcePanel = panels.find(p => p.id === feeder.source_panel_id);
       const destPanel = feeder.destination_panel_id
         ? panels.find(p => p.id === feeder.destination_panel_id)
@@ -166,6 +164,29 @@ export const FeederManager: React.FC<FeederManagerProps> = ({
       const sourcePhase = sourcePanel?.phase || projectPhase;
       const destVoltage = destPanel?.voltage || projectVoltage;
       const destPhase = destPanel?.phase || projectPhase;
+
+      // ISSUE FIX: Support both load-based and capacity-based sizing
+      let loads: { totalVA: number; continuousVA: number; noncontinuousVA: number };
+      
+      if (sizingBasis === 'capacity' && destPanel) {
+        // Use panel's maximum capacity (main breaker or bus rating)
+        const panelCapacityAmps = destPanel.main_breaker_amps || destPanel.bus_rating;
+        // Calculate VA from capacity: VA = A × V × √3 (for 3-phase) or VA = A × V (single-phase)
+        const capacityVA = destPhase === 3 
+          ? panelCapacityAmps * destVoltage * Math.sqrt(3)
+          : panelCapacityAmps * destVoltage;
+        
+        loads = {
+          totalVA: capacityVA,
+          continuousVA: capacityVA, // Assume 100% continuous for capacity-based sizing
+          noncontinuousVA: 0
+        };
+      } else {
+        // Use calculated panel loads (existing behavior)
+        loads = feeder.destination_panel_id
+          ? calculatePanelLoads(feeder.destination_panel_id)
+          : { totalVA: 0, continuousVA: 0, noncontinuousVA: 0 };
+      }
 
       // Calculate feeder sizing
       const result = calculateFeederSizing({
@@ -182,6 +203,28 @@ export const FeederManager: React.FC<FeederManagerProps> = ({
         num_current_carrying: feeder.num_current_carrying || 4,
         max_voltage_drop_percent: 3
       });
+      
+      // ISSUE FIX: EGC should be based on the OCPD protecting the downstream panel
+      // per NEC 250.122 - use panel's main breaker or feeder breaker amps
+      let egcSize = result.egc_size;
+      if (destPanel) {
+        const ocpdAmps = destPanel.main_breaker_amps || destPanel.feeder_breaker_amps || destPanel.bus_rating;
+        // Import EGC lookup from our inspection service logic
+        const egcTable = [
+          { maxOCPD: 15, cu: '14 AWG' }, { maxOCPD: 20, cu: '12 AWG' },
+          { maxOCPD: 30, cu: '10 AWG' }, { maxOCPD: 40, cu: '10 AWG' },
+          { maxOCPD: 60, cu: '10 AWG' }, { maxOCPD: 100, cu: '8 AWG' },
+          { maxOCPD: 200, cu: '6 AWG' }, { maxOCPD: 300, cu: '4 AWG' },
+          { maxOCPD: 400, cu: '3 AWG' }, { maxOCPD: 500, cu: '2 AWG' },
+          { maxOCPD: 600, cu: '1 AWG' }, { maxOCPD: 800, cu: '1/0 AWG' },
+          { maxOCPD: 1000, cu: '2/0 AWG' }, { maxOCPD: 1200, cu: '3/0 AWG' },
+          { maxOCPD: 1600, cu: '4/0 AWG' }, { maxOCPD: 2000, cu: '250 kcmil' },
+        ];
+        const egcEntry = egcTable.find(row => ocpdAmps <= row.maxOCPD);
+        if (egcEntry) {
+          egcSize = egcEntry.cu;
+        }
+      }
 
       // Update feeder with calculation results
       const updatedFeeder = {
@@ -192,7 +235,7 @@ export const FeederManager: React.FC<FeederManagerProps> = ({
         design_load_va: result.design_load_va,
         phase_conductor_size: result.phase_conductor_size,
         neutral_conductor_size: result.neutral_conductor_size,
-        egc_size: result.egc_size,
+        egc_size: egcSize, // Use corrected EGC size based on panel OCPD per NEC 250.122
         conduit_size: result.recommended_conduit_size,
         voltage_drop_percent: result.voltage_drop_percent
       };
@@ -470,6 +513,41 @@ export const FeederManager: React.FC<FeederManagerProps> = ({
                 </div>
               </div>
             )}
+
+            {/* ISSUE FIX: Sizing Basis Toggle */}
+            <div className="md:col-span-2">
+              <label className="block text-xs font-semibold text-gray-500 mb-1 uppercase tracking-wider">
+                Sizing Basis
+              </label>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setSizingBasis('load')}
+                  className={`flex-1 py-2 px-4 rounded-md text-sm font-medium transition-colors ${
+                    sizingBasis === 'load'
+                      ? 'bg-electric-500 text-white'
+                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                  }`}
+                >
+                  Calculated Load
+                </button>
+                <button
+                  onClick={() => setSizingBasis('capacity')}
+                  className={`flex-1 py-2 px-4 rounded-md text-sm font-medium transition-colors ${
+                    sizingBasis === 'capacity'
+                      ? 'bg-electric-500 text-white'
+                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                  }`}
+                >
+                  Panel Max Capacity
+                </button>
+              </div>
+              <p className="text-xs text-gray-500 mt-1 flex items-center gap-1">
+                <Info className="w-3 h-3" />
+                {sizingBasis === 'load' 
+                  ? 'Size feeder based on actual connected loads with NEC demand factors.'
+                  : 'Size feeder based on panel main breaker or bus rating (full capacity).'}
+              </p>
+            </div>
 
             {/* Distance */}
             <div>

@@ -256,9 +256,17 @@ export function usePanels(projectId: string | undefined): UsePanelsReturn {
 
   const updatePanel = async (id: string, updates: PanelUpdate) => {
     try {
+      // OPTIMISTIC UPDATE: Update local state immediately for instant UI feedback
+      const previousPanels = [...panels];
+      setPanels(prev => prev.map(p => p.id === id ? { ...p, ...updates } : p));
+
       const { error } = await supabase.from('panels').update(updates).eq('id', id);
 
-      if (error) throw error;
+      if (error) {
+        // ROLLBACK: Restore previous state on error
+        setPanels(previousPanels);
+        throw error;
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to update panel');
     }
