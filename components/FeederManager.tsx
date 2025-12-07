@@ -62,9 +62,10 @@ export const FeederManager: React.FC<FeederManagerProps> = ({
   const [sizingBasis, setSizingBasis] = useState<'load' | 'capacity'>('load');
 
   // Detect stale feeders when circuit loads change
+  // Note: Only applies to feeders sized based on calculated load (not max capacity)
   const staleFeeders = useMemo(() => {
-    return getStaleFeedersList(feeders, circuits, 5); // 5% threshold
-  }, [feeders, circuits]);
+    return getStaleFeedersList(feeders, circuits, panels, 5); // 5% threshold
+  }, [feeders, circuits, panels]);
 
   // Get valid destination panels based on selected source
   const validDestinations = useMemo(() => {
@@ -125,9 +126,79 @@ export const FeederManager: React.FC<FeederManagerProps> = ({
     };
   };
 
-  // Recalculate a stale feeder
+  // Recalculate a stale feeder (always uses current load, not capacity)
   const handleRecalculateFeeder = async (feeder: Feeder) => {
-    await handleCalculateFeeder(feeder);
+    // For recalculation, we need to update the existing feeder, not create new
+    // Temporarily set editingId, recalculate, then clear it
+    const previousEditingId = editingId;
+    const previousSizingBasis = sizingBasis;
+    
+    // Force load-based sizing for recalculation (since stale warning only applies to load-based)
+    setSizingBasis('load');
+    
+    try {
+      // Use updateFeeder directly with recalculated values
+      const destPanel = panels.find(p => p.id === feeder.destination_panel_id);
+      const sourcePanel = panels.find(p => p.id === feeder.source_panel_id);
+      
+      if (!destPanel || !sourcePanel) {
+        console.error('Cannot recalculate: source or destination panel not found');
+        return;
+      }
+      
+      // Calculate loads
+      const loads = calculatePanelLoads(feeder.destination_panel_id!);
+      
+      // Calculate feeder sizing
+      const result = calculateFeederSizing({
+        source_voltage: sourcePanel.voltage,
+        source_phase: sourcePanel.phase,
+        destination_voltage: destPanel.voltage,
+        destination_phase: destPanel.phase,
+        total_load_va: loads.totalVA,
+        continuous_load_va: loads.continuousVA,
+        noncontinuous_load_va: loads.noncontinuousVA,
+        distance_ft: feeder.distance_ft,
+        conductor_material: feeder.conductor_material,
+        ambient_temperature_c: feeder.ambient_temperature_c || 30,
+        num_current_carrying: feeder.num_current_carrying || 4,
+        max_voltage_drop_percent: 3
+      });
+      
+      // Get EGC based on panel OCPD
+      const ocpdAmps = destPanel.main_breaker_amps || destPanel.feeder_breaker_amps || destPanel.bus_rating;
+      const egcTable = [
+        { maxOCPD: 15, cu: '14 AWG' }, { maxOCPD: 20, cu: '12 AWG' },
+        { maxOCPD: 30, cu: '10 AWG' }, { maxOCPD: 40, cu: '10 AWG' },
+        { maxOCPD: 60, cu: '10 AWG' }, { maxOCPD: 100, cu: '8 AWG' },
+        { maxOCPD: 200, cu: '6 AWG' }, { maxOCPD: 300, cu: '4 AWG' },
+        { maxOCPD: 400, cu: '3 AWG' }, { maxOCPD: 500, cu: '2 AWG' },
+        { maxOCPD: 600, cu: '1 AWG' }, { maxOCPD: 800, cu: '1/0 AWG' },
+        { maxOCPD: 1000, cu: '2/0 AWG' }, { maxOCPD: 1200, cu: '3/0 AWG' },
+        { maxOCPD: 1600, cu: '4/0 AWG' }, { maxOCPD: 2000, cu: '250 kcmil' },
+      ];
+      const egcEntry = egcTable.find(row => ocpdAmps <= row.maxOCPD);
+      const egcSize = egcEntry?.cu || result.egc_size;
+      
+      // Update feeder
+      await updateFeeder(feeder.id, {
+        total_load_va: loads.totalVA,
+        continuous_load_va: loads.continuousVA,
+        noncontinuous_load_va: loads.noncontinuousVA,
+        design_load_va: result.design_load_va,
+        phase_conductor_size: result.phase_conductor_size,
+        neutral_conductor_size: result.neutral_conductor_size,
+        egc_size: egcSize,
+        conduit_size: result.recommended_conduit_size,
+        voltage_drop_percent: result.voltage_drop_percent
+      });
+      
+    } catch (err) {
+      console.error('Failed to recalculate feeder:', err);
+    } finally {
+      // Restore previous state
+      setSizingBasis(previousSizingBasis);
+    }
   };
 
   // Calculate feeder and update database
