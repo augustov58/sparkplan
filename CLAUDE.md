@@ -135,6 +135,9 @@ VITE_SUPABASE_ANON_KEY=your-anon-key
 GEMINI_API_KEY=your_api_key_here  # Server-side only
 ```
 
+**⚠️ IMPORTANT**: The Gemini API key must be set in Supabase Edge Functions secrets, not in `.env.local`.
+See `/docs/GEMINI_API_SETUP.md` for complete setup instructions.
+
 ---
 
 ## 🚀 STRATEGIC ROADMAP
