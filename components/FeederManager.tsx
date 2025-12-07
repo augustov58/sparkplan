@@ -137,6 +137,12 @@ export const FeederManager: React.FC<FeederManagerProps> = ({
     setSizingBasis('load');
     
     try {
+      // Safety check: ensure panels is an array
+      if (!Array.isArray(panels) || panels.length === 0) {
+        console.error('Cannot recalculate: panels data not available');
+        return;
+      }
+      
       // Use updateFeeder directly with recalculated values
       const destPanel = panels.find(p => p.id === feeder.destination_panel_id);
       const sourcePanel = panels.find(p => p.id === feeder.source_panel_id);
@@ -225,6 +231,12 @@ export const FeederManager: React.FC<FeederManagerProps> = ({
     if (!feeder.distance_ft || !feeder.conductor_material) return;
 
     try {
+      // Safety check: ensure panels is an array
+      if (!Array.isArray(panels)) {
+        console.error('Cannot calculate feeder: panels data not available');
+        return;
+      }
+      
       // Get source and destination panels
       const sourcePanel = panels.find(p => p.id === feeder.source_panel_id);
       const destPanel = feeder.destination_panel_id
@@ -766,9 +778,13 @@ const FeederCard: React.FC<FeederCardProps> = ({
   isEditing,
   staleStatus
 }) => {
-  const sourcePanel = panels.find(p => p.id === feeder.source_panel_id);
-  const destPanel = panels.find(p => p.id === feeder.destination_panel_id);
-  const destTransformer = transformers.find(t => t.id === feeder.destination_transformer_id);
+  // Safety check: ensure panels and transformers are arrays
+  const panelsArray = Array.isArray(panels) ? panels : [];
+  const transformersArray = Array.isArray(transformers) ? transformers : [];
+  
+  const sourcePanel = panelsArray.find(p => p.id === feeder.source_panel_id);
+  const destPanel = panelsArray.find(p => p.id === feeder.destination_panel_id);
+  const destTransformer = transformersArray.find(t => t.id === feeder.destination_transformer_id);
 
   const vdCompliant = (feeder.voltage_drop_percent || 0) <= 3.0;
 
