@@ -145,7 +145,7 @@ GEMINI_API_KEY=your_api_key_here  # Server-side only
 | Priority | Feature | Impact | Status |
 |----------|---------|--------|--------|
 | 🥇 | **Inspector Mode AI** - Pre-inspection audit | Game changer - reduces failed inspections | ✅ **COMPLETE** |
-| 🥇 | **Enhanced NEC Assistant** - Context-aware | Builds on existing Gemini integration | 🟡 Partial |
+| 🥇 | **Enhanced NEC Assistant** - Context-aware | Builds on existing Gemini integration | ✅ **COMPLETE** |
 | 🥈 | **Permit Packet Generator** | Time-saver, justifies subscription | 🔴 Not Started |
 | 🥈 | **Arc Flash Calculator** | Professional credibility | 🔴 Not Started |
 
@@ -399,8 +399,24 @@ Pre-inspection audit feature that flags NEC violations before inspector review.
 - NEC 230.42 - Service capacity
 - NEC 250.50/66 - Grounding system
 
-### Next Priority: Enhanced NEC Assistant (Context-Aware)
-Make the existing AI assistant aware of current project data for more relevant answers.
+### ✅ Enhanced NEC Assistant (Context-Aware) - IMPLEMENTED
+The AI assistant now understands the user's current project and can answer questions about specific panels, circuits, and feeders.
+
+**Features:**
+- Auto-detects project context from URL
+- Fetches project data (panels, circuits, feeders, transformers)
+- Answers project-specific questions:
+  - "Can I use #10 wire for the AC unit on panel H1?" → Checks YOUR panel H1
+  - "Is my service sized correctly?" → Analyzes YOUR calculated load
+  - "What size breaker for circuit 5?" → Looks up YOUR circuit 5
+- Shows "Project Context" badge when context is available
+- Falls back to general NEC knowledge when not in project
+
+**Location**: Floating chat widget (bottom-right), available globally
+**Service**: `services/ai/projectContextBuilder.ts` + `services/geminiService.ts`
+
+### Next Priority: Permit Packet Generator
+Auto-generate complete permit application packages to save contractors 30-60 min per permit.
 
 ---
 
