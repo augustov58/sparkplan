@@ -139,6 +139,16 @@ export function validateFeederConnectivity(
       technicalReason: 'Source and destination must be different panels',
     };
   }
+  
+  // Rule 1b: If source is MDP (service entrance), check if dest is directly fed from it
+  // This is a fast path for the most common case
+  if (sourcePanel.is_main && destPanel.fed_from === sourcePanelId) {
+    return {
+      isConnected: true,
+      path: [sourcePanel.name, destPanel.name],
+      message: `Valid feeder: ${sourcePanel.name} (service entrance) → ${destPanel.name}`,
+    };
+  }
 
   // Rule 2: Check if panels are on the same voltage segment
   const sourceRoot = getPanelSegmentRoot(sourcePanel, panels, transformers);
@@ -159,7 +169,16 @@ export function validateFeederConnectivity(
     };
   }
 
-  // Rule 3: Check if destination panel is downstream of source (valid feeder direction)
+  // Rule 3: Check if destination panel is directly fed from source (most common case)
+  if (isDirectlyFedFrom(sourcePanelId, destPanelId, panels)) {
+    return {
+      isConnected: true,
+      path: [sourcePanel.name, destPanel.name],
+      message: `Valid feeder path: ${sourcePanel.name} → ${destPanel.name}`,
+    };
+  }
+  
+  // Rule 3b: Check if destination panel is downstream of source (multi-level hierarchy)
   const downstreamPath = findDownstreamPath(sourcePanelId, destPanelId, panels);
   if (downstreamPath.length > 0) {
     return {
@@ -213,6 +232,7 @@ function findDownstreamPath(
   panels: Panel[]
 ): string[] {
   const path: string[] = [];
+  const sourcePanel = panels.find(p => p.id === sourcePanelId);
   
   // Start from destination and trace back to source
   let current: Panel | undefined = panels.find(p => p.id === destPanelId);
@@ -225,15 +245,41 @@ function findDownstreamPath(
       return path;
     }
     
-    if (current.fed_from_type === 'panel' && current.fed_from) {
+    // Check if this panel is fed from the source panel (direct connection)
+    // This handles cases where fed_from is set but fed_from_type might not be 'panel'
+    if (current.fed_from === sourcePanelId) {
+      path.unshift(sourcePanel?.name || 'Source');
+      return path;
+    }
+    
+    // Trace back through panel hierarchy
+    if (current.fed_from) {
       current = panels.find(p => p.id === current!.fed_from);
+    } else if (current.fed_from_type === 'service' || current.fed_from_type === 'transformer') {
+      // Reached service entrance or transformer - source not found in this path
+      break;
     } else {
-      // Reached service or transformer - source not found in this path
       break;
     }
   }
   
   return [];
+}
+
+/**
+ * Checks if destination is directly fed from source (forward lookup)
+ * More reliable than tracing backward
+ */
+function isDirectlyFedFrom(
+  sourcePanelId: string,
+  destPanelId: string,
+  panels: Panel[]
+): boolean {
+  const destPanel = panels.find(p => p.id === destPanelId);
+  if (!destPanel) return false;
+  
+  // Check if destination's fed_from matches source
+  return destPanel.fed_from === sourcePanelId;
 }
 
 /**
