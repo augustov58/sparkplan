@@ -15,7 +15,8 @@ import {
   Calculator,
   AlertOctagon,
   Cable,
-  Home
+  Home,
+  Shield
 } from 'lucide-react';
 import { useAuthContext } from './Auth/AuthProvider';
 import { ProjectType } from '../types';
@@ -105,6 +106,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, title, showBack, onSig
     
     // Always show
     { label: 'Inspection & Issues', icon: AlertOctagon, path: `/project/${projectId}/issues`, show: true },
+    { label: 'Inspector Mode AI', icon: Shield, path: `/project/${projectId}/inspector`, show: true },
     { label: 'Pre-Inspection Check', icon: CheckSquare, path: `/project/${projectId}/check`, show: true },
     { label: 'Compliance Reports', icon: FileText, path: `/project/${projectId}/reports`, show: true },
   ].filter(item => item.show) : [];

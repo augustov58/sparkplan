@@ -16,6 +16,7 @@ import { IssuesLog } from './components/IssuesLog';
 import { MaterialTakeOff } from './components/MaterialTakeOff';
 import { FeederManager } from './components/FeederManager';
 import { DwellingLoadCalculator } from './components/DwellingLoadCalculator';
+import { InspectorMode } from './components/InspectorMode';
 import { Project, ProjectStatus, ProjectType } from './types';
 import { askNecAssistant } from './services/geminiService';
 import { Send, MessageSquare } from 'lucide-react';
@@ -83,6 +84,16 @@ const ProjectWrapper = ({ projects, updateProject, deleteProject, onSignOut }: {
                 <Route path="/check" element={
                     <FeatureErrorBoundary>
                         <PreInspection project={project} updateProject={updateProject} />
+                    </FeatureErrorBoundary>
+                } />
+                <Route path="/inspector" element={
+                    <FeatureErrorBoundary>
+                        <InspectorMode 
+                            projectId={project.id}
+                            projectType={project.type}
+                            serviceVoltage={project.serviceVoltage}
+                            servicePhase={project.servicePhase}
+                        />
                     </FeatureErrorBoundary>
                 } />
                 <Route path="/reports" element={
