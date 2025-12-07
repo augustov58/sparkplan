@@ -729,13 +729,13 @@ export const FeederManager: React.FC<FeederManagerProps> = ({
       ) : (
         <div className="space-y-4">
           {feeders.map(feeder => {
-            const staleStatus = checkFeederLoadStatus(feeder, circuits, 5);
+            const staleStatus = checkFeederLoadStatus(feeder, circuits, panels, 5);
             return (
               <FeederCard
                 key={feeder.id}
                 feeder={feeder}
-                panels={panels}
-                transformers={transformers}
+                panels={panels || []}
+                transformers={transformers || []}
                 onEdit={handleEdit}
                 onDelete={handleDelete}
                 onRecalculate={handleRecalculateFeeder}
@@ -753,8 +753,8 @@ export const FeederManager: React.FC<FeederManagerProps> = ({
 // Feeder Card Component
 interface FeederCardProps {
   feeder: Feeder;
-  panels: any[];
-  transformers: any[];
+  panels?: any[];
+  transformers?: any[];
   onEdit: (feeder: Feeder) => void;
   onDelete: (id: string) => void;
   onRecalculate: (feeder: Feeder) => void;
@@ -770,15 +770,15 @@ interface FeederCardProps {
 
 const FeederCard: React.FC<FeederCardProps> = ({
   feeder,
-  panels,
-  transformers,
+  panels = [],
+  transformers = [],
   onEdit,
   onDelete,
   onRecalculate,
   isEditing,
   staleStatus
 }) => {
-  // Safety check: ensure panels and transformers are arrays
+  // Safety check: ensure panels and transformers are arrays (defensive programming)
   const panelsArray = Array.isArray(panels) ? panels : [];
   const transformersArray = Array.isArray(transformers) ? transformers : [];
   
