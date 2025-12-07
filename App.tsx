@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { HashRouter, Routes, Route, Navigate, useParams, useNavigate } from 'react-router-dom';
+import { HashRouter, Routes, Route, Navigate, useParams, useNavigate, useLocation } from 'react-router-dom';
 import { Layout } from './components/Layout';
 import { Dashboard } from './components/Dashboard';
 import { LoadCalculator } from './components/LoadCalculator';
@@ -19,7 +19,12 @@ import { DwellingLoadCalculator } from './components/DwellingLoadCalculator';
 import { InspectorMode } from './components/InspectorMode';
 import { Project, ProjectStatus, ProjectType } from './types';
 import { askNecAssistant } from './services/geminiService';
-import { Send, MessageSquare } from 'lucide-react';
+import { buildProjectContext, formatContextForAI } from './services/ai/projectContextBuilder';
+import { usePanels } from './hooks/usePanels';
+import { useCircuits } from './hooks/useCircuits';
+import { useFeeders } from './hooks/useFeeders';
+import { useTransformers } from './hooks/useTransformers';
+import { Send, MessageSquare, Info } from 'lucide-react';
 import { nanoid } from 'nanoid';
 import { useAuthContext } from './components/Auth/AuthProvider';
 import { Login } from './components/Auth/Login';
@@ -125,6 +130,37 @@ const NecAssistant = () => {
     const [query, setQuery] = useState('');
     const [history, setHistory] = useState<{role: 'user'|'ai', text: string}[]>([]);
     const [loading, setLoading] = useState(false);
+    const location = useLocation();
+    
+    // Detect project context from URL
+    const projectMatch = location.pathname.match(/\/project\/([^/]+)/);
+    const projectId = projectMatch ? projectMatch[1] : undefined;
+    
+    // Fetch project data if in project context
+    const { panels } = usePanels(projectId);
+    const { circuits } = useCircuits(projectId);
+    const { feeders } = useFeeders(projectId);
+    const { transformers } = useTransformers(projectId);
+    
+    // Get project info from projects list (if available)
+    const { projects } = useProjects();
+    const currentProject = projectId ? projects.find(p => p.id === projectId) : undefined;
+    
+    // Build context if in project
+    const hasContext = projectId && currentProject && panels.length > 0;
+    const projectContext = hasContext && currentProject
+        ? buildProjectContext(
+            projectId,
+            currentProject.name,
+            currentProject.type,
+            currentProject.serviceVoltage,
+            currentProject.servicePhase,
+            panels,
+            circuits,
+            feeders,
+            transformers
+          )
+        : null;
 
     const handleAsk = async () => {
         if (!query.trim()) return;
@@ -132,7 +168,13 @@ const NecAssistant = () => {
         setQuery('');
         setHistory(prev => [...prev, { role: 'user', text: q }]);
         setLoading(true);
-        const ans = await askNecAssistant(q);
+        
+        // Build context string if available
+        const contextString = projectContext 
+            ? formatContextForAI(projectContext)
+            : undefined;
+        
+        const ans = await askNecAssistant(q, contextString);
         setLoading(false);
         setHistory(prev => [...prev, { role: 'ai', text: ans || 'Sorry, I could not retrieve that information.' }]);
     };
@@ -142,13 +184,31 @@ const NecAssistant = () => {
             {isOpen && (
                 <div className="bg-white border border-gray-200 shadow-2xl rounded-lg w-96 h-[500px] mb-4 flex flex-col overflow-hidden animate-in slide-in-from-bottom-10 fade-in duration-300">
                     <div className="bg-gray-900 text-white p-4 flex justify-between items-center">
-                        <span className="font-medium flex items-center gap-2"><MessageSquare className="w-4 h-4 text-electric-500"/> NEC Copilot</span>
+                        <div className="flex items-center gap-2">
+                            <MessageSquare className="w-4 h-4 text-electric-500"/>
+                            <span className="font-medium">NEC Copilot</span>
+                            {hasContext && (
+                                <span className="text-xs bg-electric-500 text-black px-2 py-0.5 rounded-full font-medium flex items-center gap-1">
+                                    <Info className="w-3 h-3" />
+                                    Project Context
+                                </span>
+                            )}
+                        </div>
                         <button onClick={() => setIsOpen(false)} className="text-gray-400 hover:text-white">×</button>
                     </div>
                     <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-gray-50">
                         {history.length === 0 && (
                             <div className="text-center text-gray-400 text-sm mt-10">
-                                Ask any question about NEC 2023 code requirements.
+                                {hasContext ? (
+                                    <>
+                                        <p className="font-medium text-gray-600 mb-2">Ask about your project:</p>
+                                        <p className="text-xs mb-4">"Can I use #10 wire for the AC unit on panel {panels[0]?.name || 'H1'}?"</p>
+                                        <p className="text-xs mb-4">"Is my service sized correctly?"</p>
+                                        <p className="text-xs">Or ask general NEC questions</p>
+                                    </>
+                                ) : (
+                                    "Ask any question about NEC 2023 code requirements."
+                                )}
                             </div>
                         )}
                         {history.map((msg, idx) => (

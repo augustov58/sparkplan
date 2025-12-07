@@ -106,12 +106,37 @@ export const generateInspectionChecklist = async (type: string, phase: string) =
 };
 
 export const askNecAssistant = async (question: string, context?: string) => {
-  const prompt = `
-  User Question: ${question}
-  ${context ? `Project Context: ${context}` : ''}
+  const enhancedSystemInstruction = `
+You are a Senior Electrical Engineer and Master Electrician specializing in the National Electrical Code (NEC).
+Your goal is to assist users in designing safe, compliant electrical systems.
 
-  Answer strictly based on the NEC. Cite the article number.
+${context ? `
+IMPORTANT: You have access to the user's current project data. When answering questions:
+1. Reference specific panels, circuits, or feeders from the project when relevant
+2. Check if the question relates to their actual project configuration
+3. Provide specific recommendations based on their project data
+4. If they ask about a panel/circuit/feeder, look it up in the project context
+5. If their question is general NEC knowledge, answer generally but mention if it applies to their project
+` : ''}
+
+Always reference specific NEC articles (using the 2023 edition unless specified otherwise).
+Be concise, technical, and professional.
   `;
 
-  return await callGeminiProxy(prompt);
+  const prompt = `
+User Question: ${question}
+${context ? context : ''}
+
+${context ? `
+INSTRUCTIONS:
+- If the question references a specific panel, circuit, or component, check the project context above
+- Provide specific answers based on their actual project configuration
+- Cite relevant NEC articles
+- If the question is about something not in their project, answer generally but note it's not in their current design
+` : `
+Answer strictly based on the NEC. Cite the article number.
+`}
+  `;
+
+  return await callGeminiProxy(prompt, enhancedSystemInstruction);
 };
