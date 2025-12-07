@@ -36,7 +36,23 @@ async function callGeminiProxy(prompt: string, systemInstruction?: string): Prom
 
     if (response.error) {
       console.error('Gemini proxy error:', response.error);
-      return "AI service temporarily unavailable. Please try again.";
+      
+      // Provide more helpful error messages
+      const errorMessage = response.error.message || response.error.toString();
+      
+      if (errorMessage.includes('free tier not enabled') || errorMessage.includes('limit: 0')) {
+        return "⚠️ Gemini API free tier not enabled.\n\nPlease:\n1. Go to https://aistudio.google.com/app/apikey\n2. Check your API key status\n3. Enable free tier access or set up billing\n\nSee /docs/GEMINI_API_SETUP.md for details.";
+      }
+      
+      if (errorMessage.includes('Rate limit') || errorMessage.includes('429')) {
+        return "⏱️ Rate limit exceeded. Please wait a minute and try again.\n\nFree tier: 15 requests/minute, 1,500 requests/day.";
+      }
+      
+      if (errorMessage.includes('Invalid') || errorMessage.includes('401')) {
+        return "🔑 Invalid API key. Please check your GEMINI_API_KEY in Supabase Edge Functions secrets.";
+      }
+      
+      return `AI service error: ${errorMessage}\n\nPlease check /docs/GEMINI_API_SETUP.md for troubleshooting.`;
     }
 
     return response.data?.response || "No response generated.";

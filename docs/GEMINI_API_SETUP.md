@@ -106,8 +106,17 @@ The Edge Function code is in `supabase/functions/gemini-proxy/index.ts`.
 - Make sure you're logged in to the app
 - Check that Supabase auth is working (try creating a project)
 
-### API Quota Exceeded
+### API Quota Exceeded (429 Error)
 
+**If you see "limit: 0" in the error:**
+- Your API key doesn't have free tier access enabled
+- **Solution**: Go to [Google AI Studio](https://aistudio.google.com/app/apikey)
+  - Click on your API key
+  - Check if "Free tier" is enabled
+  - If not available, you may need to enable billing (free tier still works with billing enabled)
+  - Or create a new API key - new keys usually have free tier enabled by default
+
+**If you see rate limit errors (not "limit: 0"):**
 - Free tier: 15 requests/minute, 1,500 requests/day
 - Check your usage in [Google AI Studio](https://aistudio.google.com/app/apikey)
 - Wait a minute and try again, or upgrade your API quota

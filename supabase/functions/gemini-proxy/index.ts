@@ -96,7 +96,30 @@ serve(async (req) => {
     if (!geminiResponse.ok) {
       const errorText = await geminiResponse.text()
       console.error('Gemini API error:', errorText)
-      throw new Error(`Gemini API returned ${geminiResponse.status}`)
+      
+      // Parse error for better messages
+      let errorMessage = `Gemini API returned ${geminiResponse.status}`
+      try {
+        const errorData = JSON.parse(errorText)
+        if (errorData.error) {
+          if (errorData.error.code === 429) {
+            // Rate limit / quota exceeded
+            if (errorData.error.message.includes('limit: 0')) {
+              errorMessage = 'Gemini API free tier not enabled. Please check your API key in Google AI Studio and ensure free tier access is enabled, or enable billing for paid tier.'
+            } else {
+              errorMessage = `Rate limit exceeded: ${errorData.error.message}. Please wait and try again.`
+            }
+          } else if (errorData.error.code === 401) {
+            errorMessage = 'Invalid Gemini API key. Please check your API key in Supabase Edge Functions secrets.'
+          } else if (errorData.error.message) {
+            errorMessage = errorData.error.message
+          }
+        }
+      } catch (e) {
+        // If parsing fails, use default message
+      }
+      
+      throw new Error(errorMessage)
     }
 
     const data = await geminiResponse.json()
