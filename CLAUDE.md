@@ -412,8 +412,16 @@ The AI assistant now understands the user's current project and can answer quest
   - "Can I use #10 wire for the AC unit on panel H1?" → Checks YOUR panel H1
   - "Is my service sized correctly?" → Analyzes YOUR calculated load
   - "What size breaker for circuit 5?" → Looks up YOUR circuit 5
+  - "Describe my riser diagram" → Uses YOUR actual panel hierarchy
 - Shows "Project Context" badge when context is available
 - Falls back to general NEC knowledge when not in project
+
+**Context Improvements:**
+- Includes complete panel hierarchy (which panel feeds which)
+- Visual hierarchy tree showing power flow
+- Correct load values per panel
+- Panel relationships (fedFrom, downstreamPanels, downstreamTransformers)
+- AI can now accurately describe riser diagrams and answer project-specific questions
 
 **Location**: Floating chat widget (bottom-right), available globally
 **Service**: `services/ai/projectContextBuilder.ts` + `services/geminiService.ts`

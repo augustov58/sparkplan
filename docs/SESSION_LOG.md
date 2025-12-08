@@ -10,7 +10,75 @@
 
 ## 📋 Current Session Status
 
-### Session: 2025-12-07 (Continued)
+### Session: 2025-12-07 (Continued - Part 2)
+
+**Session Start**: Bug fixes + Enhanced NEC Assistant implementation
+**Focus**: Fixing ISSUES.md bugs and implementing context-aware AI assistant
+
+#### Completed This Session
+
+**📁 Documentation Cleanup:**
+- Moved 15 implementation/fix .md files to `docs/implementation-notes/`
+- Root directory now clean with only essential docs (CLAUDE.md, README.md, ISSUES.md, STRATEGIC_ANALYSIS.md)
+- Created index README in implementation-notes folder
+
+**🐛 Bug Fixes (3 ISSUES.md items):**
+1. **Panel Main Breaker doesn't update in riser diagram**
+   - Added optimistic update to `updatePanel()` in usePanels hook
+   - Changes now reflect immediately without waiting for subscription
+
+2. **Feeder sizing only based on calculated load**
+   - Added "Sizing Basis" toggle: "Calculated Load" vs "Panel Max Capacity"
+   - Max capacity uses main breaker or bus rating for full panel sizing
+
+3. **EGC calculation incorrect**
+   - EGC now based on downstream panel's OCPD per NEC Table 250.122
+   - Uses main_breaker_amps or feeder_breaker_amps, not design current
+
+**🔧 Additional Fixes:**
+- Fixed panel connectivity validation (MDP-fed panels now recognized)
+- Fixed feeder stale warnings (only for load-based feeders, not capacity-based)
+- Fixed recalculate button error (now properly updates existing feeders)
+- Added safety checks for panels.find() to prevent crashes
+
+**🤖 Enhanced NEC Assistant (Context-Aware):**
+- Auto-detects project context from URL
+- Fetches project data (panels, circuits, feeders, transformers)
+- Builds comprehensive context with panel hierarchy
+- AI can now answer project-specific questions:
+  - "Can I use #10 wire for the AC unit on panel H1?" → Checks YOUR panel H1
+  - "Is my service sized correctly?" → Analyzes YOUR calculated load
+  - "Describe my riser diagram" → Uses YOUR actual panel hierarchy
+- Shows "Project Context" badge when context is available
+- Enhanced prompts guide AI to use project data intelligently
+
+**Files Created:**
+- `services/ai/projectContextBuilder.ts` - Builds structured project context with hierarchy
+- `services/ai/index.ts` - Service exports
+- `docs/GEMINI_API_SETUP.md` - Complete Gemini API setup guide
+
+**Files Modified:**
+- `App.tsx` - NecAssistant now detects project and fetches data
+- `services/geminiService.ts` - Enhanced askNecAssistant with context-aware prompts
+- `components/FeederManager.tsx` - Sizing basis toggle + EGC fix + recalculate fix
+- `hooks/usePanels.ts` - Optimistic update for updatePanel()
+- `services/validation/panelConnectivityValidation.ts` - Fixed MDP recognition
+- `services/feeder/feederLoadSync.ts` - Exclude capacity-based feeders from stale warnings
+
+**Key Improvements:**
+- Project context includes complete panel hierarchy (which feeds which)
+- Visual hierarchy tree in context summary
+- Correct load values (uses actual circuit loads, not aggregated)
+- Panel relationships clearly shown (fedFrom, downstreamPanels, downstreamTransformers)
+
+**Build Status:**
+- ✅ Build passes (2,493 kB)
+- ✅ All fixes tested and working
+- ✅ Context-aware assistant working correctly
+
+---
+
+### Session: 2025-12-07 (Continued - Part 1)
 
 **Session Start**: Implementing Inspector Mode AI (Top Priority Feature)
 **Focus**: Pre-inspection AI audit system for NEC compliance
