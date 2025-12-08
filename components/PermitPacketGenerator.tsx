@@ -25,14 +25,26 @@ export const PermitPacketGenerator: React.FC<PermitPacketGeneratorProps> = ({ pr
   const [permitNumber, setPermitNumber] = useState('');
   const [packetType, setPacketType] = useState<'full' | 'lightweight'>('full');
 
-  // Fetch project data
+  // Fetch project data - hooks must be called unconditionally
   const { projects } = useProjects();
-  const currentProject = projects.find(p => p.id === projectId);
-  const { panels, loading: panelsLoading } = usePanels(projectId);
-  const { circuits, loading: circuitsLoading } = useCircuits(projectId);
-  const { feeders, loading: feedersLoading } = useFeeders(projectId);
-  const { transformers, loading: transformersLoading } = useTransformers(projectId);
-  const { grounding, loading: groundingLoading } = useGrounding(projectId);
+  const currentProject = projectId ? projects.find(p => p.id === projectId) : undefined;
+  const { panels, loading: panelsLoading } = usePanels(projectId || '');
+  const { circuits, loading: circuitsLoading } = useCircuits(projectId || '');
+  const { feeders, loading: feedersLoading } = useFeeders(projectId || '');
+  const { transformers, loading: transformersLoading } = useTransformers(projectId || '');
+  const { grounding, loading: groundingLoading } = useGrounding(projectId || '');
+
+  // Early return if no projectId
+  if (!projectId) {
+    return (
+      <div className="bg-white border border-gray-200 rounded-lg p-6">
+        <div className="flex items-center gap-2 text-gray-500">
+          <AlertCircle className="w-5 h-5" />
+          <p>No project ID provided</p>
+        </div>
+      </div>
+    );
+  }
 
   const dataLoading = panelsLoading || circuitsLoading || feedersLoading || transformersLoading || groundingLoading;
 
