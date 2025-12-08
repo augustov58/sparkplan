@@ -1,0 +1,215 @@
+/**
+ * Permit Packet Generator Service
+ * Generates comprehensive permit application packet with all required documents
+ */
+
+import React from 'react';
+import { pdf } from '@react-pdf/renderer';
+import { Document } from '@react-pdf/renderer';
+import type { Panel, Circuit, Feeder, Transformer } from '../../lib/database.types';
+import { 
+  CoverPage, 
+  EquipmentSchedule, 
+  LoadCalculationSummary, 
+  ComplianceSummary 
+} from './PermitPacketDocuments';
+import { PanelScheduleDocument } from './PanelScheduleDocuments';
+
+export interface PermitPacketData {
+  projectId: string;
+  projectName: string;
+  projectAddress: string;
+  projectType: 'Residential' | 'Commercial' | 'Industrial';
+  serviceVoltage: number;
+  servicePhase: 1 | 3;
+  panels: Panel[];
+  circuits: Circuit[];
+  feeders: Feeder[];
+  transformers: Transformer[];
+  preparedBy?: string;
+  permitNumber?: string;
+  hasGrounding?: boolean;
+}
+
+/**
+ * Generate complete permit packet PDF
+ * Includes: Cover page, Equipment schedule, Load summary, Compliance summary, Panel schedules
+ */
+export const generatePermitPacket = async (data: PermitPacketData): Promise<void> => {
+  try {
+    console.log('Generating permit packet for project:', data.projectName);
+
+    // Validate required data
+    if (!data.projectName || !data.panels || data.panels.length === 0) {
+      throw new Error('Invalid permit packet data. Project name and at least one panel are required.');
+    }
+
+    // Group circuits by panel
+    const circuitsByPanel = new Map<string, Circuit[]>();
+    data.circuits.forEach(circuit => {
+      const panelCircuits = circuitsByPanel.get(circuit.panel_id) || [];
+      panelCircuits.push(circuit);
+      circuitsByPanel.set(circuit.panel_id, panelCircuits);
+    });
+
+    // Sort panels: MDP first, then by name
+    const sortedPanels = [...data.panels].sort((a, b) => {
+      if (a.is_main && !b.is_main) return -1;
+      if (!a.is_main && b.is_main) return 1;
+      return a.name.localeCompare(b.name);
+    });
+
+    // Create the complete document with all pages
+    const PermitPacketDocument = () => (
+      <Document>
+        {/* Cover Page */}
+        <CoverPage
+          projectName={data.projectName}
+          projectAddress={data.projectAddress}
+          projectType={data.projectType}
+          serviceVoltage={data.serviceVoltage}
+          servicePhase={data.servicePhase}
+          preparedBy={data.preparedBy}
+          permitNumber={data.permitNumber}
+        />
+
+        {/* Equipment Schedule */}
+        <EquipmentSchedule
+          panels={data.panels}
+          transformers={data.transformers}
+          feeders={data.feeders}
+          projectName={data.projectName}
+        />
+
+        {/* Load Calculation Summary */}
+        <LoadCalculationSummary
+          panels={data.panels}
+          circuits={data.circuits}
+          projectName={data.projectName}
+          serviceVoltage={data.serviceVoltage}
+          servicePhase={data.servicePhase}
+        />
+
+        {/* NEC Compliance Summary */}
+        <ComplianceSummary
+          panels={data.panels}
+          circuits={data.circuits}
+          feeders={data.feeders}
+          projectName={data.projectName}
+          hasGrounding={data.hasGrounding}
+        />
+
+        {/* Panel Schedules - One page per panel */}
+        {sortedPanels.map(panel => {
+          const panelCircuits = circuitsByPanel.get(panel.id) || [];
+          return (
+            <PanelScheduleDocument
+              key={panel.id}
+              panel={panel}
+              circuits={panelCircuits}
+              projectName={data.projectName}
+              projectAddress={data.projectAddress}
+            />
+          );
+        })}
+      </Document>
+    );
+
+    // Generate PDF blob
+    const blob = await pdf(<PermitPacketDocument />).toBlob();
+
+    console.log('Permit packet PDF blob generated, size:', blob.size);
+
+    if (!blob || blob.size === 0) {
+      throw new Error('Failed to generate permit packet PDF blob');
+    }
+
+    // Create download link
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    const fileName = `Permit_Packet_${data.projectName.replace(/[^a-z0-9]/gi, '_')}_${new Date().toISOString().split('T')[0]}.pdf`;
+    link.download = fileName;
+
+    // Trigger download
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+
+    // Cleanup
+    setTimeout(() => URL.revokeObjectURL(url), 100);
+
+    console.log('Permit packet PDF download triggered:', fileName);
+  } catch (error) {
+    console.error('Error generating permit packet:', error);
+    throw error;
+  }
+};
+
+/**
+ * Generate a lightweight permit packet (without panel schedules)
+ * Useful for quick submittal when panel schedules are submitted separately
+ */
+export const generateLightweightPermitPacket = async (data: PermitPacketData): Promise<void> => {
+  try {
+    console.log('Generating lightweight permit packet for project:', data.projectName);
+
+    const LightweightPacketDocument = () => (
+      <Document>
+        <CoverPage
+          projectName={data.projectName}
+          projectAddress={data.projectAddress}
+          projectType={data.projectType}
+          serviceVoltage={data.serviceVoltage}
+          servicePhase={data.servicePhase}
+          preparedBy={data.preparedBy}
+          permitNumber={data.permitNumber}
+        />
+        <EquipmentSchedule
+          panels={data.panels}
+          transformers={data.transformers}
+          feeders={data.feeders}
+          projectName={data.projectName}
+        />
+        <LoadCalculationSummary
+          panels={data.panels}
+          circuits={data.circuits}
+          projectName={data.projectName}
+          serviceVoltage={data.serviceVoltage}
+          servicePhase={data.servicePhase}
+        />
+        <ComplianceSummary
+          panels={data.panels}
+          circuits={data.circuits}
+          feeders={data.feeders}
+          projectName={data.projectName}
+          hasGrounding={data.hasGrounding}
+        />
+      </Document>
+    );
+
+    const blob = await pdf(<LightweightPacketDocument />).toBlob();
+
+    if (!blob || blob.size === 0) {
+      throw new Error('Failed to generate lightweight permit packet PDF blob');
+    }
+
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    const fileName = `Permit_Packet_Lightweight_${data.projectName.replace(/[^a-z0-9]/gi, '_')}_${new Date().toISOString().split('T')[0]}.pdf`;
+    link.download = fileName;
+
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+
+    setTimeout(() => URL.revokeObjectURL(url), 100);
+
+    console.log('Lightweight permit packet PDF download triggered:', fileName);
+  } catch (error) {
+    console.error('Error generating lightweight permit packet:', error);
+    throw error;
+  }
+};
+

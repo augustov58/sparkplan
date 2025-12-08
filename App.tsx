@@ -17,6 +17,7 @@ import { MaterialTakeOff } from './components/MaterialTakeOff';
 import { FeederManager } from './components/FeederManager';
 import { DwellingLoadCalculator } from './components/DwellingLoadCalculator';
 import { InspectorMode } from './components/InspectorMode';
+import { PermitPacketGenerator } from './components/PermitPacketGenerator';
 import { Project, ProjectStatus, ProjectType } from './types';
 import { askNecAssistant } from './services/geminiService';
 import { buildProjectContext, formatContextForAI } from './services/ai/projectContextBuilder';
@@ -120,6 +121,11 @@ const ProjectWrapper = ({ projects, updateProject, deleteProject, onSignOut }: {
                             projectVoltage={project.serviceVoltage}
                             projectPhase={project.servicePhase}
                         />
+                    </FeatureErrorBoundary>
+                } />
+                <Route path="/permit-packet" element={
+                    <FeatureErrorBoundary>
+                        <PermitPacketGenerator projectId={project.id} />
                     </FeatureErrorBoundary>
                 } />
             </Routes>

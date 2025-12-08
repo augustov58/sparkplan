@@ -109,6 +109,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, title, showBack, onSig
     { label: 'Inspector Mode AI', icon: Shield, path: `/project/${projectId}/inspector`, show: true },
     { label: 'Pre-Inspection Check', icon: CheckSquare, path: `/project/${projectId}/check`, show: true },
     { label: 'Compliance Reports', icon: FileText, path: `/project/${projectId}/reports`, show: true },
+    { label: 'Permit Packet', icon: FileText, path: `/project/${projectId}/permit-packet`, show: true },
   ].filter(item => item.show) : [];
 
   return (
