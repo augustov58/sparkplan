@@ -24,7 +24,7 @@ import { usePanels } from './hooks/usePanels';
 import { useCircuits } from './hooks/useCircuits';
 import { useFeeders } from './hooks/useFeeders';
 import { useTransformers } from './hooks/useTransformers';
-import { Send, MessageSquare, Info, Copy, Check, Bot, User, Sparkles } from 'lucide-react';
+import { Send, MessageSquare, Info, Copy, Check, Bot, User, Sparkles, Maximize2, Minimize2 } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { nanoid } from 'nanoid';
@@ -135,6 +135,7 @@ interface Message {
 
 const NecAssistant = () => {
     const [isOpen, setIsOpen] = useState(false);
+    const [isEnlarged, setIsEnlarged] = useState(false);
     const [query, setQuery] = useState('');
     const [history, setHistory] = useState<Message[]>([]);
     const [loading, setLoading] = useState(false);
@@ -247,7 +248,9 @@ const NecAssistant = () => {
     return (
         <div className="fixed bottom-6 right-6 z-50 flex flex-col items-end">
             {isOpen && (
-                <div className="bg-white border border-gray-200 shadow-2xl rounded-lg w-96 h-[500px] mb-4 flex flex-col overflow-hidden animate-in slide-in-from-bottom-10 fade-in duration-300">
+                <div className={`bg-white border border-gray-200 shadow-2xl rounded-lg mb-4 flex flex-col overflow-hidden animate-in slide-in-from-bottom-10 fade-in duration-300 transition-all ${
+                    isEnlarged ? 'w-[600px] h-[700px]' : 'w-96 h-[500px]'
+                }`}>
                     {/* Header */}
                     <div className="bg-gradient-to-r from-gray-900 to-gray-800 text-white p-4 flex justify-between items-center">
                         <div className="flex items-center gap-2">
@@ -260,13 +263,27 @@ const NecAssistant = () => {
                                 </span>
                             )}
                         </div>
-                        <button 
-                            onClick={() => setIsOpen(false)} 
-                            className="text-gray-400 hover:text-white transition-colors"
-                            aria-label="Close chat"
-                        >
-                            ×
-                        </button>
+                        <div className="flex items-center gap-2">
+                            <button
+                                onClick={() => setIsEnlarged(!isEnlarged)}
+                                className="text-gray-400 hover:text-white transition-colors p-1 rounded hover:bg-gray-700"
+                                aria-label={isEnlarged ? "Minimize chat" : "Maximize chat"}
+                                title={isEnlarged ? "Minimize" : "Maximize"}
+                            >
+                                {isEnlarged ? (
+                                    <Minimize2 className="w-4 h-4" />
+                                ) : (
+                                    <Maximize2 className="w-4 h-4" />
+                                )}
+                            </button>
+                            <button 
+                                onClick={() => setIsOpen(false)} 
+                                className="text-gray-400 hover:text-white transition-colors"
+                                aria-label="Close chat"
+                            >
+                                ×
+                            </button>
+                        </div>
                     </div>
 
                     {/* Messages Area */}
@@ -358,12 +375,15 @@ const NecAssistant = () => {
                                             <p className="whitespace-pre-wrap">{msg.text}</p>
                                         )}
                                         
-                                        {/* Copy button (hover) */}
+                                        {/* Copy button - always visible for AI messages */}
                                         {msg.role === 'ai' && (
                                             <button
                                                 onClick={() => handleCopy(msg.text, idx)}
-                                                className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity bg-gray-100 hover:bg-gray-200 p-1.5 rounded text-gray-600 hover:text-gray-900"
+                                                className={`absolute top-2 right-2 transition-all bg-gray-100 hover:bg-gray-200 p-1.5 rounded text-gray-600 hover:text-gray-900 ${
+                                                    copiedIndex === idx ? 'opacity-100 bg-green-100 hover:bg-green-200' : 'opacity-70 group-hover:opacity-100'
+                                                }`}
                                                 aria-label="Copy message"
+                                                title="Copy message"
                                             >
                                                 {copiedIndex === idx ? (
                                                     <Check className="w-3.5 h-3.5 text-green-600" />
@@ -373,9 +393,21 @@ const NecAssistant = () => {
                                             </button>
                                         )}
                                     </div>
-                                    <span className="text-xs text-gray-400 mt-1 px-1">
-                                        {formatTime(msg.timestamp)}
-                                    </span>
+                                    <div className="flex items-center gap-2 mt-1">
+                                        <span className="text-xs text-gray-400 px-1">
+                                            {formatTime(msg.timestamp)}
+                                        </span>
+                                        {msg.role === 'ai' && (
+                                            <button
+                                                onClick={() => handleCopy(msg.text, idx)}
+                                                className="text-xs text-gray-400 hover:text-electric-600 transition-colors flex items-center gap-1 opacity-0 group-hover:opacity-100"
+                                                title="Copy message"
+                                            >
+                                                <Copy className="w-3 h-3" />
+                                                {copiedIndex === idx && <span className="text-green-600">Copied!</span>}
+                                            </button>
+                                        )}
+                                    </div>
                                 </div>
                                 {msg.role === 'user' && (
                                     <div className="flex-shrink-0 w-8 h-8 rounded-full bg-gray-700 flex items-center justify-center mt-1">
