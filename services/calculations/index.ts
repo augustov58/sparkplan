@@ -6,6 +6,7 @@
 
 export * from './loadCalculation';
 export * from './conductorSizing';
+export * from './arcFlash';
 export * from './breakerSizing';
 export * from './voltageDrop';
 export * from './feederSizing';

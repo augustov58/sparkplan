@@ -1,6 +1,6 @@
 
 import React, { useState } from 'react';
-import { Calculator, ArrowRight, CheckCircle, XCircle, AlertTriangle, Zap, Car, Sun } from 'lucide-react';
+import { Calculator, ArrowRight, CheckCircle, XCircle, AlertTriangle, Zap, Car, Sun, Shield } from 'lucide-react';
 import { calculateVoltageDropAC, compareVoltageDropMethods, VoltageDropResult } from '../services/calculations';
 import { ConductorSizingTool } from './ConductorSizingTool';
 import { ProjectSettings } from '../types';
@@ -26,9 +26,16 @@ import {
   COMMON_PV_PANELS,
   calculateMaxPanelsPerString
 } from '../services/calculations/solarPV';
+import {
+  calculateArcFlash,
+  type ArcFlashInput,
+  type ArcFlashResult,
+  type EquipmentType,
+  type ProtectiveDeviceType
+} from '../services/calculations/arcFlash';
 
 export const Calculators: React.FC = () => {
-  const [activeTab, setActiveTab] = useState<'voltage-drop' | 'conduit-fill' | 'conductor-sizing' | 'short-circuit' | 'ev-charging' | 'solar-pv'>('voltage-drop');
+  const [activeTab, setActiveTab] = useState<'voltage-drop' | 'conduit-fill' | 'conductor-sizing' | 'short-circuit' | 'ev-charging' | 'solar-pv' | 'arc-flash'>('voltage-drop');
 
   // Default project settings for calculator mode
   const defaultSettings: ProjectSettings = {
@@ -83,6 +90,12 @@ export const Calculators: React.FC = () => {
         >
           <span className="flex items-center gap-1"><Sun className="w-4 h-4" /> Solar PV (NEC 690)</span>
         </button>
+        <button
+          onClick={() => setActiveTab('arc-flash')}
+          className={`px-6 py-3 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${activeTab === 'arc-flash' ? 'border-electric-500 text-gray-900' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
+        >
+          <span className="flex items-center gap-1"><Shield className="w-4 h-4" /> Arc Flash (NFPA 70E)</span>
+        </button>
       </div>
 
       <div className="bg-white border border-gray-100 rounded-lg p-6 shadow-sm min-h-[400px]">
@@ -92,6 +105,7 @@ export const Calculators: React.FC = () => {
         {activeTab === 'short-circuit' && <ShortCircuitCalculator />}
         {activeTab === 'ev-charging' && <EVChargingCalculator />}
         {activeTab === 'solar-pv' && <SolarPVCalculator />}
+        {activeTab === 'arc-flash' && <ArcFlashCalculator />}
       </div>
     </div>
   );
@@ -1320,6 +1334,213 @@ const SolarPVCalculator: React.FC = () => {
               </div>
             </div>
           )}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// ============================================
+// ARC FLASH CALCULATOR - IEEE 1584 / NFPA 70E
+// ============================================
+const ArcFlashCalculator: React.FC = () => {
+  const [shortCircuitCurrent, setShortCircuitCurrent] = useState(22); // kA
+  const [voltage, setVoltage] = useState(480);
+  const [phase, setPhase] = useState<1 | 3>(3);
+  const [equipmentType, setEquipmentType] = useState<EquipmentType>('panelboard');
+  const [protectiveDevice, setProtectiveDevice] = useState<ProtectiveDeviceType>('circuit_breaker');
+  const [deviceRating, setDeviceRating] = useState(100); // Amps
+  const [workingDistance, setWorkingDistance] = useState<number | undefined>(undefined);
+  const [arcGap, setArcGap] = useState<number | undefined>(undefined);
+  const [grounded, setGrounded] = useState(true);
+
+  let result: ArcFlashResult | null = null;
+  let error: string | null = null;
+
+  try {
+    result = calculateArcFlash({
+      shortCircuitCurrent,
+      voltage,
+      phase,
+      equipmentType,
+      protectiveDevice,
+      deviceRating,
+      workingDistance,
+      arcGap,
+      grounded,
+    });
+  } catch (err) {
+    error = err instanceof Error ? err.message : 'Calculation error';
+  }
+
+  const standardWorkingDistance = workingDistance || (equipmentType === 'switchgear' ? 36 : equipmentType === 'panelboard' ? 24 : equipmentType === 'mcc' ? 24 : equipmentType === 'motor_control' ? 18 : 18);
+
+  return (
+    <div className="space-y-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+        <div className="space-y-4">
+          <h3 className="font-bold text-gray-900 flex items-center gap-2">
+            <Shield className="w-5 h-5 text-electric-500" /> System Parameters
+          </h3>
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-xs font-semibold text-gray-500 uppercase mb-1">Short Circuit Current (kA)</label>
+              <input type="number" value={shortCircuitCurrent} onChange={e => setShortCircuitCurrent(Number(e.target.value))} min="0.1" max="200" step="0.1" className="w-full border-gray-200 rounded text-sm py-2 px-3 focus:border-electric-500 focus:ring-electric-500" />
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-gray-500 uppercase mb-1">Voltage (V)</label>
+              <select value={voltage} onChange={e => setVoltage(Number(e.target.value))} className="w-full border-gray-200 rounded text-sm py-2 focus:border-electric-500 focus:ring-electric-500">
+                <option value="120">120V</option>
+                <option value="208">208V</option>
+                <option value="240">240V</option>
+                <option value="277">277V</option>
+                <option value="480">480V</option>
+                <option value="600">600V</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-gray-500 uppercase mb-1">Phase</label>
+              <select value={phase} onChange={e => setPhase(Number(e.target.value) as 1 | 3)} className="w-full border-gray-200 rounded text-sm py-2 focus:border-electric-500 focus:ring-electric-500">
+                <option value="1">Single-Phase</option>
+                <option value="3">Three-Phase</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-gray-500 uppercase mb-1">Equipment Type</label>
+              <select value={equipmentType} onChange={e => { setEquipmentType(e.target.value as EquipmentType); setWorkingDistance(undefined); }} className="w-full border-gray-200 rounded text-sm py-2 focus:border-electric-500 focus:ring-electric-500">
+                <option value="switchgear">Switchgear (36")</option>
+                <option value="panelboard">Panelboard (24")</option>
+                <option value="mcc">MCC (24")</option>
+                <option value="motor_control">Motor Control (18")</option>
+                <option value="cable">Cable (18")</option>
+                <option value="open_air">Open Air (36")</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-gray-500 uppercase mb-1">Protective Device</label>
+              <select value={protectiveDevice} onChange={e => setProtectiveDevice(e.target.value as ProtectiveDeviceType)} className="w-full border-gray-200 rounded text-sm py-2 focus:border-electric-500 focus:ring-electric-500">
+                <option value="circuit_breaker">Circuit Breaker</option>
+                <option value="current_limiting_breaker">Current Limiting Breaker</option>
+                <option value="fuse">Fuse</option>
+                <option value="current_limiting_fuse">Current Limiting Fuse</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-gray-500 uppercase mb-1">Device Rating (A)</label>
+              <input type="number" value={deviceRating} onChange={e => setDeviceRating(Number(e.target.value))} min="1" max="5000" step="1" className="w-full border-gray-200 rounded text-sm py-2 px-3 focus:border-electric-500 focus:ring-electric-500" />
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-gray-500 uppercase mb-1">Working Distance (inches)</label>
+              <input type="number" value={workingDistance || ''} onChange={e => setWorkingDistance(e.target.value ? Number(e.target.value) : undefined)} placeholder={`Default: ${standardWorkingDistance}"`} min="12" max="60" step="1" className="w-full border-gray-200 rounded text-sm py-2 px-3 focus:border-electric-500 focus:ring-electric-500" />
+              <p className="text-xs text-gray-400 mt-1">Leave blank for standard distance</p>
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-gray-500 uppercase mb-1">Arc Gap (inches)</label>
+              <input type="number" value={arcGap || ''} onChange={e => setArcGap(e.target.value ? Number(e.target.value) : undefined)} placeholder="Auto" min="0.1" max="2" step="0.1" className="w-full border-gray-200 rounded text-sm py-2 px-3 focus:border-electric-500 focus:ring-electric-500" />
+              <p className="text-xs text-gray-400 mt-1">Leave blank for standard gap</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2 pt-2">
+            <input type="checkbox" id="grounded" checked={grounded} onChange={e => setGrounded(e.target.checked)} className="rounded border-gray-300 text-electric-500 focus:ring-electric-500" />
+            <label htmlFor="grounded" className="text-sm text-gray-700">Grounded System (most common)</label>
+          </div>
+        </div>
+        <div className="space-y-4">
+          <h3 className="font-bold text-gray-900">Arc Flash Analysis Results</h3>
+          {error && (
+            <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+              <div className="flex items-center gap-2 text-red-800">
+                <AlertTriangle className="w-5 h-5" />
+                <span className="font-medium">Error</span>
+              </div>
+              <p className="text-sm text-red-700 mt-2">{error}</p>
+            </div>
+          )}
+          {result && (
+            <>
+              <div className="bg-gradient-to-br from-red-50 to-orange-50 border-2 border-red-200 rounded-lg p-6">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-sm font-semibold text-gray-700">Incident Energy</span>
+                  <span className="text-3xl font-bold text-red-700">{result.incidentEnergy.toFixed(2)} cal/cm²</span>
+                </div>
+                <div className="text-xs text-gray-600">At working distance of {result.details.workingDistance}"</div>
+              </div>
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-semibold text-gray-700">Arc Flash Boundary</span>
+                  <span className="text-2xl font-bold text-blue-700">{result.arcFlashBoundary.toFixed(1)}"</span>
+                </div>
+                <div className="text-xs text-gray-600 mt-1">Distance where incident energy = 1.2 cal/cm²</div>
+              </div>
+              <div className={`border-2 rounded-lg p-4 ${result.ppeCategory === 0 ? 'bg-green-50 border-green-200' : result.ppeCategory === 1 ? 'bg-yellow-50 border-yellow-200' : result.ppeCategory === 2 ? 'bg-orange-50 border-orange-200' : result.ppeCategory === 3 ? 'bg-red-50 border-red-200' : result.ppeCategory === 4 ? 'bg-red-100 border-red-300' : 'bg-red-200 border-red-400'}`}>
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-sm font-semibold text-gray-700">PPE Category</span>
+                  <span className={`text-2xl font-bold ${result.ppeCategory === 0 ? 'text-green-700' : result.ppeCategory === 1 ? 'text-yellow-700' : result.ppeCategory === 2 ? 'text-orange-700' : result.ppeCategory === 3 ? 'text-red-700' : result.ppeCategory === 4 ? 'text-red-800' : 'text-red-900'}`}>
+                    {result.ppeCategory === 'N/A' ? 'N/A' : `Category ${result.ppeCategory}`}
+                  </span>
+                </div>
+                <div className="text-xs text-gray-700 mt-1">{result.requiredPPE}</div>
+              </div>
+              <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
+                <h4 className="font-semibold text-gray-900 mb-3 text-sm">Calculation Details</h4>
+                <div className="grid grid-cols-2 gap-2 text-xs">
+                  <span className="text-gray-500">Short Circuit Current:</span>
+                  <span className="font-mono text-right">{result.details.shortCircuitCurrent} kA</span>
+                  <span className="text-gray-500">Arcing Current:</span>
+                  <span className="font-mono text-right">{result.details.arcingCurrent} kA</span>
+                  <span className="text-gray-500">Clearing Time:</span>
+                  <span className="font-mono text-right">{(result.details.clearingTime * 1000).toFixed(1)} ms</span>
+                  <span className="text-gray-500">Working Distance:</span>
+                  <span className="font-mono text-right">{result.details.workingDistance}"</span>
+                  <span className="text-gray-500">Arc Gap:</span>
+                  <span className="font-mono text-right">{result.details.arcGap}"</span>
+                  <span className="text-gray-500">Voltage:</span>
+                  <span className="font-mono text-right">{result.details.voltage}V {result.details.phase}φ</span>
+                </div>
+              </div>
+              <div className={`border rounded-lg p-4 ${result.compliance.compliant ? 'bg-green-50 border-green-200' : 'bg-red-50 border-red-200'}`}>
+                <div className="flex items-center gap-2 mb-2">
+                  {result.compliance.compliant ? <CheckCircle className="w-5 h-5 text-green-600" /> : <XCircle className="w-5 h-5 text-red-600" />}
+                  <span className="font-semibold text-sm text-gray-900">{result.compliance.compliant ? 'Compliant' : 'Requires Action'}</span>
+                </div>
+                <p className="text-sm text-gray-700 mb-2">{result.compliance.message}</p>
+                <div className="text-xs text-gray-600">
+                  <div><strong>NEC:</strong> {result.compliance.necArticle}</div>
+                  <div><strong>NFPA 70E:</strong> {result.compliance.nfpaArticle}</div>
+                </div>
+              </div>
+              {result.compliance.recommendations.length > 0 && (
+                <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+                  <h4 className="font-semibold text-yellow-900 mb-2 text-sm flex items-center gap-2">
+                    <AlertTriangle className="w-4 h-4" />
+                    Recommendations
+                  </h4>
+                  <ul className="text-xs text-yellow-800 space-y-1 list-disc list-inside">
+                    {result.compliance.recommendations.map((rec, i) => <li key={i}>{rec}</li>)}
+                  </ul>
+                </div>
+              )}
+            </>
+          )}
+        </div>
+      </div>
+      <div className="bg-blue-50 border border-blue-200 rounded-lg p-6">
+        <h4 className="font-bold text-gray-900 mb-3 flex items-center gap-2">
+          <Shield className="w-4 h-4" />
+          Understanding Arc Flash Calculations
+        </h4>
+        <div className="text-sm text-gray-700 space-y-3">
+          <p><strong>IEEE 1584 Standard:</strong> This calculator uses IEEE 1584-2018 equations to estimate incident energy and arc flash boundary. Results are estimates for preliminary analysis only.</p>
+          <p><strong>NFPA 70E PPE Categories:</strong></p>
+          <ul className="list-disc list-inside ml-4 space-y-1">
+            <li><strong>Category 0:</strong> {'<'} 1.2 cal/cm² - Standard work clothing</li>
+            <li><strong>Category 1:</strong> 1.2 - 4 cal/cm² - Arc-rated clothing (4 cal/cm² minimum)</li>
+            <li><strong>Category 2:</strong> 4 - 8 cal/cm² - Arc-rated clothing (8 cal/cm² minimum)</li>
+            <li><strong>Category 3:</strong> 8 - 25 cal/cm² - Arc-rated clothing (25 cal/cm² minimum)</li>
+            <li><strong>Category 4:</strong> 25 - 40 cal/cm² - Arc-rated clothing (40 cal/cm² minimum)</li>
+            <li><strong>Above Category 4:</strong> {'>'} 40 cal/cm² - De-energization required or engineering analysis</li>
+          </ul>
+          <p><strong>Important:</strong> For final design and energized work, perform detailed arc flash study using actual protective device time-current curves. Field verification required before performing energized work.</p>
         </div>
       </div>
     </div>
