@@ -24,7 +24,9 @@ import { usePanels } from './hooks/usePanels';
 import { useCircuits } from './hooks/useCircuits';
 import { useFeeders } from './hooks/useFeeders';
 import { useTransformers } from './hooks/useTransformers';
-import { Send, MessageSquare, Info } from 'lucide-react';
+import { Send, MessageSquare, Info, Copy, Check, Bot, User, Sparkles } from 'lucide-react';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import { nanoid } from 'nanoid';
 import { useAuthContext } from './components/Auth/AuthProvider';
 import { Login } from './components/Auth/Login';
@@ -125,11 +127,19 @@ const ProjectWrapper = ({ projects, updateProject, deleteProject, onSignOut }: {
     );
 };
 
+interface Message {
+    role: 'user' | 'ai';
+    text: string;
+    timestamp: Date;
+}
+
 const NecAssistant = () => {
     const [isOpen, setIsOpen] = useState(false);
     const [query, setQuery] = useState('');
-    const [history, setHistory] = useState<{role: 'user'|'ai', text: string}[]>([]);
+    const [history, setHistory] = useState<Message[]>([]);
     const [loading, setLoading] = useState(false);
+    const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
+    const messagesEndRef = React.useRef<HTMLDivElement>(null);
     const location = useLocation();
     
     // Detect project context from URL
@@ -162,11 +172,66 @@ const NecAssistant = () => {
           )
         : null;
 
-    const handleAsk = async () => {
-        if (!query.trim()) return;
-        const q = query;
+    // Auto-scroll to bottom when new messages arrive
+    useEffect(() => {
+        messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }, [history, loading]);
+
+    // Format timestamp
+    const formatTime = (date: Date) => {
+        const now = new Date();
+        const diff = now.getTime() - date.getTime();
+        const minutes = Math.floor(diff / 60000);
+        
+        if (minutes < 1) return 'Just now';
+        if (minutes < 60) return `${minutes}m ago`;
+        const hours = Math.floor(minutes / 60);
+        if (hours < 24) return `${hours}h ago`;
+        return date.toLocaleDateString();
+    };
+
+    // Copy message to clipboard
+    const handleCopy = async (text: string, index: number) => {
+        try {
+            await navigator.clipboard.writeText(text);
+            setCopiedIndex(index);
+            setTimeout(() => setCopiedIndex(null), 2000);
+        } catch (err) {
+            console.error('Failed to copy:', err);
+        }
+    };
+
+    // Extract and link NEC article references
+    const processNecReferences = (text: string): string => {
+        // Pattern: NEC 220.42, Article 250, etc.
+        return text.replace(
+            /(?:NEC|Article)\s+(\d+(?:\.\d+)?)/gi,
+            (match, article) => {
+                const articleNum = article.replace(/\./g, '-');
+                return `[${match}](https://www.nfpa.org/codes-and-standards/all-codes-and-standards/list-of-codes-and-standards/detail?code=70&tab=code-chapters)`;
+            }
+        );
+    };
+
+    // Quick action examples
+    const quickActions = hasContext ? [
+        `Can I use #10 wire for the AC unit on panel ${panels[0]?.name || 'H1'}?`,
+        `Is my service sized correctly?`,
+        `What size breaker for circuit 5 on panel ${panels[0]?.name || 'H1'}?`,
+        `Describe my riser diagram configuration`
+    ] : [
+        'What is NEC 220.42 demand factor?',
+        'How do I size a grounding electrode conductor?',
+        'What are the requirements for EV charging circuits?',
+        'Explain NEC Article 250 grounding requirements'
+    ];
+
+    const handleAsk = async (question?: string) => {
+        const q = question || query.trim();
+        if (!q) return;
+        
         setQuery('');
-        setHistory(prev => [...prev, { role: 'user', text: q }]);
+        setHistory(prev => [...prev, { role: 'user', text: q, timestamp: new Date() }]);
         setLoading(true);
         
         // Build context string if available
@@ -176,16 +241,17 @@ const NecAssistant = () => {
         
         const ans = await askNecAssistant(q, contextString);
         setLoading(false);
-        setHistory(prev => [...prev, { role: 'ai', text: ans || 'Sorry, I could not retrieve that information.' }]);
+        setHistory(prev => [...prev, { role: 'ai', text: ans || 'Sorry, I could not retrieve that information.', timestamp: new Date() }]);
     };
 
     return (
         <div className="fixed bottom-6 right-6 z-50 flex flex-col items-end">
             {isOpen && (
                 <div className="bg-white border border-gray-200 shadow-2xl rounded-lg w-96 h-[500px] mb-4 flex flex-col overflow-hidden animate-in slide-in-from-bottom-10 fade-in duration-300">
-                    <div className="bg-gray-900 text-white p-4 flex justify-between items-center">
+                    {/* Header */}
+                    <div className="bg-gradient-to-r from-gray-900 to-gray-800 text-white p-4 flex justify-between items-center">
                         <div className="flex items-center gap-2">
-                            <MessageSquare className="w-4 h-4 text-electric-500"/>
+                            <Sparkles className="w-4 h-4 text-electric-500"/>
                             <span className="font-medium">NEC Copilot</span>
                             {hasContext && (
                                 <span className="text-xs bg-electric-500 text-black px-2 py-0.5 rounded-full font-medium flex items-center gap-1">
@@ -194,55 +260,188 @@ const NecAssistant = () => {
                                 </span>
                             )}
                         </div>
-                        <button onClick={() => setIsOpen(false)} className="text-gray-400 hover:text-white">×</button>
+                        <button 
+                            onClick={() => setIsOpen(false)} 
+                            className="text-gray-400 hover:text-white transition-colors"
+                            aria-label="Close chat"
+                        >
+                            ×
+                        </button>
                     </div>
+
+                    {/* Messages Area */}
                     <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-gray-50">
                         {history.length === 0 && (
-                            <div className="text-center text-gray-400 text-sm mt-10">
+                            <div className="text-center text-gray-500 text-sm mt-8">
                                 {hasContext ? (
                                     <>
-                                        <p className="font-medium text-gray-600 mb-2">Ask about your project:</p>
-                                        <p className="text-xs mb-4">"Can I use #10 wire for the AC unit on panel {panels[0]?.name || 'H1'}?"</p>
-                                        <p className="text-xs mb-4">"Is my service sized correctly?"</p>
-                                        <p className="text-xs">Or ask general NEC questions</p>
+                                        <Bot className="w-12 h-12 mx-auto mb-3 text-gray-300" />
+                                        <p className="font-medium text-gray-700 mb-3">Ask about your project</p>
+                                        <div className="space-y-2">
+                                            {quickActions.map((action, idx) => (
+                                                <button
+                                                    key={idx}
+                                                    onClick={() => handleAsk(action)}
+                                                    className="block w-full text-left text-xs bg-white border border-gray-200 rounded-lg px-3 py-2 hover:border-electric-500 hover:bg-electric-50 transition-colors text-gray-600"
+                                                >
+                                                    "{action}"
+                                                </button>
+                                            ))}
+                                        </div>
+                                        <p className="text-xs text-gray-400 mt-4">Or type your own question</p>
                                     </>
                                 ) : (
-                                    "Ask any question about NEC 2023 code requirements."
+                                    <>
+                                        <Bot className="w-12 h-12 mx-auto mb-3 text-gray-300" />
+                                        <p className="font-medium text-gray-700 mb-3">Ask any NEC question</p>
+                                        <div className="space-y-2">
+                                            {quickActions.map((action, idx) => (
+                                                <button
+                                                    key={idx}
+                                                    onClick={() => handleAsk(action)}
+                                                    className="block w-full text-left text-xs bg-white border border-gray-200 rounded-lg px-3 py-2 hover:border-electric-500 hover:bg-electric-50 transition-colors text-gray-600"
+                                                >
+                                                    "{action}"
+                                                </button>
+                                            ))}
+                                        </div>
+                                    </>
                                 )}
                             </div>
                         )}
+                        
                         {history.map((msg, idx) => (
-                            <div key={idx} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                                <div className={`max-w-[85%] rounded-lg p-3 text-sm ${
-                                    msg.role === 'user' 
-                                    ? 'bg-electric-400 text-black' 
-                                    : 'bg-white border border-gray-200 text-gray-700 shadow-sm'
-                                }`}>
-                                    {msg.text}
+                            <div 
+                                key={idx} 
+                                className={`flex gap-2 ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
+                            >
+                                {msg.role === 'ai' && (
+                                    <div className="flex-shrink-0 w-8 h-8 rounded-full bg-gradient-to-br from-electric-400 to-electric-600 flex items-center justify-center mt-1">
+                                        <Bot className="w-4 h-4 text-black" />
+                                    </div>
+                                )}
+                                <div className={`flex flex-col max-w-[80%] ${msg.role === 'user' ? 'items-end' : 'items-start'}`}>
+                                    <div className={`group relative rounded-lg p-3 text-sm ${
+                                        msg.role === 'user' 
+                                        ? 'bg-gradient-to-br from-electric-400 to-electric-500 text-black' 
+                                        : 'bg-white border border-gray-200 text-gray-700 shadow-sm'
+                                    }`}>
+                                        {msg.role === 'ai' ? (
+                                            <div className="prose prose-sm max-w-none">
+                                                <ReactMarkdown
+                                                    remarkPlugins={[remarkGfm]}
+                                                    components={{
+                                                        a: ({node, ...props}) => (
+                                                            <a {...props} target="_blank" rel="noopener noreferrer" className="text-electric-600 hover:text-electric-700 underline" />
+                                                        ),
+                                                        code: ({node, ...props}) => (
+                                                            <code {...props} className="bg-gray-100 px-1 py-0.5 rounded text-xs font-mono" />
+                                                        ),
+                                                        pre: ({node, ...props}) => (
+                                                            <pre {...props} className="bg-gray-100 p-2 rounded text-xs overflow-x-auto" />
+                                                        ),
+                                                        ul: ({node, ...props}) => (
+                                                            <ul {...props} className="list-disc list-inside space-y-1 my-2" />
+                                                        ),
+                                                        ol: ({node, ...props}) => (
+                                                            <ol {...props} className="list-decimal list-inside space-y-1 my-2" />
+                                                        ),
+                                                        strong: ({node, ...props}) => (
+                                                            <strong {...props} className="font-semibold text-gray-900" />
+                                                        ),
+                                                    }}
+                                                >
+                                                    {msg.text}
+                                                </ReactMarkdown>
+                                            </div>
+                                        ) : (
+                                            <p className="whitespace-pre-wrap">{msg.text}</p>
+                                        )}
+                                        
+                                        {/* Copy button (hover) */}
+                                        {msg.role === 'ai' && (
+                                            <button
+                                                onClick={() => handleCopy(msg.text, idx)}
+                                                className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity bg-gray-100 hover:bg-gray-200 p-1.5 rounded text-gray-600 hover:text-gray-900"
+                                                aria-label="Copy message"
+                                            >
+                                                {copiedIndex === idx ? (
+                                                    <Check className="w-3.5 h-3.5 text-green-600" />
+                                                ) : (
+                                                    <Copy className="w-3.5 h-3.5" />
+                                                )}
+                                            </button>
+                                        )}
+                                    </div>
+                                    <span className="text-xs text-gray-400 mt-1 px-1">
+                                        {formatTime(msg.timestamp)}
+                                    </span>
                                 </div>
+                                {msg.role === 'user' && (
+                                    <div className="flex-shrink-0 w-8 h-8 rounded-full bg-gray-700 flex items-center justify-center mt-1">
+                                        <User className="w-4 h-4 text-white" />
+                                    </div>
+                                )}
                             </div>
                         ))}
-                        {loading && <div className="text-xs text-gray-400 ml-2">Consulting NEC database...</div>}
+                        
+                        {/* Typing Indicator */}
+                        {loading && (
+                            <div className="flex gap-2 justify-start">
+                                <div className="flex-shrink-0 w-8 h-8 rounded-full bg-gradient-to-br from-electric-400 to-electric-600 flex items-center justify-center">
+                                    <Bot className="w-4 h-4 text-black" />
+                                </div>
+                                <div className="bg-white border border-gray-200 rounded-lg p-3">
+                                    <div className="flex gap-1">
+                                        <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
+                                        <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
+                                        <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+                        <div ref={messagesEndRef} />
                     </div>
-                    <div className="p-3 bg-white border-t border-gray-100 flex gap-2">
-                        <input 
-                            className="flex-1 border border-gray-200 rounded px-3 py-2 text-sm focus:border-electric-500 outline-none"
-                            placeholder="Type your question..."
-                            value={query}
-                            onChange={(e) => setQuery(e.target.value)}
-                            onKeyDown={(e) => e.key === 'Enter' && handleAsk()}
-                        />
-                        <button onClick={handleAsk} disabled={loading} className="bg-gray-900 text-white p-2 rounded hover:bg-black">
-                            <Send className="w-4 h-4" />
-                        </button>
+
+                    {/* Input Area */}
+                    <div className="p-3 bg-white border-t border-gray-100">
+                        <div className="flex gap-2">
+                            <input 
+                                className="flex-1 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:border-electric-500 focus:ring-2 focus:ring-electric-500/20 outline-none transition-all"
+                                placeholder="Type your question..."
+                                value={query}
+                                onChange={(e) => setQuery(e.target.value)}
+                                onKeyDown={(e) => {
+                                    if (e.key === 'Enter' && !e.shiftKey) {
+                                        e.preventDefault();
+                                        handleAsk();
+                                    }
+                                }}
+                                disabled={loading}
+                            />
+                            <button 
+                                onClick={() => handleAsk()} 
+                                disabled={loading || !query.trim()} 
+                                className="bg-gray-900 text-white p-2 rounded-lg hover:bg-black disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                                aria-label="Send message"
+                            >
+                                <Send className="w-4 h-4" />
+                            </button>
+                        </div>
                     </div>
                 </div>
             )}
             <button 
                 onClick={() => setIsOpen(!isOpen)}
-                className="bg-gray-900 hover:bg-black text-white w-14 h-14 rounded-full shadow-lg flex items-center justify-center transition-transform hover:scale-105"
+                className="bg-gray-900 hover:bg-black text-white w-14 h-14 rounded-full shadow-lg flex items-center justify-center transition-transform hover:scale-105 relative"
+                aria-label="Open chat"
             >
                 <MessageSquare className="w-6 h-6 text-electric-500" />
+                {history.length > 0 && (
+                    <span className="absolute -top-1 -right-1 bg-electric-500 text-black text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center">
+                        {history.length}
+                    </span>
+                )}
             </button>
         </div>
     );

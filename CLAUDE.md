@@ -183,6 +183,16 @@ AI: "Based on NEC Article 517 (Healthcare Facilities), I've generated:
 - Net metering calculations
 - Utility interconnection forms
 
+### Back Burner: Future Enhancements
+*Features to consider after core roadmap is complete*
+
+| Feature | Priority | Why |
+|---------|----------|-----|
+| **Conversation Memory for AI Assistant** | Low | Add persistent chat history so AI can reference previous questions. Requires: database table for messages, conversation context in prompts, per-project chat history. Currently each question is standalone. |
+| **Multi-language Support** | Low | Expand to Spanish-speaking markets (large electrical contractor base) |
+| **Mobile App** | Medium | Native iOS/Android apps for field use |
+| **CAD Integration** | Medium | Export to AutoCAD/Revit for design firms |
+
 ---
 
 ## 💰 PRICING STRATEGY
