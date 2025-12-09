@@ -1708,20 +1708,22 @@ export const OneLineDiagram: React.FC<OneLineDiagramProps> = ({ project, updateP
                             {mainPanel.name}
                           </text>
 
-                          {/* MDP Labels - Outside Box Below - Enhanced (with background to prevent overlap) */}
+                          {/* MDP Labels - Outside Box Below - Enhanced (positioned ABOVE bus bar) */}
                           <rect
-                            x={serviceX - 80}
-                            y={218}
-                            width="160"
-                            height="20"
+                            x={serviceX - 90}
+                            y={220}
+                            width="180"
+                            height="28"
                             fill="white"
-                            fillOpacity="0.9"
-                            rx="2"
+                            fillOpacity="0.95"
+                            rx="3"
+                            stroke="#E5E7EB"
+                            strokeWidth="1"
                           />
-                          <text x={serviceX} y={230} textAnchor="middle" className="text-[10px] font-semibold fill-gray-700">
+                          <text x={serviceX} y={232} textAnchor="middle" className="text-[10px] font-semibold fill-gray-700">
                             {mainPanel.voltage}V {mainPanel.phase}Φ • {mainPanel.bus_rating}A Bus • {mainPanel.main_breaker_amps}A Main
                           </text>
-                          <text x={serviceX} y={240} textAnchor="middle" className="text-[9px] font-medium fill-electric-600">
+                          <text x={serviceX} y={243} textAnchor="middle" className="text-[9px] font-medium fill-electric-600">
                             {circuits.filter(c => c.panel_id === mainPanel.id).length} circuits
                           </text>
 
@@ -1733,17 +1735,17 @@ export const OneLineDiagram: React.FC<OneLineDiagramProps> = ({ project, updateP
                                 x1={serviceX} 
                                 y1={215} 
                                 x2={serviceX} 
-                                y2={245} 
+                                y2={250} 
                                 stroke="#1F2937" 
                                 strokeWidth="4" 
                                 strokeLinecap="round"
                               />
-                              {/* Horizontal bus bar */}
+                              {/* Horizontal bus bar - positioned at y=250 */}
                               <line
                                 x1={Math.max(150, serviceX - (totalElements * 70))}
-                                y1={245}
+                                y1={250}
                                 x2={Math.min(650, serviceX + (totalElements * 70))}
-                                y2={245}
+                                y2={250}
                                 stroke="#1F2937"
                                 strokeWidth="5"
                                 strokeLinecap="round"
@@ -1789,15 +1791,24 @@ export const OneLineDiagram: React.FC<OneLineDiagramProps> = ({ project, updateP
 
                             return (
                               <g key={`panel-${panel.id}`}>
-                                {/* Panel Label - Above Box */}
-                                <text x={xPos} y={308} textAnchor="middle" className="text-xs font-bold fill-gray-900">
+                                {/* Panel Label - Above Box (with background to prevent overlap) */}
+                                <rect
+                                  x={xPos - 30}
+                                  y={300}
+                                  width="60"
+                                  height="12"
+                                  fill="white"
+                                  fillOpacity="0.9"
+                                  rx="2"
+                                />
+                                <text x={xPos} y={310} textAnchor="middle" className="text-xs font-bold fill-gray-900">
                                   {panel.name}
                                 </text>
 
                                 {/* Connection Line - Enhanced (from bus bar to panel) */}
                                 <line 
                                     x1={xPos} 
-                                    y1={245} 
+                                    y1={250} 
                                     x2={xPos} 
                                     y2={320} 
                                     stroke="#4B5563" 
@@ -2044,13 +2055,22 @@ export const OneLineDiagram: React.FC<OneLineDiagramProps> = ({ project, updateP
 
                             return (
                               <g key={`xfmr-${xfmr.id}`}>
-                                {/* Transformer Label - Above Box */}
-                                <text x={xPos} y={308} textAnchor="middle" className="text-xs font-bold fill-gray-900">
+                                {/* Transformer Label - Above Box (with background to prevent overlap) */}
+                                <rect
+                                  x={xPos - 40}
+                                  y={300}
+                                  width="80"
+                                  height="12"
+                                  fill="white"
+                                  fillOpacity="0.9"
+                                  rx="2"
+                                />
+                                <text x={xPos} y={310} textAnchor="middle" className="text-xs font-bold fill-gray-900">
                                   {xfmr.name}
                                 </text>
 
                                 {/* Line from bus to transformer - Enhanced */}
-                                <line x1={xPos} y1={245} x2={xPos} y2={320} stroke="#4B5563" strokeWidth="2.5" strokeLinecap="round" />
+                                <line x1={xPos} y1={250} x2={xPos} y2={320} stroke="#4B5563" strokeWidth="2.5" strokeLinecap="round" />
 
                                 {/* Transformer Box - Enhanced */}
                                 <rect
