@@ -2269,16 +2269,27 @@ export const OneLineDiagram: React.FC<OneLineDiagramProps> = ({ project, updateP
                             strokeWidth="4" 
                             strokeLinecap="round"
                           />
-                          {/* Horizontal bus bar - positioned at y=250 (thicker for visibility, rendered on top) */}
+                          {/* Horizontal bus bar - positioned at y=250 (VERY THICK for visibility, rendered on top) */}
                           <line
                             x1={Math.max(150, serviceX - (totalElements * 70))}
                             y1={250}
                             x2={Math.min(650, serviceX + (totalElements * 70))}
                             y2={250}
                             stroke="#1F2937"
+                            strokeWidth="8"
+                            strokeLinecap="round"
+                            filter="url(#shadow-lg)"
+                          />
+                          {/* Additional bus bar line for extra visibility */}
+                          <line
+                            x1={Math.max(150, serviceX - (totalElements * 70))}
+                            y1={250}
+                            x2={Math.min(650, serviceX + (totalElements * 70))}
+                            y2={250}
+                            stroke="#DC2626"
                             strokeWidth="6"
                             strokeLinecap="round"
-                            filter="url(#shadow)"
+                            opacity="0.3"
                           />
                         </>
                       )}
