@@ -1703,29 +1703,7 @@ export const OneLineDiagram: React.FC<OneLineDiagramProps> = ({ project, updateP
                             MDP
                           </text>
 
-                          {/* MDP Labels - Outside Box Above - Enhanced */}
-                          <text x={serviceX} y={155} textAnchor="middle" className="text-sm font-bold fill-gray-900">
-                            {mainPanel.name}
-                          </text>
-
-                          {/* MDP Labels - Outside Box Below - Enhanced (positioned ABOVE bus bar) */}
-                          <rect
-                            x={serviceX - 90}
-                            y={220}
-                            width="180"
-                            height="28"
-                            fill="white"
-                            fillOpacity="0.95"
-                            rx="3"
-                            stroke="#E5E7EB"
-                            strokeWidth="1"
-                          />
-                          <text x={serviceX} y={232} textAnchor="middle" className="text-[10px] font-semibold fill-gray-700">
-                            {mainPanel.voltage}V {mainPanel.phase}Φ • {mainPanel.bus_rating}A Bus • {mainPanel.main_breaker_amps}A Main
-                          </text>
-                          <text x={serviceX} y={243} textAnchor="middle" className="text-[9px] font-medium fill-electric-600">
-                            {circuits.filter(c => c.panel_id === mainPanel.id).length} circuits
-                          </text>
+                          {/* MDP Labels will render AFTER connection line (see below) */}
 
                           {/* Render panels fed directly from MDP */}
                           {panelsFedFromMain.map((panel, index) => {
@@ -1844,8 +1822,8 @@ export const OneLineDiagram: React.FC<OneLineDiagramProps> = ({ project, updateP
                                   </text>
                                 )}
 
-                                {/* ✅ NEW: Render bus bar for downstream elements (horizontal bus + vertical drops) */}
-                                {totalDownstream > 0 && renderBusBar(
+                                {/* ✅ NEW: Render bus bar for downstream elements (horizontal bus + vertical drops) - only if positions exist */}
+                                {totalDownstream > 0 && downstreamPositions.length > 0 && renderBusBar(
                                   xPos,
                                   DIAGRAM_CONSTANTS.LEVEL1_PANEL_Y + DIAGRAM_CONSTANTS.PANEL_HEIGHT,
                                   downstreamPositions,
@@ -1996,8 +1974,8 @@ export const OneLineDiagram: React.FC<OneLineDiagramProps> = ({ project, updateP
                                         {downXfmr.primary_voltage}V → {downXfmr.secondary_voltage}V
                                       </text>
 
-                                      {/* ✅ NEW: Render bus bar for transformer-fed panels (orange for transformer) */}
-                                      {transformerFedPanels.length > 0 && renderBusBar(
+                                      {/* ✅ NEW: Render bus bar for transformer-fed panels (orange for transformer) - only if positions exist */}
+                                      {transformerFedPanels.length > 0 && transformerDownstreamPositions.length > 0 && renderBusBar(
                                         downXfmrX,
                                         downXfmrY + DIAGRAM_CONSTANTS.TRANSFORMER_HEIGHT,
                                         transformerDownstreamPositions,
@@ -2169,8 +2147,8 @@ export const OneLineDiagram: React.FC<OneLineDiagramProps> = ({ project, updateP
                                   {xfmr.primary_voltage}V → {xfmr.secondary_voltage}V
                                 </text>
 
-                                {/* ✅ NEW: Render bus bar for transformer-fed panels (orange for transformer) */}
-                                {downstreamPanels.length > 0 && renderBusBar(
+                                {/* ✅ NEW: Render bus bar for transformer-fed panels (orange for transformer) - only if positions exist */}
+                                {downstreamPanels.length > 0 && mdpTransformerDownstreamPositions.length > 0 && renderBusBar(
                                   xPos,
                                   DIAGRAM_CONSTANTS.LEVEL1_PANEL_Y + DIAGRAM_CONSTANTS.TRANSFORMER_HEIGHT,
                                   mdpTransformerDownstreamPositions,
@@ -2258,12 +2236,12 @@ export const OneLineDiagram: React.FC<OneLineDiagramProps> = ({ project, updateP
                       {/* Bus from MDP - Render AFTER all panels/transformers so it appears on top */}
                       {mainPanel && totalElements > 0 && (
                         <>
-                          {/* Vertical feeder line from MDP to bus bar */}
+                          {/* Vertical feeder line from MDP to bus bar - EXTENDED */}
                           <line 
                             x1={serviceX} 
                             y1={215} 
                             x2={serviceX} 
-                            y2={250} 
+                            y2={500} 
                             stroke="#1F2937" 
                             strokeWidth="4" 
                             strokeLinecap="round"
@@ -2290,6 +2268,46 @@ export const OneLineDiagram: React.FC<OneLineDiagramProps> = ({ project, updateP
                             strokeLinecap="round"
                             opacity="0.4"
                           />
+                        </>
+                      )}
+
+                      {/* MDP Labels - Render AFTER connection line so they mask it properly */}
+                      {mainPanel && (
+                        <>
+                          {/* MDP Label - Outside Box Above - with background */}
+                          <rect
+                            x={serviceX - 50}
+                            y={145}
+                            width="100"
+                            height="12"
+                            fill="white"
+                            fillOpacity="0.95"
+                            rx="2"
+                            stroke="#E5E7EB"
+                            strokeWidth="1"
+                          />
+                          <text x={serviceX} y={155} textAnchor="middle" className="text-sm font-bold fill-gray-900">
+                            {mainPanel.name}
+                          </text>
+
+                          {/* MDP Labels - Outside Box Below - with background to mask riser line */}
+                          <rect
+                            x={serviceX - 90}
+                            y={220}
+                            width="180"
+                            height="28"
+                            fill="white"
+                            fillOpacity="0.95"
+                            rx="3"
+                            stroke="#E5E7EB"
+                            strokeWidth="1"
+                          />
+                          <text x={serviceX} y={232} textAnchor="middle" className="text-[10px] font-semibold fill-gray-700">
+                            {mainPanel.voltage}V {mainPanel.phase}Φ • {mainPanel.bus_rating}A Bus • {mainPanel.main_breaker_amps}A Main
+                          </text>
+                          <text x={serviceX} y={243} textAnchor="middle" className="text-[9px] font-medium fill-electric-600">
+                            {circuits.filter(c => c.panel_id === mainPanel.id).length} circuits
+                          </text>
                         </>
                       )}
                     </>
