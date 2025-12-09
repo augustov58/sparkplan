@@ -2276,20 +2276,20 @@ export const OneLineDiagram: React.FC<OneLineDiagramProps> = ({ project, updateP
                             x2={Math.min(650, serviceX + (totalElements * 70))}
                             y2={250}
                             stroke="#1F2937"
-                            strokeWidth="8"
+                            strokeWidth="10"
                             strokeLinecap="round"
-                            filter="url(#shadow-lg)"
+                            filter="url(#shadow)"
                           />
-                          {/* Additional bus bar line for extra visibility */}
+                          {/* Additional bus bar line for extra visibility (red accent) */}
                           <line
                             x1={Math.max(150, serviceX - (totalElements * 70))}
                             y1={250}
                             x2={Math.min(650, serviceX + (totalElements * 70))}
                             y2={250}
                             stroke="#DC2626"
-                            strokeWidth="6"
+                            strokeWidth="8"
                             strokeLinecap="round"
-                            opacity="0.3"
+                            opacity="0.4"
                           />
                         </>
                       )}
