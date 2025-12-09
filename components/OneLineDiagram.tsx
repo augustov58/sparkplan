@@ -1764,30 +1764,32 @@ export const OneLineDiagram: React.FC<OneLineDiagramProps> = ({ project, updateP
 
                             return (
                               <g key={`panel-${panel.id}`}>
-                                {/* Panel Label - Above Box (with background to prevent overlap) */}
+                                {/* Connection Line - Enhanced (from bus bar to panel - EXTENDED) - RENDER FIRST */}
+                                <line 
+                                    x1={xPos} 
+                                    y1={250} 
+                                    x2={xPos} 
+                                    y2={450} 
+                                    stroke="#4B5563" 
+                                    strokeWidth="2.5" 
+                                    strokeLinecap="round"
+                                />
+
+                                {/* Panel Label - Above Box (with background to prevent overlap) - RENDER AFTER LINE */}
                                 <rect
                                   x={xPos - 30}
                                   y={300}
                                   width="60"
                                   height="12"
                                   fill="white"
-                                  fillOpacity="0.9"
+                                  fillOpacity="0.95"
                                   rx="2"
+                                  stroke="#E5E7EB"
+                                  strokeWidth="1"
                                 />
                                 <text x={xPos} y={310} textAnchor="middle" className="text-xs font-bold fill-gray-900">
                                   {panel.name}
                                 </text>
-
-                                {/* Connection Line - Enhanced (from bus bar to panel) */}
-                                <line 
-                                    x1={xPos} 
-                                    y1={250} 
-                                    x2={xPos} 
-                                    y2={320} 
-                                    stroke="#4B5563" 
-                                    strokeWidth="2.5" 
-                                    strokeLinecap="round"
-                                />
 
                                 {/* Panel Box - Enhanced with shadow */}
                                 <rect
@@ -1975,7 +1977,18 @@ export const OneLineDiagram: React.FC<OneLineDiagramProps> = ({ project, updateP
                                         XFMR
                                       </text>
 
-                                      {/* Transformer Info - Enhanced */}
+                                      {/* Transformer Info - Enhanced with background to mask riser line */}
+                                      <rect
+                                        x={downXfmrX - 50}
+                                        y={downXfmrY + 45}
+                                        width="100"
+                                        height="20"
+                                        fill="white"
+                                        fillOpacity="0.95"
+                                        rx="3"
+                                        stroke="#E5E7EB"
+                                        strokeWidth="1"
+                                      />
                                       <text x={downXfmrX} y={downXfmrY + 50} textAnchor="middle" className="text-[10px] font-semibold fill-orange-800">
                                         {downXfmr.kva_rating} kVA
                                       </text>
@@ -2092,22 +2105,24 @@ export const OneLineDiagram: React.FC<OneLineDiagramProps> = ({ project, updateP
 
                             return (
                               <g key={`xfmr-${xfmr.id}`}>
-                                {/* Transformer Label - Above Box (with background to prevent overlap) */}
+                                {/* Line from bus to transformer - Enhanced - EXTENDED - RENDER FIRST */}
+                                <line x1={xPos} y1={250} x2={xPos} y2={500} stroke="#4B5563" strokeWidth="2.5" strokeLinecap="round" />
+
+                                {/* Transformer Label - Above Box (with background to prevent overlap) - RENDER AFTER LINE */}
                                 <rect
                                   x={xPos - 40}
                                   y={300}
                                   width="80"
                                   height="12"
                                   fill="white"
-                                  fillOpacity="0.9"
+                                  fillOpacity="0.95"
                                   rx="2"
+                                  stroke="#E5E7EB"
+                                  strokeWidth="1"
                                 />
                                 <text x={xPos} y={310} textAnchor="middle" className="text-xs font-bold fill-gray-900">
                                   {xfmr.name}
                                 </text>
-
-                                {/* Line from bus to transformer - Enhanced */}
-                                <line x1={xPos} y1={250} x2={xPos} y2={320} stroke="#4B5563" strokeWidth="2.5" strokeLinecap="round" />
 
                                 {/* Transformer Box - Enhanced */}
                                 <rect
@@ -2135,7 +2150,18 @@ export const OneLineDiagram: React.FC<OneLineDiagramProps> = ({ project, updateP
                                   XFMR
                                 </text>
 
-                                {/* Transformer Info - Enhanced */}
+                                {/* Transformer Info - Enhanced with background to mask riser line */}
+                                <rect
+                                  x={xPos - 50}
+                                  y={365}
+                                  width="100"
+                                  height="20"
+                                  fill="white"
+                                  fillOpacity="0.95"
+                                  rx="3"
+                                  stroke="#E5E7EB"
+                                  strokeWidth="1"
+                                />
                                 <text x={xPos} y={370} textAnchor="middle" className="text-[10px] font-semibold fill-orange-800">
                                   {xfmr.kva_rating} kVA
                                 </text>
