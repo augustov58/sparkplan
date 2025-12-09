@@ -7,6 +7,7 @@ import React, { useState } from 'react';
 import { Zap, Plus, Trash2, AlertTriangle, CheckCircle, Info, TrendingUp } from 'lucide-react';
 import { calculateEVEMSLoadManagement, type EVEMSInput, type EVEMSResult } from '../services/calculations/evemsLoadManagement';
 import { EV_CHARGER_SPECS, type EVChargerLevel } from '../services/calculations/evCharging';
+import { EVEMSDiagram } from './EVEMSDiagram';
 
 export const EVEMSLoadManagement: React.FC = () => {
   const [serviceAmps, setServiceAmps] = useState(200);
@@ -73,8 +74,23 @@ export const EVEMSLoadManagement: React.FC = () => {
     setChargers(chargers.map(c => c.id === id ? { ...c, ...updates } : c));
   };
 
+  // Calculate total number of chargers for diagram
+  const totalChargers = chargers.reduce((sum, c) => sum + c.quantity, 0);
+  const existingLoadPercent = result 
+    ? Math.round((result.existingDemand_kVA / result.serviceCapacity_kVA) * 100)
+    : 60;
+
   return (
     <div className="space-y-6">
+      {/* System Diagram */}
+      <EVEMSDiagram
+        serviceAmps={serviceAmps}
+        serviceVoltage={serviceVoltage}
+        numChargers={totalChargers}
+        evemsEnabled={useEVEMS}
+        existingLoadPercent={existingLoadPercent}
+      />
+
       <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
         {/* Input Section */}
         <div className="space-y-6">
