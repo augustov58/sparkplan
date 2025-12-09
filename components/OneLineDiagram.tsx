@@ -1727,33 +1727,6 @@ export const OneLineDiagram: React.FC<OneLineDiagramProps> = ({ project, updateP
                             {circuits.filter(c => c.panel_id === mainPanel.id).length} circuits
                           </text>
 
-                          {/* Bus from MDP - Enhanced (always render when there are downstream elements) */}
-                          {totalElements > 0 && (
-                            <>
-                              {/* Vertical feeder line from MDP to bus bar */}
-                              <line 
-                                x1={serviceX} 
-                                y1={215} 
-                                x2={serviceX} 
-                                y2={250} 
-                                stroke="#1F2937" 
-                                strokeWidth="4" 
-                                strokeLinecap="round"
-                              />
-                              {/* Horizontal bus bar - positioned at y=250 */}
-                              <line
-                                x1={Math.max(150, serviceX - (totalElements * 70))}
-                                y1={250}
-                                x2={Math.min(650, serviceX + (totalElements * 70))}
-                                y2={250}
-                                stroke="#1F2937"
-                                strokeWidth="5"
-                                strokeLinecap="round"
-                                filter="url(#shadow)"
-                              />
-                            </>
-                          )}
-
                           {/* Render panels fed directly from MDP */}
                           {panelsFedFromMain.map((panel, index) => {
                             const spacing = 140;
