@@ -1860,15 +1860,7 @@ export const OneLineDiagram: React.FC<OneLineDiagramProps> = ({ project, updateP
                                   </>
                                 )}
 
-                                {/* ✅ NEW: Render bus bar for downstream elements (horizontal bus + vertical drops) - only if positions exist */}
-                                {totalDownstream > 0 && downstreamPositions.length > 0 && renderBusBar(
-                                  xPos,
-                                  DIAGRAM_CONSTANTS.LEVEL1_PANEL_Y + DIAGRAM_CONSTANTS.PANEL_HEIGHT,
-                                  downstreamPositions,
-                                  "#4B5563"
-                                )}
-
-                                {/* ✅ NEW: Render downstream panels fed from this panel */}
+                                {/* ✅ NEW: Render downstream panels fed from this panel - BEFORE bus bar */}
                                 {downstreamPanelsFed.map((downPanel, downIndex) => {
                                   const downPanelCircuits = circuits.filter(c => c.panel_id === downPanel.id);
                                   // ✅ FIX: Position based on total downstream elements (panels come first)
