@@ -1969,29 +1969,40 @@ export const OneLineDiagram: React.FC<OneLineDiagramProps> = ({ project, updateP
 
                                             {/* ❌ REMOVED: Diagonal connection line (now handled by bus bar above) */}
 
-                                            {/* Panel Box */}
+                                            {/* Panel Box - Enhanced */}
                                             <rect
-                                              x={tfPanelX - 25}
+                                              x={tfPanelX - 28}
                                               y={tfPanelY}
-                                              width="50"
-                                              height="30"
-                                              rx="3"
+                                              width="56"
+                                              height="35"
+                                              rx="4"
                                               stroke="#3B82F6"
-                                              strokeWidth="2"
+                                              strokeWidth="2.5"
                                               fill="#EFF6FF"
+                                              filter="url(#shadow)"
                                             />
-                                            <text x={tfPanelX} y={tfPanelY + 20} textAnchor="middle" className="text-xs font-bold fill-blue-700">
+                                            <rect
+                                              x={tfPanelX - 26}
+                                              y={tfPanelY + 2}
+                                              width="52"
+                                              height="31"
+                                              rx="3"
+                                              stroke="#93C5FD"
+                                              strokeWidth="1"
+                                              fill="none"
+                                            />
+                                            <text x={tfPanelX} y={tfPanelY + 22} textAnchor="middle" className="text-sm font-bold fill-blue-800">
                                               P
                                             </text>
 
-                                            {/* Panel Info */}
-                                            <text x={tfPanelX} y={tfPanelY + 43} textAnchor="middle" className="text-[9px] fill-gray-600">
+                                            {/* Panel Info - Enhanced */}
+                                            <text x={tfPanelX} y={tfPanelY + 45} textAnchor="middle" className="text-[10px] font-semibold fill-gray-700">
                                               {tfPanel.voltage}V {tfPanel.phase}Φ • {tfPanel.bus_rating}A
                                             </text>
-                                            <text x={tfPanelX} y={tfPanelY + 53} textAnchor="middle" className="text-[8px] fill-gray-500">
+                                            <text x={tfPanelX} y={tfPanelY + 56} textAnchor="middle" className="text-[9px] font-medium fill-gray-600">
                                               {tfPanel.main_breaker_amps ? `${tfPanel.main_breaker_amps}A` : 'MLO'}
                                             </text>
-                                            <text x={tfPanelX} y={tfPanelY + 63} textAnchor="middle" className="text-[7px] fill-electric-600">
+                                            <text x={tfPanelX} y={tfPanelY + 67} textAnchor="middle" className="text-[8px] font-medium fill-electric-600">
                                               {tfPanelCircuits.length} ckt • {(tfPanelCircuits.reduce((sum, c) => sum + (c.load_watts || 0), 0) / 1000).toFixed(1)}kVA
                                             </text>
                                           </g>
