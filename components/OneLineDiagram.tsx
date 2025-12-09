@@ -1582,27 +1582,74 @@ export const OneLineDiagram: React.FC<OneLineDiagramProps> = ({ project, updateP
                     </marker>
                 </defs>
 
+                {/* Enhanced Grid Background */}
                 <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse">
-                    <path d="M 40 0 L 0 0 0 40" fill="none" stroke="#F3F4F6" strokeWidth="1"/>
+                    <path d="M 40 0 L 0 0 0 40" fill="none" stroke="#E5E7EB" strokeWidth="0.5"/>
                 </pattern>
-                <rect width="100%" height="100%" fill="url(#grid)" />
+                <rect width="100%" height="100%" fill="#FAFAFA" />
+                <rect width="100%" height="100%" fill="url(#grid)" opacity="0.5" />
 
-                {/* Utility Service */}
-                <circle cx={serviceX} cy={50} r="20" stroke="#111827" strokeWidth="2" fill="white" />
-                <text x={serviceX} y={55} textAnchor="middle" className="text-xs font-bold font-mono">UTIL</text>
-                <text x={serviceX} y={30} textAnchor="middle" className="text-[9px] fill-gray-500">
+                {/* Utility Service - Enhanced */}
+                <defs>
+                    <filter id="shadow" x="-50%" y="-50%" width="200%" height="200%">
+                        <feDropShadow dx="0" dy="2" stdDeviation="3" floodColor="#000000" floodOpacity="0.15"/>
+                    </filter>
+                    <filter id="shadow-lg" x="-50%" y="-50%" width="200%" height="200%">
+                        <feDropShadow dx="0" dy="3" stdDeviation="5" floodColor="#000000" floodOpacity="0.2"/>
+                    </filter>
+                </defs>
+                <circle 
+                    cx={serviceX} 
+                    cy={50} 
+                    r="22" 
+                    stroke="#1F2937" 
+                    strokeWidth="2.5" 
+                    fill="white"
+                    filter="url(#shadow)"
+                />
+                <circle 
+                    cx={serviceX} 
+                    cy={50} 
+                    r="18" 
+                    stroke="#3B82F6" 
+                    strokeWidth="1" 
+                    fill="none"
+                    strokeDasharray="2,2"
+                />
+                <text x={serviceX} y={56} textAnchor="middle" className="text-xs font-bold font-mono fill-gray-900">UTIL</text>
+                <text x={serviceX} y={28} textAnchor="middle" className="text-[10px] font-semibold fill-gray-700">
                   {project.serviceVoltage}V {project.servicePhase}Φ
                 </text>
 
-                {/* Service Drop Line */}
-                <line x1={serviceX} y1={70} x2={serviceX} y2={90} stroke="#111827" strokeWidth="3" />
+                {/* Service Drop Line - Enhanced */}
+                <line x1={serviceX} y1={72} x2={serviceX} y2={88} stroke="#1F2937" strokeWidth="4" strokeLinecap="round" />
 
-                {/* Meter */}
-                <rect x={serviceX - 20} y={90} width="40" height="30" stroke="#111827" strokeWidth="2" fill="white" />
-                <text x={serviceX} y={110} textAnchor="middle" className="text-xs font-bold">M</text>
+                {/* Meter - Enhanced */}
+                <rect 
+                    x={serviceX - 22} 
+                    y={88} 
+                    width="44" 
+                    height="34" 
+                    rx="3"
+                    stroke="#1F2937" 
+                    strokeWidth="2.5" 
+                    fill="white"
+                    filter="url(#shadow)"
+                />
+                <rect 
+                    x={serviceX - 18} 
+                    y={92} 
+                    width="36" 
+                    height="26" 
+                    rx="2"
+                    stroke="#6B7280" 
+                    strokeWidth="1" 
+                    fill="#F9FAFB"
+                />
+                <text x={serviceX} y={111} textAnchor="middle" className="text-sm font-bold fill-gray-900">M</text>
 
-                {/* Service Line to First Panel */}
-                <line x1={serviceX} y1={120} x2={serviceX} y2={160} stroke="#111827" strokeWidth="3" />
+                {/* Service Line to First Panel - Enhanced */}
+                <line x1={serviceX} y1={122} x2={serviceX} y2={160} stroke="#1F2937" strokeWidth="4" strokeLinecap="round" />
 
                 {/* Render System Hierarchy */}
                 {(() => {
@@ -1630,45 +1677,66 @@ export const OneLineDiagram: React.FC<OneLineDiagramProps> = ({ project, updateP
                       {/* Main Distribution Panel (MDP) */}
                       {mainPanel && (
                         <>
-                          {/* MDP Box - Smaller */}
+                          {/* MDP Box - Enhanced with shadow */}
                           <rect
-                            x={serviceX - 30}
+                            x={serviceX - 35}
                             y={170}
-                            width="60"
-                            height="40"
-                            rx="3"
+                            width="70"
+                            height="45"
+                            rx="4"
                             stroke="#DC2626"
-                            strokeWidth="2"
+                            strokeWidth="3"
                             fill="#FEF2F2"
+                            filter="url(#shadow-lg)"
                           />
-                          <text x={serviceX} y={195} textAnchor="middle" className="text-xs font-bold fill-red-700">
+                          <rect
+                            x={serviceX - 33}
+                            y={172}
+                            width="66"
+                            height="41"
+                            rx="3"
+                            stroke="#FCA5A5"
+                            strokeWidth="1"
+                            fill="none"
+                          />
+                          <text x={serviceX} y={198} textAnchor="middle" className="text-sm font-bold fill-red-800">
                             MDP
                           </text>
 
-                          {/* MDP Labels - Outside Box Above */}
-                          <text x={serviceX} y={155} textAnchor="middle" className="text-xs font-bold fill-gray-900">
+                          {/* MDP Labels - Outside Box Above - Enhanced */}
+                          <text x={serviceX} y={155} textAnchor="middle" className="text-sm font-bold fill-gray-900">
                             {mainPanel.name}
                           </text>
 
-                          {/* MDP Labels - Outside Box Below */}
-                          <text x={serviceX} y={223} textAnchor="middle" className="text-[9px] fill-gray-600">
+                          {/* MDP Labels - Outside Box Below - Enhanced */}
+                          <text x={serviceX} y={225} textAnchor="middle" className="text-[10px] font-semibold fill-gray-700">
                             {mainPanel.voltage}V {mainPanel.phase}Φ • {mainPanel.bus_rating}A Bus • {mainPanel.main_breaker_amps}A Main
                           </text>
-                          <text x={serviceX} y={235} textAnchor="middle" className="text-[8px] fill-electric-600">
+                          <text x={serviceX} y={238} textAnchor="middle" className="text-[9px] font-medium fill-electric-600">
                             {circuits.filter(c => c.panel_id === mainPanel.id).length} circuits
                           </text>
 
-                          {/* Bus from MDP */}
+                          {/* Bus from MDP - Enhanced */}
                           {totalElements > 0 && (
                             <>
-                              <line x1={serviceX} y1={210} x2={serviceX} y2={250} stroke="#111827" strokeWidth="3" />
+                              <line 
+                                x1={serviceX} 
+                                y1={215} 
+                                x2={serviceX} 
+                                y2={250} 
+                                stroke="#1F2937" 
+                                strokeWidth="4" 
+                                strokeLinecap="round"
+                              />
                               <line
                                 x1={Math.max(150, serviceX - (totalElements * 70))}
                                 y1={250}
                                 x2={Math.min(650, serviceX + (totalElements * 70))}
                                 y2={250}
-                                stroke="#111827"
-                                strokeWidth="4"
+                                stroke="#1F2937"
+                                strokeWidth="5"
+                                strokeLinecap="round"
+                                filter="url(#shadow)"
                               />
                             </>
                           )}
@@ -1715,32 +1783,51 @@ export const OneLineDiagram: React.FC<OneLineDiagramProps> = ({ project, updateP
                                   {panel.name}
                                 </text>
 
-                                {/* Connection Line */}
-                                <line x1={xPos} y1={250} x2={xPos} y2={320} stroke="#4B5563" strokeWidth="2" />
-
-                                {/* Panel Box - Smaller */}
-                                <rect
-                                  x={xPos - 25}
-                                  y={320}
-                                  width="50"
-                                  height="30"
-                                  rx="3"
-                                  stroke="#3B82F6"
-                                  strokeWidth="2"
-                                  fill="#EFF6FF"
+                                {/* Connection Line - Enhanced */}
+                                <line 
+                                    x1={xPos} 
+                                    y1={250} 
+                                    x2={xPos} 
+                                    y2={320} 
+                                    stroke="#4B5563" 
+                                    strokeWidth="2.5" 
+                                    strokeLinecap="round"
                                 />
-                                <text x={xPos} y={340} textAnchor="middle" className="text-xs font-bold fill-blue-700">
+
+                                {/* Panel Box - Enhanced with shadow */}
+                                <rect
+                                  x={xPos - 28}
+                                  y={320}
+                                  width="56"
+                                  height="35"
+                                  rx="4"
+                                  stroke="#3B82F6"
+                                  strokeWidth="2.5"
+                                  fill="#EFF6FF"
+                                  filter="url(#shadow)"
+                                />
+                                <rect
+                                  x={xPos - 26}
+                                  y={322}
+                                  width="52"
+                                  height="31"
+                                  rx="3"
+                                  stroke="#93C5FD"
+                                  strokeWidth="1"
+                                  fill="none"
+                                />
+                                <text x={xPos} y={342} textAnchor="middle" className="text-sm font-bold fill-blue-800">
                                   P
                                 </text>
 
-                                {/* Panel Info - Below Box */}
-                                <text x={xPos} y={363} textAnchor="middle" className="text-[9px] fill-gray-600">
+                                {/* Panel Info - Below Box - Enhanced */}
+                                <text x={xPos} y={365} textAnchor="middle" className="text-[10px] font-semibold fill-gray-700">
                                   {panel.voltage}V {panel.phase}Φ • {panel.bus_rating}A
                                 </text>
-                                <text x={xPos} y={373} textAnchor="middle" className="text-[8px] fill-gray-500">
+                                <text x={xPos} y={376} textAnchor="middle" className="text-[9px] font-medium fill-gray-600">
                                   {panel.main_breaker_amps ? `${panel.main_breaker_amps}A Main` : 'MLO'}
                                 </text>
-                                <text x={xPos} y={383} textAnchor="middle" className="text-[7px] fill-electric-600">
+                                <text x={xPos} y={387} textAnchor="middle" className="text-[8px] font-medium fill-electric-600">
                                   {panelCircuits.length} ckt • {(panelCircuits.reduce((sum, c) => sum + (c.load_watts || 0), 0) / 1000).toFixed(1)}kVA
                                 </text>
                                 {panel.location && (
@@ -1825,26 +1912,37 @@ export const OneLineDiagram: React.FC<OneLineDiagramProps> = ({ project, updateP
 
                                       {/* ❌ REMOVED: Diagonal connection line (now handled by bus bar above) */}
 
-                                      {/* Transformer Box */}
+                                      {/* Transformer Box - Enhanced */}
+                                      <rect
+                                        x={downXfmrX - 32}
+                                        y={downXfmrY}
+                                        width="64"
+                                        height="38"
+                                        rx="4"
+                                        stroke="#F59E0B"
+                                        strokeWidth="2.5"
+                                        fill="#FEF3C7"
+                                        filter="url(#shadow)"
+                                      />
                                       <rect
                                         x={downXfmrX - 30}
-                                        y={downXfmrY}
+                                        y={downXfmrY + 2}
                                         width="60"
-                                        height="35"
+                                        height="34"
                                         rx="3"
-                                        stroke="#F59E0B"
-                                        strokeWidth="2"
-                                        fill="#FEF3C7"
+                                        stroke="#FCD34D"
+                                        strokeWidth="1"
+                                        fill="none"
                                       />
-                                      <text x={downXfmrX} y={downXfmrY + 22} textAnchor="middle" className="text-xs font-bold fill-orange-800">
+                                      <text x={downXfmrX} y={downXfmrY + 24} textAnchor="middle" className="text-sm font-bold fill-orange-900">
                                         XFMR
                                       </text>
 
-                                      {/* Transformer Info */}
-                                      <text x={downXfmrX} y={downXfmrY + 48} textAnchor="middle" className="text-[9px] fill-orange-700">
+                                      {/* Transformer Info - Enhanced */}
+                                      <text x={downXfmrX} y={downXfmrY + 50} textAnchor="middle" className="text-[10px] font-semibold fill-orange-800">
                                         {downXfmr.kva_rating} kVA
                                       </text>
-                                      <text x={downXfmrX} y={downXfmrY + 58} textAnchor="middle" className="text-[8px] fill-orange-700">
+                                      <text x={downXfmrX} y={downXfmrY + 61} textAnchor="middle" className="text-[9px] font-medium fill-orange-700">
                                         {downXfmr.primary_voltage}V → {downXfmr.secondary_voltage}V
                                       </text>
 
@@ -1929,29 +2027,40 @@ export const OneLineDiagram: React.FC<OneLineDiagramProps> = ({ project, updateP
                                   {xfmr.name}
                                 </text>
 
-                                {/* Line from bus to transformer */}
-                                <line x1={xPos} y1={250} x2={xPos} y2={320} stroke="#4B5563" strokeWidth="2" />
+                                {/* Line from bus to transformer - Enhanced */}
+                                <line x1={xPos} y1={250} x2={xPos} y2={320} stroke="#4B5563" strokeWidth="2.5" strokeLinecap="round" />
 
-                                {/* Transformer Box - Smaller */}
+                                {/* Transformer Box - Enhanced */}
+                                <rect
+                                  x={xPos - 32}
+                                  y={320}
+                                  width="64"
+                                  height="38"
+                                  rx="4"
+                                  stroke="#F59E0B"
+                                  strokeWidth="2.5"
+                                  fill="#FEF3C7"
+                                  filter="url(#shadow)"
+                                />
                                 <rect
                                   x={xPos - 30}
-                                  y={320}
+                                  y={322}
                                   width="60"
-                                  height="35"
+                                  height="34"
                                   rx="3"
-                                  stroke="#F59E0B"
-                                  strokeWidth="2"
-                                  fill="#FEF3C7"
+                                  stroke="#FCD34D"
+                                  strokeWidth="1"
+                                  fill="none"
                                 />
-                                <text x={xPos} y={342} textAnchor="middle" className="text-xs font-bold fill-orange-800">
+                                <text x={xPos} y={344} textAnchor="middle" className="text-sm font-bold fill-orange-900">
                                   XFMR
                                 </text>
 
-                                {/* Transformer Info - Below Box */}
-                                <text x={xPos} y={368} textAnchor="middle" className="text-[9px] fill-orange-700">
+                                {/* Transformer Info - Enhanced */}
+                                <text x={xPos} y={370} textAnchor="middle" className="text-[10px] font-semibold fill-orange-800">
                                   {xfmr.kva_rating} kVA
                                 </text>
-                                <text x={xPos} y={378} textAnchor="middle" className="text-[8px] fill-orange-700">
+                                <text x={xPos} y={381} textAnchor="middle" className="text-[9px] font-medium fill-orange-700">
                                   {xfmr.primary_voltage}V → {xfmr.secondary_voltage}V
                                 </text>
 
