@@ -1794,10 +1794,10 @@ export const OneLineDiagram: React.FC<OneLineDiagramProps> = ({ project, updateP
                                   {panel.name}
                                 </text>
 
-                                {/* Connection Line - Enhanced */}
+                                {/* Connection Line - Enhanced (from bus bar to panel) */}
                                 <line 
                                     x1={xPos} 
-                                    y1={250} 
+                                    y1={245} 
                                     x2={xPos} 
                                     y2={320} 
                                     stroke="#4B5563" 
