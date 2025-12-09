@@ -33,9 +33,10 @@ import {
   type EquipmentType,
   type ProtectiveDeviceType
 } from '../services/calculations/arcFlash';
+import { EVEMSLoadManagement } from './EVEMSLoadManagement';
 
 export const Calculators: React.FC = () => {
-  const [activeTab, setActiveTab] = useState<'voltage-drop' | 'conduit-fill' | 'conductor-sizing' | 'short-circuit' | 'ev-charging' | 'solar-pv' | 'arc-flash'>('voltage-drop');
+  const [activeTab, setActiveTab] = useState<'voltage-drop' | 'conduit-fill' | 'conductor-sizing' | 'short-circuit' | 'ev-charging' | 'solar-pv' | 'arc-flash' | 'evems'>('voltage-drop');
 
   // Default project settings for calculator mode
   const defaultSettings: ProjectSettings = {
@@ -96,6 +97,12 @@ export const Calculators: React.FC = () => {
         >
           <span className="flex items-center gap-1"><Shield className="w-4 h-4" /> Arc Flash (NFPA 70E)</span>
         </button>
+        <button
+          onClick={() => setActiveTab('evems')}
+          className={`px-6 py-3 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${activeTab === 'evems' ? 'border-electric-500 text-gray-900' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
+        >
+          <span className="flex items-center gap-1"><Zap className="w-4 h-4" /> EVEMS Load Mgmt (NEC 625.42)</span>
+        </button>
       </div>
 
       <div className="bg-white border border-gray-100 rounded-lg p-6 shadow-sm min-h-[400px]">
@@ -106,6 +113,7 @@ export const Calculators: React.FC = () => {
         {activeTab === 'ev-charging' && <EVChargingCalculator />}
         {activeTab === 'solar-pv' && <SolarPVCalculator />}
         {activeTab === 'arc-flash' && <ArcFlashCalculator />}
+        {activeTab === 'evems' && <EVEMSLoadManagement />}
       </div>
     </div>
   );
