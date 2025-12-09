@@ -1708,31 +1708,42 @@ export const OneLineDiagram: React.FC<OneLineDiagramProps> = ({ project, updateP
                             {mainPanel.name}
                           </text>
 
-                          {/* MDP Labels - Outside Box Below - Enhanced */}
-                          <text x={serviceX} y={225} textAnchor="middle" className="text-[10px] font-semibold fill-gray-700">
+                          {/* MDP Labels - Outside Box Below - Enhanced (with background to prevent overlap) */}
+                          <rect
+                            x={serviceX - 80}
+                            y={218}
+                            width="160"
+                            height="20"
+                            fill="white"
+                            fillOpacity="0.9"
+                            rx="2"
+                          />
+                          <text x={serviceX} y={230} textAnchor="middle" className="text-[10px] font-semibold fill-gray-700">
                             {mainPanel.voltage}V {mainPanel.phase}Φ • {mainPanel.bus_rating}A Bus • {mainPanel.main_breaker_amps}A Main
                           </text>
-                          <text x={serviceX} y={238} textAnchor="middle" className="text-[9px] font-medium fill-electric-600">
+                          <text x={serviceX} y={240} textAnchor="middle" className="text-[9px] font-medium fill-electric-600">
                             {circuits.filter(c => c.panel_id === mainPanel.id).length} circuits
                           </text>
 
-                          {/* Bus from MDP - Enhanced */}
+                          {/* Bus from MDP - Enhanced (always render when there are downstream elements) */}
                           {totalElements > 0 && (
                             <>
+                              {/* Vertical feeder line from MDP to bus bar */}
                               <line 
                                 x1={serviceX} 
                                 y1={215} 
                                 x2={serviceX} 
-                                y2={250} 
+                                y2={245} 
                                 stroke="#1F2937" 
                                 strokeWidth="4" 
                                 strokeLinecap="round"
                               />
+                              {/* Horizontal bus bar */}
                               <line
                                 x1={Math.max(150, serviceX - (totalElements * 70))}
-                                y1={250}
+                                y1={245}
                                 x2={Math.min(650, serviceX + (totalElements * 70))}
-                                y2={250}
+                                y2={245}
                                 stroke="#1F2937"
                                 strokeWidth="5"
                                 strokeLinecap="round"
@@ -2039,7 +2050,7 @@ export const OneLineDiagram: React.FC<OneLineDiagramProps> = ({ project, updateP
                                 </text>
 
                                 {/* Line from bus to transformer - Enhanced */}
-                                <line x1={xPos} y1={250} x2={xPos} y2={320} stroke="#4B5563" strokeWidth="2.5" strokeLinecap="round" />
+                                <line x1={xPos} y1={245} x2={xPos} y2={320} stroke="#4B5563" strokeWidth="2.5" strokeLinecap="round" />
 
                                 {/* Transformer Box - Enhanced */}
                                 <rect
