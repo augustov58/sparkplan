@@ -1950,7 +1950,7 @@ export const OneLineDiagram: React.FC<OneLineDiagramProps> = ({ project, updateP
                                 {/* ✅ NEW: Render bus bar for downstream elements (horizontal bus + vertical drops) - RENDER AFTER ALL TEXT */}
                                 {totalDownstream > 0 && downstreamPositions.length > 0 && renderBusBar(
                                   xPos,
-                                  DIAGRAM_CONSTANTS.LEVEL1_PANEL_Y + DIAGRAM_CONSTANTS.PANEL_HEIGHT + 60,
+                                  DIAGRAM_CONSTANTS.LEVEL1_PANEL_Y + DIAGRAM_CONSTANTS.PANEL_HEIGHT + 80,
                                   downstreamPositions,
                                   "#4B5563"
                                 )}
