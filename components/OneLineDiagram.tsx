@@ -2186,7 +2186,18 @@ export const OneLineDiagram: React.FC<OneLineDiagramProps> = ({ project, updateP
 
                                   return (
                                     <g key={`panel-xfmr-${panel.id}`}>
-                                      {/* Panel Label - Above Box */}
+                                      {/* Panel Label - Above Box (with background to mask riser line) */}
+                                      <rect
+                                        x={panelX - 30}
+                                        y={panelY - 18}
+                                        width="60"
+                                        height="12"
+                                        fill="white"
+                                        fillOpacity="0.95"
+                                        rx="2"
+                                        stroke="#E5E7EB"
+                                        strokeWidth="1"
+                                      />
                                       <text x={panelX} y={panelY - 12} textAnchor="middle" className="text-xs font-bold fill-gray-900">
                                         {panel.name}
                                       </text>
