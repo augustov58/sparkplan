@@ -1578,7 +1578,7 @@ export const OneLineDiagram: React.FC<OneLineDiagramProps> = ({ project, updateP
             </div>
             
             <DiagramPanZoom className="w-full h-full flex-1">
-            <svg ref={diagramRef} className="w-full bg-white" viewBox="0 0 800 750" preserveAspectRatio="xMidYMid meet" style={{ minWidth: '800px', minHeight: '750px' }}>
+            <svg ref={diagramRef} className="w-full bg-white" viewBox="0 0 1000 900" preserveAspectRatio="xMidYMid meet" style={{ minWidth: '1000px', minHeight: '900px' }}>
                 <defs>
                     <marker id="arrow" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto" markerUnits="strokeWidth">
                         <path d="M0,0 L0,6 L9,3 z" fill="#9CA3AF" />
@@ -1745,10 +1745,10 @@ export const OneLineDiagram: React.FC<OneLineDiagramProps> = ({ project, updateP
 
                             return (
                               <g key={`panel-${panel.id}`}>
-                                {/* Connection Line - Enhanced (from bus bar to panel) - RENDER FIRST */}
+                                {/* Connection Line - Enhanced (from bus bar to panel) - EXTENDED - RENDER FIRST */}
                                 <line 
                                     x1={xPos} 
-                                    y1={250} 
+                                    y1={260} 
                                     x2={xPos} 
                                     y2={DIAGRAM_CONSTANTS.LEVEL1_PANEL_Y} 
                                     stroke="#4B5563" 
@@ -1798,31 +1798,66 @@ export const OneLineDiagram: React.FC<OneLineDiagramProps> = ({ project, updateP
                                   P
                                 </text>
 
-                                {/* Panel Info - Below Box - Enhanced with background to mask riser line */}
+                                {/* Panel Info - Below Box - Enhanced with individual line backgrounds to mask riser line */}
                                 <rect
                                   x={xPos - 55}
                                   y={360}
                                   width="110"
-                                  height="40"
+                                  height="10"
                                   fill="white"
                                   fillOpacity="0.95"
-                                  rx="3"
+                                  rx="2"
                                   stroke="#E5E7EB"
-                                  strokeWidth="1"
+                                  strokeWidth="0.5"
                                 />
-                                <text x={xPos} y={365} textAnchor="middle" className="text-[10px] font-semibold fill-gray-700">
+                                <text x={xPos} y={368} textAnchor="middle" className="text-[10px] font-semibold fill-gray-700">
                                   {panel.voltage}V {panel.phase}Φ • {panel.bus_rating}A
                                 </text>
-                                <text x={xPos} y={376} textAnchor="middle" className="text-[9px] font-medium fill-gray-600">
+                                <rect
+                                  x={xPos - 45}
+                                  y={373}
+                                  width="90"
+                                  height="10"
+                                  fill="white"
+                                  fillOpacity="0.95"
+                                  rx="2"
+                                  stroke="#E5E7EB"
+                                  strokeWidth="0.5"
+                                />
+                                <text x={xPos} y={381} textAnchor="middle" className="text-[9px] font-medium fill-gray-600">
                                   {panel.main_breaker_amps ? `${panel.main_breaker_amps}A Main` : 'MLO'}
                                 </text>
-                                <text x={xPos} y={387} textAnchor="middle" className="text-[8px] font-medium fill-electric-600">
+                                <rect
+                                  x={xPos - 50}
+                                  y={386}
+                                  width="100"
+                                  height="10"
+                                  fill="white"
+                                  fillOpacity="0.95"
+                                  rx="2"
+                                  stroke="#E5E7EB"
+                                  strokeWidth="0.5"
+                                />
+                                <text x={xPos} y={394} textAnchor="middle" className="text-[8px] font-medium fill-electric-600">
                                   {panelCircuits.length} ckt • {(panelCircuits.reduce((sum, c) => sum + (c.load_watts || 0), 0) / 1000).toFixed(1)}kVA
                                 </text>
                                 {panel.location && (
-                                  <text x={xPos} y={395} textAnchor="middle" className="text-[7px] fill-gray-400 italic">
-                                    {panel.location}
-                                  </text>
+                                  <>
+                                    <rect
+                                      x={xPos - 40}
+                                      y={400}
+                                      width="80"
+                                      height="8"
+                                      fill="white"
+                                      fillOpacity="0.95"
+                                      rx="2"
+                                      stroke="#E5E7EB"
+                                      strokeWidth="0.5"
+                                    />
+                                    <text x={xPos} y={406} textAnchor="middle" className="text-[7px] fill-gray-400 italic">
+                                      {panel.location}
+                                    </text>
+                                  </>
                                 )}
 
                                 {/* ✅ NEW: Render bus bar for downstream elements (horizontal bus + vertical drops) - only if positions exist */}
@@ -1873,25 +1908,47 @@ export const OneLineDiagram: React.FC<OneLineDiagramProps> = ({ project, updateP
                                         P
                                       </text>
 
-                                      {/* Panel Info - with background to mask riser line */}
+                                      {/* Panel Info - with individual line backgrounds to mask riser line */}
                                       <rect
                                         x={downPanelX - 50}
                                         y={downPanelY + 38}
                                         width="100"
-                                        height="30"
+                                        height="10"
                                         fill="white"
                                         fillOpacity="0.95"
-                                        rx="3"
+                                        rx="2"
                                         stroke="#E5E7EB"
-                                        strokeWidth="1"
+                                        strokeWidth="0.5"
                                       />
-                                      <text x={downPanelX} y={downPanelY + 43} textAnchor="middle" className="text-[9px] fill-gray-600">
+                                      <text x={downPanelX} y={downPanelY + 46} textAnchor="middle" className="text-[9px] fill-gray-600">
                                         {downPanel.voltage}V {downPanel.phase}Φ • {downPanel.bus_rating}A
                                       </text>
-                                      <text x={downPanelX} y={downPanelY + 53} textAnchor="middle" className="text-[8px] fill-gray-500">
+                                      <rect
+                                        x={downPanelX - 40}
+                                        y={downPanelY + 50}
+                                        width="80"
+                                        height="9"
+                                        fill="white"
+                                        fillOpacity="0.95"
+                                        rx="2"
+                                        stroke="#E5E7EB"
+                                        strokeWidth="0.5"
+                                      />
+                                      <text x={downPanelX} y={downPanelY + 57} textAnchor="middle" className="text-[8px] fill-gray-500">
                                         {downPanel.main_breaker_amps ? `${downPanel.main_breaker_amps}A` : 'MLO'}
                                       </text>
-                                      <text x={downPanelX} y={downPanelY + 63} textAnchor="middle" className="text-[7px] fill-electric-600">
+                                      <rect
+                                        x={downPanelX - 45}
+                                        y={downPanelY + 60}
+                                        width="90"
+                                        height="9"
+                                        fill="white"
+                                        fillOpacity="0.95"
+                                        rx="2"
+                                        stroke="#E5E7EB"
+                                        strokeWidth="0.5"
+                                      />
+                                      <text x={downPanelX} y={downPanelY + 67} textAnchor="middle" className="text-[7px] fill-electric-600">
                                         {downPanelCircuits.length} ckt • {(downPanelCircuits.reduce((sum, c) => sum + (c.load_watts || 0), 0) / 1000).toFixed(1)}kVA
                                       </text>
                                     </g>
@@ -1958,22 +2015,33 @@ export const OneLineDiagram: React.FC<OneLineDiagramProps> = ({ project, updateP
                                         XFMR
                                       </text>
 
-                                      {/* Transformer Info - Enhanced with background to mask riser line */}
+                                      {/* Transformer Info - Enhanced with individual line backgrounds to mask riser line */}
                                       <rect
-                                        x={downXfmrX - 50}
+                                        x={downXfmrX - 40}
                                         y={downXfmrY + 45}
-                                        width="100"
-                                        height="20"
+                                        width="80"
+                                        height="10"
                                         fill="white"
                                         fillOpacity="0.95"
-                                        rx="3"
+                                        rx="2"
                                         stroke="#E5E7EB"
-                                        strokeWidth="1"
+                                        strokeWidth="0.5"
                                       />
-                                      <text x={downXfmrX} y={downXfmrY + 50} textAnchor="middle" className="text-[10px] font-semibold fill-orange-800">
+                                      <text x={downXfmrX} y={downXfmrY + 53} textAnchor="middle" className="text-[10px] font-semibold fill-orange-800">
                                         {downXfmr.kva_rating} kVA
                                       </text>
-                                      <text x={downXfmrX} y={downXfmrY + 61} textAnchor="middle" className="text-[9px] font-medium fill-orange-700">
+                                      <rect
+                                        x={downXfmrX - 50}
+                                        y={downXfmrY + 57}
+                                        width="100"
+                                        height="10"
+                                        fill="white"
+                                        fillOpacity="0.95"
+                                        rx="2"
+                                        stroke="#E5E7EB"
+                                        strokeWidth="0.5"
+                                      />
+                                      <text x={downXfmrX} y={downXfmrY + 65} textAnchor="middle" className="text-[9px] font-medium fill-orange-700">
                                         {downXfmr.primary_voltage}V → {downXfmr.secondary_voltage}V
                                       </text>
 
@@ -2037,25 +2105,47 @@ export const OneLineDiagram: React.FC<OneLineDiagramProps> = ({ project, updateP
                                               P
                                             </text>
 
-                                            {/* Panel Info - Enhanced with background to mask riser line */}
+                                            {/* Panel Info - Enhanced with individual line backgrounds to mask riser line */}
                                             <rect
                                               x={tfPanelX - 50}
                                               y={tfPanelY + 40}
                                               width="100"
-                                              height="30"
+                                              height="10"
                                               fill="white"
                                               fillOpacity="0.95"
-                                              rx="3"
+                                              rx="2"
                                               stroke="#E5E7EB"
-                                              strokeWidth="1"
+                                              strokeWidth="0.5"
                                             />
-                                            <text x={tfPanelX} y={tfPanelY + 45} textAnchor="middle" className="text-[10px] font-semibold fill-gray-700">
+                                            <text x={tfPanelX} y={tfPanelY + 48} textAnchor="middle" className="text-[10px] font-semibold fill-gray-700">
                                               {tfPanel.voltage}V {tfPanel.phase}Φ • {tfPanel.bus_rating}A
                                             </text>
-                                            <text x={tfPanelX} y={tfPanelY + 56} textAnchor="middle" className="text-[9px] font-medium fill-gray-600">
+                                            <rect
+                                              x={tfPanelX - 40}
+                                              y={tfPanelY + 52}
+                                              width="80"
+                                              height="9"
+                                              fill="white"
+                                              fillOpacity="0.95"
+                                              rx="2"
+                                              stroke="#E5E7EB"
+                                              strokeWidth="0.5"
+                                            />
+                                            <text x={tfPanelX} y={tfPanelY + 59} textAnchor="middle" className="text-[9px] font-medium fill-gray-600">
                                               {tfPanel.main_breaker_amps ? `${tfPanel.main_breaker_amps}A` : 'MLO'}
                                             </text>
-                                            <text x={tfPanelX} y={tfPanelY + 67} textAnchor="middle" className="text-[8px] font-medium fill-electric-600">
+                                            <rect
+                                              x={tfPanelX - 45}
+                                              y={tfPanelY + 62}
+                                              width="90"
+                                              height="9"
+                                              fill="white"
+                                              fillOpacity="0.95"
+                                              rx="2"
+                                              stroke="#E5E7EB"
+                                              strokeWidth="0.5"
+                                            />
+                                            <text x={tfPanelX} y={tfPanelY + 69} textAnchor="middle" className="text-[8px] font-medium fill-electric-600">
                                               {tfPanelCircuits.length} ckt • {(tfPanelCircuits.reduce((sum, c) => sum + (c.load_watts || 0), 0) / 1000).toFixed(1)}kVA
                                             </text>
                                           </g>
@@ -2086,8 +2176,8 @@ export const OneLineDiagram: React.FC<OneLineDiagramProps> = ({ project, updateP
 
                             return (
                               <g key={`xfmr-${xfmr.id}`}>
-                                {/* Line from bus to transformer - Enhanced - RENDER FIRST */}
-                                <line x1={xPos} y1={250} x2={xPos} y2={DIAGRAM_CONSTANTS.LEVEL1_PANEL_Y} stroke="#4B5563" strokeWidth="2.5" strokeLinecap="round" />
+                                {/* Line from bus to transformer - Enhanced - EXTENDED - RENDER FIRST */}
+                                <line x1={xPos} y1={260} x2={xPos} y2={DIAGRAM_CONSTANTS.LEVEL1_PANEL_Y} stroke="#4B5563" strokeWidth="2.5" strokeLinecap="round" />
 
                                 {/* Transformer Label - Above Box (with background to prevent overlap) - RENDER AFTER LINE */}
                                 <rect
@@ -2131,22 +2221,33 @@ export const OneLineDiagram: React.FC<OneLineDiagramProps> = ({ project, updateP
                                   XFMR
                                 </text>
 
-                                {/* Transformer Info - Enhanced with background to mask riser line */}
+                                {/* Transformer Info - Enhanced with individual line backgrounds to mask riser line */}
                                 <rect
-                                  x={xPos - 50}
+                                  x={xPos - 40}
                                   y={365}
-                                  width="100"
-                                  height="20"
+                                  width="80"
+                                  height="10"
                                   fill="white"
                                   fillOpacity="0.95"
-                                  rx="3"
+                                  rx="2"
                                   stroke="#E5E7EB"
-                                  strokeWidth="1"
+                                  strokeWidth="0.5"
                                 />
-                                <text x={xPos} y={370} textAnchor="middle" className="text-[10px] font-semibold fill-orange-800">
+                                <text x={xPos} y={373} textAnchor="middle" className="text-[10px] font-semibold fill-orange-800">
                                   {xfmr.kva_rating} kVA
                                 </text>
-                                <text x={xPos} y={381} textAnchor="middle" className="text-[9px] font-medium fill-orange-700">
+                                <rect
+                                  x={xPos - 50}
+                                  y={377}
+                                  width="100"
+                                  height="10"
+                                  fill="white"
+                                  fillOpacity="0.95"
+                                  rx="2"
+                                  stroke="#E5E7EB"
+                                  strokeWidth="0.5"
+                                />
+                                <text x={xPos} y={385} textAnchor="middle" className="text-[9px] font-medium fill-orange-700">
                                   {xfmr.primary_voltage}V → {xfmr.secondary_voltage}V
                                 </text>
 
@@ -2199,25 +2300,47 @@ export const OneLineDiagram: React.FC<OneLineDiagramProps> = ({ project, updateP
                                         P
                                       </text>
 
-                                      {/* Panel Info - Below Box with background to mask riser line */}
+                                      {/* Panel Info - Below Box with individual line backgrounds to mask riser line */}
                                       <rect
                                         x={panelX - 50}
                                         y={panelY + 38}
                                         width="100"
-                                        height="30"
+                                        height="10"
                                         fill="white"
                                         fillOpacity="0.95"
-                                        rx="3"
+                                        rx="2"
                                         stroke="#E5E7EB"
-                                        strokeWidth="1"
+                                        strokeWidth="0.5"
                                       />
-                                      <text x={panelX} y={panelY + 43} textAnchor="middle" className="text-[9px] fill-gray-600">
+                                      <text x={panelX} y={panelY + 46} textAnchor="middle" className="text-[9px] fill-gray-600">
                                         {panel.voltage}V {panel.phase}Φ • {panel.bus_rating}A
                                       </text>
-                                      <text x={panelX} y={panelY + 53} textAnchor="middle" className="text-[8px] fill-gray-500">
+                                      <rect
+                                        x={panelX - 40}
+                                        y={panelY + 50}
+                                        width="80"
+                                        height="9"
+                                        fill="white"
+                                        fillOpacity="0.95"
+                                        rx="2"
+                                        stroke="#E5E7EB"
+                                        strokeWidth="0.5"
+                                      />
+                                      <text x={panelX} y={panelY + 57} textAnchor="middle" className="text-[8px] fill-gray-500">
                                         {panel.main_breaker_amps ? `${panel.main_breaker_amps}A` : 'MLO'}
                                       </text>
-                                      <text x={panelX} y={panelY + 63} textAnchor="middle" className="text-[7px] fill-electric-600">
+                                      <rect
+                                        x={panelX - 45}
+                                        y={panelY + 60}
+                                        width="90"
+                                        height="9"
+                                        fill="white"
+                                        fillOpacity="0.95"
+                                        rx="2"
+                                        stroke="#E5E7EB"
+                                        strokeWidth="0.5"
+                                      />
+                                      <text x={panelX} y={panelY + 67} textAnchor="middle" className="text-[7px] fill-electric-600">
                                         {panelCircuits.length} ckt • {(panelCircuits.reduce((sum, c) => sum + (c.load_watts || 0), 0) / 1000).toFixed(1)}kVA
                                       </text>
                                     </g>
@@ -2239,22 +2362,22 @@ export const OneLineDiagram: React.FC<OneLineDiagramProps> = ({ project, updateP
                       {/* Bus from MDP - Render AFTER all panels/transformers so it appears on top */}
                       {mainPanel && totalElements > 0 && (
                         <>
-                          {/* Vertical feeder line from MDP to bus bar */}
+                          {/* Vertical feeder line from MDP to bus bar - EXTENDED */}
                           <line 
                             x1={serviceX} 
                             y1={215} 
                             x2={serviceX} 
-                            y2={250} 
+                            y2={260} 
                             stroke="#1F2937" 
                             strokeWidth="4" 
                             strokeLinecap="round"
                           />
-                          {/* Horizontal bus bar - positioned at y=250 (VERY THICK for visibility, rendered on top) */}
+                          {/* Horizontal bus bar - positioned at y=260 (VERY THICK for visibility, rendered on top) */}
                           <line
                             x1={Math.max(150, serviceX - (totalElements * 70))}
-                            y1={250}
+                            y1={260}
                             x2={Math.min(650, serviceX + (totalElements * 70))}
-                            y2={250}
+                            y2={260}
                             stroke="#1F2937"
                             strokeWidth="10"
                             strokeLinecap="round"
@@ -2263,9 +2386,9 @@ export const OneLineDiagram: React.FC<OneLineDiagramProps> = ({ project, updateP
                           {/* Additional bus bar line for extra visibility (red accent) */}
                           <line
                             x1={Math.max(150, serviceX - (totalElements * 70))}
-                            y1={250}
+                            y1={260}
                             x2={Math.min(650, serviceX + (totalElements * 70))}
-                            y2={250}
+                            y2={260}
                             stroke="#DC2626"
                             strokeWidth="8"
                             strokeLinecap="round"
@@ -2293,22 +2416,33 @@ export const OneLineDiagram: React.FC<OneLineDiagramProps> = ({ project, updateP
                             {mainPanel.name}
                           </text>
 
-                          {/* MDP Labels - Outside Box Below - with background to mask riser line */}
+                          {/* MDP Labels - Outside Box Below - with individual line backgrounds to mask riser line */}
                           <rect
                             x={serviceX - 90}
-                            y={220}
+                            y={228}
                             width="180"
-                            height="28"
+                            height="10"
                             fill="white"
                             fillOpacity="0.95"
-                            rx="3"
+                            rx="2"
                             stroke="#E5E7EB"
-                            strokeWidth="1"
+                            strokeWidth="0.5"
                           />
-                          <text x={serviceX} y={232} textAnchor="middle" className="text-[10px] font-semibold fill-gray-700">
+                          <text x={serviceX} y={236} textAnchor="middle" className="text-[10px] font-semibold fill-gray-700">
                             {mainPanel.voltage}V {mainPanel.phase}Φ • {mainPanel.bus_rating}A Bus • {mainPanel.main_breaker_amps}A Main
                           </text>
-                          <text x={serviceX} y={243} textAnchor="middle" className="text-[9px] font-medium fill-electric-600">
+                          <rect
+                            x={serviceX - 50}
+                            y={242}
+                            width="100"
+                            height="10"
+                            fill="white"
+                            fillOpacity="0.95"
+                            rx="2"
+                            stroke="#E5E7EB"
+                            strokeWidth="0.5"
+                          />
+                          <text x={serviceX} y={250} textAnchor="middle" className="text-[9px] font-medium fill-electric-600">
                             {circuits.filter(c => c.panel_id === mainPanel.id).length} circuits
                           </text>
                         </>
