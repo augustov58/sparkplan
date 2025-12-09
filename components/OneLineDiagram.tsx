@@ -1745,12 +1745,12 @@ export const OneLineDiagram: React.FC<OneLineDiagramProps> = ({ project, updateP
 
                             return (
                               <g key={`panel-${panel.id}`}>
-                                {/* Connection Line - Enhanced (from bus bar to panel - EXTENDED) - RENDER FIRST */}
+                                {/* Connection Line - Enhanced (from bus bar to panel) - RENDER FIRST */}
                                 <line 
                                     x1={xPos} 
                                     y1={250} 
                                     x2={xPos} 
-                                    y2={500} 
+                                    y2={DIAGRAM_CONSTANTS.LEVEL1_PANEL_Y} 
                                     stroke="#4B5563" 
                                     strokeWidth="2.5" 
                                     strokeLinecap="round"
@@ -2086,8 +2086,8 @@ export const OneLineDiagram: React.FC<OneLineDiagramProps> = ({ project, updateP
 
                             return (
                               <g key={`xfmr-${xfmr.id}`}>
-                                {/* Line from bus to transformer - Enhanced - EXTENDED - RENDER FIRST */}
-                                <line x1={xPos} y1={250} x2={xPos} y2={500} stroke="#4B5563" strokeWidth="2.5" strokeLinecap="round" />
+                                {/* Line from bus to transformer - Enhanced - RENDER FIRST */}
+                                <line x1={xPos} y1={250} x2={xPos} y2={DIAGRAM_CONSTANTS.LEVEL1_PANEL_Y} stroke="#4B5563" strokeWidth="2.5" strokeLinecap="round" />
 
                                 {/* Transformer Label - Above Box (with background to prevent overlap) - RENDER AFTER LINE */}
                                 <rect
@@ -2239,12 +2239,12 @@ export const OneLineDiagram: React.FC<OneLineDiagramProps> = ({ project, updateP
                       {/* Bus from MDP - Render AFTER all panels/transformers so it appears on top */}
                       {mainPanel && totalElements > 0 && (
                         <>
-                          {/* Vertical feeder line from MDP to bus bar - EXTENDED */}
+                          {/* Vertical feeder line from MDP to bus bar */}
                           <line 
                             x1={serviceX} 
                             y1={215} 
                             x2={serviceX} 
-                            y2={500} 
+                            y2={250} 
                             stroke="#1F2937" 
                             strokeWidth="4" 
                             strokeLinecap="round"
