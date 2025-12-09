@@ -1750,7 +1750,7 @@ export const OneLineDiagram: React.FC<OneLineDiagramProps> = ({ project, updateP
                                     x1={xPos} 
                                     y1={260} 
                                     x2={xPos} 
-                                    y2={DIAGRAM_CONSTANTS.LEVEL1_PANEL_Y} 
+                                    y2={DIAGRAM_CONSTANTS.LEVEL1_PANEL_Y + DIAGRAM_CONSTANTS.PANEL_HEIGHT + 60} 
                                     stroke="#4B5563" 
                                     strokeWidth="2.5" 
                                     strokeLinecap="round"
@@ -1798,7 +1798,7 @@ export const OneLineDiagram: React.FC<OneLineDiagramProps> = ({ project, updateP
                                   P
                                 </text>
 
-                                {/* Panel Info - Below Box - Enhanced with individual line backgrounds to mask riser line */}
+                                {/* Panel Info - Below Box - Enhanced with individual line backgrounds to mask riser line - RENDER AFTER LINE */}
                                 <rect
                                   x={xPos - 55}
                                   y={360}
@@ -1825,7 +1825,7 @@ export const OneLineDiagram: React.FC<OneLineDiagramProps> = ({ project, updateP
                                   strokeWidth="0.5"
                                 />
                                 <text x={xPos} y={381} textAnchor="middle" className="text-[9px] font-medium fill-gray-600">
-                                  {panel.main_breaker_amps ? `${panel.main_breaker_amps}A Main` : 'MLO'}
+                                  {panel.main_breaker_amps ? `${panel.main_breaker_amps}A` : 'MLO'}
                                 </text>
                                 <rect
                                   x={xPos - 50}
@@ -2177,7 +2177,7 @@ export const OneLineDiagram: React.FC<OneLineDiagramProps> = ({ project, updateP
                             return (
                               <g key={`xfmr-${xfmr.id}`}>
                                 {/* Line from bus to transformer - Enhanced - EXTENDED - RENDER FIRST */}
-                                <line x1={xPos} y1={260} x2={xPos} y2={DIAGRAM_CONSTANTS.LEVEL1_PANEL_Y} stroke="#4B5563" strokeWidth="2.5" strokeLinecap="round" />
+                                <line x1={xPos} y1={260} x2={xPos} y2={DIAGRAM_CONSTANTS.LEVEL1_PANEL_Y + DIAGRAM_CONSTANTS.TRANSFORMER_HEIGHT + 30} stroke="#4B5563" strokeWidth="2.5" strokeLinecap="round" />
 
                                 {/* Transformer Label - Above Box (with background to prevent overlap) - RENDER AFTER LINE */}
                                 <rect
