@@ -1740,14 +1740,14 @@ export const OneLineDiagram: React.FC<OneLineDiagramProps> = ({ project, updateP
                                 strokeWidth="4" 
                                 strokeLinecap="round"
                               />
-                              {/* Horizontal bus bar - positioned at y=250 (thicker for visibility) */}
+                              {/* Horizontal bus bar - positioned at y=250 */}
                               <line
                                 x1={Math.max(150, serviceX - (totalElements * 70))}
                                 y1={250}
                                 x2={Math.min(650, serviceX + (totalElements * 70))}
                                 y2={250}
                                 stroke="#1F2937"
-                                strokeWidth="6"
+                                strokeWidth="5"
                                 strokeLinecap="round"
                                 filter="url(#shadow)"
                               />
@@ -1805,12 +1805,12 @@ export const OneLineDiagram: React.FC<OneLineDiagramProps> = ({ project, updateP
                                   {panel.name}
                                 </text>
 
-                                {/* Connection Line - Enhanced (from bus bar to panel - extended longer) */}
+                                {/* Connection Line - Enhanced (from bus bar to panel) */}
                                 <line 
                                     x1={xPos} 
                                     y1={250} 
                                     x2={xPos} 
-                                    y2={400} 
+                                    y2={320} 
                                     stroke="#4B5563" 
                                     strokeWidth="2.5" 
                                     strokeLinecap="round"
@@ -1842,18 +1842,7 @@ export const OneLineDiagram: React.FC<OneLineDiagramProps> = ({ project, updateP
                                   P
                                 </text>
 
-                                {/* Panel Info - Below Box - Enhanced with background to mask riser line */}
-                                <rect
-                                  x={xPos - 55}
-                                  y={360}
-                                  width="110"
-                                  height="40"
-                                  fill="white"
-                                  fillOpacity="0.95"
-                                  rx="3"
-                                  stroke="#E5E7EB"
-                                  strokeWidth="1"
-                                />
+                                {/* Panel Info - Below Box - Enhanced */}
                                 <text x={xPos} y={365} textAnchor="middle" className="text-[10px] font-semibold fill-gray-700">
                                   {panel.voltage}V {panel.phase}Φ • {panel.bus_rating}A
                                 </text>
@@ -1864,7 +1853,7 @@ export const OneLineDiagram: React.FC<OneLineDiagramProps> = ({ project, updateP
                                   {panelCircuits.length} ckt • {(panelCircuits.reduce((sum, c) => sum + (c.load_watts || 0), 0) / 1000).toFixed(1)}kVA
                                 </text>
                                 {panel.location && (
-                                  <text x={xPos} y={395} textAnchor="middle" className="text-[7px] fill-gray-400 italic">
+                                  <text x={xPos} y={393} textAnchor="middle" className="text-[7px] fill-gray-400 italic">
                                     {panel.location}
                                   </text>
                                 )}
@@ -1886,12 +1875,21 @@ export const OneLineDiagram: React.FC<OneLineDiagramProps> = ({ project, updateP
 
                                   return (
                                     <g key={`panel-down-${downPanel.id}`}>
-                                      {/* Panel Label - Above Box */}
+                                      {/* Panel Label - Above Box (with background to mask riser line) */}
+                                      <rect
+                                        x={downPanelX - 30}
+                                        y={downPanelY - 18}
+                                        width="60"
+                                        height="12"
+                                        fill="white"
+                                        fillOpacity="0.95"
+                                        rx="2"
+                                        stroke="#E5E7EB"
+                                        strokeWidth="1"
+                                      />
                                       <text x={downPanelX} y={downPanelY - 12} textAnchor="middle" className="text-xs font-bold fill-gray-900">
                                         {downPanel.name}
                                       </text>
-
-                                      {/* ❌ REMOVED: Diagonal connection line (now handled by bus bar above) */}
 
                                       {/* Panel Box */}
                                       <rect
@@ -1908,18 +1906,7 @@ export const OneLineDiagram: React.FC<OneLineDiagramProps> = ({ project, updateP
                                         P
                                       </text>
 
-                                      {/* Panel Info - with background to mask riser line */}
-                                      <rect
-                                        x={downPanelX - 50}
-                                        y={downPanelY + 38}
-                                        width="100"
-                                        height="30"
-                                        fill="white"
-                                        fillOpacity="0.95"
-                                        rx="3"
-                                        stroke="#E5E7EB"
-                                        strokeWidth="1"
-                                      />
+                                      {/* Panel Info */}
                                       <text x={downPanelX} y={downPanelY + 43} textAnchor="middle" className="text-[9px] fill-gray-600">
                                         {downPanel.voltage}V {downPanel.phase}Φ • {downPanel.bus_rating}A
                                       </text>
@@ -1982,18 +1969,7 @@ export const OneLineDiagram: React.FC<OneLineDiagramProps> = ({ project, updateP
                                         XFMR
                                       </text>
 
-                                      {/* Transformer Info - Enhanced with background to mask riser line */}
-                                      <rect
-                                        x={downXfmrX - 50}
-                                        y={downXfmrY + 45}
-                                        width="100"
-                                        height="20"
-                                        fill="white"
-                                        fillOpacity="0.95"
-                                        rx="3"
-                                        stroke="#E5E7EB"
-                                        strokeWidth="1"
-                                      />
+                                      {/* Transformer Info - Enhanced */}
                                       <text x={downXfmrX} y={downXfmrY + 50} textAnchor="middle" className="text-[10px] font-semibold fill-orange-800">
                                         {downXfmr.kva_rating} kVA
                                       </text>
@@ -2017,7 +1993,18 @@ export const OneLineDiagram: React.FC<OneLineDiagramProps> = ({ project, updateP
 
                                         return (
                                           <g key={`panel-tf-${tfPanel.id}`}>
-                                            {/* Panel Label */}
+                                            {/* Panel Label (with background to mask riser line) */}
+                                            <rect
+                                              x={tfPanelX - 30}
+                                              y={tfPanelY - 18}
+                                              width="60"
+                                              height="12"
+                                              fill="white"
+                                              fillOpacity="0.95"
+                                              rx="2"
+                                              stroke="#E5E7EB"
+                                              strokeWidth="1"
+                                            />
                                             <text x={tfPanelX} y={tfPanelY - 12} textAnchor="middle" className="text-xs font-bold fill-gray-900">
                                               {tfPanel.name}
                                             </text>
@@ -2050,18 +2037,7 @@ export const OneLineDiagram: React.FC<OneLineDiagramProps> = ({ project, updateP
                                               P
                                             </text>
 
-                                            {/* Panel Info - Enhanced with background to mask riser line */}
-                                            <rect
-                                              x={tfPanelX - 50}
-                                              y={tfPanelY + 40}
-                                              width="100"
-                                              height="30"
-                                              fill="white"
-                                              fillOpacity="0.95"
-                                              rx="3"
-                                              stroke="#E5E7EB"
-                                              strokeWidth="1"
-                                            />
+                                            {/* Panel Info - Enhanced */}
                                             <text x={tfPanelX} y={tfPanelY + 45} textAnchor="middle" className="text-[10px] font-semibold fill-gray-700">
                                               {tfPanel.voltage}V {tfPanel.phase}Φ • {tfPanel.bus_rating}A
                                             </text>
@@ -2113,8 +2089,8 @@ export const OneLineDiagram: React.FC<OneLineDiagramProps> = ({ project, updateP
                                   {xfmr.name}
                                 </text>
 
-                                {/* Line from bus to transformer - Enhanced (extended longer) */}
-                                <line x1={xPos} y1={250} x2={xPos} y2={400} stroke="#4B5563" strokeWidth="2.5" strokeLinecap="round" />
+                                {/* Line from bus to transformer - Enhanced */}
+                                <line x1={xPos} y1={250} x2={xPos} y2={320} stroke="#4B5563" strokeWidth="2.5" strokeLinecap="round" />
 
                                 {/* Transformer Box - Enhanced */}
                                 <rect
@@ -2142,18 +2118,7 @@ export const OneLineDiagram: React.FC<OneLineDiagramProps> = ({ project, updateP
                                   XFMR
                                 </text>
 
-                                {/* Transformer Info - Enhanced with background to mask riser line */}
-                                <rect
-                                  x={xPos - 50}
-                                  y={365}
-                                  width="100"
-                                  height="20"
-                                  fill="white"
-                                  fillOpacity="0.95"
-                                  rx="3"
-                                  stroke="#E5E7EB"
-                                  strokeWidth="1"
-                                />
+                                {/* Transformer Info - Enhanced */}
                                 <text x={xPos} y={370} textAnchor="middle" className="text-[10px] font-semibold fill-orange-800">
                                   {xfmr.kva_rating} kVA
                                 </text>
@@ -2199,18 +2164,7 @@ export const OneLineDiagram: React.FC<OneLineDiagramProps> = ({ project, updateP
                                         P
                                       </text>
 
-                                      {/* Panel Info - Below Box with background to mask riser line */}
-                                      <rect
-                                        x={panelX - 50}
-                                        y={panelY + 38}
-                                        width="100"
-                                        height="30"
-                                        fill="white"
-                                        fillOpacity="0.95"
-                                        rx="3"
-                                        stroke="#E5E7EB"
-                                        strokeWidth="1"
-                                      />
+                                      {/* Panel Info - Below Box */}
                                       <text x={panelX} y={panelY + 43} textAnchor="middle" className="text-[9px] fill-gray-600">
                                         {panel.voltage}V {panel.phase}Φ • {panel.bus_rating}A
                                       </text>
@@ -2234,6 +2188,33 @@ export const OneLineDiagram: React.FC<OneLineDiagramProps> = ({ project, updateP
                         <text x={400} y={300} textAnchor="middle" className="text-sm fill-gray-400">
                           Add panels using the form on the left to see them here
                         </text>
+                      )}
+
+                      {/* Bus from MDP - Render AFTER all panels/transformers so it appears on top */}
+                      {mainPanel && totalElements > 0 && (
+                        <>
+                          {/* Vertical feeder line from MDP to bus bar */}
+                          <line 
+                            x1={serviceX} 
+                            y1={215} 
+                            x2={serviceX} 
+                            y2={250} 
+                            stroke="#1F2937" 
+                            strokeWidth="4" 
+                            strokeLinecap="round"
+                          />
+                          {/* Horizontal bus bar - positioned at y=250 (thicker for visibility, rendered on top) */}
+                          <line
+                            x1={Math.max(150, serviceX - (totalElements * 70))}
+                            y1={250}
+                            x2={Math.min(650, serviceX + (totalElements * 70))}
+                            y2={250}
+                            stroke="#1F2937"
+                            strokeWidth="6"
+                            strokeLinecap="round"
+                            filter="url(#shadow)"
+                          />
+                        </>
                       )}
                     </>
                   );
