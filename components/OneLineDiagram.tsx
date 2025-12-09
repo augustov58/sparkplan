@@ -1842,7 +1842,18 @@ export const OneLineDiagram: React.FC<OneLineDiagramProps> = ({ project, updateP
                                   P
                                 </text>
 
-                                {/* Panel Info - Below Box - Enhanced */}
+                                {/* Panel Info - Below Box - Enhanced with background to mask riser line */}
+                                <rect
+                                  x={xPos - 55}
+                                  y={360}
+                                  width="110"
+                                  height="40"
+                                  fill="white"
+                                  fillOpacity="0.95"
+                                  rx="3"
+                                  stroke="#E5E7EB"
+                                  strokeWidth="1"
+                                />
                                 <text x={xPos} y={365} textAnchor="middle" className="text-[10px] font-semibold fill-gray-700">
                                   {panel.voltage}V {panel.phase}Φ • {panel.bus_rating}A
                                 </text>
@@ -1853,7 +1864,7 @@ export const OneLineDiagram: React.FC<OneLineDiagramProps> = ({ project, updateP
                                   {panelCircuits.length} ckt • {(panelCircuits.reduce((sum, c) => sum + (c.load_watts || 0), 0) / 1000).toFixed(1)}kVA
                                 </text>
                                 {panel.location && (
-                                  <text x={xPos} y={393} textAnchor="middle" className="text-[7px] fill-gray-400 italic">
+                                  <text x={xPos} y={395} textAnchor="middle" className="text-[7px] fill-gray-400 italic">
                                     {panel.location}
                                   </text>
                                 )}
