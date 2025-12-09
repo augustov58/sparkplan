@@ -920,8 +920,11 @@ export const OneLineDiagram: React.FC<OneLineDiagramProps> = ({ project, updateP
         </>
       );
     } else if (downstreamElements.length === 1) {
-      // Direct vertical line (no bus needed)
+      // Direct vertical line (no bus needed) - only render if element exists and is valid
       const element = downstreamElements[0];
+      if (!element || element.x === undefined || element.topY === undefined || isNaN(element.x) || isNaN(element.topY)) {
+        return null;
+      }
       return (
         <line
           x1={parentX}
