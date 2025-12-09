@@ -43,9 +43,17 @@
 - Provides load scheduling for peak/off-peak hours
 - Educational information about EVEMS
 
+**📊 EVEMS System Architecture Diagram (Added):**
+- Created `components/EVEMSDiagram.tsx` - SVG-based visual diagram
+- Shows Main Panel → EVEMS Controller → Meter Stack → EV Chargers
+- Dynamic updates based on service size, number of chargers, and load
+- Load monitoring indicator when EVEMS is enabled
+- Visual status indicators and legend
+- Integrated into EVEMS calculator at top of interface
+
 **Testing Done**:
 - [x] Lint passes (no errors)
-- [x] Build passes (5.94s)
+- [x] Build passes (6.30s)
 - [x] TypeScript compilation successful
 
 ---
