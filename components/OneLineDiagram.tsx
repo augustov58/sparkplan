@@ -1906,7 +1906,18 @@ export const OneLineDiagram: React.FC<OneLineDiagramProps> = ({ project, updateP
                                         P
                                       </text>
 
-                                      {/* Panel Info */}
+                                      {/* Panel Info - with background to mask riser line */}
+                                      <rect
+                                        x={downPanelX - 50}
+                                        y={downPanelY + 38}
+                                        width="100"
+                                        height="30"
+                                        fill="white"
+                                        fillOpacity="0.95"
+                                        rx="3"
+                                        stroke="#E5E7EB"
+                                        strokeWidth="1"
+                                      />
                                       <text x={downPanelX} y={downPanelY + 43} textAnchor="middle" className="text-[9px] fill-gray-600">
                                         {downPanel.voltage}V {downPanel.phase}Φ • {downPanel.bus_rating}A
                                       </text>
@@ -2186,7 +2197,18 @@ export const OneLineDiagram: React.FC<OneLineDiagramProps> = ({ project, updateP
                                         P
                                       </text>
 
-                                      {/* Panel Info - Below Box */}
+                                      {/* Panel Info - Below Box with background to mask riser line */}
+                                      <rect
+                                        x={panelX - 50}
+                                        y={panelY + 38}
+                                        width="100"
+                                        height="30"
+                                        fill="white"
+                                        fillOpacity="0.95"
+                                        rx="3"
+                                        stroke="#E5E7EB"
+                                        strokeWidth="1"
+                                      />
                                       <text x={panelX} y={panelY + 43} textAnchor="middle" className="text-[9px] fill-gray-600">
                                         {panel.voltage}V {panel.phase}Φ • {panel.bus_rating}A
                                       </text>
