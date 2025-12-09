@@ -1936,7 +1936,18 @@ export const OneLineDiagram: React.FC<OneLineDiagramProps> = ({ project, updateP
 
                                   return (
                                     <g key={`xfmr-down-${downXfmr.id}`}>
-                                      {/* Transformer Label */}
+                                      {/* Transformer Label (with background to mask riser line) */}
+                                      <rect
+                                        x={downXfmrX - 40}
+                                        y={downXfmrY - 18}
+                                        width="80"
+                                        height="12"
+                                        fill="white"
+                                        fillOpacity="0.95"
+                                        rx="2"
+                                        stroke="#E5E7EB"
+                                        strokeWidth="1"
+                                      />
                                       <text x={downXfmrX} y={downXfmrY - 12} textAnchor="middle" className="text-xs font-bold fill-gray-900">
                                         {downXfmr.name}
                                       </text>
@@ -2037,7 +2048,18 @@ export const OneLineDiagram: React.FC<OneLineDiagramProps> = ({ project, updateP
                                               P
                                             </text>
 
-                                            {/* Panel Info - Enhanced */}
+                                            {/* Panel Info - Enhanced with background to mask riser line */}
+                                            <rect
+                                              x={tfPanelX - 50}
+                                              y={tfPanelY + 40}
+                                              width="100"
+                                              height="30"
+                                              fill="white"
+                                              fillOpacity="0.95"
+                                              rx="3"
+                                              stroke="#E5E7EB"
+                                              strokeWidth="1"
+                                            />
                                             <text x={tfPanelX} y={tfPanelY + 45} textAnchor="middle" className="text-[10px] font-semibold fill-gray-700">
                                               {tfPanel.voltage}V {tfPanel.phase}Φ • {tfPanel.bus_rating}A
                                             </text>
