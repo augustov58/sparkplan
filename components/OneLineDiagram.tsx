@@ -951,11 +951,12 @@ export const OneLineDiagram: React.FC<OneLineDiagramProps> = ({ project, updateP
   };
 
   // Helper function to render draggable branch grip
-  const renderBranchGrip = (panelId: string, x: number, y: number, hasDownstream: boolean) => {
+  const renderBranchGrip = (panelId: string, panelRightX: number, panelY: number, hasDownstream: boolean) => {
     if (!hasDownstream) return null;
     
     const offset = branchOffsets.get(panelId) || 0;
-    const gripX = x + offset;
+    // Grip should be at panel's right edge + small offset (x is panel left edge, panel width is 50, so right edge is x + 50)
+    const gripX = panelRightX + 8; // 8px to the right of panel edge
     const isDragging = draggingBranch === panelId;
     
     return (
@@ -966,8 +967,6 @@ export const OneLineDiagram: React.FC<OneLineDiagramProps> = ({ project, updateP
           e.stopPropagation();
           setDraggingBranch(panelId);
           if (diagramRef.current) {
-            const svg = diagramRef.current;
-            const svgRect = svg.getBoundingClientRect();
             setDragStartX(e.clientX);
             setDragStartOffset(offset);
           }
@@ -976,10 +975,10 @@ export const OneLineDiagram: React.FC<OneLineDiagramProps> = ({ project, updateP
         {/* Visual feedback line when dragging */}
         {isDragging && (
           <line
-            x1={gripX + 35}
-            y1={y - 10}
-            x2={gripX + 35}
-            y2={y + 50}
+            x1={gripX}
+            y1={panelY - 10}
+            x2={gripX}
+            y2={panelY + 50}
             stroke="#3B82F6"
             strokeWidth="2"
             strokeDasharray="4,4"
@@ -988,17 +987,17 @@ export const OneLineDiagram: React.FC<OneLineDiagramProps> = ({ project, updateP
         )}
         
         {/* Grip Icon - 6 dots in a vertical line */}
-        <circle cx={gripX + 35} cy={y + 10} r="2.5" fill={isDragging ? "#3B82F6" : "#9CA3AF"} opacity={isDragging ? 1 : 0.6} />
-        <circle cx={gripX + 35} cy={y + 15} r="2.5" fill={isDragging ? "#3B82F6" : "#9CA3AF"} opacity={isDragging ? 1 : 0.6} />
-        <circle cx={gripX + 35} cy={y + 20} r="2.5" fill={isDragging ? "#3B82F6" : "#9CA3AF"} opacity={isDragging ? 1 : 0.6} />
-        <circle cx={gripX + 35} cy={y + 25} r="2.5" fill={isDragging ? "#3B82F6" : "#9CA3AF"} opacity={isDragging ? 1 : 0.6} />
-        <circle cx={gripX + 35} cy={y + 30} r="2.5" fill={isDragging ? "#3B82F6" : "#9CA3AF"} opacity={isDragging ? 1 : 0.6} />
-        <circle cx={gripX + 35} cy={y + 35} r="2.5" fill={isDragging ? "#3B82F6" : "#9CA3AF"} opacity={isDragging ? 1 : 0.6} />
+        <circle cx={gripX} cy={panelY + 10} r="2.5" fill={isDragging ? "#3B82F6" : "#9CA3AF"} opacity={isDragging ? 1 : 0.6} />
+        <circle cx={gripX} cy={panelY + 15} r="2.5" fill={isDragging ? "#3B82F6" : "#9CA3AF"} opacity={isDragging ? 1 : 0.6} />
+        <circle cx={gripX} cy={panelY + 20} r="2.5" fill={isDragging ? "#3B82F6" : "#9CA3AF"} opacity={isDragging ? 1 : 0.6} />
+        <circle cx={gripX} cy={panelY + 25} r="2.5" fill={isDragging ? "#3B82F6" : "#9CA3AF"} opacity={isDragging ? 1 : 0.6} />
+        <circle cx={gripX} cy={panelY + 30} r="2.5" fill={isDragging ? "#3B82F6" : "#9CA3AF"} opacity={isDragging ? 1 : 0.6} />
+        <circle cx={gripX} cy={panelY + 35} r="2.5" fill={isDragging ? "#3B82F6" : "#9CA3AF"} opacity={isDragging ? 1 : 0.6} />
         
         {/* Invisible larger hit area for easier clicking */}
         <rect
-          x={gripX + 25}
-          y={y + 5}
+          x={gripX - 10}
+          y={panelY + 5}
           width="20"
           height="40"
           fill="transparent"
@@ -1831,7 +1830,12 @@ export const OneLineDiagram: React.FC<OneLineDiagramProps> = ({ project, updateP
                           {panelsFedFromMain.map((panel, index) => {
                             const spacing = 140;
                             const startX = serviceX - ((totalElements - 1) * spacing / 2);
-                            const xPos = startX + (index * spacing);
+                            const baseXPos = startX + (index * spacing);
+                            
+                            // ✅ Apply manual branch offset
+                            const branchOffset = getBranchOffset(panel.id);
+                            const xPos = baseXPos + branchOffset;
+                            
                             const panelCircuits = circuits.filter(c => c.panel_id === panel.id);
 
                             // ✅ NEW: Get downstream elements for this panel
@@ -1845,19 +1849,23 @@ export const OneLineDiagram: React.FC<OneLineDiagramProps> = ({ project, updateP
                             // ✅ NEW: Build downstream position array for bus bar rendering
                             const downstreamPositions: { x: number; topY: number }[] = [];
 
-                            // Panels come first
-                            downstreamPanelsFed.forEach((_, downIndex) => {
+                            // Panels come first - apply offsets
+                            downstreamPanelsFed.forEach((downPanel, downIndex) => {
+                              const baseX = xPos + (downIndex - (totalDownstream - 1) / 2) * DIAGRAM_CONSTANTS.LEVEL2_SPACING;
+                              const panelOffset = getBranchOffset(downPanel.id);
                               downstreamPositions.push({
-                                x: xPos + (downIndex - (totalDownstream - 1) / 2) * DIAGRAM_CONSTANTS.LEVEL2_SPACING,
+                                x: baseX + panelOffset,
                                 topY: DIAGRAM_CONSTANTS.LEVEL2_PANEL_Y
                               });
                             });
 
-                            // Transformers come after
-                            downstreamTransformersFed.forEach((_, downIndex) => {
+                            // Transformers come after - apply offsets
+                            downstreamTransformersFed.forEach((downXfmr, downIndex) => {
                               const transformerIndex = downstreamPanelsFed.length + downIndex;
+                              const baseX = xPos + (transformerIndex - (totalDownstream - 1) / 2) * DIAGRAM_CONSTANTS.LEVEL2_SPACING;
+                              // Transformers don't have their own offsets, they move with parent
                               downstreamPositions.push({
-                                x: xPos + (transformerIndex - (totalDownstream - 1) / 2) * DIAGRAM_CONSTANTS.LEVEL2_SPACING,
+                                x: baseX,
                                 topY: DIAGRAM_CONSTANTS.LEVEL2_PANEL_Y
                               });
                             });
@@ -1911,8 +1919,8 @@ export const OneLineDiagram: React.FC<OneLineDiagramProps> = ({ project, updateP
                                   "#4B5563"
                                 )}
 
-                                {/* ✅ NEW: Render draggable branch grip */}
-                                {renderBranchGrip(panel.id, xPos - 25, 320, totalDownstream > 0)}
+                                {/* ✅ NEW: Render draggable branch grip - positioned at panel right edge */}
+                                {renderBranchGrip(panel.id, xPos + 25, 320, totalDownstream > 0)}
 
                                 {/* ✅ NEW: Render downstream panels fed from this panel */}
                                 {downstreamPanelsFed.map((downPanel, downIndex) => {
@@ -1967,8 +1975,8 @@ export const OneLineDiagram: React.FC<OneLineDiagramProps> = ({ project, updateP
                                         {downPanelCircuits.length} ckt • {(downPanelCircuits.reduce((sum, c) => sum + (c.load_watts || 0), 0) / 1000).toFixed(1)}kVA
                                       </text>
                                       
-                                      {/* ✅ Render grip for nested branches */}
-                                      {renderBranchGrip(downPanel.id, downPanelX - 25, downPanelY, hasDownPanelDownstream)}
+                                      {/* ✅ Render grip for nested branches - positioned at panel right edge */}
+                                      {renderBranchGrip(downPanel.id, downPanelX + 25, downPanelY, hasDownPanelDownstream)}
                                     </g>
                                   );
                                 })}
