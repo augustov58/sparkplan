@@ -6,16 +6,16 @@
  */
 
 import React, { useState, useEffect, useMemo } from 'react';
-import { 
-  Home, 
-  Zap, 
-  Flame, 
-  Droplets, 
-  Wind, 
-  Car, 
-  Waves, 
-  Plus, 
-  Trash2, 
+import {
+  Home,
+  Zap,
+  Flame,
+  Droplets,
+  Wind,
+  Car,
+  Waves,
+  Plus,
+  Trash2,
   Calculator,
   ChevronDown,
   ChevronUp,
@@ -24,7 +24,8 @@ import {
   CheckCircle,
   Download,
   RefreshCw,
-  Users
+  Users,
+  Cable
 } from 'lucide-react';
 import { 
   Project, 
@@ -308,7 +309,8 @@ export const DwellingLoadCalculator: React.FC<DwellingLoadCalculatorProps> = ({
       // Create new circuits
       for (let i = 0; i < generatedCircuits.length; i++) {
         const circuit = generatedCircuits[i];
-        
+        if (!circuit) continue; // Skip if undefined
+
         // Calculate conductor size based on breaker amps (NEC Table 310.16)
         const getConductorSize = (amps: number): string => {
           if (amps <= 15) return '14 AWG';
@@ -320,7 +322,7 @@ export const DwellingLoadCalculator: React.FC<DwellingLoadCalculatorProps> = ({
           if (amps <= 100) return '3 AWG';
           return '1 AWG';
         };
-        
+
         await createCircuit({
           project_id: project.id,
           panel_id: mainPanel.id,
@@ -943,6 +945,47 @@ export const DwellingLoadCalculator: React.FC<DwellingLoadCalculatorProps> = ({
                     <span className="text-2xl font-bold">{loadResult.recommendedServiceSize}A</span>
                   </div>
                 </div>
+              </div>
+            </div>
+          )}
+
+          {/* Conductor Sizing */}
+          {loadResult && (
+            <div className="bg-gradient-to-br from-blue-600 to-blue-700 text-white rounded-lg p-6 shadow-lg">
+              <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+                <Cable className="w-5 h-5" />
+                Recommended Conductor Sizes
+              </h3>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="bg-blue-500/20 rounded-lg p-4 border border-blue-400/30">
+                  <div className="text-xs text-blue-100 mb-1">Service Conductors</div>
+                  <div className="text-2xl font-bold">{loadResult.serviceConductorSize} Cu</div>
+                  <div className="text-xs text-blue-200 mt-2">Ungrounded (hot)</div>
+                  <div className="text-xs text-blue-200">Per NEC Table 310.12</div>
+                </div>
+                <div className="bg-blue-500/20 rounded-lg p-4 border border-blue-400/30">
+                  <div className="text-xs text-blue-100 mb-1">Neutral Conductor</div>
+                  <div className="text-2xl font-bold">{loadResult.neutralConductorSize} Cu</div>
+                  <div className="text-xs text-blue-200 mt-2">{loadResult.neutralAmps}A demand</div>
+                  <div className="text-xs text-blue-200">
+                    {loadResult.neutralReduction > 0
+                      ? `(${loadResult.neutralReduction}% reduction applied)`
+                      : 'No reduction'}
+                  </div>
+                </div>
+                <div className="bg-blue-500/20 rounded-lg p-4 border border-blue-400/30">
+                  <div className="text-xs text-blue-100 mb-1">Grounding Electrode</div>
+                  <div className="text-2xl font-bold">{loadResult.gecSize} Cu</div>
+                  <div className="text-xs text-blue-200 mt-2">GEC to electrode</div>
+                  <div className="text-xs text-blue-200">Per NEC 250.66</div>
+                </div>
+              </div>
+              <div className="mt-4 text-xs text-blue-100 bg-blue-900/20 rounded-md p-3">
+                <p className="flex items-start gap-2">
+                  <AlertTriangle className="w-4 h-4 mt-0.5 flex-shrink-0" />
+                  <span>Conductor sizes assume copper (Cu), 75°C terminations, and standard installation conditions.
+                  For aluminum, underground, or special conditions, use the Conductor Sizing Tool for detailed calculations.</span>
+                </p>
               </div>
             </div>
           )}

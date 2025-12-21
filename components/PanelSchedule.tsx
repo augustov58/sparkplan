@@ -49,12 +49,13 @@ export const PanelSchedule: React.FC<PanelScheduleProps> = ({ project }) => {
     breakerAmps?: number;
     loadWatts?: number;
     loadType?: LoadTypeCode;
+    circuitNumber?: number;
   }>({});
   const [showDemandDetails, setShowDemandDetails] = useState(true);
 
   // Select first panel by default
   React.useEffect(() => {
-    if (panels.length > 0 && !selectedPanelId) {
+    if (panels.length > 0 && !selectedPanelId && panels[0]) {
       setSelectedPanelId(panels[0].id);
     }
   }, [panels, selectedPanelId]);
@@ -201,8 +202,12 @@ export const PanelSchedule: React.FC<PanelScheduleProps> = ({ project }) => {
     return calculateAggregatedLoad(selectedPanel.id, panels, circuits, transformers, occupancy);
   }, [selectedPanel, panels, circuits, transformers, project.settings?.occupancyType]);
 
-  // Generate slots based on panel bus rating
-  const totalSlots = selectedPanel ? Math.min(42, Math.ceil(selectedPanel.bus_rating / 10)) : 42;
+  // Generate slots based on panel type (industry standard)
+  // MDP/Main Distribution Panels: typically 24-30 poles
+  // Branch Panels: typically 42 poles
+  const totalSlots = selectedPanel
+    ? (selectedPanel.is_main ? 30 : 42)  // MDP = 30 poles, Branch panels = 42 poles
+    : 42;
 
   // Helper to find circuit at specific slot number
   const getCircuit = (num: number) => panelCircuits.find(c => c.circuit_number === num);
@@ -223,6 +228,7 @@ export const PanelSchedule: React.FC<PanelScheduleProps> = ({ project }) => {
       breakerAmps: circuit.breaker_amps,
       loadWatts: circuit.load_watts,
       loadType: circuit.load_type || 'O',
+      circuitNumber: circuit.circuit_number,
     });
   };
 
@@ -233,6 +239,7 @@ export const PanelSchedule: React.FC<PanelScheduleProps> = ({ project }) => {
       breaker_amps: editForm.breakerAmps,
       load_watts: editForm.loadWatts,
       load_type: editForm.loadType,
+      circuit_number: editForm.circuitNumber,
     });
     setEditingCircuit(null);
     setEditForm({});
@@ -513,8 +520,18 @@ export const PanelSchedule: React.FC<PanelScheduleProps> = ({ project }) => {
     return (
       <tr key={rowNum} className="border-b border-gray-100 hover:bg-gray-50/50">
         {/* Left Circuit Number */}
-        <td className="p-1 w-8 text-center text-xs font-mono text-gray-500 bg-gray-50 border-r border-gray-200">{leftNum}</td>
-        
+        <td className="p-1 w-8 text-center text-xs font-mono text-gray-500 bg-gray-50 border-r border-gray-200">
+          {leftCkt && isEditing(leftCkt) ? (
+            <input
+              type="number"
+              value={editForm.circuitNumber || ''}
+              onChange={e => setEditForm({...editForm, circuitNumber: Number(e.target.value)})}
+              className="w-full text-xs border border-electric-300 rounded px-1 py-0.5 text-center"
+              min="1"
+            />
+          ) : leftNum}
+        </td>
+
         {/* Left Circuit Data */}
         {renderLeftCircuit()}
         
@@ -541,9 +558,19 @@ export const PanelSchedule: React.FC<PanelScheduleProps> = ({ project }) => {
         
         {/* Right Circuit Data */}
         {renderRightCircuit()}
-        
+
         {/* Right Circuit Number */}
-        <td className="p-1 w-8 text-center text-xs font-mono text-gray-500 bg-gray-50 border-l border-gray-200">{rightNum}</td>
+        <td className="p-1 w-8 text-center text-xs font-mono text-gray-500 bg-gray-50 border-l border-gray-200">
+          {rightCkt && isEditing(rightCkt) ? (
+            <input
+              type="number"
+              value={editForm.circuitNumber || ''}
+              onChange={e => setEditForm({...editForm, circuitNumber: Number(e.target.value)})}
+              className="w-full text-xs border border-electric-300 rounded px-1 py-0.5 text-center"
+              min="1"
+            />
+          ) : rightNum}
+        </td>
       </tr>
     );
   };

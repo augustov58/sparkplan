@@ -313,9 +313,10 @@ function calculateMaxChargers(
   withEVEMS: boolean
 ): number {
   if (chargerSpecs.length === 0) return 0;
-  
+
   // Use the first charger spec as reference (simplified)
   const refCharger = chargerSpecs[0];
+  if (!refCharger) return 0;
   const singleChargerVA = refCharger.phase === 1
     ? refCharger.voltage * refCharger.chargerAmps
     : Math.sqrt(3) * refCharger.voltage * refCharger.chargerAmps;

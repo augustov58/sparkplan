@@ -219,6 +219,7 @@ export const EVEMSLoadManagement: React.FC = () => {
                       onChange={e => {
                         const level = e.target.value as EVChargerLevel;
                         const specs = EV_CHARGER_SPECS[level][0];
+                        if (!specs) return;
                         updateCharger(charger.id, {
                           level,
                           voltage: specs.voltage,

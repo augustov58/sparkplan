@@ -122,7 +122,7 @@ export function sizeBreaker(
 
     if (conductorSize in smallConductorLimits) {
       const maxBreaker = smallConductorLimits[conductorSize];
-      if (breakerSize > maxBreaker) {
+      if (maxBreaker && breakerSize > maxBreaker) {
         isCompatible = false;
         warnings.push(`⚠️ CRITICAL: ${conductorSize} limited to ${maxBreaker}A breaker per NEC 240.4(D).`);
         necReferences.push(`NEC 240.4(D) - ${conductorSize} maximum overcurrent protection`);

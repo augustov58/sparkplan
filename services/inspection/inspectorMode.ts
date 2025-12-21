@@ -326,7 +326,7 @@ function checkConductorProtection(circuit: Circuit, panelName: string): Inspecti
   
   if (limitKey) {
     const limit = CONDUCTOR_PROTECTION_LIMITS[limitKey];
-    if (breakerAmps > limit.maxAmps) {
+    if (limit && breakerAmps > limit.maxAmps) {
       return {
         id: generateId(),
         category: 'conductor',

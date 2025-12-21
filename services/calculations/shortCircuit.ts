@@ -98,10 +98,17 @@ export function calculateDownstreamFaultCurrent(
   const { length, conductorSize, material, conduitType, voltage, phase } = conductorRun;
 
   // Get conductor impedance data from NEC Chapter 9 Table 9
-  const conductorData = getConductorImpedance(conductorSize, material, conduitType);
+  // Note: Table 9 only has PVC data, so we'll use PVC as baseline
+  // and adjust for steel conduit magnetic effects if needed
+  let conductorData = getConductorImpedance(conductorSize, material, conduitType);
+
+  // Fallback to PVC if Steel/Aluminum not in table
+  if (!conductorData && (conduitType === 'Steel' || conduitType === 'Aluminum')) {
+    conductorData = getConductorImpedance(conductorSize, material, 'PVC');
+  }
 
   if (!conductorData) {
-    throw new Error(`Conductor ${conductorSize} ${material} in ${conduitType} conduit not found in NEC Table 9`);
+    throw new Error(`Conductor ${conductorSize} ${material} not found in NEC Table 9`);
   }
 
   // Calculate source impedance (ohms)
@@ -112,22 +119,29 @@ export function calculateDownstreamFaultCurrent(
 
   // Calculate conductor impedance (ohms)
   // For AC circuits, use impedance from NEC Chapter 9 Table 9
-  // Z = √(R² + X²) for steel conduit
-  // Simplified: For typical power factor and conductor runs < 100ft, use resistance
+  // Z = √(R² + X²)
 
   const resistanceOhmsPerFoot = conductorData.resistanceOhmsPerKFt / 1000;
   const conductorResistance = resistanceOhmsPerFoot * length;
 
-  // For steel conduit, add reactance (typical X/R ratio ≈ 1.5 for smaller conductors)
-  const reactance = conduitType === 'Steel' ? conductorResistance * 0.05 : 0; // Simplified reactance
+  // Calculate reactance based on conduit type
+  // Steel conduit has higher reactance due to magnetic effects
+  const reactanceOhmsPerFoot = conductorData.reactanceXLOhmsPerKFt / 1000;
+  let conductorReactance = reactanceOhmsPerFoot * length;
+
+  // For steel conduit, increase reactance by ~50% due to magnetic effects
+  if (conduitType === 'Steel') {
+    conductorReactance *= 1.5;
+  }
+
   const conductorImpedance = Math.sqrt(
-    conductorResistance ** 2 + reactance ** 2
+    conductorResistance ** 2 + conductorReactance ** 2
   );
 
   // Adjust for phase configuration
-  // Single-phase: Impedance of both conductors (hot + neutral)
-  // Three-phase: Impedance multiplier for line-to-line fault
-  const phaseMultiplier = phase === 1 ? 2 : 1.732; // √3 for 3-phase
+  // Single-phase: 2× impedance (out-and-back through hot + neutral)
+  // Three-phase: 1× impedance (per-phase impedance for bolted 3φ fault)
+  const phaseMultiplier = phase === 1 ? 2 : 1;
   const totalConductorImpedance = conductorImpedance * phaseMultiplier;
 
   // Total impedance
@@ -148,11 +162,11 @@ export function calculateDownstreamFaultCurrent(
 
   // NEC 110.9 compliance check
   const compliance = {
-    necArticle: 'NEC 110.9',
+    necArticle: 'NEC 110.9 - Interrupting Rating',
     compliant: requiredAIC <= 200, // Maximum commonly available
     message: requiredAIC <= 200
-      ? `Equipment must have minimum ${requiredAIC} kA AIC rating`
-      : `Fault current exceeds 200kA - requires special consideration or current limiting devices`
+      ? `Equipment interrupting rating shall be sufficient for the current available. Use ${requiredAIC} kA AIC rated breakers or higher`
+      : `Available fault current exceeds 200 kA - requires special engineering analysis or current-limiting devices`
   };
 
   return {
@@ -177,38 +191,116 @@ export function calculateDownstreamFaultCurrent(
  * - Single-phase pad-mount: 2-3%
  * - Three-phase pad-mount: 5.75% (standard)
  * - Network transformers: 5-6%
+ *
+ * If serviceConductor parameters are provided, calculates fault current at service panel
+ * accounting for conductor impedance from transformer to panel.
+ * Otherwise, calculates fault current at transformer secondary (conservative/higher value).
  */
 export function calculateServiceFaultCurrent(
   utilityTransformer: TransformerData,
   serviceVoltage: number,
-  servicePhase: 1 | 3
+  servicePhase: 1 | 3,
+  serviceConductor?: {
+    length: number;
+    conductorSize: string;
+    material: 'Cu' | 'Al';
+    conduitType: 'Steel' | 'PVC' | 'Aluminum';
+    setsInParallel?: number;
+  }
 ): ShortCircuitResult {
-  const faultCurrent = calculateTransformerFaultCurrent(utilityTransformer, servicePhase);
+  const transformerFaultCurrent = calculateTransformerFaultCurrent(utilityTransformer, servicePhase);
+
+  // If service conductor parameters provided, calculate impedance drop
+  let faultCurrentAtServicePanel = transformerFaultCurrent;
+  let conductorImpedance = 0;
+  let totalImpedance = (servicePhase === 3 ? serviceVoltage / Math.sqrt(3) : serviceVoltage) / transformerFaultCurrent;
+
+  if (serviceConductor) {
+    // Get conductor impedance data from NEC Chapter 9 Table 9
+    // Note: Table 9 only has PVC data, so we'll use PVC as baseline
+    // and adjust for steel conduit magnetic effects if needed
+    let conductorData = getConductorImpedance(
+      serviceConductor.conductorSize,
+      serviceConductor.material,
+      serviceConductor.conduitType
+    );
+
+    // Fallback to PVC if Steel/Aluminum not in table
+    if (!conductorData && (serviceConductor.conduitType === 'Steel' || serviceConductor.conduitType === 'Aluminum')) {
+      conductorData = getConductorImpedance(
+        serviceConductor.conductorSize,
+        serviceConductor.material,
+        'PVC'
+      );
+    }
+
+    if (conductorData) {
+      // Calculate source impedance at transformer secondary
+      const sourceImpedance = servicePhase === 3
+        ? (serviceVoltage / Math.sqrt(3)) / transformerFaultCurrent
+        : serviceVoltage / transformerFaultCurrent;
+
+      // Calculate conductor impedance
+      const resistanceOhmsPerFoot = conductorData.resistanceOhmsPerKFt / 1000;
+      const conductorResistance = resistanceOhmsPerFoot * serviceConductor.length;
+
+      // Calculate reactance based on conduit type
+      // Steel conduit has higher reactance due to magnetic effects
+      const reactanceOhmsPerFoot = conductorData.reactanceXLOhmsPerKFt / 1000;
+      let conductorReactance = reactanceOhmsPerFoot * serviceConductor.length;
+
+      // For steel conduit, increase reactance by ~50% due to magnetic effects
+      if (serviceConductor.conduitType === 'Steel') {
+        conductorReactance *= 1.5;
+      }
+
+      const singleConductorImpedance = Math.sqrt(
+        conductorResistance ** 2 + conductorReactance ** 2
+      );
+
+      // Adjust for phase configuration
+      // Single-phase: 2× impedance (out-and-back through hot + neutral)
+      // Three-phase: 1× impedance (per-phase impedance for bolted 3φ fault)
+      const phaseMultiplier = servicePhase === 1 ? 2 : 1;
+      let adjustedImpedance = singleConductorImpedance * phaseMultiplier;
+
+      // Parallel conductor sets reduce impedance proportionally
+      // Z_parallel = Z_single / N (where N = number of parallel sets)
+      const setsInParallel = serviceConductor.setsInParallel || 1;
+      conductorImpedance = adjustedImpedance / setsInParallel;
+
+      // Total impedance and fault current at service panel
+      totalImpedance = sourceImpedance + conductorImpedance;
+      faultCurrentAtServicePanel = servicePhase === 3
+        ? (serviceVoltage / Math.sqrt(3)) / totalImpedance
+        : serviceVoltage / totalImpedance;
+    }
+  }
 
   // Apply safety factor
   const safetyFactor = 1.25;
-  const faultCurrentWithSafety = faultCurrent * safetyFactor;
+  const faultCurrentWithSafety = faultCurrentAtServicePanel * safetyFactor;
 
   // Find required AIC
   const faultCurrentKA = faultCurrentWithSafety / 1000;
   const requiredAIC = STANDARD_AIC_RATINGS.find((rating) => rating >= faultCurrentKA) || 200;
 
   const compliance = {
-    necArticle: 'NEC 110.9',
+    necArticle: 'NEC 110.9 - Interrupting Rating',
     compliant: requiredAIC <= 200,
     message: requiredAIC <= 200
-      ? `Main service breaker must have minimum ${requiredAIC} kA AIC rating`
-      : `Fault current exceeds 200kA - consult with utility for current limiting options`
+      ? `Equipment interrupting rating shall be sufficient for the current available. Use ${requiredAIC} kA AIC rated breakers or higher (next standard tier: ${STANDARD_AIC_RATINGS.find(r => r >= requiredAIC)} kA)`
+      : `Available fault current exceeds 200 kA - requires engineering analysis and possible current-limiting devices (fuses, reactors, or utility coordination)`
   };
 
   return {
-    faultCurrent,
+    faultCurrent: faultCurrentAtServicePanel,
     requiredAIC,
     details: {
-      sourceFaultCurrent: faultCurrent,
-      conductorImpedance: 0,
-      totalImpedance: (servicePhase === 3 ? serviceVoltage / Math.sqrt(3) : serviceVoltage) / faultCurrent,
-      faultCurrentAtPoint: faultCurrent,
+      sourceFaultCurrent: transformerFaultCurrent,
+      conductorImpedance,
+      totalImpedance,
+      faultCurrentAtPoint: faultCurrentAtServicePanel,
       safetyFactor
     },
     compliance
@@ -227,7 +319,8 @@ export function calculateServiceFaultCurrent(
 export function estimateUtilityTransformer(
   serviceAmps: number,
   serviceVoltage: number,
-  servicePhase: 1 | 3
+  servicePhase: 1 | 3,
+  customImpedance?: number
 ): TransformerData {
   // Calculate approximate kVA
   const kva = servicePhase === 3
@@ -238,8 +331,10 @@ export function estimateUtilityTransformer(
   const standardSizes = [15, 25, 37.5, 50, 75, 100, 150, 225, 300, 500, 750, 1000, 1500, 2000, 2500];
   const transformerKVA = standardSizes.find((size) => size >= kva) || kva;
 
-  // Typical impedance values
-  const impedance = servicePhase === 3 ? 5.75 : 2.5; // Percent
+  // Use custom impedance if provided, otherwise use typical values
+  const impedance = customImpedance !== undefined
+    ? customImpedance
+    : (servicePhase === 3 ? 5.75 : 2.5); // Percent
 
   return {
     kva: transformerKVA,

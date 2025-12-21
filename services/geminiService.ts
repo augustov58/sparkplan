@@ -112,11 +112,46 @@ export const validateGrounding = async (grounding: GroundingDetail, serviceAmps:
   return await callGeminiProxy(prompt);
 };
 
-export const generateInspectionChecklist = async (type: string, phase: string) => {
-  const prompt = `
-  Generate a concise list of 5 critical NEC pre-inspection checks for a ${type} project in the ${phase} phase.
-  Return JSON format: [{"requirement": "description...", "category": "General"}].
-  `;
+export const generateInspectionChecklist = async (
+  type: string,
+  phase: string,
+  projectContext?: string
+) => {
+  let prompt = '';
+
+  if (projectContext) {
+    // Project-specific checklist
+    prompt = `
+You are generating a pre-inspection checklist for a SPECIFIC electrical project.
+
+${projectContext}
+
+Based on the project data above, generate 8-10 project-specific NEC inspection items for the ${phase} phase.
+
+IMPORTANT REQUIREMENTS:
+1. Reference SPECIFIC equipment from the project (e.g., "Panel H1", "Circuit C-12", "Transformer XFMR-1", "Feeder F1")
+2. Include actual ratings and specifications (e.g., "225A panel", "#6 Cu conductor", "75kVA transformer")
+3. Focus on items that inspectors will actually check on THIS project
+4. Reference specific NEC articles applicable to the equipment
+5. Cover these categories: Panels, Circuits, Feeders, Transformers, Grounding, Clearances, Protection
+
+Examples of GOOD project-specific items:
+- "Verify Panel H1 (225A) has 36-inch clearance per NEC 110.26(A)(2)"
+- "Check Circuit C-14 (50A EV charging) uses #6 Cu minimum per NEC 625.41"
+- "Confirm Feeder F1 (#2 Cu) voltage drop is under 3% per NEC 215.2(A)(3) FPN #2"
+- "Inspect Transformer XFMR-1 (75kVA) disconnect per NEC 450.14"
+
+Return ONLY valid JSON (no markdown, no code blocks):
+[{"requirement": "description with specific panel/circuit/feeder name and NEC article", "category": "category name"}]
+    `;
+  } else {
+    // Generic fallback if no project context
+    prompt = `
+Generate a concise list of 5 critical NEC pre-inspection checks for a ${type} project in the ${phase} phase.
+Return ONLY valid JSON (no markdown, no code blocks):
+[{"requirement": "description...", "category": "General"}]
+    `;
+  }
 
   return await callGeminiProxy(prompt, NEC_SYSTEM_INSTRUCTION);
 };

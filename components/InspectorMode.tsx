@@ -8,7 +8,7 @@
  * @module components/InspectorMode
  */
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { 
   Shield, 
   AlertTriangle, 
@@ -31,10 +31,11 @@ import { useCircuits } from '../hooks/useCircuits';
 import { useFeeders } from '../hooks/useFeeders';
 import { useTransformers } from '../hooks/useTransformers';
 import { useGrounding } from '../hooks/useGrounding';
-import { 
-  runInspection, 
+import { useInspectorReports } from '../hooks/useInspectorReports';
+import {
+  runInspection,
   getIssueExplanationPrompt,
-  InspectionResult, 
+  InspectionResult,
   InspectionIssue,
   IssueCategory,
   IssueSeverity
@@ -252,16 +253,39 @@ export const InspectorMode: React.FC<InspectorModeProps> = ({
   const [aiExplanation, setAiExplanation] = useState<string | null>(null);
   const [explainingIssueId, setExplainingIssueId] = useState<string | null>(null);
   const [filter, setFilter] = useState<'all' | 'critical' | 'warning'>('all');
-  
+
   // Fetch project data
   const { panels, loading: panelsLoading } = usePanels(projectId);
   const { circuits, loading: circuitsLoading } = useCircuits(projectId);
   const { feeders, loading: feedersLoading } = useFeeders(projectId);
   const { transformers, loading: transformersLoading } = useTransformers(projectId);
   const { grounding, loading: groundingLoading } = useGrounding(projectId);
-  
-  const dataLoading = panelsLoading || circuitsLoading || feedersLoading || transformersLoading || groundingLoading;
-  
+  const { latestReport, loading: reportsLoading, saveReport } = useInspectorReports(projectId);
+
+  const dataLoading = panelsLoading || circuitsLoading || feedersLoading || transformersLoading || groundingLoading || reportsLoading;
+
+  // Load latest saved report when available
+  useEffect(() => {
+    if (latestReport && !result) {
+      // Convert saved report back to InspectionResult format
+      const savedResult: InspectionResult = {
+        projectId: latestReport.project_id,
+        summary: {
+          score: latestReport.score,
+          totalChecks: latestReport.total_checks,
+          passed: latestReport.passed,
+          warnings: latestReport.warnings,
+          critical: latestReport.critical,
+        },
+        issues: latestReport.issues as InspectionIssue[],
+        passedChecks: latestReport.passed_checks as any[],
+        necArticlesReferenced: latestReport.nec_articles_referenced,
+        timestamp: new Date(latestReport.inspected_at),
+      };
+      setResult(savedResult);
+    }
+  }, [latestReport]);
+
   // Run inspection
   const runAudit = async () => {
     setLoading(true);
@@ -288,6 +312,10 @@ export const InspectorMode: React.FC<InspectorModeProps> = ({
     
     const inspectionResult = runInspection(inspectionData);
     setResult(inspectionResult);
+
+    // Save report to database for persistence
+    await saveReport(inspectionResult);
+
     setLoading(false);
   };
   
@@ -469,7 +497,12 @@ export const InspectorMode: React.FC<InspectorModeProps> = ({
           <div className="flex items-center justify-between text-sm text-gray-500">
             <div className="flex items-center gap-2">
               <Clock className="w-4 h-4" />
-              Last run: {result.timestamp.toLocaleString()}
+              <span>Last run: {result.timestamp.toLocaleString()}</span>
+              {latestReport && (
+                <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-700 border border-green-200">
+                  Saved
+                </span>
+              )}
             </div>
             <div className="flex items-center gap-2">
               <BookOpen className="w-4 h-4" />

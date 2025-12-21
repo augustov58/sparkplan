@@ -89,14 +89,18 @@ export const styles = StyleSheet.create({
     paddingHorizontal: 3,
     backgroundColor: '#fafafa',
   },
-  colCkt: { width: '6%', fontSize: 8 },
-  colBreaker: { width: '8%', fontSize: 8 },
-  colPole: { width: '6%', fontSize: 8 },
-  colWire: { width: '10%', fontSize: 8 },
-  colEgc: { width: '8%', fontSize: 8 },
-  colDescription: { width: '42%', fontSize: 8 },
-  colLoad: { width: '10%', fontSize: 8, textAlign: 'right' },
-  colPhase: { width: '10%', fontSize: 8, textAlign: 'center' },
+  // Two-column panel schedule format
+  colLeftCkt: { width: '5%', fontSize: 8, textAlign: 'center' },
+  colLeftDescription: { width: '18%', fontSize: 7 },
+  colLeftLoad: { width: '7%', fontSize: 7, textAlign: 'right' },
+  colLeftBreaker: { width: '5%', fontSize: 7, textAlign: 'center' },
+  colLeftPole: { width: '4%', fontSize: 7, textAlign: 'center' },
+  colPhase: { width: '6%', fontSize: 8, textAlign: 'center', fontFamily: 'Helvetica-Bold' },
+  colRightPole: { width: '4%', fontSize: 7, textAlign: 'center' },
+  colRightBreaker: { width: '5%', fontSize: 7, textAlign: 'center' },
+  colRightLoad: { width: '7%', fontSize: 7, textAlign: 'left' },
+  colRightDescription: { width: '18%', fontSize: 7 },
+  colRightCkt: { width: '5%', fontSize: 8, textAlign: 'center' },
   summarySection: {
     marginTop: 15,
     padding: 10,
@@ -281,44 +285,68 @@ export const PanelScheduleDocument: React.FC<PanelSchedulePDFProps> = ({
           </View>
         </View>
 
-        {/* Circuit Table */}
+        {/* Circuit Table - Two Column Format */}
         <View style={styles.tableContainer}>
           {/* Table Header */}
           <View style={styles.tableHeader}>
-            <Text style={styles.colCkt}>Ckt #</Text>
-            <Text style={styles.colBreaker}>Breaker</Text>
-            <Text style={styles.colPole}>Pole</Text>
-            <Text style={styles.colWire}>Wire</Text>
-            <Text style={styles.colEgc}>EGC</Text>
-            <Text style={styles.colDescription}>Description</Text>
-            <Text style={styles.colLoad}>Load (VA)</Text>
+            <Text style={styles.colLeftCkt}>Ckt</Text>
+            <Text style={styles.colLeftDescription}>Description</Text>
+            <Text style={styles.colLeftLoad}>Load</Text>
+            <Text style={styles.colLeftBreaker}>Br</Text>
+            <Text style={styles.colLeftPole}>P</Text>
             <Text style={styles.colPhase}>Phase</Text>
+            <Text style={styles.colRightPole}>P</Text>
+            <Text style={styles.colRightBreaker}>Br</Text>
+            <Text style={styles.colRightLoad}>Load</Text>
+            <Text style={styles.colRightDescription}>Description</Text>
+            <Text style={styles.colRightCkt}>Ckt</Text>
           </View>
 
-          {/* Circuit Rows */}
-          {sortedCircuits.map((circuit, index) => {
-            const phase = panel.phase === 1 ? 'A' :
-              ['A', 'B', 'C'][((circuit.circuit_number - 1) % 3)];
-            const isAlt = index % 2 === 1;
+          {/* Circuit Rows - Two Column Format */}
+          {(() => {
+            // Determine max slots based on panel type
+            const maxSlots = panel.is_main ? 30 : 42;
+            const numRows = maxSlots / 2;
 
-            return (
-              <View
-                key={circuit.id}
-                style={isAlt ? styles.tableRowAlt : styles.tableRow}
-              >
-                <Text style={styles.colCkt}>{circuit.circuit_number}</Text>
-                <Text style={styles.colBreaker}>{circuit.breaker_amps}A</Text>
-                <Text style={styles.colPole}>{circuit.pole}P</Text>
-                <Text style={styles.colWire}>{circuit.conductor_size || 'N/A'}</Text>
-                <Text style={styles.colEgc}>{circuit.egc_size || 'N/A'}</Text>
-                <Text style={styles.colDescription}>{circuit.description}</Text>
-                <Text style={styles.colLoad}>
-                  {(circuit.load_watts || 0).toLocaleString()}
-                </Text>
-                <Text style={styles.colPhase}>{phase}</Text>
-              </View>
-            );
-          })}
+            const rows = [];
+            for (let row = 1; row <= numRows; row++) {
+              const leftNum = row * 2 - 1;  // Odd numbers: 1, 3, 5, 7...
+              const rightNum = row * 2;      // Even numbers: 2, 4, 6, 8...
+
+              const leftCkt = sortedCircuits.find(c => c.circuit_number === leftNum);
+              const rightCkt = sortedCircuits.find(c => c.circuit_number === rightNum);
+
+              // Calculate phase for this row
+              const phase = panel.phase === 1 ? 'A' : ['A', 'B', 'C'][(row - 1) % 3];
+              const isAlt = row % 2 === 0;
+
+              rows.push(
+                <View key={row} style={isAlt ? styles.tableRowAlt : styles.tableRow}>
+                  {/* Left Circuit */}
+                  <Text style={styles.colLeftCkt}>{leftNum}</Text>
+                  <Text style={styles.colLeftDescription}>{leftCkt?.description || ''}</Text>
+                  <Text style={styles.colLeftLoad}>
+                    {leftCkt ? (leftCkt.load_watts || 0).toLocaleString() : ''}
+                  </Text>
+                  <Text style={styles.colLeftBreaker}>{leftCkt ? `${leftCkt.breaker_amps}A` : ''}</Text>
+                  <Text style={styles.colLeftPole}>{leftCkt ? `${leftCkt.pole}P` : ''}</Text>
+
+                  {/* Center Phase */}
+                  <Text style={styles.colPhase}>{phase}</Text>
+
+                  {/* Right Circuit */}
+                  <Text style={styles.colRightPole}>{rightCkt ? `${rightCkt.pole}P` : ''}</Text>
+                  <Text style={styles.colRightBreaker}>{rightCkt ? `${rightCkt.breaker_amps}A` : ''}</Text>
+                  <Text style={styles.colRightLoad}>
+                    {rightCkt ? (rightCkt.load_watts || 0).toLocaleString() : ''}
+                  </Text>
+                  <Text style={styles.colRightDescription}>{rightCkt?.description || ''}</Text>
+                  <Text style={styles.colRightCkt}>{rightNum}</Text>
+                </View>
+              );
+            }
+            return rows;
+          })()}
 
           {/* Empty state */}
           {sortedCircuits.length === 0 && (
@@ -461,44 +489,62 @@ export const MultiPanelDocument: React.FC<MultiPanelDocumentProps> = ({
             </View>
           </View>
 
-          {/* Circuit Table */}
+          {/* Circuit Table - Two Column Format */}
           <View style={styles.tableContainer}>
             <View style={styles.tableHeader}>
-              <Text style={styles.colCkt}>Ckt #</Text>
-              <Text style={styles.colBreaker}>Breaker</Text>
-              <Text style={styles.colPole}>Pole</Text>
-              <Text style={styles.colWire}>Wire</Text>
-              <Text style={styles.colEgc}>EGC</Text>
-              <Text style={styles.colDescription}>Description</Text>
-              <Text style={styles.colLoad}>Load (VA)</Text>
+              <Text style={styles.colLeftCkt}>Ckt</Text>
+              <Text style={styles.colLeftDescription}>Description</Text>
+              <Text style={styles.colLeftLoad}>Load</Text>
+              <Text style={styles.colLeftBreaker}>Br</Text>
+              <Text style={styles.colLeftPole}>P</Text>
               <Text style={styles.colPhase}>Phase</Text>
+              <Text style={styles.colRightPole}>P</Text>
+              <Text style={styles.colRightBreaker}>Br</Text>
+              <Text style={styles.colRightLoad}>Load</Text>
+              <Text style={styles.colRightDescription}>Description</Text>
+              <Text style={styles.colRightCkt}>Ckt</Text>
             </View>
 
-            {circuits
-              .sort((a, b) => a.circuit_number - b.circuit_number)
-              .map((circuit, index) => {
-                const phase = panel.phase === 1 ? 'A' :
-                  ['A', 'B', 'C'][((circuit.circuit_number - 1) % 3)];
-                const isAlt = index % 2 === 1;
+            {(() => {
+              const sortedCircuits = circuits.sort((a, b) => a.circuit_number - b.circuit_number);
+              const maxSlots = panel.is_main ? 30 : 42;
+              const numRows = maxSlots / 2;
 
-                return (
-                  <View
-                    key={circuit.id}
-                    style={isAlt ? styles.tableRowAlt : styles.tableRow}
-                  >
-                    <Text style={styles.colCkt}>{circuit.circuit_number}</Text>
-                    <Text style={styles.colBreaker}>{circuit.breaker_amps}A</Text>
-                    <Text style={styles.colPole}>{circuit.pole}P</Text>
-                    <Text style={styles.colWire}>{circuit.conductor_size || 'N/A'}</Text>
-                    <Text style={styles.colEgc}>{circuit.egc_size || 'N/A'}</Text>
-                    <Text style={styles.colDescription}>{circuit.description}</Text>
-                    <Text style={styles.colLoad}>
-                      {(circuit.load_watts || 0).toLocaleString()}
+              const rows = [];
+              for (let row = 1; row <= numRows; row++) {
+                const leftNum = row * 2 - 1;
+                const rightNum = row * 2;
+
+                const leftCkt = sortedCircuits.find(c => c.circuit_number === leftNum);
+                const rightCkt = sortedCircuits.find(c => c.circuit_number === rightNum);
+
+                const phase = panel.phase === 1 ? 'A' : ['A', 'B', 'C'][(row - 1) % 3];
+                const isAlt = row % 2 === 0;
+
+                rows.push(
+                  <View key={row} style={isAlt ? styles.tableRowAlt : styles.tableRow}>
+                    <Text style={styles.colLeftCkt}>{leftNum}</Text>
+                    <Text style={styles.colLeftDescription}>{leftCkt?.description || ''}</Text>
+                    <Text style={styles.colLeftLoad}>
+                      {leftCkt ? (leftCkt.load_watts || 0).toLocaleString() : ''}
                     </Text>
+                    <Text style={styles.colLeftBreaker}>{leftCkt ? `${leftCkt.breaker_amps}A` : ''}</Text>
+                    <Text style={styles.colLeftPole}>{leftCkt ? `${leftCkt.pole}P` : ''}</Text>
+
                     <Text style={styles.colPhase}>{phase}</Text>
+
+                    <Text style={styles.colRightPole}>{rightCkt ? `${rightCkt.pole}P` : ''}</Text>
+                    <Text style={styles.colRightBreaker}>{rightCkt ? `${rightCkt.breaker_amps}A` : ''}</Text>
+                    <Text style={styles.colRightLoad}>
+                      {rightCkt ? (rightCkt.load_watts || 0).toLocaleString() : ''}
+                    </Text>
+                    <Text style={styles.colRightDescription}>{rightCkt?.description || ''}</Text>
+                    <Text style={styles.colRightCkt}>{rightNum}</Text>
                   </View>
                 );
-              })}
+              }
+              return rows;
+            })()}
 
             {circuits.length === 0 && (
               <View style={styles.tableRow}>

@@ -249,6 +249,11 @@ export interface FeederCalculationInput {
   ambient_temperature_c: number;
   num_current_carrying: number;
   max_voltage_drop_percent?: number;
+  temperature_rating?: 60 | 75 | 90; // Conductor insulation temperature rating
+  // Transformer-specific parameters (for feeders feeding transformers)
+  transformer_kva?: number; // If feeding a transformer, use this for sizing per NEC 450.3(B)
+  transformer_primary_voltage?: number;
+  transformer_primary_phase?: 1 | 3;
 }
 
 export interface FeederCalculationResult {
@@ -264,4 +269,336 @@ export interface FeederCalculationResult {
   meets_voltage_drop: boolean;
   warnings: string[];
   necReferences: string[];
+}
+
+// ============================================================================
+// SERVICE UPGRADE WIZARD TYPES (NEC 230.42, 220.87)
+// ============================================================================
+
+/**
+ * NEC 220.87 - Methods for Determining Existing Loads
+ *
+ * Per NEC 220.87, existing loads shall be determined by one of:
+ * 1. Actual maximum demand (utility billing or load study)
+ * 2. Calculated load using NEC 220.82/220.84 demand factors
+ */
+export enum ExistingLoadDeterminationMethod {
+  /** 12-month utility billing data showing peak demand (NEC 220.87 Method 1) */
+  UTILITY_BILL = 'utility_bill',
+
+  /** 30-day continuous load study at 15-minute intervals (NEC 220.87 Method 1) */
+  LOAD_STUDY = 'load_study',
+
+  /** Calculated from panel schedule using NEC 220.82/84 demand factors (NEC 220.87 Method 2) */
+  CALCULATED = 'calculated',
+
+  /** Manual entry (user-provided value, method unspecified) */
+  MANUAL = 'manual'
+}
+
+/**
+ * Quick Check Mode - Amp-based service capacity check
+ * For quick field decisions: "Can my 200A service handle a 50A EV charger?"
+ */
+export interface QuickCheckInput {
+  currentServiceAmps: number;   // Current service size (100, 150, 200, 400, etc.)
+  currentUsageAmps: number;     // Current usage in amps (estimated or measured)
+  proposedLoadAmps: number;     // New load to be added in amps
+
+  /** How existing load was determined (NEC 220.87) */
+  existingLoadMethod?: ExistingLoadDeterminationMethod;
+}
+
+export interface QuickCheckResult {
+  totalAmps: number;               // currentUsage + proposedLoad
+  utilizationPercent: number;      // (total / service) × 100
+  availableAmps: number;           // Remaining capacity
+  canHandle: boolean;              // utilization ≤ 100%
+  upgradeRecommended: boolean;     // utilization > 80%
+  status: 'OK' | 'HIGH' | 'CRITICAL';
+  recommendation: string;
+}
+
+/**
+ * Detailed Analysis Mode - kVA-based with NEC demand factors
+ * For design phase: full NEC 220.82/220.84 load calculation
+ */
+export interface ServiceUpgradeInput {
+  // Current Service
+  currentServiceAmps: number;
+  serviceVoltage: number;
+  servicePhase: 1 | 3;
+
+  // Existing Load (from project or manual entry)
+  existingDemandLoad_kVA: number;
+
+  /** How existing load was determined - REQUIRED per NEC 220.87 */
+  existingLoadMethod: ExistingLoadDeterminationMethod;
+
+  // Proposed Additional Loads
+  proposedLoads: Array<{
+    id?: string;
+    description: string;
+    kw: number;
+    continuous: boolean;        // Apply 125% factor per NEC 210.19
+    category?: 'EV' | 'HVAC' | 'Appliance' | 'Solar' | 'Other';
+  }>;
+
+  // Optional: Panel/service details for upgrade type analysis
+  panelBusRating?: number;
+  serviceConductorSize?: string;
+  serviceConductorLength_ft?: number;
+
+  // Safety margin for future growth (default 25%)
+  futureGrowthMargin?: number;
+}
+
+export interface ServiceUpgradeResult {
+  // Current service analysis
+  currentServiceCapacity_kVA: number;
+  existingDemand_kVA: number;
+  existingUtilization_percent: number;
+  availableCapacity_kVA: number;
+
+  // With proposed loads
+  proposedAdditionalLoad_kVA: number;
+  totalFutureDemand_kVA: number;
+  futureUtilization_percent: number;
+  futureAvailableCapacity_kVA: number;
+
+  // Verdict
+  canHandle: boolean;
+  upgradeRecommended: boolean;
+  upgradeRequired: boolean;
+
+  // Recommended service size
+  recommendedServiceAmps?: number;
+  upgradePath?: {
+    from: number;
+    to: number;
+    margin_kVA: number;
+    marginPercent: number;
+  };
+
+  // Panel vs. Service upgrade analysis
+  upgradeAnalysis?: UpgradeAnalysis;
+
+  // EVEMS alternative recommendation
+  evemsRecommendation?: EVEMSRecommendation;
+
+  // Load breakdown
+  breakdown: Array<{
+    category: string;
+    description: string;
+    load_kVA: number;
+    continuous: boolean;
+  }>;
+
+  // NEC compliance
+  necReferences: string[];
+  warnings: string[];
+  notes: string[];
+}
+
+/**
+ * Panel vs. Service Upgrade Analysis
+ * Critical distinction: $2-4K (panel only) vs. $8-15K (full service)
+ */
+export interface UpgradeAnalysis {
+  upgradeType: 'none' | 'panel_only' | 'full_service';
+  reason: string;
+  costEstimate: {
+    low: number;
+    high: number;
+  };
+  timeline: string;
+
+  // Component adequacy breakdown
+  serviceConductorsAdequate: boolean;
+  meterEnclosureAdequate: boolean;
+  panelBusBarAdequate: boolean;
+
+  // Detailed recommendations
+  recommendations: string[];
+}
+
+/**
+ * EVEMS Load Management Alternative Recommendation
+ * For 3+ EV chargers, may be cheaper/faster than service upgrade
+ */
+export interface EVEMSRecommendation {
+  shouldConsider: boolean;
+  numberOfChargers: number;
+  costComparison: {
+    serviceUpgradeCost: number;
+    evemsCost: number;
+    savings: number;
+  };
+  tradeoffs: string[];
+  recommendation: string;
+}
+
+/**
+ * Load Templates for Quick Addition
+ * Pre-defined common loads (EV chargers, HVAC, appliances)
+ */
+export interface LoadTemplate {
+  name: string;
+  kw: number;
+  continuous: boolean;
+  category: 'EV' | 'HVAC' | 'Appliance' | 'Solar' | 'Other';
+  description?: string;
+}
+
+// ==========================
+// Phase 0: Basic PM Features
+// ==========================
+
+/**
+ * RFI (Request for Information) Status
+ */
+export type RFIStatus = 'Pending' | 'Answered' | 'Closed';
+
+/**
+ * Priority levels for RFIs, Calendar Events
+ */
+export type Priority = 'Low' | 'Medium' | 'High' | 'Urgent';
+
+/**
+ * RFI (Request for Information)
+ * Track design clarifications and engineering questions
+ */
+export interface RFI {
+  id: string;
+  project_id: string;
+  user_id: string;
+
+  // RFI identification
+  rfi_number: string; // e.g., "RFI-001"
+  subject: string;
+  question: string;
+  answer?: string;
+
+  // Status tracking
+  status: RFIStatus;
+  priority: Priority;
+
+  // Assignment
+  assigned_to?: string;
+  requested_by?: string;
+  responded_by?: string;
+
+  // Dates
+  due_date?: string;
+  response_date?: string;
+  closed_date?: string;
+
+  // Metadata
+  notes?: string;
+  created_at: string;
+  updated_at: string;
+}
+
+/**
+ * Site Visit Status
+ */
+export type SiteVisitStatus = 'Scheduled' | 'In Progress' | 'Completed' | 'Cancelled';
+
+/**
+ * Site Visit
+ * Log field observations and inspection visits
+ */
+export interface SiteVisit {
+  id: string;
+  project_id: string;
+  user_id: string;
+
+  // Visit details
+  visit_date: string;
+  visit_type: string; // "Site Inspection", "Pre-Inspection", "Final Walkthrough"
+  title: string;
+  description: string;
+  weather_conditions?: string;
+
+  // People present
+  attendees?: string[];
+  inspector_name?: string;
+
+  // Follow-up
+  issues_found?: string[];
+  action_items?: string[];
+  next_visit_date?: string;
+
+  // Photos
+  photos?: string[]; // Array of Supabase Storage URLs
+
+  // Status
+  status: SiteVisitStatus;
+  duration_hours?: number;
+
+  // Metadata
+  notes?: string;
+  created_at: string;
+  updated_at: string;
+}
+
+/**
+ * Calendar Event Type
+ */
+export type CalendarEventType = 'Deadline' | 'Inspection' | 'Meeting' | 'Milestone' | 'Site Visit';
+
+/**
+ * Calendar Event Status
+ */
+export type CalendarEventStatus = 'Upcoming' | 'Completed' | 'Cancelled';
+
+/**
+ * Calendar Event
+ * Track important dates and deadlines
+ */
+export interface CalendarEvent {
+  id: string;
+  project_id: string;
+  user_id: string;
+
+  // Event details
+  title: string;
+  description?: string;
+  event_type: CalendarEventType;
+  event_date: string;
+  location?: string;
+
+  // Related items (optional links)
+  related_rfi_id?: string;
+  related_site_visit_id?: string;
+
+  // Status
+  completed: boolean;
+  completed_at?: string;
+
+  created_at: string;
+  updated_at: string;
+}
+
+/**
+ * Open Item (unified view for dashboard)
+ * Combines RFIs, Issues, Site Visits, Calendar Events
+ */
+export interface OpenItem {
+  id: string;
+  type: 'rfi' | 'issue' | 'site_visit' | 'calendar_event';
+  project_id: string;
+  project_name: string;
+
+  // Display
+  title: string;
+  description: string;
+  status: string;
+  priority: Priority | 'Critical' | 'Warning' | 'Info'; // Include issue severities
+  due_date?: string;
+
+  // For navigation
+  url: string; // e.g., "/project/123/rfis" or "/project/123/issues"
+
+  created_at: string;
 }

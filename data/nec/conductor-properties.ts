@@ -98,7 +98,7 @@ export function getNextLargerSize(currentSize: string): string | null {
 export function findConductorSizeByCircularMils(targetCircularMils: number): string | null {
   for (const size of STANDARD_CONDUCTOR_SIZES) {
     const cm = CONDUCTOR_CIRCULAR_MILS[size];
-    if (cm >= targetCircularMils) {
+    if (cm && cm >= targetCircularMils) {
       return size;
     }
   }

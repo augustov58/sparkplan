@@ -1,9 +1,10 @@
 
-import React from 'react';
+import React, { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Project, ProjectStatus } from '../types';
-import { Plus, ChevronRight, AlertCircle, CheckCircle2, Clock, AlertTriangle, Trash2 } from 'lucide-react';
+import { Plus, ChevronRight, AlertCircle, CheckCircle2, Clock, AlertTriangle, Trash2, MessageSquare, MapPin, Calendar, FileText, Filter } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth';
+import { useAllOpenItems } from '../hooks/useAllOpenItems';
 
 interface DashboardProps {
   projects: Project[];
@@ -14,6 +15,12 @@ interface DashboardProps {
 export const Dashboard: React.FC<DashboardProps> = ({ projects, createNewProject, deleteProject }) => {
   const navigate = useNavigate();
   const { user } = useAuth();
+  const { openItems, loading: loadingOpenItems } = useAllOpenItems();
+
+  // Filter and sort state
+  const [selectedProject, setSelectedProject] = useState<string>('all');
+  const [selectedType, setSelectedType] = useState<string>('all');
+  const [sortBy, setSortBy] = useState<'date' | 'priority'>('priority');
 
   // Get user's display name from metadata or email
   const getUserName = () => {
@@ -32,14 +39,107 @@ export const Dashboard: React.FC<DashboardProps> = ({ projects, createNewProject
     deleteProject(projectId);
   };
 
+  const getItemTypeIcon = (type: string) => {
+    switch (type) {
+      case 'rfi': return <MessageSquare className="w-4 h-4" />;
+      case 'issue': return <AlertTriangle className="w-4 h-4" />;
+      case 'site_visit': return <MapPin className="w-4 h-4" />;
+      case 'calendar_event': return <Calendar className="w-4 h-4" />;
+      default: return <FileText className="w-4 h-4" />;
+    }
+  };
+
+  const getItemTypeLabel = (type: string) => {
+    switch (type) {
+      case 'rfi': return 'RFI';
+      case 'issue': return 'Issue';
+      case 'site_visit': return 'Site Visit';
+      case 'calendar_event': return 'Event';
+      default: return type;
+    }
+  };
+
+  const getPriorityColor = (priority: string) => {
+    switch (priority) {
+      case 'Critical':
+      case 'Urgent':
+        return 'bg-red-100 text-red-700 border-red-200';
+      case 'High':
+        return 'bg-orange-100 text-orange-700 border-orange-200';
+      case 'Warning':
+      case 'Medium':
+        return 'bg-yellow-100 text-yellow-700 border-yellow-200';
+      case 'Low':
+      case 'Info':
+        return 'bg-blue-100 text-blue-700 border-blue-200';
+      default:
+        return 'bg-gray-100 text-gray-700 border-gray-200';
+    }
+  };
+
+  const getPriorityValue = (priority: string): number => {
+    switch (priority) {
+      case 'Critical':
+      case 'Urgent':
+        return 4;
+      case 'High':
+        return 3;
+      case 'Warning':
+      case 'Medium':
+        return 2;
+      case 'Low':
+      case 'Info':
+        return 1;
+      default:
+        return 0;
+    }
+  };
+
+  // Filter and sort open items
+  const filteredAndSortedItems = useMemo(() => {
+    let filtered = openItems;
+
+    // Filter by project
+    if (selectedProject !== 'all') {
+      filtered = filtered.filter(item => item.project_id === selectedProject);
+    }
+
+    // Filter by type
+    if (selectedType !== 'all') {
+      filtered = filtered.filter(item => item.type === selectedType);
+    }
+
+    // Sort
+    const sorted = [...filtered].sort((a, b) => {
+      if (sortBy === 'priority') {
+        // Sort by priority first, then by date
+        const priorityDiff = getPriorityValue(b.priority) - getPriorityValue(a.priority);
+        if (priorityDiff !== 0) return priorityDiff;
+
+        // If same priority, sort by date
+        const dateA = a.due_date || a.created_at;
+        const dateB = b.due_date || b.created_at;
+        return new Date(dateA).getTime() - new Date(dateB).getTime();
+      } else {
+        // Sort by date
+        const dateA = a.due_date || a.created_at;
+        const dateB = b.due_date || b.created_at;
+        return new Date(dateA).getTime() - new Date(dateB).getTime();
+      }
+    });
+
+    return sorted;
+  }, [openItems, selectedProject, selectedType, sortBy]);
+
   return (
     <div className="space-y-8 animate-in fade-in duration-500">
+      {/* Header */}
       <div className="flex justify-between items-end">
         <div>
           <h2 className="text-2xl font-light text-gray-900">Welcome back, {getUserName()}</h2>
           <p className="text-gray-500 mt-1">You have <span className="font-medium text-electric-600">{projects.length} active projects</span> requiring NEC compliance review.</p>
         </div>
-        <button 
+        <button
           onClick={createNewProject}
           className="bg-electric-400 hover:bg-electric-500 text-black px-6 py-3 rounded-md font-medium flex items-center gap-2 transition-colors shadow-sm"
         >
@@ -48,6 +148,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ projects, createNewProject
         </button>
       </div>
 
+      {/* Project Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {projects.map(project => {
             const openIssues = project.issues.filter(i => i.status === 'Open').length;
@@ -123,6 +224,126 @@ export const Dashboard: React.FC<DashboardProps> = ({ projects, createNewProject
             );
         })}
       </div>
+
+      {/* Open Items Section (Below Project Cards) */}
+      {!loadingOpenItems && openItems.length > 0 && (
+        <div className="bg-white border border-gray-100 rounded-lg p-6">
+          {/* Header with Filters */}
+          <div className="flex flex-col gap-4 mb-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="text-lg font-medium text-gray-900 flex items-center gap-2">
+                  <Filter className="w-5 h-5 text-electric-500" />
+                  Open Items Across All Projects
+                </h3>
+                <p className="text-sm text-gray-500 mt-1">
+                  {filteredAndSortedItems.length} of {openItems.length} {filteredAndSortedItems.length === 1 ? 'item' : 'items'} shown
+                </p>
+              </div>
+            </div>
+
+            {/* Filters */}
+            <div className="flex flex-wrap gap-3">
+              {/* Project Filter */}
+              <select
+                value={selectedProject}
+                onChange={(e) => setSelectedProject(e.target.value)}
+                className="px-3 py-2 border border-gray-200 rounded-md text-sm bg-white hover:border-electric-400 transition-colors focus:outline-none focus:ring-2 focus:ring-electric-400"
+              >
+                <option value="all">All Projects</option>
+                {projects.map(project => (
+                  <option key={project.id} value={project.id}>{project.name}</option>
+                ))}
+              </select>
+
+              {/* Type Filter */}
+              <select
+                value={selectedType}
+                onChange={(e) => setSelectedType(e.target.value)}
+                className="px-3 py-2 border border-gray-200 rounded-md text-sm bg-white hover:border-electric-400 transition-colors focus:outline-none focus:ring-2 focus:ring-electric-400"
+              >
+                <option value="all">All Types</option>
+                <option value="rfi">RFIs</option>
+                <option value="issue">Issues</option>
+                <option value="site_visit">Site Visits</option>
+                <option value="calendar_event">Calendar Events</option>
+              </select>
+
+              {/* Sort By */}
+              <select
+                value={sortBy}
+                onChange={(e) => setSortBy(e.target.value as 'date' | 'priority')}
+                className="px-3 py-2 border border-gray-200 rounded-md text-sm bg-white hover:border-electric-400 transition-colors focus:outline-none focus:ring-2 focus:ring-electric-400"
+              >
+                <option value="priority">Sort by Priority</option>
+                <option value="date">Sort by Date</option>
+              </select>
+
+              {/* Clear Filters */}
+              {(selectedProject !== 'all' || selectedType !== 'all' || sortBy !== 'priority') && (
+                <button
+                  onClick={() => {
+                    setSelectedProject('all');
+                    setSelectedType('all');
+                    setSortBy('priority');
+                  }}
+                  className="px-3 py-2 text-sm text-gray-600 hover:text-electric-600 transition-colors"
+                >
+                  Clear Filters
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* Items List */}
+          {filteredAndSortedItems.length > 0 ? (
+            <div className="space-y-2">
+              {filteredAndSortedItems.map(item => (
+                <div
+                  key={`${item.type}-${item.id}`}
+                  onClick={() => navigate(item.url)}
+                  className="group flex items-start gap-3 p-3 rounded-lg border border-gray-100 hover:border-electric-400 hover:bg-electric-50 cursor-pointer transition-all"
+                >
+                  <div className={`p-2 rounded ${getPriorityColor(item.priority)}`}>
+                    {getItemTypeIcon(item.type)}
+                  </div>
+
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className="text-xs font-medium text-gray-600 bg-gray-100 px-2 py-0.5 rounded">
+                        {getItemTypeLabel(item.type)}
+                      </span>
+                      <span className="text-xs text-gray-500">{item.project_name}</span>
+                      <span className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded ${getPriorityColor(item.priority)}`}>
+                        {item.priority}
+                      </span>
+                      {item.status && (
+                        <span className="text-xs text-gray-400">{item.status}</span>
+                      )}
+                    </div>
+                    <p className="font-medium text-sm text-gray-900 truncate group-hover:text-electric-700 transition-colors">
+                      {item.title}
+                    </p>
+                    <p className="text-xs text-gray-600 truncate mt-0.5">{item.description}</p>
+                    {item.due_date && (
+                      <p className="text-xs text-gray-500 mt-1 flex items-center gap-1">
+                        <Clock className="w-3 h-3" />
+                        Due: {new Date(item.due_date).toLocaleDateString()}
+                      </p>
+                    )}
+                  </div>
+
+                  <ChevronRight className="w-4 h-4 text-gray-400 group-hover:text-electric-600 group-hover:translate-x-1 transition-all flex-shrink-0" />
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="text-center py-8 text-gray-500">
+              <p>No items match the selected filters.</p>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 };

@@ -355,73 +355,6 @@ export interface Database {
           updated_at?: string
         }
       }
-      issues: {
-        Row: {
-          id: string
-          project_id: string
-          article: string
-          description: string
-          status: 'Open' | 'Resolved'
-          severity: 'Critical' | 'Warning' | 'Info'
-          location: string | null
-          photo_url: string | null
-          assigned_to: string
-          created_at: string
-        }
-        Insert: {
-          id?: string
-          project_id: string
-          article: string
-          description: string
-          status: 'Open' | 'Resolved'
-          severity: 'Critical' | 'Warning' | 'Info'
-          location?: string | null
-          photo_url?: string | null
-          assigned_to: string
-          created_at?: string
-        }
-        Update: {
-          id?: string
-          project_id?: string
-          article?: string
-          description?: string
-          status?: 'Open' | 'Resolved'
-          severity?: 'Critical' | 'Warning' | 'Info'
-          location?: string | null
-          photo_url?: string | null
-          assigned_to?: string
-          created_at?: string
-        }
-      }
-      inspection_items: {
-        Row: {
-          id: string
-          project_id: string
-          category: string
-          requirement: string
-          status: 'Pending' | 'Pass' | 'Fail' | 'N/A'
-          notes: string | null
-          created_at: string
-        }
-        Insert: {
-          id?: string
-          project_id: string
-          category: string
-          requirement: string
-          status: 'Pending' | 'Pass' | 'Fail' | 'N/A'
-          notes?: string | null
-          created_at?: string
-        }
-        Update: {
-          id?: string
-          project_id?: string
-          category?: string
-          requirement?: string
-          status?: 'Pending' | 'Pass' | 'Fail' | 'N/A'
-          notes?: string | null
-          created_at?: string
-        }
-      }
       grounding_details: {
         Row: {
           id: string
@@ -449,6 +382,224 @@ export interface Database {
           electrodes?: string[]
           gec_size?: string
           bonding?: string[]
+          notes?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+      }
+      inspector_reports: {
+        Row: {
+          id: string
+          project_id: string
+          user_id: string
+          score: number
+          total_checks: number
+          passed: number
+          warnings: number
+          critical: number
+          issues: Json
+          passed_checks: Json
+          nec_articles_referenced: string[]
+          inspected_at: string
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          project_id: string
+          user_id: string
+          score: number
+          total_checks: number
+          passed: number
+          warnings: number
+          critical: number
+          issues?: Json
+          passed_checks?: Json
+          nec_articles_referenced?: string[]
+          inspected_at?: string
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          project_id?: string
+          user_id?: string
+          score?: number
+          total_checks?: number
+          passed?: number
+          warnings?: number
+          critical?: number
+          issues?: Json
+          passed_checks?: Json
+          nec_articles_referenced?: string[]
+          inspected_at?: string
+          created_at?: string
+          updated_at?: string
+        }
+      }
+      issues: {
+        Row: {
+          id: string
+          project_id: string
+          user_id: string
+          description: string
+          article: string
+          severity: 'Critical' | 'Warning' | 'Info'
+          status: 'Open' | 'Resolved'
+          assigned_to: string | null
+          notes: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          project_id: string
+          user_id: string
+          description: string
+          article: string
+          severity: 'Critical' | 'Warning' | 'Info'
+          status?: 'Open' | 'Resolved'
+          assigned_to?: string | null
+          notes?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          project_id?: string
+          user_id?: string
+          description?: string
+          article?: string
+          severity?: 'Critical' | 'Warning' | 'Info'
+          status?: 'Open' | 'Resolved'
+          assigned_to?: string | null
+          notes?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+      }
+      inspection_items: {
+        Row: {
+          id: string
+          project_id: string
+          user_id: string
+          category: string
+          requirement: string
+          status: 'Pending' | 'Pass' | 'Fail' | 'N/A'
+          notes: string | null
+          photo_url: string | null
+          inspection_date: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          project_id: string
+          user_id: string
+          category: string
+          requirement: string
+          status?: 'Pending' | 'Pass' | 'Fail' | 'N/A'
+          notes?: string | null
+          photo_url?: string | null
+          inspection_date?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          project_id?: string
+          user_id?: string
+          category?: string
+          requirement?: string
+          status?: 'Pending' | 'Pass' | 'Fail' | 'N/A'
+          notes?: string | null
+          photo_url?: string | null
+          inspection_date?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+      }
+      short_circuit_calculations: {
+        Row: {
+          id: string
+          project_id: string
+          user_id: string
+          panel_id: string | null
+          location_name: string
+          calculation_type: 'service' | 'panel'
+          service_amps: number | null
+          service_voltage: number | null
+          service_phase: number | null
+          transformer_kva: number | null
+          transformer_impedance: number | null
+          source_fault_current: number | null
+          feeder_length: number | null
+          feeder_conductor_size: string | null
+          feeder_material: string | null
+          feeder_conduit_type: string | null
+          feeder_voltage: number | null
+          feeder_phase: number | null
+          service_conductor_length: number | null
+          service_conductor_size: string | null
+          service_conductor_material: string | null
+          service_conduit_type: string | null
+          results: Json
+          notes: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          project_id: string
+          user_id: string
+          panel_id?: string | null
+          location_name: string
+          calculation_type: 'service' | 'panel'
+          service_amps?: number | null
+          service_voltage?: number | null
+          service_phase?: number | null
+          transformer_kva?: number | null
+          transformer_impedance?: number | null
+          source_fault_current?: number | null
+          feeder_length?: number | null
+          feeder_conductor_size?: string | null
+          feeder_material?: string | null
+          feeder_conduit_type?: string | null
+          feeder_voltage?: number | null
+          feeder_phase?: number | null
+          service_conductor_length?: number | null
+          service_conductor_size?: string | null
+          service_conductor_material?: string | null
+          service_conduit_type?: string | null
+          results: Json
+          notes?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          project_id?: string
+          user_id?: string
+          panel_id?: string | null
+          location_name?: string
+          calculation_type?: 'service' | 'panel'
+          service_amps?: number | null
+          service_voltage?: number | null
+          service_phase?: number | null
+          transformer_kva?: number | null
+          transformer_impedance?: number | null
+          source_fault_current?: number | null
+          feeder_length?: number | null
+          feeder_conductor_size?: string | null
+          feeder_material?: string | null
+          feeder_conduit_type?: string | null
+          feeder_voltage?: number | null
+          feeder_phase?: number | null
+          service_conductor_length?: number | null
+          service_conductor_size?: string | null
+          service_conductor_material?: string | null
+          service_conduit_type?: string | null
+          results?: Json
           notes?: string | null
           created_at?: string
           updated_at?: string
@@ -483,3 +634,19 @@ export type FeederUpdate = Database['public']['Tables']['feeders']['Update']
 export type Circuit = Database['public']['Tables']['circuits']['Row']
 export type CircuitInsert = Database['public']['Tables']['circuits']['Insert']
 export type CircuitUpdate = Database['public']['Tables']['circuits']['Update']
+
+export type InspectorReport = Database['public']['Tables']['inspector_reports']['Row']
+export type InspectorReportInsert = Database['public']['Tables']['inspector_reports']['Insert']
+export type InspectorReportUpdate = Database['public']['Tables']['inspector_reports']['Update']
+
+export type Issue = Database['public']['Tables']['issues']['Row']
+export type IssueInsert = Database['public']['Tables']['issues']['Insert']
+export type IssueUpdate = Database['public']['Tables']['issues']['Update']
+
+export type InspectionItem = Database['public']['Tables']['inspection_items']['Row']
+export type InspectionItemInsert = Database['public']['Tables']['inspection_items']['Insert']
+export type InspectionItemUpdate = Database['public']['Tables']['inspection_items']['Update']
+
+export type ShortCircuitCalculation = Database['public']['Tables']['short_circuit_calculations']['Row']
+export type ShortCircuitCalculationInsert = Database['public']['Tables']['short_circuit_calculations']['Insert']
+export type ShortCircuitCalculationUpdate = Database['public']['Tables']['short_circuit_calculations']['Update']

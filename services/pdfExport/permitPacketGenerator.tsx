@@ -7,11 +7,12 @@ import React from 'react';
 import { pdf } from '@react-pdf/renderer';
 import { Document } from '@react-pdf/renderer';
 import type { Panel, Circuit, Feeder, Transformer } from '../../lib/database.types';
-import { 
-  CoverPage, 
-  EquipmentSchedule, 
-  LoadCalculationSummary, 
-  ComplianceSummary 
+import {
+  CoverPage,
+  EquipmentSchedule,
+  RiserDiagram,
+  LoadCalculationSummary,
+  ComplianceSummary
 } from './PermitPacketDocuments';
 import { PanelScheduleDocument } from './PanelScheduleDocuments';
 
@@ -29,6 +30,13 @@ export interface PermitPacketData {
   preparedBy?: string;
   permitNumber?: string;
   hasGrounding?: boolean;
+  // Tier 1 additions for permit completeness
+  contractorLicense?: string;
+  scopeOfWork?: string;
+  serviceType?: 'overhead' | 'underground';
+  meterLocation?: string;
+  serviceConductorRouting?: string;
+  riserDiagramSvg?: string; // SVG string of the one-line diagram
 }
 
 /**
@@ -71,6 +79,11 @@ export const generatePermitPacket = async (data: PermitPacketData): Promise<void
           servicePhase={data.servicePhase}
           preparedBy={data.preparedBy}
           permitNumber={data.permitNumber}
+          contractorLicense={data.contractorLicense}
+          scopeOfWork={data.scopeOfWork}
+          serviceType={data.serviceType}
+          meterLocation={data.meterLocation}
+          serviceConductorRouting={data.serviceConductorRouting}
         />
 
         {/* Equipment Schedule */}
@@ -79,6 +92,16 @@ export const generatePermitPacket = async (data: PermitPacketData): Promise<void
           transformers={data.transformers}
           feeders={data.feeders}
           projectName={data.projectName}
+        />
+
+        {/* Riser Diagram */}
+        <RiserDiagram
+          panels={data.panels}
+          transformers={data.transformers}
+          feeders={data.feeders}
+          projectName={data.projectName}
+          serviceVoltage={data.serviceVoltage}
+          servicePhase={data.servicePhase}
         />
 
         {/* Load Calculation Summary */}

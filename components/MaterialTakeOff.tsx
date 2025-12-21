@@ -221,7 +221,7 @@ export const MaterialTakeOff: React.FC<MaterialTakeOffProps> = ({ project }) => 
       if (!groups[item.category]) {
         groups[item.category] = [];
       }
-      groups[item.category].push(item);
+      groups[item.category]!.push(item);
     });
     return groups;
   }, [materials]);

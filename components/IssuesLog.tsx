@@ -1,51 +1,57 @@
 
 import React, { useState } from 'react';
-import { Project, NecIssue } from '../types';
+import { Project } from '../types';
 import { AlertCircle, CheckCircle, Search, Filter, Plus, Trash2 } from 'lucide-react';
+import { useIssues } from '../hooks/useIssues';
 
 interface IssuesLogProps {
   project: Project;
   updateProject: (p: Project) => void;
 }
 
-export const IssuesLog: React.FC<IssuesLogProps> = ({ project, updateProject }) => {
+export const IssuesLog: React.FC<IssuesLogProps> = ({ project }) => {
+  const { issues, loading, error, createIssue, toggleIssueStatus, deleteIssue: removeIssue } = useIssues(project.id);
   const [filter, setFilter] = useState<'All' | 'Open' | 'Resolved'>('All');
   const [searchTerm, setSearchTerm] = useState('');
-  const [newIssue, setNewIssue] = useState<Partial<NecIssue>>({
+  const [newIssue, setNewIssue] = useState({
     description: '',
     article: '',
-    severity: 'Warning'
+    severity: 'Warning' as 'Critical' | 'Warning' | 'Info'
   });
   const [isAdding, setIsAdding] = useState(false);
 
-  const handleAdd = () => {
+  console.log('IssuesLog - issues:', issues, 'loading:', loading, 'error:', error);
+
+  const handleAdd = async () => {
     if (!newIssue.description) return;
-    const issue: NecIssue = {
-        id: Date.now().toString(),
-        description: newIssue.description,
-        article: newIssue.article || 'General',
-        severity: newIssue.severity as any,
-        status: 'Open',
-        assignedTo: 'Unassigned',
-        createdAt: Date.now()
-    };
-    updateProject({ ...project, issues: [issue, ...project.issues] });
-    setNewIssue({ description: '', article: '', severity: 'Warning' });
-    setIsAdding(false);
+
+    console.log('Creating issue with data:', {
+      project_id: project.id,
+      description: newIssue.description,
+      article: newIssue.article || 'General',
+      severity: newIssue.severity,
+      status: 'Open'
+    });
+
+    const result = await createIssue({
+      project_id: project.id,
+      description: newIssue.description,
+      article: newIssue.article || 'General',
+      severity: newIssue.severity,
+      status: 'Open'
+    });
+
+    console.log('Issue creation result:', result);
+
+    if (result) {
+      setNewIssue({ description: '', article: '', severity: 'Warning' });
+      setIsAdding(false);
+    } else {
+      console.error('Failed to create issue - check hook error state');
+    }
   };
 
-  const toggleStatus = (id: string) => {
-    const updated = project.issues.map(i => 
-        i.id === id ? { ...i, status: i.status === 'Open' ? 'Resolved' : 'Open' } as NecIssue : i
-    );
-    updateProject({ ...project, issues: updated });
-  };
-
-  const deleteIssue = (id: string) => {
-    updateProject({ ...project, issues: project.issues.filter(i => i.id !== id) });
-  };
-
-  const filteredIssues = project.issues.filter(i => {
+  const filteredIssues = issues.filter(i => {
     const matchesFilter = filter === 'All' || i.status === filter;
     const matchesSearch = i.description.toLowerCase().includes(searchTerm.toLowerCase()) || i.article.toLowerCase().includes(searchTerm.toLowerCase());
     return matchesFilter && matchesSearch;
@@ -58,13 +64,19 @@ export const IssuesLog: React.FC<IssuesLogProps> = ({ project, updateProject }) 
             <h2 className="text-2xl font-light text-gray-900">Violation Log & Punch List</h2>
             <p className="text-gray-500 mt-1">Track code violations and corrective actions.</p>
          </div>
-         <button 
+         <button
            onClick={() => setIsAdding(!isAdding)}
            className="bg-gray-900 text-white px-4 py-2 rounded text-sm font-medium flex items-center gap-2 hover:bg-black"
          >
            <Plus className="w-4 h-4" /> Log Violation
          </button>
        </div>
+
+       {error && (
+         <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+           <p className="text-red-700 font-medium">Error: {error}</p>
+         </div>
+       )}
 
        {isAdding && (
          <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 animate-in slide-in-from-top-2">
@@ -129,38 +141,43 @@ export const IssuesLog: React.FC<IssuesLogProps> = ({ project, updateProject }) 
        </div>
 
        <div className="space-y-3">
-          {filteredIssues.length === 0 && (
+          {loading && (
+             <div className="text-center py-12 text-gray-400">
+                Loading issues...
+             </div>
+          )}
+          {!loading && filteredIssues.length === 0 && (
              <div className="text-center py-12 text-gray-400">
                 No issues found matching your criteria.
              </div>
           )}
-          {filteredIssues.map(issue => (
-              <div 
-                key={issue.id} 
+          {!loading && filteredIssues.map(issue => (
+              <div
+                key={issue.id}
                 className={`bg-white border rounded-lg p-4 flex items-start gap-4 transition-all hover:shadow-md ${issue.status === 'Resolved' ? 'border-gray-100 opacity-60' : 'border-l-4 border-l-red-500 border-y-gray-100 border-r-gray-100'}`}
               >
-                  <button onClick={() => toggleStatus(issue.id)} className="mt-1 flex-shrink-0 text-gray-300 hover:text-green-500 transition-colors">
+                  <button onClick={() => toggleIssueStatus(issue.id)} className="mt-1 flex-shrink-0 text-gray-300 hover:text-green-500 transition-colors">
                       {issue.status === 'Resolved' ? <CheckCircle className="w-5 h-5 text-green-500" /> : <div className="w-5 h-5 rounded-full border-2 border-current" />}
                   </button>
-                  
+
                   <div className="flex-1">
                       <div className="flex items-center gap-2 mb-1">
                           <span className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded-full ${
-                              issue.severity === 'Critical' ? 'bg-red-100 text-red-700' : 
+                              issue.severity === 'Critical' ? 'bg-red-100 text-red-700' :
                               issue.severity === 'Warning' ? 'bg-yellow-100 text-yellow-700' : 'bg-blue-50 text-blue-600'
                           }`}>
                               {issue.severity}
                           </span>
                           <span className="text-xs font-mono text-gray-500">NEC {issue.article}</span>
                           <span className="text-xs text-gray-300 mx-1">•</span>
-                          <span className="text-xs text-gray-400">{new Date(issue.createdAt).toLocaleDateString()}</span>
+                          <span className="text-xs text-gray-400">{new Date(issue.created_at).toLocaleDateString()}</span>
                       </div>
                       <p className={`text-sm ${issue.status === 'Resolved' ? 'text-gray-400 line-through' : 'text-gray-900'}`}>
                           {issue.description}
                       </p>
                   </div>
 
-                  <button onClick={() => deleteIssue(issue.id)} className="text-gray-300 hover:text-red-500">
+                  <button onClick={() => removeIssue(issue.id)} className="text-gray-300 hover:text-red-500">
                       <Trash2 className="w-4 h-4" />
                   </button>
               </div>

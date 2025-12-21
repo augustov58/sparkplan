@@ -4,9 +4,10 @@
  */
 
 import React, { useState } from 'react';
-import { Cable, AlertTriangle, CheckCircle } from 'lucide-react';
+import { Cable, AlertTriangle, CheckCircle, Info } from 'lucide-react';
 import { sizeConductor, quickSizeConductor } from '../services/calculations';
 import { ProjectSettings } from '../types';
+import { TABLE_310_16 } from '../data/nec/table-310-16';
 
 interface ConductorSizingToolProps {
   projectSettings: ProjectSettings;
@@ -288,6 +289,12 @@ export const ConductorSizingTool: React.FC<ConductorSizingToolProps> = ({ projec
                 </div>
               </div>
 
+              {/* Ampacity Comparison Table */}
+              <AmpacityComparisonTable
+                conductorSize={result.conductorSize}
+                loadAmps={loadAmps}
+              />
+
               {/* NEC References */}
               <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
                 <div className="text-sm font-bold text-blue-900 mb-2">NEC References</div>
@@ -303,6 +310,107 @@ export const ConductorSizingTool: React.FC<ConductorSizingToolProps> = ({ projec
             </>
           ) : null}
         </div>
+      </div>
+    </div>
+  );
+};
+
+/**
+ * Ampacity Comparison Table Component
+ * Shows ampacity values at all temperature ratings for comparison
+ * Implements NEC 110.14(C) termination temperature requirements
+ */
+interface AmpacityComparisonTableProps {
+  conductorSize: string;
+  loadAmps: number;
+}
+
+const AmpacityComparisonTable: React.FC<AmpacityComparisonTableProps> = ({ conductorSize, loadAmps }) => {
+  // Get ampacity data for both materials
+  const cuData = TABLE_310_16.find(e => e.size === conductorSize && e.material === 'Cu');
+  const alData = TABLE_310_16.find(e => e.size === conductorSize && e.material === 'Al');
+
+  // Determine which temperature column to use per NEC 110.14(C)
+  // For circuits ≤100A or conductors #14-#1 AWG: Use 60°C column (unless equipment listed for 75°C)
+  // For circuits >100A or conductors larger than #1 AWG: Use 75°C column
+  const conductorSizeIndex = ['14 AWG', '12 AWG', '10 AWG', '8 AWG', '6 AWG', '4 AWG', '3 AWG', '2 AWG', '1 AWG'].indexOf(conductorSize);
+  const isSmallConductor = conductorSizeIndex !== -1;  const recommendedTemp = (loadAmps <= 100 && isSmallConductor) ? 60 : 75;
+
+  return (
+    <div className="bg-white border border-gray-200 rounded-lg p-6">
+      <div className="flex items-start gap-2 mb-4">
+        <Info className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" />
+        <div>
+          <h4 className="font-bold text-gray-900 mb-1">Ampacity Comparison (NEC Table 310.16)</h4>
+          <p className="text-xs text-gray-600">
+            <strong>NEC 110.14(C):</strong> {recommendedTemp === 60
+              ? 'For circuits ≤100A, use 60°C column for terminations (unless equipment is listed for 75°C)'
+              : 'For circuits >100A or conductors larger than #1 AWG, use 75°C column for terminations'}
+          </p>
+        </div>
+      </div>
+
+      <div className="overflow-x-auto">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="border-b-2 border-gray-300">
+              <th className="text-left py-2 px-3 font-bold text-gray-700">Material</th>
+              <th className="text-center py-2 px-3 font-bold text-gray-700">60°C</th>
+              <th className="text-center py-2 px-3 font-bold text-gray-700 bg-electric-50">75°C</th>
+              <th className="text-center py-2 px-3 font-bold text-gray-700">90°C</th>
+            </tr>
+          </thead>
+          <tbody>
+            {/* Copper Row */}
+            {cuData && (
+              <tr className="border-b border-gray-200">
+                <td className="py-3 px-3 font-semibold text-gray-900">
+                  Copper (Cu)
+                  <div className="text-xs text-gray-500 font-normal">THW, THWN</div>
+                </td>
+                <td className={`text-center py-3 px-3 font-mono text-lg ${recommendedTemp === 60 ? 'bg-yellow-100 font-bold text-yellow-900 border-2 border-yellow-400' : 'text-gray-600'}`}>
+                  {cuData.temp60C}A
+                  {recommendedTemp === 60 && <div className="text-xs font-bold text-yellow-700">USE THIS</div>}
+                </td>
+                <td className={`text-center py-3 px-3 font-mono text-lg ${recommendedTemp === 75 ? 'bg-electric-100 font-bold text-electric-900 border-2 border-electric-400' : 'text-gray-900 bg-electric-50'}`}>
+                  {cuData.temp75C}A
+                  {recommendedTemp === 75 && <div className="text-xs font-bold text-electric-700">USE THIS</div>}
+                </td>
+                <td className="text-center py-3 px-3 font-mono text-lg text-gray-600">
+                  {cuData.temp90C}A
+                  <div className="text-xs text-gray-500">Derating only</div>
+                </td>
+              </tr>
+            )}
+
+            {/* Aluminum Row */}
+            {alData && (
+              <tr>
+                <td className="py-3 px-3 font-semibold text-gray-900">
+                  Aluminum (Al)
+                  <div className="text-xs text-gray-500 font-normal">THW, THWN</div>
+                </td>
+                <td className={`text-center py-3 px-3 font-mono text-lg ${recommendedTemp === 60 ? 'bg-yellow-100 font-bold text-yellow-900 border-2 border-yellow-400' : 'text-gray-600'}`}>
+                  {alData.temp60C}A
+                  {recommendedTemp === 60 && <div className="text-xs font-bold text-yellow-700">USE THIS</div>}
+                </td>
+                <td className={`text-center py-3 px-3 font-mono text-lg ${recommendedTemp === 75 ? 'bg-electric-100 font-bold text-electric-900 border-2 border-electric-400' : 'text-gray-900 bg-electric-50'}`}>
+                  {alData.temp75C}A
+                  {recommendedTemp === 75 && <div className="text-xs font-bold text-electric-700">USE THIS</div>}
+                </td>
+                <td className="text-center py-3 px-3 font-mono text-lg text-gray-600">
+                  {alData.temp90C}A
+                  <div className="text-xs text-gray-500">Derating only</div>
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+
+      <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded text-xs text-blue-800">
+        <strong>Note:</strong> The 90°C column is used only for ampacity adjustment (temperature correction and bundling).
+        Final ampacity for terminations is limited by equipment temperature rating per NEC 110.14(C).
       </div>
     </div>
   );

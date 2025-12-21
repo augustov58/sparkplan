@@ -71,6 +71,7 @@ export function getEgcSize(ocpdRating: number, material: 'Cu' | 'Al'): string {
 
   // If OCPD exceeds table, return largest available size
   const lastEntry = TABLE_250_122[TABLE_250_122.length - 1];
+  if (!lastEntry) return '1 AWG'; // Fallback
   return material === 'Cu' ? lastEntry.copperEgcSize : lastEntry.aluminumEgcSize;
 }
 
@@ -99,6 +100,15 @@ export function getEgcSizeDetailed(
   if (!tableEntry) {
     // OCPD exceeds table maximum
     const lastEntry = TABLE_250_122[TABLE_250_122.length - 1];
+    if (!lastEntry) {
+      // Should never happen, but handle gracefully
+      return {
+        egcSize: '1 AWG',
+        tableEntry: null,
+        necReference: 'NEC 250.122(A) - Table 250.122',
+        notes: ['⚠️ Table lookup error']
+      };
+    }
     notes.push(`⚠️ OCPD rating (${ocpdRating}A) exceeds NEC Table 250.122 maximum (${lastEntry.maxOcpdRating}A). Engineering judgment required.`);
     return {
       egcSize: material === 'Cu' ? lastEntry.copperEgcSize : lastEntry.aluminumEgcSize,

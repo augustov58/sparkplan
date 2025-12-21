@@ -115,13 +115,14 @@
  * @see {@link /CASCADING_HIERARCHY_FIX.md} - Bus bar implementation details
  */
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { Project, PanelCircuit, ProjectType } from '../types';
 import { generateOneLineDescription } from '../services/geminiService';
 import { RefreshCcw, Download, Zap, Plus, Trash2, Grid, Bolt, List, Image, FileCode, Edit2, X, Save } from 'lucide-react';
 import { useCircuits } from '../hooks/useCircuits';
 import { usePanels } from '../hooks/usePanels';
 import { useTransformers } from '../hooks/useTransformers';
+import { useFeeders } from '../hooks/useFeeders';
 import { FeederManager } from './FeederManager';
 import { BulkCircuitCreator } from './BulkCircuitCreator';
 import {
@@ -136,6 +137,7 @@ import {
 } from '../services/validation/panelConnectionValidation';
 import { DiagramPanZoom } from './DiagramPanZoom';
 import { exportDiagram, DiagramExportOptions } from '../services/pdfExport/oneLineDiagramExport';
+import { calculateTreeLayout, getDescendantIds } from '../services/diagram/treeLayoutCalculator';
 
 interface OneLineDiagramProps {
   project: Project;
@@ -143,19 +145,20 @@ interface OneLineDiagramProps {
 }
 
 export const OneLineDiagram: React.FC<OneLineDiagramProps> = ({ project, updateProject }) => {
-  // Use panels, circuits, and transformers from database
+  // Use panels, circuits, transformers, and feeders from database
   const { panels, createPanel, updatePanel, deletePanel, getMainPanel } = usePanels(project.id);
   const { circuits, createCircuit, deleteCircuit } = useCircuits(project.id);
   const { transformers, createTransformer, deleteTransformer } = useTransformers(project.id);
+  const { feeders } = useFeeders(project.id);
 
   const [description, setDescription] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [exporting, setExporting] = useState(false);
   const diagramRef = useRef<SVGSVGElement>(null);
 
-  // Branch dragging state for manual branch repositioning
-  const [branchOffsets, setBranchOffsets] = useState<Map<string, number>>(new Map());
-  const [draggingBranch, setDraggingBranch] = useState<string | null>(null);
+  // Manual dragging state for fine-tuning panel positions
+  const [manualOffsets, setManualOffsets] = useState<Map<string, number>>(new Map());
+  const [draggingNodeId, setDraggingNodeId] = useState<string | null>(null);
   const [dragStartX, setDragStartX] = useState(0);
   const [dragStartOffset, setDragStartOffset] = useState(0);
 
@@ -228,51 +231,130 @@ export const OneLineDiagram: React.FC<OneLineDiagramProps> = ({ project, updateP
     }
   }, [panels, newCircuit.panelId, getMainPanel]);
 
-  // Load branch offsets from localStorage on mount
+  // Calculate tree layout positions (automatic collision-free spacing)
+  const treeLayoutPositions = useMemo(() => {
+    return calculateTreeLayout(panels, transformers, {
+      minNodeSpacing: 140, // Matches LEVEL1_SPACING
+      levelSpacing: 180,
+    });
+  }, [panels, transformers]);
+
+  /**
+   * Calculate maximum depth of panel hierarchy (for dynamic viewBox height)
+   */
+  const calculateMaxDepth = useMemo(() => {
+    const mainPanel = panels.find(p => p.is_main);
+    if (!mainPanel) return 3; // Default to 3 levels
+
+    const getDepth = (panelId: string, transformerId: string | null, currentDepth: number): number => {
+      // Find panels fed from this panel or transformer
+      const childPanels = transformerId
+        ? panels.filter(p => p.fed_from_type === 'transformer' && p.fed_from_transformer_id === transformerId)
+        : panels.filter(p => p.fed_from_type === 'panel' && p.fed_from === panelId);
+
+      // Find transformers fed from this panel
+      const childTransformers = transformerId ? [] : transformers.filter(t => t.fed_from_panel_id === panelId);
+
+      if (childPanels.length === 0 && childTransformers.length === 0) {
+        return currentDepth;
+      }
+
+      let maxChildDepth = currentDepth;
+
+      // Check depth of child panels
+      childPanels.forEach(child => {
+        const depth = getDepth(child.id, null, currentDepth + 1);
+        maxChildDepth = Math.max(maxChildDepth, depth);
+      });
+
+      // Check depth of child transformers and their panels
+      childTransformers.forEach(xfmr => {
+        const depth = getDepth('', xfmr.id, currentDepth + 1);
+        maxChildDepth = Math.max(maxChildDepth, depth);
+      });
+
+      return maxChildDepth;
+    };
+
+    return getDepth(mainPanel.id, null, 0);
+  }, [panels, transformers]);
+
+  /**
+   * Calculate Y position for a given level (0 = MDP, 1 = Level 1, 2 = Level 2, etc.)
+   */
+  const getLevelY = (level: number): number => {
+    const BASE_Y = 320; // Level 1 Y position
+    const LEVEL_SPACING = 130; // Vertical space between levels
+    return BASE_Y + (level - 1) * LEVEL_SPACING;
+  };
+
+  // Dynamic viewBox height based on hierarchy depth
+  const viewBoxHeight = useMemo(() => {
+    const minHeight = 750;
+    const calculatedHeight = getLevelY(calculateMaxDepth) + 150; // Add padding below lowest level
+    return Math.max(minHeight, calculatedHeight);
+  }, [calculateMaxDepth]);
+
+  // Load manual offsets from localStorage on mount
   useEffect(() => {
-    const saved = localStorage.getItem(`diagram-branch-offsets-${project.id}`);
+    const saved = localStorage.getItem(`diagram-manual-offsets-${project.id}`);
     if (saved) {
       try {
         const offsets = JSON.parse(saved);
-        setBranchOffsets(new Map(Object.entries(offsets).map(([k, v]) => [k, Number(v)])));
+        setManualOffsets(new Map(Object.entries(offsets).map(([k, v]) => [k, Number(v)])));
       } catch (e) {
-        console.error('Failed to load branch offsets:', e);
+        console.error('Failed to load manual offsets:', e);
       }
     }
   }, [project.id]);
 
-  // Save branch offsets to localStorage when they change
+  // Save manual offsets to localStorage when they change
   useEffect(() => {
-    if (branchOffsets.size > 0) {
-      const offsetsObj = Object.fromEntries(branchOffsets);
-      localStorage.setItem(`diagram-branch-offsets-${project.id}`, JSON.stringify(offsetsObj));
+    if (manualOffsets.size > 0) {
+      const offsetsObj = Object.fromEntries(manualOffsets);
+      localStorage.setItem(`diagram-manual-offsets-${project.id}`, JSON.stringify(offsetsObj));
     }
-  }, [branchOffsets, project.id]);
+  }, [manualOffsets, project.id]);
 
-  // Handle branch dragging
+  // Handle dragging mouse events
   useEffect(() => {
     const handleMouseMove = (e: MouseEvent) => {
-      if (draggingBranch && diagramRef.current) {
+      if (draggingNodeId && diagramRef.current) {
         const svg = diagramRef.current;
         const svgRect = svg.getBoundingClientRect();
         const viewBox = svg.viewBox.baseVal;
         const scaleX = viewBox.width / svgRect.width;
         const deltaX = (e.clientX - dragStartX) * scaleX;
         const newOffset = dragStartOffset + deltaX;
-        
-        setBranchOffsets(prev => {
+
+        // Update offset for dragged node AND all descendants (move entire subtree together)
+        setManualOffsets(prev => {
           const updated = new Map(prev);
-          updated.set(draggingBranch, newOffset);
+
+          // Calculate how much the parent moved this frame
+          const parentCurrentOffset = prev.get(draggingNodeId) || 0;
+          const delta = newOffset - parentCurrentOffset;
+
+          // Apply same delta to parent
+          updated.set(draggingNodeId, newOffset);
+
+          // Apply same delta to all descendants (so they move together)
+          const descendants = getDescendantIds(draggingNodeId, panels, transformers);
+          descendants.forEach(descendantId => {
+            const descendantCurrentOffset = prev.get(descendantId) || 0;
+            updated.set(descendantId, descendantCurrentOffset + delta);
+          });
+
           return updated;
         });
       }
     };
 
     const handleMouseUp = () => {
-      setDraggingBranch(null);
+      setDraggingNodeId(null);
     };
 
-    if (draggingBranch) {
+    if (draggingNodeId) {
       window.addEventListener('mousemove', handleMouseMove);
       window.addEventListener('mouseup', handleMouseUp);
       return () => {
@@ -280,7 +362,372 @@ export const OneLineDiagram: React.FC<OneLineDiagramProps> = ({ project, updateP
         window.removeEventListener('mouseup', handleMouseUp);
       };
     }
-  }, [draggingBranch, dragStartX, dragStartOffset]);
+  }, [draggingNodeId, dragStartX, dragStartOffset, panels, transformers]);
+
+  /**
+   * Get final X position for a node (tree layout + manual offset)
+   * Returns position centered around serviceX (400)
+   */
+  const getFinalPosition = (nodeId: string, serviceX: number): number => {
+    const treePos = treeLayoutPositions.get(nodeId) || 0;
+    const manualOffset = manualOffsets.get(nodeId) || 0;
+    return serviceX + treePos + manualOffset;
+  };
+
+  /**
+   * Render draggable grip handle for panels with downstream elements
+   */
+  const renderDragGrip = (nodeId: string, x: number, y: number, hasDownstream: boolean) => {
+    if (!hasDownstream) return null;
+
+    const gripX = x + 30; // Right side of panel (25 for center + 5 offset)
+    const isDragging = draggingNodeId === nodeId;
+
+    return (
+      <g
+        key={`grip-${nodeId}`}
+        style={{ cursor: isDragging ? 'grabbing' : 'grab' }}
+        onMouseDown={(e: React.MouseEvent) => {
+          e.stopPropagation();
+          const currentOffset = manualOffsets.get(nodeId) || 0;
+          setDraggingNodeId(nodeId);
+          setDragStartX(e.clientX);
+          setDragStartOffset(currentOffset);
+        }}
+      >
+        {/* Visual feedback when dragging */}
+        {isDragging && (
+          <line
+            x1={gripX}
+            y1={y + 5}
+            x2={gripX}
+            y2={y + 40}
+            stroke="#3B82F6"
+            strokeWidth="2"
+            strokeDasharray="4,4"
+            opacity="0.5"
+          />
+        )}
+
+        {/* Grip dots */}
+        {[12, 17, 22, 27, 32].map((offset, i) => (
+          <circle
+            key={i}
+            cx={gripX}
+            cy={y + offset}
+            r="2"
+            fill={isDragging ? "#3B82F6" : "#9CA3AF"}
+            opacity={isDragging ? 1 : 0.6}
+          />
+        ))}
+
+        {/* Hit area */}
+        <rect
+          x={gripX - 8}
+          y={y + 8}
+          width="16"
+          height="36"
+          fill="transparent"
+        />
+      </g>
+    );
+  };
+
+  /**
+   * Recursively render a panel/transformer and all its descendants
+   * Supports unlimited hierarchy depth
+   *
+   * @param nodeId - Panel or transformer ID
+   * @param nodeType - 'panel' or 'transformer'
+   * @param level - Current level (1 = first level after MDP, 2 = second level, etc.)
+   * @param parentY - Y position of parent element (for calculating bus position)
+   * @param index - Index among siblings (for alternating label directions)
+   * @param serviceX - X position of service entrance (for tree layout positioning)
+   * @param parentPanelId - ID of parent panel (for feeder labels), null if fed from MDP
+   * @param parentTransformerId - ID of parent transformer (for feeder labels), null if fed from panel
+   */
+  const renderNodeAndDescendants = (
+    nodeId: string,
+    nodeType: 'panel' | 'transformer',
+    level: number,
+    parentY: number,
+    index: number,
+    serviceX: number,
+    parentPanelId: string | null = null,
+    parentTransformerId: string | null = null
+  ): React.ReactElement | null => {
+    const currentY = getLevelY(level);
+    const xPos = getFinalPosition(nodeId, serviceX);
+
+    if (nodeType === 'panel') {
+      const panel = panels.find(p => p.id === nodeId);
+      if (!panel) return null;
+
+      const panelCircuits = circuits.filter(c => c.panel_id === panel.id);
+
+      // Get downstream elements
+      const downstreamPanels = panels.filter(p => p.fed_from_type === 'panel' && p.fed_from === nodeId);
+      const downstreamTransformers = transformers.filter(t => t.fed_from_panel_id === nodeId);
+      const totalDownstream = downstreamPanels.length + downstreamTransformers.length;
+
+      // Build downstream positions for bus bar
+      const downstreamPositions: { x: number; topY: number }[] = [];
+      downstreamPanels.forEach(dp => {
+        downstreamPositions.push({ x: getFinalPosition(dp.id, serviceX), topY: getLevelY(level + 1) });
+      });
+      downstreamTransformers.forEach(dt => {
+        downstreamPositions.push({ x: getFinalPosition(dt.id, serviceX), topY: getLevelY(level + 1) });
+      });
+
+      // Calculate bus Y position
+      const busY = parentY + DIAGRAM_CONSTANTS.BUS_OFFSET;
+
+      return (
+        <g key={`panel-${panel.id}-level-${level}`}>
+          {/* Feeder Label - shows wire size and conduit from parent to this panel */}
+          {renderFeederLabel(
+            xPos,
+            busY,
+            currentY,
+            parentPanelId,
+            panel.id,
+            null,
+            index % 2 === 0 ? 'right' : 'left'
+          )}
+
+          {/* Panel Label */}
+          {renderMaskedText(xPos, currentY - 12, panel.name, 'middle', 'text-xs font-bold fill-gray-900', 10)}
+
+          {/* Panel Box */}
+          <rect
+            x={xPos - 25}
+            y={currentY}
+            width="50"
+            height="30"
+            rx="3"
+            stroke="#3B82F6"
+            strokeWidth="2"
+            fill="#EFF6FF"
+          />
+          <text x={xPos} y={currentY + 20} textAnchor="middle" fontSize="10" fontWeight="bold" className="fill-blue-700">
+            P
+          </text>
+
+          {/* Panel Info */}
+          {renderMaskedText(xPos, currentY + 43, `${panel.voltage}V ${panel.phase}Φ • ${panel.bus_rating}A`, 'middle', 'text-[9px] fill-gray-600', 8)}
+          {renderMaskedText(xPos, currentY + 53, panel.main_breaker_amps ? `${panel.main_breaker_amps}A Main` : 'MLO', 'middle', 'text-[8px] fill-gray-500', 7)}
+          {renderMaskedText(xPos, currentY + 63, `${panelCircuits.length} ckt • ${(panelCircuits.reduce((sum, c) => sum + (c.load_watts || 0), 0) / 1000).toFixed(1)}kVA`, 'middle', 'text-[7px] fill-electric-600', 6)}
+          {panel.location && renderMaskedText(xPos, currentY + 73, panel.location, 'middle', 'text-[7px] fill-gray-400 italic', 6)}
+
+          {/* Bus bar for downstream elements */}
+          {totalDownstream > 0 && renderBusBar(xPos, currentY + DIAGRAM_CONSTANTS.PANEL_HEIGHT, downstreamPositions, "#4B5563")}
+
+          {/* Drag grip */}
+          {renderDragGrip(panel.id, xPos, currentY, totalDownstream > 0)}
+
+          {/* Recursively render downstream panels */}
+          {downstreamPanels.map((dp, dpIndex) =>
+            renderNodeAndDescendants(dp.id, 'panel', level + 1, currentY + DIAGRAM_CONSTANTS.PANEL_HEIGHT, dpIndex, serviceX, panel.id, null)
+          )}
+
+          {/* Recursively render downstream transformers */}
+          {downstreamTransformers.map((dt, dtIndex) =>
+            renderNodeAndDescendants(dt.id, 'transformer', level + 1, currentY + DIAGRAM_CONSTANTS.PANEL_HEIGHT, downstreamPanels.length + dtIndex, serviceX, panel.id, null)
+          )}
+        </g>
+      );
+    } else {
+      // Transformer rendering
+      const transformer = transformers.find(t => t.id === nodeId);
+      if (!transformer) return null;
+
+      const downstreamPanels = panels.filter(p => p.fed_from_type === 'transformer' && p.fed_from_transformer_id === nodeId);
+      const downstreamPositions = downstreamPanels.map(dp => ({
+        x: getFinalPosition(dp.id, serviceX),
+        topY: getLevelY(level + 1)
+      }));
+
+      const busY = parentY + DIAGRAM_CONSTANTS.BUS_OFFSET;
+
+      return (
+        <g key={`xfmr-${transformer.id}-level-${level}`}>
+          {/* Feeder Label - shows wire size and conduit from parent panel to this transformer */}
+          {renderFeederLabel(
+            xPos,
+            busY,
+            currentY,
+            parentPanelId,
+            null,
+            transformer.id,
+            index % 2 === 0 ? 'right' : 'left'
+          )}
+
+          {/* Transformer Label */}
+          {renderMaskedText(xPos, currentY - 12, transformer.name, 'middle', 'text-xs font-bold fill-gray-900', 10)}
+
+          {/* Transformer Box */}
+          <rect
+            x={xPos - 30}
+            y={currentY}
+            width="60"
+            height="35"
+            rx="3"
+            stroke="#F59E0B"
+            strokeWidth="2"
+            fill="#FEF3C7"
+          />
+          <text x={xPos} y={currentY + 22} textAnchor="middle" fontSize="10" fontWeight="bold" className="fill-orange-800">
+            XFMR
+          </text>
+
+          {/* Transformer Info */}
+          {renderMaskedText(xPos, currentY + 48, `${transformer.kva_rating} kVA`, 'middle', 'text-[9px] fill-orange-700', 8)}
+          {renderMaskedText(xPos, currentY + 58, `${transformer.primary_voltage}V → ${transformer.secondary_voltage}V`, 'middle', 'text-[8px] fill-orange-700', 7)}
+
+          {/* Bus bar for downstream panels */}
+          {downstreamPanels.length > 0 && renderBusBar(xPos, currentY + DIAGRAM_CONSTANTS.TRANSFORMER_HEIGHT, downstreamPositions, "#F59E0B")}
+
+          {/* Drag grip */}
+          {renderDragGrip(transformer.id, xPos, currentY, downstreamPanels.length > 0)}
+
+          {/* Recursively render downstream panels */}
+          {downstreamPanels.map((dp, dpIndex) =>
+            renderNodeAndDescendants(dp.id, 'panel', level + 1, currentY + DIAGRAM_CONSTANTS.TRANSFORMER_HEIGHT, dpIndex, serviceX, null, transformer.id)
+          )}
+        </g>
+      );
+    }
+  };
+
+  /**
+   * Render feeder label with wire size and conduit info
+   * Shows label with leader line and loop grabbing the feeder
+   *
+   * @param feederLineX - X position of the vertical feeder line
+   * @param feederStartY - Y start position of feeder line
+   * @param feederEndY - Y end position of feeder line
+   * @param sourcePanelId - Source panel ID
+   * @param destPanelId - Destination panel ID (or null if transformer)
+   * @param destTransformerId - Destination transformer ID (or null if panel)
+   * @param offsetDirection - 'left' or 'right' to position label
+   */
+  const renderFeederLabel = (
+    feederLineX: number,
+    feederStartY: number,
+    feederEndY: number,
+    sourcePanelId: string | null,
+    destPanelId: string | null,
+    destTransformerId: string | null,
+    offsetDirection: 'left' | 'right' = 'right'
+  ) => {
+    // Find matching feeder in database
+    const feeder = feeders.find(f => {
+      const sourceMatches = f.source_panel_id === sourcePanelId;
+      const destMatches = destPanelId
+        ? f.destination_panel_id === destPanelId
+        : f.destination_transformer_id === destTransformerId;
+      return sourceMatches && destMatches;
+    });
+
+    // No feeder data = no label
+    if (!feeder || !feeder.phase_conductor_size || !feeder.conduit_size) {
+      return null;
+    }
+
+    // Calculate label position
+    const loopY = (feederStartY + feederEndY) / 2; // Middle of feeder line
+    const loopRadius = 4;
+    const leaderLength = 40;
+    const labelOffsetX = offsetDirection === 'right' ? leaderLength : -leaderLength;
+    const labelX = feederLineX + labelOffsetX;
+
+    // Build label text lines
+    const line1 = `${feeder.phase_conductor_size} ${feeder.conductor_material}`;
+    const line2 = feeder.egc_size ? `+ ${feeder.egc_size} EGC` : '';
+    const line3 = feeder.conduit_size;
+
+    // Estimate label dimensions
+    const charWidth = 6;
+    const lineHeight = 12;
+    const padding = 4;
+    const maxLineLength = Math.max(line1.length, line2.length, line3.length);
+    const labelWidth = maxLineLength * charWidth + padding * 2;
+    const labelHeight = (line2 ? 3 : 2) * lineHeight + padding * 2;
+
+    // Adjust label box position based on direction
+    const labelBoxX = offsetDirection === 'right' ? labelX : labelX - labelWidth;
+
+    return (
+      <g key={`feeder-label-${feeder.id}`}>
+        {/* Loop on feeder line */}
+        <circle
+          cx={feederLineX}
+          cy={loopY}
+          r={loopRadius}
+          fill="white"
+          stroke="#6366F1"
+          strokeWidth="2"
+        />
+
+        {/* Leader line from loop to label */}
+        <line
+          x1={feederLineX + (offsetDirection === 'right' ? loopRadius : -loopRadius)}
+          y1={loopY}
+          x2={labelX}
+          y2={loopY}
+          stroke="#6366F1"
+          strokeWidth="1.5"
+          strokeDasharray="2,2"
+        />
+
+        {/* Label box with border */}
+        <rect
+          x={labelBoxX}
+          y={loopY - labelHeight / 2}
+          width={labelWidth}
+          height={labelHeight}
+          fill="white"
+          stroke="#6366F1"
+          strokeWidth="1.5"
+          rx="3"
+        />
+
+        {/* Label text */}
+        <text
+          x={labelBoxX + padding}
+          y={loopY - labelHeight / 2 + lineHeight}
+          fontSize="8"
+          fontWeight="500"
+          className="fill-gray-800"
+          textAnchor="start"
+        >
+          {line1}
+        </text>
+        {line2 && (
+          <text
+            x={labelBoxX + padding}
+            y={loopY - labelHeight / 2 + lineHeight * 2}
+            fontSize="8"
+            fontWeight="500"
+            className="fill-gray-800"
+            textAnchor="start"
+          >
+            {line2}
+          </text>
+        )}
+        <text
+          x={labelBoxX + padding}
+          y={loopY - labelHeight / 2 + lineHeight * (line2 ? 3 : 2)}
+          fontSize="8"
+          fontWeight="500"
+          className="fill-indigo-600"
+          textAnchor="start"
+        >
+          {line3}
+        </text>
+      </g>
+    );
+  };
 
   const handleGenerate = async () => {
     setLoading(true);
@@ -425,8 +872,9 @@ export const OneLineDiagram: React.FC<OneLineDiagramProps> = ({ project, updateP
 
   const removePanel = async (id: string) => {
     const panel = panels.find(p => p.id === id);
+    if (!panel) return; // Guard check
 
-    if (panel?.is_main) {
+    if (panel.is_main) {
       const mainPanels = panels.filter(p => p.is_main);
 
       // Warn user if deleting the only main panel
@@ -671,7 +1119,7 @@ export const OneLineDiagram: React.FC<OneLineDiagramProps> = ({ project, updateP
 
     // Check for multi-pole circuit conflicts
     const conflict = isCircuitNumberOccupied(circuitNumber, newCircuit.panelId, pole);
-    if (conflict.occupied) {
+    if (conflict.occupied && conflict.conflictingCircuit) {
       alert(`Cannot create circuit at slot ${circuitNumber}.\n\nSlot ${conflict.conflictingSlot} is occupied by ${conflict.conflictingCircuit.pole}-pole circuit "${conflict.conflictingCircuit.description}" starting at slot ${conflict.conflictingCircuit.circuit_number}.\n\nPlease choose a different circuit number.`);
       return;
     }
@@ -798,9 +1246,12 @@ export const OneLineDiagram: React.FC<OneLineDiagramProps> = ({ project, updateP
       }
 
       if (conflicts.length > 0) {
-        const conflictMessages = conflicts.map(c =>
-          `Circuit ${c.circuit.circuit_number} (${c.circuit.description}): Slot ${c.conflict.conflictingSlot} occupied by ${c.conflict.conflictingCircuit.pole}P circuit "${c.conflict.conflictingCircuit.description}"`
-        ).join('\n');
+        const conflictMessages = conflicts
+          .filter(c => c.conflict.conflictingCircuit) // Filter out undefined
+          .map(c =>
+            `Circuit ${c.circuit.circuit_number} (${c.circuit.description}): Slot ${c.conflict.conflictingSlot} occupied by ${c.conflict.conflictingCircuit!.pole}P circuit "${c.conflict.conflictingCircuit!.description}"`
+          )
+          .join('\n');
 
         alert(`Cannot create circuits due to multi-pole slot conflicts:\n\n${conflictMessages}\n\nPlease fix the circuit numbers and try again.`);
         return;
@@ -921,92 +1372,67 @@ export const OneLineDiagram: React.FC<OneLineDiagramProps> = ({ project, updateP
     MDP_WIDTH: 60
   };
 
+  /**
+   * Helper to render text with tight white background mask (prevents feeder lines from obscuring text)
+   * @param x - X position (text anchor)
+   * @param y - Y position (text baseline)
+   * @param text - Text content
+   * @param textAnchor - Text alignment ('start', 'middle', 'end')
+   * @param className - Tailwind CSS classes for text styling
+   * @param fontSize - Approximate font size for mask sizing (default: 12)
+   */
+  const renderMaskedText = (
+    x: number,
+    y: number,
+    text: string | number,
+    textAnchor: 'start' | 'middle' | 'end' = 'middle',
+    className: string = 'text-xs fill-gray-900',
+    fontSize: number = 12
+  ) => {
+    // Estimate text width (rough approximation: 0.6 * fontSize * character count)
+    const charCount = String(text).length;
+    const estimatedWidth = charCount * fontSize * 0.6;
+
+    // Calculate mask rectangle position based on text anchor
+    let maskX = x;
+    if (textAnchor === 'middle') {
+      maskX = x - estimatedWidth / 2;
+    } else if (textAnchor === 'end') {
+      maskX = x - estimatedWidth;
+    }
+
+    // Mask height slightly larger than font size
+    const maskHeight = fontSize * 1.2;
+    const maskY = y - fontSize * 0.85; // Adjust for text baseline
+
+    // Add small padding
+    const padding = 2;
+
+    return (
+      <g>
+        {/* White background mask */}
+        <rect
+          x={maskX - padding}
+          y={maskY - padding}
+          width={estimatedWidth + padding * 2}
+          height={maskHeight + padding * 2}
+          fill="white"
+          stroke="none"
+        />
+        {/* Text on top */}
+        <text x={x} y={y} textAnchor={textAnchor} className={className}>
+          {text}
+        </text>
+      </g>
+    );
+  };
+
   // ✅ NEW: Helper to determine if horizontal bus is needed (2+ downstream elements)
   const needsHorizontalBus = (downstreamCount: number) => {
     return downstreamCount >= 2;
   };
 
   // ✅ NEW: Helper to render horizontal bus with vertical drops
-  // Helper function to get total branch offset (including parent offsets recursively)
-  const getBranchOffset = (panelId: string): number => {
-    const panel = panels.find(p => p.id === panelId);
-    if (!panel || panel.is_main) {
-      return branchOffsets.get(panelId) || 0;
-    }
-    
-    // Get parent offset recursively
-    let parentOffset = 0;
-    if (panel.fed_from_type === 'panel' && panel.fed_from) {
-      parentOffset = getBranchOffset(panel.fed_from);
-    } else if (panel.fed_from_type === 'transformer' && panel.fed_from_transformer_id) {
-      const transformer = transformers.find(t => t.id === panel.fed_from_transformer_id);
-      if (transformer?.fed_from_panel_id) {
-        parentOffset = getBranchOffset(transformer.fed_from_panel_id);
-      }
-    }
-    
-    // Add this panel's offset
-    const thisOffset = branchOffsets.get(panelId) || 0;
-    return parentOffset + thisOffset;
-  };
-
-  // Helper function to render draggable branch grip
-  const renderBranchGrip = (panelId: string, panelRightX: number, panelY: number, hasDownstream: boolean) => {
-    if (!hasDownstream) return null;
-    
-    const offset = branchOffsets.get(panelId) || 0;
-    // Grip should be at panel's right edge + small offset (x is panel left edge, panel width is 50, so right edge is x + 50)
-    const gripX = panelRightX + 8; // 8px to the right of panel edge
-    const isDragging = draggingBranch === panelId;
-    
-    return (
-      <g 
-        key={`grip-${panelId}`}
-        style={{ cursor: isDragging ? 'grabbing' : 'grab' }}
-        onMouseDown={(e: React.MouseEvent) => {
-          e.stopPropagation();
-          setDraggingBranch(panelId);
-          if (diagramRef.current) {
-            setDragStartX(e.clientX);
-            setDragStartOffset(offset);
-          }
-        }}
-      >
-        {/* Visual feedback line when dragging */}
-        {isDragging && (
-          <line
-            x1={gripX}
-            y1={panelY - 10}
-            x2={gripX}
-            y2={panelY + 50}
-            stroke="#3B82F6"
-            strokeWidth="2"
-            strokeDasharray="4,4"
-            opacity="0.5"
-          />
-        )}
-        
-        {/* Grip Icon - 6 dots in a vertical line */}
-        <circle cx={gripX} cy={panelY + 10} r="2.5" fill={isDragging ? "#3B82F6" : "#9CA3AF"} opacity={isDragging ? 1 : 0.6} />
-        <circle cx={gripX} cy={panelY + 15} r="2.5" fill={isDragging ? "#3B82F6" : "#9CA3AF"} opacity={isDragging ? 1 : 0.6} />
-        <circle cx={gripX} cy={panelY + 20} r="2.5" fill={isDragging ? "#3B82F6" : "#9CA3AF"} opacity={isDragging ? 1 : 0.6} />
-        <circle cx={gripX} cy={panelY + 25} r="2.5" fill={isDragging ? "#3B82F6" : "#9CA3AF"} opacity={isDragging ? 1 : 0.6} />
-        <circle cx={gripX} cy={panelY + 30} r="2.5" fill={isDragging ? "#3B82F6" : "#9CA3AF"} opacity={isDragging ? 1 : 0.6} />
-        <circle cx={gripX} cy={panelY + 35} r="2.5" fill={isDragging ? "#3B82F6" : "#9CA3AF"} opacity={isDragging ? 1 : 0.6} />
-        
-        {/* Invisible larger hit area for easier clicking */}
-        <rect
-          x={gripX - 10}
-          y={panelY + 5}
-          width="20"
-          height="40"
-          fill="transparent"
-          style={{ cursor: isDragging ? 'grabbing' : 'grab' }}
-        />
-      </g>
-    );
-  };
-
   const renderBusBar = (
     parentX: number,
     parentBottomY: number,
@@ -1062,6 +1488,7 @@ export const OneLineDiagram: React.FC<OneLineDiagramProps> = ({ project, updateP
     } else if (downstreamElements.length === 1) {
       // Direct vertical line (no bus needed)
       const element = downstreamElements[0];
+      if (!element) return null;
       return (
         <line
           x1={parentX}
@@ -1712,14 +2139,14 @@ export const OneLineDiagram: React.FC<OneLineDiagramProps> = ({ project, updateP
                 <FileCode className="w-3 h-3" />
                 SVG
               </button>
-              {branchOffsets.size > 0 && (
+              {manualOffsets.size > 0 && (
                 <button
                   onClick={() => {
-                    setBranchOffsets(new Map());
-                    localStorage.removeItem(`diagram-branch-offsets-${project.id}`);
+                    setManualOffsets(new Map());
+                    localStorage.removeItem(`diagram-manual-offsets-${project.id}`);
                   }}
                   className="bg-white hover:bg-gray-50 text-gray-700 px-3 py-1 rounded text-xs font-medium border border-gray-200 flex items-center gap-1 transition-colors shadow-sm"
-                  title="Reset branch positions to automatic layout"
+                  title="Reset all manual panel positions to automatic layout"
                 >
                   <RefreshCcw className="w-3 h-3" />
                   Reset Layout
@@ -1728,7 +2155,7 @@ export const OneLineDiagram: React.FC<OneLineDiagramProps> = ({ project, updateP
             </div>
             
             <DiagramPanZoom className="w-full h-full flex-1">
-            <svg ref={diagramRef} className="w-full bg-white" viewBox="0 0 800 750" preserveAspectRatio="xMidYMid meet" style={{ minWidth: '800px', minHeight: '750px' }}>
+            <svg ref={diagramRef} className="w-full bg-white" viewBox={`0 0 800 ${viewBoxHeight}`} preserveAspectRatio="xMidYMid meet" style={{ minWidth: '800px', minHeight: `${viewBoxHeight}px` }}>
                 <defs>
                     <marker id="arrow" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto" markerUnits="strokeWidth">
                         <path d="M0,0 L0,6 L9,3 z" fill="#9CA3AF" />
@@ -1742,8 +2169,8 @@ export const OneLineDiagram: React.FC<OneLineDiagramProps> = ({ project, updateP
 
                 {/* Utility Service */}
                 <circle cx={serviceX} cy={50} r="20" stroke="#111827" strokeWidth="2" fill="white" />
-                <text x={serviceX} y={55} textAnchor="middle" className="text-xs font-bold font-mono">UTIL</text>
-                <text x={serviceX} y={30} textAnchor="middle" className="text-[9px] fill-gray-500">
+                <text x={serviceX} y={55} textAnchor="middle" fontSize="10" fontWeight="bold" className="font-mono">UTIL</text>
+                <text x={serviceX} y={30} textAnchor="middle" fontSize="8" className="fill-gray-500">
                   {project.serviceVoltage}V {project.servicePhase}Φ
                 </text>
 
@@ -1752,7 +2179,7 @@ export const OneLineDiagram: React.FC<OneLineDiagramProps> = ({ project, updateP
 
                 {/* Meter */}
                 <rect x={serviceX - 20} y={90} width="40" height="30" stroke="#111827" strokeWidth="2" fill="white" />
-                <text x={serviceX} y={110} textAnchor="middle" className="text-xs font-bold">M</text>
+                <text x={serviceX} y={110} textAnchor="middle" fontSize="10" fontWeight="bold">M</text>
 
                 {/* Service Line to First Panel */}
                 <line x1={serviceX} y1={120} x2={serviceX} y2={160} stroke="#111827" strokeWidth="3" />
@@ -1778,6 +2205,25 @@ export const OneLineDiagram: React.FC<OneLineDiagramProps> = ({ project, updateP
                   // Calculate total elements for spacing
                   const totalElements = panelsFedFromMain.length + transformersFedFromMain.length;
 
+                  // ✅ BUILD MDP DOWNSTREAM POSITIONS (using tree layout + manual offsets)
+                  const mdpDownstreamPositions: { x: number; topY: number }[] = [];
+
+                  // Add all panels fed from MDP
+                  panelsFedFromMain.forEach((panel) => {
+                    mdpDownstreamPositions.push({
+                      x: getFinalPosition(panel.id, serviceX),
+                      topY: DIAGRAM_CONSTANTS.LEVEL1_PANEL_Y
+                    });
+                  });
+
+                  // Add all transformers fed from MDP
+                  transformersFedFromMain.forEach((xfmr) => {
+                    mdpDownstreamPositions.push({
+                      x: getFinalPosition(xfmr.id, serviceX),
+                      topY: DIAGRAM_CONSTANTS.LEVEL1_PANEL_Y
+                    });
+                  });
+
                   return (
                     <>
                       {/* Main Distribution Panel (MDP) */}
@@ -1794,406 +2240,34 @@ export const OneLineDiagram: React.FC<OneLineDiagramProps> = ({ project, updateP
                             strokeWidth="2"
                             fill="#FEF2F2"
                           />
-                          <text x={serviceX} y={195} textAnchor="middle" className="text-xs font-bold fill-red-700">
+                          <text x={serviceX} y={195} textAnchor="middle" fontSize="10" fontWeight="bold" className="fill-red-700">
                             MDP
                           </text>
 
-                          {/* MDP Labels - Outside Box Above */}
-                          <text x={serviceX} y={155} textAnchor="middle" className="text-xs font-bold fill-gray-900">
-                            {mainPanel.name}
-                          </text>
+                          {/* MDP Labels - Outside Box Above (MASKED) */}
+                          {renderMaskedText(serviceX, 155, mainPanel.name, 'middle', 'text-xs font-bold fill-gray-900', 10)}
 
-                          {/* MDP Labels - Outside Box Below */}
-                          <text x={serviceX} y={223} textAnchor="middle" className="text-[9px] fill-gray-600">
-                            {mainPanel.voltage}V {mainPanel.phase}Φ • {mainPanel.bus_rating}A Bus • {mainPanel.main_breaker_amps}A Main
-                          </text>
-                          <text x={serviceX} y={235} textAnchor="middle" className="text-[8px] fill-electric-600">
-                            {circuits.filter(c => c.panel_id === mainPanel.id).length} circuits
-                          </text>
+                          {/* MDP Labels - Outside Box Below (MASKED) */}
+                          {renderMaskedText(serviceX, 223, `${mainPanel.voltage}V ${mainPanel.phase}Φ • ${mainPanel.bus_rating}A Bus • ${mainPanel.main_breaker_amps}A Main`, 'middle', 'text-[9px] fill-gray-600', 8)}
+                          {renderMaskedText(serviceX, 235, `${circuits.filter(c => c.panel_id === mainPanel.id).length} circuits`, 'middle', 'text-[8px] fill-electric-600', 7)}
 
-                          {/* Bus from MDP */}
-                          {totalElements > 0 && (
-                            <>
-                              <line x1={serviceX} y1={210} x2={serviceX} y2={250} stroke="#111827" strokeWidth="3" />
-                              <line
-                                x1={Math.max(150, serviceX - (totalElements * 70))}
-                                y1={250}
-                                x2={Math.min(650, serviceX + (totalElements * 70))}
-                                y2={250}
-                                stroke="#111827"
-                                strokeWidth="4"
-                              />
-                            </>
+                          {/* ✅ FIXED: MDP Bus Bar using actual final positions (responds to manual dragging) */}
+                          {totalElements > 0 && renderBusBar(
+                            serviceX,
+                            170 + 40, // MDP bottom Y (MDP_Y + MDP_HEIGHT)
+                            mdpDownstreamPositions,
+                            "#111827"
                           )}
 
-                          {/* Render panels fed directly from MDP */}
-                          {panelsFedFromMain.map((panel, index) => {
-                            const spacing = 140;
-                            const startX = serviceX - ((totalElements - 1) * spacing / 2);
-                            const baseXPos = startX + (index * spacing);
-                            
-                            // ✅ Apply manual branch offset
-                            const branchOffset = getBranchOffset(panel.id);
-                            const xPos = baseXPos + branchOffset;
-                            
-                            const panelCircuits = circuits.filter(c => c.panel_id === panel.id);
-
-                            // ✅ NEW: Get downstream elements for this panel
-                            const downstream = getDownstreamElements(panel.id);
-                            const downstreamPanelsFed = panels.filter(p => p.fed_from_type === 'panel' && p.fed_from === panel.id);
-                            const downstreamTransformersFed = transformers.filter(t => t.fed_from_panel_id === panel.id);
-
-                            // ✅ FIX: Calculate total downstream elements to avoid overlap
-                            const totalDownstream = downstreamPanelsFed.length + downstreamTransformersFed.length;
-
-                            // ✅ NEW: Build downstream position array for bus bar rendering
-                            const downstreamPositions: { x: number; topY: number }[] = [];
-
-                            // Panels come first - apply offsets
-                            downstreamPanelsFed.forEach((downPanel, downIndex) => {
-                              const baseX = xPos + (downIndex - (totalDownstream - 1) / 2) * DIAGRAM_CONSTANTS.LEVEL2_SPACING;
-                              const panelOffset = getBranchOffset(downPanel.id);
-                              downstreamPositions.push({
-                                x: baseX + panelOffset,
-                                topY: DIAGRAM_CONSTANTS.LEVEL2_PANEL_Y
-                              });
-                            });
-
-                            // Transformers come after - apply offsets
-                            downstreamTransformersFed.forEach((downXfmr, downIndex) => {
-                              const transformerIndex = downstreamPanelsFed.length + downIndex;
-                              const baseX = xPos + (transformerIndex - (totalDownstream - 1) / 2) * DIAGRAM_CONSTANTS.LEVEL2_SPACING;
-                              // Transformers don't have their own offsets, they move with parent
-                              downstreamPositions.push({
-                                x: baseX,
-                                topY: DIAGRAM_CONSTANTS.LEVEL2_PANEL_Y
-                              });
-                            });
-
-                            return (
-                              <g key={`panel-${panel.id}`}>
-                                {/* Panel Label - Above Box */}
-                                <text x={xPos} y={308} textAnchor="middle" className="text-xs font-bold fill-gray-900">
-                                  {panel.name}
-                                </text>
-
-                                {/* Connection Line */}
-                                <line x1={xPos} y1={250} x2={xPos} y2={320} stroke="#4B5563" strokeWidth="2" />
-
-                                {/* Panel Box - Smaller */}
-                                <rect
-                                  x={xPos - 25}
-                                  y={320}
-                                  width="50"
-                                  height="30"
-                                  rx="3"
-                                  stroke="#3B82F6"
-                                  strokeWidth="2"
-                                  fill="#EFF6FF"
-                                />
-                                <text x={xPos} y={340} textAnchor="middle" className="text-xs font-bold fill-blue-700">
-                                  P
-                                </text>
-
-                                {/* Panel Info - Below Box */}
-                                <text x={xPos} y={363} textAnchor="middle" className="text-[9px] fill-gray-600">
-                                  {panel.voltage}V {panel.phase}Φ • {panel.bus_rating}A
-                                </text>
-                                <text x={xPos} y={373} textAnchor="middle" className="text-[8px] fill-gray-500">
-                                  {panel.main_breaker_amps ? `${panel.main_breaker_amps}A Main` : 'MLO'}
-                                </text>
-                                <text x={xPos} y={383} textAnchor="middle" className="text-[7px] fill-electric-600">
-                                  {panelCircuits.length} ckt • {(panelCircuits.reduce((sum, c) => sum + (c.load_watts || 0), 0) / 1000).toFixed(1)}kVA
-                                </text>
-                                {panel.location && (
-                                  <text x={xPos} y={393} textAnchor="middle" className="text-[7px] fill-gray-400 italic">
-                                    {panel.location}
-                                  </text>
-                                )}
-
-                                {/* ✅ NEW: Render bus bar for downstream elements (horizontal bus + vertical drops) */}
-                                {totalDownstream > 0 && renderBusBar(
-                                  xPos,
-                                  DIAGRAM_CONSTANTS.LEVEL1_PANEL_Y + DIAGRAM_CONSTANTS.PANEL_HEIGHT,
-                                  downstreamPositions,
-                                  "#4B5563"
-                                )}
-
-                                {/* ✅ NEW: Render draggable branch grip - positioned at panel right edge */}
-                                {renderBranchGrip(panel.id, xPos + 25, 320, totalDownstream > 0)}
-
-                                {/* ✅ NEW: Render downstream panels fed from this panel */}
-                                {downstreamPanelsFed.map((downPanel, downIndex) => {
-                                  const downPanelCircuits = circuits.filter(c => c.panel_id === downPanel.id);
-                                  // ✅ FIX: Position based on total downstream elements (panels come first)
-                                  const baseDownPanelX = xPos + (downIndex - (totalDownstream - 1) / 2) * DIAGRAM_CONSTANTS.LEVEL2_SPACING;
-                                  // ✅ Apply branch offset for nested branches
-                                  const downPanelOffset = getBranchOffset(downPanel.id);
-                                  const downPanelX = baseDownPanelX + downPanelOffset;
-                                  const downPanelY = DIAGRAM_CONSTANTS.LEVEL2_PANEL_Y;
-                                  
-                                  // Check if this panel has downstream elements
-                                  const downPanelDownstream = panels.filter(p => 
-                                    (p.fed_from_type === 'panel' && p.fed_from === downPanel.id) ||
-                                    (p.fed_from_type === 'transformer' && transformers.find(t => t.id === p.fed_from_transformer_id && t.fed_from_panel_id === downPanel.id))
-                                  );
-                                  const downPanelTransformers = transformers.filter(t => t.fed_from_panel_id === downPanel.id);
-                                  const hasDownPanelDownstream = downPanelDownstream.length > 0 || downPanelTransformers.length > 0;
-
-                                  return (
-                                    <g key={`panel-down-${downPanel.id}`}>
-                                      {/* Panel Label - Above Box */}
-                                      <text x={downPanelX} y={downPanelY - 12} textAnchor="middle" className="text-xs font-bold fill-gray-900">
-                                        {downPanel.name}
-                                      </text>
-
-                                      {/* ❌ REMOVED: Diagonal connection line (now handled by bus bar above) */}
-
-                                      {/* Panel Box */}
-                                      <rect
-                                        x={downPanelX - 25}
-                                        y={downPanelY}
-                                        width="50"
-                                        height="30"
-                                        rx="3"
-                                        stroke="#3B82F6"
-                                        strokeWidth="2"
-                                        fill="#EFF6FF"
-                                      />
-                                      <text x={downPanelX} y={downPanelY + 20} textAnchor="middle" className="text-xs font-bold fill-blue-700">
-                                        P
-                                      </text>
-
-                                      {/* Panel Info */}
-                                      <text x={downPanelX} y={downPanelY + 43} textAnchor="middle" className="text-[9px] fill-gray-600">
-                                        {downPanel.voltage}V {downPanel.phase}Φ • {downPanel.bus_rating}A
-                                      </text>
-                                      <text x={downPanelX} y={downPanelY + 53} textAnchor="middle" className="text-[8px] fill-gray-500">
-                                        {downPanel.main_breaker_amps ? `${downPanel.main_breaker_amps}A` : 'MLO'}
-                                      </text>
-                                      <text x={downPanelX} y={downPanelY + 63} textAnchor="middle" className="text-[7px] fill-electric-600">
-                                        {downPanelCircuits.length} ckt • {(downPanelCircuits.reduce((sum, c) => sum + (c.load_watts || 0), 0) / 1000).toFixed(1)}kVA
-                                      </text>
-                                      
-                                      {/* ✅ Render grip for nested branches - positioned at panel right edge */}
-                                      {renderBranchGrip(downPanel.id, downPanelX + 25, downPanelY, hasDownPanelDownstream)}
-                                    </g>
-                                  );
-                                })}
-
-                                {/* ✅ NEW: Render downstream transformers fed from this panel */}
-                                {downstreamTransformersFed.map((downXfmr, downIndex) => {
-                                  // ✅ FIX: Position transformers after panels (add panel count to index)
-                                  const transformerIndex = downstreamPanelsFed.length + downIndex;
-                                  const downXfmrX = xPos + (transformerIndex - (totalDownstream - 1) / 2) * DIAGRAM_CONSTANTS.LEVEL2_SPACING;
-                                  const downXfmrY = DIAGRAM_CONSTANTS.LEVEL2_PANEL_Y;
-                                  const transformerFedPanels = panels.filter(p => p.fed_from_transformer_id === downXfmr.id);
-
-                                  // Build positions for panels fed from this transformer
-                                  const transformerDownstreamPositions = transformerFedPanels.map((_, tfIndex) => ({
-                                    x: downXfmrX + (tfIndex - (transformerFedPanels.length - 1) / 2) * DIAGRAM_CONSTANTS.LEVEL3_SPACING,
-                                    topY: DIAGRAM_CONSTANTS.LEVEL3_PANEL_Y
-                                  }));
-
-                                  return (
-                                    <g key={`xfmr-down-${downXfmr.id}`}>
-                                      {/* Transformer Label */}
-                                      <text x={downXfmrX} y={downXfmrY - 12} textAnchor="middle" className="text-xs font-bold fill-gray-900">
-                                        {downXfmr.name}
-                                      </text>
-
-                                      {/* ❌ REMOVED: Diagonal connection line (now handled by bus bar above) */}
-
-                                      {/* Transformer Box */}
-                                      <rect
-                                        x={downXfmrX - 30}
-                                        y={downXfmrY}
-                                        width="60"
-                                        height="35"
-                                        rx="3"
-                                        stroke="#F59E0B"
-                                        strokeWidth="2"
-                                        fill="#FEF3C7"
-                                      />
-                                      <text x={downXfmrX} y={downXfmrY + 22} textAnchor="middle" className="text-xs font-bold fill-orange-800">
-                                        XFMR
-                                      </text>
-
-                                      {/* Transformer Info */}
-                                      <text x={downXfmrX} y={downXfmrY + 48} textAnchor="middle" className="text-[9px] fill-orange-700">
-                                        {downXfmr.kva_rating} kVA
-                                      </text>
-                                      <text x={downXfmrX} y={downXfmrY + 58} textAnchor="middle" className="text-[8px] fill-orange-700">
-                                        {downXfmr.primary_voltage}V → {downXfmr.secondary_voltage}V
-                                      </text>
-
-                                      {/* ✅ NEW: Render bus bar for transformer-fed panels (orange for transformer) */}
-                                      {transformerFedPanels.length > 0 && renderBusBar(
-                                        downXfmrX,
-                                        downXfmrY + DIAGRAM_CONSTANTS.TRANSFORMER_HEIGHT,
-                                        transformerDownstreamPositions,
-                                        "#F59E0B"
-                                      )}
-
-                                      {/* Panels fed from this downstream transformer */}
-                                      {transformerFedPanels.map((tfPanel, tfIndex) => {
-                                        const tfPanelCircuits = circuits.filter(c => c.panel_id === tfPanel.id);
-                                        const tfPanelX = downXfmrX + (tfIndex - (transformerFedPanels.length - 1) / 2) * DIAGRAM_CONSTANTS.LEVEL3_SPACING;
-                                        const tfPanelY = DIAGRAM_CONSTANTS.LEVEL3_PANEL_Y;
-
-                                        return (
-                                          <g key={`panel-tf-${tfPanel.id}`}>
-                                            {/* Panel Label */}
-                                            <text x={tfPanelX} y={tfPanelY - 12} textAnchor="middle" className="text-xs font-bold fill-gray-900">
-                                              {tfPanel.name}
-                                            </text>
-
-                                            {/* ❌ REMOVED: Diagonal connection line (now handled by bus bar above) */}
-
-                                            {/* Panel Box */}
-                                            <rect
-                                              x={tfPanelX - 25}
-                                              y={tfPanelY}
-                                              width="50"
-                                              height="30"
-                                              rx="3"
-                                              stroke="#3B82F6"
-                                              strokeWidth="2"
-                                              fill="#EFF6FF"
-                                            />
-                                            <text x={tfPanelX} y={tfPanelY + 20} textAnchor="middle" className="text-xs font-bold fill-blue-700">
-                                              P
-                                            </text>
-
-                                            {/* Panel Info */}
-                                            <text x={tfPanelX} y={tfPanelY + 43} textAnchor="middle" className="text-[9px] fill-gray-600">
-                                              {tfPanel.voltage}V {tfPanel.phase}Φ • {tfPanel.bus_rating}A
-                                            </text>
-                                            <text x={tfPanelX} y={tfPanelY + 53} textAnchor="middle" className="text-[8px] fill-gray-500">
-                                              {tfPanel.main_breaker_amps ? `${tfPanel.main_breaker_amps}A` : 'MLO'}
-                                            </text>
-                                            <text x={tfPanelX} y={tfPanelY + 63} textAnchor="middle" className="text-[7px] fill-electric-600">
-                                              {tfPanelCircuits.length} ckt • {(tfPanelCircuits.reduce((sum, c) => sum + (c.load_watts || 0), 0) / 1000).toFixed(1)}kVA
-                                            </text>
-                                          </g>
-                                        );
-                                      })}
-                                    </g>
-                                  );
-                                })}
-                              </g>
-                            );
-                          })}
-
-                          {/* Render transformers and their downstream panels */}
-                          {transformersFedFromMain.map((xfmr, xfmrIndex) => {
-                            const spacing = 140;
-                            const baseIndex = panelsFedFromMain.length + xfmrIndex;
-                            const startX = serviceX - ((totalElements - 1) * spacing / 2);
-                            const xPos = startX + (baseIndex * spacing);
-
-                            // Find panels fed from this transformer
-                            const downstreamPanels = panels.filter(p => p.fed_from_transformer_id === xfmr.id);
-
-                            // ✅ NEW: Build downstream position array for bus bar rendering
-                            const mdpTransformerDownstreamPositions = downstreamPanels.map((_, pIndex) => ({
-                              x: xPos + (pIndex - (downstreamPanels.length - 1) / 2) * DIAGRAM_CONSTANTS.LEVEL2_SPACING,
-                              topY: DIAGRAM_CONSTANTS.LEVEL2_PANEL_Y
-                            }));
-
-                            return (
-                              <g key={`xfmr-${xfmr.id}`}>
-                                {/* Transformer Label - Above Box */}
-                                <text x={xPos} y={308} textAnchor="middle" className="text-xs font-bold fill-gray-900">
-                                  {xfmr.name}
-                                </text>
-
-                                {/* Line from bus to transformer */}
-                                <line x1={xPos} y1={250} x2={xPos} y2={320} stroke="#4B5563" strokeWidth="2" />
-
-                                {/* Transformer Box - Smaller */}
-                                <rect
-                                  x={xPos - 30}
-                                  y={320}
-                                  width="60"
-                                  height="35"
-                                  rx="3"
-                                  stroke="#F59E0B"
-                                  strokeWidth="2"
-                                  fill="#FEF3C7"
-                                />
-                                <text x={xPos} y={342} textAnchor="middle" className="text-xs font-bold fill-orange-800">
-                                  XFMR
-                                </text>
-
-                                {/* Transformer Info - Below Box */}
-                                <text x={xPos} y={368} textAnchor="middle" className="text-[9px] fill-orange-700">
-                                  {xfmr.kva_rating} kVA
-                                </text>
-                                <text x={xPos} y={378} textAnchor="middle" className="text-[8px] fill-orange-700">
-                                  {xfmr.primary_voltage}V → {xfmr.secondary_voltage}V
-                                </text>
-
-                                {/* ✅ NEW: Render bus bar for transformer-fed panels (orange for transformer) */}
-                                {downstreamPanels.length > 0 && renderBusBar(
-                                  xPos,
-                                  DIAGRAM_CONSTANTS.LEVEL1_PANEL_Y + DIAGRAM_CONSTANTS.TRANSFORMER_HEIGHT,
-                                  mdpTransformerDownstreamPositions,
-                                  "#F59E0B"
-                                )}
-
-                                {/* Downstream panels from transformer */}
-                                {downstreamPanels.map((panel, pIndex) => {
-                                  const panelCircuits = circuits.filter(c => c.panel_id === panel.id);
-                                  const panelX = xPos + (pIndex - (downstreamPanels.length - 1) / 2) * DIAGRAM_CONSTANTS.LEVEL2_SPACING;
-                                  const panelY = DIAGRAM_CONSTANTS.LEVEL2_PANEL_Y;
-
-                                  return (
-                                    <g key={`panel-xfmr-${panel.id}`}>
-                                      {/* Panel Label - Above Box */}
-                                      <text x={panelX} y={panelY - 12} textAnchor="middle" className="text-xs font-bold fill-gray-900">
-                                        {panel.name}
-                                      </text>
-
-                                      {/* ❌ REMOVED: Diagonal connection line (now handled by bus bar above) */}
-
-                                      {/* Panel Box - Smaller */}
-                                      <rect
-                                        x={panelX - 25}
-                                        y={panelY}
-                                        width="50"
-                                        height="30"
-                                        rx="3"
-                                        stroke="#3B82F6"
-                                        strokeWidth="2"
-                                        fill="#EFF6FF"
-                                      />
-                                      <text x={panelX} y={panelY + 20} textAnchor="middle" className="text-xs font-bold fill-blue-700">
-                                        P
-                                      </text>
-
-                                      {/* Panel Info - Below Box */}
-                                      <text x={panelX} y={panelY + 43} textAnchor="middle" className="text-[9px] fill-gray-600">
-                                        {panel.voltage}V {panel.phase}Φ • {panel.bus_rating}A
-                                      </text>
-                                      <text x={panelX} y={panelY + 53} textAnchor="middle" className="text-[8px] fill-gray-500">
-                                        {panel.main_breaker_amps ? `${panel.main_breaker_amps}A` : 'MLO'}
-                                      </text>
-                                      <text x={panelX} y={panelY + 63} textAnchor="middle" className="text-[7px] fill-electric-600">
-                                        {panelCircuits.length} ckt • {(panelCircuits.reduce((sum, c) => sum + (c.load_watts || 0), 0) / 1000).toFixed(1)}kVA
-                                      </text>
-                                    </g>
-                                  );
-                                })}
-                              </g>
-                            );
-                          })}
+                          {/* ✅ NEW: Use recursive rendering for unlimited depth */}
+                          {panelsFedFromMain.map((panel, index) => renderNodeAndDescendants(panel.id, 'panel', 1, 210, index, serviceX, mainPanel?.id || null, null))}
+                          {transformersFedFromMain.map((xfmr, index) => renderNodeAndDescendants(xfmr.id, 'transformer', 1, 210, panelsFedFromMain.length + index, serviceX, mainPanel?.id || null, null))}
                         </>
                       )}
 
-                      {/* No Panels Message */}
+                      {/* Message when no panels exist */}
                       {panels.length === 0 && (
-                        <text x={400} y={300} textAnchor="middle" className="text-sm fill-gray-400">
+                        <text x={400} y={300} textAnchor="middle" fontSize="12" className="fill-gray-400">
                           Add panels using the form on the left to see them here
                         </text>
                       )}

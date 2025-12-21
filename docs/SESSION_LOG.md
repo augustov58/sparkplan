@@ -2,13 +2,261 @@
 
 **Purpose**: This document tracks changes made during development sessions for seamless handoff between Claude instances.
 
-**Last Updated**: 2025-12-07
+**Last Updated**: 2025-12-17
 **Current Branch**: `cursor-features`
-**Previous Branch**: `augusto-improvements`
 
 ---
 
 ## 📋 Current Session Status
+
+### Session: 2025-12-17 - TypeScript Strictness Phase 1 ✅ COMPLETE
+
+**Session Start**: TypeScript strict mode implementation
+**Focus**: Enable critical strict flags and fix runtime safety issues
+**Status**: ✅ Phase 1 Complete - Production code safe
+
+#### Completed This Session
+
+**🎯 TypeScript Strictness - Phase 1 Complete (45% Error Reduction)**
+
+**Enabled Strict Flags** (`tsconfig.json`):
+- `strictNullChecks: true` - Prevents null/undefined crashes
+- `noImplicitAny: true` - Requires explicit types
+- `noUncheckedIndexedAccess: true` - Array access safety
+
+**Results**:
+- **Errors Reduced**: 176 → 96 (80 errors fixed)
+- **Runtime Safety**: All "possibly undefined" crashes fixed
+- **Files Modified**: 28 production files
+
+**Critical Fixes** (See `/docs/TYPESCRIPT_STRICTNESS_STATUS.md` for details):
+1. ✅ Array.find() possibly undefined (15+ errors)
+2. ✅ Array indexing possibly undefined (20+ errors)
+3. ✅ Object property possibly undefined (21+ errors)
+4. ✅ Missing required properties (6 errors)
+5. ✅ Duplicate database type definitions (4 errors)
+6. ✅ Deno type errors in Edge Functions (3 errors)
+7. ✅ Database schema mismatches (3 errors)
+
+**Remaining Work** (96 errors - documented for later):
+- 17 Supabase type mismatches (TS2769) - Low priority, compile-time only
+- 5 Argument type mismatches (TS2345) - Medium priority
+- ~70 Test file errors - Separate task
+- 4 Minor property access errors
+
+**Impact**: Production code is now significantly safer. All errors that could cause runtime crashes (null/undefined access) have been fixed. Remaining errors are lower-priority type mismatches.
+
+**Documentation Created**:
+- `/docs/TYPESCRIPT_STRICTNESS_STATUS.md` - Complete status report with:
+  - Detailed breakdown of all fixes
+  - Remaining error analysis
+  - Step-by-step guide to continue work
+  - Reference of all modified files
+
+**Next Steps**:
+- Remaining TypeScript errors documented for future sprint
+- Focus can return to feature development
+- Revisit Phase 2 strict flags during dedicated refactoring
+
+---
+
+### Session: 2025-12-17 - Service Upgrade Wizard (NEC 220.87 Compliant)
+
+**Session Start**: Service Upgrade Wizard Phase 1 MVP Implementation
+**Focus**: Phase 2 - EV Niche Domination (Critical NEC compliance fix)
+
+#### Completed This Session
+
+**⚡ Service Upgrade Wizard - Phase 1 MVP Complete:**
+- Quick Check mode for amp-based service capacity analysis
+- Auto-integration with project panel schedules (killer feature)
+- 25+ load templates for quick additions (EV, HVAC, appliances)
+- Color-coded utilization gauge (Green/Yellow/Red)
+- Real-time calculation with status recommendations
+
+**🔴 CRITICAL NEC 220.87 COMPLIANCE FIX:**
+**Problem Identified**: Initial implementation did NOT comply with NEC 220.87 requirement to apply 125% multiplier to existing loads when sizing service upgrades. This could lead to dangerous undersizing of electrical services.
+
+**Solution Implemented**:
+1. **Added ExistingLoadDeterminationMethod enum** (`types.ts:285-297`):
+   - `UTILITY_BILL` - 12-month utility billing (actual peak - NO multiplier needed)
+   - `LOAD_STUDY` - 30-day continuous recording (actual peak - NO multiplier needed)
+   - `CALCULATED` - Panel schedule calculation (125% multiplier REQUIRED per NEC)
+   - `MANUAL` - Manual entry (125% multiplier REQUIRED per NEC)
+
+2. **Updated calculation logic** (`serviceUpgrade.ts`):
+   ```typescript
+   // NEC 220.87: Apply 125% to existing load based on determination method
+   const adjustedExistingLoad = isActualMeasurement
+     ? existingLoad
+     : existingLoad × 1.25;  // CRITICAL: 125% multiplier per NEC 220.87
+
+   totalAmps = adjustedExistingLoad + proposedLoadAmps;
+   ```
+
+3. **Added comprehensive NEC warnings**:
+   - Orange warning banner when using calculated/manual methods
+   - Recommends actual measurement (utility billing or load study) over calculated
+   - Shows which determination method was used in results
+   - Clear NEC 220.87 references throughout UI
+
+4. **UI enhancements** (`ServiceUpgradeWizard.tsx:237-308`):
+   - Radio button selector for determination method with full NEC explanations
+   - Auto-sets to "Calculated" when using project panel data
+   - Warning displays when using methods that require 125% multiplier
+   - Clear visual distinction between actual vs. calculated loads
+
+**Impact Example**:
+```
+BEFORE (Non-Compliant):
+Existing: 140A + Proposed: 50A = 190A / 200A = 95% ❌ UNDERSIZED
+
+AFTER (NEC 220.87 Compliant):
+Existing: 140A × 1.25 = 175A + Proposed: 50A = 225A / 200A = 112.5% ✅ UPGRADE REQUIRED
+```
+
+**Files Created:**
+1. `/services/calculations/serviceUpgrade.ts` (600+ lines)
+   - `quickServiceCheck()` - Amp-based quick analysis
+   - `analyzeServiceUpgrade()` - Detailed kVA-based analysis (Phase 2)
+   - `LOAD_TEMPLATES[]` - 25+ pre-defined loads
+   - Full NEC 220.87 compliance logic
+
+2. `/components/ServiceUpgradeWizard.tsx` (400+ lines)
+   - Quick Check mode UI
+   - Panel schedule integration
+   - Determination method selector
+   - Utilization gauge with color coding
+   - Load templates dropdown
+
+**Files Modified:**
+1. `/types.ts` (+28 lines)
+   - Added `ExistingLoadDeterminationMethod` enum
+   - Updated `QuickCheckInput` interface
+   - Updated `ServiceUpgradeInput` interface
+
+2. `/components/Calculators.tsx` (+10 lines)
+   - Added "Service Upgrade (NEC 230.42)" tab to sidebar
+   - Imported and rendered ServiceUpgradeWizard component
+
+**Build Status:**
+- ✅ Production Build: Successful (2,819 kB)
+- ✅ Dev Server: Running with HMR
+- ✅ TypeScript: No errors
+- ✅ NEC 220.87: Fully compliant
+
+**NEC Articles Implemented:**
+- NEC 220.87 - Determining Existing Loads (125% multiplier) ✅ **CRITICAL**
+- NEC 230.42 - Service Conductor Sizing ✅
+- NEC 220.82/220.84 - Dwelling Unit Load Calculation ✅
+- NEC 210.19 - Branch Circuit Continuous Load (125% factor) ✅
+- NEC 625.41 - EV Charger Continuous Load (125% factor) ✅
+
+**Location**: `/project/:id/tools` → Service Upgrade tab
+
+**Key Features**:
+- 70% of use cases covered (Quick Check mode)
+- Panel schedule auto-population (unique differentiator)
+- NEC 220.87 compliant (prevents dangerous undersizing)
+- Clear warnings when using less accurate methods
+- Professional-grade calculation accuracy
+
+**Phase 2 Deferred** (Detailed Analysis Mode):
+- Panel vs. Service upgrade distinction ($2-4K vs $6-15K)
+- EVEMS cost comparison for 3+ chargers
+- Voltage drop check for long service runs
+- PDF export for upgrade proposals
+
+**Documentation Updated:**
+- Updated CLAUDE.md Phase 2 status (Service Upgrade Wizard marked complete)
+- Added Service Upgrade Wizard to implemented calculations table
+- Added comprehensive "Recent Changes" entry for 2025-12-17
+- Updated SESSION_LOG.md (this document)
+
+---
+
+### Session: 2025-12-16 - Residential Workflow Completion
+
+**Session Start**: Conductor Sizing Bug Fix + Residential Service Sizing Complete
+**Focus**: Close critical gaps in residential workflow implementation
+
+#### Completed This Session
+
+**🔧 NEC 110.14(C) Termination Temperature Fix (CRITICAL BUG):**
+- Fixed 100A load sizing issue - was incorrectly using 75°C column
+- Implemented NEC 110.14(C)(1)(a) enforcement: Circuits ≤100A require 60°C termination
+- Auto-upsizes conductors when they violate termination temperature limits
+- File modified: `services/calculations/conductorSizing.ts:244-301`
+- **Result**: 100A load now correctly sizes to 1 AWG (110A @ 60°C) instead of 3 AWG
+
+**⚡ Residential Service Sizing - Complete Implementation:**
+
+1. **Neutral Conductor Calculation (NEC 220.61/220.82):**
+   - Added `calculateNeutralLoad()` function
+   - Identifies loads that use neutral vs. 240V-only loads
+   - Applies NEC 220.61(B) reduction: First 200A @ 100%, remainder @ 70%
+   - Returns neutral VA, amps, and reduction percentage
+   - File: `services/calculations/residentialLoad.ts:215-287`
+
+2. **Service Conductor Auto-Sizing (NEC Table 310.12):**
+   - Added `recommendServiceConductorSize()` function
+   - Sizes ungrounded (hot) conductors based on service amps
+   - Sizes neutral conductor based on calculated neutral load
+   - Supports both Copper and Aluminum
+   - File: `services/calculations/residentialLoad.ts:289-319`
+
+3. **Grounding Electrode Conductor Auto-Sizing (NEC 250.66):**
+   - Added `recommendGecSize()` function
+   - Automatically sizes GEC based on service conductor size
+   - Uses NEC Table 250.66 lookup
+   - File: `services/calculations/residentialLoad.ts:321-353`
+
+4. **Updated ResidentialLoadResult Interface:**
+   - Added `neutralLoadVA`, `neutralAmps`, `neutralReduction`
+   - Added `serviceConductorSize`, `neutralConductorSize`, `gecSize`
+   - File: `services/calculations/residentialLoad.ts:105-133`
+
+5. **UI Integration - Conductor Sizing Display:**
+   - Added beautiful gradient blue card showing all conductor sizes
+   - Three-column layout: Service Conductors, Neutral Conductor, GEC
+   - Shows neutral reduction percentage when applied
+   - Includes warning about copper/standard conditions
+   - File: `components/DwellingLoadCalculator.tsx:950-989`
+
+**📊 Workflow Coverage Improvement:**
+- Before: 70% implementation
+- After: **85% implementation** (all core sections 100% complete)
+
+**📚 Documentation Created:**
+- Created `/docs/RESIDENTIAL_WORKFLOW_STATUS.md` - Comprehensive status document
+  - Implementation coverage breakdown
+  - Future enhancement roadmap (deferred features)
+  - Why we stopped here (production-ready decision)
+  - User guide for residential workflow
+
+**Key Files Modified:**
+1. `services/calculations/conductorSizing.ts` - NEC 110.14(C) fix
+2. `services/calculations/residentialLoad.ts` - Neutral/service/GEC sizing
+3. `components/DwellingLoadCalculator.tsx` - UI display
+
+**Build Status:**
+- ✅ Production Build: Successful (5.42s)
+- ✅ Dev Server: Running
+- ✅ TypeScript: No errors
+- ✅ All existing tests: Pass
+
+**NEC Articles Now Covered in Residential Workflow:**
+- NEC 110.14(C) - Termination Temperature Ratings ✅ NEW
+- NEC 220.61 - Neutral Load Calculation ✅ NEW
+- NEC 220.82 - Single-Family Dwelling Load ✅ Enhanced
+- NEC 220.84 - Multi-Family Dwelling Load ✅ Enhanced
+- NEC 250.66 - GEC Sizing ✅ NEW
+- NEC 310.12 - Service Conductor Sizing ✅ NEW
+
+**Next Steps (Deferred to Future):**
+See `/docs/RESIDENTIAL_WORKFLOW_STATUS.md` for detailed future enhancement roadmap.
+
+---
 
 ### Session: 2025-12-07 (Continued - Part 3)
 

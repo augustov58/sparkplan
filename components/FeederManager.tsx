@@ -61,6 +61,11 @@ export const FeederManager: React.FC<FeederManagerProps> = ({
   // ISSUE FIX: Add sizing basis option - 'load' uses calculated panel load, 'capacity' uses panel max capacity
   const [sizingBasis, setSizingBasis] = useState<'load' | 'capacity'>('load');
 
+  // Advanced calculation options
+  const [showAdvancedOptions, setShowAdvancedOptions] = useState(false);
+  const [continuousLoadPercent, setContinuousLoadPercent] = useState(100); // % of load that is continuous (default 100% for capacity-based)
+  const [temperatureRating, setTemperatureRating] = useState<60 | 75 | 90>(75); // Conductor insulation temperature rating
+
   // Detect stale feeders when circuit loads change
   // Note: Only applies to feeders sized based on calculated load (not max capacity)
   const staleFeeders = useMemo(() => {
@@ -142,25 +147,40 @@ export const FeederManager: React.FC<FeederManagerProps> = ({
         console.error('Cannot recalculate: panels data not available');
         return;
       }
-      
-      // Use updateFeeder directly with recalculated values
-      const destPanel = panels.find(p => p.id === feeder.destination_panel_id);
+
+      // Check if feeding a transformer or panel
+      const isTransformer = !!feeder.destination_transformer_id;
+      const destTransformer = isTransformer && Array.isArray(transformers)
+        ? transformers.find(t => t.id === feeder.destination_transformer_id)
+        : null;
+
+      const destPanel = !isTransformer && feeder.destination_panel_id
+        ? panels.find(p => p.id === feeder.destination_panel_id)
+        : null;
+
       const sourcePanel = panels.find(p => p.id === feeder.source_panel_id);
-      
-      if (!destPanel || !sourcePanel) {
-        console.error('Cannot recalculate: source or destination panel not found');
+
+      if (!sourcePanel) {
+        console.error('Cannot recalculate: source panel not found');
         return;
       }
-      
-      // Calculate loads
-      const loads = calculatePanelLoads(feeder.destination_panel_id!);
-      
+
+      if (!destPanel && !destTransformer) {
+        console.error('Cannot recalculate: destination panel or transformer not found');
+        return;
+      }
+
+      // Calculate loads (only for panels, not transformers)
+      const loads = destPanel
+        ? calculatePanelLoads(feeder.destination_panel_id!)
+        : { totalVA: 0, continuousVA: 0, noncontinuousVA: 0 };
+
       // Calculate feeder sizing
       const result = calculateFeederSizing({
         source_voltage: sourcePanel.voltage,
         source_phase: sourcePanel.phase,
-        destination_voltage: destPanel.voltage,
-        destination_phase: destPanel.phase,
+        destination_voltage: destPanel?.voltage || destTransformer?.secondary_voltage || sourcePanel.voltage,
+        destination_phase: destPanel?.phase || destTransformer?.secondary_phase || sourcePanel.phase,
         total_load_va: loads.totalVA,
         continuous_load_va: loads.continuousVA,
         noncontinuous_load_va: loads.noncontinuousVA,
@@ -168,11 +188,19 @@ export const FeederManager: React.FC<FeederManagerProps> = ({
         conductor_material: feeder.conductor_material,
         ambient_temperature_c: feeder.ambient_temperature_c || 30,
         num_current_carrying: feeder.num_current_carrying || 4,
-        max_voltage_drop_percent: 3
+        max_voltage_drop_percent: 3,
+        // Add transformer parameters if feeding a transformer
+        ...(destTransformer && {
+          transformer_kva: destTransformer.kva_rating,
+          transformer_primary_voltage: destTransformer.primary_voltage,
+          transformer_primary_phase: destTransformer.primary_phase
+        })
       });
-      
-      // Get EGC based on panel OCPD
-      const ocpdAmps = destPanel.main_breaker_amps || destPanel.feeder_breaker_amps || destPanel.bus_rating;
+
+      // Get EGC based on OCPD (panel or transformer primary breaker)
+      const ocpdAmps = destPanel
+        ? (destPanel.main_breaker_amps || destPanel.feeder_breaker_amps || destPanel.bus_rating)
+        : (destTransformer?.primary_breaker_amps || 0);
       const egcTable = [
         { maxOCPD: 15, cu: '14 AWG' }, { maxOCPD: 20, cu: '12 AWG' },
         { maxOCPD: 30, cu: '10 AWG' }, { maxOCPD: 40, cu: '10 AWG' },
@@ -236,37 +264,47 @@ export const FeederManager: React.FC<FeederManagerProps> = ({
         console.error('Cannot calculate feeder: panels data not available');
         return;
       }
-      
+
+      // Check if feeding a transformer or panel
+      const isTransformer = !!feeder.destination_transformer_id;
+      const destTransformer = isTransformer && Array.isArray(transformers)
+        ? transformers.find(t => t.id === feeder.destination_transformer_id)
+        : null;
+
       // Get source and destination panels
       const sourcePanel = panels.find(p => p.id === feeder.source_panel_id);
-      const destPanel = feeder.destination_panel_id
+      const destPanel = !isTransformer && feeder.destination_panel_id
         ? panels.find(p => p.id === feeder.destination_panel_id)
         : null;
 
       const sourceVoltage = sourcePanel?.voltage || projectVoltage;
       const sourcePhase = sourcePanel?.phase || projectPhase;
-      const destVoltage = destPanel?.voltage || projectVoltage;
-      const destPhase = destPanel?.phase || projectPhase;
+      const destVoltage = destPanel?.voltage || destTransformer?.secondary_voltage || projectVoltage;
+      const destPhase = destPanel?.phase || destTransformer?.secondary_phase || projectPhase;
 
       // ISSUE FIX: Support both load-based and capacity-based sizing
       let loads: { totalVA: number; continuousVA: number; noncontinuousVA: number };
-      
+
       if (sizingBasis === 'capacity' && destPanel) {
         // Use panel's maximum capacity (main breaker or bus rating)
         const panelCapacityAmps = destPanel.main_breaker_amps || destPanel.bus_rating;
         // Calculate VA from capacity: VA = A × V × √3 (for 3-phase) or VA = A × V (single-phase)
-        const capacityVA = destPhase === 3 
+        const capacityVA = destPhase === 3
           ? panelCapacityAmps * destVoltage * Math.sqrt(3)
           : panelCapacityAmps * destVoltage;
-        
+
+        // Apply continuous load percentage from advanced options
+        const continuousVA = capacityVA * (continuousLoadPercent / 100);
+        const noncontinuousVA = capacityVA - continuousVA;
+
         loads = {
           totalVA: capacityVA,
-          continuousVA: capacityVA, // Assume 100% continuous for capacity-based sizing
-          noncontinuousVA: 0
+          continuousVA: continuousVA,
+          noncontinuousVA: noncontinuousVA
         };
       } else {
-        // Use calculated panel loads (existing behavior)
-        loads = feeder.destination_panel_id
+        // Use calculated panel loads (or zero for transformers)
+        loads = destPanel && feeder.destination_panel_id
           ? calculatePanelLoads(feeder.destination_panel_id)
           : { totalVA: 0, continuousVA: 0, noncontinuousVA: 0 };
       }
@@ -284,14 +322,24 @@ export const FeederManager: React.FC<FeederManagerProps> = ({
         conductor_material: feeder.conductor_material,
         ambient_temperature_c: feeder.ambient_temperature_c || 30,
         num_current_carrying: feeder.num_current_carrying || 4,
-        max_voltage_drop_percent: 3
+        max_voltage_drop_percent: 3,
+        temperature_rating: temperatureRating, // Use user-specified temperature rating
+        // Add transformer parameters if feeding a transformer
+        ...(destTransformer && {
+          transformer_kva: destTransformer.kva_rating,
+          transformer_primary_voltage: destTransformer.primary_voltage,
+          transformer_primary_phase: destTransformer.primary_phase
+        })
       });
       
-      // ISSUE FIX: EGC should be based on the OCPD protecting the downstream panel
-      // per NEC 250.122 - use panel's main breaker or feeder breaker amps
+      // ISSUE FIX: EGC should be based on the OCPD protecting the downstream panel or transformer
+      // per NEC 250.122 - use panel's main breaker or feeder breaker amps, or transformer primary breaker
       let egcSize = result.egc_size;
-      if (destPanel) {
-        const ocpdAmps = destPanel.main_breaker_amps || destPanel.feeder_breaker_amps || destPanel.bus_rating;
+      const ocpdAmps = destPanel
+        ? (destPanel.main_breaker_amps || destPanel.feeder_breaker_amps || destPanel.bus_rating)
+        : (destTransformer?.primary_breaker_amps || 0);
+
+      if (ocpdAmps > 0) {
         // Import EGC lookup from our inspection service logic
         const egcTable = [
           { maxOCPD: 15, cu: '14 AWG' }, { maxOCPD: 20, cu: '12 AWG' },
@@ -684,7 +732,104 @@ export const FeederManager: React.FC<FeederManagerProps> = ({
                 onChange={e => setFormData({ ...formData, num_current_carrying: Number(e.target.value) })}
                 className="w-full border-gray-200 rounded-md focus:border-electric-500 focus:ring-electric-500 text-sm py-2"
               />
+              <p className="text-xs text-gray-500 mt-1">
+                Affects bundling adjustment (NEC 310.15(C)(1))
+              </p>
             </div>
+
+            {/* Advanced Options Toggle */}
+            <div className="md:col-span-2">
+              <button
+                type="button"
+                onClick={() => setShowAdvancedOptions(!showAdvancedOptions)}
+                className="flex items-center gap-2 text-sm text-electric-600 hover:text-electric-700 font-medium"
+              >
+                {showAdvancedOptions ? '▼' : '▶'} Advanced Calculation Options
+              </button>
+            </div>
+
+            {/* Advanced Options Section */}
+            {showAdvancedOptions && (
+              <>
+                {/* Temperature Rating */}
+                <div>
+                  <label className="block text-xs font-semibold text-gray-500 mb-1 uppercase tracking-wider">
+                    Insulation Temperature Rating
+                  </label>
+                  <select
+                    value={temperatureRating}
+                    onChange={e => setTemperatureRating(Number(e.target.value) as 60 | 75 | 90)}
+                    className="w-full border-gray-200 rounded-md focus:border-electric-500 focus:ring-electric-500 text-sm py-2"
+                  >
+                    <option value={60}>60°C (THHN, TW)</option>
+                    <option value={75}>75°C (THWN, XHHW)</option>
+                    <option value={90}>90°C (THHN, XHHW-2)</option>
+                  </select>
+                  <p className="text-xs text-gray-500 mt-1">
+                    Higher ratings allow smaller conductors
+                  </p>
+                </div>
+
+                {/* Continuous Load Percentage (only for capacity-based sizing) */}
+                {sizingBasis === 'capacity' && (
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-500 mb-1 uppercase tracking-wider">
+                      Continuous Load Percentage
+                    </label>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="range"
+                        min="0"
+                        max="100"
+                        step="10"
+                        value={continuousLoadPercent}
+                        onChange={e => setContinuousLoadPercent(Number(e.target.value))}
+                        className="flex-1"
+                      />
+                      <span className="text-sm font-medium w-12 text-right">{continuousLoadPercent}%</span>
+                    </div>
+                    <p className="text-xs text-gray-500 mt-1">
+                      % of panel capacity that operates continuously (&gt;3 hrs). Continuous loads get 125% multiplier (NEC 215.2(A)(1))
+                    </p>
+                    <div className="text-xs text-gray-600 mt-2 space-y-1">
+                      <div className="flex justify-between">
+                        <span>Continuous: {Math.round(((formData.destination_panel_id ? panels.find(p => p.id === formData.destination_panel_id)?.main_breaker_amps : 200) || 200) * (continuousLoadPercent / 100))}A × 1.25</span>
+                        <span>Non-continuous: {Math.round(((formData.destination_panel_id ? panels.find(p => p.id === formData.destination_panel_id)?.main_breaker_amps : 200) || 200) * (1 - continuousLoadPercent / 100))}A × 1.0</span>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Info box explaining the calculation */}
+                <div className="md:col-span-2 bg-blue-50 border border-blue-200 rounded-lg p-3">
+                  <div className="flex items-start gap-2">
+                    <Info className="w-4 h-4 text-blue-600 mt-0.5 flex-shrink-0" />
+                    <div className="text-xs text-blue-700 space-y-1">
+                      <p className="font-semibold">Calculation Multipliers:</p>
+                      <ul className="list-disc ml-4 space-y-1">
+                        <li>
+                          <strong>Continuous load factor:</strong> {continuousLoadPercent}% × 1.25 = {(continuousLoadPercent / 100 * 1.25).toFixed(2)} (NEC 215.2(A)(1))
+                        </li>
+                        <li>
+                          <strong>Bundling adjustment:</strong> {formData.num_current_carrying || 4} conductors = {
+                            (formData.num_current_carrying || 4) <= 3 ? '100%' :
+                            (formData.num_current_carrying || 4) <= 6 ? '80%' :
+                            (formData.num_current_carrying || 4) <= 9 ? '70%' :
+                            (formData.num_current_carrying || 4) <= 20 ? '50%' : '45%'
+                          } (NEC 310.15(C)(1))
+                        </li>
+                        <li>
+                          <strong>Temperature correction:</strong> {formData.ambient_temperature_c || 30}°C @ {temperatureRating}°C insulation
+                        </li>
+                      </ul>
+                      <p className="mt-2 pt-2 border-t border-blue-300">
+                        <strong>Example:</strong> 200A panel → {Math.round(200 * (continuousLoadPercent / 100) * 1.25 + 200 * (1 - continuousLoadPercent / 100))}A design load → {Math.round((200 * (continuousLoadPercent / 100) * 1.25 + 200 * (1 - continuousLoadPercent / 100)) / ((formData.num_current_carrying || 4) <= 3 ? 1.0 : (formData.num_current_carrying || 4) <= 6 ? 0.8 : 0.7))}A base ampacity needed
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </>
+            )}
           </div>
 
           {/* Form Actions */}

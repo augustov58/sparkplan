@@ -46,6 +46,7 @@ export function getTemperatureCorrectionFactor(
 ): number {
   // Find closest ambient temperature
   let closest = TABLE_310_15_B1[0];
+  if (!closest) return 1.0; // Fallback to no correction
   let minDiff = Math.abs(ambientTempC - closest.ambientTempC);
 
   for (const entry of TABLE_310_15_B1) {

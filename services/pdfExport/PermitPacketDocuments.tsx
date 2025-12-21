@@ -133,6 +133,12 @@ interface CoverPageProps {
   preparedBy?: string;
   permitNumber?: string;
   date?: string;
+  // Tier 1 additions
+  contractorLicense?: string;
+  scopeOfWork?: string;
+  serviceType?: 'overhead' | 'underground';
+  meterLocation?: string;
+  serviceConductorRouting?: string;
 }
 
 export const CoverPage: React.FC<CoverPageProps> = ({
@@ -144,6 +150,11 @@ export const CoverPage: React.FC<CoverPageProps> = ({
   preparedBy,
   permitNumber,
   date = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }),
+  contractorLicense,
+  scopeOfWork,
+  serviceType,
+  meterLocation,
+  serviceConductorRouting,
 }) => (
   <Page size="LETTER" style={permitStyles.coverPage}>
     <View>
@@ -187,6 +198,12 @@ export const CoverPage: React.FC<CoverPageProps> = ({
           <Text style={permitStyles.coverInfoValue}>{preparedBy}</Text>
         </View>
       )}
+      {contractorLicense && (
+        <View style={permitStyles.coverInfoRow}>
+          <Text style={permitStyles.coverInfoLabel}>Contractor License:</Text>
+          <Text style={permitStyles.coverInfoValue}>{contractorLicense}</Text>
+        </View>
+      )}
       <View style={permitStyles.coverInfoRow}>
         <Text style={permitStyles.coverInfoLabel}>Date Prepared:</Text>
         <Text style={permitStyles.coverInfoValue}>{date}</Text>
@@ -196,6 +213,39 @@ export const CoverPage: React.FC<CoverPageProps> = ({
         <Text style={permitStyles.coverInfoValue}>2023</Text>
       </View>
     </View>
+
+    {scopeOfWork && (
+      <View style={permitStyles.coverSection}>
+        <Text style={permitStyles.coverSectionTitle}>SCOPE OF WORK</Text>
+        <Text style={{ fontSize: 10, lineHeight: 1.5 }}>{scopeOfWork}</Text>
+      </View>
+    )}
+
+    {(serviceType || meterLocation || serviceConductorRouting) && (
+      <View style={permitStyles.coverSection}>
+        <Text style={permitStyles.coverSectionTitle}>SERVICE ENTRANCE DETAILS</Text>
+        {serviceType && (
+          <View style={permitStyles.coverInfoRow}>
+            <Text style={permitStyles.coverInfoLabel}>Service Type:</Text>
+            <Text style={permitStyles.coverInfoValue}>
+              {serviceType === 'overhead' ? 'Overhead' : 'Underground'}
+            </Text>
+          </View>
+        )}
+        {meterLocation && (
+          <View style={permitStyles.coverInfoRow}>
+            <Text style={permitStyles.coverInfoLabel}>Meter Location:</Text>
+            <Text style={permitStyles.coverInfoValue}>{meterLocation}</Text>
+          </View>
+        )}
+        {serviceConductorRouting && (
+          <View style={permitStyles.coverInfoRow}>
+            <Text style={permitStyles.coverInfoLabel}>Conductor Routing:</Text>
+            <Text style={permitStyles.coverInfoValue}>{serviceConductorRouting}</Text>
+          </View>
+        )}
+      </View>
+    )}
 
     <View>
       <Text style={permitStyles.footer}>
@@ -345,7 +395,7 @@ export const EquipmentSchedule: React.FC<EquipmentScheduleProps> = ({
                   <Text style={{ width: '25%' }}>{destination}</Text>
                   <Text style={{ width: '15%' }}>{feeder.phase_conductor_size || 'N/A'}</Text>
                   <Text style={{ width: '15%' }}>
-                    {feeder.total_load_va ? `${Math.round(feeder.total_load_va / 1000)}` : 'N/A'}
+                    N/A
                   </Text>
                 </View>
               );
@@ -356,6 +406,145 @@ export const EquipmentSchedule: React.FC<EquipmentScheduleProps> = ({
 
       <Text style={permitStyles.footer}>
         Page 2 - Equipment Schedule | {projectName}
+      </Text>
+    </Page>
+  );
+};
+
+// ============================================================================
+// RISER DIAGRAM (Text-Based System Hierarchy)
+// ============================================================================
+
+interface RiserDiagramProps {
+  panels: Panel[];
+  transformers: Transformer[];
+  feeders: Feeder[];
+  projectName: string;
+  serviceVoltage: number;
+  servicePhase: number;
+}
+
+export const RiserDiagram: React.FC<RiserDiagramProps> = ({
+  panels,
+  transformers,
+  feeders,
+  projectName,
+  serviceVoltage,
+  servicePhase,
+}) => {
+  const mainPanel = panels.find(p => p.is_main);
+
+  // Build hierarchy recursively
+  const renderPanelHierarchy = (panelId: string, level: number = 0): any[] => {
+    const panel = panels.find(p => p.id === panelId);
+    if (!panel) return [];
+
+    const indent = '  '.repeat(level);
+    const elements: any[] = [];
+
+    // Panel info
+    elements.push(
+      <Text key={`panel-${panelId}`} style={{ fontSize: 9, marginBottom: 3, marginLeft: level * 15 }}>
+        {indent}├─ {panel.name} ({panel.voltage}V {panel.phase}φ, {panel.bus_rating}A)
+        {panel.main_breaker_amps ? ` - ${panel.main_breaker_amps}A Main` : ' - MLO'}
+      </Text>
+    );
+
+    // Find feeders from this panel
+    const downstreamFeeders = feeders.filter(f => f.source_panel_id === panelId);
+
+    downstreamFeeders.forEach(feeder => {
+      // Check if feeding a panel or transformer
+      if (feeder.destination_panel_id) {
+        const destPanel = panels.find(p => p.id === feeder.destination_panel_id);
+        if (destPanel) {
+          elements.push(
+            <Text key={`feeder-${feeder.id}`} style={{ fontSize: 8, marginBottom: 2, marginLeft: (level + 1) * 15, color: '#666' }}>
+              {indent}  │  Feeder: {feeder.phase_conductor_size || 'N/A'} {feeder.conductor_material || 'Cu'}
+            </Text>
+          );
+          elements.push(...renderPanelHierarchy(destPanel.id, level + 1));
+        }
+      } else if (feeder.destination_transformer_id) {
+        const xfmr = transformers.find(t => t.id === feeder.destination_transformer_id);
+        if (xfmr) {
+          elements.push(
+            <Text key={`xfmr-${xfmr.id}`} style={{ fontSize: 9, marginBottom: 3, marginLeft: (level + 1) * 15 }}>
+              {indent}  ├─ {xfmr.name} ({xfmr.kva_rating} kVA, {xfmr.primary_voltage}V→{xfmr.secondary_voltage}V)
+            </Text>
+          );
+
+          // Find panels fed from this transformer
+          const xfmrPanels = panels.filter(p => p.fed_from_type === 'transformer' && p.fed_from_transformer_id === xfmr.id);
+          xfmrPanels.forEach(xfmrPanel => {
+            elements.push(...renderPanelHierarchy(xfmrPanel.id, level + 2));
+          });
+        }
+      }
+    });
+
+    return elements;
+  };
+
+  return (
+    <Page size="LETTER" style={permitStyles.page}>
+      <Text style={permitStyles.sectionTitle}>RISER DIAGRAM - SYSTEM HIERARCHY</Text>
+
+      <Text style={{ fontSize: 10, marginBottom: 15, color: '#666' }}>
+        This diagram shows the electrical power distribution from service entrance through all panels and transformers.
+      </Text>
+
+      {/* Service Entrance */}
+      <View style={{ marginBottom: 20, padding: 10, backgroundColor: '#f9f9f9', borderRadius: 4 }}>
+        <Text style={{ fontSize: 11, fontFamily: 'Helvetica-Bold', marginBottom: 5 }}>
+          UTILITY SERVICE
+        </Text>
+        <Text style={{ fontSize: 9 }}>
+          Service: {serviceVoltage}V {servicePhase === 3 ? '3-Phase' : 'Single-Phase'}
+        </Text>
+        <Text style={{ fontSize: 9 }}>
+          ↓
+        </Text>
+        <Text style={{ fontSize: 9 }}>
+          Meter
+        </Text>
+        <Text style={{ fontSize: 9 }}>
+          ↓
+        </Text>
+      </View>
+
+      {/* Panel Hierarchy */}
+      <View style={{ marginBottom: 20 }}>
+        {mainPanel ? (
+          renderPanelHierarchy(mainPanel.id)
+        ) : (
+          <Text style={{ fontSize: 9, fontStyle: 'italic', color: '#999' }}>
+            No main panel defined
+          </Text>
+        )}
+      </View>
+
+      {/* Legend */}
+      <View style={{ marginTop: 30, padding: 10, backgroundColor: '#f0f0f0', borderRadius: 4 }}>
+        <Text style={{ fontSize: 10, fontFamily: 'Helvetica-Bold', marginBottom: 5 }}>
+          LEGEND
+        </Text>
+        <Text style={{ fontSize: 8, marginBottom: 2 }}>
+          • MDP = Main Distribution Panel
+        </Text>
+        <Text style={{ fontSize: 8, marginBottom: 2 }}>
+          • MLO = Main Lug Only (no main breaker)
+        </Text>
+        <Text style={{ fontSize: 8, marginBottom: 2 }}>
+          • Feeder conductor sizes shown above each sub-panel connection
+        </Text>
+        <Text style={{ fontSize: 8 }}>
+          • All voltage and amperage ratings shown in parentheses
+        </Text>
+      </View>
+
+      <Text style={permitStyles.footer}>
+        Page 3 - Riser Diagram | {projectName}
       </Text>
     </Page>
   );

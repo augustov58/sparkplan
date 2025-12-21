@@ -45,11 +45,11 @@ const LIGHTING_DEMAND_TABLE = [
  * Simplified for 12 kW and less
  */
 const RANGE_DEMAND_FACTORS: Record<number, { demand: number; colA?: number; colB?: number; colC: number }> = {
-  1: { colC: 8000 },    // 1 range: 8 kW
-  2: { colC: 11000 },   // 2 ranges: 11 kW
-  3: { colC: 14000 },   // 3 ranges: 14 kW
-  4: { colC: 17000 },   // 4 ranges: 17 kW
-  5: { colC: 20000 },   // 5 ranges: 20 kW
+  1: { demand: 8000, colC: 8000 },    // 1 range: 8 kW
+  2: { demand: 11000, colC: 11000 },   // 2 ranges: 11 kW
+  3: { demand: 14000, colC: 14000 },   // 3 ranges: 14 kW
+  4: { demand: 17000, colC: 17000 },   // 4 ranges: 17 kW
+  5: { demand: 20000, colC: 20000 },   // 5 ranges: 20 kW
 };
 
 /**
@@ -107,17 +107,27 @@ export interface ResidentialLoadResult {
   totalConnectedVA: number;
   totalDemandVA: number;
   demandFactor: number;
-  
+
   // Service sizing
   serviceAmps: number;
   recommendedServiceSize: 100 | 150 | 200 | 400;
-  
+
+  // Neutral conductor sizing (NEC 220.61)
+  neutralLoadVA: number;
+  neutralAmps: number;
+  neutralReduction: number;  // Percentage reduction applied (0-30%)
+
+  // Recommended conductor sizes
+  serviceConductorSize?: string;  // Ungrounded conductors
+  neutralConductorSize?: string;  // Grounded (neutral) conductor
+  gecSize?: string;              // Grounding electrode conductor
+
   // Breakdown
   breakdown: LoadBreakdown[];
-  
+
   // NEC References
   necReferences: string[];
-  
+
   // Warnings
   warnings: string[];
 }
@@ -200,6 +210,146 @@ function recommendServiceSize(amps: number): 100 | 150 | 200 | 400 {
   if (amps <= 120) return 150;     // 150A * 0.8 = 120A
   if (amps <= 160) return 200;     // 200A * 0.8 = 160A
   return 400;
+}
+
+/**
+ * Calculate neutral load per NEC 220.61 and 220.82
+ *
+ * For dwelling units:
+ * - Neutral load = loads that use the neutral conductor
+ * - 240V-only loads (no neutral) are excluded (range, dryer, A/C, water heater when 240V)
+ * - First 200A at 100%, remainder at 70%
+ *
+ * @param breakdown - Load breakdown array
+ * @param serviceVoltage - Service voltage (typically 240V)
+ * @returns Neutral load info with VA, amps, and reduction percentage
+ */
+function calculateNeutralLoad(
+  breakdown: LoadBreakdown[],
+  serviceVoltage: number
+): { neutralVA: number; neutralAmps: number; reductionPercent: number } {
+  // Categories that use neutral (120V loads or 240V with neutral)
+  const neutralCategories = [
+    'General Loads Subtotal',  // Lighting, small appliance, laundry
+    'Dishwasher',
+    'Garbage Disposal',
+    'HVAC',  // Some HVAC uses neutral for controls
+  ];
+
+  // Categories that DON'T use neutral (240V-only)
+  const nonNeutralCategories = [
+    'Electric Range',
+    'Electric Dryer',
+    'Electric Water Heater',
+    'EV Charger',
+    'Pool Pump',
+    'Pool Heater',
+    'Hot Tub/Spa',
+    'Well Pump'
+  ];
+
+  // Calculate neutral demand
+  let neutralDemandVA = 0;
+
+  for (const item of breakdown) {
+    if (neutralCategories.includes(item.category)) {
+      neutralDemandVA += item.demandVA;
+    } else if (!nonNeutralCategories.includes(item.category) && !item.category.includes('Demand Factor')) {
+      // For 'Other Appliance' or unknown categories, assume they use neutral (conservative)
+      neutralDemandVA += item.demandVA;
+    }
+  }
+
+  // NEC 220.61(B) - Dwelling Unit Neutral Load Reduction
+  // First 200A at 100%, remainder at 70%
+  const neutralAmpsBeforeReduction = neutralDemandVA / serviceVoltage;
+
+  let neutralAmps: number;
+  let reductionPercent: number;
+
+  if (neutralAmpsBeforeReduction <= 200) {
+    // No reduction for loads ≤200A
+    neutralAmps = neutralAmpsBeforeReduction;
+    reductionPercent = 0;
+  } else {
+    // Apply 70% to portion over 200A (30% reduction)
+    const first200A = 200;
+    const over200A = neutralAmpsBeforeReduction - 200;
+    neutralAmps = first200A + (over200A * 0.70);
+    reductionPercent = 30;
+  }
+
+  return {
+    neutralVA: Math.round(neutralAmps * serviceVoltage),
+    neutralAmps: Math.round(neutralAmps * 10) / 10,
+    reductionPercent
+  };
+}
+
+/**
+ * Recommend service conductor size based on ampacity (NEC Table 310.12)
+ * Residential services ≤400A use Table 310.12
+ *
+ * This is simplified - actual sizing should use ConductorSizingTool
+ * for temperature/bundling corrections
+ */
+function recommendServiceConductorSize(amps: number, material: 'Cu' | 'Al' = 'Cu'): string {
+  // NEC Table 310.12 - Service Conductor Sizing (75°C column)
+  const serviceConductorTable: { amps: number; Cu: string; Al: string }[] = [
+    { amps: 100, Cu: '1 AWG', Al: '1/0 AWG' },
+    { amps: 110, Cu: '1/0 AWG', Al: '2/0 AWG' },
+    { amps: 125, Cu: '1/0 AWG', Al: '2/0 AWG' },
+    { amps: 150, Cu: '2/0 AWG', Al: '3/0 AWG' },
+    { amps: 175, Cu: '2/0 AWG', Al: '4/0 AWG' },
+    { amps: 200, Cu: '3/0 AWG', Al: '4/0 AWG' },
+    { amps: 225, Cu: '3/0 AWG', Al: '250 kcmil' },
+    { amps: 250, Cu: '4/0 AWG', Al: '300 kcmil' },
+    { amps: 300, Cu: '250 kcmil', Al: '350 kcmil' },
+    { amps: 350, Cu: '350 kcmil', Al: '500 kcmil' },
+    { amps: 400, Cu: '400 kcmil', Al: '600 kcmil' },
+  ];
+
+  for (const entry of serviceConductorTable) {
+    if (amps <= entry.amps) {
+      return material === 'Cu' ? entry.Cu : entry.Al;
+    }
+  }
+
+  return material === 'Cu' ? '600 kcmil' : '750 kcmil';
+}
+
+/**
+ * Recommend grounding electrode conductor (GEC) size per NEC 250.66
+ * Based on service conductor size
+ */
+function recommendGecSize(serviceConductorSize: string, material: 'Cu' | 'Al' = 'Cu'): string {
+  // NEC Table 250.66 - Grounding Electrode Conductor Size
+  const gecTable: { serviceConductor: string; Cu: string; Al: string }[] = [
+    { serviceConductor: '2 AWG or smaller', Cu: '8 AWG', Al: '6 AWG' },
+    { serviceConductor: '1 AWG or 1/0 AWG', Cu: '6 AWG', Al: '4 AWG' },
+    { serviceConductor: '2/0 or 3/0 AWG', Cu: '4 AWG', Al: '2 AWG' },
+    { serviceConductor: '4/0 AWG to 350 kcmil', Cu: '2 AWG', Al: '1/0 AWG' },
+    { serviceConductor: '400 to 600 kcmil', Cu: '1/0 AWG', Al: '3/0 AWG' },
+    { serviceConductor: '650 to 1100 kcmil', Cu: '2/0 AWG', Al: '4/0 AWG' },
+  ];
+
+  // Simple lookup - this is a simplified version
+  // Actual implementation should parse conductor size and match ranges
+  const sizeMap: Record<string, number> = {
+    '8 AWG': 8, '6 AWG': 6, '4 AWG': 4, '3 AWG': 3, '2 AWG': 2, '1 AWG': 1,
+    '1/0 AWG': 0, '2/0 AWG': -1, '3/0 AWG': -2, '4/0 AWG': -3,
+    '250 kcmil': -4, '300 kcmil': -5, '350 kcmil': -6, '400 kcmil': -7,
+    '500 kcmil': -8, '600 kcmil': -9, '750 kcmil': -10, '1000 kcmil': -11
+  };
+
+  const sizeNum = sizeMap[serviceConductorSize] || 0;
+
+  if (sizeNum >= 2) return material === 'Cu' ? '8 AWG' : '6 AWG';
+  if (sizeNum >= 0) return material === 'Cu' ? '6 AWG' : '4 AWG';
+  if (sizeNum >= -2) return material === 'Cu' ? '4 AWG' : '2 AWG';
+  if (sizeNum >= -6) return material === 'Cu' ? '2 AWG' : '1/0 AWG';
+  if (sizeNum >= -9) return material === 'Cu' ? '1/0 AWG' : '3/0 AWG';
+  return material === 'Cu' ? '2/0 AWG' : '4/0 AWG';
 }
 
 // ============================================================================
@@ -510,12 +660,40 @@ export function calculateSingleFamilyLoad(input: SingleFamilyInput): Residential
   const serviceAmps = totalDemand / serviceVoltage;
   const recommendedSize = recommendServiceSize(serviceAmps);
 
+  // =========================================
+  // Calculate Neutral Load (NEC 220.61, 220.82)
+  // =========================================
+  const neutralLoad = calculateNeutralLoad(breakdown, serviceVoltage);
+  if (neutralLoad.reductionPercent > 0) {
+    necReferences.push('NEC 220.61(B) - Neutral Load Reduction');
+    warnings.push(
+      `ℹ️ Neutral load reduced by ${neutralLoad.reductionPercent}% per NEC 220.61(B) ` +
+      `(first 200A at 100%, remainder at 70%)`
+    );
+  }
+
+  // =========================================
+  // Recommend Conductor Sizes (Copper assumed)
+  // =========================================
+  const serviceConductorSize = recommendServiceConductorSize(serviceAmps, 'Cu');
+  const neutralConductorSize = recommendServiceConductorSize(neutralLoad.neutralAmps, 'Cu');
+  const gecSize = recommendGecSize(serviceConductorSize, 'Cu');
+
+  necReferences.push('NEC Table 310.12 - Service Conductor Sizing');
+  necReferences.push('NEC 250.66 - Grounding Electrode Conductor');
+
   return {
     totalConnectedVA: Math.round(totalConnected),
     totalDemandVA: Math.round(totalDemand),
     demandFactor: totalDemand / totalConnected,
     serviceAmps: Math.round(serviceAmps),
     recommendedServiceSize: recommendedSize,
+    neutralLoadVA: neutralLoad.neutralVA,
+    neutralAmps: neutralLoad.neutralAmps,
+    neutralReduction: neutralLoad.reductionPercent,
+    serviceConductorSize,
+    neutralConductorSize,
+    gecSize,
     breakdown,
     necReferences: [...new Set(necReferences)],
     warnings
@@ -607,12 +785,36 @@ export function calculateMultiFamilyLoad(input: MultiFamilyInput): ResidentialLo
   const serviceAmps = finalDemand / serviceVoltage;
   const recommendedSize = recommendServiceSize(serviceAmps);
 
+  // Calculate Neutral Load (NEC 220.61, 220.84)
+  const neutralLoad = calculateNeutralLoad(breakdown, serviceVoltage);
+  if (neutralLoad.reductionPercent > 0) {
+    necReferences.push('NEC 220.61(B) - Neutral Load Reduction');
+    warnings.push(
+      `ℹ️ Neutral load reduced by ${neutralLoad.reductionPercent}% per NEC 220.61(B) ` +
+      `(first 200A at 100%, remainder at 70%)`
+    );
+  }
+
+  // Recommend Conductor Sizes (Copper assumed)
+  const serviceConductorSize = recommendServiceConductorSize(serviceAmps, 'Cu');
+  const neutralConductorSize = recommendServiceConductorSize(neutralLoad.neutralAmps, 'Cu');
+  const gecSize = recommendGecSize(serviceConductorSize, 'Cu');
+
+  necReferences.push('NEC Table 310.12 - Service Conductor Sizing');
+  necReferences.push('NEC 250.66 - Grounding Electrode Conductor');
+
   return {
     totalConnectedVA: Math.round(totalConnected),
     totalDemandVA: Math.round(finalDemand),
     demandFactor: finalDemand / totalConnected,
     serviceAmps: Math.round(serviceAmps),
     recommendedServiceSize: recommendedSize,
+    neutralLoadVA: neutralLoad.neutralVA,
+    neutralAmps: neutralLoad.neutralAmps,
+    neutralReduction: neutralLoad.reductionPercent,
+    serviceConductorSize,
+    neutralConductorSize,
+    gecSize,
     breakdown,
     necReferences,
     warnings

@@ -173,7 +173,7 @@ export function buildProjectContext(
       destinationPanel: destPanel?.name,
       destinationTransformer: destTransformer?.name,
       phaseConductorSize: feeder.phase_conductor_size || 'Not calculated',
-      totalLoadVA: feeder.total_load_va || 0,
+      // totalLoadVA removed - field doesn't exist in database schema
       voltageDropPercent: feeder.voltage_drop_percent || undefined,
     };
   });

@@ -76,7 +76,7 @@ export const BulkCircuitCreator: React.FC<BulkCircuitCreatorProps> = ({
 
   const addCircuit = () => {
     const lastCircuit = circuits[circuits.length - 1];
-    const nextCircuitNumber = lastCircuit.circuit_number + 1;
+    const nextCircuitNumber = lastCircuit ? lastCircuit.circuit_number + 1 : 1;
 
     setCircuits([
       ...circuits,
@@ -169,6 +169,7 @@ export const BulkCircuitCreator: React.FC<BulkCircuitCreatorProps> = ({
         description: '',
         breaker_amps: 20,
         pole: 1,
+        load_type: 'C', // Default to continuous load
         load_watts: 1800,
         conductor_size: '12 AWG',
         egc_size: '12 AWG'

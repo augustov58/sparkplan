@@ -4,6 +4,9 @@
  * Prevents API key exposure in frontend code
  */
 
+// @ts-ignore: Deno global available in Supabase Edge Functions
+declare const Deno: any;
+
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2"
 
@@ -16,6 +19,8 @@ interface GeminiRequest {
   prompt: string
   systemInstruction?: string
   model?: string
+  pdfData?: string // Base64 encoded PDF
+  imageData?: string // Base64 encoded image
 }
 
 serve(async (req) => {
@@ -59,7 +64,7 @@ serve(async (req) => {
     }
 
     // Parse request body
-    const { prompt, systemInstruction, model = 'gemini-2.0-flash-exp' }: GeminiRequest = await req.json()
+    const { prompt, systemInstruction, model = 'gemini-2.0-flash-exp', pdfData, imageData }: GeminiRequest = await req.json()
 
     if (!prompt) {
       throw new Error('Prompt is required')
@@ -68,9 +73,32 @@ serve(async (req) => {
     // Call Gemini API
     const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${geminiApiKey}`
 
+    // Build parts array for multimodal input
+    const parts: any[] = [{ text: prompt }]
+
+    // Add PDF if provided
+    if (pdfData) {
+      parts.push({
+        inline_data: {
+          mime_type: "application/pdf",
+          data: pdfData
+        }
+      })
+    }
+
+    // Add image if provided
+    if (imageData) {
+      parts.push({
+        inline_data: {
+          mime_type: "image/jpeg", // Assume JPEG, could be enhanced
+          data: imageData
+        }
+      })
+    }
+
     const geminiPayload = {
       contents: [{
-        parts: [{ text: prompt }]
+        parts: parts
       }],
       ...(systemInstruction && {
         systemInstruction: {

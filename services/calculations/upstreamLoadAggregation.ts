@@ -348,12 +348,12 @@ function calculateMotorDemand(motorLoads: number[]): DemandCalculation {
   
   const totalConnected = motorLoads.reduce((a, b) => a + b, 0);
   const sortedMotors = [...motorLoads].sort((a, b) => b - a);
-  const largestMotor = sortedMotors[0];
+  const largestMotor = sortedMotors[0] || 0;
   const otherMotors = sortedMotors.slice(1).reduce((a, b) => a + b, 0);
-  
+
   // Largest at 125%, others at 100%
   const demandVA = (largestMotor * 1.25) + otherMotors;
-  
+
   return {
     loadType: 'Motors',
     connectedVA: totalConnected,

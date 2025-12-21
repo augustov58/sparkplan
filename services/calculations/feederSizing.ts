@@ -40,30 +40,68 @@ export function calculateFeederSizing(
   input: FeederCalculationInput
 ): FeederCalculationResult {
   const warnings: string[] = [];
-  const necReferences: string[] = [
-    'NEC 215.2 - Feeder Conductor Ampacity',
-    'NEC 215.2(A)(1) - 125% Continuous + 100% Noncontinuous Loads'
-  ];
+  const necReferences: string[] = [];
 
-  // STEP 1: Calculate design load per NEC 215.2(A)(1)
-  // Design load = (continuous × 1.25) + (noncontinuous × 1.0)
-  const design_load_va = (input.continuous_load_va * 1.25) + input.noncontinuous_load_va;
-
-  if (input.continuous_load_va > input.total_load_va * 0.8) {
-    warnings.push(
-      `ℹ️ High continuous load (${((input.continuous_load_va / input.total_load_va) * 100).toFixed(0)}%). ` +
-      `Ensure adequate conductor cooling and derating.`
-    );
-  }
-
-  // STEP 2: Calculate design current
+  let design_load_va: number;
   let design_current_amps: number;
-  if (input.source_phase === 1) {
-    // Single-phase: I = VA / V
-    design_current_amps = design_load_va / input.source_voltage;
+
+  // Check if this feeder is feeding a transformer
+  const isFeedingTransformer = input.transformer_kva !== undefined &&
+                                 input.transformer_primary_voltage !== undefined &&
+                                 input.transformer_primary_phase !== undefined;
+
+  if (isFeedingTransformer) {
+    // TRANSFORMER FEEDER SIZING per NEC 450.3(B)
+    necReferences.push(
+      'NEC 215.2(A)(1) - Feeder Ampacity Requirements',
+      'NEC 450.3(B) - Transformer Overcurrent Protection',
+      'NEC 215.3 - Overload Protection'
+    );
+
+    // STEP 1: Calculate transformer primary current
+    // I_primary = (kVA × 1000) / (V × √3) for 3-phase
+    // I_primary = (kVA × 1000) / V for single-phase
+    const transformerPrimaryCurrent = input.transformer_primary_phase === 3
+      ? (input.transformer_kva! * 1000) / (input.transformer_primary_voltage! * Math.sqrt(3))
+      : (input.transformer_kva! * 1000) / input.transformer_primary_voltage!;
+
+    // STEP 2: Apply 125% factor for continuous load (NEC 215.2(A)(1))
+    // Transformers are considered continuous loads
+    design_current_amps = transformerPrimaryCurrent * 1.25;
+    design_load_va = input.transformer_kva! * 1000 * 1.25;
+
+    warnings.push(
+      `ℹ️ Feeder sized for ${input.transformer_kva} kVA transformer. ` +
+      `Transformer primary current: ${transformerPrimaryCurrent.toFixed(1)}A, ` +
+      `feeder sized at 125% = ${design_current_amps.toFixed(1)}A (NEC 450.3(B))`
+    );
+
   } else {
-    // Three-phase: I = VA / (√3 × V)
-    design_current_amps = design_load_va / (Math.sqrt(3) * input.source_voltage);
+    // STANDARD PANEL FEEDER SIZING per NEC 215.2(A)(1)
+    necReferences.push(
+      'NEC 215.2 - Feeder Conductor Ampacity',
+      'NEC 215.2(A)(1) - 125% Continuous + 100% Noncontinuous Loads'
+    );
+
+    // STEP 1: Calculate design load per NEC 215.2(A)(1)
+    // Design load = (continuous × 1.25) + (noncontinuous × 1.0)
+    design_load_va = (input.continuous_load_va * 1.25) + input.noncontinuous_load_va;
+
+    if (input.continuous_load_va > input.total_load_va * 0.8) {
+      warnings.push(
+        `ℹ️ High continuous load (${((input.continuous_load_va / input.total_load_va) * 100).toFixed(0)}%). ` +
+        `Ensure adequate conductor cooling and derating.`
+      );
+    }
+
+    // STEP 2: Calculate design current
+    if (input.source_phase === 1) {
+      // Single-phase: I = VA / V
+      design_current_amps = design_load_va / input.source_voltage;
+    } else {
+      // Three-phase: I = VA / (√3 × V)
+      design_current_amps = design_load_va / (Math.sqrt(3) * input.source_voltage);
+    }
   }
 
   // STEP 3: Size phase conductors using conductor sizing service
@@ -75,7 +113,7 @@ export function calculateFeederSizing(
       servicePhase: input.source_phase,
       occupancyType: 'commercial', // Feeders typically use commercial/industrial ratings
       conductorMaterial: input.conductor_material,
-      temperatureRating: 75
+      temperatureRating: input.temperature_rating || 75 // Use specified temp rating or default to 75°C
     },
     input.ambient_temperature_c,
     input.num_current_carrying,

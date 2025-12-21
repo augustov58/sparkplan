@@ -8,7 +8,6 @@ import { OneLineDiagram } from './components/OneLineDiagram';
 import { GroundingBonding } from './components/GroundingBonding';
 import { PanelSchedule } from './components/PanelSchedule';
 import { PreInspection } from './components/PreInspection';
-import { ComplianceReport } from './components/ComplianceReport';
 import { LandingPage } from './components/LandingPage';
 import { ProjectSetup } from './components/ProjectSetup';
 import { Calculators } from './components/Calculators';
@@ -16,8 +15,13 @@ import { IssuesLog } from './components/IssuesLog';
 import { MaterialTakeOff } from './components/MaterialTakeOff';
 import { FeederManager } from './components/FeederManager';
 import { DwellingLoadCalculator } from './components/DwellingLoadCalculator';
+import { CommercialLoadCalculator } from './components/CommercialLoadCalculator';
 import { InspectorMode } from './components/InspectorMode';
 import { PermitPacketGenerator } from './components/PermitPacketGenerator';
+import { ShortCircuitResults } from './components/ShortCircuitResults';
+import { RFIManager } from './components/RFIManager';
+import { SiteVisitManager } from './components/SiteVisitManager';
+import { CalendarView } from './components/CalendarView';
 import { Project, ProjectStatus, ProjectType } from './types';
 import { askNecAssistant } from './services/geminiService';
 import { buildProjectContext, formatContextForAI } from './services/ai/projectContextBuilder';
@@ -56,9 +60,11 @@ const ProjectWrapper = ({ projects, updateProject, deleteProject, onSignOut }: {
                 } />
                 <Route path="/load-calc" element={
                     <FeatureErrorBoundary>
-                        {/* Residential projects use DwellingLoadCalculator, others use LoadCalculator */}
+                        {/* Residential projects use DwellingLoadCalculator, Commercial/Industrial use CommercialLoadCalculator */}
                         {project.type === ProjectType.RESIDENTIAL ? (
                             <DwellingLoadCalculator project={project} updateProject={updateProject} />
+                        ) : project.type === ProjectType.COMMERCIAL || project.type === ProjectType.INDUSTRIAL ? (
+                            <CommercialLoadCalculator projectId={project.id} />
                         ) : (
                             <LoadCalculator project={project} updateProject={updateProject} />
                         )}
@@ -89,6 +95,21 @@ const ProjectWrapper = ({ projects, updateProject, deleteProject, onSignOut }: {
                         <IssuesLog project={project} updateProject={updateProject} />
                     </FeatureErrorBoundary>
                 } />
+                <Route path="/rfis" element={
+                    <FeatureErrorBoundary>
+                        <RFIManager project={project} />
+                    </FeatureErrorBoundary>
+                } />
+                <Route path="/site-visits" element={
+                    <FeatureErrorBoundary>
+                        <SiteVisitManager project={project} />
+                    </FeatureErrorBoundary>
+                } />
+                <Route path="/calendar" element={
+                    <FeatureErrorBoundary>
+                        <CalendarView project={project} />
+                    </FeatureErrorBoundary>
+                } />
                 <Route path="/check" element={
                     <FeatureErrorBoundary>
                         <PreInspection project={project} updateProject={updateProject} />
@@ -96,17 +117,12 @@ const ProjectWrapper = ({ projects, updateProject, deleteProject, onSignOut }: {
                 } />
                 <Route path="/inspector" element={
                     <FeatureErrorBoundary>
-                        <InspectorMode 
+                        <InspectorMode
                             projectId={project.id}
                             projectType={project.type}
                             serviceVoltage={project.serviceVoltage}
                             servicePhase={project.servicePhase}
                         />
-                    </FeatureErrorBoundary>
-                } />
-                <Route path="/reports" element={
-                    <FeatureErrorBoundary>
-                        <ComplianceReport project={project} />
                     </FeatureErrorBoundary>
                 } />
                 <Route path="/materials" element={
@@ -126,6 +142,11 @@ const ProjectWrapper = ({ projects, updateProject, deleteProject, onSignOut }: {
                 <Route path="/permit-packet" element={
                     <FeatureErrorBoundary>
                         <PermitPacketGenerator projectId={project.id} />
+                    </FeatureErrorBoundary>
+                } />
+                <Route path="/short-circuit" element={
+                    <FeatureErrorBoundary>
+                        <ShortCircuitResults />
                     </FeatureErrorBoundary>
                 } />
             </Routes>
@@ -512,7 +533,8 @@ function AppContent() {
         serviceVoltage: template ? template.serviceVoltage : 120,
         servicePhase: template ? template.servicePhase : 1,
         conductorMaterial: 'Cu',
-        temperatureRating: 75
+        temperatureRating: 75,
+        occupancyType: 'dwelling' // Default for new projects
       }
     };
 
@@ -583,6 +605,15 @@ function AppContent() {
           ) : (
             <LandingPage />
           )
+        } />
+
+        {/* Global calendar - shows all events across all projects */}
+        <Route path="/calendar" element={
+          <ProtectedRoute>
+            <Layout title="Calendar - All Projects" onSignOut={handleSignOut}>
+              <CalendarView />
+            </Layout>
+          </ProtectedRoute>
         } />
 
         {/* Authentication routes */}

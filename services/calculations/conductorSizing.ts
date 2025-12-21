@@ -241,11 +241,114 @@ export function sizeConductor(
     warnings.push('⚠️ WARNING: Adjusted ampacity is marginal. Consider next size up for safety margin.');
   }
 
+  // CHECK NEC 110.14(C) - TERMINATION TEMPERATURE RATING LIMITS
+  // For circuits ≤100A with conductors #14-#1 AWG: Use 60°C column for terminations
+  // For circuits >100A: Use 75°C column for terminations
+  const requiredOCPD = ocpdRating ?? Math.ceil(requiredAmpacity);
+  let finalConductor = conductor;
+  let finalBaseAmpacity = baseAmpacity;
+  let finalAdjustedAmpacity = adjustedAmpacity;
+
+  // List of "small conductors" per NEC 110.14(C)(1)(a)
+  const smallConductorSizes = ['14 AWG', '12 AWG', '10 AWG', '8 AWG', '6 AWG', '4 AWG', '3 AWG', '2 AWG', '1 AWG'];
+  const isSmallConductor = smallConductorSizes.includes(conductor.size);
+
+  // NEC 110.14(C): Termination temperature limits
+  if (requiredAmpacity <= 100 && isSmallConductor && settings.temperatureRating > 60) {
+    // For circuits ≤100A with small conductors, check 60°C termination rating
+    const ampacityAt60C = conductor.temp60C;
+    const adjustedAmpacityAt60C = ampacityAt60C * combinedDerating;
+
+    if (adjustedAmpacityAt60C < requiredAmpacity) {
+      // Conductor doesn't meet requirements at 60°C termination - need to upsize
+      warnings.push(
+        `⚠️ NEC 110.14(C)(1)(a): Circuits ≤100A require 60°C termination rating. ` +
+        `${conductor.size} at 60°C = ${ampacityAt60C}A (adjusted: ${adjustedAmpacityAt60C.toFixed(1)}A) is insufficient for ${requiredAmpacity.toFixed(1)}A. Upsizing conductor.`
+      );
+      necReferences.push('NEC 110.14(C)(1) - Termination Temperature Rating');
+
+      // Find conductor that meets requirement at 60°C
+      const requiredAt60C = requiredAmpacity / combinedDerating;
+      const upsizedConductor = findConductorByAmpacity(
+        requiredAt60C,
+        settings.conductorMaterial,
+        60 // Use 60°C column
+      );
+
+      if (upsizedConductor) {
+        finalConductor = upsizedConductor;
+        // Still use the higher temp rating for the base ampacity (for derating calculations)
+        finalBaseAmpacity = upsizedConductor[`temp${settings.temperatureRating}C` as 'temp60C' | 'temp75C' | 'temp90C'];
+        finalAdjustedAmpacity = finalBaseAmpacity * combinedDerating;
+        warnings.push(
+          `✓ Upsized to ${upsizedConductor.size} to meet 60°C termination requirement (${upsizedConductor.temp60C}A @ 60°C).`
+        );
+      }
+    } else {
+      // Conductor is sized based on higher temp but limited by 60°C termination
+      necReferences.push('NEC 110.14(C)(1)(a) - 60°C termination for ≤100A circuits');
+      warnings.push(
+        `ℹ️ NEC 110.14(C): Circuit ≤100A requires 60°C termination. ` +
+        `${conductor.size} rated ${ampacityAt60C}A @ 60°C, sufficient for ${requiredAmpacity.toFixed(1)}A.`
+      );
+    }
+  } else if (requiredAmpacity > 100 && settings.temperatureRating > 75) {
+    // For circuits >100A, 75°C termination rating applies
+    necReferences.push('NEC 110.14(C)(1)(b) - 75°C termination for >100A circuits');
+    warnings.push(
+      `ℹ️ NEC 110.14(C): Circuit >100A uses 75°C termination rating.`
+    );
+  }
+
+  // CHECK NEC 240.4(D) - OVERCURRENT PROTECTION FOR SMALL CONDUCTORS
+  // 14 AWG: Max 15A | 12 AWG: Max 20A | 10 AWG: Max 30A
+  const smallConductorLimits: Record<string, number> = {
+    '14 AWG': 15,
+    '12 AWG': 20,
+    '10 AWG': 30
+  };
+
+  const maxLimit = smallConductorLimits[finalConductor.size];
+  if (maxLimit && requiredOCPD > maxLimit) {
+    // Selected conductor violates NEC 240.4(D) - need to upsize
+    warnings.push(
+      `⚠️ NEC 240.4(D): ${finalConductor.size} limited to ${maxLimit}A OCPD. ` +
+      `Load requires ${requiredOCPD}A protection - upsizing conductor.`
+    );
+    necReferences.push('NEC 240.4(D) - Small Conductor Protection');
+
+    // Find next larger conductor that can handle the OCPD
+    let nextBaseAmpacity = baseAmpacityNeeded;
+    // Increase required ampacity to meet OCPD limit
+    if (finalConductor.size === '14 AWG') {
+      // Need at least 12 AWG
+      nextBaseAmpacity = Math.max(baseAmpacityNeeded, 20 / combinedDerating);
+    } else if (finalConductor.size === '12 AWG') {
+      // Need at least 10 AWG
+      nextBaseAmpacity = Math.max(baseAmpacityNeeded, 30 / combinedDerating);
+    }
+
+    const upsizedConductor = findConductorByAmpacity(
+      nextBaseAmpacity,
+      settings.conductorMaterial,
+      settings.temperatureRating
+    );
+
+    if (upsizedConductor) {
+      finalConductor = upsizedConductor;
+      finalBaseAmpacity = upsizedConductor[`temp${settings.temperatureRating}C` as 'temp60C' | 'temp75C' | 'temp90C'];
+      finalAdjustedAmpacity = finalBaseAmpacity * combinedDerating;
+      warnings.push(
+        `✓ Upsized to ${upsizedConductor.size} to comply with NEC 240.4(D) overcurrent protection limits.`
+      );
+    }
+  }
+
   // 6. CALCULATE EQUIPMENT GROUNDING CONDUCTOR SIZE (NEC 250.122)
   const ocpdForEgc = ocpdRating ?? Math.ceil(requiredAmpacity);
   const egcResult = calculateEgcSize(
     ocpdForEgc,
-    conductor.size,
+    finalConductor.size,
     settings.conductorMaterial,
     false // Don't auto-upsize - would need voltage drop calculation to determine
   );
@@ -256,16 +359,16 @@ export function sizeConductor(
   }
 
   return {
-    conductorSize: conductor.size,
-    ampacity: baseAmpacity,
-    adjustedAmpacity: Math.round(adjustedAmpacity * 100) / 100,
+    conductorSize: finalConductor.size,
+    ampacity: finalBaseAmpacity,
+    adjustedAmpacity: Math.round(finalAdjustedAmpacity * 100) / 100,
     egcSize: egcResult.egcSize,
     egcUpsized: egcResult.upsized,
     baseTempCorrection: tempCorrection,
     bundlingAdjustment,
     continuousLoadFactor,
     requiredAmpacity: Math.round(requiredAmpacity * 100) / 100,
-    baseAmpacity,
+    baseAmpacity: finalBaseAmpacity,
     necReferences,
     warnings
   };

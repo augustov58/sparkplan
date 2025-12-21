@@ -24,6 +24,12 @@ export const PermitPacketGenerator: React.FC<PermitPacketGeneratorProps> = ({ pr
   const [preparedBy, setPreparedBy] = useState('');
   const [permitNumber, setPermitNumber] = useState('');
   const [packetType, setPacketType] = useState<'full' | 'lightweight'>('full');
+  // Tier 1 additions
+  const [contractorLicense, setContractorLicense] = useState('');
+  const [scopeOfWork, setScopeOfWork] = useState('');
+  const [serviceType, setServiceType] = useState<'overhead' | 'underground'>('overhead');
+  const [meterLocation, setMeterLocation] = useState('');
+  const [serviceConductorRouting, setServiceConductorRouting] = useState('');
 
   // Fetch project data - hooks must be called unconditionally
   const { projects } = useProjects();
@@ -76,6 +82,12 @@ export const PermitPacketGenerator: React.FC<PermitPacketGeneratorProps> = ({ pr
         preparedBy: preparedBy.trim() || undefined,
         permitNumber: permitNumber.trim() || undefined,
         hasGrounding: !!grounding,
+        // Tier 1 additions
+        contractorLicense: contractorLicense.trim() || undefined,
+        scopeOfWork: scopeOfWork.trim() || undefined,
+        serviceType: serviceType || undefined,
+        meterLocation: meterLocation.trim() || undefined,
+        serviceConductorRouting: serviceConductorRouting.trim() || undefined,
       };
 
       if (packetType === 'full') {
@@ -125,8 +137,10 @@ export const PermitPacketGenerator: React.FC<PermitPacketGeneratorProps> = ({ pr
           <div className="text-sm text-blue-900">
             <p className="font-medium mb-1">What's Included:</p>
             <ul className="list-disc list-inside space-y-1 text-blue-800">
-              <li>Cover page with project information</li>
+              <li>Cover page with contractor license & scope of work</li>
+              <li>Service entrance details</li>
               <li>Equipment schedule (panels, transformers, feeders)</li>
+              <li>Riser diagram (system hierarchy)</li>
               <li>Load calculation summary</li>
               <li>NEC compliance summary</li>
               {packetType === 'full' && <li>Complete panel schedules for all panels</li>}
@@ -201,7 +215,7 @@ export const PermitPacketGenerator: React.FC<PermitPacketGeneratorProps> = ({ pr
           </div>
         </div>
 
-        {/* Optional Fields */}
+        {/* Contractor Information */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
             <label htmlFor="preparedBy" className="block text-sm font-medium text-gray-700 mb-2">
@@ -217,6 +231,23 @@ export const PermitPacketGenerator: React.FC<PermitPacketGeneratorProps> = ({ pr
             />
           </div>
           <div>
+            <label htmlFor="contractorLicense" className="block text-sm font-medium text-gray-700 mb-2">
+              Contractor License <span className="text-red-500">*</span>
+            </label>
+            <input
+              id="contractorLicense"
+              type="text"
+              value={contractorLicense}
+              onChange={(e) => setContractorLicense(e.target.value)}
+              placeholder="e.g., C-10 #123456"
+              className="w-full border border-gray-200 rounded px-3 py-2 text-sm focus:border-electric-500 focus:ring-2 focus:ring-electric-500/20 outline-none"
+            />
+            <p className="text-xs text-gray-500 mt-1">Required by most jurisdictions</p>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
             <label htmlFor="permitNumber" className="block text-sm font-medium text-gray-700 mb-2">
               Permit Number (Optional)
             </label>
@@ -228,6 +259,69 @@ export const PermitPacketGenerator: React.FC<PermitPacketGeneratorProps> = ({ pr
               placeholder="e.g., PER-2024-001234"
               className="w-full border border-gray-200 rounded px-3 py-2 text-sm focus:border-electric-500 focus:ring-2 focus:ring-electric-500/20 outline-none"
             />
+          </div>
+        </div>
+
+        {/* Scope of Work */}
+        <div>
+          <label htmlFor="scopeOfWork" className="block text-sm font-medium text-gray-700 mb-2">
+            Scope of Work <span className="text-red-500">*</span>
+          </label>
+          <textarea
+            id="scopeOfWork"
+            value={scopeOfWork}
+            onChange={(e) => setScopeOfWork(e.target.value)}
+            placeholder="e.g., Replace existing 100A overhead service with 200A underground service, relocate meter to exterior wall, install new 200A main panel"
+            rows={3}
+            className="w-full border border-gray-200 rounded px-3 py-2 text-sm focus:border-electric-500 focus:ring-2 focus:ring-electric-500/20 outline-none"
+          />
+          <p className="text-xs text-gray-500 mt-1">Brief description of work to be performed</p>
+        </div>
+
+        {/* Service Entrance Details */}
+        <div className="border-t border-gray-200 pt-4">
+          <h4 className="font-medium text-gray-900 mb-4">Service Entrance Details</h4>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div>
+              <label htmlFor="serviceType" className="block text-sm font-medium text-gray-700 mb-2">
+                Service Type
+              </label>
+              <select
+                id="serviceType"
+                value={serviceType}
+                onChange={(e) => setServiceType(e.target.value as 'overhead' | 'underground')}
+                className="w-full border border-gray-200 rounded px-3 py-2 text-sm focus:border-electric-500 focus:ring-2 focus:ring-electric-500/20 outline-none"
+              >
+                <option value="overhead">Overhead</option>
+                <option value="underground">Underground</option>
+              </select>
+            </div>
+            <div>
+              <label htmlFor="meterLocation" className="block text-sm font-medium text-gray-700 mb-2">
+                Meter Location
+              </label>
+              <input
+                id="meterLocation"
+                type="text"
+                value={meterLocation}
+                onChange={(e) => setMeterLocation(e.target.value)}
+                placeholder="e.g., Exterior wall, north side"
+                className="w-full border border-gray-200 rounded px-3 py-2 text-sm focus:border-electric-500 focus:ring-2 focus:ring-electric-500/20 outline-none"
+              />
+            </div>
+            <div>
+              <label htmlFor="serviceConductorRouting" className="block text-sm font-medium text-gray-700 mb-2">
+                Conductor Routing
+              </label>
+              <input
+                id="serviceConductorRouting"
+                type="text"
+                value={serviceConductorRouting}
+                onChange={(e) => setServiceConductorRouting(e.target.value)}
+                placeholder="e.g., PVC conduit, buried 24in"
+                className="w-full border border-gray-200 rounded px-3 py-2 text-sm focus:border-electric-500 focus:ring-2 focus:ring-electric-500/20 outline-none"
+              />
+            </div>
           </div>
         </div>
       </div>
