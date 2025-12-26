@@ -5,6 +5,7 @@ import { Layout } from './components/Layout';
 import { Dashboard } from './components/Dashboard';
 import { LoadCalculator } from './components/LoadCalculator';
 import { OneLineDiagram } from './components/OneLineDiagram';
+import { DiagramOnlyView } from './components/DiagramOnlyView';
 import { GroundingBonding } from './components/GroundingBonding';
 import { PanelSchedule } from './components/PanelSchedule';
 import { PreInspection } from './components/PreInspection';
@@ -22,6 +23,9 @@ import { ShortCircuitResults } from './components/ShortCircuitResults';
 import { RFIManager } from './components/RFIManager';
 import { SiteVisitManager } from './components/SiteVisitManager';
 import { CalendarView } from './components/CalendarView';
+import { AgentActivityLog } from './components/AgentActivityLog';
+import { UtilityInterconnectionForm } from './components/UtilityInterconnectionForm';
+import { EVPanelTemplates } from './components/EVPanelTemplates';
 import { Project, ProjectStatus, ProjectType } from './types';
 import { askNecAssistant } from './services/geminiService';
 import { buildProjectContext, formatContextForAI } from './services/ai/projectContextBuilder';
@@ -43,6 +47,22 @@ import { TemplateSelector } from './components/TemplateSelector';
 import type { ProjectTemplate } from './data/project-templates';
 
 // Note: Mock data removed - now using Supabase database
+
+// Wrapper component to fetch data for Utility Interconnection Form
+const UtilityInterconnectionWrapper = ({ project }: { project: Project }) => {
+    const { panels } = usePanels(project.id);
+    const { circuits } = useCircuits(project.id);
+    const { transformers } = useTransformers(project.id);
+
+    return (
+        <UtilityInterconnectionForm
+            project={project}
+            panels={panels}
+            circuits={circuits}
+            transformers={transformers}
+        />
+    );
+};
 
 const ProjectWrapper = ({ projects, updateProject, deleteProject, onSignOut }: { projects: Project[], updateProject: (p: Project) => void, deleteProject: (id: string) => void, onSignOut: () => void }) => {
     const { id } = useParams();
@@ -75,9 +95,24 @@ const ProjectWrapper = ({ projects, updateProject, deleteProject, onSignOut }: {
                         <OneLineDiagram project={project} updateProject={updateProject} />
                     </FeatureErrorBoundary>
                 } />
+                <Route path="/diagram" element={
+                    <FeatureErrorBoundary>
+                        <OneLineDiagram project={project} updateProject={updateProject} />
+                    </FeatureErrorBoundary>
+                } />
                 <Route path="/tools" element={
                     <FeatureErrorBoundary>
-                        <Calculators />
+                        <Calculators projectId={project.id} />
+                    </FeatureErrorBoundary>
+                } />
+                <Route path="/utility-interconnection" element={
+                    <FeatureErrorBoundary>
+                        <UtilityInterconnectionWrapper project={project} />
+                    </FeatureErrorBoundary>
+                } />
+                <Route path="/ev-templates" element={
+                    <FeatureErrorBoundary>
+                        <EVPanelTemplates project={project} />
                     </FeatureErrorBoundary>
                 } />
                 <Route path="/grounding" element={
@@ -124,6 +159,10 @@ const ProjectWrapper = ({ projects, updateProject, deleteProject, onSignOut }: {
                             servicePhase={project.servicePhase}
                         />
                     </FeatureErrorBoundary>
+                } />
+                {/* Activity log merged into Inspector Mode - route kept for backwards compatibility */}
+                <Route path="/activity-log" element={
+                    <Navigate to={`/project/${project.id}/inspector`} replace />
                 } />
                 <Route path="/materials" element={
                     <FeatureErrorBoundary>

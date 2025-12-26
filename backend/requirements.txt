@@ -1,0 +1,18 @@
+# Core dependencies
+fastapi>=0.104.0
+uvicorn[standard]>=0.24.0
+python-dotenv>=1.0.0
+
+# Pydantic AI - only install what we need (Gemini support)
+pydantic-ai-slim[google]>=0.0.13
+pydantic>=2.10.0
+pydantic-settings>=2.1.0
+
+# Supabase
+supabase>=2.22.0
+
+# Image processing
+pillow>=10.1.0
+
+# File uploads
+python-multipart>=0.0.6

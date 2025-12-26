@@ -602,3 +602,227 @@ export interface OpenItem {
 
   created_at: string;
 }
+
+// ============================================================================
+// PHASE 1: AGENTIC AI INFRASTRUCTURE TYPES
+// ============================================================================
+
+/**
+ * Agent Action Type
+ * Defines the type of action the AI agent is suggesting
+ */
+export type AgentActionType =
+  | 'draft_rfi'
+  | 'suggest_change'
+  | 'predict_failure'
+  | 'flag_violation'
+  | 'recommend_upgrade'
+  | 'generate_notes';
+
+/**
+ * Agent Name
+ * Identifies which AI agent generated the action
+ */
+export type AgentName =
+  | 'rfi_drafter'
+  | 'change_impact'
+  | 'photo_analyzer'
+  | 'predictive_inspector'
+  | 'content_generator';
+
+/**
+ * Agent Action Status
+ * Workflow status for agent-suggested actions
+ */
+export type AgentActionStatus = 'pending' | 'approved' | 'rejected' | 'expired';
+
+/**
+ * Agent Action
+ * AI-suggested action awaiting user approval
+ */
+export interface AgentAction {
+  id: string;
+  project_id: string;
+  user_id: string;
+  action_type: AgentActionType;
+  agent_name: AgentName;
+  priority: number; // 0-100
+  status: AgentActionStatus;
+  title: string;
+  description: string;
+  reasoning?: string;
+  confidence_score?: number; // 0.00 - 1.00
+  action_data: Record<string, any>;
+  impact_analysis?: ImpactAnalysis;
+  user_notes?: string;
+  rejection_reason?: string;
+  created_at: string;
+  reviewed_at?: string;
+  expires_at?: string;
+  updated_at: string;
+}
+
+/**
+ * Impact Analysis
+ * Detailed analysis of proposed changes
+ */
+export interface ImpactAnalysis {
+  can_accommodate: boolean;
+  impact_summary: string;
+  service_impact?: ServiceImpact;
+  feeder_impacts?: FeederImpact[];
+  panel_impacts?: PanelImpact[];
+  voltage_drop_issues?: VoltageDropIssue[];
+  cost_estimate?: CostEstimate;
+  timeline_impact?: TimelineImpact;
+  recommendations?: string[];
+  change_order_draft?: string;
+}
+
+/**
+ * Service Impact
+ * Impact on main service entrance
+ */
+export interface ServiceImpact {
+  upgrade_needed: boolean;
+  current_size: number; // Amps
+  required_size?: number; // Amps
+  utilization_before: number; // Percentage
+  utilization_after: number; // Percentage
+  reason?: string;
+}
+
+/**
+ * Feeder Impact
+ * Impact on specific feeder
+ */
+export interface FeederImpact {
+  feeder_name: string;
+  current_size: string; // e.g., "#2 Cu"
+  required_size: string; // e.g., "#1/0 Cu"
+  reason: string;
+  voltage_drop_before: number;
+  voltage_drop_after: number;
+}
+
+/**
+ * Panel Impact
+ * Impact on specific panel
+ */
+export interface PanelImpact {
+  panel_name: string;
+  capacity_before: number; // Percentage
+  capacity_after: number; // Percentage
+  overloaded: boolean;
+  poles_before: number;
+  poles_after: number;
+}
+
+/**
+ * Voltage Drop Issue
+ * Voltage drop violation
+ */
+export interface VoltageDropIssue {
+  feeder_or_circuit: string;
+  voltage_drop: number; // Percentage
+  exceeds_limit: boolean;
+  limit: number; // NEC limit (typically 3%)
+}
+
+/**
+ * Cost Estimate
+ * Estimated cost range for changes
+ */
+export interface CostEstimate {
+  low: number;
+  high: number;
+  breakdown: Array<{ item: string; cost: number }>;
+}
+
+/**
+ * Timeline Impact
+ * Estimated impact on project timeline
+ */
+export interface TimelineImpact {
+  delay_days: number;
+  confidence: number;
+  factors: string[];
+}
+
+/**
+ * Analysis Cache
+ * Cached AI analysis results
+ */
+export interface AnalysisCache {
+  id: string;
+  project_id: string;
+  user_id: string;
+  analysis_type: string;
+  context_hash: string;
+  results: Record<string, any>;
+  model_version: string;
+  tokens_used?: number;
+  processing_time_ms?: number;
+  created_at: string;
+  expires_at: string;
+}
+
+/**
+ * Agent Activity Log
+ * Audit trail for agent actions
+ */
+export interface AgentActivityLog {
+  id: string;
+  project_id: string;
+  user_id: string;
+  agent_action_id?: string;
+  event_type: string;
+  agent_name: AgentName;
+  details?: Record<string, any>;
+  created_at: string;
+}
+
+/**
+ * Project Photo
+ * Photo storage with Vision AI analysis
+ */
+export interface ProjectPhoto {
+  id: string;
+  project_id: string;
+  user_id: string;
+  storage_path: string;
+  file_name: string;
+  file_size?: number;
+  mime_type?: string;
+  location?: string;
+  description?: string;
+  tags?: string[];
+  analyzed: boolean;
+  analysis_results?: VisionAnalysisResult;
+  detected_violations?: NecViolation[];
+  created_at: string;
+  updated_at: string;
+}
+
+/**
+ * Vision Analysis Result
+ * Results from Vision AI photo analysis
+ */
+export interface VisionAnalysisResult {
+  equipment_detected: string[];
+  violations: NecViolation[];
+  safety_concerns: string[];
+  scene_description: string;
+}
+
+/**
+ * NEC Violation
+ * Detected NEC code violation
+ */
+export interface NecViolation {
+  nec_article: string;
+  severity: 'critical' | 'warning' | 'info';
+  confidence: number; // 0.00 - 1.00
+  description: string;
+  recommendation: string;
+}

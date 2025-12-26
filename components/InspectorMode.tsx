@@ -9,11 +9,11 @@
  */
 
 import React, { useState, useEffect, useMemo } from 'react';
-import { 
-  Shield, 
-  AlertTriangle, 
-  AlertCircle, 
-  CheckCircle2, 
+import {
+  Shield,
+  AlertTriangle,
+  AlertCircle,
+  CheckCircle2,
   Info,
   RefreshCw,
   ChevronDown,
@@ -24,7 +24,15 @@ import {
   ExternalLink,
   Clock,
   Target,
-  BookOpen
+  BookOpen,
+  Activity,
+  CheckCircle,
+  XCircle,
+  TrendingUp,
+  Camera,
+  MessageSquare,
+  Filter,
+  Database
 } from 'lucide-react';
 import { usePanels } from '../hooks/usePanels';
 import { useCircuits } from '../hooks/useCircuits';
@@ -32,6 +40,8 @@ import { useFeeders } from '../hooks/useFeeders';
 import { useTransformers } from '../hooks/useTransformers';
 import { useGrounding } from '../hooks/useGrounding';
 import { useInspectorReports } from '../hooks/useInspectorReports';
+import { getAllActions } from '../services/ai/agentOrchestrator';
+import type { AgentAction } from '../types';
 import {
   runInspection,
   getIssueExplanationPrompt,
@@ -41,6 +51,7 @@ import {
   IssueSeverity
 } from '../services/inspection/inspectorMode';
 import { askNecAssistant } from '../services/geminiService';
+import { predictInspection } from '../services/api/pythonBackend';
 
 interface InspectorModeProps {
   projectId: string;
@@ -250,6 +261,7 @@ export const InspectorMode: React.FC<InspectorModeProps> = ({
 }) => {
   const [result, setResult] = useState<InspectionResult | null>(null);
   const [loading, setLoading] = useState(false);
+  const [aiPredicting, setAiPredicting] = useState(false);
   const [aiExplanation, setAiExplanation] = useState<string | null>(null);
   const [explainingIssueId, setExplainingIssueId] = useState<string | null>(null);
   const [filter, setFilter] = useState<'all' | 'critical' | 'warning'>('all');
@@ -290,10 +302,10 @@ export const InspectorMode: React.FC<InspectorModeProps> = ({
   const runAudit = async () => {
     setLoading(true);
     setAiExplanation(null);
-    
+
     // Small delay for UI feedback
     await new Promise(resolve => setTimeout(resolve, 500));
-    
+
     const inspectionData = {
       projectId,
       projectType,
@@ -309,7 +321,7 @@ export const InspectorMode: React.FC<InspectorModeProps> = ({
         bonding: grounding.bonding || [],
       } : undefined,
     };
-    
+
     const inspectionResult = runInspection(inspectionData);
     setResult(inspectionResult);
 
@@ -317,6 +329,26 @@ export const InspectorMode: React.FC<InspectorModeProps> = ({
     await saveReport(inspectionResult);
 
     setLoading(false);
+  };
+
+  // Run AI Predictive Inspector
+  const runAIPrediction = async () => {
+    setAiPredicting(true);
+    setAiExplanation(null);
+
+    try {
+      // Call Python backend to trigger Predictive Inspector agent
+      await predictInspection(projectId);
+
+      // Success! The result will appear in the AI Copilot sidebar
+      // Show success message
+      alert('AI Prediction started! Check the AI Copilot sidebar (right side) for results.');
+    } catch (error: any) {
+      console.error('AI Prediction error:', error);
+      alert(`Failed to run AI prediction: ${error.message || 'Unknown error'}\n\nMake sure the Python backend is running at http://localhost:8000`);
+    } finally {
+      setAiPredicting(false);
+    }
   };
   
   // Get AI explanation for an issue
@@ -372,23 +404,43 @@ export const InspectorMode: React.FC<InspectorModeProps> = ({
           </p>
         </div>
         
-        <button
-          onClick={runAudit}
-          disabled={loading || dataLoading}
-          className="inline-flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-xl font-medium shadow-lg shadow-indigo-200 hover:shadow-xl hover:shadow-indigo-300 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-        >
-          {loading ? (
-            <>
-              <RefreshCw className="w-4 h-4 animate-spin" />
-              Running Audit...
-            </>
-          ) : (
-            <>
-              <Zap className="w-4 h-4" />
-              Run Inspection
-            </>
-          )}
-        </button>
+        <div className="flex items-center gap-3">
+          <button
+            onClick={runAudit}
+            disabled={loading || dataLoading}
+            className="inline-flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-xl font-medium shadow-lg shadow-indigo-200 hover:shadow-xl hover:shadow-indigo-300 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {loading ? (
+              <>
+                <RefreshCw className="w-4 h-4 animate-spin" />
+                Running Audit...
+              </>
+            ) : (
+              <>
+                <Zap className="w-4 h-4" />
+                Run Inspection
+              </>
+            )}
+          </button>
+
+          <button
+            onClick={runAIPrediction}
+            disabled={aiPredicting || dataLoading}
+            className="inline-flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-xl font-medium shadow-lg shadow-purple-200 hover:shadow-xl hover:shadow-purple-300 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {aiPredicting ? (
+              <>
+                <RefreshCw className="w-4 h-4 animate-spin" />
+                AI Analyzing...
+              </>
+            ) : (
+              <>
+                <Sparkles className="w-4 h-4" />
+                AI Predict Inspection
+              </>
+            )}
+          </button>
+        </div>
       </div>
       
       {/* Data loading state */}
@@ -638,6 +690,335 @@ export const InspectorMode: React.FC<InspectorModeProps> = ({
             </div>
           </div>
         </>
+      )}
+
+      {/* AI Agent Activity Log Section */}
+      <AIActivitySection projectId={projectId} />
+    </div>
+  );
+};
+
+// ============================================================================
+// AI ACTIVITY LOG SECTION
+// ============================================================================
+
+interface AIActivitySectionProps {
+  projectId: string;
+}
+
+const AIActivitySection: React.FC<AIActivitySectionProps> = ({ projectId }) => {
+  const [actions, setActions] = useState<AgentAction[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [filterAgent, setFilterAgent] = useState<string>('all');
+  const [filterStatus, setFilterStatus] = useState<string>('all');
+  const [expandedActions, setExpandedActions] = useState<Set<string>>(new Set());
+
+  // Fetch actions
+  const fetchActions = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      const data = await getAllActions(projectId, { limit: 100 });
+      setActions(data);
+    } catch (err: any) {
+      setError(err.message || 'Failed to fetch agent actions');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchActions();
+  }, [projectId]);
+
+  const toggleAction = (actionId: string) => {
+    const newExpanded = new Set(expandedActions);
+    if (newExpanded.has(actionId)) {
+      newExpanded.delete(actionId);
+    } else {
+      newExpanded.add(actionId);
+    }
+    setExpandedActions(newExpanded);
+  };
+
+  // Filter actions
+  const filteredActions = actions.filter(action => {
+    if (filterAgent !== 'all' && action.agent_name !== filterAgent) return false;
+    if (filterStatus !== 'all' && action.status !== filterStatus) return false;
+    return true;
+  });
+
+  // Get unique agents and statuses for filters
+  const uniqueAgents = Array.from(new Set(actions.map(action => action.agent_name)));
+  const uniqueStatuses = Array.from(new Set(actions.map(action => action.status)));
+
+  const getAgentIcon = (agentName: string) => {
+    switch (agentName) {
+      case 'change_impact': return <TrendingUp className="w-4 h-4" />;
+      case 'photo_analyzer': return <Camera className="w-4 h-4" />;
+      case 'predictive_inspector': return <Shield className="w-4 h-4" />;
+      case 'rfi_drafter': return <MessageSquare className="w-4 h-4" />;
+      case 'content_generator': return <Sparkles className="w-4 h-4" />;
+      default: return <Activity className="w-4 h-4" />;
+    }
+  };
+
+  const getAgentName = (agentName: string) => {
+    switch (agentName) {
+      case 'change_impact': return 'Change Impact Analyzer';
+      case 'photo_analyzer': return 'Photo Analyzer';
+      case 'predictive_inspector': return 'Predictive Inspector';
+      case 'rfi_drafter': return 'RFI Drafter';
+      case 'content_generator': return 'Content Generator';
+      default: return agentName;
+    }
+  };
+
+  const getStatusIcon = (status: string) => {
+    switch (status) {
+      case 'approved': return <CheckCircle className="w-4 h-4 text-green-600" />;
+      case 'rejected': return <XCircle className="w-4 h-4 text-red-600" />;
+      case 'pending': return <Clock className="w-4 h-4 text-blue-600" />;
+      case 'expired': return <XCircle className="w-4 h-4 text-gray-600" />;
+      default: return <Activity className="w-4 h-4 text-gray-600" />;
+    }
+  };
+
+  const getStatusLabel = (status: string) => {
+    switch (status) {
+      case 'approved': return 'Approved';
+      case 'rejected': return 'Rejected';
+      case 'pending': return 'Pending';
+      case 'expired': return 'Expired';
+      default: return status;
+    }
+  };
+
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case 'approved': return 'bg-green-100 text-green-800 border-green-200';
+      case 'rejected': return 'bg-red-100 text-red-800 border-red-200';
+      case 'pending': return 'bg-blue-100 text-blue-800 border-blue-200';
+      case 'expired': return 'bg-gray-100 text-gray-800 border-gray-200';
+      default: return 'bg-gray-100 text-gray-800 border-gray-200';
+    }
+  };
+
+  // Simple time ago function
+  const timeAgo = (date: Date): string => {
+    const seconds = Math.floor((new Date().getTime() - date.getTime()) / 1000);
+    const intervals = {
+      year: 31536000,
+      month: 2592000,
+      week: 604800,
+      day: 86400,
+      hour: 3600,
+      minute: 60,
+    };
+
+    for (const [unit, secondsInUnit] of Object.entries(intervals)) {
+      const interval = Math.floor(seconds / secondsInUnit);
+      if (interval >= 1) {
+        return `${interval} ${unit}${interval > 1 ? 's' : ''} ago`;
+      }
+    }
+    return 'just now';
+  };
+
+  return (
+    <div className="mt-8 space-y-4">
+      {/* Header */}
+      <div className="bg-gradient-to-r from-indigo-50 to-purple-50 border border-indigo-100 rounded-xl p-6">
+        <div className="flex items-center justify-between">
+          <div>
+            <h3 className="text-xl font-bold text-gray-900 flex items-center gap-2">
+              <Activity className="w-6 h-6 text-indigo-600" />
+              AI Agent Activity & Suggestions History
+            </h3>
+            <p className="text-sm text-gray-600 mt-1">
+              Track all AI suggestions, approvals, and rejections for this project
+            </p>
+          </div>
+          <button
+            onClick={fetchActions}
+            className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors"
+          >
+            <RefreshCw className="w-4 h-4" />
+            Refresh
+          </button>
+        </div>
+      </div>
+
+      {/* Filters */}
+      {actions.length > 0 && (
+        <div className="bg-white border border-gray-200 rounded-xl p-4">
+          <div className="flex items-center gap-2 mb-3">
+            <Filter className="w-4 h-4 text-gray-500" />
+            <h4 className="font-medium text-gray-900">Filters</h4>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Agent</label>
+              <select
+                value={filterAgent}
+                onChange={(e) => setFilterAgent(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-sm"
+              >
+                <option value="all">All Agents</option>
+                {uniqueAgents.map(agent => (
+                  <option key={agent} value={agent}>{getAgentName(agent)}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
+              <select
+                value={filterStatus}
+                onChange={(e) => setFilterStatus(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-sm"
+              >
+                <option value="all">All Statuses</option>
+                {uniqueStatuses.map(status => (
+                  <option key={status} value={status}>{getStatusLabel(status)}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+          <div className="mt-3 text-sm text-gray-600">
+            Showing {filteredActions.length} of {actions.length} suggestions
+          </div>
+        </div>
+      )}
+
+      {/* Activity Timeline */}
+      {loading ? (
+        <div className="flex items-center justify-center py-12 bg-white border border-gray-200 rounded-xl">
+          <RefreshCw className="w-8 h-8 text-indigo-500 animate-spin" />
+          <span className="ml-3 text-gray-600">Loading activity logs...</span>
+        </div>
+      ) : error ? (
+        <div className="bg-red-50 border border-red-200 rounded-xl p-4 text-red-800">
+          <p className="font-medium">Error loading activity logs</p>
+          <p className="text-sm mt-1">{error}</p>
+        </div>
+      ) : filteredActions.length === 0 ? (
+        <div className="text-center py-12 bg-gray-50 rounded-xl border border-gray-200">
+          <Activity className="w-12 h-12 text-gray-400 mx-auto mb-3" />
+          <p className="text-gray-600 font-medium">No AI suggestions found</p>
+          <p className="text-sm text-gray-500 mt-1">
+            {actions.length === 0
+              ? "AI suggestions will appear here as you use the AI Copilot features"
+              : "Try adjusting your filters to see more results"}
+          </p>
+        </div>
+      ) : (
+        <div className="space-y-3">
+          {filteredActions.map((action) => {
+            const isExpanded = expandedActions.has(action.id);
+            return (
+              <div
+                key={action.id}
+                className="bg-white border border-gray-200 rounded-xl overflow-hidden hover:shadow-md transition-shadow"
+              >
+                <div
+                  onClick={() => toggleAction(action.id)}
+                  className="flex items-center gap-3 p-4 cursor-pointer hover:bg-gray-50"
+                >
+                  <div className="flex-shrink-0">
+                    {getAgentIcon(action.agent_name)}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className="text-sm font-medium text-gray-900">
+                        {action.title}
+                      </span>
+                      <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium border ${getStatusColor(action.status)}`}>
+                        {getStatusIcon(action.status)}
+                        {getStatusLabel(action.status)}
+                      </span>
+                      {action.confidence_score && (
+                        <span className="text-xs text-gray-500">
+                          {Math.round(action.confidence_score * 100)}% confidence
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-xs text-gray-600 mb-1">{action.description}</p>
+                    <div className="flex items-center gap-3 text-xs text-gray-500">
+                      <span>{getAgentName(action.agent_name)}</span>
+                      <span>•</span>
+                      <span>{timeAgo(new Date(action.created_at))}</span>
+                    </div>
+                  </div>
+                  <div className="flex-shrink-0">
+                    {isExpanded ? (
+                      <ChevronDown className="w-5 h-5 text-gray-400" />
+                    ) : (
+                      <ChevronRight className="w-5 h-5 text-gray-400" />
+                    )}
+                  </div>
+                </div>
+
+                {isExpanded && (
+                  <div className="border-t border-gray-100 p-4 bg-gray-50 space-y-4">
+                    {/* Reasoning */}
+                    {action.reasoning && (
+                      <div>
+                        <h5 className="text-xs font-semibold text-gray-700 mb-1">AI Reasoning:</h5>
+                        <p className="text-sm text-gray-600">{action.reasoning}</p>
+                      </div>
+                    )}
+
+                    {/* Impact Analysis */}
+                    {action.impact_analysis && (
+                      <div>
+                        <h5 className="text-xs font-semibold text-gray-700 mb-2">Impact Analysis:</h5>
+                        <pre className="bg-white border border-gray-200 rounded p-3 text-xs font-mono overflow-x-auto">
+                          {JSON.stringify(action.impact_analysis, null, 2)}
+                        </pre>
+                      </div>
+                    )}
+
+                    {/* Action Data */}
+                    {action.action_data && (
+                      <div>
+                        <h5 className="text-xs font-semibold text-gray-700 mb-2">Full Details:</h5>
+                        <pre className="bg-white border border-gray-200 rounded p-3 text-xs font-mono overflow-x-auto max-h-96">
+                          {JSON.stringify(action.action_data, null, 2)}
+                        </pre>
+                      </div>
+                    )}
+
+                    {/* User Notes/Rejection Reason */}
+                    {action.status === 'approved' && action.user_notes && (
+                      <div className="bg-green-50 border border-green-200 rounded p-3">
+                        <h5 className="text-xs font-semibold text-green-700 mb-1">Approval Notes:</h5>
+                        <p className="text-sm text-green-800">{action.user_notes}</p>
+                      </div>
+                    )}
+                    {action.status === 'rejected' && action.rejection_reason && (
+                      <div className="bg-red-50 border border-red-200 rounded p-3">
+                        <h5 className="text-xs font-semibold text-red-700 mb-1">Rejection Reason:</h5>
+                        <p className="text-sm text-red-800">{action.rejection_reason}</p>
+                      </div>
+                    )}
+
+                    {/* Metadata */}
+                    <div className="text-xs text-gray-500 flex items-center gap-4 pt-2 border-t border-gray-200">
+                      <span>Created: {new Date(action.created_at).toLocaleString()}</span>
+                      {action.reviewed_at && (
+                        <>
+                          <span>•</span>
+                          <span>Reviewed: {new Date(action.reviewed_at).toLocaleString()}</span>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
       )}
     </div>
   );

@@ -1,5 +1,5 @@
 
-import React from 'react';
+import React, { useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import {
   LayoutGrid,
@@ -20,10 +20,16 @@ import {
   MessageSquare,
   MapPin,
   Calendar,
-  Network
+  Network,
+  Plug,
+  Package,
+  Grid,
+  ChevronDown,
+  ChevronRight
 } from 'lucide-react';
 import { useAuthContext } from './Auth/AuthProvider';
 import { ProjectType } from '../types';
+import { AICopilotSidebar } from './AICopilotSidebar';
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -39,6 +45,9 @@ interface SidebarItemProps {
   path: string;
   active: boolean;
   nested?: boolean;
+  hasChildren?: boolean;
+  isExpanded?: boolean;
+  onToggle?: () => void;
 }
 
 interface SidebarSectionProps {
@@ -53,11 +62,33 @@ const SidebarSection: React.FC<SidebarSectionProps> = ({ title }) => {
   );
 };
 
-const SidebarItem: React.FC<SidebarItemProps> = ({ icon: Icon, label, path, active, nested = false }) => {
+const SidebarItem: React.FC<SidebarItemProps> = ({
+  icon: Icon,
+  label,
+  path,
+  active,
+  nested = false,
+  hasChildren = false,
+  isExpanded = false,
+  onToggle
+}) => {
   const navigate = useNavigate();
+
+  const handleClick = () => {
+    // Always navigate to path if it exists
+    if (path) {
+      navigate(path);
+    }
+
+    // Also toggle dropdown if has children
+    if (hasChildren && onToggle) {
+      onToggle();
+    }
+  };
+
   return (
     <div
-      onClick={() => navigate(path)}
+      onClick={handleClick}
       className={`
         flex items-center gap-3 cursor-pointer transition-all duration-200 group
         ${nested ? 'pl-12 pr-4 py-2' : 'px-4 py-3'}
@@ -65,9 +96,14 @@ const SidebarItem: React.FC<SidebarItemProps> = ({ icon: Icon, label, path, acti
       `}
     >
       <Icon className={`${nested ? 'w-4 h-4' : 'w-5 h-5'} ${active ? 'text-electric-500' : 'text-gray-400 group-hover:text-gray-600'}`} />
-      <span className={`${nested ? 'text-xs' : 'text-sm'} font-medium ${active ? 'text-gray-900' : 'text-gray-500 group-hover:text-gray-700'}`}>
+      <span className={`${nested ? 'text-xs' : 'text-sm'} font-medium flex-1 ${active ? 'text-gray-900' : 'text-gray-500 group-hover:text-gray-700'}`}>
         {label}
       </span>
+      {hasChildren && (
+        isExpanded ?
+          <ChevronDown className="w-4 h-4 text-gray-400" /> :
+          <ChevronRight className="w-4 h-4 text-gray-400" />
+      )}
     </div>
   );
 };
@@ -76,6 +112,9 @@ export const Layout: React.FC<LayoutProps> = ({ children, title, showBack, onSig
   const navigate = useNavigate();
   const location = useLocation();
   const { user } = useAuthContext();
+  const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({
+    'Circuit Design': true // Default to expanded
+  });
 
   // Extract user initials from email
   const getUserInitials = () => {
@@ -114,16 +153,17 @@ export const Layout: React.FC<LayoutProps> = ({ children, title, showBack, onSig
           label: 'Circuit Design',
           icon: CircuitBoard,
           path: `/project/${projectId}/circuits`,
-          show: isCommercialOrIndustrial,
+          show: true,
           nested: [
-            { label: 'One-Line Diagram', icon: Network, path: `/project/${projectId}/diagram` }
+            { label: 'One-Line Diagram', icon: Network, path: `/project/${projectId}/diagram` },
+            { label: 'Panel Schedules', icon: Grid, path: `/project/${projectId}/panel` },
+            { label: 'Feeder Sizing', icon: Cable, path: `/project/${projectId}/feeders` },
+            { label: 'Short Circuit Analysis', icon: Activity, path: `/project/${projectId}/short-circuit` }
           ]
         },
-        { label: 'Panel Schedules', icon: LayoutGrid, path: `/project/${projectId}/panel`, show: true },
         { label: 'Grounding & Bonding', icon: Zap, path: `/project/${projectId}/grounding`, show: true },
-        { label: 'Feeder Sizing', icon: Cable, path: `/project/${projectId}/feeders`, show: isCommercialOrIndustrial },
-        { label: 'Short Circuit Analysis', icon: Activity, path: `/project/${projectId}/short-circuit`, show: true },
         { label: 'Tools & Calculators', icon: Calculator, path: `/project/${projectId}/tools`, show: true },
+        { label: 'EV Panel Templates', icon: Package, path: `/project/${projectId}/ev-templates`, show: true },
       ]
     },
     {
@@ -133,9 +173,10 @@ export const Layout: React.FC<LayoutProps> = ({ children, title, showBack, onSig
         { label: 'RFI Tracking', icon: MessageSquare, path: `/project/${projectId}/rfis`, show: true },
         { label: 'Site Visits', icon: MapPin, path: `/project/${projectId}/site-visits`, show: true },
         { label: 'Calendar', icon: Calendar, path: `/project/${projectId}/calendar`, show: true },
-        { label: 'Inspector Mode AI', icon: Shield, path: `/project/${projectId}/inspector`, show: true },
+        { label: 'AI Inspector & Activity', icon: Shield, path: `/project/${projectId}/inspector`, show: true },
         { label: 'Pre-Inspection Check', icon: CheckSquare, path: `/project/${projectId}/check`, show: true },
         { label: 'Permit Packet', icon: FileText, path: `/project/${projectId}/permit-packet`, show: true },
+        { label: 'Utility Interconnection', icon: Plug, path: `/project/${projectId}/utility-interconnection`, show: true },
       ]
     }
   ] : [];
@@ -193,8 +234,14 @@ export const Layout: React.FC<LayoutProps> = ({ children, title, showBack, onSig
                           label={item.label}
                           path={item.path}
                           active={location.pathname === item.path}
+                          hasChildren={!!item.nested}
+                          isExpanded={expandedSections[item.label]}
+                          onToggle={() => setExpandedSections(prev => ({
+                            ...prev,
+                            [item.label]: !prev[item.label]
+                          }))}
                         />
-                        {item.nested && item.nested.map((nestedItem: any) => (
+                        {item.nested && expandedSections[item.label] && item.nested.map((nestedItem: any) => (
                           <SidebarItem
                             key={nestedItem.label}
                             icon={nestedItem.icon}
@@ -254,6 +301,9 @@ export const Layout: React.FC<LayoutProps> = ({ children, title, showBack, onSig
           {children}
         </div>
       </main>
+
+      {/* AI Copilot Sidebar - Only show on project routes */}
+      {isProjectRoute && <AICopilotSidebar />}
     </div>
   );
 };
