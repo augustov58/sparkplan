@@ -11,10 +11,12 @@ import {
   Clock,
   AlertCircle,
   Calendar,
-  FileText
+  FileText,
+  Sparkles
 } from 'lucide-react';
 import { useRFIs } from '../hooks/useRFIs';
 import { RFIPDFExtractor } from './RFIPDFExtractor';
+import { draftRFI } from '../services/api/pythonBackend';
 
 interface RFIManagerProps {
   project: Project;
@@ -36,10 +38,15 @@ export const RFIManager: React.FC<RFIManagerProps> = ({ project }) => {
   const [filter, setFilter] = useState<'All' | 'Pending' | 'Answered' | 'Closed'>('All');
   const [searchTerm, setSearchTerm] = useState('');
   const [isCreating, setIsCreating] = useState(false);
-  const [usePDFExtraction, setUsePDFExtraction] = useState(false);
+  const [creationMode, setCreationMode] = useState<'manual' | 'pdf' | 'ai'>('manual');
   const [isAnswering, setIsAnswering] = useState<string | null>(null);
   const [answerText, setAnswerText] = useState('');
   const [respondedBy, setRespondedBy] = useState('');
+
+  // AI Drafting state
+  const [aiTopic, setAiTopic] = useState('');
+  const [aiContext, setAiContext] = useState('');
+  const [aiDrafting, setAiDrafting] = useState(false);
 
   const [newRFI, setNewRFI] = useState({
     rfi_number: '',
@@ -147,12 +154,12 @@ export const RFIManager: React.FC<RFIManagerProps> = ({ project }) => {
           <div className="flex items-center justify-between mb-4">
             <h3 className="font-medium text-gray-900">New Request for Information</h3>
 
-            {/* Toggle between manual and PDF extraction */}
+            {/* Toggle between manual, PDF extraction, and AI drafting */}
             <div className="flex gap-2">
               <button
-                onClick={() => setUsePDFExtraction(false)}
+                onClick={() => setCreationMode('manual')}
                 className={`px-3 py-1 text-xs font-medium rounded transition-colors ${
-                  !usePDFExtraction
+                  creationMode === 'manual'
                     ? 'bg-electric-500 text-black'
                     : 'bg-gray-200 text-gray-600 hover:bg-gray-300'
                 }`}
@@ -160,9 +167,9 @@ export const RFIManager: React.FC<RFIManagerProps> = ({ project }) => {
                 Manual Entry
               </button>
               <button
-                onClick={() => setUsePDFExtraction(true)}
+                onClick={() => setCreationMode('pdf')}
                 className={`px-3 py-1 text-xs font-medium rounded transition-colors flex items-center gap-1 ${
-                  usePDFExtraction
+                  creationMode === 'pdf'
                     ? 'bg-electric-500 text-black'
                     : 'bg-gray-200 text-gray-600 hover:bg-gray-300'
                 }`}
@@ -170,10 +177,21 @@ export const RFIManager: React.FC<RFIManagerProps> = ({ project }) => {
                 <FileText className="w-3 h-3" />
                 Extract from PDF
               </button>
+              <button
+                onClick={() => setCreationMode('ai')}
+                className={`px-3 py-1 text-xs font-medium rounded transition-colors flex items-center gap-1 ${
+                  creationMode === 'ai'
+                    ? 'bg-purple-500 text-white'
+                    : 'bg-gray-200 text-gray-600 hover:bg-gray-300'
+                }`}
+              >
+                <Sparkles className="w-3 h-3" />
+                Draft with AI
+              </button>
             </div>
           </div>
 
-          {usePDFExtraction ? (
+          {creationMode === 'pdf' ? (
             <RFIPDFExtractor
               onDataExtracted={(data) => {
                 setNewRFI({
@@ -186,10 +204,117 @@ export const RFIManager: React.FC<RFIManagerProps> = ({ project }) => {
                   requested_by: data.requested_by || '',
                   due_date: data.due_date || ''
                 });
-                setUsePDFExtraction(false);
+                setCreationMode('manual');
               }}
-              onCancel={() => setUsePDFExtraction(false)}
+              onCancel={() => setCreationMode('manual')}
             />
+          ) : creationMode === 'ai' ? (
+            <div className="space-y-4">
+              {/* AI Drafting Form */}
+              <div className="bg-purple-50 border border-purple-200 rounded-lg p-4 mb-4">
+                <div className="flex items-start gap-2">
+                  <Sparkles className="w-5 h-5 text-purple-600 flex-shrink-0 mt-0.5" />
+                  <div>
+                    <h4 className="text-sm font-medium text-purple-900">AI RFI Drafter</h4>
+                    <p className="text-xs text-purple-700 mt-1">
+                      Describe what you need clarification about, and AI will generate a professional RFI with NEC references.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Topic <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  placeholder="e.g., Service entrance grounding requirements"
+                  className="input-std w-full"
+                  value={aiTopic}
+                  onChange={e => setAiTopic(e.target.value)}
+                />
+                <p className="text-xs text-gray-500 mt-1">What do you need clarification about?</p>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Additional Context (Optional)
+                </label>
+                <textarea
+                  placeholder="Any additional details that would help AI draft a better question..."
+                  className="input-std w-full min-h-[80px]"
+                  value={aiContext}
+                  onChange={e => setAiContext(e.target.value)}
+                />
+                <p className="text-xs text-gray-500 mt-1">
+                  Include project details, specific concerns, or inspector comments
+                </p>
+              </div>
+
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                <h4 className="text-xs font-medium text-blue-900 mb-1">Examples:</h4>
+                <ul className="text-xs text-blue-800 space-y-0.5">
+                  <li>• "GEC sizing for 400A service with multiple electrodes"</li>
+                  <li>• "Bonding requirements for metal water pipe"</li>
+                  <li>• "EV charger circuit breaker sizing question"</li>
+                </ul>
+              </div>
+
+              <div className="flex gap-2">
+                <button
+                  onClick={async () => {
+                    if (!aiTopic.trim()) {
+                      alert('Please enter a topic');
+                      return;
+                    }
+
+                    setAiDrafting(true);
+                    try {
+                      // Call Python backend to draft RFI
+                      await draftRFI(project.id, aiTopic, aiContext);
+
+                      // Success! The draft will appear in AI Copilot sidebar
+                      alert('AI RFI draft started! Check the AI Copilot sidebar (right side) for the generated RFI. You can review and approve it there.');
+
+                      // Reset AI form
+                      setAiTopic('');
+                      setAiContext('');
+                      setCreationMode('manual');
+                    } catch (error: any) {
+                      console.error('AI RFI drafting error:', error);
+                      alert(`Failed to draft RFI: ${error.message || 'Unknown error'}\n\nMake sure the Python backend is running at http://localhost:8000`);
+                    } finally {
+                      setAiDrafting(false);
+                    }
+                  }}
+                  disabled={aiDrafting || !aiTopic.trim()}
+                  className="flex-1 bg-gradient-to-r from-purple-600 to-pink-600 text-white px-4 py-2 rounded text-sm font-medium flex items-center justify-center gap-2 hover:shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {aiDrafting ? (
+                    <>
+                      <Sparkles className="w-4 h-4 animate-pulse" />
+                      AI Drafting...
+                    </>
+                  ) : (
+                    <>
+                      <Sparkles className="w-4 h-4" />
+                      Draft RFI with AI
+                    </>
+                  )}
+                </button>
+                <button
+                  onClick={() => {
+                    setAiTopic('');
+                    setAiContext('');
+                    setCreationMode('manual');
+                  }}
+                  className="px-4 py-2 border border-gray-300 text-gray-700 rounded text-sm font-medium hover:bg-gray-50 transition-colors"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
           ) : (
             <div className="space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

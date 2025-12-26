@@ -12,10 +12,13 @@ import {
   CheckCircle,
   AlertTriangle,
   ClipboardList,
-  Image as ImageIcon
+  Image as ImageIcon,
+  Sparkles
 } from 'lucide-react';
 import { useSiteVisits } from '../hooks/useSiteVisits';
 import { PhotoUploader } from './PhotoUploader';
+import { analyzePhoto } from '../services/api/pythonBackend';
+import { supabase } from '@/lib/supabase';
 
 interface SiteVisitManagerProps {
   project: Project;
@@ -35,6 +38,7 @@ export const SiteVisitManager: React.FC<SiteVisitManagerProps> = ({ project }) =
   const [filter, setFilter] = useState<'All' | 'Scheduled' | 'In Progress' | 'Completed' | 'Cancelled'>('All');
   const [searchTerm, setSearchTerm] = useState('');
   const [isCreating, setIsCreating] = useState(false);
+  const [analyzingPhotos, setAnalyzingPhotos] = useState(false);
 
   const [newVisit, setNewVisit] = useState({
     title: '',
@@ -395,6 +399,91 @@ export const SiteVisitManager: React.FC<SiteVisitManagerProps> = ({ project }) =
                   onPhotosUploaded={(urls) => setNewVisit({ ...newVisit, photos: urls })}
                   existingPhotos={newVisit.photos}
                 />
+
+                {/* AI Photo Analysis */}
+                {newVisit.photos.length > 0 && (
+                  <div className="mt-4 bg-purple-50 border border-purple-200 rounded-lg p-4">
+                    <div className="flex items-start justify-between gap-4">
+                      <div>
+                        <div className="flex items-center gap-2 mb-1">
+                          <Sparkles className="w-4 h-4 text-purple-600" />
+                          <h4 className="text-sm font-medium text-purple-900">AI Photo Analysis Available</h4>
+                        </div>
+                        <p className="text-xs text-purple-700">
+                          {newVisit.photos.length} photo{newVisit.photos.length > 1 ? 's' : ''} uploaded.
+                          Analyze for NEC violations, equipment identification, and safety concerns.
+                        </p>
+                      </div>
+                      <button
+                        onClick={async () => {
+                          setAnalyzingPhotos(true);
+                          try {
+                            // Analyze each uploaded photo
+                            for (const photoUrl of newVisit.photos) {
+                              // Extract storage path from public URL
+                              // URL format: https://<project>.supabase.co/storage/v1/object/public/site-visit-photos/<path>
+                              const urlParts = photoUrl.split('/site-visit-photos/');
+                              if (urlParts.length !== 2) {
+                                console.error('Invalid photo URL format:', photoUrl);
+                                continue;
+                              }
+                              const storagePath = urlParts[1];
+
+                              // Download photo from Supabase Storage
+                              const { data: blob, error } = await supabase.storage
+                                .from('site-visit-photos')
+                                .download(storagePath);
+
+                              if (error) {
+                                console.error('Error downloading photo:', error);
+                                continue;
+                              }
+
+                              // Convert blob to File object
+                              const fileName = storagePath.split('/').pop() || 'photo.jpg';
+                              const photoFile = new File([blob], fileName, { type: blob.type });
+
+                              // Call Photo Analyzer API
+                              await analyzePhoto(
+                                project.id,
+                                photoFile,
+                                `Site visit: ${newVisit.title}`
+                              );
+                            }
+
+                            alert(
+                              `Successfully analyzed ${newVisit.photos.length} photo${newVisit.photos.length > 1 ? 's' : ''}!\n\n` +
+                              'Check the AI Copilot sidebar (right side) for:\n' +
+                              '• Equipment identification\n' +
+                              '• NEC violations detected\n' +
+                              '• Safety concerns\n' +
+                              '• Recommended fixes'
+                            );
+                          } catch (error: any) {
+                            console.error('Photo analysis error:', error);
+                            alert(`Failed to analyze photos: ${error.message || 'Unknown error'}\n\nMake sure the Python backend is running at http://localhost:8000`);
+                          } finally {
+                            setAnalyzingPhotos(false);
+                          }
+                        }}
+                        disabled={analyzingPhotos}
+                        className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded text-xs font-medium hover:shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
+                      >
+                        {analyzingPhotos ? (
+                          <>
+                            <Sparkles className="w-3 h-3 animate-pulse" />
+                            Analyzing...
+                          </>
+                        ) : (
+                          <>
+                            <Sparkles className="w-3 h-3" />
+                            Analyze with AI
+                          </>
+                        )}
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
 
               <div>

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../lib/supabase';
 import {
   getPendingActions,
@@ -24,7 +24,7 @@ export function useAgentActions(
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const fetchActions = async () => {
+  const fetchActions = useCallback(async () => {
     if (!projectId) {
       setActions([]);
       setLoading(false);
@@ -46,7 +46,7 @@ export function useAgentActions(
     } finally {
       setLoading(false);
     }
-  };
+  }, [projectId, options?.agentName]);
 
   // Initial fetch
   useEffect(() => {
@@ -67,7 +67,8 @@ export function useAgentActions(
           table: 'agent_actions',
           filter: `project_id=eq.${projectId}`,
         },
-        () => {
+        (payload) => {
+          console.log('Agent action change detected:', payload);
           fetchActions(); // Refetch on any change
         }
       )
@@ -76,7 +77,7 @@ export function useAgentActions(
     return () => {
       channel.unsubscribe();
     };
-  }, [projectId]);
+  }, [projectId, fetchActions]);
 
   const approve = async (actionId: string, notes?: string) => {
     // Optimistic update

@@ -1073,3 +1073,369 @@ npm run type-check
 - Read `/CLAUDE.md` for comprehensive project overview
 - Check `/CASCADING_HIERARCHY_FIX.md` for one-line diagram details
 - Review `/tests/calculations.test.ts` for calculation examples
+
+---
+
+## Testing Strategy
+
+**Last Updated**: 2025-12-03
+**Current Coverage**: ~20% (calculation services only)
+**Target Coverage**: 75%
+**Framework**: Vitest 4.0.14 + React Testing Library
+
+### Testing Pyramid
+
+```
+                    E2E Tests
+                   /         \
+                  /  (Future) \
+                 /______________\
+                /                \
+               /  Integration     \
+              /    Tests           \
+             /     (Planned)        \
+            /_______________________ \
+           /                          \
+          /      Unit Tests            \
+         /   (Current: calculations)   \
+        /________________________________\
+```
+
+#### Layer Breakdown
+
+**Unit Tests** (Foundation):
+- **Purpose**: Test individual functions in isolation
+- **Speed**: Very fast (<1ms per test)
+- **Coverage target**: 100% for calculation services, 80% for utilities
+- **Current**: 11/11 passing (calculation services only)
+
+**Integration Tests** (Middle):
+- **Purpose**: Test multiple components/hooks working together
+- **Speed**: Fast (10-100ms per test)
+- **Coverage target**: 80% for custom hooks, 60% for components
+- **Current**: NOT IMPLEMENTED
+
+**E2E Tests** (Top):
+- **Purpose**: Test complete user workflows
+- **Speed**: Slow (1-10 seconds per test)
+- **Coverage target**: Critical user paths only
+- **Current**: NOT IMPLEMENTED
+
+### Current Test Coverage
+
+#### ✅ What's Tested (11 tests, 100% passing)
+
+**File**: `/tests/calculations.test.ts`
+
+**Load Calculations (5 tests)**:
+```typescript
+describe('Load Calculations', () => {
+  it('calculates dwelling load per NEC 220.82') // ✅ PASSING
+  it('applies lighting demand factors per NEC Table 220.42') // ✅ PASSING
+  it('applies range demand factors per NEC Table 220.55') // ✅ PASSING
+  it('applies 125% continuous load factor') // ✅ PASSING
+  it('calculates commercial load per NEC 220.40') // ✅ PASSING
+});
+```
+
+**Conductor Sizing (3 tests)**:
+```typescript
+describe('Conductor Sizing', () => {
+  it('sizes conductors with temperature correction') // ✅ PASSING
+  it('applies bundling adjustment factors') // ✅ PASSING
+  it('selects correct conductor size from NEC Table 310.16') // ✅ PASSING
+});
+```
+
+**Breaker Sizing (2 tests)**:
+```typescript
+describe('Breaker Sizing', () => {
+  it('selects next standard breaker size per NEC 240.6(A)') // ✅ PASSING
+  it('applies 125% factor for continuous loads') // ✅ PASSING
+});
+```
+
+**Voltage Drop (1 test)**:
+```typescript
+describe('Voltage Drop', () => {
+  it('calculates voltage drop using AC impedance method') // ✅ PASSING
+});
+```
+
+#### ❌ What's NOT Tested
+
+**Custom Hooks** (0% coverage):
+- `usePanels`, `useCircuits`, `useTransformers`, `useLoads`, `useProjects`
+- Real-time subscriptions
+- Optimistic updates
+- Error handling
+
+**Components** (0% coverage):
+- `OneLineDiagram`, `CircuitDesign`, `LoadCalculator`, etc.
+- User interactions
+- Rendering logic
+
+**Database Logic** (0% coverage):
+- RLS policies
+- Triggers
+- Constraints
+
+### Unit Testing Strategy
+
+#### What to Unit Test
+
+**✅ Pure functions** (no side effects):
+- Calculation services (`/services/calculations/`)
+- Utility functions (`/lib/utils/`)
+- Type guards (`isPanel`, `isValidVoltage`)
+
+**✅ Business logic**:
+- NEC compliance checks
+- Validation rules
+- Formatting functions
+
+**❌ Don't unit test**:
+- React components (use integration tests)
+- Database queries (use integration tests with test DB)
+- External API calls (mock at integration level)
+
+#### Unit Test Template
+
+```typescript
+// /tests/myCalculation.test.ts
+import { describe, it, expect } from 'vitest';
+import { myCalculation } from '@/services/calculations/myCalculation';
+
+describe('My Calculation', () => {
+  describe('NEC compliance', () => {
+    it('should apply 125% continuous load factor per NEC 215.2(A)(1)', () => {
+      const result = myCalculation({
+        loadAmps: 80,
+        isContinuous: true
+      });
+
+      expect(result.adjustedAmps).toBe(100);  // 80 * 1.25
+      expect(result.necReference).toBe('NEC 215.2(A)(1)');
+    });
+
+    it('should not apply factor for non-continuous loads', () => {
+      const result = myCalculation({
+        loadAmps: 80,
+        isContinuous: false
+      });
+
+      expect(result.adjustedAmps).toBe(80);  // No factor
+    });
+  });
+
+  describe('edge cases', () => {
+    it('should handle zero load', () => {
+      const result = myCalculation({ loadAmps: 0, isContinuous: true });
+      expect(result.adjustedAmps).toBe(0);
+    });
+
+    it('should throw error for negative load', () => {
+      expect(() => {
+        myCalculation({ loadAmps: -10, isContinuous: true });
+      }).toThrow('Load must be positive');
+    });
+  });
+
+  describe('boundary conditions', () => {
+    it('should handle maximum safe load (10000A)', () => {
+      const result = myCalculation({ loadAmps: 10000, isContinuous: true });
+      expect(result.adjustedAmps).toBe(12500);  // 10000 * 1.25
+    });
+  });
+});
+```
+
+#### Running Tests
+
+```bash
+# Run all tests
+npm test
+
+# Run tests in watch mode (re-run on file change)
+npm test -- --watch
+
+# Run specific test file
+npm test calculations.test.ts
+
+# Run tests with coverage report
+npm test -- --coverage
+```
+
+### Mocking Patterns
+
+#### Mocking Supabase Client
+
+**Pattern**: Mock at module level, reset between tests
+
+```typescript
+import { vi, beforeEach, describe, it, expect } from 'vitest';
+import { supabase } from '@/lib/supabase';
+
+// Mock Supabase module
+vi.mock('@/lib/supabase', () => ({
+  supabase: {
+    from: vi.fn(),
+    channel: vi.fn()
+  }
+}));
+
+describe('usePanels hook', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();  // Reset mocks between tests
+  });
+
+  it('should fetch panels on mount', async () => {
+    // Setup mock response
+    const mockPanels = [
+      { id: '1', name: 'MDP', voltage: 480 }
+    ];
+
+    (supabase.from as any).mockReturnValue({
+      select: vi.fn().mockReturnValue({
+        eq: vi.fn().mockReturnValue({
+          order: vi.fn().mockResolvedValue({
+            data: mockPanels,
+            error: null
+          })
+        })
+      })
+    });
+
+    // Test hook
+    const { result } = renderHook(() => usePanels('project-123'));
+
+    // Wait for async fetch
+    await waitFor(() => {
+      expect(result.current.loading).toBe(false);
+    });
+
+    // Assert
+    expect(result.current.panels).toEqual(mockPanels);
+    expect(supabase.from).toHaveBeenCalledWith('panels');
+  });
+});
+```
+
+#### Mocking Gemini AI Service
+
+**Pattern**: Mock entire service module
+
+```typescript
+import { vi } from 'vitest';
+
+// Mock Gemini service
+vi.mock('@/services/geminiService', () => ({
+  validateLoadCalculation: vi.fn().mockResolvedValue(
+    'Load calculation is valid per NEC 220.82'
+  ),
+  generateOneLineDescription: vi.fn().mockResolvedValue(
+    'Electrical system: 480V 3-phase service with step-down transformers'
+  ),
+  askNecAssistant: vi.fn().mockResolvedValue(
+    'Per NEC Article 215, feeder conductors must be sized...'
+  )
+}));
+
+// In test
+it('should display AI validation result', async () => {
+  render(<LoadCalculator />);
+
+  fireEvent.click(screen.getByText('Validate with AI'));
+
+  await waitFor(() => {
+    expect(screen.getByText(/Load calculation is valid/)).toBeInTheDocument();
+  });
+});
+```
+
+### Coverage Goals
+
+#### Target Coverage by Layer
+
+| Layer | Current | Target | Priority |
+|-------|---------|--------|----------|
+| **Calculation Services** | 100% | 100% | ✅ DONE |
+| **Custom Hooks** | 0% | 80% | 🔴 HIGH |
+| **Components** | 0% | 60% | 🟡 MEDIUM |
+| **Utilities** | 0% | 80% | 🟡 MEDIUM |
+| **Overall** | ~20% | 75% | 🎯 GOAL |
+
+#### Coverage Thresholds (Vitest Config)
+
+```typescript
+// vitest.config.ts
+export default defineConfig({
+  test: {
+    coverage: {
+      provider: 'v8',
+      reporter: ['text', 'html', 'lcov'],
+      thresholds: {
+        lines: 75,
+        functions: 75,
+        branches: 70,
+        statements: 75
+      },
+      exclude: [
+        'node_modules/',
+        'dist/',
+        'tests/',
+        '**/*.test.ts',
+        '**/*.test.tsx'
+      ]
+    }
+  }
+});
+```
+
+#### Viewing Coverage Report
+
+```bash
+# Generate coverage report
+npm test -- --coverage
+
+# Open HTML report
+open coverage/index.html
+```
+
+### Test Organization
+
+#### File Structure
+
+```
+/tests/
+  ├── calculations.test.ts       # ✅ Unit tests (calculations)
+  ├── usePanels.test.ts          # ❌ Integration tests (hooks) - TODO
+  ├── useCircuits.test.ts        # ❌ Integration tests (hooks) - TODO
+  ├── CircuitDesign.test.tsx     # ❌ Component tests - TODO
+  ├── OneLineDiagram.test.tsx    # ❌ Component tests - TODO
+  ├── setup.ts                   # Test setup and mocks
+  └── examples/                  # Example test patterns
+      ├── hook-testing-example.test.ts
+      └── component-testing-example.test.tsx
+```
+
+#### Naming Conventions
+
+- **Unit tests**: `functionName.test.ts`
+- **Hook tests**: `useHookName.test.ts`
+- **Component tests**: `ComponentName.test.tsx`
+
+### Summary
+
+**Current State**: 11 tests (calculations only), 100% passing
+**Target State**: 100+ tests across all layers, 75% coverage
+
+**Immediate Priorities**:
+1. Add hook tests (`usePanels`, `useCircuits`, `useTransformers`)
+2. Add component integration tests (`CircuitDesign`, `LoadCalculator`)
+3. Set up coverage thresholds in CI/CD
+
+**Long-Term Goals**:
+1. E2E tests for critical workflows (Playwright)
+2. Visual regression tests (Percy, Chromatic)
+3. Performance testing (React DevTools Profiler)

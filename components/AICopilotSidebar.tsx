@@ -12,10 +12,70 @@ import {
   TrendingUp,
   MessageSquare,
   Camera,
-  Shield
+  Shield,
+  Clock,
+  BookOpen,
+  CheckSquare
 } from 'lucide-react';
 import { useAgentActions } from '../hooks/useAgentActions';
 import type { AgentAction } from '../types';
+
+// ============================================================================
+// TypeScript Interfaces for Pydantic AI Prediction Data
+// ============================================================================
+
+interface PredictedIssue {
+  category: string;
+  description: string;
+  nec_reference: string;
+  likelihood: number; // 0.0 - 1.0
+  suggested_fix: string;
+  estimated_fix_time: string;
+}
+
+interface InspectionPrediction {
+  failure_likelihood: number; // 0.0 - 1.0
+  risk_level: 'Low' | 'Medium' | 'High' | 'Critical';
+  predicted_issues: PredictedIssue[];
+  preparation_checklist: string[];
+  estimated_prep_time: string;
+  confidence: number; // 0.0 - 1.0
+}
+
+interface RFIDraft {
+  subject: string;
+  question: string;
+  suggested_recipient: string | null;
+  priority: 'Low' | 'Medium' | 'High' | 'Urgent';
+  related_nec_articles: string[];
+  rationale: string;
+}
+
+interface NecViolation {
+  nec_article: string;
+  description: string;
+  severity: 'Info' | 'Warning' | 'Critical';
+  recommendation: string;
+  location_in_photo: string | null;
+}
+
+interface Equipment {
+  type: string;
+  manufacturer: string | null;
+  model: string | null;
+  rating: string | null;
+  condition: 'Good' | 'Fair' | 'Poor' | 'Unknown';
+}
+
+interface PhotoAnalysis {
+  summary: string;
+  violations: NecViolation[];
+  equipment_identified: Equipment[];
+  recommendations: string[];
+  severity: 'Info' | 'Warning' | 'Critical';
+  requires_correction: boolean;
+  suggested_actions: string[];
+}
 
 export const AICopilotSidebar: React.FC = () => {
   const { id: projectId } = useParams<{ id: string }>();
@@ -55,7 +115,9 @@ export const AICopilotSidebar: React.FC = () => {
     return (
       <button
         onClick={() => setIsOpen(true)}
-        className="fixed right-4 bottom-4 bg-electric-500 text-white p-3 rounded-full shadow-lg hover:bg-electric-600 transition-colors z-50"
+        className="fixed right-4 bottom-24 bg-electric-500 text-white p-3 rounded-full shadow-lg hover:bg-electric-600 transition-colors z-50"
+        aria-label="Open AI Copilot"
+        title="AI Copilot - View AI suggestions"
       >
         <Sparkles className="w-6 h-6" />
         {actions.length > 0 && (
@@ -117,6 +179,407 @@ export const AICopilotSidebar: React.FC = () => {
           ))
         )}
       </div>
+    </div>
+  );
+};
+
+// ============================================================================
+// RFI Draft Display Component
+// ============================================================================
+
+interface RFIDraftViewProps {
+  draft: RFIDraft;
+}
+
+const RFIDraftView: React.FC<RFIDraftViewProps> = ({ draft }) => {
+  const getPriorityColor = (priority: string) => {
+    switch (priority) {
+      case 'Urgent': return 'bg-red-100 text-red-800 border-red-300';
+      case 'High': return 'bg-orange-100 text-orange-800 border-orange-300';
+      case 'Medium': return 'bg-yellow-100 text-yellow-800 border-yellow-300';
+      case 'Low': return 'bg-green-100 text-green-800 border-green-300';
+      default: return 'bg-gray-100 text-gray-800 border-gray-300';
+    }
+  };
+
+  return (
+    <div className="space-y-3">
+      {/* Priority & Subject */}
+      <div className="bg-gradient-to-r from-gray-50 to-blue-50 rounded-lg p-3 border border-gray-200">
+        <div className="flex items-start justify-between gap-2 mb-2">
+          <span className={`px-3 py-1 rounded-full text-xs font-bold border ${getPriorityColor(draft.priority)}`}>
+            {draft.priority} Priority
+          </span>
+          {draft.suggested_recipient && (
+            <span className="text-xs text-gray-600">
+              To: <span className="font-medium">{draft.suggested_recipient}</span>
+            </span>
+          )}
+        </div>
+
+        <h4 className="text-sm font-bold text-gray-900 mb-1">{draft.subject}</h4>
+        <p className="text-xs text-gray-600 italic">{draft.rationale}</p>
+      </div>
+
+      {/* Question */}
+      <div className="bg-white rounded-lg p-3 border border-gray-200">
+        <h5 className="text-xs font-bold text-gray-700 mb-1.5 flex items-center gap-1">
+          <MessageSquare className="w-3 h-3 text-blue-500" />
+          Question:
+        </h5>
+        <p className="text-xs text-gray-700 whitespace-pre-wrap">{draft.question}</p>
+      </div>
+
+      {/* NEC References */}
+      {draft.related_nec_articles.length > 0 && (
+        <div className="bg-blue-50 rounded-lg p-3 border border-blue-200">
+          <h5 className="text-xs font-bold text-blue-800 mb-1.5 flex items-center gap-1">
+            <BookOpen className="w-3 h-3" />
+            Related NEC Articles:
+          </h5>
+          <div className="flex flex-wrap gap-1.5">
+            {draft.related_nec_articles.map((article, index) => (
+              <span key={index} className="text-xs px-2 py-0.5 bg-blue-100 text-blue-700 rounded font-mono">
+                {article}
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+// ============================================================================
+// Photo Analysis Display Component
+// ============================================================================
+
+interface PhotoAnalysisViewProps {
+  analysis: PhotoAnalysis;
+}
+
+const PhotoAnalysisView: React.FC<PhotoAnalysisViewProps> = ({ analysis }) => {
+  const [expandedViolations, setExpandedViolations] = useState<Set<number>>(new Set());
+
+  const toggleViolation = (index: number) => {
+    const newExpanded = new Set(expandedViolations);
+    if (newExpanded.has(index)) {
+      newExpanded.delete(index);
+    } else {
+      newExpanded.add(index);
+    }
+    setExpandedViolations(newExpanded);
+  };
+
+  const getSeverityColor = (severity: string) => {
+    switch (severity) {
+      case 'Critical': return 'bg-red-100 text-red-800 border-red-300';
+      case 'Warning': return 'bg-orange-100 text-orange-800 border-orange-300';
+      case 'Info': return 'bg-blue-100 text-blue-800 border-blue-300';
+      default: return 'bg-gray-100 text-gray-800 border-gray-300';
+    }
+  };
+
+  const getConditionColor = (condition: string) => {
+    switch (condition) {
+      case 'Good': return 'text-green-700 bg-green-50';
+      case 'Fair': return 'text-yellow-700 bg-yellow-50';
+      case 'Poor': return 'text-red-700 bg-red-50';
+      default: return 'text-gray-700 bg-gray-50';
+    }
+  };
+
+  return (
+    <div className="space-y-3">
+      {/* Summary & Overall Severity */}
+      <div className="bg-gradient-to-r from-gray-50 to-purple-50 rounded-lg p-3 border border-gray-200">
+        <div className="flex items-start justify-between mb-2">
+          <span className={`px-3 py-1 rounded-full text-xs font-bold border ${getSeverityColor(analysis.severity)}`}>
+            {analysis.severity}
+          </span>
+          {analysis.requires_correction && (
+            <span className="text-xs px-2 py-1 bg-red-100 text-red-700 rounded font-medium">
+              Correction Required
+            </span>
+          )}
+        </div>
+        <p className="text-xs text-gray-700">{analysis.summary}</p>
+      </div>
+
+      {/* NEC Violations */}
+      {analysis.violations.length > 0 && (
+        <div className="space-y-2">
+          <h4 className="text-xs font-bold text-gray-700 flex items-center gap-1">
+            <AlertTriangle className="w-3 h-3 text-red-500" />
+            NEC Violations Detected ({analysis.violations.length})
+          </h4>
+
+          {analysis.violations.map((violation, index) => (
+            <div
+              key={index}
+              className="bg-white rounded-lg border border-red-200 overflow-hidden hover:shadow-sm transition-shadow"
+            >
+              {/* Violation Header */}
+              <div
+                className="p-2 cursor-pointer hover:bg-red-50 transition-colors"
+                onClick={() => toggleViolation(index)}
+              >
+                <div className="flex items-start justify-between gap-2">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className={`text-xs font-bold ${getSeverityColor(violation.severity)} px-2 py-0.5 rounded`}>
+                        {violation.severity}
+                      </span>
+                      <span className="text-xs px-1.5 py-0.5 bg-blue-100 text-blue-700 rounded font-mono">
+                        {violation.nec_article}
+                      </span>
+                    </div>
+                    <p className="text-xs text-gray-700 line-clamp-2">{violation.description}</p>
+                    {violation.location_in_photo && (
+                      <p className="text-xs text-gray-500 mt-0.5">📍 {violation.location_in_photo}</p>
+                    )}
+                  </div>
+                  {expandedViolations.has(index) ? (
+                    <ChevronUp className="w-3 h-3 text-gray-400 flex-shrink-0" />
+                  ) : (
+                    <ChevronDown className="w-3 h-3 text-gray-400 flex-shrink-0" />
+                  )}
+                </div>
+              </div>
+
+              {/* Expanded Recommendation */}
+              {expandedViolations.has(index) && (
+                <div className="px-2 pb-2 bg-red-50 border-t border-red-100">
+                  <div className="bg-white rounded p-2 mt-2">
+                    <p className="text-xs text-gray-600 font-medium mb-0.5">Recommendation:</p>
+                    <p className="text-xs text-gray-700">{violation.recommendation}</p>
+                  </div>
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Equipment Identified */}
+      {analysis.equipment_identified.length > 0 && (
+        <div className="bg-gray-50 rounded-lg p-3 border border-gray-200">
+          <h4 className="text-xs font-bold text-gray-700 mb-2 flex items-center gap-1">
+            <Camera className="w-3 h-3 text-gray-500" />
+            Equipment Identified ({analysis.equipment_identified.length})
+          </h4>
+          <div className="space-y-2">
+            {analysis.equipment_identified.map((equip, index) => (
+              <div key={index} className="bg-white rounded p-2 border border-gray-200">
+                <div className="flex items-start justify-between gap-2 mb-1">
+                  <span className="text-xs font-medium text-gray-900">{equip.type}</span>
+                  <span className={`text-xs px-2 py-0.5 rounded font-medium ${getConditionColor(equip.condition)}`}>
+                    {equip.condition}
+                  </span>
+                </div>
+                <div className="text-xs text-gray-600 space-y-0.5">
+                  {equip.manufacturer && <p>• Manufacturer: {equip.manufacturer}</p>}
+                  {equip.model && <p>• Model: {equip.model}</p>}
+                  {equip.rating && <p>• Rating: {equip.rating}</p>}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Recommended Actions */}
+      {analysis.suggested_actions.length > 0 && (
+        <div className="bg-green-50 rounded-lg p-3 border border-green-200">
+          <h4 className="text-xs font-bold text-green-800 mb-1.5 flex items-center gap-1">
+            <CheckSquare className="w-3 h-3" />
+            Suggested Actions
+          </h4>
+          <ul className="space-y-1">
+            {analysis.suggested_actions.map((action, index) => (
+              <li key={index} className="flex items-start gap-2 text-xs text-green-900">
+                <Check className="w-3 h-3 text-green-600 flex-shrink-0 mt-0.5" />
+                <span>{action}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {/* General Recommendations */}
+      {analysis.recommendations.length > 0 && (
+        <div className="bg-blue-50 rounded-lg p-3 border border-blue-200">
+          <h4 className="text-xs font-bold text-blue-800 mb-1.5">General Recommendations:</h4>
+          <ul className="text-xs text-blue-900 space-y-1">
+            {analysis.recommendations.map((rec, index) => (
+              <li key={index}>• {rec}</li>
+            ))}
+          </ul>
+        </div>
+      )}
+    </div>
+  );
+};
+
+// ============================================================================
+// Inspection Prediction Display Component
+// ============================================================================
+
+interface InspectionPredictionViewProps {
+  prediction: InspectionPrediction;
+}
+
+const InspectionPredictionView: React.FC<InspectionPredictionViewProps> = ({ prediction }) => {
+  const [expandedIssues, setExpandedIssues] = useState<Set<number>>(new Set());
+
+  const toggleIssue = (index: number) => {
+    const newExpanded = new Set(expandedIssues);
+    if (newExpanded.has(index)) {
+      newExpanded.delete(index);
+    } else {
+      newExpanded.add(index);
+    }
+    setExpandedIssues(newExpanded);
+  };
+
+  const getRiskColor = (riskLevel: string) => {
+    switch (riskLevel) {
+      case 'Critical': return 'bg-red-100 text-red-800 border-red-300';
+      case 'High': return 'bg-orange-100 text-orange-800 border-orange-300';
+      case 'Medium': return 'bg-yellow-100 text-yellow-800 border-yellow-300';
+      case 'Low': return 'bg-green-100 text-green-800 border-green-300';
+      default: return 'bg-gray-100 text-gray-800 border-gray-300';
+    }
+  };
+
+  const getLikelihoodColor = (likelihood: number) => {
+    if (likelihood >= 0.7) return 'bg-red-500';
+    if (likelihood >= 0.4) return 'bg-orange-500';
+    if (likelihood >= 0.2) return 'bg-yellow-500';
+    return 'bg-green-500';
+  };
+
+  return (
+    <div className="space-y-3">
+      {/* Risk Level & Failure Likelihood */}
+      <div className="bg-gradient-to-r from-gray-50 to-blue-50 rounded-lg p-3 border border-gray-200">
+        <div className="flex items-center justify-between mb-3">
+          <span className={`px-3 py-1 rounded-full text-xs font-bold border ${getRiskColor(prediction.risk_level)}`}>
+            {prediction.risk_level} Risk
+          </span>
+          <div className="flex items-center gap-2">
+            <Clock className="w-3 h-3 text-gray-500" />
+            <span className="text-xs text-gray-600 font-medium">{prediction.estimated_prep_time}</span>
+          </div>
+        </div>
+
+        <div className="space-y-1">
+          <div className="flex items-center justify-between text-xs">
+            <span className="text-gray-600 font-medium">Failure Likelihood</span>
+            <span className="text-gray-900 font-bold">{Math.round(prediction.failure_likelihood * 100)}%</span>
+          </div>
+          <div className="bg-gray-200 rounded-full h-2 overflow-hidden">
+            <div
+              className={`h-2 rounded-full transition-all ${getLikelihoodColor(prediction.failure_likelihood)}`}
+              style={{ width: `${prediction.failure_likelihood * 100}%` }}
+            />
+          </div>
+        </div>
+      </div>
+
+      {/* Predicted Issues */}
+      {prediction.predicted_issues && prediction.predicted_issues.length > 0 && (
+        <div className="space-y-2">
+          <h4 className="text-xs font-bold text-gray-700 flex items-center gap-1">
+            <AlertTriangle className="w-3 h-3 text-orange-500" />
+            Predicted Issues ({prediction.predicted_issues.length})
+          </h4>
+
+          {prediction.predicted_issues.map((issue, index) => (
+            <div
+              key={index}
+              className="bg-white rounded-lg border border-gray-200 overflow-hidden hover:shadow-sm transition-shadow"
+            >
+              {/* Issue Header */}
+              <div
+                className="p-2 cursor-pointer hover:bg-gray-50 transition-colors"
+                onClick={() => toggleIssue(index)}
+              >
+                <div className="flex items-start justify-between gap-2">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className="text-xs font-medium text-gray-900">{issue.category}</span>
+                      <span className="text-xs px-1.5 py-0.5 bg-blue-100 text-blue-700 rounded font-mono">
+                        {issue.nec_reference}
+                      </span>
+                    </div>
+                    <p className="text-xs text-gray-600 line-clamp-1">{issue.description}</p>
+                  </div>
+                  <div className="flex items-center gap-2 flex-shrink-0">
+                    <span className="text-xs text-gray-500 font-medium">
+                      {Math.round(issue.likelihood * 100)}%
+                    </span>
+                    {expandedIssues.has(index) ? (
+                      <ChevronUp className="w-3 h-3 text-gray-400" />
+                    ) : (
+                      <ChevronDown className="w-3 h-3 text-gray-400" />
+                    )}
+                  </div>
+                </div>
+
+                {/* Likelihood Bar */}
+                <div className="mt-1.5 bg-gray-200 rounded-full h-1 overflow-hidden">
+                  <div
+                    className={`h-1 rounded-full ${getLikelihoodColor(issue.likelihood)}`}
+                    style={{ width: `${issue.likelihood * 100}%` }}
+                  />
+                </div>
+              </div>
+
+              {/* Expanded Details */}
+              {expandedIssues.has(index) && (
+                <div className="px-2 pb-2 space-y-2 bg-gray-50 border-t border-gray-100">
+                  <div>
+                    <p className="text-xs text-gray-600 font-medium mb-0.5">Description:</p>
+                    <p className="text-xs text-gray-700">{issue.description}</p>
+                  </div>
+
+                  <div className="bg-blue-50 rounded p-2 border border-blue-100">
+                    <p className="text-xs text-blue-700 font-medium mb-0.5 flex items-center gap-1">
+                      <BookOpen className="w-3 h-3" />
+                      Suggested Fix:
+                    </p>
+                    <p className="text-xs text-blue-900">{issue.suggested_fix}</p>
+                  </div>
+
+                  <div className="flex items-center gap-1 text-xs text-gray-500">
+                    <Clock className="w-3 h-3" />
+                    <span>Estimated time: {issue.estimated_fix_time}</span>
+                  </div>
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Preparation Checklist */}
+      {prediction.preparation_checklist && prediction.preparation_checklist.length > 0 && (
+        <div className="bg-green-50 rounded-lg p-3 border border-green-200">
+          <h4 className="text-xs font-bold text-green-800 mb-2 flex items-center gap-1">
+            <CheckSquare className="w-3 h-3" />
+            Preparation Checklist
+          </h4>
+          <ul className="space-y-1">
+            {prediction.preparation_checklist.map((item, index) => (
+              <li key={index} className="flex items-start gap-2 text-xs text-green-900">
+                <Check className="w-3 h-3 text-green-600 flex-shrink-0 mt-0.5" />
+                <span>{item}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
     </div>
   );
 };
@@ -261,6 +724,21 @@ const ActionCard: React.FC<ActionCardProps> = ({
                 </div>
               )}
             </div>
+          )}
+
+          {/* RFI Draft (RFI Drafter Agent) */}
+          {action.agent_name === 'rfi_drafter' && action.action_data && (
+            <RFIDraftView draft={action.action_data as RFIDraft} />
+          )}
+
+          {/* Photo Analysis (Photo Analyzer Agent) */}
+          {action.agent_name === 'photo_analyzer' && action.action_data && (
+            <PhotoAnalysisView analysis={action.action_data as PhotoAnalysis} />
+          )}
+
+          {/* Inspection Prediction (Predictive Inspector Agent) */}
+          {action.agent_name === 'predictive_inspector' && action.action_data && (
+            <InspectionPredictionView prediction={action.action_data as InspectionPrediction} />
           )}
 
           {/* Action Buttons */}

@@ -1,7 +1,6 @@
 
 import React, { useState } from 'react';
-import { useParams } from 'react-router-dom';
-import { Calculator, ArrowRight, CheckCircle, XCircle, AlertTriangle, Zap, Car, Sun, Shield, Save, X, Plus, Trash2, TrendingUp } from 'lucide-react';
+import { Calculator, ArrowRight, CheckCircle, XCircle, AlertTriangle, Zap, Car, Sun, Shield, Save, X, Plus, Trash2, TrendingUp, Sparkles, Info } from 'lucide-react';
 import { calculateVoltageDropAC, compareVoltageDropMethods, VoltageDropResult } from '../services/calculations';
 import { ConductorSizingTool } from './ConductorSizingTool';
 import { ProjectSettings } from '../types';
@@ -41,9 +40,14 @@ import { useShortCircuitCalculations } from '../hooks/useShortCircuitCalculation
 import { usePanels } from '../hooks/usePanels';
 import { getConduitDimensions } from '../data/nec/chapter9-conduit-dimensions';
 import { getConductorDimensions, STANDARD_WIRE_SIZES } from '../data/nec/chapter9-conductor-dimensions';
+import { analyzeChangeImpact } from '../services/api/pythonBackend';
 
-export const Calculators: React.FC = () => {
-  const [activeTab, setActiveTab] = useState<'voltage-drop' | 'conduit-fill' | 'conductor-sizing' | 'short-circuit' | 'ev-charging' | 'solar-pv' | 'arc-flash' | 'evems' | 'service-upgrade' | 'commercial-load'>('voltage-drop');
+interface CalculatorsProps {
+  projectId?: string;
+}
+
+export const Calculators: React.FC<CalculatorsProps> = ({ projectId }) => {
+  const [activeTab, setActiveTab] = useState<'voltage-drop' | 'conduit-fill' | 'conductor-sizing' | 'short-circuit' | 'ev-charging' | 'solar-pv' | 'arc-flash' | 'evems' | 'service-upgrade' | 'commercial-load' | 'change-impact'>('voltage-drop');
 
   // Default project settings for calculator mode
   const defaultSettings: ProjectSettings = {
@@ -124,6 +128,17 @@ export const Calculators: React.FC = () => {
           >
             <span className="flex items-center gap-2"><Calculator className="w-4 h-4" /> Commercial Load (NEC 220.40)</span>
           </button>
+
+          {/* AI-Powered Tools Section */}
+          <div className="pt-4 mt-4 border-t border-gray-200">
+            <p className="px-3 text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">AI-Powered Analysis</p>
+            <button
+              onClick={() => setActiveTab('change-impact')}
+              className={`w-full text-left px-3 py-2.5 text-sm font-medium border-l-4 transition-colors ${activeTab === 'change-impact' ? 'border-electric-500 bg-electric-50 text-gray-900' : 'border-transparent text-gray-500 hover:bg-gray-50 hover:text-gray-700'}`}
+            >
+              <span className="flex items-center gap-2"><Sparkles className="w-4 h-4" /> Change Impact Analyzer</span>
+            </button>
+          </div>
         </div>
 
         {/* Calculator Content Area */}
@@ -131,13 +146,14 @@ export const Calculators: React.FC = () => {
           {activeTab === 'voltage-drop' && <VoltageDropCalculator />}
           {activeTab === 'conductor-sizing' && <ConductorSizingTool projectSettings={defaultSettings} />}
           {activeTab === 'conduit-fill' && <ConduitFillCalculator />}
-          {activeTab === 'short-circuit' && <ShortCircuitCalculator />}
+          {activeTab === 'short-circuit' && <ShortCircuitCalculator projectId={projectId} />}
           {activeTab === 'ev-charging' && <EVChargingCalculator />}
           {activeTab === 'solar-pv' && <SolarPVCalculator />}
           {activeTab === 'arc-flash' && <ArcFlashCalculator />}
           {activeTab === 'evems' && <EVEMSLoadManagement />}
           {activeTab === 'service-upgrade' && <ServiceUpgradeWizard />}
           {activeTab === 'commercial-load' && <CommercialLoadCalculator />}
+          {activeTab === 'change-impact' && <ChangeImpactAnalyzer projectId={projectId} />}
         </div>
       </div>
     </div>
@@ -602,10 +618,12 @@ const ConduitFillCalculator: React.FC = () => {
   );
 };
 
-const ShortCircuitCalculator: React.FC = () => {
-  // Get project context if available
-  const params = useParams<{ id?: string }>();
-  const projectId = params.id;
+interface ShortCircuitCalculatorProps {
+  projectId?: string;
+}
+
+const ShortCircuitCalculator: React.FC<ShortCircuitCalculatorProps> = ({ projectId }) => {
+  // Project ID now passed as prop instead of using useParams
 
   // Hooks for save functionality
   const { createCalculation } = useShortCircuitCalculations(projectId);
@@ -1987,6 +2005,224 @@ const ArcFlashCalculator: React.FC = () => {
           </ul>
           <p><strong>Important:</strong> For final design and energized work, perform detailed arc flash study using actual protective device time-current curves. Field verification required before performing energized work.</p>
         </div>
+      </div>
+    </div>
+  );
+};
+
+// ============================================================================
+// Change Impact Analyzer (AI-Powered)
+// ============================================================================
+
+interface ChangeImpactAnalyzerProps {
+  projectId?: string;
+}
+
+const ChangeImpactAnalyzer: React.FC<ChangeImpactAnalyzerProps> = ({ projectId }) => {
+  const [changeDescription, setChangeDescription] = useState('');
+  const [proposedLoads, setProposedLoads] = useState<Array<{ type: string; amps: number; quantity: number }>>([
+    { type: 'EV Charger', amps: 50, quantity: 1 }
+  ]);
+  const [analyzing, setAnalyzing] = useState(false);
+  const [success, setSuccess] = useState(false);
+
+  const addLoad = () => {
+    setProposedLoads([...proposedLoads, { type: '', amps: 0, quantity: 1 }]);
+  };
+
+  const removeLoad = (index: number) => {
+    setProposedLoads(proposedLoads.filter((_, i) => i !== index));
+  };
+
+  const updateLoad = (index: number, field: 'type' | 'amps' | 'quantity', value: string | number) => {
+    const updated = [...proposedLoads];
+    updated[index] = { ...updated[index], [field]: value };
+    setProposedLoads(updated);
+  };
+
+  const handleAnalyze = async () => {
+    if (!projectId) {
+      alert('Project ID not found');
+      return;
+    }
+
+    if (!changeDescription.trim()) {
+      alert('Please enter a change description');
+      return;
+    }
+
+    if (proposedLoads.length === 0 || proposedLoads.some(l => !l.type || l.amps <= 0)) {
+      alert('Please add at least one load with valid type and amperage');
+      return;
+    }
+
+    setAnalyzing(true);
+    setSuccess(false);
+
+    try {
+      await analyzeChangeImpact(projectId, changeDescription, proposedLoads);
+      setSuccess(true);
+
+      // Reset form after 3 seconds
+      setTimeout(() => {
+        setSuccess(false);
+      }, 5000);
+    } catch (error: any) {
+      console.error('Change impact analysis error:', error);
+      alert(`Failed to analyze change impact: ${error.message || 'Unknown error'}\n\nMake sure the Python backend is running at http://localhost:8000`);
+    } finally {
+      setAnalyzing(false);
+    }
+  };
+
+  return (
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="border-b border-gray-200 pb-4">
+        <div className="flex items-center gap-2 mb-2">
+          <Sparkles className="w-5 h-5 text-purple-500" />
+          <h3 className="text-lg font-semibold text-gray-900">AI Change Impact Analyzer</h3>
+        </div>
+        <p className="text-sm text-gray-600">
+          Describe a proposed change to your electrical system and AI will analyze the cascading impacts:
+          service upgrades, feeder sizing, voltage drop, cost estimates, and timeline delays.
+        </p>
+      </div>
+
+      {/* Success Message */}
+      {success && (
+        <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+          <div className="flex items-start gap-3">
+            <CheckCircle className="w-5 h-5 text-green-600 flex-shrink-0 mt-0.5" />
+            <div>
+              <p className="text-sm font-medium text-green-900">Analysis started!</p>
+              <p className="text-sm text-green-700 mt-1">
+                Check the <strong>AI Copilot sidebar</strong> (right side) for detailed results including service impact, cost estimates, and recommendations.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Change Description */}
+      <div className="space-y-2">
+        <label className="block text-sm font-medium text-gray-700">
+          Change Description <span className="text-red-500">*</span>
+        </label>
+        <textarea
+          value={changeDescription}
+          onChange={(e) => setChangeDescription(e.target.value)}
+          placeholder="e.g., Add 3x Level 2 EV chargers to parking garage"
+          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-electric-500 focus:border-electric-500 text-sm"
+          rows={3}
+        />
+        <p className="text-xs text-gray-500">Describe what you're planning to add or change</p>
+      </div>
+
+      {/* Proposed Loads */}
+      <div className="space-y-3">
+        <div className="flex items-center justify-between">
+          <label className="block text-sm font-medium text-gray-700">
+            Proposed Loads <span className="text-red-500">*</span>
+          </label>
+          <button
+            onClick={addLoad}
+            className="flex items-center gap-1 text-sm text-electric-600 hover:text-electric-700 font-medium"
+          >
+            <Plus className="w-4 h-4" />
+            Add Load
+          </button>
+        </div>
+
+        <div className="space-y-2">
+          {proposedLoads.map((load, index) => (
+            <div key={index} className="flex items-center gap-2">
+              <input
+                type="text"
+                value={load.type}
+                onChange={(e) => updateLoad(index, 'type', e.target.value)}
+                placeholder="Equipment type (e.g., EV Charger, Heat Pump)"
+                className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-electric-500 focus:border-electric-500 text-sm"
+              />
+              <input
+                type="number"
+                value={load.amps || ''}
+                onChange={(e) => updateLoad(index, 'amps', parseFloat(e.target.value) || 0)}
+                placeholder="Amps"
+                className="w-24 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-electric-500 focus:border-electric-500 text-sm"
+              />
+              <input
+                type="number"
+                value={load.quantity || ''}
+                onChange={(e) => updateLoad(index, 'quantity', parseInt(e.target.value) || 1)}
+                placeholder="Qty"
+                className="w-20 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-electric-500 focus:border-electric-500 text-sm"
+              />
+              {proposedLoads.length > 1 && (
+                <button
+                  onClick={() => removeLoad(index)}
+                  className="p-2 text-gray-400 hover:text-red-600 transition-colors"
+                >
+                  <Trash2 className="w-4 h-4" />
+                </button>
+              )}
+            </div>
+          ))}
+        </div>
+        <p className="text-xs text-gray-500">Enter each piece of equipment you're planning to add</p>
+      </div>
+
+      {/* Analyze Button */}
+      <button
+        onClick={handleAnalyze}
+        disabled={analyzing || !changeDescription.trim() || proposedLoads.some(l => !l.type || l.amps <= 0)}
+        className="w-full flex items-center justify-center gap-2 px-6 py-3 bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-lg font-medium shadow-lg hover:shadow-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+      >
+        {analyzing ? (
+          <>
+            <Sparkles className="w-5 h-5 animate-pulse" />
+            AI Analyzing Impact...
+          </>
+        ) : (
+          <>
+            <Sparkles className="w-5 h-5" />
+            Analyze Change Impact
+          </>
+        )}
+      </button>
+
+      {/* Example Section */}
+      <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+        <h4 className="text-sm font-medium text-blue-900 mb-2">Example Use Cases:</h4>
+        <ul className="text-sm text-blue-800 space-y-1">
+          <li>• "Add 5x Level 2 EV chargers in parking lot" → Determines if service upgrade needed</li>
+          <li>• "Install 15-ton rooftop HVAC unit" → Analyzes feeder sizing and voltage drop</li>
+          <li>• "Add commercial kitchen equipment" → Calculates panel capacity and circuit requirements</li>
+          <li>• "Install solar array + battery storage" → Evaluates bidirectional power flow impacts</li>
+        </ul>
+      </div>
+
+      {/* How It Works */}
+      <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
+        <h4 className="text-sm font-medium text-gray-900 mb-2 flex items-center gap-2">
+          <Info className="w-4 h-4 text-gray-500" />
+          How It Works
+        </h4>
+        <p className="text-sm text-gray-700">
+          The AI agent analyzes your current electrical system (panels, circuits, feeders, service) and predicts:
+        </p>
+        <ul className="text-sm text-gray-700 mt-2 space-y-1 ml-4">
+          <li>✓ Whether existing service can accommodate the new load</li>
+          <li>✓ Required service upgrade size (if needed)</li>
+          <li>✓ Feeder sizing changes required</li>
+          <li>✓ Voltage drop impact</li>
+          <li>✓ Cost estimate for material + labor</li>
+          <li>✓ Timeline impact (delay days)</li>
+          <li>✓ Step-by-step recommendations with NEC references</li>
+        </ul>
+        <p className="text-xs text-gray-500 mt-3">
+          Results appear in the AI Copilot sidebar. You can approve or reject the analysis.
+        </p>
       </div>
     </div>
   );
