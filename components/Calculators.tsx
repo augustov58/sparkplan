@@ -38,16 +38,21 @@ import { ServiceUpgradeWizard } from './ServiceUpgradeWizard';
 import { CommercialLoadCalculator } from './CommercialLoadCalculator';
 import { useShortCircuitCalculations } from '../hooks/useShortCircuitCalculations';
 import { usePanels } from '../hooks/usePanels';
+import { useProjects } from '../hooks/useProjects';
 import { getConduitDimensions } from '../data/nec/chapter9-conduit-dimensions';
 import { getConductorDimensions, STANDARD_WIRE_SIZES } from '../data/nec/chapter9-conductor-dimensions';
 import { analyzeChangeImpact } from '../services/api/pythonBackend';
+import { EVPanelTemplates } from './EVPanelTemplates';
 
 interface CalculatorsProps {
   projectId?: string;
 }
 
 export const Calculators: React.FC<CalculatorsProps> = ({ projectId }) => {
-  const [activeTab, setActiveTab] = useState<'voltage-drop' | 'conduit-fill' | 'conductor-sizing' | 'short-circuit' | 'ev-charging' | 'solar-pv' | 'arc-flash' | 'evems' | 'service-upgrade' | 'commercial-load' | 'change-impact'>('voltage-drop');
+  const { getProjectById } = useProjects();
+  const project = projectId ? getProjectById(projectId) : undefined;
+
+  const [activeTab, setActiveTab] = useState<'voltage-drop' | 'conduit-fill' | 'conductor-sizing' | 'short-circuit' | 'ev-charging' | 'solar-pv' | 'arc-flash' | 'evems' | 'service-upgrade' | 'commercial-load' | 'change-impact' | 'ev-panel-builder'>('voltage-drop');
 
   // Default project settings for calculator mode
   const defaultSettings: ProjectSettings = {
@@ -97,6 +102,12 @@ export const Calculators: React.FC<CalculatorsProps> = ({ projectId }) => {
             className={`w-full text-left px-3 py-2.5 text-sm font-medium border-l-4 transition-colors ${activeTab === 'ev-charging' ? 'border-electric-500 bg-electric-50 text-gray-900' : 'border-transparent text-gray-500 hover:bg-gray-50 hover:text-gray-700'}`}
           >
             <span className="flex items-center gap-2"><Car className="w-4 h-4" /> EV Charging (NEC 625)</span>
+          </button>
+          <button
+            onClick={() => setActiveTab('ev-panel-builder')}
+            className={`w-full text-left px-3 py-2.5 text-sm font-medium border-l-4 transition-colors ${activeTab === 'ev-panel-builder' ? 'border-electric-500 bg-electric-50 text-gray-900' : 'border-transparent text-gray-500 hover:bg-gray-50 hover:text-gray-700'}`}
+          >
+            <span className="flex items-center gap-2"><Zap className="w-4 h-4" /> EV Panel Builder</span>
           </button>
           <button
             onClick={() => setActiveTab('solar-pv')}
@@ -154,6 +165,16 @@ export const Calculators: React.FC<CalculatorsProps> = ({ projectId }) => {
           {activeTab === 'service-upgrade' && <ServiceUpgradeWizard />}
           {activeTab === 'commercial-load' && <CommercialLoadCalculator />}
           {activeTab === 'change-impact' && <ChangeImpactAnalyzer projectId={projectId} />}
+          {activeTab === 'ev-panel-builder' && project && <EVPanelTemplates project={project} />}
+          {activeTab === 'ev-panel-builder' && !project && (
+            <div className="flex flex-col items-center justify-center h-64 text-center">
+              <AlertTriangle className="w-12 h-12 text-yellow-500 mb-4" />
+              <h3 className="text-lg font-semibold text-gray-900 mb-2">Project Required</h3>
+              <p className="text-sm text-gray-600">
+                EV Panel Builder requires an active project. Please navigate to a project to use this tool.
+              </p>
+            </div>
+          )}
         </div>
       </div>
     </div>

@@ -60,6 +60,65 @@ export const SiteVisitManager: React.FC<SiteVisitManagerProps> = ({ project }) =
   const [issueInput, setIssueInput] = useState('');
   const [actionInput, setActionInput] = useState('');
 
+  // Calendar integration: sync scheduled site visits to calendar
+  const handleStatusChange = async (visitId: string, newStatus: 'Scheduled' | 'In Progress' | 'Completed' | 'Cancelled') => {
+    const visit = visits.find(v => v.id === visitId);
+    if (!visit) return;
+
+    // Update the visit status first
+    await updateVisit(visitId, { status: newStatus });
+
+    // Calendar integration logic
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+
+    // Check if a calendar event already exists for this site visit
+    const { data: existingEvents } = await supabase
+      .from('calendar_events')
+      .select('id')
+      .eq('related_site_visit_id', visitId)
+      .single();
+
+    if (newStatus === 'Scheduled') {
+      // CREATE or UPDATE calendar event when status is Scheduled
+      if (existingEvents) {
+        // Update existing event
+        await supabase
+          .from('calendar_events')
+          .update({
+            title: visit.title,
+            description: visit.description,
+            event_date: visit.visit_date,
+            location: visit.inspector_name ? `Inspector: ${visit.inspector_name}` : undefined,
+            event_type: 'Site Visit',
+            completed: false
+          })
+          .eq('id', existingEvents.id);
+      } else {
+        // Create new calendar event
+        await supabase
+          .from('calendar_events')
+          .insert({
+            project_id: project.id,
+            user_id: user.id,
+            title: visit.title,
+            description: visit.description,
+            event_date: visit.visit_date,
+            location: visit.inspector_name ? `Inspector: ${visit.inspector_name}` : undefined,
+            event_type: 'Site Visit',
+            related_site_visit_id: visitId,
+            completed: false
+          });
+      }
+    } else if (existingEvents) {
+      // REMOVE calendar event when status changes away from Scheduled
+      await supabase
+        .from('calendar_events')
+        .delete()
+        .eq('id', existingEvents.id);
+    }
+  };
+
   const handleCreate = async () => {
     if (!newVisit.title || !newVisit.description) return;
 
@@ -81,6 +140,26 @@ export const SiteVisitManager: React.FC<SiteVisitManagerProps> = ({ project }) =
     });
 
     if (result) {
+      // If status is Scheduled, also create a calendar event
+      if (newVisit.status === 'Scheduled') {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user) {
+          await supabase
+            .from('calendar_events')
+            .insert({
+              project_id: project.id,
+              user_id: user.id,
+              title: newVisit.title,
+              description: newVisit.description,
+              event_date: newVisit.visit_date,
+              location: newVisit.inspector_name ? `Inspector: ${newVisit.inspector_name}` : undefined,
+              event_type: 'Site Visit',
+              related_site_visit_id: result.id,
+              completed: false
+            });
+        }
+      }
+
       setNewVisit({
         title: '',
         description: '',
@@ -578,9 +657,19 @@ export const SiteVisitManager: React.FC<SiteVisitManagerProps> = ({ project }) =
               <div className="flex items-center gap-2">
                 {getStatusIcon(visit.status)}
                 <h3 className="font-medium text-gray-900">{visit.title}</h3>
-                <span className={`text-xs font-medium px-2 py-0.5 rounded ${getStatusColor(visit.status)}`}>
-                  {visit.status}
-                </span>
+
+                {/* Status Selector */}
+                <select
+                  value={visit.status}
+                  onChange={(e) => handleStatusChange(visit.id, e.target.value as 'Scheduled' | 'In Progress' | 'Completed' | 'Cancelled')}
+                  className={`text-xs font-medium px-2 py-0.5 rounded border-none cursor-pointer ${getStatusColor(visit.status)}`}
+                >
+                  <option value="Scheduled">Scheduled</option>
+                  <option value="In Progress">In Progress</option>
+                  <option value="Completed">Completed</option>
+                  <option value="Cancelled">Cancelled</option>
+                </select>
+
                 <span className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded">
                   {visit.visit_type}
                 </span>

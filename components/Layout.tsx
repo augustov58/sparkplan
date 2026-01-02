@@ -1,6 +1,6 @@
 
 import React, { useState } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { useNavigate, useLocation, Link } from 'react-router-dom';
 import {
   LayoutGrid,
   Zap,
@@ -74,20 +74,23 @@ const SidebarItem: React.FC<SidebarItemProps> = ({
 }) => {
   const navigate = useNavigate();
 
-  const handleClick = () => {
-    // Always navigate to path if it exists
-    if (path) {
-      navigate(path);
+  const handleClick = (e: React.MouseEvent) => {
+    // Prevent default if has children (accordion behavior)
+    if (hasChildren && onToggle) {
+      e.preventDefault();
+      onToggle();
     }
 
-    // Also toggle dropdown if has children
-    if (hasChildren && onToggle) {
-      onToggle();
+    // Navigate if path exists
+    if (path && !hasChildren) {
+      e.preventDefault();
+      navigate(path, { replace: false });
     }
   };
 
   return (
-    <div
+    <Link
+      to={path}
       onClick={handleClick}
       className={`
         flex items-center gap-3 cursor-pointer transition-all duration-200 group
@@ -104,7 +107,7 @@ const SidebarItem: React.FC<SidebarItemProps> = ({
           <ChevronDown className="w-4 h-4 text-gray-400" /> :
           <ChevronRight className="w-4 h-4 text-gray-400" />
       )}
-    </div>
+    </Link>
   );
 };
 
@@ -163,7 +166,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, title, showBack, onSig
         },
         { label: 'Grounding & Bonding', icon: Zap, path: `/project/${projectId}/grounding`, show: true },
         { label: 'Tools & Calculators', icon: Calculator, path: `/project/${projectId}/tools`, show: true },
-        { label: 'EV Panel Templates', icon: Package, path: `/project/${projectId}/ev-templates`, show: true },
+        // EV Panel Templates moved to Tools & Calculators tab
       ]
     },
     {
@@ -176,7 +179,8 @@ export const Layout: React.FC<LayoutProps> = ({ children, title, showBack, onSig
         { label: 'AI Inspector & Activity', icon: Shield, path: `/project/${projectId}/inspector`, show: true },
         { label: 'Pre-Inspection Check', icon: CheckSquare, path: `/project/${projectId}/check`, show: true },
         { label: 'Permit Packet', icon: FileText, path: `/project/${projectId}/permit-packet`, show: true },
-        { label: 'Utility Interconnection', icon: Plug, path: `/project/${projectId}/utility-interconnection`, show: true },
+        // COMING SOON: Utility Interconnection (Phase 2 - EV Niche)
+        // { label: 'Utility Interconnection', icon: Plug, path: `/project/${projectId}/utility-interconnection`, show: true },
       ]
     }
   ] : [];

@@ -6,7 +6,7 @@
 
 import React, { useState, useMemo } from 'react';
 import { Project } from '../types';
-import { LayoutGrid, Download, Edit2, Save, X, Trash2, Settings, Calculator, Info, ArrowDown } from 'lucide-react';
+import { LayoutGrid, Download, Edit2, Save, X, Trash2, Settings, Calculator, Info, ArrowDown, Plus } from 'lucide-react';
 import { usePanels } from '../hooks/usePanels';
 import { useCircuits } from '../hooks/useCircuits';
 import { useTransformers } from '../hooks/useTransformers';
@@ -39,7 +39,7 @@ interface PanelScheduleProps {
 
 export const PanelSchedule: React.FC<PanelScheduleProps> = ({ project }) => {
   const { panels } = usePanels(project.id);
-  const { circuits, updateCircuit, deleteCircuit } = useCircuits(project.id);
+  const { circuits, createCircuit, updateCircuit, deleteCircuit } = useCircuits(project.id);
   const { transformers } = useTransformers(project.id);
 
   const [selectedPanelId, setSelectedPanelId] = useState<string | null>(null);
@@ -52,6 +52,22 @@ export const PanelSchedule: React.FC<PanelScheduleProps> = ({ project }) => {
     circuitNumber?: number;
   }>({});
   const [showDemandDetails, setShowDemandDetails] = useState(true);
+  const [addingCircuit, setAddingCircuit] = useState<'left' | 'right' | null>(null);
+  const [newCircuit, setNewCircuit] = useState<{
+    description?: string;
+    breakerAmps?: number;
+    loadWatts?: number;
+    loadType?: LoadTypeCode;
+    pole?: 1 | 2 | 3;
+    conductorSize?: string;
+    circuitNumber?: number;
+  }>({
+    breakerAmps: 20,
+    loadWatts: 0,
+    loadType: 'O',
+    pole: 1,
+    conductorSize: '12 AWG',
+  });
 
   // Select first panel by default
   React.useEffect(() => {
@@ -276,6 +292,168 @@ export const PanelSchedule: React.FC<PanelScheduleProps> = ({ project }) => {
     } catch (error) {
       alert(`Failed to export PDF: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
+  };
+
+  // Get all occupied slot numbers (including multi-pole circuit expansions)
+  const getOccupiedSlots = (): Set<number> => {
+    if (!selectedPanelId) return new Set();
+    const panelCkts = circuits.filter(c => c.panel_id === selectedPanelId);
+    const occupied = new Set<number>();
+
+    panelCkts.forEach(ckt => {
+      // Add the circuit's base number
+      occupied.add(ckt.circuit_number);
+
+      // Add slots occupied by multi-pole circuits
+      // 1-pole: occupies 1 slot (e.g., slot 1)
+      // 2-pole: occupies 2 slots (e.g., slots 1 and 3)
+      // 3-pole: occupies 3 slots (e.g., slots 1, 3, and 5)
+      if (ckt.pole > 1) {
+        for (let i = 1; i < ckt.pole; i++) {
+          occupied.add(ckt.circuit_number + (i * 2));
+        }
+      }
+    });
+
+    return occupied;
+  };
+
+  // Check if a circuit with given number and pole count can be placed
+  const isCircuitSlotAvailable = (circuitNumber: number, pole: number): boolean => {
+    const occupied = getOccupiedSlots();
+
+    // Check if the base slot and all required slots are free
+    for (let i = 0; i < pole; i++) {
+      const slotNumber = circuitNumber + (i * 2);
+      if (occupied.has(slotNumber)) {
+        return false; // Slot is occupied
+      }
+    }
+
+    return true; // All required slots are free
+  };
+
+  const getNextAvailableCircuitNumber = (side: 'left' | 'right', pole: number = 1) => {
+    const startNumber = side === 'left' ? 1 : 2;
+    const occupied = getOccupiedSlots();
+
+    // Find the first available slot on this side
+    for (let num = startNumber; num <= 100; num += 2) {
+      if (isCircuitSlotAvailable(num, pole)) {
+        return num;
+      }
+    }
+
+    // If no slot available, return a high number (shouldn't happen in practice)
+    return side === 'left' ? 101 : 102;
+  };
+
+  const startAddCircuit = (side: 'left' | 'right') => {
+    const circuitNumber = getNextAvailableCircuitNumber(side, 1);
+    setNewCircuit({
+      breakerAmps: 20,
+      loadWatts: 0,
+      loadType: 'O',
+      pole: 1,
+      conductorSize: '12 AWG',
+      circuitNumber,
+    });
+    setAddingCircuit(side);
+  };
+
+  // Recalculate circuit number when pole count changes
+  const handlePoleChange = (newPole: 1 | 2 | 3) => {
+    const currentNumber = newCircuit.circuitNumber;
+
+    // If current number is still valid for new pole count, keep it
+    if (currentNumber && isCircuitSlotAvailable(currentNumber, newPole)) {
+      setNewCircuit({...newCircuit, pole: newPole});
+    } else {
+      // Otherwise, find next available slot for this pole count
+      const nextAvailable = getNextAvailableCircuitNumber(addingCircuit || 'left', newPole);
+      setNewCircuit({...newCircuit, pole: newPole, circuitNumber: nextAvailable});
+    }
+  };
+
+  // Handle manual circuit number entry
+  const handleCircuitNumberChange = (value: string) => {
+    const num = parseInt(value);
+
+    // Allow empty or invalid input (user is typing)
+    if (value === '' || isNaN(num)) {
+      setNewCircuit({...newCircuit, circuitNumber: undefined});
+      return;
+    }
+
+    // Validate side (left = odd, right = even)
+    const isLeftSide = addingCircuit === 'left';
+    const isOdd = num % 2 === 1;
+
+    if ((isLeftSide && !isOdd) || (!isLeftSide && isOdd)) {
+      // Wrong side - show warning but allow the value
+      console.warn(`Circuit ${num} is on the ${isOdd ? 'left' : 'right'} side, but you're adding to the ${addingCircuit} side`);
+    }
+
+    setNewCircuit({...newCircuit, circuitNumber: num});
+  };
+
+  const handleAddCircuit = async () => {
+    if (!selectedPanelId || !newCircuit.description) {
+      alert('Please enter a circuit description');
+      return;
+    }
+
+    const circuitNumber = newCircuit.circuitNumber || getNextAvailableCircuitNumber(addingCircuit || 'left', newCircuit.pole || 1);
+    const pole = newCircuit.pole || 1;
+
+    // CRITICAL: Validate that the slot is available
+    if (!isCircuitSlotAvailable(circuitNumber, pole)) {
+      const occupiedSlots = [];
+      for (let i = 0; i < pole; i++) {
+        const slotNumber = circuitNumber + (i * 2);
+        occupiedSlots.push(slotNumber);
+      }
+      alert(`Cannot add ${pole}-pole circuit at slot ${circuitNumber}. Slots ${occupiedSlots.join(', ')} are occupied or would conflict with existing circuits.`);
+      return;
+    }
+
+    try {
+      await createCircuit({
+        project_id: project.id,
+        panel_id: selectedPanelId,
+        circuit_number: circuitNumber,
+        description: newCircuit.description,
+        breaker_amps: newCircuit.breakerAmps || 20,
+        load_watts: newCircuit.loadWatts || 0,
+        pole: pole,
+        load_type: newCircuit.loadType || 'O',
+        conductor_size: newCircuit.conductorSize || '12 AWG',
+      });
+
+      // Reset form only if successful
+      setNewCircuit({
+        breakerAmps: 20,
+        loadWatts: 0,
+        loadType: 'O',
+        pole: 1,
+        conductorSize: '12 AWG',
+      });
+      setAddingCircuit(null);
+    } catch (error) {
+      console.error('Failed to create circuit:', error);
+      alert(`Failed to add circuit: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  };
+
+  const cancelAddCircuit = () => {
+    setNewCircuit({
+      breakerAmps: 20,
+      loadWatts: 0,
+      loadType: 'O',
+      pole: 1,
+      conductorSize: '12 AWG',
+    });
+    setAddingCircuit(null);
   };
 
   // Check if a slot is occupied by a multi-pole circuit above it
@@ -714,7 +892,217 @@ export const PanelSchedule: React.FC<PanelScheduleProps> = ({ project }) => {
             </thead>
             <tbody className="bg-white">
               {Array.from({ length: Math.ceil(totalSlots / 2) }).map((_, i) => renderRow(i + 1))}
-              
+
+              {/* Add Circuit Row - Inline */}
+              <tr className="bg-electric-50 border-t-2 border-electric-300 hover:bg-electric-100">
+                {/* Left Side - Add Circuit */}
+                {addingCircuit === 'left' ? (
+                  <>
+                    <td className="p-1 text-center" style={{minWidth: '55px'}}>
+                      <input
+                        type="number"
+                        value={newCircuit.circuitNumber || ''}
+                        onChange={e => handleCircuitNumberChange(e.target.value)}
+                        placeholder="#"
+                        className={`w-full border rounded px-1.5 py-0.5 text-xs text-center font-medium ${
+                          newCircuit.circuitNumber && !isCircuitSlotAvailable(newCircuit.circuitNumber, newCircuit.pole || 1)
+                            ? 'border-red-500 bg-red-50'
+                            : 'border-gray-300'
+                        }`}
+                        style={{minWidth: '50px'}}
+                        title={
+                          newCircuit.circuitNumber && !isCircuitSlotAvailable(newCircuit.circuitNumber, newCircuit.pole || 1)
+                            ? 'Slot occupied or conflicts with existing circuit'
+                            : 'Circuit number (odd numbers for left side)'
+                        }
+                      />
+                    </td>
+                    <td className="p-1">
+                      <input
+                        type="text"
+                        value={newCircuit.description || ''}
+                        onChange={e => setNewCircuit({...newCircuit, description: e.target.value})}
+                        placeholder="Description"
+                        className="w-full border border-gray-300 rounded px-1 py-0.5 text-xs"
+                        autoFocus
+                      />
+                    </td>
+                    <td className="p-1">
+                      <select
+                        value={newCircuit.loadType || 'O'}
+                        onChange={e => setNewCircuit({...newCircuit, loadType: e.target.value as LoadTypeCode})}
+                        className="w-full border border-gray-300 rounded px-1 py-0.5 text-[10px]"
+                      >
+                        {LOAD_TYPES.map(lt => <option key={lt.code} value={lt.code}>{lt.code}</option>)}
+                      </select>
+                    </td>
+                    <td colSpan={3} className="p-1">
+                      <input
+                        type="number"
+                        value={newCircuit.loadWatts || ''}
+                        onChange={e => setNewCircuit({...newCircuit, loadWatts: Number(e.target.value)})}
+                        placeholder="VA"
+                        className="w-full border border-gray-300 rounded px-1 py-0.5 text-xs"
+                      />
+                    </td>
+                    <td className="p-1">
+                      <select
+                        value={newCircuit.breakerAmps || 20}
+                        onChange={e => setNewCircuit({...newCircuit, breakerAmps: Number(e.target.value)})}
+                        className="w-full border border-gray-300 rounded px-1 py-0.5 text-[10px]"
+                      >
+                        <option value="15">15</option>
+                        <option value="20">20</option>
+                        <option value="30">30</option>
+                        <option value="40">40</option>
+                        <option value="50">50</option>
+                        <option value="60">60</option>
+                        <option value="100">100</option>
+                      </select>
+                    </td>
+                    <td className="p-1">
+                      <select
+                        value={newCircuit.pole || 1}
+                        onChange={e => handlePoleChange(Number(e.target.value) as 1 | 2 | 3)}
+                        className="w-full border border-gray-300 rounded px-1 py-0.5 text-[10px]"
+                      >
+                        <option value="1">1P</option>
+                        <option value="2">2P</option>
+                        {selectedPanel?.phase === 3 && <option value="3">3P</option>}
+                      </select>
+                    </td>
+                  </>
+                ) : (
+                  <>
+                    <td colSpan={2} className="p-2 text-center">
+                      <button
+                        onClick={() => startAddCircuit('left')}
+                        className="text-xs text-electric-600 hover:text-electric-700 font-medium flex items-center justify-center gap-1 w-full"
+                      >
+                        <Plus className="w-3 h-3" /> Add Circuit
+                      </button>
+                    </td>
+                    <td colSpan={6}></td>
+                  </>
+                )}
+
+                {/* Center Phase Column */}
+                <td className="p-1 bg-electric-600"></td>
+
+                {/* Right Side - Add Circuit */}
+                {addingCircuit === 'right' ? (
+                  <>
+                    <td className="p-1">
+                      <select
+                        value={newCircuit.pole || 1}
+                        onChange={e => handlePoleChange(Number(e.target.value) as 1 | 2 | 3)}
+                        className="w-full border border-gray-300 rounded px-1 py-0.5 text-[10px]"
+                      >
+                        <option value="1">1P</option>
+                        <option value="2">2P</option>
+                        {selectedPanel?.phase === 3 && <option value="3">3P</option>}
+                      </select>
+                    </td>
+                    <td className="p-1">
+                      <select
+                        value={newCircuit.breakerAmps || 20}
+                        onChange={e => setNewCircuit({...newCircuit, breakerAmps: Number(e.target.value)})}
+                        className="w-full border border-gray-300 rounded px-1 py-0.5 text-[10px]"
+                      >
+                        <option value="15">15</option>
+                        <option value="20">20</option>
+                        <option value="30">30</option>
+                        <option value="40">40</option>
+                        <option value="50">50</option>
+                        <option value="60">60</option>
+                        <option value="100">100</option>
+                      </select>
+                    </td>
+                    <td colSpan={3} className="p-1">
+                      <input
+                        type="number"
+                        value={newCircuit.loadWatts || ''}
+                        onChange={e => setNewCircuit({...newCircuit, loadWatts: Number(e.target.value)})}
+                        placeholder="VA"
+                        className="w-full border border-gray-300 rounded px-1 py-0.5 text-xs"
+                      />
+                    </td>
+                    <td className="p-1">
+                      <select
+                        value={newCircuit.loadType || 'O'}
+                        onChange={e => setNewCircuit({...newCircuit, loadType: e.target.value as LoadTypeCode})}
+                        className="w-full border border-gray-300 rounded px-1 py-0.5 text-[10px]"
+                      >
+                        {LOAD_TYPES.map(lt => <option key={lt.code} value={lt.code}>{lt.code}</option>)}
+                      </select>
+                    </td>
+                    <td className="p-1">
+                      <input
+                        type="text"
+                        value={newCircuit.description || ''}
+                        onChange={e => setNewCircuit({...newCircuit, description: e.target.value})}
+                        placeholder="Description"
+                        className="w-full border border-gray-300 rounded px-1 py-0.5 text-xs"
+                      />
+                    </td>
+                    <td className="p-1 text-center" style={{minWidth: '55px'}}>
+                      <input
+                        type="number"
+                        value={newCircuit.circuitNumber || ''}
+                        onChange={e => handleCircuitNumberChange(e.target.value)}
+                        placeholder="#"
+                        className={`w-full border rounded px-1.5 py-0.5 text-xs text-center font-medium ${
+                          newCircuit.circuitNumber && !isCircuitSlotAvailable(newCircuit.circuitNumber, newCircuit.pole || 1)
+                            ? 'border-red-500 bg-red-50'
+                            : 'border-gray-300'
+                        }`}
+                        style={{minWidth: '50px'}}
+                        title={
+                          newCircuit.circuitNumber && !isCircuitSlotAvailable(newCircuit.circuitNumber, newCircuit.pole || 1)
+                            ? 'Slot occupied or conflicts with existing circuit'
+                            : 'Circuit number (even numbers for right side)'
+                        }
+                      />
+                    </td>
+                  </>
+                ) : (
+                  <>
+                    <td colSpan={6}></td>
+                    <td colSpan={2} className="p-2 text-center">
+                      <button
+                        onClick={() => startAddCircuit('right')}
+                        className="text-xs text-electric-600 hover:text-electric-700 font-medium flex items-center justify-center gap-1 w-full"
+                      >
+                        <Plus className="w-3 h-3" /> Add Circuit
+                      </button>
+                    </td>
+                  </>
+                )}
+              </tr>
+
+              {/* Save/Cancel Row - shown when adding circuit */}
+              {addingCircuit && (
+                <tr className="bg-electric-100 border-b border-electric-300">
+                  <td colSpan={17} className="p-2 text-center">
+                    <div className="flex justify-center gap-2">
+                      <button
+                        onClick={handleAddCircuit}
+                        disabled={!newCircuit.description}
+                        className="flex items-center gap-1 px-3 py-1 bg-gray-900 hover:bg-black text-white rounded text-xs font-medium disabled:opacity-50"
+                      >
+                        <Save className="w-3 h-3" /> Save Circuit
+                      </button>
+                      <button
+                        onClick={cancelAddCircuit}
+                        className="flex items-center gap-1 px-3 py-1 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded text-xs font-medium"
+                      >
+                        <X className="w-3 h-3" /> Cancel
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              )}
+
               {/* Feeder Circuits Section - Downstream Panels & Transformers */}
               {feederCircuits.length > 0 && (
                 <>

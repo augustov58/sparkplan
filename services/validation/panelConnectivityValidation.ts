@@ -65,33 +65,51 @@ function getPanelSegmentRoot(
 ): string | null {
   // Trace back to find the root of this voltage segment
   let current: Panel | undefined = panel;
-  
+
+  console.log(`📍 Tracing segment root for ${panel.name}:`, {
+    fed_from_type: panel.fed_from_type,
+    fed_from: panel.fed_from,
+    totalPanels: panels.length
+  });
+
   while (current) {
     if (current.fed_from_type === 'service') {
       // This is the service entrance - it's the root
+      console.log(`  ✓ Found service entrance: ${current.name}`);
       return current.id;
     }
-    
+
     if (current.fed_from_type === 'panel' && current.fed_from) {
       const parent = panels.find(p => p.id === current!.fed_from);
+      console.log(`  → Looking for parent of ${current.name}:`, {
+        fed_from: current.fed_from,
+        parentFound: !!parent,
+        parentName: parent?.name
+      });
+
       if (parent) {
         // Check if same voltage - if different, current is a segment boundary
         if (parent.voltage !== current.voltage) {
           // This panel is the start of a new segment (line-to-neutral derivative)
+          console.log(`  ⚡ Voltage change: ${parent.name} (${parent.voltage}V) → ${current.name} (${current.voltage}V)`);
           return current.id;
         }
         current = parent;
+        continue; // ✅ Continue to next iteration to trace parent's hierarchy
       } else {
+        console.log(`  ❌ Parent not found! Returning ${current.name}.id`);
         return current.id;
       }
     }
-    
+
     if (current.fed_from_type === 'transformer' && current.fed_from_transformer_id) {
       // Transformer creates a new voltage segment - this panel is the root
+      console.log(`  🔌 Transformer segment boundary: ${current.name}`);
       return current.id;
     }
-    
-    // Fallback
+
+    // Fallback - should not reach here in normal cases
+    console.log(`  ⚠️ Unexpected fallback for ${current.name}`);
     break;
   }
   
@@ -130,6 +148,12 @@ export function validateFeederConnectivity(
     };
   }
 
+  // DEBUG: Log panel info
+  console.log('🔍 Connectivity Check:', {
+    source: `${sourcePanel.name} (${sourcePanel.voltage}V ${sourcePanel.phase}φ, fed_from_type: ${sourcePanel.fed_from_type})`,
+    dest: `${destPanel.name} (${destPanel.voltage}V ${destPanel.phase}φ, fed_from_type: ${destPanel.fed_from_type}, fed_from: ${destPanel.fed_from})`,
+  });
+
   // Rule 1: Same panel cannot have feeder to itself
   if (sourcePanelId === destPanelId) {
     return {
@@ -154,11 +178,22 @@ export function validateFeederConnectivity(
   const sourceRoot = getPanelSegmentRoot(sourcePanel, panels, transformers);
   const destRoot = getPanelSegmentRoot(destPanel, panels, transformers);
 
+  console.log('🔍 Segment roots:', {
+    sourceRoot,
+    destRoot,
+    same: sourceRoot === destRoot
+  });
+
   if (sourceRoot !== destRoot) {
     // Find out why they're on different segments
     const sourceSegmentPanel = panels.find(p => p.id === sourceRoot);
     const destSegmentPanel = panels.find(p => p.id === destRoot);
-    
+
+    console.log('❌ Different segments:', {
+      sourceSegment: sourceSegmentPanel?.name,
+      destSegment: destSegmentPanel?.name
+    });
+
     return {
       isConnected: false,
       path: [],
@@ -180,7 +215,12 @@ export function validateFeederConnectivity(
   
   // Rule 3b: Check if destination panel is downstream of source (multi-level hierarchy)
   const downstreamPath = findDownstreamPath(sourcePanelId, destPanelId, panels);
+  console.log('🔍 Downstream path check:', {
+    found: downstreamPath.length > 0,
+    path: downstreamPath
+  });
   if (downstreamPath.length > 0) {
+    console.log('✅ Valid downstream path found');
     return {
       isConnected: true,
       path: downstreamPath,
@@ -252,13 +292,11 @@ function findDownstreamPath(
       return path;
     }
     
-    // Trace back through panel hierarchy
-    if (current.fed_from) {
+    // Trace back through panel hierarchy (only if fed from another panel)
+    if (current.fed_from_type === 'panel' && current.fed_from) {
       current = panels.find(p => p.id === current!.fed_from);
-    } else if (current.fed_from_type === 'service' || current.fed_from_type === 'transformer') {
-      // Reached service entrance or transformer - source not found in this path
-      break;
     } else {
+      // Reached service entrance, transformer, or end of path
       break;
     }
   }
@@ -334,15 +372,23 @@ export function getValidFeederDestinations(
   panels.forEach(panel => {
     if (panel.id === sourcePanelId) return; // Skip self
 
-    const validation = validateFeederConnectivity(
-      sourcePanelId,
-      panel.id,
-      panels,
-      transformers
-    );
+    // CRITICAL FIX: Only allow panels that are DOWNSTREAM of the source,
+    // not just on the same voltage segment (siblings should be excluded)
+    // Check if panel is directly or indirectly downstream
+    const isDownstream = isPanelDownstream(sourcePanelId, panel.id, panels);
 
-    if (validation.isConnected) {
-      validDestinations.push(panel);
+    if (isDownstream) {
+      // Double-check connectivity for safety
+      const validation = validateFeederConnectivity(
+        sourcePanelId,
+        panel.id,
+        panels,
+        transformers
+      );
+
+      if (validation.isConnected) {
+        validDestinations.push(panel);
+      }
     }
   });
 
@@ -369,18 +415,273 @@ export function getAllDownstreamPanels(
   panels: Panel[]
 ): Panel[] {
   const downstream: Panel[] = [];
-  
+
   // Find all panels directly fed from this panel
   const directChildren = panels.filter(
     p => p.fed_from_type === 'panel' && p.fed_from === panelId
   );
-  
+
   for (const child of directChildren) {
     downstream.push(child);
     // Recursively get children of children
     downstream.push(...getAllDownstreamPanels(child.id, panels));
   }
-  
+
   return downstream;
+}
+
+/**
+ * Enhanced connectivity validation that supports transformers as sources and destinations
+ *
+ * Handles all four combinations:
+ * - Panel → Panel (delegates to validateFeederConnectivity)
+ * - Panel → Transformer
+ * - Transformer → Panel
+ * - Transformer → Transformer
+ *
+ * @param sourcePanelId - Source panel ID (null if source is transformer)
+ * @param sourceTransformerId - Source transformer ID (null if source is panel)
+ * @param destPanelId - Destination panel ID (null if destination is transformer)
+ * @param destTransformerId - Destination transformer ID (null if destination is panel)
+ * @param panels - All panels in the project
+ * @param transformers - All transformers in the project
+ * @returns Validation result with message
+ */
+export function validateFeederConnectivityEnhanced(
+  sourcePanelId: string | null,
+  sourceTransformerId: string | null,
+  destPanelId: string | null,
+  destTransformerId: string | null,
+  panels: Panel[],
+  transformers: Transformer[]
+): ConnectivityValidation {
+  // Case 1: Panel → Panel (use existing logic)
+  if (sourcePanelId && destPanelId) {
+    return validateFeederConnectivity(sourcePanelId, destPanelId, panels, transformers);
+  }
+
+  // Case 2: Panel → Transformer
+  if (sourcePanelId && destTransformerId) {
+    const sourcePanel = panels.find(p => p.id === sourcePanelId);
+    const destTransformer = transformers.find(t => t.id === destTransformerId);
+
+    if (!sourcePanel || !destTransformer) {
+      return {
+        isConnected: false,
+        path: [],
+        message: 'Source panel or destination transformer not found',
+        technicalReason: 'Invalid IDs provided',
+      };
+    }
+
+    // Transformer must be fed from this panel (directly)
+    if (destTransformer.fed_from_panel_id === sourcePanelId) {
+      return {
+        isConnected: true,
+        path: [sourcePanel.name, destTransformer.name],
+        message: `Valid feeder: ${sourcePanel.name} → ${destTransformer.name}`,
+      };
+    }
+
+    // Check if transformer is downstream of source panel (through other panels)
+    const isDownstream = isTransformerDownstreamOfPanel(sourcePanelId, destTransformerId, panels, transformers);
+    if (isDownstream) {
+      return {
+        isConnected: true,
+        path: [sourcePanel.name, '...', destTransformer.name],
+        message: `Valid feeder: ${sourcePanel.name} → ${destTransformer.name} (downstream)`,
+      };
+    }
+
+    return {
+      isConnected: false,
+      path: [],
+      message: `Transformer ${destTransformer.name} is not fed from panel ${sourcePanel.name}`,
+      technicalReason: `${destTransformer.name} must be downstream of ${sourcePanel.name} to create a feeder.`,
+    };
+  }
+
+  // Case 3: Transformer → Panel
+  if (sourceTransformerId && destPanelId) {
+    const sourceTransformer = transformers.find(t => t.id === sourceTransformerId);
+    const destPanel = panels.find(p => p.id === destPanelId);
+
+    if (!sourceTransformer || !destPanel) {
+      return {
+        isConnected: false,
+        path: [],
+        message: 'Source transformer or destination panel not found',
+        technicalReason: 'Invalid IDs provided',
+      };
+    }
+
+    // Panel must be fed from this transformer (directly or indirectly)
+    if (destPanel.fed_from_type === 'transformer' && destPanel.fed_from_transformer_id === sourceTransformerId) {
+      return {
+        isConnected: true,
+        path: [sourceTransformer.name, destPanel.name],
+        message: `Valid feeder: ${sourceTransformer.name} → ${destPanel.name}`,
+      };
+    }
+
+    // Check if panel is downstream of transformer (through other panels)
+    const isDownstream = isPanelDownstreamOfTransformer(sourceTransformerId, destPanelId, panels, transformers);
+    if (isDownstream) {
+      return {
+        isConnected: true,
+        path: [sourceTransformer.name, '...', destPanel.name],
+        message: `Valid feeder: ${sourceTransformer.name} → ${destPanel.name} (downstream)`,
+      };
+    }
+
+    return {
+      isConnected: false,
+      path: [],
+      message: `Panel ${destPanel.name} is not fed from transformer ${sourceTransformer.name}`,
+      technicalReason: `${destPanel.name} must be downstream of ${sourceTransformer.name} to create a feeder. ` +
+        `Currently fed from: ${destPanel.fed_from_type || 'unknown'}`,
+    };
+  }
+
+  // Case 4: Transformer → Transformer
+  if (sourceTransformerId && destTransformerId) {
+    const sourceTransformer = transformers.find(t => t.id === sourceTransformerId);
+    const destTransformer = transformers.find(t => t.id === destTransformerId);
+
+    if (!sourceTransformer || !destTransformer) {
+      return {
+        isConnected: false,
+        path: [],
+        message: 'Source or destination transformer not found',
+        technicalReason: 'Invalid IDs provided',
+      };
+    }
+
+    // Same transformer cannot feed itself
+    if (sourceTransformerId === destTransformerId) {
+      return {
+        isConnected: false,
+        path: [],
+        message: 'Cannot create feeder to the same transformer',
+        technicalReason: 'Source and destination must be different transformers',
+      };
+    }
+
+    // Destination transformer must be downstream of source transformer
+    // This means the destination is fed from a panel that's on the secondary side of the source
+    const isDownstream = isTransformerDownstreamOfTransformer(sourceTransformerId, destTransformerId, panels, transformers);
+    if (isDownstream) {
+      return {
+        isConnected: true,
+        path: [sourceTransformer.name, '...', destTransformer.name],
+        message: `Valid feeder: ${sourceTransformer.name} → ${destTransformer.name}`,
+      };
+    }
+
+    return {
+      isConnected: false,
+      path: [],
+      message: `Transformers are not electrically connected`,
+      technicalReason: `${destTransformer.name} must be downstream of ${sourceTransformer.name}. ` +
+        `They are on different voltage segments or branches.`,
+    };
+  }
+
+  // Should never reach here
+  return {
+    isConnected: false,
+    path: [],
+    message: 'Invalid feeder configuration',
+    technicalReason: 'Must specify either source panel or transformer, and destination panel or transformer',
+  };
+}
+
+/**
+ * Check if a transformer is downstream of a panel (directly or through intermediate panels)
+ */
+function isTransformerDownstreamOfPanel(
+  panelId: string,
+  transformerId: string,
+  panels: Panel[],
+  transformers: Transformer[]
+): boolean {
+  const transformer = transformers.find(t => t.id === transformerId);
+  if (!transformer) return false;
+
+  // Check if transformer is directly fed from this panel
+  if (transformer.fed_from_panel_id === panelId) return true;
+
+  // Check if transformer is fed from a panel that's downstream of the source panel
+  if (transformer.fed_from_panel_id) {
+    const intermediatePath = findDownstreamPath(panelId, transformer.fed_from_panel_id, panels);
+    return intermediatePath.length > 0;
+  }
+
+  return false;
+}
+
+/**
+ * Check if a panel is downstream of a transformer (directly or through intermediate panels)
+ */
+function isPanelDownstreamOfTransformer(
+  transformerId: string,
+  panelId: string,
+  panels: Panel[],
+  transformers: Transformer[]
+): boolean {
+  const panel = panels.find(p => p.id === panelId);
+  if (!panel) return false;
+
+  // Trace back from panel to see if we reach the transformer
+  let current: Panel | undefined = panel;
+  const visited = new Set<string>();
+
+  while (current && !visited.has(current.id)) {
+    visited.add(current.id);
+
+    // Check if this panel is directly fed from the transformer
+    if (current.fed_from_type === 'transformer' && current.fed_from_transformer_id === transformerId) {
+      return true;
+    }
+
+    // Trace back through panel hierarchy
+    if (current.fed_from_type === 'panel' && current.fed_from) {
+      current = panels.find(p => p.id === current!.fed_from);
+    } else {
+      break;
+    }
+  }
+
+  return false;
+}
+
+/**
+ * Check if a transformer is downstream of another transformer
+ * (through intermediate panels on the secondary side)
+ */
+function isTransformerDownstreamOfTransformer(
+  sourceTransformerId: string,
+  destTransformerId: string,
+  panels: Panel[],
+  transformers: Transformer[]
+): boolean {
+  const sourceTransformer = transformers.find(t => t.id === sourceTransformerId);
+  const destTransformer = transformers.find(t => t.id === destTransformerId);
+
+  if (!sourceTransformer || !destTransformer) return false;
+
+  // Find all panels fed from source transformer (secondary side)
+  const secondarySidePanels = panels.filter(
+    p => p.fed_from_type === 'transformer' && p.fed_from_transformer_id === sourceTransformerId
+  );
+
+  // Check if destination transformer is downstream of any of these panels
+  for (const panel of secondarySidePanels) {
+    if (isTransformerDownstreamOfPanel(panel.id, destTransformerId, panels, transformers)) {
+      return true;
+    }
+  }
+
+  return false;
 }
 

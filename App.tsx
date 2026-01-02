@@ -25,7 +25,7 @@ import { SiteVisitManager } from './components/SiteVisitManager';
 import { CalendarView } from './components/CalendarView';
 import { AgentActivityLog } from './components/AgentActivityLog';
 import { UtilityInterconnectionForm } from './components/UtilityInterconnectionForm';
-import { EVPanelTemplates } from './components/EVPanelTemplates';
+// EVPanelTemplates moved to Calculators component
 import { Project, ProjectStatus, ProjectType } from './types';
 import { askNecAssistant } from './services/geminiService';
 import { buildProjectContext, formatContextForAI } from './services/ai/projectContextBuilder';
@@ -72,6 +72,7 @@ const ProjectWrapper = ({ projects, updateProject, deleteProject, onSignOut }: {
 
     return (
         <Layout title={project.name} showBack onSignOut={onSignOut} projectType={project.type}>
+            <div key={location.pathname}>
             <Routes>
                 <Route path="/" element={
                     <FeatureErrorBoundary>
@@ -97,7 +98,7 @@ const ProjectWrapper = ({ projects, updateProject, deleteProject, onSignOut }: {
                 } />
                 <Route path="/diagram" element={
                     <FeatureErrorBoundary>
-                        <OneLineDiagram project={project} updateProject={updateProject} />
+                        <OneLineDiagram project={project} updateProject={updateProject} diagramOnly={true} />
                     </FeatureErrorBoundary>
                 } />
                 <Route path="/tools" element={
@@ -105,16 +106,18 @@ const ProjectWrapper = ({ projects, updateProject, deleteProject, onSignOut }: {
                         <Calculators projectId={project.id} />
                     </FeatureErrorBoundary>
                 } />
-                <Route path="/utility-interconnection" element={
+                {/* COMING SOON: Utility Interconnection (Phase 2 - EV Niche) */}
+                {/* <Route path="/utility-interconnection" element={
                     <FeatureErrorBoundary>
                         <UtilityInterconnectionWrapper project={project} />
                     </FeatureErrorBoundary>
-                } />
-                <Route path="/ev-templates" element={
+                } /> */}
+                {/* EV Panel Builder moved to Tools & Calculators tab */}
+                {/* <Route path="/ev-templates" element={
                     <FeatureErrorBoundary>
                         <EVPanelTemplates project={project} />
                     </FeatureErrorBoundary>
-                } />
+                } /> */}
                 <Route path="/grounding" element={
                     <FeatureErrorBoundary>
                         <GroundingBonding project={project} updateProject={updateProject} />
@@ -189,6 +192,7 @@ const ProjectWrapper = ({ projects, updateProject, deleteProject, onSignOut }: {
                     </FeatureErrorBoundary>
                 } />
             </Routes>
+            </div>
         </Layout>
     );
 };
@@ -558,22 +562,30 @@ function AppContent() {
     setShowTemplateSelector(true);
   };
 
-  const handleTemplateSelection = async (template: ProjectTemplate | null) => {
+  const handleTemplateSelection = async (template: ProjectTemplate | null, projectType?: ProjectType) => {
+    // Determine project type: use template type if available, otherwise use the projectType parameter from tab selection, fallback to RESIDENTIAL
+    const selectedType = template ? template.type : (projectType || ProjectType.RESIDENTIAL);
+
+    // Set default service parameters based on project type
+    const defaultServiceVoltage = selectedType === ProjectType.RESIDENTIAL ? 240 :
+                                   selectedType === ProjectType.COMMERCIAL ? 208 : 480;
+    const defaultServicePhase = selectedType === ProjectType.RESIDENTIAL ? 1 : 3;
+
     const newProject: Partial<Project> = {
-      name: template ? template.name : `New Project ${projects.length + 1}`,
+      name: template ? template.name : `New ${selectedType} Project ${projects.length + 1}`,
       address: 'TBD',
-      type: template ? template.type : ProjectType.RESIDENTIAL,
+      type: selectedType,
       necEdition: '2023',
       status: ProjectStatus.PLANNING,
       progress: 0,
-      serviceVoltage: template ? template.serviceVoltage : 120,
-      servicePhase: template ? template.servicePhase : 1,
+      serviceVoltage: template ? template.serviceVoltage : defaultServiceVoltage,
+      servicePhase: template ? template.servicePhase : defaultServicePhase,
       settings: {
-        serviceVoltage: template ? template.serviceVoltage : 120,
-        servicePhase: template ? template.servicePhase : 1,
+        serviceVoltage: template ? template.serviceVoltage : defaultServiceVoltage,
+        servicePhase: template ? template.servicePhase : defaultServicePhase,
         conductorMaterial: 'Cu',
         temperatureRating: 75,
-        occupancyType: 'dwelling' // Default for new projects
+        occupancyType: selectedType === ProjectType.RESIDENTIAL ? 'dwelling' : 'office' // Default based on project type
       }
     };
 

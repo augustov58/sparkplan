@@ -6,7 +6,11 @@
 import React from 'react';
 import { pdf } from '@react-pdf/renderer';
 import { Document } from '@react-pdf/renderer';
-import type { Panel, Circuit, Feeder, Transformer } from '../../lib/database.types';
+import type { Panel, Circuit, Feeder, Transformer, ShortCircuitCalculation, Database } from '../../lib/database.types';
+import type { Jurisdiction } from '../../types';
+import type { ArcFlashResult } from '../calculations/arcFlash';
+
+type GroundingDetail = Database['public']['Tables']['grounding_details']['Row'];
 import {
   CoverPage,
   EquipmentSchedule,
@@ -15,6 +19,12 @@ import {
   ComplianceSummary
 } from './PermitPacketDocuments';
 import { PanelScheduleDocument } from './PanelScheduleDocuments';
+import { EquipmentSpecsDocument } from './EquipmentSpecsDocuments';
+import { VoltageDropDocument } from './VoltageDropDocuments';
+import { JurisdictionRequirementsDocument } from './JurisdictionDocuments';
+import { ShortCircuitCalculationDocument } from './ShortCircuitDocuments';
+import { ArcFlashDocument } from './ArcFlashDocuments';
+import { GroundingPlanDocument } from './GroundingPlanDocuments';
 
 export interface PermitPacketData {
   projectId: string;
@@ -37,6 +47,21 @@ export interface PermitPacketData {
   meterLocation?: string;
   serviceConductorRouting?: string;
   riserDiagramSvg?: string; // SVG string of the one-line diagram
+  // Tier 3: Jurisdiction Requirements
+  jurisdictionId?: string;
+  jurisdiction?: Jurisdiction; // Full jurisdiction object for PDF generation
+  // Tier 2: Additional calculations and plans
+  shortCircuitCalculations?: ShortCircuitCalculation[]; // Short circuit analysis results
+  arcFlashData?: {  // Arc flash analysis data
+    equipmentName: string;
+    equipmentType: string;
+    systemVoltage: number;
+    faultCurrent: number;
+    workingDistance: number;
+    clearingTime: number;
+    result: ArcFlashResult;
+  };
+  groundingSystem?: GroundingDetail; // Grounding electrode system
 }
 
 /**
@@ -121,6 +146,71 @@ export const generatePermitPacket = async (data: PermitPacketData): Promise<void
           projectName={data.projectName}
           hasGrounding={data.hasGrounding}
         />
+
+        {/* Equipment Specifications (Tier 2) */}
+        <EquipmentSpecsDocument
+          projectName={data.projectName}
+          projectAddress={data.projectAddress}
+          panels={data.panels}
+          transformers={data.transformers}
+          includeNECReferences={true}
+        />
+
+        {/* Voltage Drop Report (Tier 2) */}
+        {data.feeders && data.feeders.length > 0 && (
+          <VoltageDropDocument
+            projectName={data.projectName}
+            projectAddress={data.projectAddress}
+            feeders={data.feeders}
+            panels={data.panels}
+            transformers={data.transformers}
+            includeNECReferences={true}
+          />
+        )}
+
+        {/* Short Circuit Analysis (Tier 2) */}
+        {data.shortCircuitCalculations && data.shortCircuitCalculations.length > 0 && (
+          <>
+            {data.shortCircuitCalculations.map((calc, index) => (
+              <ShortCircuitCalculationDocument
+                key={calc.id || index}
+                calculation={calc}
+                projectName={data.projectName}
+                projectAddress={data.projectAddress}
+                panelName={calc.calculation_type === 'panel' ? calc.panel_name : undefined}
+              />
+            ))}
+          </>
+        )}
+
+        {/* Arc Flash Analysis (Tier 2) */}
+        {data.arcFlashData && (
+          <ArcFlashDocument
+            projectName={data.projectName}
+            projectAddress={data.projectAddress}
+            equipmentName={data.arcFlashData.equipmentName}
+            arcFlashData={data.arcFlashData}
+          />
+        )}
+
+        {/* Grounding Plan (Tier 2) */}
+        {data.groundingSystem && (
+          <GroundingPlanDocument
+            projectName={data.projectName}
+            projectAddress={data.projectAddress}
+            grounding={data.groundingSystem}
+            serviceAmperage={sortedPanels.find(p => p.is_main)?.bus_rating || data.serviceVoltage}
+            conductorMaterial="Cu"
+          />
+        )}
+
+        {/* Jurisdiction Requirements Checklist (Tier 3) */}
+        {data.jurisdiction && (
+          <JurisdictionRequirementsDocument
+            jurisdiction={data.jurisdiction}
+            projectName={data.projectName}
+          />
+        )}
 
         {/* Panel Schedules - One page per panel */}
         {sortedPanels.map(panel => {

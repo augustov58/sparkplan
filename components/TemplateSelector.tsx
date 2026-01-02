@@ -16,7 +16,7 @@ import {
 interface TemplateSelectorProps {
   isOpen: boolean;
   onClose: () => void;
-  onSelectTemplate: (template: ProjectTemplate | null) => void;
+  onSelectTemplate: (template: ProjectTemplate | null, projectType?: ProjectType) => void;
 }
 
 export const TemplateSelector: React.FC<TemplateSelectorProps> = ({
@@ -35,8 +35,8 @@ export const TemplateSelector: React.FC<TemplateSelectorProps> = ({
       const template = getTemplateById(selectedTemplateId);
       onSelectTemplate(template || null);
     } else {
-      // Start blank
-      onSelectTemplate(null);
+      // Start blank - pass the selected project type from tabs
+      onSelectTemplate(null, selectedType);
     }
     onClose();
   };
@@ -176,32 +176,19 @@ export const TemplateSelector: React.FC<TemplateSelectorProps> = ({
         </div>
 
         {/* Footer Actions */}
-        <div className="bg-gray-50 p-6 flex justify-between items-center border-t border-gray-200">
+        <div className="bg-gray-50 p-6 flex justify-end items-center border-t border-gray-200 gap-3">
           <button
-            onClick={handleStartBlank}
-            className="px-6 py-2 text-gray-700 font-medium hover:text-gray-900 transition-colors"
+            onClick={onClose}
+            className="px-6 py-2 border border-gray-300 rounded-md font-medium text-gray-700 hover:bg-gray-50 transition-colors"
           >
-            Start Blank
+            Cancel
           </button>
-          <div className="flex gap-3">
-            <button
-              onClick={onClose}
-              className="px-6 py-2 border border-gray-300 rounded-md font-medium text-gray-700 hover:bg-gray-50 transition-colors"
-            >
-              Cancel
-            </button>
-            <button
-              onClick={handleSelectTemplate}
-              disabled={selectedTemplateId === null}
-              className={`px-6 py-2 rounded-md font-medium transition-colors ${
-                selectedTemplateId
-                  ? 'bg-electric-400 text-black hover:bg-electric-500'
-                  : 'bg-gray-200 text-gray-400 cursor-not-allowed'
-              }`}
-            >
-              {selectedTemplateId ? 'Use This Template' : 'Select a Template'}
-            </button>
-          </div>
+          <button
+            onClick={handleSelectTemplate}
+            className="px-6 py-2 rounded-md font-medium bg-electric-400 text-black hover:bg-electric-500 transition-colors"
+          >
+            {selectedTemplateId ? 'Use This Template' : 'Start Blank Project'}
+          </button>
         </div>
       </div>
     </div>

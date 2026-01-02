@@ -11,16 +11,17 @@
  */
 
 import React, { useState, useMemo, useEffect } from 'react';
-import { Cable, Plus, Trash2, Edit2, Save, X, AlertTriangle, CheckCircle, RefreshCw, Info } from 'lucide-react';
+import { Cable, Plus, Trash2, Edit2, Save, X, AlertTriangle, CheckCircle, RefreshCw, Info, Download } from 'lucide-react';
 import { useFeeders } from '../hooks/useFeeders';
 import { usePanels } from '../hooks/usePanels';
 import { useTransformers } from '../hooks/useTransformers';
 import { useCircuits } from '../hooks/useCircuits';
 import { calculateFeederSizing } from '../services/calculations';
 import { validateFeederForm, showValidationErrors } from '../lib/validation-utils';
-import { validateFeederConnectivity, getValidFeederDestinations } from '../services/validation/panelConnectivityValidation';
+import { validateFeederConnectivityEnhanced, getValidFeederDestinations } from '../services/validation/panelConnectivityValidation';
 import { checkFeederLoadStatus, getStaleFeedersList } from '../services/feeder/feederLoadSync';
 import { calculateAggregatedLoad } from '../services/calculations/upstreamLoadAggregation';
+import { exportVoltageDropReport, hasVoltageDropData } from '../services/pdfExport/voltageDropPDF';
 import type { Feeder, FeederCalculationResult } from '../types';
 
 interface FeederManagerProps {
@@ -46,6 +47,7 @@ export const FeederManager: React.FC<FeederManagerProps> = ({
   const [formData, setFormData] = useState<Partial<Feeder>>({
     name: '',
     source_panel_id: null,
+    source_transformer_id: null, // NEW: Support transformer as source
     destination_panel_id: null,
     destination_transformer_id: null,
     distance_ft: 100,
@@ -54,6 +56,7 @@ export const FeederManager: React.FC<FeederManagerProps> = ({
     ambient_temperature_c: 30,
     num_current_carrying: 4
   });
+  const [sourceType, setSourceType] = useState<'panel' | 'transformer'>('panel'); // NEW: Source type toggle
   const [destinationType, setDestinationType] = useState<'panel' | 'transformer'>('panel');
   const [connectivityError, setConnectivityError] = useState<string | null>(null);
   const [showStaleWarning, setShowStaleWarning] = useState(true);
@@ -72,30 +75,87 @@ export const FeederManager: React.FC<FeederManagerProps> = ({
     return getStaleFeedersList(feeders, circuits, panels, 5); // 5% threshold
   }, [feeders, circuits, panels]);
 
-  // Get valid destination panels based on selected source
+  // Get valid destination panels based on selected source (panel only - for now keep simple)
   const validDestinations = useMemo(() => {
     if (!formData.source_panel_id) return [];
     return getValidFeederDestinations(formData.source_panel_id, panels, transformers);
   }, [formData.source_panel_id, panels, transformers]);
 
-  // Validate connectivity when destination changes
+  // Auto-generate feeder name when source and destination are selected
   useEffect(() => {
-    if (formData.source_panel_id && formData.destination_panel_id) {
-      const validation = validateFeederConnectivity(
-        formData.source_panel_id,
-        formData.destination_panel_id,
-        panels,
-        transformers
-      );
-      if (!validation.isConnected) {
-        setConnectivityError(validation.message + (validation.technicalReason ? `\n\n${validation.technicalReason}` : ''));
-      } else {
-        setConnectivityError(null);
-      }
+    // Only auto-generate if name is empty or was previously auto-generated
+    // Skip if user has manually entered a custom name
+    if (formData.name && !formData.name.includes('→')) return;
+
+    let sourceName = '';
+    let destName = '';
+
+    // Get source name
+    if (formData.source_panel_id) {
+      const sourcePanel = panels.find(p => p.id === formData.source_panel_id);
+      sourceName = sourcePanel?.name || '';
+    } else if (formData.source_transformer_id) {
+      const sourceTransformer = transformers.find(t => t.id === formData.source_transformer_id);
+      sourceName = sourceTransformer?.name || '';
+    }
+
+    // Get destination name
+    if (formData.destination_panel_id) {
+      const destPanel = panels.find(p => p.id === formData.destination_panel_id);
+      destName = destPanel?.name || '';
+    } else if (formData.destination_transformer_id) {
+      const destTransformer = transformers.find(t => t.id === formData.destination_transformer_id);
+      destName = destTransformer?.name || '';
+    }
+
+    // Auto-generate name if both source and destination are selected
+    if (sourceName && destName) {
+      setFormData(prev => ({ ...prev, name: `${sourceName} → ${destName}` }));
+    }
+  }, [
+    formData.source_panel_id,
+    formData.source_transformer_id,
+    formData.destination_panel_id,
+    formData.destination_transformer_id,
+    panels,
+    transformers
+  ]);
+
+  // Validate connectivity when source or destination changes (enhanced for transformers)
+  useEffect(() => {
+    // Skip validation if no source or destination selected
+    if (!formData.source_panel_id && !formData.source_transformer_id) {
+      setConnectivityError(null);
+      return;
+    }
+    if (!formData.destination_panel_id && !formData.destination_transformer_id) {
+      setConnectivityError(null);
+      return;
+    }
+
+    // Use enhanced validation that handles all four combinations
+    const validation = validateFeederConnectivityEnhanced(
+      formData.source_panel_id,
+      formData.source_transformer_id,
+      formData.destination_panel_id,
+      formData.destination_transformer_id,
+      panels,
+      transformers
+    );
+
+    if (!validation.isConnected) {
+      setConnectivityError(validation.message + (validation.technicalReason ? `\n\n${validation.technicalReason}` : ''));
     } else {
       setConnectivityError(null);
     }
-  }, [formData.source_panel_id, formData.destination_panel_id, panels, transformers]);
+  }, [
+    formData.source_panel_id,
+    formData.source_transformer_id,
+    formData.destination_panel_id,
+    formData.destination_transformer_id,
+    panels,
+    transformers
+  ]);
 
   // Calculate loads for a destination panel (includes downstream aggregation per NEC 220.40)
   const calculatePanelLoads = (panelId: string) => {
@@ -142,26 +202,38 @@ export const FeederManager: React.FC<FeederManagerProps> = ({
     setSizingBasis('load');
     
     try {
-      // Safety check: ensure panels is an array
+      // Safety check: ensure panels and transformers are arrays
       if (!Array.isArray(panels) || panels.length === 0) {
         console.error('Cannot recalculate: panels data not available');
         return;
       }
+      if (!Array.isArray(transformers)) {
+        console.error('Cannot recalculate: transformers data not available');
+        return;
+      }
 
-      // Check if feeding a transformer or panel
-      const isTransformer = !!feeder.destination_transformer_id;
-      const destTransformer = isTransformer && Array.isArray(transformers)
+      // Check if destination is transformer or panel
+      const isDestTransformer = !!feeder.destination_transformer_id;
+      const destTransformer = isDestTransformer
         ? transformers.find(t => t.id === feeder.destination_transformer_id)
         : null;
 
-      const destPanel = !isTransformer && feeder.destination_panel_id
+      const destPanel = !isDestTransformer && feeder.destination_panel_id
         ? panels.find(p => p.id === feeder.destination_panel_id)
         : null;
 
-      const sourcePanel = panels.find(p => p.id === feeder.source_panel_id);
+      // Check if source is transformer or panel (NEW)
+      const isSourceTransformer = !!feeder.source_transformer_id;
+      const sourceTransformer = isSourceTransformer
+        ? transformers.find(t => t.id === feeder.source_transformer_id)
+        : null;
 
-      if (!sourcePanel) {
-        console.error('Cannot recalculate: source panel not found');
+      const sourcePanel = !isSourceTransformer && feeder.source_panel_id
+        ? panels.find(p => p.id === feeder.source_panel_id)
+        : null;
+
+      if (!sourcePanel && !sourceTransformer) {
+        console.error('Cannot recalculate: source panel or transformer not found');
         return;
       }
 
@@ -175,12 +247,16 @@ export const FeederManager: React.FC<FeederManagerProps> = ({
         ? calculatePanelLoads(feeder.destination_panel_id!)
         : { totalVA: 0, continuousVA: 0, noncontinuousVA: 0 };
 
+      // Determine source voltage and phase (from panel OR transformer secondary)
+      const sourceVoltage = sourceTransformer?.secondary_voltage || sourcePanel?.voltage || 480;
+      const sourcePhase = sourceTransformer?.secondary_phase || sourcePanel?.phase || 3;
+
       // Calculate feeder sizing
       const result = calculateFeederSizing({
-        source_voltage: sourcePanel.voltage,
-        source_phase: sourcePanel.phase,
-        destination_voltage: destPanel?.voltage || destTransformer?.secondary_voltage || sourcePanel.voltage,
-        destination_phase: destPanel?.phase || destTransformer?.secondary_phase || sourcePanel.phase,
+        source_voltage: sourceVoltage,
+        source_phase: sourcePhase,
+        destination_voltage: destPanel?.voltage || destTransformer?.secondary_voltage || sourceVoltage,
+        destination_phase: destPanel?.phase || destTransformer?.secondary_phase || sourcePhase,
         total_load_va: loads.totalVA,
         continuous_load_va: loads.continuousVA,
         noncontinuous_load_va: loads.noncontinuousVA,
@@ -237,10 +313,10 @@ export const FeederManager: React.FC<FeederManagerProps> = ({
 
   // Calculate feeder and update database
   const handleCalculateFeeder = async (feeder: Partial<Feeder>) => {
-    // Validate form data
+    // Validate form data - ensure at least one source (panel OR transformer)
     const validation = validateFeederForm({
       name: feeder.name || '',
-      source_panel_id: feeder.source_panel_id || '',
+      source_panel_id: feeder.source_panel_id || feeder.source_transformer_id || '', // Accept either
       destination_panel_id: feeder.destination_panel_id,
       destination_transformer_id: feeder.destination_transformer_id,
       distance_ft: feeder.distance_ft || 0,
@@ -259,51 +335,84 @@ export const FeederManager: React.FC<FeederManagerProps> = ({
     if (!feeder.distance_ft || !feeder.conductor_material) return;
 
     try {
-      // Safety check: ensure panels is an array
+      // Safety check: ensure panels and transformers are arrays
       if (!Array.isArray(panels)) {
         console.error('Cannot calculate feeder: panels data not available');
         return;
       }
+      if (!Array.isArray(transformers)) {
+        console.error('Cannot calculate feeder: transformers data not available');
+        return;
+      }
 
-      // Check if feeding a transformer or panel
-      const isTransformer = !!feeder.destination_transformer_id;
-      const destTransformer = isTransformer && Array.isArray(transformers)
+      // Check if feeding a transformer or panel (destination)
+      const isDestTransformer = !!feeder.destination_transformer_id;
+      const destTransformer = isDestTransformer
         ? transformers.find(t => t.id === feeder.destination_transformer_id)
         : null;
 
+      // Check if source is transformer or panel (NEW)
+      const isSourceTransformer = !!feeder.source_transformer_id;
+      const sourceTransformer = isSourceTransformer
+        ? transformers.find(t => t.id === feeder.source_transformer_id)
+        : null;
+
       // Get source and destination panels
-      const sourcePanel = panels.find(p => p.id === feeder.source_panel_id);
-      const destPanel = !isTransformer && feeder.destination_panel_id
+      const sourcePanel = !isSourceTransformer && feeder.source_panel_id
+        ? panels.find(p => p.id === feeder.source_panel_id)
+        : null;
+      const destPanel = !isDestTransformer && feeder.destination_panel_id
         ? panels.find(p => p.id === feeder.destination_panel_id)
         : null;
 
-      const sourceVoltage = sourcePanel?.voltage || projectVoltage;
-      const sourcePhase = sourcePanel?.phase || projectPhase;
+      // Determine source voltage and phase (from panel OR transformer secondary)
+      const sourceVoltage = sourceTransformer?.secondary_voltage || sourcePanel?.voltage || projectVoltage;
+      const sourcePhase = sourceTransformer?.secondary_phase || sourcePanel?.phase || projectPhase;
+
+      // Determine destination voltage and phase
       const destVoltage = destPanel?.voltage || destTransformer?.secondary_voltage || projectVoltage;
       const destPhase = destPanel?.phase || destTransformer?.secondary_phase || projectPhase;
 
       // ISSUE FIX: Support both load-based and capacity-based sizing
       let loads: { totalVA: number; continuousVA: number; noncontinuousVA: number };
 
-      if (sizingBasis === 'capacity' && destPanel) {
-        // Use panel's maximum capacity (main breaker or bus rating)
-        const panelCapacityAmps = destPanel.main_breaker_amps || destPanel.bus_rating;
-        // Calculate VA from capacity: VA = A × V × √3 (for 3-phase) or VA = A × V (single-phase)
-        const capacityVA = destPhase === 3
-          ? panelCapacityAmps * destVoltage * Math.sqrt(3)
-          : panelCapacityAmps * destVoltage;
+      if (sizingBasis === 'capacity') {
+        // Use maximum capacity of destination (panel or transformer)
+        if (destPanel) {
+          // Use panel's maximum capacity (main breaker or bus rating)
+          const panelCapacityAmps = destPanel.main_breaker_amps || destPanel.bus_rating;
+          // Calculate VA from capacity: VA = A × V × √3 (for 3-phase) or VA = A × V (single-phase)
+          const capacityVA = destPhase === 3
+            ? panelCapacityAmps * destVoltage * Math.sqrt(3)
+            : panelCapacityAmps * destVoltage;
 
-        // Apply continuous load percentage from advanced options
-        const continuousVA = capacityVA * (continuousLoadPercent / 100);
-        const noncontinuousVA = capacityVA - continuousVA;
+          // Apply continuous load percentage from advanced options
+          const continuousVA = capacityVA * (continuousLoadPercent / 100);
+          const noncontinuousVA = capacityVA - continuousVA;
 
-        loads = {
-          totalVA: capacityVA,
-          continuousVA: continuousVA,
-          noncontinuousVA: noncontinuousVA
-        };
+          loads = {
+            totalVA: capacityVA,
+            continuousVA: continuousVA,
+            noncontinuousVA: noncontinuousVA
+          };
+        } else if (destTransformer) {
+          // Use transformer's maximum capacity (kVA rating)
+          const capacityVA = destTransformer.kva_rating * 1000;
+
+          // Apply continuous load percentage from advanced options
+          const continuousVA = capacityVA * (continuousLoadPercent / 100);
+          const noncontinuousVA = capacityVA - continuousVA;
+
+          loads = {
+            totalVA: capacityVA,
+            continuousVA: continuousVA,
+            noncontinuousVA: noncontinuousVA
+          };
+        } else {
+          loads = { totalVA: 0, continuousVA: 0, noncontinuousVA: 0 };
+        }
       } else {
-        // Use calculated panel loads (or zero for transformers)
+        // Use calculated panel loads (or zero for transformers without connected load data)
         loads = destPanel && feeder.destination_panel_id
           ? calculatePanelLoads(feeder.destination_panel_id)
           : { totalVA: 0, continuousVA: 0, noncontinuousVA: 0 };
@@ -391,6 +500,7 @@ export const FeederManager: React.FC<FeederManagerProps> = ({
     setFormData({
       name: '',
       source_panel_id: null,
+      source_transformer_id: null,
       destination_panel_id: null,
       destination_transformer_id: null,
       distance_ft: 100,
@@ -399,11 +509,13 @@ export const FeederManager: React.FC<FeederManagerProps> = ({
       ambient_temperature_c: 30,
       num_current_carrying: 4
     });
+    setSourceType('panel');
     setDestinationType('panel');
   };
 
   const handleEdit = (feeder: Feeder) => {
     setFormData(feeder);
+    setSourceType(feeder.source_panel_id ? 'panel' : 'transformer');
     setDestinationType(feeder.destination_panel_id ? 'panel' : 'transformer');
     setEditingId(feeder.id);
     setShowCreateForm(false);
@@ -417,6 +529,26 @@ export const FeederManager: React.FC<FeederManagerProps> = ({
   const handleDelete = async (id: string) => {
     if (confirm('Delete this feeder? This action cannot be undone.')) {
       await deleteFeeder(id);
+    }
+  };
+
+  const handleExportVoltageDropReport = async () => {
+    try {
+      // Get project name from first panel or use default
+      const projectName = panels.length > 0 ? `Project ${projectId.substring(0, 8)}` : 'Electrical Project';
+      const projectAddress = ''; // Could be passed as prop if available
+
+      await exportVoltageDropReport(
+        projectName,
+        feeders,
+        panels,
+        transformers,
+        projectAddress,
+        true // Include NEC references
+      );
+    } catch (error) {
+      console.error('Failed to export voltage drop report:', error);
+      alert(`Failed to export voltage drop report: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   };
 
@@ -486,15 +618,48 @@ export const FeederManager: React.FC<FeederManagerProps> = ({
           <p className="text-sm text-gray-500 mt-1">
             Manage feeders between panels and transformers
           </p>
+          {/* Debug info for voltage drop export */}
+          {feeders.length > 0 && !hasVoltageDropData(feeders) && (
+            <p className="text-xs text-amber-600 mt-2 flex items-center gap-1">
+              <Info className="w-3 h-3" />
+              Voltage drop export requires at least one feeder with length and calculated load.
+              {' '}({feeders.filter(f => f.distance_ft && f.distance_ft > 0).length} of {feeders.length} have length,
+              {' '}{feeders.filter(f => f.total_load_va && f.total_load_va > 0).length} of {feeders.length} have load)
+            </p>
+          )}
         </div>
         {!showCreateForm && !editingId && (
-          <button
-            onClick={() => setShowCreateForm(true)}
-            className="flex items-center gap-2 px-4 py-2 bg-electric-500 text-white rounded-lg hover:bg-electric-600 transition-colors text-sm font-medium"
-          >
-            <Plus className="w-4 h-4" />
-            Add Feeder
-          </button>
+          <div className="flex items-center gap-2">
+            {/* Export Voltage Drop Report Button */}
+            {feeders.length > 0 && (
+              <button
+                onClick={handleExportVoltageDropReport}
+                disabled={!hasVoltageDropData(feeders)}
+                className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-colors text-sm font-medium ${
+                  hasVoltageDropData(feeders)
+                    ? 'bg-gray-700 text-white hover:bg-gray-800'
+                    : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                }`}
+                title={
+                  hasVoltageDropData(feeders)
+                    ? 'Export voltage drop analysis report (PDF)'
+                    : 'Add length and load data to feeders to enable export'
+                }
+              >
+                <Download className="w-4 h-4" />
+                Export Voltage Drop Report
+              </button>
+            )}
+
+            {/* Add Feeder Button */}
+            <button
+              onClick={() => setShowCreateForm(true)}
+              className="flex items-center gap-2 px-4 py-2 bg-electric-500 text-white rounded-lg hover:bg-electric-600 transition-colors text-sm font-medium"
+            >
+              <Plus className="w-4 h-4" />
+              Add Feeder
+            </button>
+          </div>
         )}
       </div>
 
@@ -520,23 +685,75 @@ export const FeederManager: React.FC<FeederManagerProps> = ({
               />
             </div>
 
-            {/* Source Panel */}
+            {/* Source Type Toggle */}
             <div>
               <label className="block text-xs font-semibold text-gray-500 mb-1 uppercase tracking-wider">
-                Source Panel
+                Source Type
               </label>
-              <select
-                value={formData.source_panel_id || ''}
-                onChange={e => setFormData({ ...formData, source_panel_id: e.target.value || null })}
-                className="w-full border-gray-200 rounded-md focus:border-electric-500 focus:ring-electric-500 text-sm py-2"
-              >
-                <option value="">Select Source Panel</option>
-                {panels.map(panel => (
-                  <option key={panel.id} value={panel.id}>
-                    {panel.name} ({panel.voltage}V, {panel.phase}-phase)
-                  </option>
-                ))}
-              </select>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSourceType('panel');
+                    setFormData({ ...formData, source_transformer_id: null });
+                  }}
+                  className={`flex-1 py-2 px-4 rounded-md text-sm font-medium transition-colors ${
+                    sourceType === 'panel'
+                      ? 'bg-electric-500 text-white'
+                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                  }`}
+                >
+                  Panel
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSourceType('transformer');
+                    setFormData({ ...formData, source_panel_id: null });
+                  }}
+                  className={`flex-1 py-2 px-4 rounded-md text-sm font-medium transition-colors ${
+                    sourceType === 'transformer'
+                      ? 'bg-electric-500 text-white'
+                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                  }`}
+                >
+                  Transformer
+                </button>
+              </div>
+            </div>
+
+            {/* Source Selection */}
+            <div>
+              <label className="block text-xs font-semibold text-gray-500 mb-1 uppercase tracking-wider">
+                {sourceType === 'panel' ? 'Source Panel' : 'Source Transformer'}
+              </label>
+              {sourceType === 'panel' ? (
+                <select
+                  value={formData.source_panel_id || ''}
+                  onChange={e => setFormData({ ...formData, source_panel_id: e.target.value || null })}
+                  className="w-full border-gray-200 rounded-md focus:border-electric-500 focus:ring-electric-500 text-sm py-2"
+                >
+                  <option value="">Select Source Panel</option>
+                  {panels.map(panel => (
+                    <option key={panel.id} value={panel.id}>
+                      {panel.name} ({panel.voltage}V, {panel.phase}φ)
+                    </option>
+                  ))}
+                </select>
+              ) : (
+                <select
+                  value={formData.source_transformer_id || ''}
+                  onChange={e => setFormData({ ...formData, source_transformer_id: e.target.value || null })}
+                  className="w-full border-gray-200 rounded-md focus:border-electric-500 focus:ring-electric-500 text-sm py-2"
+                >
+                  <option value="">Select Source Transformer</option>
+                  {transformers.map(xfmr => (
+                    <option key={xfmr.id} value={xfmr.id}>
+                      {xfmr.name} ({xfmr.kva_rating}kVA, {xfmr.primary_voltage}V → {xfmr.secondary_voltage}V)
+                    </option>
+                  ))}
+                </select>
+              )}
             </div>
 
             {/* Destination Type Toggle */}
@@ -674,9 +891,9 @@ export const FeederManager: React.FC<FeederManagerProps> = ({
               </div>
               <p className="text-xs text-gray-500 mt-1 flex items-center gap-1">
                 <Info className="w-3 h-3" />
-                {sizingBasis === 'load' 
+                {sizingBasis === 'load'
                   ? 'Size feeder based on actual connected loads with NEC demand factors.'
-                  : 'Size feeder based on panel main breaker or bus rating (full capacity).'}
+                  : 'Size feeder based on destination max capacity (panel main breaker/bus rating or transformer kVA).'}
               </p>
             </div>
 
@@ -837,7 +1054,8 @@ export const FeederManager: React.FC<FeederManagerProps> = ({
             <button
               onClick={() => handleCalculateFeeder(formData)}
               disabled={
-                !formData.name || 
+                !formData.name ||
+                (!formData.source_panel_id && !formData.source_transformer_id) ||
                 (!formData.destination_panel_id && !formData.destination_transformer_id) ||
                 !!connectivityError
               }
@@ -926,17 +1144,22 @@ const FeederCard: React.FC<FeederCardProps> = ({
   // Safety check: ensure panels and transformers are arrays (defensive programming)
   const panelsArray = Array.isArray(panels) ? panels : [];
   const transformersArray = Array.isArray(transformers) ? transformers : [];
-  
+
   const sourcePanel = panelsArray.find(p => p.id === feeder.source_panel_id);
+  const sourceTransformer = transformersArray.find(t => t.id === feeder.source_transformer_id); // NEW
   const destPanel = panelsArray.find(p => p.id === feeder.destination_panel_id);
   const destTransformer = transformersArray.find(t => t.id === feeder.destination_transformer_id);
+
+  // Build source and destination labels
+  const sourceLabel = sourcePanel?.name || sourceTransformer?.name || 'Unknown';
+  const destLabel = destPanel?.name || destTransformer?.name || 'Unknown';
 
   const vdCompliant = (feeder.voltage_drop_percent || 0) <= 3.0;
 
   return (
     <div className={`bg-white border rounded-lg p-6 ${
-      isEditing ? 'border-electric-500 border-2' : 
-      staleStatus.isStale ? 'border-amber-300 border-2' : 
+      isEditing ? 'border-electric-500 border-2' :
+      staleStatus.isStale ? 'border-amber-300 border-2' :
       'border-gray-200'
     }`}>
       {/* Stale Warning Badge */}
@@ -945,7 +1168,7 @@ const FeederCard: React.FC<FeederCardProps> = ({
           <div className="flex items-center gap-2">
             <AlertTriangle className="w-4 h-4 text-amber-600" />
             <span className="text-sm text-amber-800">
-              Load changed: {staleStatus.cachedConnectedVA.toLocaleString()} VA → {staleStatus.currentConnectedVA.toLocaleString()} VA 
+              Load changed: {staleStatus.cachedConnectedVA.toLocaleString()} VA → {staleStatus.currentConnectedVA.toLocaleString()} VA
               ({staleStatus.loadDifferencePercent > 0 ? '+' : ''}{staleStatus.loadDifferencePercent}%)
             </span>
           </div>
@@ -971,7 +1194,7 @@ const FeederCard: React.FC<FeederCardProps> = ({
             )}
           </h4>
           <p className="text-sm text-gray-500 mt-1">
-            {sourcePanel?.name || 'Unknown'} → {destPanel?.name || destTransformer?.name || 'Unknown'}
+            {sourceLabel} → {destLabel}
           </p>
         </div>
         <div className="flex gap-2">

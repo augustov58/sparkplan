@@ -410,3 +410,183 @@ export function applyEVPanelTemplate(input: ApplyTemplateInput): ApplyTemplateOu
 
   return { panel, circuits };
 }
+
+/**
+ * Custom EV Panel Configuration
+ * Allows users to build custom EV charging panels with any number of chargers
+ */
+export type ChargerTypeOption = 'Level 2 (48A)' | 'Level 2 (80A)' | 'DC Fast Charge (150kW)';
+
+export interface CustomEVPanelConfig {
+  chargerType: ChargerTypeOption;
+  numberOfChargers: number;
+  useEVEMS: boolean;
+  simultaneousChargers?: number;  // Required if useEVEMS is true
+  includeSpare: boolean;
+  includeLighting: boolean;
+  panelName?: string;
+}
+
+export interface CustomEVPanelInput {
+  projectId: string;
+  config: CustomEVPanelConfig;
+}
+
+/**
+ * Generate custom EV panel based on user configuration
+ */
+export function generateCustomEVPanel(input: CustomEVPanelInput): ApplyTemplateOutput {
+  const { projectId, config } = input;
+  const {
+    chargerType,
+    numberOfChargers,
+    useEVEMS,
+    simultaneousChargers,
+    includeSpare,
+    includeLighting,
+    panelName
+  } = config;
+
+  // Determine charger specifications based on type
+  let chargerAmps: number;
+  let chargerKW: number;
+  let voltage: number;
+  let phase: 1 | 3;
+  let breakerSize: number;
+  let conductorSize: string;
+  let loadVA: number;
+
+  switch (chargerType) {
+    case 'Level 2 (48A)':
+      chargerAmps = 48;
+      chargerKW = 11.5;
+      voltage = 240;
+      phase = 1;
+      breakerSize = 60;  // 125% of 48A = 60A
+      conductorSize = '6 AWG Cu';
+      loadVA = 11520;  // 48A × 240V
+      break;
+    case 'Level 2 (80A)':
+      chargerAmps = 80;
+      chargerKW = 19.2;
+      voltage = 240;
+      phase = 1;
+      breakerSize = 100;  // 125% of 80A = 100A
+      conductorSize = '3 AWG Cu';
+      loadVA = 19200;  // 80A × 240V
+      break;
+    case 'DC Fast Charge (150kW)':
+      chargerAmps = 180;  // 150kW / (480V × √3)
+      chargerKW = 150;
+      voltage = 480;
+      phase = 3;
+      breakerSize = 225;  // 125% of 180A = 225A
+      conductorSize = '3/0 AWG Cu';
+      loadVA = 150000;  // 150kW
+      break;
+  }
+
+  // Calculate total load
+  const totalChargerLoad = numberOfChargers * breakerSize;
+
+  // Apply EVEMS demand factor if enabled
+  let effectiveLoad = totalChargerLoad;
+  if (useEVEMS && simultaneousChargers) {
+    effectiveLoad = simultaneousChargers * breakerSize;
+  }
+
+  // Add spare and lighting loads
+  const spareLoad = includeSpare ? 20 : 0;
+  const lightingLoad = includeLighting ? 20 : 0;
+  const totalLoad = effectiveLoad + spareLoad + lightingLoad;
+
+  // Determine panel rating (round up to standard sizes)
+  const standardSizes = [100, 125, 150, 200, 225, 300, 400, 500, 600, 800, 1000, 1200, 1600, 2000];
+  const panelRating = standardSizes.find(size => size >= totalLoad) || 2000;
+
+  // Generate panel name
+  const defaultName = `${numberOfChargers}× ${chargerType}${useEVEMS ? ' with EVEMS' : ''} Panel`;
+
+  // Create panel
+  const panel: Omit<Panel, 'id' | 'created_at'> = {
+    project_id: projectId,
+    name: panelName || defaultName,
+    main_breaker_amps: panelRating,
+    voltage: voltage,
+    phase: phase,
+    bus_rating: panelRating,
+    panel_type: 'Sub-panel',
+    fed_from_type: 'service',
+    location: 'EV Charging Area'
+  };
+
+  // Generate circuits
+  const circuits: Omit<Circuit, 'id' | 'created_at' | 'project_id' | 'panel_id'>[] = [];
+  let circuitNumber = 1;
+
+  // Add EV charger circuits
+  for (let i = 1; i <= numberOfChargers; i++) {
+    circuits.push({
+      circuitNumber: circuitNumber,
+      breakerAmps: breakerSize,
+      poles: phase === 1 ? 2 : 3,
+      voltage: voltage,
+      description: `EV Charger #${i} - ${chargerType}${useEVEMS ? ' (EVEMS managed)' : ''}`,
+      conductorSize: conductorSize,
+      conductorType: 'THHN',
+      loadVA: loadVA,
+      isEvCharger: true,
+      evChargerAmps: chargerAmps
+    });
+    circuitNumber += 2;  // Skip odd numbers for proper panel layout
+  }
+
+  // Add EVEMS controller circuit if enabled
+  if (useEVEMS) {
+    circuits.push({
+      circuitNumber: circuitNumber,
+      breakerAmps: 20,
+      poles: 2,
+      voltage: 240,
+      description: 'EVEMS Load Management System',
+      conductorSize: '12 AWG Cu',
+      conductorType: 'THHN',
+      loadVA: 500,
+      isEvCharger: false
+    });
+    circuitNumber += 2;
+  }
+
+  // Add spare circuit if requested
+  if (includeSpare) {
+    circuits.push({
+      circuitNumber: circuitNumber,
+      breakerAmps: 20,
+      poles: 2,
+      voltage: voltage === 480 ? 277 : 120,
+      description: 'Spare Circuit',
+      conductorSize: '12 AWG Cu',
+      conductorType: 'THHN',
+      loadVA: 0,
+      isEvCharger: false
+    });
+    circuitNumber += 2;
+  }
+
+  // Add lighting circuit if requested
+  if (includeLighting) {
+    circuits.push({
+      circuitNumber: circuitNumber,
+      breakerAmps: 20,
+      poles: 2,
+      voltage: voltage === 480 ? 277 : 120,
+      description: 'Lighting Circuit',
+      conductorSize: '12 AWG Cu',
+      conductorType: 'THHN',
+      loadVA: 1800,
+      isEvCharger: false
+    });
+  }
+
+  return { panel, circuits };
+}

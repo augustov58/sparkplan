@@ -12,6 +12,9 @@ import { useFeeders } from '../hooks/useFeeders';
 import { useTransformers } from '../hooks/useTransformers';
 import { useGrounding } from '../hooks/useGrounding';
 import { useProjects } from '../hooks/useProjects';
+import { useJurisdictions } from '../hooks/useJurisdictions';
+import { useShortCircuitCalculations } from '../hooks/useShortCircuitCalculations';
+import { JurisdictionSearchWizard } from './JurisdictionSearchWizard';
 
 interface PermitPacketGeneratorProps {
   projectId: string;
@@ -39,6 +42,8 @@ export const PermitPacketGenerator: React.FC<PermitPacketGeneratorProps> = ({ pr
   const { feeders, loading: feedersLoading } = useFeeders(projectId || '');
   const { transformers, loading: transformersLoading } = useTransformers(projectId || '');
   const { grounding, loading: groundingLoading } = useGrounding(projectId || '');
+  const { getJurisdictionById } = useJurisdictions();
+  const { calculations: shortCircuitCalculations } = useShortCircuitCalculations(projectId || '');
 
   // Early return if no projectId
   if (!projectId) {
@@ -68,6 +73,11 @@ export const PermitPacketGenerator: React.FC<PermitPacketGeneratorProps> = ({ pr
     setSuccess(false);
 
     try {
+      // Get jurisdiction data if project has jurisdiction_id
+      const jurisdiction = currentProject.jurisdiction_id
+        ? getJurisdictionById(currentProject.jurisdiction_id)
+        : undefined;
+
       const packetData: PermitPacketData = {
         projectId,
         projectName: currentProject.name,
@@ -88,6 +98,15 @@ export const PermitPacketGenerator: React.FC<PermitPacketGeneratorProps> = ({ pr
         serviceType: serviceType || undefined,
         meterLocation: meterLocation.trim() || undefined,
         serviceConductorRouting: serviceConductorRouting.trim() || undefined,
+        // Tier 2: Additional calculations and plans
+        shortCircuitCalculations: shortCircuitCalculations || [],
+        groundingSystem: grounding || undefined,
+        // Note: arcFlashData would come from a dedicated arc flash calculation
+        // For now, we'll leave it undefined until user runs arc flash calculator
+        arcFlashData: undefined,
+        // Tier 3: Jurisdiction requirements
+        jurisdictionId: currentProject.jurisdiction_id,
+        jurisdiction: jurisdiction,
       };
 
       if (packetType === 'full') {
@@ -143,6 +162,12 @@ export const PermitPacketGenerator: React.FC<PermitPacketGeneratorProps> = ({ pr
               <li>Riser diagram (system hierarchy)</li>
               <li>Load calculation summary</li>
               <li>NEC compliance summary</li>
+              <li>Equipment specifications (Tier 2)</li>
+              <li>Voltage drop report (if feeders exist)</li>
+              <li>Short circuit analysis (if calculations exist)</li>
+              <li>Arc flash analysis (if data available)</li>
+              <li>Grounding plan (NEC Article 250)</li>
+              <li>Jurisdiction requirements checklist (if jurisdiction selected)</li>
               {packetType === 'full' && <li>Complete panel schedules for all panels</li>}
             </ul>
           </div>
@@ -172,6 +197,16 @@ export const PermitPacketGenerator: React.FC<PermitPacketGeneratorProps> = ({ pr
             <p className="font-medium">{circuits.length}</p>
           </div>
         </div>
+      </div>
+
+      {/* Jurisdiction Requirements Wizard */}
+      <div className="bg-white border border-gray-200 rounded-lg p-6">
+        <h3 className="font-bold text-gray-900 mb-4">Jurisdiction Requirements</h3>
+        <p className="text-sm text-gray-600 mb-6">
+          Search for your jurisdiction to see what documents and calculations are required for your permit submittal.
+          The requirements will be automatically included in your permit packet.
+        </p>
+        <JurisdictionSearchWizard projectId={projectId} />
       </div>
 
       {/* Configuration */}

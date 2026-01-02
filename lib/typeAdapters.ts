@@ -23,6 +23,7 @@ export function dbProjectToFrontend(dbProject: DbProject): Project {
     progress: dbProject.progress,
     serviceVoltage: dbProject.service_voltage,
     servicePhase: dbProject.service_phase,
+    jurisdiction_id: dbProject.jurisdiction_id,  // BUGFIX: Include jurisdiction_id
     settings: (dbProject.settings as any) || {
       serviceVoltage: dbProject.service_voltage,
       servicePhase: dbProject.service_phase,
@@ -77,6 +78,7 @@ export function frontendProjectToDbUpdate(project: Project): Database['public'][
     progress: project.progress,
     service_voltage: project.serviceVoltage,
     service_phase: project.servicePhase,
-    settings: project.settings
+    settings: project.settings,
+    jurisdiction_id: project.jurisdiction_id  // BUGFIX: Include jurisdiction_id
   };
 }

@@ -202,6 +202,8 @@ export interface Project {
   // but we prefer using settings object
   serviceVoltage: number;
   servicePhase: 1 | 3;
+  // Jurisdiction Requirements (Tier 3 Permit Packet)
+  jurisdiction_id?: string;  // FK to jurisdictions table
 }
 
 // ============================================================================
@@ -213,6 +215,7 @@ export interface Feeder {
   project_id: string;
   name: string;
   source_panel_id: string | null;
+  source_transformer_id: string | null; // NEW: Support transformer as source
   destination_panel_id: string | null;
   destination_transformer_id: string | null;
   distance_ft: number;
@@ -826,3 +829,173 @@ export interface NecViolation {
   description: string;
   recommendation: string;
 }
+
+// ============================================================================
+// EQUIPMENT SPECIFICATION TYPES (Phase 1, Tier 2)
+// ============================================================================
+
+/**
+ * Panel Equipment Specifications
+ * Optional equipment details for permit applications and NEC 110.9 compliance
+ *
+ * @remarks
+ * These fields extend the base Panel type from database.types.ts.
+ * After migration 20251230_equipment_specifications.sql is run, these fields
+ * will be part of the database schema and auto-generated types.
+ */
+export interface PanelEquipmentSpecs {
+  /** Equipment manufacturer (e.g., 'Square D', 'Eaton', 'Siemens') */
+  manufacturer?: string;
+
+  /** Model or catalog number */
+  model_number?: string;
+
+  /** NEMA enclosure type per NEC 408.20 (e.g., '1', '3R', '4X') */
+  nema_enclosure_type?: string;
+
+  /** UL listing information per NEC 110.3(B) (e.g., 'UL 67 - Panelboards') */
+  ul_listing?: string;
+
+  /** Available Interrupting Current rating in kA per NEC 110.9
+   * Standard values: 10, 14, 22, 25, 42, 65, 100, 200 kA
+   */
+  aic_rating?: number;
+
+  /** Series-rated system flag per NEC 240.86 */
+  series_rating?: boolean;
+
+  /** Additional equipment specification notes */
+  notes?: string;
+}
+
+/**
+ * Transformer Equipment Specifications
+ * Optional equipment details for permit applications
+ *
+ * @remarks
+ * These fields extend the base Transformer type from database.types.ts.
+ * After migration 20251230_equipment_specifications.sql is run, these fields
+ * will be part of the database schema and auto-generated types.
+ */
+export interface TransformerEquipmentSpecs {
+  /** Winding type ('Dry-type', 'Liquid-filled') */
+  winding_type?: string;
+
+  /** Transformer impedance percentage (e.g., 5.75%) */
+  impedance_percent?: number;
+
+  /** Cooling type (AA = Air-Air, AN = Air-Natural, FA = Forced Air) */
+  cooling_type?: string;
+
+  /** UL listing per NEC 110.3(B) (e.g., 'UL 1561 - Dry-type', 'UL 1562 - Liquid-filled') */
+  ul_listing?: string;
+
+  /** Temperature rise rating in °C (80, 115, 150) */
+  temperature_rise?: number;
+
+  /** Additional equipment specification notes */
+  notes?: string;
+}
+
+// ============================================================================
+// JURISDICTION REQUIREMENTS (Permit Packet Tier 3)
+// ============================================================================
+
+/**
+ * Jurisdiction (Authority Having Jurisdiction)
+ * Reference data for permit requirements by city/county
+ *
+ * @remarks
+ * This is a shared reference table (no RLS) that stores AHJ-specific
+ * permit requirements. Users can search jurisdictions and save to their
+ * project for inclusion in permit packet.
+ *
+ * Database table: public.jurisdictions
+ * Migration: 20251231_jurisdiction_requirements.sql
+ */
+export interface Jurisdiction {
+  id: string;
+  jurisdiction_name: string;        // "Miami, Miami-Dade County, FL"
+  city: string;                     // "Miami"
+  county?: string;                  // "Miami-Dade"
+  state: string;                    // "FL" (2-letter code)
+  ahj_name?: string;                // "City of Miami Building Department"
+  ahj_website?: string;             // URL for reference
+  required_documents: string[];     // ['one_line_diagram', 'load_calc', ...]
+  required_calculations: string[];  // ['short_circuit', 'voltage_drop', ...]
+  notes?: string;                   // Special requirements, fees, etc.
+  nec_edition: '2020' | '2023';
+  estimated_review_days?: number;   // Typical plan review time
+  is_active: boolean;               // Soft delete pattern
+  data_source?: string;             // Source of data (e.g., "Official AHJ Website")
+  source_url?: string;              // URL to official source document
+  last_verified_date?: string;      // ISO date when requirements were last verified
+  created_at: string;
+  updated_at: string;
+}
+
+/**
+ * Document types that AHJs commonly require for permit submittal
+ */
+export const DOCUMENT_TYPES = [
+  'one_line_diagram',
+  'load_calculation',
+  'panel_schedules',
+  'equipment_specifications',
+  'short_circuit_analysis',
+  'arc_flash_analysis',
+  'voltage_drop_report',
+  'grounding_plan',
+  'service_entrance_details',
+  'riser_diagram',
+  'site_plan',
+  'photometric_plan',
+] as const;
+
+export type DocumentType = typeof DOCUMENT_TYPES[number];
+
+/**
+ * Calculation types that AHJs commonly require
+ */
+export const CALCULATION_TYPES = [
+  'load_calculation',
+  'voltage_drop',
+  'short_circuit',
+  'arc_flash',
+  'grounding',
+  'conductor_sizing',
+  'conduit_fill',
+] as const;
+
+export type CalculationType = typeof CALCULATION_TYPES[number];
+
+/**
+ * Human-readable labels for document types (UI display)
+ */
+export const DOCUMENT_LABELS: Record<DocumentType, string> = {
+  one_line_diagram: 'One-Line Diagram',
+  load_calculation: 'Load Calculation Summary',
+  panel_schedules: 'Panel Schedules',
+  equipment_specifications: 'Equipment Specifications',
+  short_circuit_analysis: 'Short Circuit Analysis',
+  arc_flash_analysis: 'Arc Flash Analysis',
+  voltage_drop_report: 'Voltage Drop Report',
+  grounding_plan: 'Grounding System Plan',
+  service_entrance_details: 'Service Entrance Details',
+  riser_diagram: 'Riser Diagram',
+  site_plan: 'Site Plan / Plot Plan',
+  photometric_plan: 'Photometric Plan (Lighting)',
+};
+
+/**
+ * Human-readable labels for calculation types (UI display)
+ */
+export const CALCULATION_LABELS: Record<CalculationType, string> = {
+  load_calculation: 'Load Calculation (NEC 220)',
+  voltage_drop: 'Voltage Drop Calculation',
+  short_circuit: 'Short Circuit Analysis (NEC 110.9)',
+  arc_flash: 'Arc Flash Hazard Analysis (NFPA 70E)',
+  grounding: 'Grounding Electrode Sizing (NEC 250)',
+  conductor_sizing: 'Conductor Ampacity Sizing (NEC 310)',
+  conduit_fill: 'Conduit Fill Calculation (NEC 310)',
+};

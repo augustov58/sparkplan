@@ -117,6 +117,11 @@ export function useProjects(): UseProjectsReturn {
   };
 
   const updateProject = async (project: Project) => {
+    // ISSUE FIX: Optimistically update local state immediately
+    // This ensures UI reflects changes instantly without waiting for real-time subscription
+    const previousProjects = projects;
+    setProjects(prev => prev.map(p => p.id === project.id ? project : p));
+
     try {
       const dbUpdates = frontendProjectToDbUpdate(project);
 
@@ -130,6 +135,8 @@ export function useProjects(): UseProjectsReturn {
 
       if (error) throw error;
     } catch (err) {
+      // Rollback optimistic update on error
+      setProjects(previousProjects);
       console.error('Failed to update project:', err);
       setError(err instanceof Error ? err.message : 'Failed to update project');
     }
