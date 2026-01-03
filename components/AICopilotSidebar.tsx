@@ -130,7 +130,15 @@ export const AICopilotSidebar: React.FC = () => {
   }
 
   return (
-    <div className="fixed right-0 top-16 bottom-0 w-96 bg-white border-l border-gray-200 shadow-xl z-40 flex flex-col">
+    <>
+      {/* Mobile overlay */}
+      <div
+        className="fixed inset-0 bg-black/50 z-40 md:hidden"
+        onClick={() => setIsOpen(false)}
+      />
+
+      {/* Sidebar */}
+      <div className="fixed right-0 top-16 bottom-0 w-full max-w-sm md:w-96 bg-white border-l border-gray-200 shadow-xl z-50 flex flex-col">
       {/* Header */}
       <div className="p-4 border-b border-gray-200 flex items-center justify-between bg-gradient-to-r from-electric-50 to-blue-50">
         <div className="flex items-center gap-2">
@@ -180,6 +188,7 @@ export const AICopilotSidebar: React.FC = () => {
         )}
       </div>
     </div>
+    </>
   );
 };
 

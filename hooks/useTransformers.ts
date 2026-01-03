@@ -6,6 +6,7 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 import type { Database } from '@/lib/database.types';
+import { showToast, toastMessages } from '@/lib/toast';
 
 type Transformer = Database['public']['Tables']['transformers']['Row'];
 type TransformerInsert = Database['public']['Tables']['transformers']['Insert'];
@@ -92,9 +93,11 @@ export function useTransformers(projectId: string | undefined): UseTransformersR
         setTransformers(prev => [...prev, data]);
       }
 
+      showToast.success(toastMessages.transformer.created);
       return data;
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to create transformer');
+      showToast.error(toastMessages.transformer.error);
       return null;
     }
   };
@@ -107,8 +110,10 @@ export function useTransformers(projectId: string | undefined): UseTransformersR
         .eq('id', id);
 
       if (error) throw error;
+      showToast.success(toastMessages.transformer.updated);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to update transformer');
+      showToast.error(toastMessages.transformer.error);
     }
   };
 
@@ -120,8 +125,10 @@ export function useTransformers(projectId: string | undefined): UseTransformersR
         .eq('id', id);
 
       if (error) throw error;
+      showToast.success(toastMessages.transformer.deleted);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to delete transformer');
+      showToast.error(toastMessages.transformer.error);
     }
   };
 

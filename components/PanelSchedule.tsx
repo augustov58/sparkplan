@@ -4,7 +4,7 @@
  * and demand factor calculations per NEC 2023
  */
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useCallback } from 'react';
 import { Project } from '../types';
 import { LayoutGrid, Download, Edit2, Save, X, Trash2, Settings, Calculator, Info, ArrowDown, Plus } from 'lucide-react';
 import { usePanels } from '../hooks/usePanels';
@@ -237,7 +237,8 @@ export const PanelSchedule: React.FC<PanelScheduleProps> = ({ project }) => {
     return ['A', 'B'][(rowNum - 1) % 2];
   };
 
-  const startEdit = (circuit: any) => {
+  // Memoized callbacks for better performance
+  const startEdit = useCallback((circuit: any) => {
     setEditingCircuit(circuit.id);
     setEditForm({
       description: circuit.description,
@@ -246,9 +247,9 @@ export const PanelSchedule: React.FC<PanelScheduleProps> = ({ project }) => {
       loadType: circuit.load_type || 'O',
       circuitNumber: circuit.circuit_number,
     });
-  };
+  }, []);
 
-  const saveEdit = async () => {
+  const saveEdit = useCallback(async () => {
     if (!editingCircuit) return;
     await updateCircuit(editingCircuit, {
       description: editForm.description,
@@ -259,18 +260,18 @@ export const PanelSchedule: React.FC<PanelScheduleProps> = ({ project }) => {
     });
     setEditingCircuit(null);
     setEditForm({});
-  };
+  }, [editingCircuit, editForm, updateCircuit]);
 
-  const cancelEdit = () => {
+  const cancelEdit = useCallback(() => {
     setEditingCircuit(null);
     setEditForm({});
-  };
+  }, []);
 
-  const handleDeleteCircuit = async (circuit: any) => {
+  const handleDeleteCircuit = useCallback(async (circuit: any) => {
     if (confirm(`Delete circuit ${circuit.circuit_number} - "${circuit.description}"?`)) {
       await deleteCircuit(circuit.id);
     }
-  };
+  }, [deleteCircuit]);
 
   const handleExportPDF = async () => {
     if (!selectedPanel) return;

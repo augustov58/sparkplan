@@ -7,6 +7,7 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 import type { Feeder } from '../types';
+import { showToast, toastMessages } from '@/lib/toast';
 
 export function useFeeders(projectId: string | undefined) {
   const [feeders, setFeeders] = useState<Feeder[]>([]);
@@ -84,11 +85,13 @@ export function useFeeders(projectId: string | undefined) {
       // Optimistic update
       setFeeders(prev => [...prev, data]);
       setError(null);
+      showToast.success(toastMessages.feeder.created);
       return data;
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to create feeder';
       setError(message);
       console.error('Error creating feeder:', err);
+      showToast.error(toastMessages.feeder.error);
       throw err;
     }
   };
@@ -110,11 +113,13 @@ export function useFeeders(projectId: string | undefined) {
       // Optimistic update
       setFeeders(prev => prev.map(f => f.id === id ? { ...f, ...data } : f));
       setError(null);
+      showToast.success(toastMessages.feeder.updated);
       return data;
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to update feeder';
       setError(message);
       console.error('Error updating feeder:', err);
+      showToast.error(toastMessages.feeder.error);
       throw err;
     }
   };
@@ -134,10 +139,12 @@ export function useFeeders(projectId: string | undefined) {
       // Optimistic update
       setFeeders(prev => prev.filter(f => f.id !== id));
       setError(null);
+      showToast.success(toastMessages.feeder.deleted);
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to delete feeder';
       setError(message);
       console.error('Error deleting feeder:', err);
+      showToast.error(toastMessages.feeder.error);
       throw err;
     }
   };

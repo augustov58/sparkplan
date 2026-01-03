@@ -139,6 +139,11 @@ import {
 import { DiagramPanZoom } from './DiagramPanZoom';
 import { exportDiagram, DiagramExportOptions } from '../services/pdfExport/oneLineDiagramExport';
 import { calculateTreeLayout, getDescendantIds } from '../services/diagram/treeLayoutCalculator';
+import type { Database } from '../lib/database.types';
+
+// Database types for glyph functions
+type Panel = Database['public']['Tables']['panels']['Row'];
+type Transformer = Database['public']['Tables']['transformers']['Row'];
 
 interface OneLineDiagramProps {
   project: Project;
@@ -289,15 +294,15 @@ export const OneLineDiagram: React.FC<OneLineDiagramProps> = ({ project, updateP
    * Calculate Y position for a given level (0 = MDP, 1 = Level 1, 2 = Level 2, etc.)
    */
   const getLevelY = (level: number): number => {
-    const BASE_Y = 320; // Level 1 Y position
-    const LEVEL_SPACING = 130; // Vertical space between levels
+    const BASE_Y = 380; // Level 1 Y position (updated to match LEVEL1_PANEL_Y = 380)
+    const LEVEL_SPACING = 210; // Vertical space between levels (increased for proper bus drop clearance)
     return BASE_Y + (level - 1) * LEVEL_SPACING;
   };
 
   // Dynamic viewBox height based on hierarchy depth
   const viewBoxHeight = useMemo(() => {
-    const minHeight = 750;
-    const calculatedHeight = getLevelY(calculateMaxDepth) + 150; // Add padding below lowest level
+    const minHeight = 1100; // Increased to accommodate Level3 at Y=800 + panel height + padding
+    const calculatedHeight = getLevelY(calculateMaxDepth) + 300; // Add padding below lowest level
     return Math.max(minHeight, calculatedHeight);
   }, [calculateMaxDepth]);
 
@@ -318,10 +323,10 @@ export const OneLineDiagram: React.FC<OneLineDiagramProps> = ({ project, updateP
     });
 
     // Add padding for elements that extend beyond panel centers:
-    // - Panel width: 50px (25px on each side from center)
+    // - Panel width: 65px (32.5px on each side from center) - realistic panel proportions
     // - Feeder label boxes: ~100px (extend to the right)
     // - Right margin: 80px (breathing room)
-    const PANEL_HALF_WIDTH = 25;
+    const PANEL_HALF_WIDTH = 33; // Updated to match new PANEL_W (65px)
     const FEEDER_LABEL_EXTENSION = 100;
     const RIGHT_MARGIN = 80;
 
@@ -413,6 +418,58 @@ export const OneLineDiagram: React.FC<OneLineDiagramProps> = ({ project, updateP
     }
   }, [draggingNodeId, dragStartX, dragStartOffset, panels, transformers]);
 
+  // Handle dragging touch events (mobile support)
+  useEffect(() => {
+    const handleTouchMove = (e: TouchEvent) => {
+      if (draggingNodeId && diagramRef.current && e.touches.length === 1) {
+        e.preventDefault(); // Prevent scrolling while dragging
+        const touch = e.touches[0];
+        const svg = diagramRef.current;
+        const svgRect = svg.getBoundingClientRect();
+        const viewBox = svg.viewBox.baseVal;
+        const scaleX = viewBox.width / svgRect.width;
+        const deltaX = (touch.clientX - dragStartX) * scaleX;
+        const newOffset = dragStartOffset + deltaX;
+
+        // Update offset for dragged node AND all descendants (move entire subtree together)
+        setManualOffsets(prev => {
+          const updated = new Map(prev);
+
+          // Calculate how much the parent moved this frame
+          const parentCurrentOffset = prev.get(draggingNodeId) || 0;
+          const delta = newOffset - parentCurrentOffset;
+
+          // Apply same delta to parent
+          updated.set(draggingNodeId, newOffset);
+
+          // Apply same delta to all descendants (so they move together)
+          const descendants = getDescendantIds(draggingNodeId, panels, transformers);
+          descendants.forEach(descendantId => {
+            const descendantCurrentOffset = prev.get(descendantId) || 0;
+            updated.set(descendantId, descendantCurrentOffset + delta);
+          });
+
+          return updated;
+        });
+      }
+    };
+
+    const handleTouchEnd = () => {
+      setDraggingNodeId(null);
+    };
+
+    if (draggingNodeId) {
+      window.addEventListener('touchmove', handleTouchMove, { passive: false });
+      window.addEventListener('touchend', handleTouchEnd);
+      window.addEventListener('touchcancel', handleTouchEnd);
+      return () => {
+        window.removeEventListener('touchmove', handleTouchMove);
+        window.removeEventListener('touchend', handleTouchEnd);
+        window.removeEventListener('touchcancel', handleTouchEnd);
+      };
+    }
+  }, [draggingNodeId, dragStartX, dragStartOffset, panels, transformers]);
+
   /**
    * Get final X position for a node (tree layout + manual offset)
    * Returns position centered around serviceX (400)
@@ -424,10 +481,10 @@ export const OneLineDiagram: React.FC<OneLineDiagramProps> = ({ project, updateP
   };
 
   /**
-   * Render draggable grip handle for panels with downstream elements
+   * Render draggable grip handle for all panels (allows manual positioning)
    */
   const renderDragGrip = (nodeId: string, x: number, y: number, hasDownstream: boolean) => {
-    if (!hasDownstream) return null;
+    // Always show drag handle to allow manual positioning of any panel
 
     const gripX = x + 30; // Right side of panel (25 for center + 5 offset)
     const isDragging = draggingNodeId === nodeId;
@@ -442,6 +499,16 @@ export const OneLineDiagram: React.FC<OneLineDiagramProps> = ({ project, updateP
           setDraggingNodeId(nodeId);
           setDragStartX(e.clientX);
           setDragStartOffset(currentOffset);
+        }}
+        onTouchStart={(e: React.TouchEvent) => {
+          e.stopPropagation();
+          if (e.touches.length === 1) {
+            const touch = e.touches[0];
+            const currentOffset = manualOffsets.get(nodeId) || 0;
+            setDraggingNodeId(nodeId);
+            setDragStartX(touch.clientX);
+            setDragStartOffset(currentOffset);
+          }
         }}
       >
         {/* Visual feedback when dragging */}
@@ -522,14 +589,17 @@ export const OneLineDiagram: React.FC<OneLineDiagramProps> = ({ project, updateP
       // Build downstream positions for bus bar
       const downstreamPositions: { x: number; topY: number }[] = [];
       downstreamPanels.forEach(dp => {
-        downstreamPositions.push({ x: getFinalPosition(dp.id, serviceX), topY: getLevelY(level + 1) });
+        downstreamPositions.push({ x: getFinalPosition(dp.id, serviceX), topY: getLevelY(level + 1) - DIAGRAM_CONSTANTS.PORT_OFFSET });
       });
       downstreamTransformers.forEach(dt => {
-        downstreamPositions.push({ x: getFinalPosition(dt.id, serviceX), topY: getLevelY(level + 1) });
+        downstreamPositions.push({ x: getFinalPosition(dt.id, serviceX), topY: getLevelY(level + 1) - DIAGRAM_CONSTANTS.PORT_OFFSET });
       });
 
       // Calculate bus Y position
       const busY = parentY + DIAGRAM_CONSTANTS.BUS_OFFSET;
+
+      // ✅ PHASE 4: Render professional panel glyph
+      const panelGlyph = renderPanelGlyph(xPos, currentY, panel, false);
 
       return (
         <g key={`panel-${panel.id}-level-${level}`}>
@@ -544,31 +614,10 @@ export const OneLineDiagram: React.FC<OneLineDiagramProps> = ({ project, updateP
             index % 2 === 0 ? 'right' : 'left'
           )}
 
-          {/* Panel Label */}
-          {renderMaskedText(xPos, currentY - 12, panel.name, 'middle', 'text-xs font-bold fill-gray-900', 10)}
+          {/* ✅ Professional panel symbol with connection ports */}
+          {panelGlyph.element}
 
-          {/* Panel Box */}
-          <rect
-            x={xPos - 25}
-            y={currentY}
-            width="50"
-            height="30"
-            rx="3"
-            stroke="#3B82F6"
-            strokeWidth="2"
-            fill="#EFF6FF"
-          />
-          <text x={xPos} y={currentY + 20} textAnchor="middle" fontSize="10" fontWeight="bold" className="fill-blue-700">
-            P
-          </text>
-
-          {/* Panel Info */}
-          {renderMaskedText(xPos, currentY + 43, `${panel.voltage}V ${panel.phase}Φ • ${panel.bus_rating}A`, 'middle', 'text-[9px] fill-gray-600', 8)}
-          {renderMaskedText(xPos, currentY + 53, panel.main_breaker_amps ? `${panel.main_breaker_amps}A Main` : 'MLO', 'middle', 'text-[8px] fill-gray-500', 7)}
-          {renderMaskedText(xPos, currentY + 63, `${panelCircuits.length} ckt • ${(panelCircuits.reduce((sum, c) => sum + (c.load_watts || 0), 0) / 1000).toFixed(1)}kVA`, 'middle', 'text-[7px] fill-electric-600', 6)}
-          {panel.location && renderMaskedText(xPos, currentY + 73, panel.location, 'middle', 'text-[7px] fill-gray-400 italic', 6)}
-
-          {/* Bus bar for downstream elements */}
+          {/* Bus bar for downstream elements (port-based routing) */}
           {totalDownstream > 0 && renderBusBar(xPos, currentY + DIAGRAM_CONSTANTS.PANEL_HEIGHT, downstreamPositions, "#4B5563")}
 
           {/* Drag grip */}
@@ -593,10 +642,13 @@ export const OneLineDiagram: React.FC<OneLineDiagramProps> = ({ project, updateP
       const downstreamPanels = panels.filter(p => p.fed_from_type === 'transformer' && p.fed_from_transformer_id === nodeId);
       const downstreamPositions = downstreamPanels.map(dp => ({
         x: getFinalPosition(dp.id, serviceX),
-        topY: getLevelY(level + 1)
+        topY: getLevelY(level + 1) - DIAGRAM_CONSTANTS.PORT_OFFSET
       }));
 
       const busY = parentY + DIAGRAM_CONSTANTS.BUS_OFFSET;
+
+      // ✅ PHASE 4: Render professional transformer glyph
+      const transformerGlyph = renderTransformerGlyph(xPos, currentY, transformer);
 
       return (
         <g key={`xfmr-${transformer.id}-level-${level}`}>
@@ -611,29 +663,10 @@ export const OneLineDiagram: React.FC<OneLineDiagramProps> = ({ project, updateP
             index % 2 === 0 ? 'right' : 'left'
           )}
 
-          {/* Transformer Label */}
-          {renderMaskedText(xPos, currentY - 12, transformer.name, 'middle', 'text-xs font-bold fill-gray-900', 10)}
+          {/* ✅ Professional transformer symbol with connection ports */}
+          {transformerGlyph.element}
 
-          {/* Transformer Box */}
-          <rect
-            x={xPos - 30}
-            y={currentY}
-            width="60"
-            height="35"
-            rx="3"
-            stroke="#F59E0B"
-            strokeWidth="2"
-            fill="#FEF3C7"
-          />
-          <text x={xPos} y={currentY + 22} textAnchor="middle" fontSize="10" fontWeight="bold" className="fill-orange-800">
-            XFMR
-          </text>
-
-          {/* Transformer Info */}
-          {renderMaskedText(xPos, currentY + 48, `${transformer.kva_rating} kVA`, 'middle', 'text-[9px] fill-orange-700', 8)}
-          {renderMaskedText(xPos, currentY + 58, `${transformer.primary_voltage}V → ${transformer.secondary_voltage}V`, 'middle', 'text-[8px] fill-orange-700', 7)}
-
-          {/* Bus bar for downstream panels */}
+          {/* Bus bar for downstream panels (port-based routing) */}
           {downstreamPanels.length > 0 && renderBusBar(xPos, currentY + DIAGRAM_CONSTANTS.TRANSFORMER_HEIGHT, downstreamPositions, "#F59E0B")}
 
           {/* Drag grip */}
@@ -695,10 +728,10 @@ export const OneLineDiagram: React.FC<OneLineDiagramProps> = ({ project, updateP
     const line2 = feeder.egc_size ? `+ ${feeder.egc_size} EGC` : '';
     const line3 = feeder.conduit_size;
 
-    // Estimate label dimensions
-    const charWidth = 6;
-    const lineHeight = 12;
-    const padding = 4;
+    // Estimate label dimensions (reduced for more compact labels)
+    const charWidth = 4.5;  // Reduced from 6
+    const lineHeight = 9;   // Reduced from 12
+    const padding = 3;      // Reduced from 4
     const maxLineLength = Math.max(line1.length, line2.length, line3.length);
     const labelWidth = maxLineLength * charWidth + padding * 2;
     const labelHeight = (line2 ? 3 : 2) * lineHeight + padding * 2;
@@ -745,7 +778,7 @@ export const OneLineDiagram: React.FC<OneLineDiagramProps> = ({ project, updateP
         <text
           x={labelBoxX + padding}
           y={loopY - labelHeight / 2 + lineHeight}
-          fontSize="8"
+          fontSize="6.5"
           fontWeight="500"
           className="fill-gray-800"
           textAnchor="start"
@@ -767,7 +800,7 @@ export const OneLineDiagram: React.FC<OneLineDiagramProps> = ({ project, updateP
         <text
           x={labelBoxX + padding}
           y={loopY - labelHeight / 2 + lineHeight * (line2 ? 3 : 2)}
-          fontSize="8"
+          fontSize="6.5"
           fontWeight="500"
           className="fill-indigo-600"
           textAnchor="start"
@@ -1421,12 +1454,12 @@ export const OneLineDiagram: React.FC<OneLineDiagramProps> = ({ project, updateP
     METER_Y: 90,
     MDP_Y: 170,
     MDP_BUS_Y: 250,
-    LEVEL1_PANEL_Y: 320,
-    LEVEL2_PANEL_Y: 450,  // Increased from 430 to accommodate bus
-    LEVEL3_PANEL_Y: 580,  // Increased from 540 to accommodate bus
+    LEVEL1_PANEL_Y: 380,  // Increased from 360 to provide longer bus drop lines
+    LEVEL2_PANEL_Y: 590,  // Increased: 380 + 210 (LEVEL_SPACING)
+    LEVEL3_PANEL_Y: 800,  // Increased: 590 + 210 (LEVEL_SPACING)
 
     // Bus bar offsets (distance below element bottom)
-    BUS_OFFSET: 40,
+    BUS_OFFSET: 50,       // Distance from parent bottom port to horizontal bus
 
     // Line styling
     BUS_STROKE_WIDTH: 4,
@@ -1438,13 +1471,36 @@ export const OneLineDiagram: React.FC<OneLineDiagramProps> = ({ project, updateP
     LEVEL2_SPACING: 90,
     LEVEL3_SPACING: 70,
 
-    // Element dimensions
-    PANEL_HEIGHT: 30,
-    PANEL_WIDTH: 50,
-    TRANSFORMER_HEIGHT: 35,
-    TRANSFORMER_WIDTH: 60,
-    MDP_HEIGHT: 40,
-    MDP_WIDTH: 60
+    // Professional panel symbol dimensions (realistic electrical panel)
+    PANEL_W: 65,            // Panel width (narrower, realistic proportions)
+    PANEL_H: 100,           // Panel height (taller, vertical orientation like real panels)
+    PANEL_HEADER_H: 18,     // Header strip height
+    MDP_W: 80,              // MDP width (larger than standard panel)
+    MDP_H: 110,             // MDP height (taller than standard panel)
+
+    // Professional transformer symbol dimensions (coil/core style)
+    XFMR_W: 100,            // Transformer width (upgraded from 60)
+    XFMR_H: 70,             // Transformer height (upgraded from 35)
+    XFMR_COIL_W: 20,        // Individual coil width
+    XFMR_CORE_W: 4,         // Center core width
+    XFMR_TURNS: 3,          // Number of coil turns to draw
+
+    // Connection anchors
+    PORT_OFFSET: 0,         // Distance from symbol edge to port center (0 = lines connect directly to symbol edge)
+    PORT_RADIUS: 3,         // Visual port circle radius
+
+    // Typography
+    HEADER_FONT: 11,        // Header text size
+    BODY_FONT: 9,           // Body text size
+    SMALL_FONT: 8,          // Small details size
+
+    // Legacy dimensions (kept for backward compatibility)
+    PANEL_HEIGHT: 100,      // Updated to match PANEL_H
+    PANEL_WIDTH: 65,        // Updated to match PANEL_W
+    TRANSFORMER_HEIGHT: 70, // Updated to match XFMR_H
+    TRANSFORMER_WIDTH: 100, // Updated to match XFMR_W
+    MDP_HEIGHT: 110,        // Updated to match MDP_H
+    MDP_WIDTH: 80           // Updated to match MDP_W
   };
 
   /**
@@ -1502,6 +1558,398 @@ export const OneLineDiagram: React.FC<OneLineDiagramProps> = ({ project, updateP
     );
   };
 
+  // ============================================================================
+  // PHASE 2: PROFESSIONAL GLYPH RENDERING FUNCTIONS
+  // ============================================================================
+
+  /**
+   * Renders a professional panel symbol (realistic electrical panel with door)
+   * Returns connection anchors for port-based routing
+   */
+  const renderPanelGlyph = (
+    x: number,
+    y: number,
+    panel: Panel,
+    isMDP: boolean = false
+  ): { element: React.ReactNode; topPort: { x: number; y: number }; bottomPort: { x: number; y: number } } => {
+    const width = isMDP ? DIAGRAM_CONSTANTS.MDP_W : DIAGRAM_CONSTANTS.PANEL_W;
+    const height = isMDP ? DIAGRAM_CONSTANTS.MDP_H : DIAGRAM_CONSTANTS.PANEL_H;
+    const headerHeight = DIAGRAM_CONSTANTS.PANEL_HEADER_H;
+
+    // Connection ports
+    const topPort = { x, y: y - DIAGRAM_CONSTANTS.PORT_OFFSET };
+    const bottomPort = { x, y: y + height + DIAGRAM_CONSTANTS.PORT_OFFSET };
+
+    // Color coding by voltage (MDP stays red, high voltage = dark yellow, low voltage = blue)
+    let panelColor = '#3B82F6'; // Default blue for low voltage
+    if (isMDP) {
+      panelColor = '#DC2626'; // Red for MDP
+    } else if (panel.voltage === 480 || panel.voltage === 277) {
+      panelColor = '#D97706'; // Dark amber for high voltage
+    }
+
+    const element = (
+      <g>
+        {/* Panel enclosure (outer box) */}
+        <rect
+          x={x - width / 2}
+          y={y}
+          width={width}
+          height={height}
+          fill="#E5E7EB"
+          stroke="#6B7280"
+          strokeWidth={2}
+          rx={2}
+        />
+
+        {/* Panel door (inner rectangle with slight inset) */}
+        <rect
+          x={x - width / 2 + 3}
+          y={y + 3}
+          width={width - 6}
+          height={height - 6}
+          fill="white"
+          stroke={panelColor}
+          strokeWidth={isMDP ? 2.5 : 2}
+          rx={1}
+        />
+
+        {/* Door hinges (left side, 3 small rectangles) */}
+        <rect x={x - width / 2 + 1} y={y + 15} width={4} height={8} fill="#4B5563" rx={1} />
+        <rect x={x - width / 2 + 1} y={y + height / 2 - 4} width={4} height={8} fill="#4B5563" rx={1} />
+        <rect x={x - width / 2 + 1} y={y + height - 23} width={4} height={8} fill="#4B5563" rx={1} />
+
+        {/* Handle/Lock (right side) */}
+        <circle
+          cx={x + width / 2 - 6}
+          cy={y + height / 2}
+          r={3}
+          fill="#6B7280"
+          stroke="#374151"
+          strokeWidth={1}
+        />
+
+        {/* Header label plate */}
+        <rect
+          x={x - width / 2 + 6}
+          y={y + 8}
+          width={width - 12}
+          height={headerHeight}
+          fill={panelColor}
+          rx={1}
+        />
+
+        {/* Panel name in header */}
+        <text
+          x={x}
+          y={y + 8 + headerHeight / 2 + 4}
+          textAnchor="middle"
+          fontSize={DIAGRAM_CONSTANTS.HEADER_FONT}
+          fontWeight="bold"
+          fill="white"
+        >
+          {panel.name}
+        </text>
+
+        {/* Directory window (shows circuit info) */}
+        <rect
+          x={x - width / 2 + 8}
+          y={y + headerHeight + 14}
+          width={width - 16}
+          height={height - headerHeight - 38}
+          fill="#F9FAFB"
+          stroke="#D1D5DB"
+          strokeWidth={1}
+          rx={1}
+        />
+
+        {/* Circuit lines in directory (simulated) */}
+        {[0, 1, 2, 3].map(i => (
+          <line
+            key={i}
+            x1={x - width / 2 + 12}
+            y1={y + headerHeight + 20 + i * 8}
+            x2={x + width / 2 - 12}
+            y2={y + headerHeight + 20 + i * 8}
+            stroke="#9CA3AF"
+            strokeWidth={0.5}
+          />
+        ))}
+
+        {/* Ratings at bottom */}
+        <text
+          x={x}
+          y={y + height - 18}
+          textAnchor="middle"
+          fontSize={DIAGRAM_CONSTANTS.SMALL_FONT}
+          fontWeight="bold"
+          fill="#374151"
+        >
+          {panel.bus_rating}A • {panel.main_breaker_amps ? `${panel.main_breaker_amps}A` : 'MLO'}
+        </text>
+
+        {/* Voltage/phase at very bottom */}
+        <text
+          x={x}
+          y={y + height - 6}
+          textAnchor="middle"
+          fontSize={DIAGRAM_CONSTANTS.SMALL_FONT - 1}
+          fill="#6B7280"
+        >
+          {panel.voltage}V {panel.phase === 3 ? '3Φ' : '1Φ'}
+        </text>
+
+        {/* Connection ports (visual indicators) */}
+        <circle
+          cx={topPort.x}
+          cy={topPort.y}
+          r={DIAGRAM_CONSTANTS.PORT_RADIUS}
+          fill="#10B981"
+          stroke="white"
+          strokeWidth={1}
+        />
+        <circle
+          cx={bottomPort.x}
+          cy={bottomPort.y}
+          r={DIAGRAM_CONSTANTS.PORT_RADIUS}
+          fill="#10B981"
+          stroke="white"
+          strokeWidth={1}
+        />
+      </g>
+    );
+
+    return { element, topPort, bottomPort };
+  };
+
+  /**
+   * Renders a professional transformer symbol (coil/core style)
+   * Returns connection anchors for port-based routing
+   */
+  const renderTransformerGlyph = (
+    x: number,
+    y: number,
+    transformer: Transformer
+  ): { element: React.ReactNode; topPort: { x: number; y: number }; bottomPort: { x: number; y: number } } => {
+    const width = DIAGRAM_CONSTANTS.XFMR_W;
+    const height = DIAGRAM_CONSTANTS.XFMR_H;
+    const coilWidth = DIAGRAM_CONSTANTS.XFMR_COIL_W;
+    const coreWidth = DIAGRAM_CONSTANTS.XFMR_CORE_W;
+    const turns = DIAGRAM_CONSTANTS.XFMR_TURNS;
+
+    // Connection ports
+    const topPort = { x, y: y - DIAGRAM_CONSTANTS.PORT_OFFSET };
+    const bottomPort = { x, y: y + height + DIAGRAM_CONSTANTS.PORT_OFFSET };
+
+    // Calculate coil positions (left primary, right secondary)
+    const primaryX = x - coreWidth / 2 - coilWidth / 2;
+    const secondaryX = x + coreWidth / 2 + coilWidth / 2;
+    const coilY = y + height / 2;
+    const coilHeight = height * 0.6;
+    const turnHeight = coilHeight / turns;
+
+    const element = (
+      <g>
+        {/* Background card */}
+        <rect
+          x={x - width / 2}
+          y={y}
+          width={width}
+          height={height}
+          fill="white"
+          stroke="#9333EA"
+          strokeWidth={2}
+          rx={4}
+        />
+
+        {/* Iron core (center) */}
+        <rect
+          x={x - coreWidth / 2}
+          y={y + height * 0.15}
+          width={coreWidth}
+          height={height * 0.7}
+          fill="#6B7280"
+          stroke="#374151"
+          strokeWidth={1}
+        />
+
+        {/* Primary coil (left) - sine wave pattern */}
+        <g>
+          {Array.from({ length: turns }).map((_, i) => (
+            <ellipse
+              key={`primary-${i}`}
+              cx={primaryX}
+              cy={coilY - coilHeight / 2 + i * turnHeight + turnHeight / 2}
+              rx={coilWidth / 2}
+              ry={turnHeight / 2.5}
+              fill="none"
+              stroke="#DC2626"
+              strokeWidth={2}
+            />
+          ))}
+        </g>
+
+        {/* Secondary coil (right) - sine wave pattern */}
+        <g>
+          {Array.from({ length: turns }).map((_, i) => (
+            <ellipse
+              key={`secondary-${i}`}
+              cx={secondaryX}
+              cy={coilY - coilHeight / 2 + i * turnHeight + turnHeight / 2}
+              rx={coilWidth / 2}
+              ry={turnHeight / 2.5}
+              fill="none"
+              stroke="#3B82F6"
+              strokeWidth={2}
+            />
+          ))}
+        </g>
+
+        {/* Transformer name */}
+        <text
+          x={x}
+          y={y + 12}
+          textAnchor="middle"
+          fontSize={DIAGRAM_CONSTANTS.HEADER_FONT}
+          fontWeight="bold"
+          fill="#9333EA"
+        >
+          {transformer.name}
+        </text>
+
+        {/* kVA rating */}
+        <text
+          x={x}
+          y={y + height - 6}
+          textAnchor="middle"
+          fontSize={DIAGRAM_CONSTANTS.BODY_FONT}
+          fill="#374151"
+        >
+          {transformer.kva_rating}kVA
+        </text>
+
+        {/* Primary voltage (left side) */}
+        <text
+          x={x - width / 2 + 8}
+          y={y + height / 2}
+          textAnchor="start"
+          fontSize={DIAGRAM_CONSTANTS.SMALL_FONT}
+          fill="#DC2626"
+        >
+          {transformer.primary_voltage}V
+        </text>
+
+        {/* Secondary voltage (right side) */}
+        <text
+          x={x + width / 2 - 8}
+          y={y + height / 2}
+          textAnchor="end"
+          fontSize={DIAGRAM_CONSTANTS.SMALL_FONT}
+          fill="#3B82F6"
+        >
+          {transformer.secondary_voltage}V
+        </text>
+
+        {/* Connection ports (visual indicators) */}
+        <circle
+          cx={topPort.x}
+          cy={topPort.y}
+          r={DIAGRAM_CONSTANTS.PORT_RADIUS}
+          fill="#10B981"
+          stroke="white"
+          strokeWidth={1}
+        />
+        <circle
+          cx={bottomPort.x}
+          cy={bottomPort.y}
+          r={DIAGRAM_CONSTANTS.PORT_RADIUS}
+          fill="#10B981"
+          stroke="white"
+          strokeWidth={1}
+        />
+      </g>
+    );
+
+    return { element, topPort, bottomPort };
+  };
+
+  // ============================================================================
+  // PHASE 3: PORT-BASED BUSBAR ROUTING
+  // ============================================================================
+
+  /**
+   * Renders orthogonal busbar routing from parent bottomPort to child topPorts
+   * Supports direct vertical connection (1 child) or horizontal bus + drops (2+ children)
+   */
+  const renderBusBarFromPorts = (
+    parentBottomPort: { x: number; y: number },
+    childTopPorts: { x: number; y: number }[],
+    strokeColor: string = "#4B5563"
+  ): React.ReactNode => {
+    if (childTopPorts.length === 0) return null;
+
+    // Single child: Direct vertical line
+    if (childTopPorts.length === 1) {
+      const childPort = childTopPorts[0];
+      if (!childPort) return null;
+
+      return (
+        <line
+          x1={parentBottomPort.x}
+          y1={parentBottomPort.y}
+          x2={childPort.x}
+          y2={childPort.y}
+          stroke={strokeColor}
+          strokeWidth={DIAGRAM_CONSTANTS.FEEDER_STROKE_WIDTH}
+          strokeDasharray="none"
+        />
+      );
+    }
+
+    // Multiple children: Horizontal bus with vertical drops
+    // Bus positioned midway between parent bottom and child tops
+    const busY = (parentBottomPort.y + Math.min(...childTopPorts.map(p => p.y))) / 2;
+    const minX = Math.min(...childTopPorts.map(p => p.x));
+    const maxX = Math.max(...childTopPorts.map(p => p.x));
+
+    return (
+      <g>
+        {/* Vertical line from parent bottom port to bus */}
+        <line
+          x1={parentBottomPort.x}
+          y1={parentBottomPort.y}
+          x2={parentBottomPort.x}
+          y2={busY}
+          stroke={strokeColor}
+          strokeWidth={DIAGRAM_CONSTANTS.FEEDER_STROKE_WIDTH}
+        />
+
+        {/* Horizontal bus bar */}
+        <line
+          x1={minX}
+          y1={busY}
+          x2={maxX}
+          y2={busY}
+          stroke={strokeColor}
+          strokeWidth={DIAGRAM_CONSTANTS.BUS_STROKE_WIDTH}
+        />
+
+        {/* Vertical drops from bus to child top ports */}
+        {childTopPorts.map((childPort, idx) => (
+          <line
+            key={`bus-drop-${idx}`}
+            x1={childPort.x}
+            y1={busY}
+            x2={childPort.x}
+            y2={childPort.y}
+            stroke={strokeColor}
+            strokeWidth={DIAGRAM_CONSTANTS.VERTICAL_DROP_STROKE_WIDTH}
+          />
+        ))}
+      </g>
+    );
+  };
+
   // ✅ NEW: Helper to determine if horizontal bus is needed (2+ downstream elements)
   const needsHorizontalBus = (downstreamCount: number) => {
     return downstreamCount >= 2;
@@ -1546,33 +1994,77 @@ export const OneLineDiagram: React.FC<OneLineDiagramProps> = ({ project, updateP
             strokeWidth={DIAGRAM_CONSTANTS.BUS_STROKE_WIDTH}
           />
 
-          {/* Vertical drops to downstream elements */}
-          {downstreamElements.map((element, idx) => (
-            <line
-              key={`drop-${idx}`}
-              x1={element.x}
-              y1={busY}
-              x2={element.x}
-              y2={element.topY}
-              stroke={strokeColor}
-              strokeWidth={DIAGRAM_CONSTANTS.VERTICAL_DROP_STROKE_WIDTH}
-            />
-          ))}
+          {/* Vertical drops to downstream elements (connect to topPort, not panel top) */}
+          {downstreamElements.map((element, idx) => {
+            // Panels have topPort at topY - PORT_OFFSET to connect properly
+            const connectionY = element.topY - DIAGRAM_CONSTANTS.PORT_OFFSET;
+            return (
+              <line
+                key={`drop-${idx}`}
+                x1={element.x}
+                y1={busY}
+                x2={element.x}
+                y2={connectionY}
+                stroke={strokeColor}
+                strokeWidth={DIAGRAM_CONSTANTS.VERTICAL_DROP_STROKE_WIDTH}
+              />
+            );
+          })}
         </>
       );
     } else if (downstreamElements.length === 1) {
-      // Direct vertical line (no bus needed)
+      // Single downstream element - prefer straight vertical line
       const element = downstreamElements[0];
       if (!element) return null;
+      const connectionY = element.topY - DIAGRAM_CONSTANTS.PORT_OFFSET;
+
+      // If parent and child are closely aligned (within 5px), draw straight vertical line
+      const horizontalOffset = Math.abs(parentX - element.x);
+      if (horizontalOffset <= 5) {
+        return (
+          <line
+            x1={parentX}
+            y1={parentBottomY}
+            x2={parentX}
+            y2={connectionY}
+            stroke={strokeColor}
+            strokeWidth={DIAGRAM_CONSTANTS.FEEDER_STROKE_WIDTH}
+          />
+        );
+      }
+
+      // Otherwise, use orthogonal routing: vertical down, horizontal jog, vertical down
+      const jogY = parentBottomY + DIAGRAM_CONSTANTS.BUS_OFFSET;
       return (
-        <line
-          x1={parentX}
-          y1={parentBottomY}
-          x2={element.x}
-          y2={element.topY}
-          stroke={strokeColor}
-          strokeWidth={DIAGRAM_CONSTANTS.FEEDER_STROKE_WIDTH}
-        />
+        <>
+          {/* Vertical line from parent down to jog point */}
+          <line
+            x1={parentX}
+            y1={parentBottomY}
+            x2={parentX}
+            y2={jogY}
+            stroke={strokeColor}
+            strokeWidth={DIAGRAM_CONSTANTS.FEEDER_STROKE_WIDTH}
+          />
+          {/* Horizontal jog to child X position */}
+          <line
+            x1={parentX}
+            y1={jogY}
+            x2={element.x}
+            y2={jogY}
+            stroke={strokeColor}
+            strokeWidth={DIAGRAM_CONSTANTS.FEEDER_STROKE_WIDTH}
+          />
+          {/* Vertical line down to child */}
+          <line
+            x1={element.x}
+            y1={jogY}
+            x2={element.x}
+            y2={connectionY}
+            stroke={strokeColor}
+            strokeWidth={DIAGRAM_CONSTANTS.FEEDER_STROKE_WIDTH}
+          />
+        </>
       );
     }
 
@@ -1686,62 +2178,48 @@ export const OneLineDiagram: React.FC<OneLineDiagramProps> = ({ project, updateP
                   // ✅ BUILD MDP DOWNSTREAM POSITIONS (using tree layout + manual offsets)
                   const mdpDownstreamPositions: { x: number; topY: number }[] = [];
 
-                  // Add all panels fed from MDP
+                  // Add all panels fed from MDP (use topPort.y for accurate connection)
                   panelsFedFromMain.forEach((panel) => {
                     mdpDownstreamPositions.push({
                       x: getFinalPosition(panel.id, serviceX),
-                      topY: DIAGRAM_CONSTANTS.LEVEL1_PANEL_Y
+                      topY: DIAGRAM_CONSTANTS.LEVEL1_PANEL_Y - DIAGRAM_CONSTANTS.PORT_OFFSET
                     });
                   });
 
-                  // Add all transformers fed from MDP
+                  // Add all transformers fed from MDP (use topPort.y for accurate connection)
                   transformersFedFromMain.forEach((xfmr) => {
                     mdpDownstreamPositions.push({
                       x: getFinalPosition(xfmr.id, serviceX),
-                      topY: DIAGRAM_CONSTANTS.LEVEL1_PANEL_Y
+                      topY: DIAGRAM_CONSTANTS.LEVEL1_PANEL_Y - DIAGRAM_CONSTANTS.PORT_OFFSET
                     });
                   });
 
                   return (
                     <>
                       {/* Main Distribution Panel (MDP) */}
-                      {mainPanel && (
-                        <>
-                          {/* MDP Box - Smaller */}
-                          <rect
-                            x={serviceX - 30}
-                            y={170}
-                            width="60"
-                            height="40"
-                            rx="3"
-                            stroke="#DC2626"
-                            strokeWidth="2"
-                            fill="#FEF2F2"
-                          />
-                          <text x={serviceX} y={195} textAnchor="middle" fontSize="10" fontWeight="bold" className="fill-red-700">
-                            MDP
-                          </text>
+                      {mainPanel && (() => {
+                        // ✅ PHASE 4: Render professional MDP glyph
+                        const mdpGlyph = renderPanelGlyph(serviceX, DIAGRAM_CONSTANTS.MDP_Y, mainPanel, true);
 
-                          {/* MDP Labels - Outside Box Above (MASKED) */}
-                          {renderMaskedText(serviceX, 155, mainPanel.name, 'middle', 'text-xs font-bold fill-gray-900', 10)}
+                        return (
+                          <>
+                            {/* ✅ Professional MDP symbol with connection ports */}
+                            {mdpGlyph.element}
 
-                          {/* MDP Labels - Outside Box Below (MASKED) */}
-                          {renderMaskedText(serviceX, 223, `${mainPanel.voltage}V ${mainPanel.phase}Φ • ${mainPanel.bus_rating}A Bus • ${mainPanel.main_breaker_amps}A Main`, 'middle', 'text-[9px] fill-gray-600', 8)}
-                          {renderMaskedText(serviceX, 235, `${circuits.filter(c => c.panel_id === mainPanel.id).length} circuits`, 'middle', 'text-[8px] fill-electric-600', 7)}
-
-                          {/* ✅ FIXED: MDP Bus Bar using actual final positions (responds to manual dragging) */}
+                          {/* ✅ FIXED: MDP Bus Bar using actual bottomPort position for accurate connections */}
                           {totalElements > 0 && renderBusBar(
                             serviceX,
-                            170 + 40, // MDP bottom Y (MDP_Y + MDP_HEIGHT)
+                            mdpGlyph.bottomPort.y, // Use actual bottomPort.y for proper connection
                             mdpDownstreamPositions,
                             "#111827"
                           )}
 
                           {/* ✅ NEW: Use recursive rendering for unlimited depth */}
-                          {panelsFedFromMain.map((panel, index) => renderNodeAndDescendants(panel.id, 'panel', 1, 210, index, serviceX, mainPanel?.id || null, null))}
-                          {transformersFedFromMain.map((xfmr, index) => renderNodeAndDescendants(xfmr.id, 'transformer', 1, 210, panelsFedFromMain.length + index, serviceX, mainPanel?.id || null, null))}
+                          {panelsFedFromMain.map((panel, index) => renderNodeAndDescendants(panel.id, 'panel', 1, DIAGRAM_CONSTANTS.MDP_Y + DIAGRAM_CONSTANTS.MDP_HEIGHT, index, serviceX, mainPanel?.id || null, null))}
+                          {transformersFedFromMain.map((xfmr, index) => renderNodeAndDescendants(xfmr.id, 'transformer', 1, DIAGRAM_CONSTANTS.MDP_Y + DIAGRAM_CONSTANTS.MDP_HEIGHT, panelsFedFromMain.length + index, serviceX, mainPanel?.id || null, null))}
                         </>
-                      )}
+                        );
+                      })()}
 
                       {/* Message when no panels exist */}
                       {panels.length === 0 && (
@@ -2345,62 +2823,48 @@ export const OneLineDiagram: React.FC<OneLineDiagramProps> = ({ project, updateP
                   // ✅ BUILD MDP DOWNSTREAM POSITIONS (using tree layout + manual offsets)
                   const mdpDownstreamPositions: { x: number; topY: number }[] = [];
 
-                  // Add all panels fed from MDP
+                  // Add all panels fed from MDP (use topPort.y for accurate connection)
                   panelsFedFromMain.forEach((panel) => {
                     mdpDownstreamPositions.push({
                       x: getFinalPosition(panel.id, serviceX),
-                      topY: DIAGRAM_CONSTANTS.LEVEL1_PANEL_Y
+                      topY: DIAGRAM_CONSTANTS.LEVEL1_PANEL_Y - DIAGRAM_CONSTANTS.PORT_OFFSET
                     });
                   });
 
-                  // Add all transformers fed from MDP
+                  // Add all transformers fed from MDP (use topPort.y for accurate connection)
                   transformersFedFromMain.forEach((xfmr) => {
                     mdpDownstreamPositions.push({
                       x: getFinalPosition(xfmr.id, serviceX),
-                      topY: DIAGRAM_CONSTANTS.LEVEL1_PANEL_Y
+                      topY: DIAGRAM_CONSTANTS.LEVEL1_PANEL_Y - DIAGRAM_CONSTANTS.PORT_OFFSET
                     });
                   });
 
                   return (
                     <>
                       {/* Main Distribution Panel (MDP) */}
-                      {mainPanel && (
-                        <>
-                          {/* MDP Box - Smaller */}
-                          <rect
-                            x={serviceX - 30}
-                            y={170}
-                            width="60"
-                            height="40"
-                            rx="3"
-                            stroke="#DC2626"
-                            strokeWidth="2"
-                            fill="#FEF2F2"
-                          />
-                          <text x={serviceX} y={195} textAnchor="middle" fontSize="10" fontWeight="bold" className="fill-red-700">
-                            MDP
-                          </text>
+                      {mainPanel && (() => {
+                        // ✅ PHASE 4: Render professional MDP glyph
+                        const mdpGlyph = renderPanelGlyph(serviceX, DIAGRAM_CONSTANTS.MDP_Y, mainPanel, true);
 
-                          {/* MDP Labels - Outside Box Above (MASKED) */}
-                          {renderMaskedText(serviceX, 155, mainPanel.name, 'middle', 'text-xs font-bold fill-gray-900', 10)}
+                        return (
+                          <>
+                            {/* ✅ Professional MDP symbol with connection ports */}
+                            {mdpGlyph.element}
 
-                          {/* MDP Labels - Outside Box Below (MASKED) */}
-                          {renderMaskedText(serviceX, 223, `${mainPanel.voltage}V ${mainPanel.phase}Φ • ${mainPanel.bus_rating}A Bus • ${mainPanel.main_breaker_amps}A Main`, 'middle', 'text-[9px] fill-gray-600', 8)}
-                          {renderMaskedText(serviceX, 235, `${circuits.filter(c => c.panel_id === mainPanel.id).length} circuits`, 'middle', 'text-[8px] fill-electric-600', 7)}
-
-                          {/* ✅ FIXED: MDP Bus Bar using actual final positions (responds to manual dragging) */}
+                          {/* ✅ FIXED: MDP Bus Bar using actual bottomPort position for accurate connections */}
                           {totalElements > 0 && renderBusBar(
                             serviceX,
-                            170 + 40, // MDP bottom Y (MDP_Y + MDP_HEIGHT)
+                            mdpGlyph.bottomPort.y, // Use actual bottomPort.y for proper connection
                             mdpDownstreamPositions,
                             "#111827"
                           )}
 
                           {/* ✅ NEW: Use recursive rendering for unlimited depth */}
-                          {panelsFedFromMain.map((panel, index) => renderNodeAndDescendants(panel.id, 'panel', 1, 210, index, serviceX, mainPanel?.id || null, null))}
-                          {transformersFedFromMain.map((xfmr, index) => renderNodeAndDescendants(xfmr.id, 'transformer', 1, 210, panelsFedFromMain.length + index, serviceX, mainPanel?.id || null, null))}
+                          {panelsFedFromMain.map((panel, index) => renderNodeAndDescendants(panel.id, 'panel', 1, DIAGRAM_CONSTANTS.MDP_Y + DIAGRAM_CONSTANTS.MDP_HEIGHT, index, serviceX, mainPanel?.id || null, null))}
+                          {transformersFedFromMain.map((xfmr, index) => renderNodeAndDescendants(xfmr.id, 'transformer', 1, DIAGRAM_CONSTANTS.MDP_Y + DIAGRAM_CONSTANTS.MDP_HEIGHT, panelsFedFromMain.length + index, serviceX, mainPanel?.id || null, null))}
                         </>
-                      )}
+                        );
+                      })()}
 
                       {/* Message when no panels exist */}
                       {panels.length === 0 && (

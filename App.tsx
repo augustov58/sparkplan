@@ -1,30 +1,33 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, Suspense, lazy } from 'react';
 import { HashRouter, Routes, Route, Navigate, useParams, useNavigate, useLocation } from 'react-router-dom';
 import { Layout } from './components/Layout';
 import { Dashboard } from './components/Dashboard';
-import { LoadCalculator } from './components/LoadCalculator';
-import { OneLineDiagram } from './components/OneLineDiagram';
-import { DiagramOnlyView } from './components/DiagramOnlyView';
-import { GroundingBonding } from './components/GroundingBonding';
-import { PanelSchedule } from './components/PanelSchedule';
-import { PreInspection } from './components/PreInspection';
-import { LandingPage } from './components/LandingPage';
 import { ProjectSetup } from './components/ProjectSetup';
-import { Calculators } from './components/Calculators';
-import { IssuesLog } from './components/IssuesLog';
-import { MaterialTakeOff } from './components/MaterialTakeOff';
-import { FeederManager } from './components/FeederManager';
-import { DwellingLoadCalculator } from './components/DwellingLoadCalculator';
-import { CommercialLoadCalculator } from './components/CommercialLoadCalculator';
-import { InspectorMode } from './components/InspectorMode';
-import { PermitPacketGenerator } from './components/PermitPacketGenerator';
-import { ShortCircuitResults } from './components/ShortCircuitResults';
-import { RFIManager } from './components/RFIManager';
-import { SiteVisitManager } from './components/SiteVisitManager';
-import { CalendarView } from './components/CalendarView';
-import { AgentActivityLog } from './components/AgentActivityLog';
-import { UtilityInterconnectionForm } from './components/UtilityInterconnectionForm';
+import { LandingPage } from './components/LandingPage';
+import { LoadingSpinner } from './components/LoadingSpinner';
+
+// Lazy load heavy components for better performance
+const LoadCalculator = lazy(() => import('./components/LoadCalculator').then(m => ({ default: m.LoadCalculator })));
+const OneLineDiagram = lazy(() => import('./components/OneLineDiagram').then(m => ({ default: m.OneLineDiagram })));
+const DiagramOnlyView = lazy(() => import('./components/DiagramOnlyView').then(m => ({ default: m.DiagramOnlyView })));
+const GroundingBonding = lazy(() => import('./components/GroundingBonding').then(m => ({ default: m.GroundingBonding })));
+const PanelSchedule = lazy(() => import('./components/PanelSchedule').then(m => ({ default: m.PanelSchedule })));
+const PreInspection = lazy(() => import('./components/PreInspection').then(m => ({ default: m.PreInspection })));
+const Calculators = lazy(() => import('./components/Calculators').then(m => ({ default: m.Calculators })));
+const IssuesLog = lazy(() => import('./components/IssuesLog').then(m => ({ default: m.IssuesLog })));
+const MaterialTakeOff = lazy(() => import('./components/MaterialTakeOff').then(m => ({ default: m.MaterialTakeOff })));
+const FeederManager = lazy(() => import('./components/FeederManager').then(m => ({ default: m.FeederManager })));
+const DwellingLoadCalculator = lazy(() => import('./components/DwellingLoadCalculator').then(m => ({ default: m.DwellingLoadCalculator })));
+const CommercialLoadCalculator = lazy(() => import('./components/CommercialLoadCalculator').then(m => ({ default: m.CommercialLoadCalculator })));
+const InspectorMode = lazy(() => import('./components/InspectorMode').then(m => ({ default: m.InspectorMode })));
+const PermitPacketGenerator = lazy(() => import('./components/PermitPacketGenerator').then(m => ({ default: m.PermitPacketGenerator })));
+const ShortCircuitResults = lazy(() => import('./components/ShortCircuitResults').then(m => ({ default: m.ShortCircuitResults })));
+const RFIManager = lazy(() => import('./components/RFIManager').then(m => ({ default: m.RFIManager })));
+const SiteVisitManager = lazy(() => import('./components/SiteVisitManager').then(m => ({ default: m.SiteVisitManager })));
+const CalendarView = lazy(() => import('./components/CalendarView').then(m => ({ default: m.CalendarView })));
+const AgentActivityLog = lazy(() => import('./components/AgentActivityLog').then(m => ({ default: m.AgentActivityLog })));
+const UtilityInterconnectionForm = lazy(() => import('./components/UtilityInterconnectionForm').then(m => ({ default: m.UtilityInterconnectionForm })));
 // EVPanelTemplates moved to Calculators component
 import { Project, ProjectStatus, ProjectType } from './types';
 import { askNecAssistant } from './services/geminiService';
@@ -45,6 +48,8 @@ import { useProjects } from './hooks/useProjects';
 import { ErrorBoundary, FeatureErrorBoundary } from './components/ErrorBoundary';
 import { TemplateSelector } from './components/TemplateSelector';
 import type { ProjectTemplate } from './data/project-templates';
+import { Toaster } from 'react-hot-toast';
+import { TemplateType, createProjectFromTemplate } from './services/sampleTemplates';
 
 // Note: Mock data removed - now using Supabase database
 
@@ -81,29 +86,37 @@ const ProjectWrapper = ({ projects, updateProject, deleteProject, onSignOut }: {
                 } />
                 <Route path="/load-calc" element={
                     <FeatureErrorBoundary>
-                        {/* Residential projects use DwellingLoadCalculator, Commercial/Industrial use CommercialLoadCalculator */}
-                        {project.type === ProjectType.RESIDENTIAL ? (
-                            <DwellingLoadCalculator project={project} updateProject={updateProject} />
-                        ) : project.type === ProjectType.COMMERCIAL || project.type === ProjectType.INDUSTRIAL ? (
-                            <CommercialLoadCalculator projectId={project.id} />
-                        ) : (
-                            <LoadCalculator project={project} updateProject={updateProject} />
-                        )}
+                        <Suspense fallback={<LoadingSpinner />}>
+                            {/* Residential projects use DwellingLoadCalculator, Commercial/Industrial use CommercialLoadCalculator */}
+                            {project.type === ProjectType.RESIDENTIAL ? (
+                                <DwellingLoadCalculator project={project} updateProject={updateProject} />
+                            ) : project.type === ProjectType.COMMERCIAL || project.type === ProjectType.INDUSTRIAL ? (
+                                <CommercialLoadCalculator projectId={project.id} />
+                            ) : (
+                                <LoadCalculator project={project} updateProject={updateProject} />
+                            )}
+                        </Suspense>
                     </FeatureErrorBoundary>
                 } />
                 <Route path="/circuits" element={
                     <FeatureErrorBoundary>
-                        <OneLineDiagram project={project} updateProject={updateProject} />
+                        <Suspense fallback={<LoadingSpinner />}>
+                            <OneLineDiagram project={project} updateProject={updateProject} />
+                        </Suspense>
                     </FeatureErrorBoundary>
                 } />
                 <Route path="/diagram" element={
                     <FeatureErrorBoundary>
-                        <OneLineDiagram project={project} updateProject={updateProject} diagramOnly={true} />
+                        <Suspense fallback={<LoadingSpinner />}>
+                            <OneLineDiagram project={project} updateProject={updateProject} diagramOnly={true} />
+                        </Suspense>
                     </FeatureErrorBoundary>
                 } />
                 <Route path="/tools" element={
                     <FeatureErrorBoundary>
-                        <Calculators projectId={project.id} />
+                        <Suspense fallback={<LoadingSpinner />}>
+                            <Calculators projectId={project.id} />
+                        </Suspense>
                     </FeatureErrorBoundary>
                 } />
                 {/* COMING SOON: Utility Interconnection (Phase 2 - EV Niche) */}
@@ -120,47 +133,63 @@ const ProjectWrapper = ({ projects, updateProject, deleteProject, onSignOut }: {
                 } /> */}
                 <Route path="/grounding" element={
                     <FeatureErrorBoundary>
-                        <GroundingBonding project={project} updateProject={updateProject} />
+                        <Suspense fallback={<LoadingSpinner />}>
+                            <GroundingBonding project={project} updateProject={updateProject} />
+                        </Suspense>
                     </FeatureErrorBoundary>
                 } />
                 <Route path="/panel" element={
                     <FeatureErrorBoundary>
-                        <PanelSchedule project={project} />
+                        <Suspense fallback={<LoadingSpinner />}>
+                            <PanelSchedule project={project} />
+                        </Suspense>
                     </FeatureErrorBoundary>
                 } />
                 <Route path="/issues" element={
                     <FeatureErrorBoundary>
-                        <IssuesLog project={project} updateProject={updateProject} />
+                        <Suspense fallback={<LoadingSpinner />}>
+                            <IssuesLog project={project} updateProject={updateProject} />
+                        </Suspense>
                     </FeatureErrorBoundary>
                 } />
                 <Route path="/rfis" element={
                     <FeatureErrorBoundary>
-                        <RFIManager project={project} />
+                        <Suspense fallback={<LoadingSpinner />}>
+                            <RFIManager project={project} />
+                        </Suspense>
                     </FeatureErrorBoundary>
                 } />
                 <Route path="/site-visits" element={
                     <FeatureErrorBoundary>
-                        <SiteVisitManager project={project} />
+                        <Suspense fallback={<LoadingSpinner />}>
+                            <SiteVisitManager project={project} />
+                        </Suspense>
                     </FeatureErrorBoundary>
                 } />
                 <Route path="/calendar" element={
                     <FeatureErrorBoundary>
-                        <CalendarView project={project} />
+                        <Suspense fallback={<LoadingSpinner />}>
+                            <CalendarView project={project} />
+                        </Suspense>
                     </FeatureErrorBoundary>
                 } />
                 <Route path="/check" element={
                     <FeatureErrorBoundary>
-                        <PreInspection project={project} updateProject={updateProject} />
+                        <Suspense fallback={<LoadingSpinner />}>
+                            <PreInspection project={project} updateProject={updateProject} />
+                        </Suspense>
                     </FeatureErrorBoundary>
                 } />
                 <Route path="/inspector" element={
                     <FeatureErrorBoundary>
-                        <InspectorMode
-                            projectId={project.id}
-                            projectType={project.type}
-                            serviceVoltage={project.serviceVoltage}
-                            servicePhase={project.servicePhase}
-                        />
+                        <Suspense fallback={<LoadingSpinner />}>
+                            <InspectorMode
+                                projectId={project.id}
+                                projectType={project.type}
+                                serviceVoltage={project.serviceVoltage}
+                                servicePhase={project.servicePhase}
+                            />
+                        </Suspense>
                     </FeatureErrorBoundary>
                 } />
                 {/* Activity log merged into Inspector Mode - route kept for backwards compatibility */}
@@ -169,26 +198,34 @@ const ProjectWrapper = ({ projects, updateProject, deleteProject, onSignOut }: {
                 } />
                 <Route path="/materials" element={
                     <FeatureErrorBoundary>
-                        <MaterialTakeOff project={project} />
+                        <Suspense fallback={<LoadingSpinner />}>
+                            <MaterialTakeOff project={project} />
+                        </Suspense>
                     </FeatureErrorBoundary>
                 } />
                 <Route path="/feeders" element={
                     <FeatureErrorBoundary>
-                        <FeederManager
-                            projectId={project.id}
-                            projectVoltage={project.serviceVoltage}
-                            projectPhase={project.servicePhase}
-                        />
+                        <Suspense fallback={<LoadingSpinner />}>
+                            <FeederManager
+                                projectId={project.id}
+                                projectVoltage={project.serviceVoltage}
+                                projectPhase={project.servicePhase}
+                            />
+                        </Suspense>
                     </FeatureErrorBoundary>
                 } />
                 <Route path="/permit-packet" element={
                     <FeatureErrorBoundary>
-                        <PermitPacketGenerator projectId={project.id} />
+                        <Suspense fallback={<LoadingSpinner />}>
+                            <PermitPacketGenerator projectId={project.id} />
+                        </Suspense>
                     </FeatureErrorBoundary>
                 } />
                 <Route path="/short-circuit" element={
                     <FeatureErrorBoundary>
-                        <ShortCircuitResults />
+                        <Suspense fallback={<LoadingSpinner />}>
+                            <ShortCircuitResults />
+                        </Suspense>
                     </FeatureErrorBoundary>
                 } />
             </Routes>
@@ -316,10 +353,10 @@ const NecAssistant = () => {
     };
 
     return (
-        <div className="fixed bottom-6 right-6 z-50 flex flex-col items-end">
+        <div className="fixed bottom-4 right-4 left-4 md:left-auto md:bottom-6 md:right-6 z-50 flex flex-col items-end">
             {isOpen && (
-                <div className={`bg-white border border-gray-200 shadow-2xl rounded-lg mb-4 flex flex-col overflow-hidden animate-in slide-in-from-bottom-10 fade-in duration-300 transition-all ${
-                    isEnlarged ? 'w-[600px] h-[700px]' : 'w-96 h-[500px]'
+                <div className={`bg-white border border-gray-200 shadow-2xl rounded-lg mb-4 flex flex-col overflow-hidden animate-in slide-in-from-bottom-10 fade-in duration-300 transition-all w-full ${
+                    isEnlarged ? 'md:w-[600px] h-[90vh] md:h-[700px]' : 'md:w-96 h-[70vh] md:h-[500px]'
                 }`}>
                     {/* Header */}
                     <div className="bg-gradient-to-r from-gray-900 to-gray-800 text-white p-4 flex justify-between items-center">
@@ -609,6 +646,61 @@ function AppContent() {
     }
   };
 
+  const handleSampleTemplateSelection = async (templateType: TemplateType) => {
+    if (!user) return;
+
+    // Create project from comprehensive sample template
+    const { project: templateProject, panels: templatePanels } = createProjectFromTemplate(templateType, user.id);
+    const created = await createProject(templateProject);
+
+    if (created) {
+      const { supabase } = await import('./lib/supabase');
+
+      // Create loads for the project
+      if (templateProject.loads && templateProject.loads.length > 0) {
+        try {
+          const loadsWithCorrectId = templateProject.loads.map(load => ({
+            ...load,
+            project_id: created.id, // Use actual database-generated project ID
+          }));
+
+          const { error: loadsError } = await supabase
+            .from('loads')
+            .insert(loadsWithCorrectId);
+
+          if (loadsError) {
+            console.error('Error creating template loads:', loadsError);
+          }
+        } catch (err) {
+          console.error('Failed to create loads:', err);
+        }
+      }
+
+      // Create panels for the project
+      if (templatePanels.length > 0) {
+        try {
+          const panelsWithCorrectId = templatePanels.map(panel => ({
+            ...panel,
+            project_id: created.id, // Use actual database-generated project ID
+          }));
+
+          const { error: panelsError } = await supabase
+            .from('panels')
+            .insert(panelsWithCorrectId);
+
+          if (panelsError) {
+            console.error('Error creating template panels:', panelsError);
+          }
+        } catch (err) {
+          console.error('Failed to create panels:', err);
+        }
+      }
+
+      // Navigate to new project
+      navigate(`/project/${created.id}`);
+    }
+  };
+
   const updateProject = async (updated: Project) => {
     await updateProjectDB(updated);
   };
@@ -662,7 +754,9 @@ function AppContent() {
         <Route path="/calendar" element={
           <ProtectedRoute>
             <Layout title="Calendar - All Projects" onSignOut={handleSignOut}>
-              <CalendarView />
+              <Suspense fallback={<LoadingSpinner />}>
+                <CalendarView />
+              </Suspense>
             </Layout>
           </ProtectedRoute>
         } />
@@ -693,6 +787,7 @@ function AppContent() {
         isOpen={showTemplateSelector}
         onClose={() => setShowTemplateSelector(false)}
         onSelectTemplate={handleTemplateSelection}
+        onSelectSampleTemplate={handleSampleTemplateSelection}
       />
 
       {user && <NecAssistant />}
@@ -704,6 +799,30 @@ export default function App() {
   return (
     <ErrorBoundary>
       <HashRouter>
+        <Toaster
+          position="top-right"
+          toastOptions={{
+            duration: 4000,
+            style: {
+              background: '#363636',
+              color: '#fff',
+            },
+            success: {
+              duration: 3000,
+              iconTheme: {
+                primary: '#10B981',
+                secondary: '#fff',
+              },
+            },
+            error: {
+              duration: 5000,
+              iconTheme: {
+                primary: '#EF4444',
+                secondary: '#fff',
+              },
+            },
+          }}
+        />
         <AppContent />
       </HashRouter>
     </ErrorBoundary>

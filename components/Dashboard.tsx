@@ -1,10 +1,16 @@
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Project, ProjectStatus } from '../types';
-import { Plus, ChevronRight, AlertCircle, CheckCircle2, Clock, AlertTriangle, Trash2, MessageSquare, MapPin, Calendar, FileText, Filter } from 'lucide-react';
+import { Plus, ChevronRight, AlertCircle, CheckCircle2, Clock, AlertTriangle, Trash2, MessageSquare, MapPin, Calendar, FileText, Filter, FolderPlus, Upload } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth';
 import { useAllOpenItems } from '../hooks/useAllOpenItems';
+import { WelcomeModal } from './WelcomeModal';
+import { EmptyState } from './LoadingSpinner';
+import { ProjectExportImportCompact } from './ProjectExportImport';
+import { TemplateType, createProjectFromTemplate } from '../services/sampleTemplates';
+import { useProjects } from '../hooks/useProjects';
+import { supabase } from '../lib/supabase';
 
 interface DashboardProps {
   projects: Project[];
@@ -16,11 +22,61 @@ export const Dashboard: React.FC<DashboardProps> = ({ projects, createNewProject
   const navigate = useNavigate();
   const { user } = useAuth();
   const { openItems, loading: loadingOpenItems } = useAllOpenItems();
+  const { createProject } = useProjects();
 
   // Filter and sort state
   const [selectedProject, setSelectedProject] = useState<string>('all');
   const [selectedType, setSelectedType] = useState<string>('all');
   const [sortBy, setSortBy] = useState<'date' | 'priority'>('priority');
+
+  // Welcome modal state
+  const [showWelcome, setShowWelcome] = useState(false);
+
+  // Show welcome modal for new users (no projects + hasn't dismissed it before)
+  useEffect(() => {
+    if (projects.length === 0 && !localStorage.getItem('welcomeModalDismissed')) {
+      setShowWelcome(true);
+    }
+  }, [projects.length]);
+
+  const handleCloseWelcome = () => {
+    setShowWelcome(false);
+    localStorage.setItem('welcomeModalDismissed', 'true');
+  };
+
+  // Handle template-based project creation from WelcomeModal
+  const handleCreateFromTemplate = async (templateType?: TemplateType) => {
+    if (!user) return;
+
+    if (templateType) {
+      // Create project from sample template
+      const { project: templateProject, panels: templatePanels } = createProjectFromTemplate(templateType, user.id);
+      const newProject = await createProject(templateProject);
+
+      if (newProject) {
+        // Create panels for the project
+        if (templatePanels.length > 0) {
+          try {
+            const { error } = await supabase
+              .from('panels')
+              .insert(templatePanels);
+
+            if (error) {
+              console.error('Error creating template panels:', error);
+            }
+          } catch (err) {
+            console.error('Failed to create panels:', err);
+          }
+        }
+
+        // Navigate to the new project
+        navigate(`/project/${newProject.id}`);
+      }
+    } else {
+      // Fall back to standard project creation
+      createNewProject();
+    }
+  };
 
   // Get user's display name from metadata or email
   const getUserName = () => {
@@ -139,18 +195,36 @@ export const Dashboard: React.FC<DashboardProps> = ({ projects, createNewProject
           <h2 className="text-2xl font-light text-gray-900">Welcome back, {getUserName()}</h2>
           <p className="text-gray-500 mt-1">You have <span className="font-medium text-electric-600">{projects.length} active projects</span> requiring NEC compliance review.</p>
         </div>
-        <button
-          onClick={createNewProject}
-          className="bg-electric-400 hover:bg-electric-500 text-black px-6 py-3 rounded-md font-medium flex items-center gap-2 transition-colors shadow-sm"
-        >
-          <Plus className="w-5 h-5" />
-          Create New NEC Project
-        </button>
+        <div className="flex items-center gap-3">
+          <ProjectExportImportCompact
+            onImportSuccess={(projectId, projectName) => {
+              navigate(`/project/${projectId}`);
+            }}
+          />
+          <button
+            onClick={createNewProject}
+            className="bg-electric-400 hover:bg-electric-500 text-black px-6 py-3 rounded-md font-medium flex items-center gap-2 transition-colors shadow-sm"
+          >
+            <Plus className="w-5 h-5" />
+            Create New NEC Project
+          </button>
+        </div>
       </div>
 
       {/* Project Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {projects.map(project => {
+      {projects.length === 0 ? (
+        <EmptyState
+          icon={<FolderPlus className="w-16 h-16" />}
+          title="No projects yet"
+          description="Create your first NEC compliance project to get started with electrical design and code validation."
+          action={{
+            label: "Create First Project",
+            onClick: createNewProject
+          }}
+        />
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {projects.map(project => {
             const openIssues = project.issues.filter(i => i.status === 'Open').length;
             const criticalIssues = project.issues.filter(i => i.status === 'Open' && i.severity === 'Critical').length;
             
@@ -222,8 +296,9 @@ export const Dashboard: React.FC<DashboardProps> = ({ projects, createNewProject
                 </div>
               </div>
             );
-        })}
-      </div>
+          })}
+        </div>
+      )}
 
       {/* Open Items Section (Below Project Cards) */}
       {!loadingOpenItems && openItems.length > 0 && (
@@ -343,6 +418,14 @@ export const Dashboard: React.FC<DashboardProps> = ({ projects, createNewProject
             </div>
           )}
         </div>
+      )}
+
+      {/* Welcome Modal for New Users */}
+      {showWelcome && (
+        <WelcomeModal
+          onClose={handleCloseWelcome}
+          onCreateProject={handleCreateFromTemplate}
+        />
       )}
     </div>
   );

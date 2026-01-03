@@ -67,7 +67,6 @@ interface FeederSummary {
   destinationPanel?: string;
   destinationTransformer?: string;
   phaseConductorSize: string;
-  totalLoadVA: number;
   voltageDropPercent?: number;
 }
 
@@ -333,15 +332,12 @@ export function formatContextForAI(context: ProjectContext): string {
     prompt += `\n`;
   }
 
-  // Add key circuits (if user asks about specific circuits)
-  if (context.circuits.length > 0 && context.circuits.length <= 20) {
-    prompt += `KEY CIRCUITS:\n`;
-    context.circuits.slice(0, 10).forEach(circuit => {
+  // Add circuits (show all up to 50, which is already the limit from buildProjectContext)
+  if (context.circuits.length > 0) {
+    prompt += `CIRCUITS (${context.circuits.length} total):\n`;
+    context.circuits.forEach(circuit => {
       prompt += `- ${circuit.panelName} Ckt ${circuit.circuitNumber}: ${circuit.description}, ${circuit.breakerAmps}A/${circuit.pole}P, ${circuit.loadWatts}W, ${circuit.conductorSize}\n`;
     });
-    if (context.circuits.length > 10) {
-      prompt += `... and ${context.circuits.length - 10} more circuits\n`;
-    }
     prompt += `\n`;
   }
 
@@ -349,7 +345,7 @@ export function formatContextForAI(context: ProjectContext): string {
   if (context.feeders.length > 0) {
     prompt += `FEEDERS:\n`;
     context.feeders.forEach(feeder => {
-      prompt += `- ${feeder.name}: ${feeder.sourcePanel} → ${feeder.destinationPanel || feeder.destinationTransformer || 'Unknown'}, ${feeder.phaseConductorSize}, ${Math.round(feeder.totalLoadVA / 1000)}kVA`;
+      prompt += `- ${feeder.name}: ${feeder.sourcePanel} → ${feeder.destinationPanel || feeder.destinationTransformer || 'Unknown'}, ${feeder.phaseConductorSize}`;
       if (feeder.voltageDropPercent) {
         prompt += `, ${feeder.voltageDropPercent.toFixed(1)}% VD`;
       }

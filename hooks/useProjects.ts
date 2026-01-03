@@ -9,6 +9,7 @@ import type { Database } from '@/lib/database.types';
 import { Project } from '@/types';
 import { useAuthContext } from '@/components/Auth/AuthProvider';
 import { dbProjectToFrontend, frontendProjectToDbInsert, frontendProjectToDbUpdate } from '@/lib/typeAdapters';
+import { showToast, toastMessages } from '@/lib/toast';
 
 type DbProject = Database['public']['Tables']['projects']['Row'];
 
@@ -108,10 +109,12 @@ export function useProjects(): UseProjectsReturn {
       // Optimistically update local state immediately (real-time subscription will sync later)
       setProjects(prev => [frontendProject, ...prev]);
 
+      showToast.success(toastMessages.project.created);
       return frontendProject;
     } catch (err) {
       console.error('Failed to create project:', err);
       setError(err instanceof Error ? err.message : 'Failed to create project');
+      showToast.error(toastMessages.project.error);
       return null;
     }
   };
@@ -134,11 +137,13 @@ export function useProjects(): UseProjectsReturn {
         .eq('id', project.id);
 
       if (error) throw error;
+      showToast.success(toastMessages.project.updated);
     } catch (err) {
       // Rollback optimistic update on error
       setProjects(previousProjects);
       console.error('Failed to update project:', err);
       setError(err instanceof Error ? err.message : 'Failed to update project');
+      showToast.error(toastMessages.project.error);
     }
   };
 
@@ -152,10 +157,12 @@ export function useProjects(): UseProjectsReturn {
       const { error } = await supabase.from('projects').delete().eq('id', id);
 
       if (error) throw error;
+      showToast.success(toastMessages.project.deleted);
     } catch (err) {
       // Rollback optimistic update on error
       setProjects(previousProjects);
       setError(err instanceof Error ? err.message : 'Failed to delete project');
+      showToast.error(toastMessages.project.error);
     }
   };
 

@@ -74,6 +74,7 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 import type { Database } from '@/lib/database.types';
+import { showToast, toastMessages } from '@/lib/toast';
 
 type Panel = Database['public']['Tables']['panels']['Row'];
 type PanelInsert = Database['public']['Tables']['panels']['Insert'];
@@ -247,9 +248,11 @@ export function usePanels(projectId: string | undefined): UsePanelsReturn {
         setPanels(prev => [...prev, data]);
       }
 
+      showToast.success(toastMessages.panel.created);
       return data;
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to create panel');
+      showToast.error(toastMessages.panel.error);
       return null;
     }
   };
@@ -267,8 +270,10 @@ export function usePanels(projectId: string | undefined): UsePanelsReturn {
         setPanels(previousPanels);
         throw error;
       }
+      showToast.success(toastMessages.panel.updated);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to update panel');
+      showToast.error(toastMessages.panel.error);
     }
   };
 
@@ -277,8 +282,10 @@ export function usePanels(projectId: string | undefined): UsePanelsReturn {
       const { error } = await supabase.from('panels').delete().eq('id', id);
 
       if (error) throw error;
+      showToast.success(toastMessages.panel.deleted);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to delete panel');
+      showToast.error(toastMessages.panel.error);
     }
   };
 

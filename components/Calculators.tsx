@@ -1,6 +1,6 @@
 
 import React, { useState } from 'react';
-import { Calculator, ArrowRight, CheckCircle, XCircle, AlertTriangle, Zap, Car, Sun, Shield, Save, X, Plus, Trash2, TrendingUp, Sparkles, Info } from 'lucide-react';
+import { Calculator, ArrowRight, CheckCircle, XCircle, AlertTriangle, Zap, Car, Sun, Shield, Save, X, Plus, Trash2, TrendingUp, Sparkles, Info, Menu } from 'lucide-react';
 import { calculateVoltageDropAC, compareVoltageDropMethods, VoltageDropResult } from '../services/calculations';
 import { ConductorSizingTool } from './ConductorSizingTool';
 import { ProjectSettings } from '../types';
@@ -63,6 +63,29 @@ export const Calculators: React.FC<CalculatorsProps> = ({ projectId }) => {
     temperatureRating: 75
   };
 
+  const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
+
+  // Calculator options for mobile dropdown
+  const calculatorOptions = [
+    { value: 'voltage-drop', label: 'Voltage Drop (NEC 210.19)' },
+    { value: 'conductor-sizing', label: 'Conductor Sizing (NEC 310 + 250.122)' },
+    { value: 'conduit-fill', label: 'Conduit Fill (Chapter 9)' },
+    { value: 'short-circuit', label: 'Short Circuit (NEC 110.9)' },
+    { value: 'ev-charging', label: 'EV Charging (NEC 625)' },
+    { value: 'ev-panel-builder', label: 'EV Panel Builder' },
+    { value: 'solar-pv', label: 'Solar PV (NEC 690)' },
+    { value: 'arc-flash', label: 'Arc Flash (NFPA 70E)' },
+    { value: 'evems', label: 'EVEMS Load Mgmt (NEC 625.42)' },
+    { value: 'service-upgrade', label: 'Service Upgrade (NEC 230.42)' },
+    { value: 'commercial-load', label: 'Commercial Load (NEC 220.40)' },
+    { value: 'change-impact', label: 'Change Impact Analyzer (AI)' },
+  ];
+
+  const handleMobileCalculatorChange = (value: string) => {
+    setActiveTab(value as any);
+    setIsMobileSidebarOpen(false);
+  };
+
   return (
     <div className="animate-in fade-in duration-500 max-w-6xl">
       <div className="section-spacing">
@@ -70,9 +93,23 @@ export const Calculators: React.FC<CalculatorsProps> = ({ projectId }) => {
         <p className="text-gray-500 mt-0.5 text-sm">Deterministic calculators for NEC compliance (Not AI).</p>
       </div>
 
-      <div className="grid grid-cols-[260px_1fr] gap-6">
-        {/* Vertical Sidebar Navigation */}
-        <div className="space-y-0.5 pr-4 border-r border-gray-200">
+      {/* Mobile Calculator Selector */}
+      <div className="md:hidden mb-4">
+        <label className="block text-sm font-medium text-gray-700 mb-2">Select Calculator</label>
+        <select
+          value={activeTab}
+          onChange={(e) => handleMobileCalculatorChange(e.target.value)}
+          className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-electric-500 focus:border-electric-500"
+        >
+          {calculatorOptions.map(opt => (
+            <option key={opt.value} value={opt.value}>{opt.label}</option>
+          ))}
+        </select>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-[260px_1fr] gap-6">
+        {/* Vertical Sidebar Navigation - Hidden on mobile */}
+        <div className="hidden md:block space-y-0.5 pr-4 border-r border-gray-200">
           <button
             onClick={() => setActiveTab('voltage-drop')}
             className={`w-full text-left px-3 py-2.5 text-sm font-medium border-l-4 transition-colors ${activeTab === 'voltage-drop' ? 'border-electric-500 bg-electric-50 text-gray-900' : 'border-transparent text-gray-500 hover:bg-gray-50 hover:text-gray-700'}`}

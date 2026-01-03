@@ -6,6 +6,7 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 import type { Database } from '@/lib/database.types';
+import { showToast, toastMessages } from '@/lib/toast';
 
 type Circuit = Database['public']['Tables']['circuits']['Row'];
 type CircuitInsert = Database['public']['Tables']['circuits']['Insert'];
@@ -103,9 +104,11 @@ export function useCircuits(projectId: string | undefined): UseCircuitsReturn {
       // REPLACE: Replace temp circuit with real one from database
       setCircuits(prev => prev.map(c => c.id === tempId ? data : c));
 
+      showToast.success(toastMessages.circuit.created);
       return data;
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to create circuit');
+      showToast.error(toastMessages.circuit.error);
       return null;
     }
   };
@@ -124,8 +127,10 @@ export function useCircuits(projectId: string | undefined): UseCircuitsReturn {
         setCircuits(previousCircuits);
         throw error;
       }
+      showToast.success(toastMessages.circuit.updated);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to update circuit');
+      showToast.error(toastMessages.circuit.error);
     }
   };
 
@@ -143,8 +148,10 @@ export function useCircuits(projectId: string | undefined): UseCircuitsReturn {
         setCircuits(previousCircuits);
         throw error;
       }
+      showToast.success(toastMessages.circuit.deleted);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to delete circuit');
+      showToast.error(toastMessages.circuit.error);
     }
   };
 
@@ -156,7 +163,8 @@ export function useCircuits(projectId: string | undefined): UseCircuitsReturn {
     try {
       // OPTIMISTIC UPDATE: Remove all panel circuits from local state immediately
       const previousCircuits = [...circuits];
-      const panelCircuitIds = circuits.filter(c => c.panel_id === panelId).map(c => c.id);
+      const panelCircuits = circuits.filter(c => c.panel_id === panelId);
+      const count = panelCircuits.length;
       setCircuits(prev => prev.filter(c => c.panel_id !== panelId));
 
       // Delete from database - delete all circuits matching the panel
@@ -170,8 +178,12 @@ export function useCircuits(projectId: string | undefined): UseCircuitsReturn {
         setCircuits(previousCircuits);
         throw error;
       }
+      if (count > 0) {
+        showToast.success(`${count} circuit${count === 1 ? '' : 's'} deleted`);
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to delete panel circuits');
+      showToast.error(toastMessages.circuit.error);
     }
   };
 

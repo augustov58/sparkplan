@@ -25,7 +25,9 @@ import {
   Package,
   Grid,
   ChevronDown,
-  ChevronRight
+  ChevronRight,
+  Menu,
+  X
 } from 'lucide-react';
 import { useAuthContext } from './Auth/AuthProvider';
 import { ProjectType } from '../types';
@@ -48,6 +50,7 @@ interface SidebarItemProps {
   hasChildren?: boolean;
   isExpanded?: boolean;
   onToggle?: () => void;
+  onNavigate?: () => void;
 }
 
 interface SidebarSectionProps {
@@ -70,21 +73,26 @@ const SidebarItem: React.FC<SidebarItemProps> = ({
   nested = false,
   hasChildren = false,
   isExpanded = false,
-  onToggle
+  onToggle,
+  onNavigate
 }) => {
   const navigate = useNavigate();
 
   const handleClick = (e: React.MouseEvent) => {
-    // Prevent default if has children (accordion behavior)
+    e.preventDefault();
+
+    // Toggle accordion if has children
     if (hasChildren && onToggle) {
-      e.preventDefault();
       onToggle();
     }
 
-    // Navigate if path exists
-    if (path && !hasChildren) {
-      e.preventDefault();
+    // Navigate to path (even if has children - allows parent route navigation)
+    if (path) {
       navigate(path, { replace: false });
+      // Close mobile menu after navigation
+      if (onNavigate) {
+        onNavigate();
+      }
     }
   };
 
@@ -118,6 +126,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, title, showBack, onSig
   const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({
     'Circuit Design': true // Default to expanded
   });
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   // Extract user initials from email
   const getUserInitials = () => {
@@ -187,14 +196,37 @@ export const Layout: React.FC<LayoutProps> = ({ children, title, showBack, onSig
 
   return (
     <div className="min-h-screen bg-white flex flex-row font-sans">
+      {/* Mobile Menu Overlay */}
+      {isMobileMenuOpen && (
+        <div
+          className="fixed inset-0 bg-black/50 z-40 md:hidden"
+          onClick={() => setIsMobileMenuOpen(false)}
+        />
+      )}
+
       {/* Sidebar */}
-      <aside className="w-64 border-r border-gray-100 h-screen sticky top-0 flex flex-col bg-white z-10">
+      <aside className={`
+        w-64 border-r border-gray-100 h-screen flex flex-col bg-white z-50
+        fixed md:sticky top-0
+        transition-transform duration-300 ease-in-out
+        ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}
+      `}>
         <div className="p-6 border-b border-gray-50">
-          <div className="flex items-center gap-2" onClick={() => navigate('/')}>
-            <div className="w-8 h-8 bg-electric-500 rounded flex items-center justify-center cursor-pointer">
-              <Zap className="text-white w-5 h-5 fill-current" />
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2 cursor-pointer" onClick={() => navigate('/')}>
+              <div className="w-8 h-8 bg-electric-500 rounded flex items-center justify-center">
+                <Zap className="text-white w-5 h-5 fill-current" />
+              </div>
+              <span className="font-bold text-lg tracking-tight text-gray-900">NEC PRO</span>
             </div>
-            <span className="font-bold text-lg tracking-tight text-gray-900 cursor-pointer">NEC PRO</span>
+            {/* Close button - only show on mobile */}
+            <button
+              onClick={() => setIsMobileMenuOpen(false)}
+              className="md:hidden text-gray-400 hover:text-gray-600 p-1"
+              aria-label="Close menu"
+            >
+              <X className="w-5 h-5" />
+            </button>
           </div>
         </div>
 
@@ -206,12 +238,14 @@ export const Layout: React.FC<LayoutProps> = ({ children, title, showBack, onSig
                 label="All Projects"
                 path="/"
                 active={location.pathname === '/'}
+                onNavigate={() => setIsMobileMenuOpen(false)}
               />
               <SidebarItem
                 icon={Calendar}
                 label="Calendar"
                 path="/calendar"
                 active={location.pathname === '/calendar'}
+                onNavigate={() => setIsMobileMenuOpen(false)}
               />
             </>
           )}
@@ -220,7 +254,10 @@ export const Layout: React.FC<LayoutProps> = ({ children, title, showBack, onSig
             <>
               <div className="px-4 py-2 mb-2">
                 <button
-                  onClick={() => navigate('/')}
+                  onClick={() => {
+                    navigate('/');
+                    setIsMobileMenuOpen(false);
+                  }}
                   className="flex items-center gap-2 text-xs text-gray-400 hover:text-gray-600 transition-colors"
                 >
                   <ArrowLeft className="w-3 h-3" /> Back to Dashboard
@@ -244,6 +281,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, title, showBack, onSig
                             ...prev,
                             [item.label]: !prev[item.label]
                           }))}
+                          onNavigate={() => setIsMobileMenuOpen(false)}
                         />
                         {item.nested && expandedSections[item.label] && item.nested.map((nestedItem: any) => (
                           <SidebarItem
@@ -253,6 +291,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, title, showBack, onSig
                             path={nestedItem.path}
                             active={location.pathname === nestedItem.path}
                             nested={true}
+                            onNavigate={() => setIsMobileMenuOpen(false)}
                           />
                         ))}
                       </React.Fragment>
@@ -295,13 +334,23 @@ export const Layout: React.FC<LayoutProps> = ({ children, title, showBack, onSig
           }}
         />
 
-        <header className="h-16 border-b border-gray-100 flex items-center px-8 justify-between sticky top-0 bg-white/80 backdrop-blur-sm z-10">
-          <h1 className="text-xl font-medium text-gray-900">{title}</h1>
+        <header className="h-16 border-b border-gray-100 flex items-center px-4 md:px-8 justify-between sticky top-0 bg-white/80 backdrop-blur-sm z-10">
+          <div className="flex items-center gap-3">
+            {/* Hamburger menu button - only show on mobile */}
+            <button
+              onClick={() => setIsMobileMenuOpen(true)}
+              className="md:hidden text-gray-600 hover:text-gray-900 p-2 -ml-2"
+              aria-label="Open menu"
+            >
+              <Menu className="w-6 h-6" />
+            </button>
+            <h1 className="text-lg md:text-xl font-medium text-gray-900">{title}</h1>
+          </div>
           <div className="flex items-center gap-4">
              {/* Header Actions Could Go Here */}
           </div>
         </header>
-        <div className="p-8 max-w-[1600px] mx-auto relative z-0">
+        <div className="p-4 md:p-8 max-w-[1600px] mx-auto relative z-0">
           {children}
         </div>
       </main>

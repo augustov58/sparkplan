@@ -841,10 +841,15 @@ export function generateResidentialPanelSchedule(input: SingleFamilyInput): Gene
   const circuits: GeneratedCircuit[] = [];
   const { squareFootage, smallApplianceCircuits, laundryCircuit, appliances } = input;
 
-  // General Lighting circuits (one per ~1000-1500 sq ft)
-  const lightingCircuits = Math.max(2, Math.ceil(squareFootage / 1200));
-  const lightingVAPerCircuit = Math.ceil((squareFootage * 3) / lightingCircuits);
-  
+  // General Lighting circuits - MUST NOT EXCEED CIRCUIT CAPACITY
+  // NEC 210.70: General lighting
+  // 15A × 120V = 1,800 VA max capacity
+  // Use 1,500 VA per circuit for safety margin (83% capacity)
+  const totalLightingVA = squareFootage * 3; // NEC 220.12: 3 VA/sq ft
+  const MAX_VA_PER_15A_CIRCUIT = 1500; // Safe loading (not exceeding 1,800 VA)
+  const lightingCircuits = Math.ceil(totalLightingVA / MAX_VA_PER_15A_CIRCUIT);
+  const lightingVAPerCircuit = Math.ceil(totalLightingVA / lightingCircuits);
+
   for (let i = 1; i <= lightingCircuits; i++) {
     circuits.push({
       description: `Lighting Circuit ${i}`,

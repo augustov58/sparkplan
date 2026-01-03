@@ -1,0 +1,171 @@
+/**
+ * Button Component System
+ * Reusable button variants for consistent UI styling
+ */
+
+import React from 'react';
+import { Loader2 } from 'lucide-react';
+
+export type ButtonVariant = 'primary' | 'secondary' | 'danger' | 'ghost' | 'outline';
+export type ButtonSize = 'sm' | 'md' | 'lg';
+
+interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
+  /** Button style variant */
+  variant?: ButtonVariant;
+  /** Button size */
+  size?: ButtonSize;
+  /** Loading state - shows spinner and disables button */
+  loading?: boolean;
+  /** Icon to show before text */
+  icon?: React.ReactNode;
+  /** Full width button */
+  fullWidth?: boolean;
+  /** Children (button text/content) */
+  children: React.ReactNode;
+}
+
+const variantClasses: Record<ButtonVariant, string> = {
+  primary: 'bg-electric-500 hover:bg-electric-600 text-white shadow-sm disabled:bg-gray-300',
+  secondary: 'bg-gray-700 hover:bg-gray-800 text-white shadow-sm disabled:bg-gray-300',
+  danger: 'bg-red-600 hover:bg-red-700 text-white shadow-sm disabled:bg-red-300',
+  ghost: 'bg-transparent hover:bg-gray-100 text-gray-700 disabled:text-gray-400',
+  outline: 'bg-white hover:bg-gray-50 text-gray-700 border border-gray-300 disabled:border-gray-200 disabled:text-gray-400'
+};
+
+const sizeClasses: Record<ButtonSize, string> = {
+  sm: 'text-xs px-3 py-1.5 gap-1.5',
+  md: 'text-sm px-4 py-2 gap-2',
+  lg: 'text-base px-6 py-3 gap-2'
+};
+
+/**
+ * Button Component
+ *
+ * @example
+ * // Primary button
+ * <Button variant="primary">Save Changes</Button>
+ *
+ * @example
+ * // Button with icon and loading state
+ * <Button variant="primary" icon={<Save className="w-4 h-4" />} loading={isSaving}>
+ *   Save
+ * </Button>
+ *
+ * @example
+ * // Danger button
+ * <Button variant="danger" size="sm" onClick={handleDelete}>
+ *   Delete
+ * </Button>
+ */
+export const Button: React.FC<ButtonProps> = ({
+  variant = 'primary',
+  size = 'md',
+  loading = false,
+  icon,
+  fullWidth = false,
+  children,
+  className = '',
+  disabled,
+  ...props
+}) => {
+  return (
+    <button
+      className={`
+        inline-flex items-center justify-center
+        font-medium rounded-lg
+        transition-colors
+        disabled:cursor-not-allowed disabled:opacity-60
+        ${variantClasses[variant]}
+        ${sizeClasses[size]}
+        ${fullWidth ? 'w-full' : ''}
+        ${className}
+      `}
+      disabled={disabled || loading}
+      {...props}
+    >
+      {loading ? (
+        <Loader2 className="w-4 h-4 animate-spin" />
+      ) : icon ? (
+        icon
+      ) : null}
+      {children}
+    </button>
+  );
+};
+
+/**
+ * Icon Button
+ * Square button for icon-only actions
+ */
+interface IconButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
+  icon: React.ReactNode;
+  variant?: ButtonVariant;
+  size?: ButtonSize;
+  loading?: boolean;
+}
+
+const iconButtonSizeClasses: Record<ButtonSize, string> = {
+  sm: 'p-1.5',
+  md: 'p-2',
+  lg: 'p-3'
+};
+
+export const IconButton: React.FC<IconButtonProps> = ({
+  icon,
+  variant = 'ghost',
+  size = 'md',
+  loading = false,
+  className = '',
+  disabled,
+  ...props
+}) => {
+  return (
+    <button
+      className={`
+        inline-flex items-center justify-center
+        rounded-lg
+        transition-colors
+        disabled:cursor-not-allowed disabled:opacity-60
+        ${variantClasses[variant]}
+        ${iconButtonSizeClasses[size]}
+        ${className}
+      `}
+      disabled={disabled || loading}
+      {...props}
+    >
+      {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : icon}
+    </button>
+  );
+};
+
+/**
+ * Button Group
+ * Groups buttons together with connected appearance
+ */
+interface ButtonGroupProps {
+  children: React.ReactNode;
+  className?: string;
+}
+
+export const ButtonGroup: React.FC<ButtonGroupProps> = ({ children, className = '' }) => {
+  return (
+    <div className={`inline-flex rounded-lg shadow-sm ${className}`} role="group">
+      {React.Children.map(children, (child, index) => {
+        if (!React.isValidElement(child)) return child;
+
+        const isFirst = index === 0;
+        const isLast = index === React.Children.count(children) - 1;
+
+        return React.cloneElement(child as React.ReactElement<any>, {
+          className: `
+            ${child.props.className || ''}
+            ${!isFirst ? '-ml-px' : ''}
+            ${!isFirst && !isLast ? 'rounded-none' : ''}
+            ${isFirst && !isLast ? 'rounded-r-none' : ''}
+            ${isLast && !isFirst ? 'rounded-l-none' : ''}
+          `
+        });
+      })}
+    </div>
+  );
+};
