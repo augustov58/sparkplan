@@ -102,8 +102,8 @@ export const PreInspection: React.FC<InspectionProps> = ({ project }) => {
     <div className="space-y-8 animate-in fade-in duration-500">
        <div className="flex justify-between items-center">
          <div>
-           <h2 className="text-2xl font-light text-gray-900">Pre-Inspection Checklist</h2>
-           <p className="text-gray-500 mt-1">Rough-in and Final inspection verification.</p>
+           <h2 className="text-2xl font-light text-white">Pre-Inspection Checklist</h2>
+           <p className="text-slate-500 mt-1">Rough-in and Final inspection verification.</p>
          </div>
          <div className="flex gap-2">
            {items.length > 0 && (
@@ -129,20 +129,20 @@ export const PreInspection: React.FC<InspectionProps> = ({ project }) => {
       {/* Bulk Delete Confirmation Dialog */}
       {showDeleteConfirm && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4 animate-in fade-in zoom-in-95 duration-200">
+          <div className="bg-slate-800 rounded-lg p-6 max-w-md w-full mx-4 animate-in fade-in zoom-in-95 duration-200">
             <div className="flex items-center gap-3 mb-4">
               <div className="w-10 h-10 rounded-full bg-red-100 flex items-center justify-center">
                 <AlertTriangle className="w-5 h-5 text-red-600" />
               </div>
               <div>
-                <h3 className="font-semibold text-gray-900">Delete All Items?</h3>
-                <p className="text-sm text-gray-500">This will remove all {items.length} checklist items.</p>
+                <h3 className="font-semibold text-white">Delete All Items?</h3>
+                <p className="text-sm text-slate-500">This will remove all {items.length} checklist items.</p>
               </div>
             </div>
             <div className="flex justify-end gap-2">
               <button
                 onClick={() => setShowDeleteConfirm(false)}
-                className="px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 rounded-md"
+                className="px-4 py-2 text-sm text-slate-300 hover:bg-gray-100 rounded-md"
               >
                 Cancel
               </button>
@@ -163,8 +163,8 @@ export const PreInspection: React.FC<InspectionProps> = ({ project }) => {
         </div>
       )}
 
-      <div className="bg-white border border-gray-100 rounded-lg overflow-hidden shadow-sm">
-         <div className="grid grid-cols-12 bg-gray-50 p-4 border-b border-gray-100 text-xs font-bold text-gray-500 uppercase">
+      <div className="bg-slate-800 border border-gray-100 rounded-lg overflow-hidden shadow-sm">
+         <div className="grid grid-cols-12 bg-gray-50 p-4 border-b border-gray-100 text-xs font-bold text-slate-500 uppercase">
              <div className="col-span-1 flex items-center">
                <input type="checkbox" className="w-4 h-4 rounded opacity-0 pointer-events-none" />
              </div>
@@ -194,7 +194,7 @@ export const PreInspection: React.FC<InspectionProps> = ({ project }) => {
                         />
                      </div>
                      <div className="col-span-8">
-                         <span className={`block text-sm font-medium ${item.status === 'Pass' ? 'text-gray-500 line-through' : 'text-gray-900'}`}>
+                         <span className={`block text-sm font-medium ${item.status === 'Pass' ? 'text-slate-500 line-through' : 'text-white'}`}>
                            {item.requirement}
                          </span>
                          <span className="text-xs text-electric-600 bg-electric-50 px-2 py-0.5 rounded-full mt-1 inline-block">{item.category}</span>

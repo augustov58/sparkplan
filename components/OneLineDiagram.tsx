@@ -126,6 +126,7 @@ import { useFeeders } from '../hooks/useFeeders';
 import { FeederManager } from './FeederManager';
 import { BulkCircuitCreator } from './BulkCircuitCreator';
 import { EquipmentSpecForm } from './EquipmentSpecForm';
+import { useTheme } from './ThemeContext';
 import {
   validatePanelForm,
   validateCircuitForm,
@@ -157,6 +158,19 @@ export const OneLineDiagram: React.FC<OneLineDiagramProps> = ({ project, updateP
   const { circuits, createCircuit, deleteCircuit } = useCircuits(project.id);
   const { transformers, createTransformer, deleteTransformer } = useTransformers(project.id);
   const { feeders } = useFeeders(project.id);
+
+  // Theme for SVG colors
+  const { isDark } = useTheme();
+
+  // Theme-aware SVG colors
+  const svgColors = {
+    gridStroke: isDark ? '#334155' : '#e2e8f0',
+    symbolFill: isDark ? '#1e293b' : '#ffffff',
+    symbolStroke: isDark ? '#64748b' : '#374151',
+    lineStroke: isDark ? '#64748b' : '#374151',
+    textFill: isDark ? '#e2e8f0' : '#1e293b',
+    textMuted: isDark ? '#94a3b8' : '#64748b',
+  };
 
   const [description, setDescription] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -746,7 +760,7 @@ export const OneLineDiagram: React.FC<OneLineDiagramProps> = ({ project, updateP
           cx={feederLineX}
           cy={loopY}
           r={loopRadius}
-          fill="white"
+          fill={svgColors.symbolFill}
           stroke="#6366F1"
           strokeWidth="2"
         />
@@ -768,7 +782,7 @@ export const OneLineDiagram: React.FC<OneLineDiagramProps> = ({ project, updateP
           y={loopY - labelHeight / 2}
           width={labelWidth}
           height={labelHeight}
-          fill="white"
+          fill={svgColors.symbolFill}
           stroke="#6366F1"
           strokeWidth="1.5"
           rx="3"
@@ -1541,13 +1555,13 @@ export const OneLineDiagram: React.FC<OneLineDiagramProps> = ({ project, updateP
 
     return (
       <g>
-        {/* White background mask */}
+        {/* Background mask */}
         <rect
           x={maskX - padding}
           y={maskY - padding}
           width={estimatedWidth + padding * 2}
           height={maskHeight + padding * 2}
-          fill="white"
+          fill={isDark ? '#0f172a' : '#f1f5f9'}
           stroke="none"
         />
         {/* Text on top */}
@@ -1608,7 +1622,7 @@ export const OneLineDiagram: React.FC<OneLineDiagramProps> = ({ project, updateP
           y={y + 3}
           width={width - 6}
           height={height - 6}
-          fill="white"
+          fill={svgColors.symbolFill}
           stroke={panelColor}
           strokeWidth={isMDP ? 2.5 : 2}
           rx={1}
@@ -1756,7 +1770,7 @@ export const OneLineDiagram: React.FC<OneLineDiagramProps> = ({ project, updateP
           y={y}
           width={width}
           height={height}
-          fill="white"
+          fill={svgColors.symbolFill}
           stroke="#9333EA"
           strokeWidth={2}
           rx={4}
@@ -2077,8 +2091,8 @@ export const OneLineDiagram: React.FC<OneLineDiagramProps> = ({ project, updateP
   if (diagramOnly) {
     return (
       <div className="w-full h-[calc(100vh-4rem)] animate-in fade-in duration-500">
-        <div className="bg-white border border-gray-100 rounded-lg h-full overflow-auto relative shadow-inner flex flex-col">
-            <div className="absolute top-4 left-4 z-20 bg-white/90 backdrop-blur px-3 py-1 text-xs font-mono border border-gray-200 rounded">
+        <div className="bg-slate-800 border border-slate-700 rounded-lg h-full overflow-auto relative shadow-inner flex flex-col">
+            <div className="absolute top-4 left-4 z-20 bg-slate-800/90 backdrop-blur px-3 py-1 text-xs font-mono border border-slate-700 rounded">
                {project.serviceVoltage}V {project.servicePhase}Φ Service
             </div>
 
@@ -2096,7 +2110,7 @@ export const OneLineDiagram: React.FC<OneLineDiagramProps> = ({ project, updateP
               <button
                 onClick={() => handleExportDiagram('png')}
                 disabled={exporting || panels.length === 0}
-                className="bg-white hover:bg-gray-50 disabled:bg-gray-100 text-gray-700 px-3 py-1 rounded text-xs font-medium border border-gray-200 flex items-center gap-1 transition-colors shadow-sm"
+                className="bg-slate-800 hover:bg-slate-800 disabled:bg-slate-700 text-slate-300 px-3 py-1 rounded text-xs font-medium border border-slate-700 flex items-center gap-1 transition-colors shadow-sm"
                 title="Export as PNG Image"
               >
                 <Image className="w-3 h-3" />
@@ -2105,7 +2119,7 @@ export const OneLineDiagram: React.FC<OneLineDiagramProps> = ({ project, updateP
               <button
                 onClick={() => handleExportDiagram('svg')}
                 disabled={exporting || panels.length === 0}
-                className="bg-white hover:bg-gray-50 disabled:bg-gray-100 text-gray-700 px-3 py-1 rounded text-xs font-medium border border-gray-200 flex items-center gap-1 transition-colors shadow-sm"
+                className="bg-slate-800 hover:bg-slate-800 disabled:bg-slate-700 text-slate-300 px-3 py-1 rounded text-xs font-medium border border-slate-700 flex items-center gap-1 transition-colors shadow-sm"
                 title="Export as SVG Vector"
               >
                 <FileCode className="w-3 h-3" />
@@ -2117,7 +2131,7 @@ export const OneLineDiagram: React.FC<OneLineDiagramProps> = ({ project, updateP
                     setManualOffsets(new Map());
                     localStorage.removeItem(`diagram-manual-offsets-${project.id}`);
                   }}
-                  className="bg-white hover:bg-gray-50 text-gray-700 px-3 py-1 rounded text-xs font-medium border border-gray-200 flex items-center gap-1 transition-colors shadow-sm"
+                  className="bg-slate-800 hover:bg-slate-800 text-slate-300 px-3 py-1 rounded text-xs font-medium border border-slate-700 flex items-center gap-1 transition-colors shadow-sm"
                   title="Reset all manual panel positions to automatic layout"
                 >
                   <RefreshCcw className="w-3 h-3" />
@@ -2127,7 +2141,7 @@ export const OneLineDiagram: React.FC<OneLineDiagramProps> = ({ project, updateP
             </div>
 
             <DiagramPanZoom className="w-full h-full flex-1">
-            <svg ref={diagramRef} className="w-full bg-white" viewBox={`0 0 ${viewBoxWidth} ${viewBoxHeight}`} preserveAspectRatio="xMidYMid meet" style={{ minWidth: `${viewBoxWidth}px`, minHeight: `${viewBoxHeight}px` }}>
+            <svg ref={diagramRef} className="w-full bg-slate-800" viewBox={`0 0 ${viewBoxWidth} ${viewBoxHeight}`} preserveAspectRatio="xMidYMid meet" style={{ minWidth: `${viewBoxWidth}px`, minHeight: `${viewBoxHeight}px` }}>
                 <defs>
                     <marker id="arrow" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto" markerUnits="strokeWidth">
                         <path d="M0,0 L0,6 L9,3 z" fill="#9CA3AF" />
@@ -2135,22 +2149,22 @@ export const OneLineDiagram: React.FC<OneLineDiagramProps> = ({ project, updateP
                 </defs>
 
                 <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse">
-                    <path d="M 40 0 L 0 0 0 40" fill="none" stroke="#F3F4F6" strokeWidth="1"/>
+                    <path d="M 40 0 L 0 0 0 40" fill="none" stroke={svgColors.gridStroke} strokeWidth="1"/>
                 </pattern>
                 <rect width="100%" height="100%" fill="url(#grid)" />
 
                 {/* Utility Service */}
-                <circle cx={serviceX} cy={50} r="20" stroke="#111827" strokeWidth="2" fill="white" />
-                <text x={serviceX} y={55} textAnchor="middle" fontSize="10" fontWeight="bold" className="font-mono">UTIL</text>
-                <text x={serviceX} y={30} textAnchor="middle" fontSize="8" className="fill-gray-500">
+                <circle cx={serviceX} cy={50} r="20" stroke={svgColors.symbolStroke} strokeWidth="2" fill={svgColors.symbolFill} />
+                <text x={serviceX} y={55} textAnchor="middle" fontSize="10" fontWeight="bold" className="font-mono" fill={svgColors.textFill}>UTIL</text>
+                <text x={serviceX} y={30} textAnchor="middle" fontSize="8" fill={svgColors.textMuted}>
                   {project.serviceVoltage}V {project.servicePhase}Φ
                 </text>
 
                 {/* Service Drop Line */}
-                <line x1={serviceX} y1={70} x2={serviceX} y2={90} stroke="#111827" strokeWidth="3" />
+                <line x1={serviceX} y1={70} x2={serviceX} y2={90} stroke={svgColors.lineStroke} strokeWidth="3" />
 
                 {/* Meter */}
-                <rect x={serviceX - 20} y={90} width="40" height="30" stroke="#111827" strokeWidth="2" fill="white" />
+                <rect x={serviceX - 20} y={90} width="40" height="30" stroke={svgColors.symbolStroke} strokeWidth="2" fill={svgColors.symbolFill} />
                 <text x={serviceX} y={110} textAnchor="middle" fontSize="10" fontWeight="bold">M</text>
 
                 {/* Service Line to First Panel */}
@@ -2234,8 +2248,8 @@ export const OneLineDiagram: React.FC<OneLineDiagramProps> = ({ project, updateP
             </DiagramPanZoom>
 
             {description && (
-                <div className="p-4 bg-gray-50 border-t border-gray-100 text-xs text-gray-600 max-h-32 overflow-y-auto">
-                    <h4 className="font-bold text-gray-900 mb-1">AI Analysis</h4>
+                <div className="p-4 bg-slate-800 border-t border-slate-700 text-xs text-slate-400 max-h-32 overflow-y-auto">
+                    <h4 className="font-bold text-white mb-1">AI Analysis</h4>
                     {description}
                 </div>
             )}
@@ -2253,13 +2267,13 @@ export const OneLineDiagram: React.FC<OneLineDiagramProps> = ({ project, updateP
       {/* Header */}
       <div className="flex justify-between items-center">
         <div>
-          <h2 className="text-lg font-medium text-gray-900">Circuit Design & One-Line</h2>
-          <p className="text-sm text-gray-500">Design branch circuits and generate system diagram.</p>
+          <h2 className="text-lg font-medium text-white">Circuit Design & One-Line</h2>
+          <p className="text-sm text-slate-500">Design branch circuits and generate system diagram.</p>
         </div>
         <div className="flex gap-2">
             <button 
               onClick={handleGenerate}
-              className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 rounded-md text-sm font-medium hover:bg-gray-50 text-gray-700"
+              className="flex items-center gap-2 px-4 py-2 bg-slate-800 border border-slate-700 rounded-md text-sm font-medium hover:bg-slate-800 text-slate-300"
             >
               <RefreshCcw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
               {description ? 'Regenerate Analysis' : 'Analyze Topology'}
@@ -2276,28 +2290,28 @@ export const OneLineDiagram: React.FC<OneLineDiagramProps> = ({ project, updateP
         {/* Left Col: Panel & Circuit Editors */}
         <div className="space-y-6 lg:max-h-[calc(100vh-12rem)] lg:overflow-y-auto lg:pr-2">
            {/* Add Panel */}
-           <div className="bg-white border border-gray-100 rounded-lg p-6 shadow-sm">
-             <h3 className="font-medium text-gray-900 mb-4 flex items-center gap-2">
+           <div className="bg-slate-800 border border-slate-700 rounded-lg p-6 shadow-sm">
+             <h3 className="font-medium text-white mb-4 flex items-center gap-2">
                <Grid className="w-4 h-4 text-electric-500" /> Add Panel/Bus
              </h3>
              <div className="space-y-3">
                <div>
-                 <label className="text-xs font-semibold text-gray-500 uppercase">Panel Name</label>
+                 <label className="text-xs font-semibold text-slate-500 uppercase">Panel Name</label>
                  <input
                     type="text"
                     value={newPanel.name}
                     onChange={e => setNewPanel({...newPanel, name: e.target.value})}
                     placeholder="e.g. LP - Lighting Panel"
-                    className="w-full border-gray-200 rounded text-sm py-2 focus:border-electric-500 focus:ring-electric-500"
+                    className="w-full border-slate-700 rounded text-sm py-2 focus:border-electric-500 focus:ring-electric-500"
                  />
                </div>
                <div className="grid grid-cols-2 gap-3">
                  <div>
-                   <label className="text-xs font-semibold text-gray-500 uppercase">Voltage (V)</label>
+                   <label className="text-xs font-semibold text-slate-500 uppercase">Voltage (V)</label>
                    <select
                       value={newPanel.voltage}
                       onChange={e => setNewPanel({...newPanel, voltage: Number(e.target.value)})}
-                      className="w-full border-gray-200 rounded text-sm py-2"
+                      className="w-full border-slate-700 rounded text-sm py-2"
                    >
                      <option value="120">120V</option>
                      <option value="208">208V</option>
@@ -2307,11 +2321,11 @@ export const OneLineDiagram: React.FC<OneLineDiagramProps> = ({ project, updateP
                    </select>
                  </div>
                  <div>
-                   <label className="text-xs font-semibold text-gray-500 uppercase">Phase</label>
+                   <label className="text-xs font-semibold text-slate-500 uppercase">Phase</label>
                    <select
                       value={newPanel.phase}
                       onChange={e => setNewPanel({...newPanel, phase: Number(e.target.value) as 1 | 3})}
-                      className="w-full border-gray-200 rounded text-sm py-2"
+                      className="w-full border-slate-700 rounded text-sm py-2"
                    >
                      <option value="1">Single-Phase</option>
                      <option value="3">Three-Phase</option>
@@ -2320,32 +2334,32 @@ export const OneLineDiagram: React.FC<OneLineDiagramProps> = ({ project, updateP
                </div>
                <div className="grid grid-cols-2 gap-3">
                  <div>
-                   <label className="text-xs font-semibold text-gray-500 uppercase">Bus Rating (A)</label>
+                   <label className="text-xs font-semibold text-slate-500 uppercase">Bus Rating (A)</label>
                    <input
                       type="number"
                       value={newPanel.busRating}
                       onChange={e => setNewPanel({...newPanel, busRating: Number(e.target.value)})}
-                      className="w-full border-gray-200 rounded text-sm py-2"
+                      className="w-full border-slate-700 rounded text-sm py-2"
                    />
                  </div>
                  <div>
-                   <label className="text-xs font-semibold text-gray-500 uppercase">Main Breaker (A)</label>
+                   <label className="text-xs font-semibold text-slate-500 uppercase">Main Breaker (A)</label>
                    <input
                       type="number"
                       value={newPanel.mainBreakerAmps}
                       onChange={e => setNewPanel({...newPanel, mainBreakerAmps: Number(e.target.value)})}
-                      className="w-full border-gray-200 rounded text-sm py-2"
+                      className="w-full border-slate-700 rounded text-sm py-2"
                    />
                  </div>
                </div>
                <div>
-                  <label className="text-xs font-semibold text-gray-500 uppercase">Location</label>
+                  <label className="text-xs font-semibold text-slate-500 uppercase">Location</label>
                   <input
                     type="text"
                     value={newPanel.location}
                     onChange={e => setNewPanel({...newPanel, location: e.target.value})}
                     placeholder="Optional"
-                    className="w-full border-gray-200 rounded text-sm py-2"
+                    className="w-full border-slate-700 rounded text-sm py-2"
                  />
                </div>
                <div className="flex items-center">
@@ -2354,9 +2368,9 @@ export const OneLineDiagram: React.FC<OneLineDiagramProps> = ({ project, updateP
                    id="isMainPanel"
                    checked={newPanel.isMain}
                    onChange={e => setNewPanel({...newPanel, isMain: e.target.checked})}
-                   className="rounded border-gray-300 text-electric-500 focus:ring-electric-500"
+                   className="rounded border-slate-600 text-electric-500 focus:ring-electric-500"
                  />
-                 <label htmlFor="isMainPanel" className="ml-2 text-sm text-gray-700 cursor-pointer">
+                 <label htmlFor="isMainPanel" className="ml-2 text-sm text-slate-300 cursor-pointer">
                    This is the Main Distribution Panel (MDP)
                  </label>
                </div>
@@ -2364,24 +2378,24 @@ export const OneLineDiagram: React.FC<OneLineDiagramProps> = ({ project, updateP
                {!newPanel.isMain && (
                  <>
                    <div>
-                     <label className="text-xs font-semibold text-gray-500 uppercase">Fed From</label>
+                     <label className="text-xs font-semibold text-slate-500 uppercase">Fed From</label>
                      <select
                         value={newPanel.fedFromType}
                         onChange={e => setNewPanel({...newPanel, fedFromType: e.target.value as 'panel' | 'transformer', fedFromId: ''})}
-                        className="w-full border-gray-200 rounded text-sm py-2"
+                        className="w-full border-slate-700 rounded text-sm py-2"
                      >
                        <option value="panel">Panel</option>
                        <option value="transformer">Transformer</option>
                      </select>
                    </div>
                    <div>
-                     <label className="text-xs font-semibold text-gray-500 uppercase">
+                     <label className="text-xs font-semibold text-slate-500 uppercase">
                        Select {newPanel.fedFromType === 'panel' ? 'Panel' : 'Transformer'}
                      </label>
                      <select
                         value={newPanel.fedFromId}
                         onChange={e => setNewPanel({...newPanel, fedFromId: e.target.value})}
-                        className="w-full border-gray-200 rounded text-sm py-2"
+                        className="w-full border-slate-700 rounded text-sm py-2"
                      >
                        <option value="">Auto-select from MDP</option>
                        {newPanel.fedFromType === 'panel' && panels.map(panel => (
@@ -2409,27 +2423,27 @@ export const OneLineDiagram: React.FC<OneLineDiagramProps> = ({ project, updateP
            </div>
 
            {/* Add Transformer */}
-           <div className="bg-white border border-gray-100 rounded-lg p-6 shadow-sm">
-             <h3 className="font-medium text-gray-900 mb-4 flex items-center gap-2">
+           <div className="bg-slate-800 border border-slate-700 rounded-lg p-6 shadow-sm">
+             <h3 className="font-medium text-white mb-4 flex items-center gap-2">
                <Bolt className="w-4 h-4 text-orange-500" /> Add Transformer
              </h3>
              <div className="space-y-3">
                <div>
-                 <label className="text-xs font-semibold text-gray-500 uppercase">Transformer Name</label>
+                 <label className="text-xs font-semibold text-slate-500 uppercase">Transformer Name</label>
                  <input
                     type="text"
                     value={newTransformer.name}
                     onChange={e => setNewTransformer({...newTransformer, name: e.target.value})}
                     placeholder="e.g. XFMR-1"
-                    className="w-full border-gray-200 rounded text-sm py-2"
+                    className="w-full border-slate-700 rounded text-sm py-2"
                  />
                </div>
                <div>
-                 <label className="text-xs font-semibold text-gray-500 uppercase">Fed From Panel</label>
+                 <label className="text-xs font-semibold text-slate-500 uppercase">Fed From Panel</label>
                  <select
                     value={newTransformer.fedFromPanelId}
                     onChange={e => setNewTransformer({...newTransformer, fedFromPanelId: e.target.value})}
-                    className="w-full border-gray-200 rounded text-sm py-2"
+                    className="w-full border-slate-700 rounded text-sm py-2"
                  >
                    <option value="">Select panel...</option>
                    {panels.map(panel => (
@@ -2441,11 +2455,11 @@ export const OneLineDiagram: React.FC<OneLineDiagramProps> = ({ project, updateP
                </div>
                <div className="grid grid-cols-2 gap-3">
                  <div>
-                   <label className="text-xs font-semibold text-gray-500 uppercase">kVA Rating</label>
+                   <label className="text-xs font-semibold text-slate-500 uppercase">kVA Rating</label>
                    <select
                       value={newTransformer.kvaRating}
                       onChange={e => setNewTransformer({...newTransformer, kvaRating: Number(e.target.value)})}
-                      className="w-full border-gray-200 rounded text-sm py-2"
+                      className="w-full border-slate-700 rounded text-sm py-2"
                    >
                      <option value="15">15 kVA</option>
                      <option value="30">30 kVA</option>
@@ -2459,22 +2473,22 @@ export const OneLineDiagram: React.FC<OneLineDiagramProps> = ({ project, updateP
                    </select>
                  </div>
                  <div>
-                   <label className="text-xs font-semibold text-gray-500 uppercase">Primary Breaker</label>
+                   <label className="text-xs font-semibold text-slate-500 uppercase">Primary Breaker</label>
                    <input
                       type="number"
                       value={newTransformer.primaryBreakerAmps}
                       onChange={e => setNewTransformer({...newTransformer, primaryBreakerAmps: Number(e.target.value)})}
-                      className="w-full border-gray-200 rounded text-sm py-2"
+                      className="w-full border-slate-700 rounded text-sm py-2"
                    />
                  </div>
                </div>
                <div className="grid grid-cols-2 gap-3">
                  <div>
-                   <label className="text-xs font-semibold text-gray-500 uppercase">Secondary Voltage</label>
+                   <label className="text-xs font-semibold text-slate-500 uppercase">Secondary Voltage</label>
                    <select
                       value={newTransformer.secondaryVoltage}
                       onChange={e => setNewTransformer({...newTransformer, secondaryVoltage: Number(e.target.value)})}
-                      className="w-full border-gray-200 rounded text-sm py-2"
+                      className="w-full border-slate-700 rounded text-sm py-2"
                    >
                      <option value="120">120V</option>
                      <option value="208">208V</option>
@@ -2484,11 +2498,11 @@ export const OneLineDiagram: React.FC<OneLineDiagramProps> = ({ project, updateP
                    </select>
                  </div>
                  <div>
-                   <label className="text-xs font-semibold text-gray-500 uppercase">Secondary Phase</label>
+                   <label className="text-xs font-semibold text-slate-500 uppercase">Secondary Phase</label>
                    <select
                       value={newTransformer.secondaryPhase}
                       onChange={e => setNewTransformer({...newTransformer, secondaryPhase: Number(e.target.value) as 1 | 3})}
-                      className="w-full border-gray-200 rounded text-sm py-2"
+                      className="w-full border-slate-700 rounded text-sm py-2"
                    >
                      <option value="1">Single-Phase</option>
                      <option value="3">Three-Phase</option>
@@ -2496,13 +2510,13 @@ export const OneLineDiagram: React.FC<OneLineDiagramProps> = ({ project, updateP
                  </div>
                </div>
                <div>
-                 <label className="text-xs font-semibold text-gray-500 uppercase">Location (Optional)</label>
+                 <label className="text-xs font-semibold text-slate-500 uppercase">Location (Optional)</label>
                  <input
                     type="text"
                     value={newTransformer.location}
                     onChange={e => setNewTransformer({...newTransformer, location: e.target.value})}
                     placeholder="e.g. Electrical Room"
-                    className="w-full border-gray-200 rounded text-sm py-2"
+                    className="w-full border-slate-700 rounded text-sm py-2"
                  />
                </div>
                <button
@@ -2517,21 +2531,21 @@ export const OneLineDiagram: React.FC<OneLineDiagramProps> = ({ project, updateP
 
            {/* Transformers List */}
            {transformers.length > 0 && (
-             <div className="bg-white border border-gray-100 rounded-lg overflow-hidden">
-               <div className="bg-gray-50 px-4 py-2 border-b border-gray-100 text-xs font-medium text-gray-500 uppercase">
+             <div className="bg-slate-800 border border-slate-700 rounded-lg overflow-hidden">
+               <div className="bg-slate-800 px-4 py-2 border-b border-slate-700 text-xs font-medium text-slate-500 uppercase">
                  Transformers ({transformers.length})
                </div>
                <div className="divide-y divide-gray-50 max-h-[200px] overflow-y-auto">
                  {transformers.map(xfmr => {
                    const sourcePanel = panels.find(p => p.id === xfmr.fed_from_panel_id);
                    return (
-                     <div key={xfmr.id} className="p-3 flex justify-between items-center hover:bg-gray-50 group">
+                     <div key={xfmr.id} className="p-3 flex justify-between items-center hover:bg-slate-800 group">
                        <div>
                          <div className="flex items-center gap-2">
                             <Bolt className="w-4 h-4 text-orange-500" />
-                            <span className="text-sm font-medium text-gray-900">{xfmr.name}</span>
+                            <span className="text-sm font-medium text-white">{xfmr.name}</span>
                          </div>
-                         <div className="text-xs text-gray-500 ml-6">
+                         <div className="text-xs text-slate-500 ml-6">
                            {xfmr.kva_rating} kVA • {xfmr.primary_voltage}V → {xfmr.secondary_voltage}V
                            {sourcePanel && ` • From ${sourcePanel.name}`}
                          </div>
@@ -2547,8 +2561,8 @@ export const OneLineDiagram: React.FC<OneLineDiagramProps> = ({ project, updateP
            )}
 
            {/* Panels List */}
-           <div className="bg-white border border-gray-100 rounded-lg overflow-hidden">
-             <div className="bg-gray-50 px-4 py-2 border-b border-gray-100 text-xs font-medium text-gray-500 uppercase">
+           <div className="bg-slate-800 border border-slate-700 rounded-lg overflow-hidden">
+             <div className="bg-slate-800 px-4 py-2 border-b border-slate-700 text-xs font-medium text-slate-500 uppercase">
                Panels ({panels.length})
              </div>
              <div className="divide-y divide-gray-50 max-h-[200px] overflow-y-auto">
@@ -2558,13 +2572,13 @@ export const OneLineDiagram: React.FC<OneLineDiagramProps> = ({ project, updateP
                  const isEditing = editingPanel?.id === panel.id;
 
                  return (
-                   <div key={panel.id} className={`p-3 ${isEditing ? 'bg-blue-50 border-l-4 border-blue-500' : 'hover:bg-gray-50'} group`}>
+                   <div key={panel.id} className={`p-3 ${isEditing ? 'bg-blue-50 border-l-4 border-blue-500' : 'hover:bg-slate-800'} group`}>
                      {isEditing ? (
                        // ISSUE #18 FIX: Edit form for panel
                        <div className="space-y-3">
                          <div className="flex items-center justify-between">
                            <span className="text-xs font-semibold text-blue-700 uppercase">Editing Panel</span>
-                           <button onClick={cancelEditPanel} className="text-gray-400 hover:text-gray-600">
+                           <button onClick={cancelEditPanel} className="text-slate-500 hover:text-slate-400">
                              <X className="w-4 h-4" />
                            </button>
                          </div>
@@ -2572,16 +2586,16 @@ export const OneLineDiagram: React.FC<OneLineDiagramProps> = ({ project, updateP
                            type="text"
                            value={editingPanel.name}
                            onChange={e => setEditingPanel({ ...editingPanel, name: e.target.value })}
-                           className="w-full border-gray-200 rounded text-sm py-1.5 px-2"
+                           className="w-full border-slate-700 rounded text-sm py-1.5 px-2"
                            placeholder="Panel Name"
                          />
                          <div className="grid grid-cols-2 gap-2">
                            <div>
-                             <label className="text-[10px] text-gray-500 uppercase">Voltage</label>
+                             <label className="text-[10px] text-slate-500 uppercase">Voltage</label>
                              <select
                                value={editingPanel.voltage}
                                onChange={e => setEditingPanel({ ...editingPanel, voltage: Number(e.target.value) })}
-                               className="w-full border-gray-200 rounded text-xs py-1"
+                               className="w-full border-slate-700 rounded text-xs py-1"
                                disabled={panel.is_main && isResidentialProject}
                              >
                                <option value="120">120V</option>
@@ -2592,11 +2606,11 @@ export const OneLineDiagram: React.FC<OneLineDiagramProps> = ({ project, updateP
                              </select>
                            </div>
                            <div>
-                             <label className="text-[10px] text-gray-500 uppercase">Phase</label>
+                             <label className="text-[10px] text-slate-500 uppercase">Phase</label>
                              <select
                                value={editingPanel.phase}
                                onChange={e => setEditingPanel({ ...editingPanel, phase: Number(e.target.value) as 1 | 3 })}
-                               className="w-full border-gray-200 rounded text-xs py-1"
+                               className="w-full border-slate-700 rounded text-xs py-1"
                                disabled={panel.is_main && isResidentialProject}
                              >
                                <option value="1">1Φ</option>
@@ -2606,21 +2620,21 @@ export const OneLineDiagram: React.FC<OneLineDiagramProps> = ({ project, updateP
                          </div>
                          <div className="grid grid-cols-2 gap-2">
                            <div>
-                             <label className="text-[10px] text-gray-500 uppercase">Bus Rating</label>
+                             <label className="text-[10px] text-slate-500 uppercase">Bus Rating</label>
                              <input
                                type="number"
                                value={editingPanel.busRating}
                                onChange={e => setEditingPanel({ ...editingPanel, busRating: Number(e.target.value) })}
-                               className="w-full border-gray-200 rounded text-xs py-1 px-2"
+                               className="w-full border-slate-700 rounded text-xs py-1 px-2"
                              />
                            </div>
                            <div>
-                             <label className="text-[10px] text-gray-500 uppercase">Main Breaker</label>
+                             <label className="text-[10px] text-slate-500 uppercase">Main Breaker</label>
                              <input
                                type="number"
                                value={editingPanel.mainBreakerAmps}
                                onChange={e => setEditingPanel({ ...editingPanel, mainBreakerAmps: Number(e.target.value) })}
-                               className="w-full border-gray-200 rounded text-xs py-1 px-2"
+                               className="w-full border-slate-700 rounded text-xs py-1 px-2"
                              />
                            </div>
                          </div>
@@ -2628,7 +2642,7 @@ export const OneLineDiagram: React.FC<OneLineDiagramProps> = ({ project, updateP
                            type="text"
                            value={editingPanel.location}
                            onChange={e => setEditingPanel({ ...editingPanel, location: e.target.value })}
-                           className="w-full border-gray-200 rounded text-xs py-1 px-2"
+                           className="w-full border-slate-700 rounded text-xs py-1 px-2"
                            placeholder="Location (optional)"
                          />
                          {panel.is_main && isResidentialProject && (
@@ -2638,23 +2652,23 @@ export const OneLineDiagram: React.FC<OneLineDiagramProps> = ({ project, updateP
                          )}
 
                          {/* Equipment Specifications Section (Expandable) */}
-                         <div className="border-t border-gray-200 pt-3 mt-3">
+                         <div className="border-t border-slate-700 pt-3 mt-3">
                            <button
                              onClick={() => setShowEquipmentSpecs(!showEquipmentSpecs)}
-                             className="w-full flex items-center justify-between text-xs font-medium text-gray-700 hover:text-blue-600 transition-colors"
+                             className="w-full flex items-center justify-between text-xs font-medium text-slate-300 hover:text-blue-600 transition-colors"
                              type="button"
                            >
                              <span className="flex items-center gap-1">
                                <Bolt className="w-3 h-3" />
                                Equipment Specifications (Optional)
                              </span>
-                             <span className="text-gray-400">
+                             <span className="text-slate-500">
                                {showEquipmentSpecs ? '▼' : '▶'}
                              </span>
                            </button>
 
                            {showEquipmentSpecs && editingPanel && (
-                             <div className="mt-3 p-3 bg-gray-50 rounded border border-gray-200">
+                             <div className="mt-3 p-3 bg-slate-800 rounded border border-slate-700">
                                <EquipmentSpecForm
                                  type="panel"
                                  currentData={editingEquipmentSpecs || {}}
@@ -2681,13 +2695,13 @@ export const OneLineDiagram: React.FC<OneLineDiagramProps> = ({ project, updateP
                          <div>
                            <div className="flex items-center gap-2">
                               <Zap className={`w-4 h-4 ${panel.is_main ? 'text-red-500' : 'text-electric-500'}`} />
-                              <span className="text-sm font-medium text-gray-900">{panel.name}</span>
+                              <span className="text-sm font-medium text-white">{panel.name}</span>
                               {panel.is_main && <span className="text-[10px] bg-red-100 text-red-600 px-1.5 py-0.5 rounded font-bold">MAIN</span>}
                               {panel.is_main && mainPanelCount > 1 && (
                                 <span className="text-[10px] bg-yellow-100 text-yellow-700 px-1.5 py-0.5 rounded font-bold">DUPLICATE</span>
                               )}
                            </div>
-                           <div className="text-xs text-gray-500 ml-6">
+                           <div className="text-xs text-slate-500 ml-6">
                              {panel.bus_rating}A Bus • {panel.main_breaker_amps}A Main • {panel.voltage}V {panel.phase}Φ • {circuits.filter(c => c.panel_id === panel.id).length} ckts
                            </div>
                          </div>
@@ -2720,8 +2734,8 @@ export const OneLineDiagram: React.FC<OneLineDiagramProps> = ({ project, updateP
         </div>
 
         {/* Right Col: Diagram */}
-        <div className="bg-white border border-gray-100 rounded-lg h-[600px] lg:h-[calc(100vh-12rem)] lg:sticky lg:top-4 overflow-auto relative shadow-inner flex flex-col">
-            <div className="absolute top-4 left-4 z-20 bg-white/90 backdrop-blur px-3 py-1 text-xs font-mono border border-gray-200 rounded">
+        <div className="bg-slate-800 border border-slate-700 rounded-lg h-[600px] lg:h-[calc(100vh-12rem)] lg:sticky lg:top-4 overflow-auto relative shadow-inner flex flex-col">
+            <div className="absolute top-4 left-4 z-20 bg-slate-800/90 backdrop-blur px-3 py-1 text-xs font-mono border border-slate-700 rounded">
                {project.serviceVoltage}V {project.servicePhase}Φ Service
             </div>
             
@@ -2739,7 +2753,7 @@ export const OneLineDiagram: React.FC<OneLineDiagramProps> = ({ project, updateP
               <button
                 onClick={() => handleExportDiagram('png')}
                 disabled={exporting || panels.length === 0}
-                className="bg-white hover:bg-gray-50 disabled:bg-gray-100 text-gray-700 px-3 py-1 rounded text-xs font-medium border border-gray-200 flex items-center gap-1 transition-colors shadow-sm"
+                className="bg-slate-800 hover:bg-slate-800 disabled:bg-slate-700 text-slate-300 px-3 py-1 rounded text-xs font-medium border border-slate-700 flex items-center gap-1 transition-colors shadow-sm"
                 title="Export as PNG Image"
               >
                 <Image className="w-3 h-3" />
@@ -2748,7 +2762,7 @@ export const OneLineDiagram: React.FC<OneLineDiagramProps> = ({ project, updateP
               <button
                 onClick={() => handleExportDiagram('svg')}
                 disabled={exporting || panels.length === 0}
-                className="bg-white hover:bg-gray-50 disabled:bg-gray-100 text-gray-700 px-3 py-1 rounded text-xs font-medium border border-gray-200 flex items-center gap-1 transition-colors shadow-sm"
+                className="bg-slate-800 hover:bg-slate-800 disabled:bg-slate-700 text-slate-300 px-3 py-1 rounded text-xs font-medium border border-slate-700 flex items-center gap-1 transition-colors shadow-sm"
                 title="Export as SVG Vector"
               >
                 <FileCode className="w-3 h-3" />
@@ -2760,7 +2774,7 @@ export const OneLineDiagram: React.FC<OneLineDiagramProps> = ({ project, updateP
                     setManualOffsets(new Map());
                     localStorage.removeItem(`diagram-manual-offsets-${project.id}`);
                   }}
-                  className="bg-white hover:bg-gray-50 text-gray-700 px-3 py-1 rounded text-xs font-medium border border-gray-200 flex items-center gap-1 transition-colors shadow-sm"
+                  className="bg-slate-800 hover:bg-slate-800 text-slate-300 px-3 py-1 rounded text-xs font-medium border border-slate-700 flex items-center gap-1 transition-colors shadow-sm"
                   title="Reset all manual panel positions to automatic layout"
                 >
                   <RefreshCcw className="w-3 h-3" />
@@ -2770,7 +2784,7 @@ export const OneLineDiagram: React.FC<OneLineDiagramProps> = ({ project, updateP
             </div>
             
             <DiagramPanZoom className="w-full h-full flex-1">
-            <svg ref={diagramRef} className="w-full bg-white" viewBox={`0 0 ${viewBoxWidth} ${viewBoxHeight}`} preserveAspectRatio="xMidYMid meet" style={{ minWidth: `${viewBoxWidth}px`, minHeight: `${viewBoxHeight}px` }}>
+            <svg ref={diagramRef} className="w-full bg-slate-800" viewBox={`0 0 ${viewBoxWidth} ${viewBoxHeight}`} preserveAspectRatio="xMidYMid meet" style={{ minWidth: `${viewBoxWidth}px`, minHeight: `${viewBoxHeight}px` }}>
                 <defs>
                     <marker id="arrow" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto" markerUnits="strokeWidth">
                         <path d="M0,0 L0,6 L9,3 z" fill="#9CA3AF" />
@@ -2778,22 +2792,22 @@ export const OneLineDiagram: React.FC<OneLineDiagramProps> = ({ project, updateP
                 </defs>
 
                 <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse">
-                    <path d="M 40 0 L 0 0 0 40" fill="none" stroke="#F3F4F6" strokeWidth="1"/>
+                    <path d="M 40 0 L 0 0 0 40" fill="none" stroke={svgColors.gridStroke} strokeWidth="1"/>
                 </pattern>
                 <rect width="100%" height="100%" fill="url(#grid)" />
 
                 {/* Utility Service */}
-                <circle cx={serviceX} cy={50} r="20" stroke="#111827" strokeWidth="2" fill="white" />
-                <text x={serviceX} y={55} textAnchor="middle" fontSize="10" fontWeight="bold" className="font-mono">UTIL</text>
-                <text x={serviceX} y={30} textAnchor="middle" fontSize="8" className="fill-gray-500">
+                <circle cx={serviceX} cy={50} r="20" stroke={svgColors.symbolStroke} strokeWidth="2" fill={svgColors.symbolFill} />
+                <text x={serviceX} y={55} textAnchor="middle" fontSize="10" fontWeight="bold" className="font-mono" fill={svgColors.textFill}>UTIL</text>
+                <text x={serviceX} y={30} textAnchor="middle" fontSize="8" fill={svgColors.textMuted}>
                   {project.serviceVoltage}V {project.servicePhase}Φ
                 </text>
 
                 {/* Service Drop Line */}
-                <line x1={serviceX} y1={70} x2={serviceX} y2={90} stroke="#111827" strokeWidth="3" />
+                <line x1={serviceX} y1={70} x2={serviceX} y2={90} stroke={svgColors.lineStroke} strokeWidth="3" />
 
                 {/* Meter */}
-                <rect x={serviceX - 20} y={90} width="40" height="30" stroke="#111827" strokeWidth="2" fill="white" />
+                <rect x={serviceX - 20} y={90} width="40" height="30" stroke={svgColors.symbolStroke} strokeWidth="2" fill={svgColors.symbolFill} />
                 <text x={serviceX} y={110} textAnchor="middle" fontSize="10" fontWeight="bold">M</text>
 
                 {/* Service Line to First Panel */}
@@ -2879,8 +2893,8 @@ export const OneLineDiagram: React.FC<OneLineDiagramProps> = ({ project, updateP
             </DiagramPanZoom>
 
             {description && (
-                <div className="p-4 bg-gray-50 border-t border-gray-100 text-xs text-gray-600 max-h-32 overflow-y-auto">
-                    <h4 className="font-bold text-gray-900 mb-1">AI Analysis</h4>
+                <div className="p-4 bg-slate-800 border-t border-slate-700 text-xs text-slate-400 max-h-32 overflow-y-auto">
+                    <h4 className="font-bold text-white mb-1">AI Analysis</h4>
                     {description}
                 </div>
             )}
@@ -2888,7 +2902,7 @@ export const OneLineDiagram: React.FC<OneLineDiagramProps> = ({ project, updateP
       </div>
 
       {/* Feeder Management Section */}
-      <div className="mt-8 pt-8 border-t border-gray-200">
+      <div className="mt-8 pt-8 border-t border-slate-700">
         <FeederManager
           projectId={project.id}
           projectVoltage={project.serviceVoltage}

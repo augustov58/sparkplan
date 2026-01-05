@@ -114,22 +114,22 @@ export const LoadCalculator: React.FC<LoadCalculatorProps> = ({ project, updateP
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         {/* Left Column: Input Form */}
         <div className="lg:col-span-2 space-y-6">
-          <form onSubmit={handleSubmit(onSubmit)} className="bg-white border border-gray-100 rounded-lg p-6 shadow-sm hover:shadow-md transition-shadow">
-            <h3 className="text-lg font-medium text-gray-900 mb-4 flex items-center gap-2">
+          <form onSubmit={handleSubmit(onSubmit)} className="bg-slate-800 border border-gray-100 rounded-lg p-6 shadow-sm hover:shadow-md transition-shadow">
+            <h3 className="text-lg font-medium text-white mb-4 flex items-center gap-2">
               <Plus className="w-5 h-5 text-electric-500" />
               Add Electrical Load
             </h3>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
               <div>
-                <label className="block text-xs font-semibold text-gray-500 mb-1 uppercase tracking-wider">
+                <label className="block text-xs font-semibold text-slate-500 mb-1 uppercase tracking-wider">
                   Description *
                 </label>
                 <input
                   type="text"
                   {...register('description')}
                   className={`w-full border rounded-md focus:border-electric-500 focus:ring-electric-500 text-sm py-2 ${
-                    errors.description ? 'border-red-300' : 'border-gray-200'
+                    errors.description ? 'border-red-300' : 'border-slate-700'
                   }`}
                   placeholder="e.g. Living Room Lights"
                 />
@@ -141,14 +141,14 @@ export const LoadCalculator: React.FC<LoadCalculatorProps> = ({ project, updateP
                 )}
               </div>
               <div>
-                <label className="block text-xs font-semibold text-gray-500 mb-1 uppercase tracking-wider">
+                <label className="block text-xs font-semibold text-slate-500 mb-1 uppercase tracking-wider">
                   Watts (VA) *
                 </label>
                 <input
                   type="number"
                   {...register('watts', { valueAsNumber: true })}
                   className={`w-full border rounded-md focus:border-electric-500 focus:ring-electric-500 text-sm py-2 ${
-                    errors.watts ? 'border-red-300' : 'border-gray-200'
+                    errors.watts ? 'border-red-300' : 'border-slate-700'
                   }`}
                   placeholder="e.g. 1500"
                 />
@@ -160,14 +160,14 @@ export const LoadCalculator: React.FC<LoadCalculatorProps> = ({ project, updateP
                 )}
               </div>
               <div>
-                <label className="block text-xs font-semibold text-gray-500 mb-1 uppercase tracking-wider">
+                <label className="block text-xs font-semibold text-slate-500 mb-1 uppercase tracking-wider">
                   Quantity *
                 </label>
                 <input
                   type="number"
                   {...register('quantity', { valueAsNumber: true })}
                   className={`w-full border rounded-md focus:border-electric-500 focus:ring-electric-500 text-sm py-2 ${
-                    errors.quantity ? 'border-red-300' : 'border-gray-200'
+                    errors.quantity ? 'border-red-300' : 'border-slate-700'
                   }`}
                   placeholder="1"
                   min="1"
@@ -180,7 +180,7 @@ export const LoadCalculator: React.FC<LoadCalculatorProps> = ({ project, updateP
                 )}
               </div>
               <div>
-                <label className="block text-xs font-semibold text-gray-500 mb-1 uppercase tracking-wider">
+                <label className="block text-xs font-semibold text-slate-500 mb-1 uppercase tracking-wider">
                   Load Type *
                 </label>
                 <select
@@ -191,7 +191,7 @@ export const LoadCalculator: React.FC<LoadCalculatorProps> = ({ project, updateP
                     }
                   })}
                   className={`w-full border rounded-md focus:border-electric-500 focus:ring-electric-500 text-sm py-2 ${
-                    errors.loadType ? 'border-red-300' : 'border-gray-200'
+                    errors.loadType ? 'border-red-300' : 'border-slate-700'
                   }`}
                 >
                   <option value="Lighting">Lighting</option>
@@ -217,7 +217,7 @@ export const LoadCalculator: React.FC<LoadCalculatorProps> = ({ project, updateP
                     {...register('continuous')}
                     className="rounded border-gray-300 text-electric-500 focus:ring-electric-500"
                    />
-                   <span className="text-sm text-gray-600">Continuous Load (125%)</span>
+                   <span className="text-sm text-slate-400">Continuous Load (125%)</span>
                  </label>
               </div>
             </div>
@@ -230,13 +230,13 @@ export const LoadCalculator: React.FC<LoadCalculatorProps> = ({ project, updateP
             </button>
           </form>
 
-          <div className="bg-white border border-gray-100 rounded-lg overflow-hidden">
+          <div className="bg-slate-800 border border-gray-100 rounded-lg overflow-hidden">
             <div className="px-6 py-4 border-b border-gray-50 flex justify-between items-center">
-              <h3 className="font-medium text-gray-900">Load Schedule</h3>
-              <span className="text-xs font-mono bg-gray-100 px-2 py-1 rounded text-gray-500">{loads.length} items</span>
+              <h3 className="font-medium text-white">Load Schedule</h3>
+              <span className="text-xs font-mono bg-gray-100 px-2 py-1 rounded text-slate-500">{loads.length} items</span>
             </div>
             <table className="w-full text-left text-sm">
-              <thead className="bg-gray-50 text-gray-500 font-medium">
+              <thead className="bg-gray-50 text-slate-500 font-medium">
                 <tr>
                   <th className="px-6 py-3 font-normal">Description</th>
                   <th className="px-6 py-3 font-normal">Type</th>
@@ -248,10 +248,10 @@ export const LoadCalculator: React.FC<LoadCalculatorProps> = ({ project, updateP
               <tbody className="divide-y divide-gray-50">
                 {loads.map(load => (
                   <tr key={load.id} className="hover:bg-gray-50/50 group">
-                    <td className="px-6 py-3 text-gray-900">{load.description} {load.continuous && <span className="text-electric-500 text-xs ml-2">●</span>}</td>
-                    <td className="px-6 py-3 text-gray-500 capitalize">{load.type}</td>
-                    <td className="px-6 py-3 text-right font-mono text-gray-700">{load.watts.toLocaleString()}</td>
-                    <td className="px-6 py-3 text-right text-gray-500">{load.phase}</td>
+                    <td className="px-6 py-3 text-white">{load.description} {load.continuous && <span className="text-electric-500 text-xs ml-2">●</span>}</td>
+                    <td className="px-6 py-3 text-slate-500 capitalize">{load.type}</td>
+                    <td className="px-6 py-3 text-right font-mono text-slate-300">{load.watts.toLocaleString()}</td>
+                    <td className="px-6 py-3 text-right text-slate-500">{load.phase}</td>
                     <td className="px-6 py-3 text-right">
                       <button onClick={() => removeLoad(load.id)} className="text-gray-300 hover:text-red-500 transition-colors">
                         <Trash2 className="w-4 h-4" />
@@ -278,8 +278,8 @@ export const LoadCalculator: React.FC<LoadCalculatorProps> = ({ project, updateP
             <div className="space-y-4">
               {/* Connected Load */}
               <div className="flex justify-between items-center">
-                <span className="text-gray-600 text-sm">Total Connected Load</span>
-                <span className="font-mono text-xl font-bold text-gray-900">{(totalConnectedWatts / 1000).toFixed(2)} kVA</span>
+                <span className="text-slate-400 text-sm">Total Connected Load</span>
+                <span className="font-mono text-xl font-bold text-white">{(totalConnectedWatts / 1000).toFixed(2)} kVA</span>
               </div>
 
               {/* Continuous Load Breakdown */}
@@ -302,23 +302,23 @@ export const LoadCalculator: React.FC<LoadCalculatorProps> = ({ project, updateP
 
               {/* Total Demand Load */}
               <div className="flex justify-between items-center border-t border-electric-200 pt-3">
-                <span className="text-gray-700 text-sm font-semibold">Total Demand Load</span>
-                <span className="font-mono text-xl font-bold text-gray-900">{(totalDemandWatts / 1000).toFixed(2)} kVA</span>
+                <span className="text-slate-300 text-sm font-semibold">Total Demand Load</span>
+                <span className="font-mono text-xl font-bold text-white">{(totalDemandWatts / 1000).toFixed(2)} kVA</span>
               </div>
 
               {/* Calculated Current */}
               <div className="flex justify-between items-center">
-                <span className="text-gray-600 text-sm">Calculated Current</span>
-                <span className="font-mono text-xl font-bold text-gray-900">{totalAmps} A</span>
+                <span className="text-slate-400 text-sm">Calculated Current</span>
+                <span className="font-mono text-xl font-bold text-white">{totalAmps} A</span>
               </div>
-              <div className="text-xs text-gray-500">
+              <div className="text-xs text-slate-500">
                 @ {project.serviceVoltage}V {project.servicePhase === 1 ? 'Single' : 'Three'}-Phase
               </div>
 
               {/* Recommended Service Size */}
               <div className="pt-4 border-t border-electric-200/50">
                 <span className="text-xs text-electric-700 block mb-1">Recommended Service Size</span>
-                <span className="text-2xl font-bold text-gray-900">{totalAmps > 200 ? '400A' : totalAmps > 100 ? '200A' : '100A'}</span>
+                <span className="text-2xl font-bold text-white">{totalAmps > 200 ? '400A' : totalAmps > 100 ? '200A' : '100A'}</span>
               </div>
 
               {/* Export PDF Button */}
@@ -332,7 +332,7 @@ export const LoadCalculator: React.FC<LoadCalculatorProps> = ({ project, updateP
                     <Download className="w-4 h-4" />
                     {isExporting ? 'Exporting...' : 'Export Report (TXT)'}
                   </button>
-                  <p className="text-xs text-gray-500 mt-2 text-center">
+                  <p className="text-xs text-slate-500 mt-2 text-center">
                     Download detailed NEC calculation report
                   </p>
                 </div>
@@ -340,9 +340,9 @@ export const LoadCalculator: React.FC<LoadCalculatorProps> = ({ project, updateP
             </div>
           </div>
 
-          <div className="bg-white border border-gray-100 rounded-lg p-6 shadow-sm">
+          <div className="bg-slate-800 border border-gray-100 rounded-lg p-6 shadow-sm">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="font-medium text-gray-900 flex items-center gap-2">
+              <h3 className="font-medium text-white flex items-center gap-2">
                 <Cpu className="w-4 h-4 text-electric-500" />
                 AI Validation (NEC 220)
               </h3>
@@ -360,7 +360,7 @@ export const LoadCalculator: React.FC<LoadCalculatorProps> = ({ project, updateP
                  </button>
                </div>
             ) : (
-              <div className="prose prose-sm max-w-none text-gray-600 bg-gray-50 p-4 rounded-md border border-gray-100 text-xs">
+              <div className="prose prose-sm max-w-none text-slate-400 bg-gray-50 p-4 rounded-md border border-gray-100 text-xs">
                 <div className="whitespace-pre-wrap font-mono">{validationResult}</div>
                 <button 
                   onClick={() => setValidationResult(null)}

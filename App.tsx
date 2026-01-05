@@ -6,6 +6,7 @@ import { Dashboard } from './components/Dashboard';
 import { ProjectSetup } from './components/ProjectSetup';
 import { LandingPage } from './components/LandingPage';
 import { LoadingSpinner } from './components/LoadingSpinner';
+import { ThemeProvider } from './components/ThemeContext';
 
 // Lazy load heavy components for better performance
 const LoadCalculator = lazy(() => import('./components/LoadCalculator').then(m => ({ default: m.LoadCalculator })));
@@ -797,34 +798,36 @@ function AppContent() {
 
 export default function App() {
   return (
-    <ErrorBoundary>
-      <HashRouter>
-        <Toaster
-          position="top-right"
-          toastOptions={{
-            duration: 4000,
-            style: {
-              background: '#363636',
-              color: '#fff',
-            },
-            success: {
-              duration: 3000,
-              iconTheme: {
-                primary: '#10B981',
-                secondary: '#fff',
+    <ThemeProvider>
+      <ErrorBoundary>
+        <HashRouter>
+          <Toaster
+            position="top-right"
+            toastOptions={{
+              duration: 4000,
+              style: {
+                background: '#363636',
+                color: '#fff',
               },
-            },
-            error: {
-              duration: 5000,
-              iconTheme: {
-                primary: '#EF4444',
-                secondary: '#fff',
+              success: {
+                duration: 3000,
+                iconTheme: {
+                  primary: '#10B981',
+                  secondary: '#fff',
+                },
               },
-            },
-          }}
-        />
-        <AppContent />
-      </HashRouter>
-    </ErrorBoundary>
+              error: {
+                duration: 5000,
+                iconTheme: {
+                  primary: '#EF4444',
+                  secondary: '#fff',
+                },
+              },
+            }}
+          />
+          <AppContent />
+        </HashRouter>
+      </ErrorBoundary>
+    </ThemeProvider>
   );
 }

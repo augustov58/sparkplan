@@ -97,7 +97,7 @@ const CategoryBadge: React.FC<{ category: IssueCategory }> = ({ category }) => {
   };
   
   return (
-    <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-600 border border-gray-200">
+    <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-slate-400 border border-slate-700">
       {labels[category]}
     </span>
   );
@@ -149,7 +149,7 @@ const ScoreGauge: React.FC<{ score: number }> = ({ score }) => {
       </svg>
       <div className="absolute inset-0 flex flex-col items-center justify-center">
         <span className={`text-3xl font-bold ${getColor()}`}>{score}</span>
-        <span className="text-xs text-gray-500">{getLabel()}</span>
+        <span className="text-xs text-slate-500">{getLabel()}</span>
       </div>
     </div>
   );
@@ -174,7 +174,7 @@ const IssueCard: React.FC<IssueCardProps> = ({ issue, onExplain, explaining }) =
     }`}>
       <button
         onClick={() => setExpanded(!expanded)}
-        className="w-full px-4 py-3 flex items-start gap-3 text-left hover:bg-white/50 transition-colors"
+        className="w-full px-4 py-3 flex items-start gap-3 text-left hover:bg-slate-800/50 transition-colors"
       >
         <div className="mt-0.5">
           {expanded ? (
@@ -187,37 +187,37 @@ const IssueCard: React.FC<IssueCardProps> = ({ issue, onExplain, explaining }) =
           <div className="flex items-center gap-2 flex-wrap">
             <SeverityBadge severity={issue.severity} />
             <CategoryBadge category={issue.category} />
-            <span className="text-xs font-mono text-gray-500">{issue.necArticle}</span>
+            <span className="text-xs font-mono text-slate-500">{issue.necArticle}</span>
           </div>
-          <h4 className="font-medium text-gray-900 mt-1">{issue.title}</h4>
-          <p className="text-sm text-gray-500 mt-0.5 line-clamp-1">{issue.location}</p>
+          <h4 className="font-medium text-white mt-1">{issue.title}</h4>
+          <p className="text-sm text-slate-500 mt-0.5 line-clamp-1">{issue.location}</p>
         </div>
       </button>
       
       {expanded && (
         <div className="px-4 pb-4 pt-0 ml-7 border-t border-gray-100">
-          <p className="text-sm text-gray-700 mt-3">{issue.description}</p>
+          <p className="text-sm text-slate-300 mt-3">{issue.description}</p>
           
           {(issue.currentValue || issue.requiredValue) && (
             <div className="mt-3 grid grid-cols-2 gap-4">
               {issue.currentValue && (
-                <div className="bg-white rounded-lg px-3 py-2 border">
-                  <span className="text-xs text-gray-500 block">Current</span>
-                  <span className="font-medium text-gray-900">{issue.currentValue}</span>
+                <div className="bg-slate-800 rounded-lg px-3 py-2 border">
+                  <span className="text-xs text-slate-500 block">Current</span>
+                  <span className="font-medium text-white">{issue.currentValue}</span>
                 </div>
               )}
               {issue.requiredValue && (
-                <div className="bg-white rounded-lg px-3 py-2 border">
-                  <span className="text-xs text-gray-500 block">Required</span>
-                  <span className="font-medium text-gray-900">{issue.requiredValue}</span>
+                <div className="bg-slate-800 rounded-lg px-3 py-2 border">
+                  <span className="text-xs text-slate-500 block">Required</span>
+                  <span className="font-medium text-white">{issue.requiredValue}</span>
                 </div>
               )}
             </div>
           )}
           
-          <div className="mt-3 p-3 bg-white rounded-lg border">
-            <span className="text-xs font-medium text-gray-500 uppercase tracking-wider">Recommendation</span>
-            <p className="text-sm text-gray-700 mt-1">{issue.recommendation}</p>
+          <div className="mt-3 p-3 bg-slate-800 rounded-lg border">
+            <span className="text-xs font-medium text-slate-500 uppercase tracking-wider">Recommendation</span>
+            <p className="text-sm text-slate-300 mt-1">{issue.recommendation}</p>
           </div>
           
           <div className="mt-3 flex items-center gap-2">
@@ -237,7 +237,7 @@ const IssueCard: React.FC<IssueCardProps> = ({ issue, onExplain, explaining }) =
               href={`https://www.google.com/search?q=${encodeURIComponent(issue.necArticle + ' explained')}`}
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-slate-400 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
             >
               <ExternalLink className="w-4 h-4" />
               Lookup NEC
@@ -394,11 +394,11 @@ export const InspectorMode: React.FC<InspectorModeProps> = ({
               <Shield className="w-5 h-5 text-white" />
             </div>
             <div>
-              <h2 className="text-2xl font-semibold text-gray-900">Inspector Mode</h2>
-              <p className="text-gray-500 text-sm">Pre-Inspection AI Audit</p>
+              <h2 className="text-2xl font-semibold text-white">Inspector Mode</h2>
+              <p className="text-slate-500 text-sm">Pre-Inspection AI Audit</p>
             </div>
           </div>
-          <p className="mt-3 text-gray-600 max-w-xl">
+          <p className="mt-3 text-slate-400 max-w-xl">
             Automated NEC compliance check before inspector review. Catch issues early and 
             reduce failed inspections.
           </p>
@@ -445,20 +445,20 @@ export const InspectorMode: React.FC<InspectorModeProps> = ({
       
       {/* Data loading state */}
       {dataLoading && (
-        <div className="bg-white border border-gray-100 rounded-xl p-8 text-center">
+        <div className="bg-slate-800 border border-gray-100 rounded-xl p-8 text-center">
           <RefreshCw className="w-8 h-8 animate-spin text-gray-400 mx-auto mb-3" />
-          <p className="text-gray-500">Loading project data...</p>
+          <p className="text-slate-500">Loading project data...</p>
         </div>
       )}
       
       {/* No data state */}
       {!dataLoading && panels.length === 0 && !result && (
-        <div className="bg-gradient-to-br from-gray-50 to-gray-100 border border-gray-200 rounded-xl p-12 text-center">
+        <div className="bg-gradient-to-br from-gray-50 to-gray-100 border border-slate-700 rounded-xl p-12 text-center">
           <div className="w-16 h-16 rounded-full bg-gray-200 flex items-center justify-center mx-auto mb-4">
             <FileText className="w-8 h-8 text-gray-400" />
           </div>
-          <h3 className="text-lg font-medium text-gray-900 mb-2">No Panels Configured</h3>
-          <p className="text-gray-500 max-w-md mx-auto">
+          <h3 className="text-lg font-medium text-white mb-2">No Panels Configured</h3>
+          <p className="text-slate-500 max-w-md mx-auto">
             Add panels and circuits to your project using the One-Line Diagram tool, then 
             run the inspection audit.
           </p>
@@ -471,13 +471,13 @@ export const InspectorMode: React.FC<InspectorModeProps> = ({
           <div className="w-16 h-16 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center mx-auto mb-4">
             <Shield className="w-8 h-8 text-white" />
           </div>
-          <h3 className="text-lg font-medium text-gray-900 mb-2">Ready to Inspect</h3>
-          <p className="text-gray-600 max-w-md mx-auto mb-4">
+          <h3 className="text-lg font-medium text-white mb-2">Ready to Inspect</h3>
+          <p className="text-slate-400 max-w-md mx-auto mb-4">
             Your project has {panels.length} panel{panels.length !== 1 ? 's' : ''} and{' '}
             {circuits.length} circuit{circuits.length !== 1 ? 's' : ''}. 
             Click "Run Inspection" to check NEC compliance.
           </p>
-          <div className="flex items-center justify-center gap-4 text-sm text-gray-500">
+          <div className="flex items-center justify-center gap-4 text-sm text-slate-500">
             <span className="flex items-center gap-1">
               <Target className="w-4 h-4" />
               {panels.length} Panels
@@ -500,9 +500,9 @@ export const InspectorMode: React.FC<InspectorModeProps> = ({
           {/* Summary Cards */}
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             {/* Score Card */}
-            <div className="md:col-span-1 bg-white border border-gray-100 rounded-xl p-6 flex flex-col items-center justify-center">
+            <div className="md:col-span-1 bg-slate-800 border border-gray-100 rounded-xl p-6 flex flex-col items-center justify-center">
               <ScoreGauge score={result.summary.score} />
-              <p className="text-sm text-gray-500 mt-2">Compliance Score</p>
+              <p className="text-sm text-slate-500 mt-2">Compliance Score</p>
             </div>
             
             {/* Stats Cards */}
@@ -546,7 +546,7 @@ export const InspectorMode: React.FC<InspectorModeProps> = ({
           </div>
           
           {/* Timestamp and NEC Articles */}
-          <div className="flex items-center justify-between text-sm text-gray-500">
+          <div className="flex items-center justify-between text-sm text-slate-500">
             <div className="flex items-center gap-2">
               <Clock className="w-4 h-4" />
               <span>Last run: {result.timestamp.toLocaleString()}</span>
@@ -570,8 +570,8 @@ export const InspectorMode: React.FC<InspectorModeProps> = ({
                   <Sparkles className="w-4 h-4 text-white" />
                 </div>
                 <div className="flex-1">
-                  <h4 className="font-medium text-gray-900 mb-2">AI Explanation</h4>
-                  <div className="prose prose-sm text-gray-700 whitespace-pre-wrap">
+                  <h4 className="font-medium text-white mb-2">AI Explanation</h4>
+                  <div className="prose prose-sm text-slate-300 whitespace-pre-wrap">
                     {aiExplanation}
                   </div>
                   <button
@@ -587,10 +587,10 @@ export const InspectorMode: React.FC<InspectorModeProps> = ({
           
           {/* Issues Section */}
           {result.issues.length > 0 ? (
-            <div className="bg-white border border-gray-100 rounded-xl overflow-hidden">
+            <div className="bg-slate-800 border border-gray-100 rounded-xl overflow-hidden">
               {/* Filter tabs */}
               <div className="px-4 py-3 border-b border-gray-100 flex items-center gap-4 bg-gray-50">
-                <span className="text-sm font-medium text-gray-700">Filter:</span>
+                <span className="text-sm font-medium text-slate-300">Filter:</span>
                 <div className="flex gap-1">
                   {(['all', 'critical', 'warning'] as const).map(f => (
                     <button
@@ -599,7 +599,7 @@ export const InspectorMode: React.FC<InspectorModeProps> = ({
                       className={`px-3 py-1 rounded-lg text-sm font-medium transition-colors ${
                         filter === f 
                           ? 'bg-gray-900 text-white' 
-                          : 'text-gray-600 hover:bg-gray-200'
+                          : 'text-slate-400 hover:bg-gray-200'
                       }`}
                     >
                       {f === 'all' ? `All (${result.issues.length})` 
@@ -614,7 +614,7 @@ export const InspectorMode: React.FC<InspectorModeProps> = ({
               <div className="divide-y divide-gray-100">
                 {Array.from(issuesByCategory.entries()).map(([category, categoryIssues]) => (
                   <div key={category} className="p-4">
-                    <h4 className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-3">
+                    <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-3">
                       {category} Issues ({categoryIssues.length})
                     </h4>
                     <div className="space-y-3">
@@ -649,7 +649,7 @@ export const InspectorMode: React.FC<InspectorModeProps> = ({
           
           {/* Passed Checks Collapsible */}
           {result.passedChecks.length > 0 && (
-            <details className="bg-white border border-gray-100 rounded-xl overflow-hidden">
+            <details className="bg-slate-800 border border-gray-100 rounded-xl overflow-hidden">
               <summary className="px-4 py-3 bg-green-50 cursor-pointer hover:bg-green-100 transition-colors flex items-center gap-2">
                 <CheckCircle2 className="w-5 h-5 text-green-600" />
                 <span className="font-medium text-green-900">
@@ -660,7 +660,7 @@ export const InspectorMode: React.FC<InspectorModeProps> = ({
                 {result.passedChecks.map(check => (
                   <div key={check.id} className="py-2 flex items-center gap-3">
                     <CheckCircle2 className="w-4 h-4 text-green-500 flex-shrink-0" />
-                    <span className="text-sm text-gray-700">{check.description}</span>
+                    <span className="text-sm text-slate-300">{check.description}</span>
                     <span className="text-xs font-mono text-gray-400 ml-auto">{check.necArticle}</span>
                   </div>
                 ))}
@@ -669,8 +669,8 @@ export const InspectorMode: React.FC<InspectorModeProps> = ({
           )}
           
           {/* NEC Articles Referenced */}
-          <div className="bg-gray-50 border border-gray-200 rounded-xl p-4">
-            <h4 className="text-sm font-medium text-gray-700 mb-2 flex items-center gap-2">
+          <div className="bg-gray-50 border border-slate-700 rounded-xl p-4">
+            <h4 className="text-sm font-medium text-slate-300 mb-2 flex items-center gap-2">
               <BookOpen className="w-4 h-4" />
               NEC Articles Referenced
             </h4>
@@ -681,7 +681,7 @@ export const InspectorMode: React.FC<InspectorModeProps> = ({
                   href={`https://www.google.com/search?q=${encodeURIComponent(article + ' NEC')}`}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="inline-flex items-center gap-1 px-2.5 py-1 bg-white border border-gray-200 rounded-lg text-xs font-mono text-gray-600 hover:bg-gray-100 hover:border-gray-300 transition-colors"
+                  className="inline-flex items-center gap-1 px-2.5 py-1 bg-slate-800 border border-slate-700 rounded-lg text-xs font-mono text-slate-400 hover:bg-gray-100 hover:border-gray-300 transition-colors"
                 >
                   {article}
                   <ExternalLink className="w-3 h-3" />
@@ -780,8 +780,8 @@ const AIActivitySection: React.FC<AIActivitySectionProps> = ({ projectId }) => {
       case 'approved': return <CheckCircle className="w-4 h-4 text-green-600" />;
       case 'rejected': return <XCircle className="w-4 h-4 text-red-600" />;
       case 'pending': return <Clock className="w-4 h-4 text-blue-600" />;
-      case 'expired': return <XCircle className="w-4 h-4 text-gray-600" />;
-      default: return <Activity className="w-4 h-4 text-gray-600" />;
+      case 'expired': return <XCircle className="w-4 h-4 text-slate-400" />;
+      default: return <Activity className="w-4 h-4 text-slate-400" />;
     }
   };
 
@@ -800,8 +800,8 @@ const AIActivitySection: React.FC<AIActivitySectionProps> = ({ projectId }) => {
       case 'approved': return 'bg-green-100 text-green-800 border-green-200';
       case 'rejected': return 'bg-red-100 text-red-800 border-red-200';
       case 'pending': return 'bg-blue-100 text-blue-800 border-blue-200';
-      case 'expired': return 'bg-gray-100 text-gray-800 border-gray-200';
-      default: return 'bg-gray-100 text-gray-800 border-gray-200';
+      case 'expired': return 'bg-gray-100 text-gray-800 border-slate-700';
+      default: return 'bg-gray-100 text-gray-800 border-slate-700';
     }
   };
 
@@ -832,11 +832,11 @@ const AIActivitySection: React.FC<AIActivitySectionProps> = ({ projectId }) => {
       <div className="bg-gradient-to-r from-indigo-50 to-purple-50 border border-indigo-100 rounded-xl p-6">
         <div className="flex items-center justify-between">
           <div>
-            <h3 className="text-xl font-bold text-gray-900 flex items-center gap-2">
+            <h3 className="text-xl font-bold text-white flex items-center gap-2">
               <Activity className="w-6 h-6 text-indigo-600" />
               AI Agent Activity & Suggestions History
             </h3>
-            <p className="text-sm text-gray-600 mt-1">
+            <p className="text-sm text-slate-400 mt-1">
               Track all AI suggestions, approvals, and rejections for this project
             </p>
           </div>
@@ -852,14 +852,14 @@ const AIActivitySection: React.FC<AIActivitySectionProps> = ({ projectId }) => {
 
       {/* Filters */}
       {actions.length > 0 && (
-        <div className="bg-white border border-gray-200 rounded-xl p-4">
+        <div className="bg-slate-800 border border-slate-700 rounded-xl p-4">
           <div className="flex items-center gap-2 mb-3">
-            <Filter className="w-4 h-4 text-gray-500" />
-            <h4 className="font-medium text-gray-900">Filters</h4>
+            <Filter className="w-4 h-4 text-slate-500" />
+            <h4 className="font-medium text-white">Filters</h4>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Agent</label>
+              <label className="block text-sm font-medium text-slate-300 mb-1">Agent</label>
               <select
                 value={filterAgent}
                 onChange={(e) => setFilterAgent(e.target.value)}
@@ -872,7 +872,7 @@ const AIActivitySection: React.FC<AIActivitySectionProps> = ({ projectId }) => {
               </select>
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
+              <label className="block text-sm font-medium text-slate-300 mb-1">Status</label>
               <select
                 value={filterStatus}
                 onChange={(e) => setFilterStatus(e.target.value)}
@@ -885,7 +885,7 @@ const AIActivitySection: React.FC<AIActivitySectionProps> = ({ projectId }) => {
               </select>
             </div>
           </div>
-          <div className="mt-3 text-sm text-gray-600">
+          <div className="mt-3 text-sm text-slate-400">
             Showing {filteredActions.length} of {actions.length} suggestions
           </div>
         </div>
@@ -893,9 +893,9 @@ const AIActivitySection: React.FC<AIActivitySectionProps> = ({ projectId }) => {
 
       {/* Activity Timeline */}
       {loading ? (
-        <div className="flex items-center justify-center py-12 bg-white border border-gray-200 rounded-xl">
+        <div className="flex items-center justify-center py-12 bg-slate-800 border border-slate-700 rounded-xl">
           <RefreshCw className="w-8 h-8 text-indigo-500 animate-spin" />
-          <span className="ml-3 text-gray-600">Loading activity logs...</span>
+          <span className="ml-3 text-slate-400">Loading activity logs...</span>
         </div>
       ) : error ? (
         <div className="bg-red-50 border border-red-200 rounded-xl p-4 text-red-800">
@@ -903,10 +903,10 @@ const AIActivitySection: React.FC<AIActivitySectionProps> = ({ projectId }) => {
           <p className="text-sm mt-1">{error}</p>
         </div>
       ) : filteredActions.length === 0 ? (
-        <div className="text-center py-12 bg-gray-50 rounded-xl border border-gray-200">
+        <div className="text-center py-12 bg-gray-50 rounded-xl border border-slate-700">
           <Activity className="w-12 h-12 text-gray-400 mx-auto mb-3" />
-          <p className="text-gray-600 font-medium">No AI suggestions found</p>
-          <p className="text-sm text-gray-500 mt-1">
+          <p className="text-slate-400 font-medium">No AI suggestions found</p>
+          <p className="text-sm text-slate-500 mt-1">
             {actions.length === 0
               ? "AI suggestions will appear here as you use the AI Copilot features"
               : "Try adjusting your filters to see more results"}
@@ -919,7 +919,7 @@ const AIActivitySection: React.FC<AIActivitySectionProps> = ({ projectId }) => {
             return (
               <div
                 key={action.id}
-                className="bg-white border border-gray-200 rounded-xl overflow-hidden hover:shadow-md transition-shadow"
+                className="bg-slate-800 border border-slate-700 rounded-xl overflow-hidden hover:shadow-md transition-shadow"
               >
                 <div
                   onClick={() => toggleAction(action.id)}
@@ -930,7 +930,7 @@ const AIActivitySection: React.FC<AIActivitySectionProps> = ({ projectId }) => {
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-1">
-                      <span className="text-sm font-medium text-gray-900">
+                      <span className="text-sm font-medium text-white">
                         {action.title}
                       </span>
                       <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium border ${getStatusColor(action.status)}`}>
@@ -938,13 +938,13 @@ const AIActivitySection: React.FC<AIActivitySectionProps> = ({ projectId }) => {
                         {getStatusLabel(action.status)}
                       </span>
                       {action.confidence_score && (
-                        <span className="text-xs text-gray-500">
+                        <span className="text-xs text-slate-500">
                           {Math.round(action.confidence_score * 100)}% confidence
                         </span>
                       )}
                     </div>
-                    <p className="text-xs text-gray-600 mb-1">{action.description}</p>
-                    <div className="flex items-center gap-3 text-xs text-gray-500">
+                    <p className="text-xs text-slate-400 mb-1">{action.description}</p>
+                    <div className="flex items-center gap-3 text-xs text-slate-500">
                       <span>{getAgentName(action.agent_name)}</span>
                       <span>•</span>
                       <span>{timeAgo(new Date(action.created_at))}</span>
@@ -964,16 +964,16 @@ const AIActivitySection: React.FC<AIActivitySectionProps> = ({ projectId }) => {
                     {/* Reasoning */}
                     {action.reasoning && (
                       <div>
-                        <h5 className="text-xs font-semibold text-gray-700 mb-1">AI Reasoning:</h5>
-                        <p className="text-sm text-gray-600">{action.reasoning}</p>
+                        <h5 className="text-xs font-semibold text-slate-300 mb-1">AI Reasoning:</h5>
+                        <p className="text-sm text-slate-400">{action.reasoning}</p>
                       </div>
                     )}
 
                     {/* Impact Analysis */}
                     {action.impact_analysis && (
                       <div>
-                        <h5 className="text-xs font-semibold text-gray-700 mb-2">Impact Analysis:</h5>
-                        <pre className="bg-white border border-gray-200 rounded p-3 text-xs font-mono overflow-x-auto">
+                        <h5 className="text-xs font-semibold text-slate-300 mb-2">Impact Analysis:</h5>
+                        <pre className="bg-slate-800 border border-slate-700 rounded p-3 text-xs font-mono overflow-x-auto">
                           {JSON.stringify(action.impact_analysis, null, 2)}
                         </pre>
                       </div>
@@ -982,8 +982,8 @@ const AIActivitySection: React.FC<AIActivitySectionProps> = ({ projectId }) => {
                     {/* Action Data */}
                     {action.action_data && (
                       <div>
-                        <h5 className="text-xs font-semibold text-gray-700 mb-2">Full Details:</h5>
-                        <pre className="bg-white border border-gray-200 rounded p-3 text-xs font-mono overflow-x-auto max-h-96">
+                        <h5 className="text-xs font-semibold text-slate-300 mb-2">Full Details:</h5>
+                        <pre className="bg-slate-800 border border-slate-700 rounded p-3 text-xs font-mono overflow-x-auto max-h-96">
                           {JSON.stringify(action.action_data, null, 2)}
                         </pre>
                       </div>
@@ -1004,7 +1004,7 @@ const AIActivitySection: React.FC<AIActivitySectionProps> = ({ projectId }) => {
                     )}
 
                     {/* Metadata */}
-                    <div className="text-xs text-gray-500 flex items-center gap-4 pt-2 border-t border-gray-200">
+                    <div className="text-xs text-slate-500 flex items-center gap-4 pt-2 border-t border-slate-700">
                       <span>Created: {new Date(action.created_at).toLocaleString()}</span>
                       {action.reviewed_at && (
                         <>

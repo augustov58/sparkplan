@@ -48,8 +48,8 @@ export const PermitPacketGenerator: React.FC<PermitPacketGeneratorProps> = ({ pr
   // Early return if no projectId
   if (!projectId) {
     return (
-      <div className="bg-white border border-gray-200 rounded-lg p-6">
-        <div className="flex items-center gap-2 text-gray-500">
+      <div className="bg-slate-800 border border-slate-700 rounded-lg p-6">
+        <div className="flex items-center gap-2 text-slate-500">
           <AlertCircle className="w-5 h-5" />
           <p>No project ID provided</p>
         </div>
@@ -127,8 +127,8 @@ export const PermitPacketGenerator: React.FC<PermitPacketGeneratorProps> = ({ pr
 
   if (!currentProject) {
     return (
-      <div className="bg-white border border-gray-200 rounded-lg p-6">
-        <div className="flex items-center gap-2 text-gray-500">
+      <div className="bg-slate-800 border border-slate-700 rounded-lg p-6">
+        <div className="flex items-center gap-2 text-slate-500">
           <AlertCircle className="w-5 h-5" />
           <p>Project not found</p>
         </div>
@@ -140,11 +140,11 @@ export const PermitPacketGenerator: React.FC<PermitPacketGeneratorProps> = ({ pr
     <div className="space-y-6 animate-in fade-in duration-500">
       {/* Header */}
       <div>
-        <h2 className="text-2xl font-light text-gray-900 flex items-center gap-2">
+        <h2 className="text-2xl font-light text-white flex items-center gap-2">
           <FileText className="w-6 h-6 text-electric-500" />
           Permit Packet Generator
         </h2>
-        <p className="text-gray-500 mt-1">
+        <p className="text-slate-500 mt-1">
           Generate comprehensive permit application package with all required documents
         </p>
       </div>
@@ -175,34 +175,34 @@ export const PermitPacketGenerator: React.FC<PermitPacketGeneratorProps> = ({ pr
       </div>
 
       {/* Project Summary */}
-      <div className="bg-white border border-gray-200 rounded-lg p-6">
-        <h3 className="font-bold text-gray-900 mb-4">Project Summary</h3>
+      <div className="bg-slate-800 border border-slate-700 rounded-lg p-6">
+        <h3 className="font-bold text-white mb-4">Project Summary</h3>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           <div>
-            <p className="text-xs text-gray-500 mb-1">Project</p>
+            <p className="text-xs text-slate-500 mb-1">Project</p>
             <p className="font-medium">{currentProject.name}</p>
           </div>
           <div>
-            <p className="text-xs text-gray-500 mb-1">Service</p>
+            <p className="text-xs text-slate-500 mb-1">Service</p>
             <p className="font-medium">
               {currentProject.serviceVoltage}V {currentProject.servicePhase === 3 ? '3φ' : '1φ'}
             </p>
           </div>
           <div>
-            <p className="text-xs text-gray-500 mb-1">Panels</p>
+            <p className="text-xs text-slate-500 mb-1">Panels</p>
             <p className="font-medium">{panels.length}</p>
           </div>
           <div>
-            <p className="text-xs text-gray-500 mb-1">Circuits</p>
+            <p className="text-xs text-slate-500 mb-1">Circuits</p>
             <p className="font-medium">{circuits.length}</p>
           </div>
         </div>
       </div>
 
       {/* Jurisdiction Requirements Wizard */}
-      <div className="bg-white border border-gray-200 rounded-lg p-6">
-        <h3 className="font-bold text-gray-900 mb-4">Jurisdiction Requirements</h3>
-        <p className="text-sm text-gray-600 mb-6">
+      <div className="bg-slate-800 border border-slate-700 rounded-lg p-6">
+        <h3 className="font-bold text-white mb-4">Jurisdiction Requirements</h3>
+        <p className="text-sm text-slate-400 mb-6">
           Search for your jurisdiction to see what documents and calculations are required for your permit submittal.
           The requirements will be automatically included in your permit packet.
         </p>
@@ -210,12 +210,12 @@ export const PermitPacketGenerator: React.FC<PermitPacketGeneratorProps> = ({ pr
       </div>
 
       {/* Configuration */}
-      <div className="bg-white border border-gray-200 rounded-lg p-6 space-y-6">
-        <h3 className="font-bold text-gray-900">Packet Configuration</h3>
+      <div className="bg-slate-800 border border-slate-700 rounded-lg p-6 space-y-6">
+        <h3 className="font-bold text-white">Packet Configuration</h3>
 
         {/* Packet Type */}
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
+          <label className="block text-sm font-medium text-slate-300 mb-2">
             Packet Type
           </label>
           <div className="flex gap-4">
@@ -230,7 +230,7 @@ export const PermitPacketGenerator: React.FC<PermitPacketGeneratorProps> = ({ pr
               />
               <div>
                 <span className="font-medium">Full Packet</span>
-                <p className="text-xs text-gray-500">Includes all panel schedules</p>
+                <p className="text-xs text-slate-500">Includes all panel schedules</p>
               </div>
             </label>
             <label className="flex items-center gap-2 cursor-pointer">
@@ -244,7 +244,7 @@ export const PermitPacketGenerator: React.FC<PermitPacketGeneratorProps> = ({ pr
               />
               <div>
                 <span className="font-medium">Lightweight</span>
-                <p className="text-xs text-gray-500">Summary only (no panel schedules)</p>
+                <p className="text-xs text-slate-500">Summary only (no panel schedules)</p>
               </div>
             </label>
           </div>
@@ -253,7 +253,7 @@ export const PermitPacketGenerator: React.FC<PermitPacketGeneratorProps> = ({ pr
         {/* Contractor Information */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
-            <label htmlFor="preparedBy" className="block text-sm font-medium text-gray-700 mb-2">
+            <label htmlFor="preparedBy" className="block text-sm font-medium text-slate-300 mb-2">
               Prepared By (Optional)
             </label>
             <input
@@ -262,11 +262,11 @@ export const PermitPacketGenerator: React.FC<PermitPacketGeneratorProps> = ({ pr
               value={preparedBy}
               onChange={(e) => setPreparedBy(e.target.value)}
               placeholder="Contractor/Engineer name"
-              className="w-full border border-gray-200 rounded px-3 py-2 text-sm focus:border-electric-500 focus:ring-2 focus:ring-electric-500/20 outline-none"
+              className="w-full border border-slate-700 rounded px-3 py-2 text-sm focus:border-electric-500 focus:ring-2 focus:ring-electric-500/20 outline-none"
             />
           </div>
           <div>
-            <label htmlFor="contractorLicense" className="block text-sm font-medium text-gray-700 mb-2">
+            <label htmlFor="contractorLicense" className="block text-sm font-medium text-slate-300 mb-2">
               Contractor License <span className="text-red-500">*</span>
             </label>
             <input
@@ -275,15 +275,15 @@ export const PermitPacketGenerator: React.FC<PermitPacketGeneratorProps> = ({ pr
               value={contractorLicense}
               onChange={(e) => setContractorLicense(e.target.value)}
               placeholder="e.g., C-10 #123456"
-              className="w-full border border-gray-200 rounded px-3 py-2 text-sm focus:border-electric-500 focus:ring-2 focus:ring-electric-500/20 outline-none"
+              className="w-full border border-slate-700 rounded px-3 py-2 text-sm focus:border-electric-500 focus:ring-2 focus:ring-electric-500/20 outline-none"
             />
-            <p className="text-xs text-gray-500 mt-1">Required by most jurisdictions</p>
+            <p className="text-xs text-slate-500 mt-1">Required by most jurisdictions</p>
           </div>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
-            <label htmlFor="permitNumber" className="block text-sm font-medium text-gray-700 mb-2">
+            <label htmlFor="permitNumber" className="block text-sm font-medium text-slate-300 mb-2">
               Permit Number (Optional)
             </label>
             <input
@@ -292,14 +292,14 @@ export const PermitPacketGenerator: React.FC<PermitPacketGeneratorProps> = ({ pr
               value={permitNumber}
               onChange={(e) => setPermitNumber(e.target.value)}
               placeholder="e.g., PER-2024-001234"
-              className="w-full border border-gray-200 rounded px-3 py-2 text-sm focus:border-electric-500 focus:ring-2 focus:ring-electric-500/20 outline-none"
+              className="w-full border border-slate-700 rounded px-3 py-2 text-sm focus:border-electric-500 focus:ring-2 focus:ring-electric-500/20 outline-none"
             />
           </div>
         </div>
 
         {/* Scope of Work */}
         <div>
-          <label htmlFor="scopeOfWork" className="block text-sm font-medium text-gray-700 mb-2">
+          <label htmlFor="scopeOfWork" className="block text-sm font-medium text-slate-300 mb-2">
             Scope of Work <span className="text-red-500">*</span>
           </label>
           <textarea
@@ -308,31 +308,31 @@ export const PermitPacketGenerator: React.FC<PermitPacketGeneratorProps> = ({ pr
             onChange={(e) => setScopeOfWork(e.target.value)}
             placeholder="e.g., Replace existing 100A overhead service with 200A underground service, relocate meter to exterior wall, install new 200A main panel"
             rows={3}
-            className="w-full border border-gray-200 rounded px-3 py-2 text-sm focus:border-electric-500 focus:ring-2 focus:ring-electric-500/20 outline-none"
+            className="w-full border border-slate-700 rounded px-3 py-2 text-sm focus:border-electric-500 focus:ring-2 focus:ring-electric-500/20 outline-none"
           />
-          <p className="text-xs text-gray-500 mt-1">Brief description of work to be performed</p>
+          <p className="text-xs text-slate-500 mt-1">Brief description of work to be performed</p>
         </div>
 
         {/* Service Entrance Details */}
-        <div className="border-t border-gray-200 pt-4">
-          <h4 className="font-medium text-gray-900 mb-4">Service Entrance Details</h4>
+        <div className="border-t border-slate-700 pt-4">
+          <h4 className="font-medium text-white mb-4">Service Entrance Details</h4>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div>
-              <label htmlFor="serviceType" className="block text-sm font-medium text-gray-700 mb-2">
+              <label htmlFor="serviceType" className="block text-sm font-medium text-slate-300 mb-2">
                 Service Type
               </label>
               <select
                 id="serviceType"
                 value={serviceType}
                 onChange={(e) => setServiceType(e.target.value as 'overhead' | 'underground')}
-                className="w-full border border-gray-200 rounded px-3 py-2 text-sm focus:border-electric-500 focus:ring-2 focus:ring-electric-500/20 outline-none"
+                className="w-full border border-slate-700 rounded px-3 py-2 text-sm focus:border-electric-500 focus:ring-2 focus:ring-electric-500/20 outline-none"
               >
                 <option value="overhead">Overhead</option>
                 <option value="underground">Underground</option>
               </select>
             </div>
             <div>
-              <label htmlFor="meterLocation" className="block text-sm font-medium text-gray-700 mb-2">
+              <label htmlFor="meterLocation" className="block text-sm font-medium text-slate-300 mb-2">
                 Meter Location
               </label>
               <input
@@ -341,11 +341,11 @@ export const PermitPacketGenerator: React.FC<PermitPacketGeneratorProps> = ({ pr
                 value={meterLocation}
                 onChange={(e) => setMeterLocation(e.target.value)}
                 placeholder="e.g., Exterior wall, north side"
-                className="w-full border border-gray-200 rounded px-3 py-2 text-sm focus:border-electric-500 focus:ring-2 focus:ring-electric-500/20 outline-none"
+                className="w-full border border-slate-700 rounded px-3 py-2 text-sm focus:border-electric-500 focus:ring-2 focus:ring-electric-500/20 outline-none"
               />
             </div>
             <div>
-              <label htmlFor="serviceConductorRouting" className="block text-sm font-medium text-gray-700 mb-2">
+              <label htmlFor="serviceConductorRouting" className="block text-sm font-medium text-slate-300 mb-2">
                 Conductor Routing
               </label>
               <input
@@ -354,7 +354,7 @@ export const PermitPacketGenerator: React.FC<PermitPacketGeneratorProps> = ({ pr
                 value={serviceConductorRouting}
                 onChange={(e) => setServiceConductorRouting(e.target.value)}
                 placeholder="e.g., PVC conduit, buried 24in"
-                className="w-full border border-gray-200 rounded px-3 py-2 text-sm focus:border-electric-500 focus:ring-2 focus:ring-electric-500/20 outline-none"
+                className="w-full border border-slate-700 rounded px-3 py-2 text-sm focus:border-electric-500 focus:ring-2 focus:ring-electric-500/20 outline-none"
               />
             </div>
           </div>

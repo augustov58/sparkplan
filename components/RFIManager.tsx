@@ -113,8 +113,8 @@ export const RFIManager: React.FC<RFIManagerProps> = ({ project }) => {
       case 'Urgent': return 'bg-red-100 text-red-700';
       case 'High': return 'bg-orange-100 text-orange-700';
       case 'Medium': return 'bg-blue-50 text-blue-600';
-      case 'Low': return 'bg-gray-100 text-gray-600';
-      default: return 'bg-gray-100 text-gray-600';
+      case 'Low': return 'bg-gray-100 text-slate-400';
+      default: return 'bg-gray-100 text-slate-400';
     }
   };
 
@@ -123,7 +123,7 @@ export const RFIManager: React.FC<RFIManagerProps> = ({ project }) => {
       case 'Pending': return <Clock className="w-4 h-4 text-yellow-500" />;
       case 'Answered': return <MessageSquare className="w-4 h-4 text-blue-500" />;
       case 'Closed': return <CheckCircle className="w-4 h-4 text-green-500" />;
-      default: return <AlertCircle className="w-4 h-4 text-gray-500" />;
+      default: return <AlertCircle className="w-4 h-4 text-slate-500" />;
     }
   };
 
@@ -131,8 +131,8 @@ export const RFIManager: React.FC<RFIManagerProps> = ({ project }) => {
     <div className="space-y-6 animate-in fade-in duration-500">
       <div className="flex justify-between items-center">
         <div>
-          <h2 className="text-2xl font-light text-gray-900">RFI Tracking</h2>
-          <p className="text-gray-500 mt-1">Request for Information management and tracking.</p>
+          <h2 className="text-2xl font-light text-white">RFI Tracking</h2>
+          <p className="text-slate-500 mt-1">Request for Information management and tracking.</p>
         </div>
         <button
           onClick={() => setIsCreating(!isCreating)}
@@ -150,9 +150,9 @@ export const RFIManager: React.FC<RFIManagerProps> = ({ project }) => {
 
       {/* Create RFI Form */}
       {isCreating && (
-        <div className="bg-gray-50 border border-gray-200 rounded-lg p-6 animate-in slide-in-from-top-2">
+        <div className="bg-slate-800/50 border border-slate-700 rounded-lg p-6 animate-in slide-in-from-top-2">
           <div className="flex items-center justify-between mb-4">
-            <h3 className="font-medium text-gray-900">New Request for Information</h3>
+            <h3 className="font-medium text-white">New Request for Information</h3>
 
             {/* Toggle between manual, PDF extraction, and AI drafting */}
             <div className="flex gap-2">
@@ -161,7 +161,7 @@ export const RFIManager: React.FC<RFIManagerProps> = ({ project }) => {
                 className={`px-3 py-1 text-xs font-medium rounded transition-colors ${
                   creationMode === 'manual'
                     ? 'bg-electric-500 text-black'
-                    : 'bg-gray-200 text-gray-600 hover:bg-gray-300'
+                    : 'bg-gray-200 text-slate-400 hover:bg-gray-300'
                 }`}
               >
                 Manual Entry
@@ -171,7 +171,7 @@ export const RFIManager: React.FC<RFIManagerProps> = ({ project }) => {
                 className={`px-3 py-1 text-xs font-medium rounded transition-colors flex items-center gap-1 ${
                   creationMode === 'pdf'
                     ? 'bg-electric-500 text-black'
-                    : 'bg-gray-200 text-gray-600 hover:bg-gray-300'
+                    : 'bg-gray-200 text-slate-400 hover:bg-gray-300'
                 }`}
               >
                 <FileText className="w-3 h-3" />
@@ -182,7 +182,7 @@ export const RFIManager: React.FC<RFIManagerProps> = ({ project }) => {
                 className={`px-3 py-1 text-xs font-medium rounded transition-colors flex items-center gap-1 ${
                   creationMode === 'ai'
                     ? 'bg-purple-500 text-white'
-                    : 'bg-gray-200 text-gray-600 hover:bg-gray-300'
+                    : 'bg-gray-200 text-slate-400 hover:bg-gray-300'
                 }`}
               >
                 <Sparkles className="w-3 h-3" />
@@ -224,7 +224,7 @@ export const RFIManager: React.FC<RFIManagerProps> = ({ project }) => {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-sm font-medium text-slate-300 mb-1">
                   Topic <span className="text-red-500">*</span>
                 </label>
                 <input
@@ -234,11 +234,11 @@ export const RFIManager: React.FC<RFIManagerProps> = ({ project }) => {
                   value={aiTopic}
                   onChange={e => setAiTopic(e.target.value)}
                 />
-                <p className="text-xs text-gray-500 mt-1">What do you need clarification about?</p>
+                <p className="text-xs text-slate-500 mt-1">What do you need clarification about?</p>
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-sm font-medium text-slate-300 mb-1">
                   Additional Context (Optional)
                 </label>
                 <textarea
@@ -247,7 +247,7 @@ export const RFIManager: React.FC<RFIManagerProps> = ({ project }) => {
                   value={aiContext}
                   onChange={e => setAiContext(e.target.value)}
                 />
-                <p className="text-xs text-gray-500 mt-1">
+                <p className="text-xs text-slate-500 mt-1">
                   Include project details, specific concerns, or inspector comments
                 </p>
               </div>
@@ -309,7 +309,7 @@ export const RFIManager: React.FC<RFIManagerProps> = ({ project }) => {
                     setAiContext('');
                     setCreationMode('manual');
                   }}
-                  className="px-4 py-2 border border-gray-300 text-gray-700 rounded text-sm font-medium hover:bg-gray-50 transition-colors"
+                  className="px-4 py-2 border border-slate-600 text-slate-300 rounded text-sm font-medium hover:bg-slate-800/50 transition-colors"
                 >
                   Cancel
                 </button>
@@ -319,10 +319,10 @@ export const RFIManager: React.FC<RFIManagerProps> = ({ project }) => {
             <div className="space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="md:col-span-2">
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-sm font-medium text-slate-300 mb-1">
                   RFI Number
                   {!newRFI.rfi_number && (
-                    <span className="text-xs text-gray-500 ml-2">(Auto-generated if left empty)</span>
+                    <span className="text-xs text-slate-500 ml-2">(Auto-generated if left empty)</span>
                   )}
                 </label>
                 <input
@@ -335,7 +335,7 @@ export const RFIManager: React.FC<RFIManagerProps> = ({ project }) => {
               </div>
 
               <div className="md:col-span-2">
-                <label className="block text-sm font-medium text-gray-700 mb-1">Subject</label>
+                <label className="block text-sm font-medium text-slate-300 mb-1">Subject</label>
                 <input
                   type="text"
                   placeholder="Brief subject of the RFI..."
@@ -346,7 +346,7 @@ export const RFIManager: React.FC<RFIManagerProps> = ({ project }) => {
               </div>
 
               <div className="md:col-span-2">
-                <label className="block text-sm font-medium text-gray-700 mb-1">Question</label>
+                <label className="block text-sm font-medium text-slate-300 mb-1">Question</label>
                 <textarea
                   placeholder="Detailed question or information request..."
                   className="input-std w-full min-h-[100px]"
@@ -356,7 +356,7 @@ export const RFIManager: React.FC<RFIManagerProps> = ({ project }) => {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Assigned To</label>
+                <label className="block text-sm font-medium text-slate-300 mb-1">Assigned To</label>
                 <input
                   type="text"
                   placeholder="Name or role..."
@@ -367,7 +367,7 @@ export const RFIManager: React.FC<RFIManagerProps> = ({ project }) => {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Requested By</label>
+                <label className="block text-sm font-medium text-slate-300 mb-1">Requested By</label>
                 <input
                   type="text"
                   placeholder="Your name..."
@@ -378,7 +378,7 @@ export const RFIManager: React.FC<RFIManagerProps> = ({ project }) => {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Priority</label>
+                <label className="block text-sm font-medium text-slate-300 mb-1">Priority</label>
                 <select
                   className="input-std w-full"
                   value={newRFI.priority}
@@ -392,7 +392,7 @@ export const RFIManager: React.FC<RFIManagerProps> = ({ project }) => {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Due Date</label>
+                <label className="block text-sm font-medium text-slate-300 mb-1">Due Date</label>
                 <input
                   type="date"
                   className="input-std w-full"
@@ -405,7 +405,7 @@ export const RFIManager: React.FC<RFIManagerProps> = ({ project }) => {
             <div className="flex justify-end gap-2 pt-2">
               <button
                 onClick={() => setIsCreating(false)}
-                className="px-4 py-2 text-sm text-gray-600 hover:text-gray-900 transition-colors"
+                className="px-4 py-2 text-sm text-slate-400 hover:text-white transition-colors"
               >
                 Cancel
               </button>
@@ -422,7 +422,7 @@ export const RFIManager: React.FC<RFIManagerProps> = ({ project }) => {
       )}
 
       {/* Search and Filter */}
-      <div className="flex gap-4 items-center bg-white p-2 rounded-lg border border-gray-100 shadow-sm">
+      <div className="flex gap-4 items-center bg-slate-800 p-2 rounded-lg border border-slate-700 shadow-sm">
         <div className="relative flex-1">
           <Search className="w-4 h-4 absolute left-3 top-3 text-gray-400" />
           <input
@@ -438,7 +438,7 @@ export const RFIManager: React.FC<RFIManagerProps> = ({ project }) => {
               key={f}
               onClick={() => setFilter(f)}
               className={`px-3 py-1.5 rounded text-xs font-medium transition-colors ${
-                filter === f ? 'bg-gray-900 text-white' : 'text-gray-500 hover:bg-gray-100'
+                filter === f ? 'bg-gray-900 text-white' : 'text-slate-500 hover:bg-gray-100'
               }`}
             >
               {f}
@@ -469,9 +469,9 @@ export const RFIManager: React.FC<RFIManagerProps> = ({ project }) => {
         {!loading && filteredRFIs.map(rfi => (
           <div
             key={rfi.id}
-            className={`bg-white border rounded-lg p-4 transition-all hover:shadow-md ${
+            className={`bg-slate-800 border rounded-lg p-4 transition-all hover:shadow-md ${
               rfi.status === 'Closed'
-                ? 'border-gray-100 opacity-60'
+                ? 'border-slate-700 opacity-60'
                 : rfi.status === 'Pending'
                 ? 'border-l-4 border-l-yellow-500 border-y-gray-100 border-r-gray-100'
                 : 'border-l-4 border-l-blue-500 border-y-gray-100 border-r-gray-100'
@@ -481,7 +481,7 @@ export const RFIManager: React.FC<RFIManagerProps> = ({ project }) => {
             <div className="flex items-start justify-between gap-4 mb-3">
               <div className="flex items-center gap-2">
                 {getStatusIcon(rfi.status)}
-                <span className="font-mono font-bold text-sm text-gray-900">{rfi.rfi_number}</span>
+                <span className="font-mono font-bold text-sm text-white">{rfi.rfi_number}</span>
                 <span className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded-full ${getPriorityColor(rfi.priority)}`}>
                   {rfi.priority}
                 </span>
@@ -503,24 +503,24 @@ export const RFIManager: React.FC<RFIManagerProps> = ({ project }) => {
             </div>
 
             {/* Subject */}
-            <h3 className="font-medium text-gray-900 mb-2">{rfi.subject}</h3>
+            <h3 className="font-medium text-white mb-2">{rfi.subject}</h3>
 
             {/* Question */}
-            <div className="bg-gray-50 rounded p-3 mb-3">
-              <p className="text-xs font-medium text-gray-500 mb-1">QUESTION:</p>
-              <p className="text-sm text-gray-700">{rfi.question}</p>
+            <div className="bg-slate-800/50 rounded p-3 mb-3">
+              <p className="text-xs font-medium text-slate-500 mb-1">QUESTION:</p>
+              <p className="text-sm text-slate-300">{rfi.question}</p>
             </div>
 
             {/* Answer (if exists) */}
             {rfi.answer && (
               <div className="bg-blue-50 rounded p-3 mb-3">
                 <p className="text-xs font-medium text-blue-600 mb-1">ANSWER:</p>
-                <p className="text-sm text-gray-700">{rfi.answer}</p>
+                <p className="text-sm text-slate-300">{rfi.answer}</p>
                 {rfi.responded_by && (
-                  <p className="text-xs text-gray-500 mt-2">Responded by: {rfi.responded_by}</p>
+                  <p className="text-xs text-slate-500 mt-2">Responded by: {rfi.responded_by}</p>
                 )}
                 {rfi.response_date && (
-                  <p className="text-xs text-gray-500">
+                  <p className="text-xs text-slate-500">
                     Date: {new Date(rfi.response_date).toLocaleDateString()}
                   </p>
                 )}
@@ -528,29 +528,29 @@ export const RFIManager: React.FC<RFIManagerProps> = ({ project }) => {
             )}
 
             {/* Metadata */}
-            <div className="flex items-center gap-4 text-xs text-gray-500 mb-3">
+            <div className="flex items-center gap-4 text-xs text-slate-500 mb-3">
               {rfi.assigned_to && (
-                <span>Assigned to: <span className="font-medium text-gray-700">{rfi.assigned_to}</span></span>
+                <span>Assigned to: <span className="font-medium text-slate-300">{rfi.assigned_to}</span></span>
               )}
               {rfi.requested_by && (
-                <span>Requested by: <span className="font-medium text-gray-700">{rfi.requested_by}</span></span>
+                <span>Requested by: <span className="font-medium text-slate-300">{rfi.requested_by}</span></span>
               )}
               {rfi.due_date && (
                 <span className="flex items-center gap-1">
                   <Calendar className="w-3 h-3" />
-                  Due: <span className="font-medium text-gray-700">{new Date(rfi.due_date).toLocaleDateString()}</span>
+                  Due: <span className="font-medium text-slate-300">{new Date(rfi.due_date).toLocaleDateString()}</span>
                 </span>
               )}
             </div>
 
             {/* Answer Modal Trigger */}
             {isAnswering === rfi.id && (
-              <div className="bg-white border-t border-gray-200 -mx-4 -mb-4 mt-3 p-4 rounded-b-lg animate-in slide-in-from-top-2">
-                <h4 className="font-medium text-gray-900 mb-3">Provide Answer</h4>
+              <div className="bg-slate-800 border-t border-slate-700 -mx-4 -mb-4 mt-3 p-4 rounded-b-lg animate-in slide-in-from-top-2">
+                <h4 className="font-medium text-white mb-3">Provide Answer</h4>
 
                 <div className="space-y-3">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Answer</label>
+                    <label className="block text-sm font-medium text-slate-300 mb-1">Answer</label>
                     <textarea
                       placeholder="Provide detailed answer..."
                       className="input-std w-full min-h-[80px]"
@@ -560,7 +560,7 @@ export const RFIManager: React.FC<RFIManagerProps> = ({ project }) => {
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Responded By</label>
+                    <label className="block text-sm font-medium text-slate-300 mb-1">Responded By</label>
                     <input
                       type="text"
                       placeholder="Your name..."
@@ -577,7 +577,7 @@ export const RFIManager: React.FC<RFIManagerProps> = ({ project }) => {
                         setAnswerText('');
                         setRespondedBy('');
                       }}
-                      className="px-4 py-2 text-sm text-gray-600 hover:text-gray-900 transition-colors"
+                      className="px-4 py-2 text-sm text-slate-400 hover:text-white transition-colors"
                     >
                       Cancel
                     </button>
@@ -614,7 +614,7 @@ export const RFIManager: React.FC<RFIManagerProps> = ({ project }) => {
                 {rfi.status !== 'Closed' && (
                   <button
                     onClick={() => setIsAnswering(rfi.id)}
-                    className="text-xs px-3 py-1.5 text-gray-600 hover:text-gray-900 transition-colors"
+                    className="text-xs px-3 py-1.5 text-slate-400 hover:text-white transition-colors"
                   >
                     {rfi.status === 'Answered' ? 'Edit Answer' : 'Add Note'}
                   </button>

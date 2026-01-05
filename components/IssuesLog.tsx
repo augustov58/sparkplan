@@ -61,26 +61,26 @@ export const IssuesLog: React.FC<IssuesLogProps> = ({ project }) => {
     <div className="space-y-6 animate-in fade-in duration-500">
        <div className="flex justify-between items-center">
          <div>
-            <h2 className="text-2xl font-light text-gray-900">Violation Log & Punch List</h2>
-            <p className="text-gray-500 mt-1">Track code violations and corrective actions.</p>
+            <h2 className="text-2xl font-light text-white">Violation Log & Punch List</h2>
+            <p className="text-slate-400 mt-1">Track code violations and corrective actions.</p>
          </div>
          <button
            onClick={() => setIsAdding(!isAdding)}
-           className="bg-gray-900 text-white px-4 py-2 rounded text-sm font-medium flex items-center gap-2 hover:bg-black"
+           className="bg-amber-500 text-slate-900 px-4 py-2 rounded text-sm font-medium flex items-center gap-2 hover:bg-amber-400"
          >
            <Plus className="w-4 h-4" /> Log Violation
          </button>
        </div>
 
        {error && (
-         <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-           <p className="text-red-700 font-medium">Error: {error}</p>
+         <div className="bg-red-900/30 border border-red-700 rounded-lg p-4">
+           <p className="text-red-400 font-medium">Error: {error}</p>
          </div>
        )}
 
        {isAdding && (
-         <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 animate-in slide-in-from-top-2">
-            <h3 className="font-medium text-gray-900 mb-3">New Issue</h3>
+         <div className="bg-slate-800 border border-slate-700 rounded-lg p-4 animate-in slide-in-from-top-2">
+            <h3 className="font-medium text-white mb-3">New Issue</h3>
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
                 <div className="md:col-span-2">
                     <input 
@@ -111,28 +111,28 @@ export const IssuesLog: React.FC<IssuesLogProps> = ({ project }) => {
                 </div>
             </div>
             <div className="flex justify-end gap-2">
-                <button onClick={() => setIsAdding(false)} className="px-3 py-1 text-sm text-gray-500">Cancel</button>
-                <button onClick={handleAdd} className="bg-electric-500 text-black px-4 py-1.5 rounded text-sm font-bold">Save Issue</button>
+                <button onClick={() => setIsAdding(false)} className="px-3 py-1 text-sm text-slate-400 hover:text-white">Cancel</button>
+                <button onClick={handleAdd} className="bg-amber-500 text-slate-900 px-4 py-1.5 rounded text-sm font-bold hover:bg-amber-400">Save Issue</button>
             </div>
          </div>
        )}
 
-       <div className="flex gap-4 items-center bg-white p-2 rounded-lg border border-gray-100 shadow-sm">
+       <div className="flex gap-4 items-center bg-slate-800 p-2 rounded-lg border border-slate-700">
          <div className="relative flex-1">
-            <Search className="w-4 h-4 absolute left-3 top-3 text-gray-400" />
-            <input 
-                placeholder="Search issues..." 
-                className="w-full pl-10 pr-4 py-2 text-sm border-none focus:ring-0"
+            <Search className="w-4 h-4 absolute left-3 top-3 text-slate-400" />
+            <input
+                placeholder="Search issues..."
+                className="w-full pl-10 pr-4 py-2 text-sm bg-slate-900 border-slate-700 text-white rounded focus:ring-amber-500 focus:border-amber-500"
                 value={searchTerm}
                 onChange={e => setSearchTerm(e.target.value)}
             />
          </div>
          <div className="flex gap-1 pr-2">
             {(['All', 'Open', 'Resolved'] as const).map(f => (
-                <button 
+                <button
                   key={f}
                   onClick={() => setFilter(f)}
-                  className={`px-3 py-1.5 rounded text-xs font-medium transition-colors ${filter === f ? 'bg-gray-900 text-white' : 'text-gray-500 hover:bg-gray-100'}`}
+                  className={`px-3 py-1.5 rounded text-xs font-medium transition-colors ${filter === f ? 'bg-amber-500 text-slate-900' : 'text-slate-400 hover:bg-slate-700'}`}
                 >
                     {f}
                 </button>
@@ -142,42 +142,42 @@ export const IssuesLog: React.FC<IssuesLogProps> = ({ project }) => {
 
        <div className="space-y-3">
           {loading && (
-             <div className="text-center py-12 text-gray-400">
+             <div className="text-center py-12 text-slate-400">
                 Loading issues...
              </div>
           )}
           {!loading && filteredIssues.length === 0 && (
-             <div className="text-center py-12 text-gray-400">
+             <div className="text-center py-12 text-slate-400">
                 No issues found matching your criteria.
              </div>
           )}
           {!loading && filteredIssues.map(issue => (
               <div
                 key={issue.id}
-                className={`bg-white border rounded-lg p-4 flex items-start gap-4 transition-all hover:shadow-md ${issue.status === 'Resolved' ? 'border-gray-100 opacity-60' : 'border-l-4 border-l-red-500 border-y-gray-100 border-r-gray-100'}`}
+                className={`bg-slate-800 border rounded-lg p-4 flex items-start gap-4 transition-all hover:bg-slate-700/50 ${issue.status === 'Resolved' ? 'border-slate-700 opacity-60' : 'border-l-4 border-l-red-500 border-y-slate-700 border-r-slate-700'}`}
               >
-                  <button onClick={() => toggleIssueStatus(issue.id)} className="mt-1 flex-shrink-0 text-gray-300 hover:text-green-500 transition-colors">
-                      {issue.status === 'Resolved' ? <CheckCircle className="w-5 h-5 text-green-500" /> : <div className="w-5 h-5 rounded-full border-2 border-current" />}
+                  <button onClick={() => toggleIssueStatus(issue.id)} className="mt-1 flex-shrink-0 text-slate-500 hover:text-green-400 transition-colors">
+                      {issue.status === 'Resolved' ? <CheckCircle className="w-5 h-5 text-green-400" /> : <div className="w-5 h-5 rounded-full border-2 border-current" />}
                   </button>
 
                   <div className="flex-1">
                       <div className="flex items-center gap-2 mb-1">
                           <span className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded-full ${
-                              issue.severity === 'Critical' ? 'bg-red-100 text-red-700' :
-                              issue.severity === 'Warning' ? 'bg-yellow-100 text-yellow-700' : 'bg-blue-50 text-blue-600'
+                              issue.severity === 'Critical' ? 'bg-red-900/50 text-red-400' :
+                              issue.severity === 'Warning' ? 'bg-yellow-900/50 text-yellow-400' : 'bg-blue-900/50 text-blue-400'
                           }`}>
                               {issue.severity}
                           </span>
-                          <span className="text-xs font-mono text-gray-500">NEC {issue.article}</span>
-                          <span className="text-xs text-gray-300 mx-1">•</span>
-                          <span className="text-xs text-gray-400">{new Date(issue.created_at).toLocaleDateString()}</span>
+                          <span className="text-xs font-mono text-amber-400">NEC {issue.article}</span>
+                          <span className="text-xs text-slate-600 mx-1">•</span>
+                          <span className="text-xs text-slate-500">{new Date(issue.created_at).toLocaleDateString()}</span>
                       </div>
-                      <p className={`text-sm ${issue.status === 'Resolved' ? 'text-gray-400 line-through' : 'text-gray-900'}`}>
+                      <p className={`text-sm ${issue.status === 'Resolved' ? 'text-slate-500 line-through' : 'text-white'}`}>
                           {issue.description}
                       </p>
                   </div>
 
-                  <button onClick={() => removeIssue(issue.id)} className="text-gray-300 hover:text-red-500">
+                  <button onClick={() => removeIssue(issue.id)} className="text-slate-500 hover:text-red-400">
                       <Trash2 className="w-4 h-4" />
                   </button>
               </div>

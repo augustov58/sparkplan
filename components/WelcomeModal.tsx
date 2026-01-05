@@ -1,10 +1,10 @@
 /**
- * Welcome Modal Component
- * Shown to new users on first login
+ * Welcome Modal Component - Industrial Schematic Design
+ * System initialization interface for new users
  */
 
 import React, { useState } from 'react';
-import { X, Zap, CheckCircle, Rocket, FileText, Calculator } from 'lucide-react';
+import { X, Zap, Check, Rocket, FileText, Calculator, CircuitBoard, Activity, ChevronRight } from 'lucide-react';
 import { TemplateType } from '../services/sampleTemplates';
 
 interface WelcomeModalProps {
@@ -12,201 +12,163 @@ interface WelcomeModalProps {
   onCreateProject: (templateType?: TemplateType) => void;
 }
 
+// Status LED component
+const StatusLED = ({ active = true, color = 'emerald' }: { active?: boolean; color?: string }) => (
+  <div
+    className={`w-2 h-2 rounded-full flex-shrink-0 ${
+      active
+        ? color === 'amber'
+          ? 'bg-amber-400 shadow-[0_0_8px_rgba(251,191,36,0.6)]'
+          : 'bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.6)]'
+        : 'bg-slate-600'
+    }`}
+  />
+);
+
+// Voltage bar component
+const VoltageBar = ({ level = 3, max = 5 }: { level?: number; max?: number }) => (
+  <div className="flex gap-0.5">
+    {[...Array(max)].map((_, i) => (
+      <div
+        key={i}
+        className={`w-1 h-3 rounded-sm transition-all duration-300 ${
+          i < level ? 'bg-amber-400' : 'bg-slate-700'
+        }`}
+      />
+    ))}
+  </div>
+);
+
 export const WelcomeModal: React.FC<WelcomeModalProps> = ({ onClose, onCreateProject }) => {
   const [currentStep, setCurrentStep] = useState(0);
   const [selectedTemplate, setSelectedTemplate] = useState<TemplateType | undefined>('residential');
 
   const steps = [
     {
-      title: 'Welcome to NEC Pro Compliance',
-      icon: <Zap className="w-12 h-12 text-electric-500" />,
-      description: 'Your professional electrical design and compliance platform powered by AI.',
+      title: 'System Initialization',
+      subtitle: 'NEC Pro Compliance Platform',
+      icon: <Zap className="w-8 h-8 text-amber-400" />,
+      description: 'Professional electrical design and compliance platform powered by AI.',
       content: (
         <div className="space-y-4">
-          <p className="text-gray-600">
-            NEC Pro helps electrical contractors and engineers design safe, compliant electrical systems with:
+          <p className="text-slate-400 text-sm">
+            Core system modules activated:
           </p>
-          <ul className="space-y-3">
-            <li className="flex items-start gap-3">
-              <CheckCircle className="w-5 h-5 text-green-500 flex-shrink-0 mt-0.5" />
-              <span className="text-sm text-gray-700">
-                <strong>Load Calculations</strong> - NEC 220.82, 220.84, and commercial methods
-              </span>
-            </li>
-            <li className="flex items-start gap-3">
-              <CheckCircle className="w-5 h-5 text-green-500 flex-shrink-0 mt-0.5" />
-              <span className="text-sm text-gray-700">
-                <strong>One-Line Diagrams</strong> - Professional riser diagrams with PDF export
-              </span>
-            </li>
-            <li className="flex items-start gap-3">
-              <CheckCircle className="w-5 h-5 text-green-500 flex-shrink-0 mt-0.5" />
-              <span className="text-sm text-gray-700">
-                <strong>Panel Schedules</strong> - Automated circuit tracking and panel design
-              </span>
-            </li>
-            <li className="flex items-start gap-3">
-              <CheckCircle className="w-5 h-5 text-green-500 flex-shrink-0 mt-0.5" />
-              <span className="text-sm text-gray-700">
-                <strong>AI NEC Assistant</strong> - Instant answers to code questions
-              </span>
-            </li>
-          </ul>
-        </div>
-      ),
-    },
-    {
-      title: 'Professional Features',
-      icon: <Calculator className="w-12 h-12 text-electric-500" />,
-      description: 'Everything you need for electrical design and compliance.',
-      content: (
-        <div className="space-y-4">
-          <div className="grid grid-cols-2 gap-4">
-            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-              <h4 className="font-semibold text-blue-900 text-sm mb-2">Calculations</h4>
-              <ul className="space-y-1 text-xs text-blue-800">
-                <li>• Voltage Drop</li>
-                <li>• Short Circuit</li>
-                <li>• Arc Flash</li>
-                <li>• Feeder Sizing</li>
-                <li>• EV Charging</li>
-              </ul>
-            </div>
-            <div className="bg-green-50 border border-green-200 rounded-lg p-4">
-              <h4 className="font-semibold text-green-900 text-sm mb-2">Project Management</h4>
-              <ul className="space-y-1 text-xs text-green-800">
-                <li>• RFI Tracking</li>
-                <li>• Site Visit Logs</li>
-                <li>• Calendar Events</li>
-                <li>• Inspector AI</li>
-              </ul>
-            </div>
-            <div className="bg-purple-50 border border-purple-200 rounded-lg p-4">
-              <h4 className="font-semibold text-purple-900 text-sm mb-2">Export & Sharing</h4>
-              <ul className="space-y-1 text-xs text-purple-800">
-                <li>• PDF Export</li>
-                <li>• Permit Packets</li>
-                <li>• Panel Schedules</li>
-                <li>• One-Line Diagrams</li>
-              </ul>
-            </div>
-            <div className="bg-orange-50 border border-orange-200 rounded-lg p-4">
-              <h4 className="font-semibold text-orange-900 text-sm mb-2">Compliance</h4>
-              <ul className="space-y-1 text-xs text-orange-800">
-                <li>• Grounding System</li>
-                <li>• Pre-Inspection Check</li>
-                <li>• NEC Validation</li>
-                <li>• Code References</li>
-              </ul>
-            </div>
+          <div className="space-y-2">
+            {[
+              { label: 'Load Calculations', sub: 'NEC 220.82, 220.84, Commercial Methods' },
+              { label: 'One-Line Diagrams', sub: 'Professional riser diagrams with PDF export' },
+              { label: 'Panel Schedules', sub: 'Automated circuit tracking and panel design' },
+              { label: 'AI NEC Assistant', sub: 'Instant answers to code questions' },
+            ].map((item, i) => (
+              <div key={i} className="flex items-start gap-3 p-3 bg-slate-800/50 border border-slate-700 rounded-lg">
+                <div className="w-5 h-5 rounded bg-emerald-500/20 flex items-center justify-center flex-shrink-0 mt-0.5">
+                  <Check className="w-3 h-3 text-emerald-400" />
+                </div>
+                <div>
+                  <span className="text-sm font-medium text-white">{item.label}</span>
+                  <p className="text-xs text-slate-500 mt-0.5">{item.sub}</p>
+                </div>
+              </div>
+            ))}
           </div>
         </div>
       ),
     },
     {
-      title: 'Ready to Get Started?',
-      icon: <Rocket className="w-12 h-12 text-electric-500" />,
-      description: 'Create your first project and start designing compliant electrical systems.',
+      title: 'Module Overview',
+      subtitle: 'System Capabilities',
+      icon: <Calculator className="w-8 h-8 text-amber-400" />,
+      description: 'Complete toolkit for electrical design and compliance.',
+      content: (
+        <div className="grid grid-cols-2 gap-3">
+          {[
+            { title: 'Calculations', color: 'blue', items: ['Voltage Drop', 'Short Circuit', 'Arc Flash', 'Feeder Sizing', 'EV Charging'] },
+            { title: 'Management', color: 'emerald', items: ['RFI Tracking', 'Site Visit Logs', 'Calendar Events', 'Inspector AI'] },
+            { title: 'Export', color: 'purple', items: ['PDF Export', 'Permit Packets', 'Panel Schedules', 'One-Line Diagrams'] },
+            { title: 'Compliance', color: 'amber', items: ['Grounding System', 'Pre-Inspection', 'NEC Validation', 'Code References'] },
+          ].map((module, i) => (
+            <div key={i} className="bg-slate-800/50 border border-slate-700 rounded-lg p-4">
+              <div className="flex items-center gap-2 mb-3">
+                <StatusLED active color={module.color === 'amber' ? 'amber' : 'emerald'} />
+                <h4 className="font-semibold text-white text-sm">{module.title}</h4>
+              </div>
+              <ul className="space-y-1.5">
+                {module.items.map((item, j) => (
+                  <li key={j} className="text-xs text-slate-400 flex items-center gap-2">
+                    <span className="w-1 h-1 bg-slate-600 rounded-full" />
+                    {item}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ))}
+        </div>
+      ),
+    },
+    {
+      title: 'Initialize Project',
+      subtitle: 'Select Template',
+      icon: <Rocket className="w-8 h-8 text-amber-400" />,
+      description: 'Choose a project template to begin system configuration.',
       content: (
         <div className="space-y-4">
-          <p className="text-gray-600">
-            Choose a project template to get started:
-          </p>
           <div className="grid grid-cols-2 gap-3">
-            <button
-              onClick={() => setSelectedTemplate('residential')}
-              className={`text-left border-2 rounded-lg p-4 transition-all ${
-                selectedTemplate === 'residential'
-                  ? 'border-electric-500 bg-electric-50'
-                  : 'border-gray-200 bg-gray-50 hover:border-electric-300'
-              }`}
-            >
-              <div className="flex items-start gap-3">
-                <div className="text-2xl">🏠</div>
-                <div className="flex-1">
-                  <h4 className="font-semibold text-sm text-gray-900">Residential Home</h4>
-                  <p className="text-xs text-gray-600 mt-1">2,400 sq ft single-family with typical loads</p>
+            {[
+              { id: 'residential' as TemplateType, icon: '01', title: 'Residential Home', desc: '2,400 sq ft single-family' },
+              { id: 'commercial' as TemplateType, icon: '02', title: 'Commercial Office', desc: '5,000 sq ft with HVAC' },
+              { id: 'industrial' as TemplateType, icon: '03', title: 'Light Manufacturing', desc: '10,000 sq ft with machinery' },
+              { id: 'ev-charging' as TemplateType, icon: '04', title: 'EV Charging Install', desc: 'Residential Level 2 charger' },
+            ].map((template) => (
+              <button
+                key={template.id}
+                onClick={() => setSelectedTemplate(template.id)}
+                className={`text-left border rounded-lg p-4 transition-all ${
+                  selectedTemplate === template.id
+                    ? 'border-amber-400/50 bg-amber-400/10'
+                    : 'border-slate-700 bg-slate-800/30 hover:border-slate-600'
+                }`}
+              >
+                <div className="flex items-start gap-3">
+                  <div className={`w-8 h-8 rounded flex items-center justify-center font-mono text-xs ${
+                    selectedTemplate === template.id
+                      ? 'bg-amber-400/20 text-amber-400'
+                      : 'bg-slate-800 text-slate-500'
+                  }`}>
+                    {template.icon}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <h4 className={`font-medium text-sm ${
+                      selectedTemplate === template.id ? 'text-amber-400' : 'text-white'
+                    }`}>
+                      {template.title}
+                    </h4>
+                    <p className="text-xs text-slate-500 mt-0.5">{template.desc}</p>
+                  </div>
+                  {selectedTemplate === template.id && (
+                    <StatusLED active color="amber" />
+                  )}
                 </div>
-                {selectedTemplate === 'residential' && (
-                  <CheckCircle className="w-5 h-5 text-electric-600 flex-shrink-0" />
-                )}
-              </div>
-            </button>
-
-            <button
-              onClick={() => setSelectedTemplate('commercial')}
-              className={`text-left border-2 rounded-lg p-4 transition-all ${
-                selectedTemplate === 'commercial'
-                  ? 'border-electric-500 bg-electric-50'
-                  : 'border-gray-200 bg-gray-50 hover:border-electric-300'
-              }`}
-            >
-              <div className="flex items-start gap-3">
-                <div className="text-2xl">🏢</div>
-                <div className="flex-1">
-                  <h4 className="font-semibold text-sm text-gray-900">Commercial Office</h4>
-                  <p className="text-xs text-gray-600 mt-1">5,000 sq ft office with HVAC</p>
-                </div>
-                {selectedTemplate === 'commercial' && (
-                  <CheckCircle className="w-5 h-5 text-electric-600 flex-shrink-0" />
-                )}
-              </div>
-            </button>
-
-            <button
-              onClick={() => setSelectedTemplate('industrial')}
-              className={`text-left border-2 rounded-lg p-4 transition-all ${
-                selectedTemplate === 'industrial'
-                  ? 'border-electric-500 bg-electric-50'
-                  : 'border-gray-200 bg-gray-50 hover:border-electric-300'
-              }`}
-            >
-              <div className="flex items-start gap-3">
-                <div className="text-2xl">🏭</div>
-                <div className="flex-1">
-                  <h4 className="font-semibold text-sm text-gray-900">Light Manufacturing</h4>
-                  <p className="text-xs text-gray-600 mt-1">10,000 sq ft with machinery</p>
-                </div>
-                {selectedTemplate === 'industrial' && (
-                  <CheckCircle className="w-5 h-5 text-electric-600 flex-shrink-0" />
-                )}
-              </div>
-            </button>
-
-            <button
-              onClick={() => setSelectedTemplate('ev-charging')}
-              className={`text-left border-2 rounded-lg p-4 transition-all ${
-                selectedTemplate === 'ev-charging'
-                  ? 'border-electric-500 bg-electric-50'
-                  : 'border-gray-200 bg-gray-50 hover:border-electric-300'
-              }`}
-            >
-              <div className="flex items-start gap-3">
-                <div className="text-2xl">⚡</div>
-                <div className="flex-1">
-                  <h4 className="font-semibold text-sm text-gray-900">EV Charging Install</h4>
-                  <p className="text-xs text-gray-600 mt-1">Residential with Level 2 charger</p>
-                </div>
-                {selectedTemplate === 'ev-charging' && (
-                  <CheckCircle className="w-5 h-5 text-electric-600 flex-shrink-0" />
-                )}
-              </div>
-            </button>
+              </button>
+            ))}
           </div>
 
-          <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mt-4">
-            <p className="text-xs text-blue-800">
-              <strong>Sample projects include:</strong> Pre-configured loads, grounding system, and project settings.
-              You can modify everything after creation!
+          <div className="bg-slate-800/50 border border-slate-700 rounded-lg p-3">
+            <div className="flex items-center gap-2 mb-1">
+              <CircuitBoard className="w-4 h-4 text-blue-400" />
+              <span className="text-xs font-medium text-blue-400 font-mono uppercase tracking-wider">Template Info</span>
+            </div>
+            <p className="text-xs text-slate-400">
+              Sample projects include pre-configured loads, grounding system, and project settings. All data can be modified after creation.
             </p>
           </div>
 
-          <div className="bg-electric-50 border border-electric-200 rounded-lg p-4 mt-4">
-            <h4 className="font-semibold text-electric-900 text-sm mb-2 flex items-center gap-2">
-              <Zap className="w-4 h-4" />
-              Pro Tip
-            </h4>
-            <p className="text-xs text-electric-800">
+          <div className="bg-amber-400/10 border border-amber-400/20 rounded-lg p-3">
+            <div className="flex items-center gap-2 mb-1">
+              <Zap className="w-4 h-4 text-amber-400" />
+              <span className="text-xs font-medium text-amber-400 font-mono uppercase tracking-wider">Pro Tip</span>
+            </div>
+            <p className="text-xs text-slate-400">
               Use the AI NEC Assistant (chat icon in bottom-right) to ask code questions while you work!
             </p>
           </div>
@@ -218,81 +180,110 @@ export const WelcomeModal: React.FC<WelcomeModalProps> = ({ onClose, onCreatePro
   const currentStepData = steps[currentStep];
 
   return (
-    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+    <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+      <div className="bg-slate-900 border border-slate-800 rounded-xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-hidden flex flex-col">
         {/* Header */}
-        <div className="sticky top-0 bg-white border-b border-gray-100 px-6 py-4 flex items-center justify-between">
+        <div className="bg-slate-800/50 border-b border-slate-700/50 px-5 py-3 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-electric-500 rounded flex items-center justify-center">
-              <Zap className="text-white w-6 h-6 fill-current" />
+            <div className="relative">
+              <div className="w-9 h-9 bg-gradient-to-br from-amber-400 to-amber-500 rounded-lg flex items-center justify-center">
+                <Zap className="w-5 h-5 text-slate-900" strokeWidth={2.5} />
+              </div>
+              <div className="absolute -top-0.5 -right-0.5 w-2 h-2 bg-emerald-400 rounded-full border border-slate-900" />
             </div>
-            <h2 className="text-lg font-bold text-gray-900">NEC PRO</h2>
+            <div>
+              <span className="font-bold text-white" style={{ fontFamily: "'JetBrains Mono', monospace" }}>NEC PRO</span>
+              <div className="flex items-center gap-1.5">
+                <StatusLED active />
+                <span className="text-[9px] text-slate-500 uppercase tracking-wider">Initializing</span>
+              </div>
+            </div>
           </div>
-          <button
-            onClick={onClose}
-            className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
-            title="Close"
-          >
-            <X className="w-5 h-5 text-gray-500" />
-          </button>
+          <div className="flex items-center gap-4">
+            <VoltageBar level={currentStep + 2} />
+            <button
+              onClick={onClose}
+              className="p-1.5 text-slate-500 hover:text-white hover:bg-slate-800 rounded transition-colors"
+              title="Close"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          </div>
         </div>
 
         {/* Content */}
-        <div className="px-6 py-8">
+        <div className="flex-1 overflow-y-auto px-6 py-6">
           {/* Step indicator */}
-          <div className="flex items-center justify-center gap-2 mb-8">
+          <div className="flex items-center justify-center gap-3 mb-6">
             {steps.map((_, index) => (
-              <div
-                key={index}
-                className={`h-2 rounded-full transition-all ${
-                  index === currentStep
-                    ? 'w-8 bg-electric-500'
-                    : index < currentStep
-                    ? 'w-2 bg-electric-300'
-                    : 'w-2 bg-gray-200'
-                }`}
-              />
+              <div key={index} className="flex items-center gap-3">
+                <div
+                  className={`w-8 h-8 rounded flex items-center justify-center font-mono text-xs transition-all ${
+                    index === currentStep
+                      ? 'bg-amber-400/20 text-amber-400 border border-amber-400/50'
+                      : index < currentStep
+                        ? 'bg-emerald-500/20 text-emerald-400'
+                        : 'bg-slate-800 text-slate-600'
+                  }`}
+                >
+                  {index < currentStep ? (
+                    <Check className="w-4 h-4" />
+                  ) : (
+                    String(index + 1).padStart(2, '0')
+                  )}
+                </div>
+                {index < steps.length - 1 && (
+                  <div className={`w-12 h-px ${
+                    index < currentStep ? 'bg-emerald-500/50' : 'bg-slate-700'
+                  }`} />
+                )}
+              </div>
             ))}
           </div>
 
           {/* Step content */}
           <div className="text-center mb-6">
-            <div className="inline-flex items-center justify-center mb-4">
+            <div className="inline-flex items-center justify-center w-16 h-16 bg-slate-800 border border-slate-700 rounded-xl mb-4">
               {currentStepData.icon}
             </div>
-            <h3 className="text-2xl font-bold text-gray-900 mb-2">
+            <div className="flex items-center justify-center gap-2 mb-2">
+              <StatusLED active color="amber" />
+              <span className="text-[10px] font-mono text-slate-500 uppercase tracking-wider">{currentStepData.subtitle}</span>
+            </div>
+            <h3 className="text-2xl font-bold text-white mb-2">
               {currentStepData.title}
             </h3>
-            <p className="text-sm text-gray-600">
+            <p className="text-sm text-slate-400">
               {currentStepData.description}
             </p>
           </div>
 
-          <div className="mb-8">
+          <div className="mb-6">
             {currentStepData.content}
           </div>
         </div>
 
         {/* Footer */}
-        <div className="sticky bottom-0 bg-gray-50 border-t border-gray-100 px-6 py-4 flex items-center justify-between">
+        <div className="bg-slate-800/30 border-t border-slate-700/50 px-5 py-4 flex items-center justify-between">
           <button
             onClick={() => setCurrentStep(Math.max(0, currentStep - 1))}
             disabled={currentStep === 0}
-            className="px-4 py-2 text-sm font-medium text-gray-600 hover:text-gray-900 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            className="px-4 py-2 text-sm font-medium text-slate-500 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
           >
             Back
           </button>
 
-          <div className="text-xs text-gray-500">
-            Step {currentStep + 1} of {steps.length}
+          <div className="text-xs text-slate-600 font-mono">
+            Step {String(currentStep + 1).padStart(2, '0')} / {String(steps.length).padStart(2, '0')}
           </div>
 
           {currentStep < steps.length - 1 ? (
             <button
               onClick={() => setCurrentStep(currentStep + 1)}
-              className="px-4 py-2 bg-electric-500 hover:bg-electric-600 text-white text-sm font-medium rounded-lg transition-colors"
+              className="group px-5 py-2 bg-slate-800 hover:bg-slate-700 border border-slate-700 text-white text-sm font-medium rounded-lg transition-all flex items-center gap-2"
             >
-              Next
+              Continue
+              <ChevronRight className="w-4 h-4 group-hover:translate-x-0.5 transition-transform" />
             </button>
           ) : (
             <button
@@ -300,10 +291,11 @@ export const WelcomeModal: React.FC<WelcomeModalProps> = ({ onClose, onCreatePro
                 onClose();
                 onCreateProject(selectedTemplate);
               }}
-              className="px-6 py-2 bg-electric-500 hover:bg-electric-600 text-white text-sm font-semibold rounded-lg transition-colors flex items-center gap-2"
+              className="group px-5 py-2 bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-300 hover:to-amber-400 text-slate-900 text-sm font-semibold rounded-lg transition-all flex items-center gap-2 shadow-lg shadow-amber-500/20"
             >
-              <Rocket className="w-4 h-4" />
-              Create Project from Template
+              <Activity className="w-4 h-4" />
+              Initialize Project
+              <ChevronRight className="w-4 h-4 group-hover:translate-x-0.5 transition-transform" />
             </button>
           )}
         </div>

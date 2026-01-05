@@ -509,7 +509,7 @@ export const PanelSchedule: React.FC<PanelScheduleProps> = ({ project }) => {
       if (leftMultiPoleAbove) {
         return (
           <>
-            <td colSpan={5} className="p-1 bg-gray-50 text-center text-xs text-gray-400 italic border-r border-gray-200">
+            <td colSpan={5} className="p-1 bg-slate-800/50 text-center text-xs text-gray-400 italic border-r border-slate-700">
               ↑ {leftMultiPoleAbove.pole}P
             </td>
           </>
@@ -518,11 +518,11 @@ export const PanelSchedule: React.FC<PanelScheduleProps> = ({ project }) => {
       if (!leftCkt) {
         return (
           <>
-            <td className="p-1 border-r border-gray-100 text-xs text-gray-300">SPARE</td>
-            <td className="p-1 border-r border-gray-100 text-center text-xs"></td>
-            <td className="p-1 border-r border-gray-100 text-center text-xs font-mono bg-gray-50"></td>
-            <td className="p-1 border-r border-gray-100 text-center text-xs font-mono bg-gray-50"></td>
-            <td className="p-1 border-r border-gray-200 text-center text-xs font-mono bg-gray-50"></td>
+            <td className="p-1 border-r border-slate-700 text-xs text-gray-300">SPARE</td>
+            <td className="p-1 border-r border-slate-700 text-center text-xs"></td>
+            <td className="p-1 border-r border-slate-700 text-center text-xs font-mono bg-slate-800/50"></td>
+            <td className="p-1 border-r border-slate-700 text-center text-xs font-mono bg-slate-800/50"></td>
+            <td className="p-1 border-r border-slate-700 text-center text-xs font-mono bg-slate-800/50"></td>
           </>
         );
       }
@@ -532,7 +532,7 @@ export const PanelSchedule: React.FC<PanelScheduleProps> = ({ project }) => {
       if (isEditing(leftCkt)) {
         return (
           <>
-            <td className="p-1 border-r border-gray-100">
+            <td className="p-1 border-r border-slate-700">
               <input
                 type="text"
                 value={editForm.description || ''}
@@ -540,7 +540,7 @@ export const PanelSchedule: React.FC<PanelScheduleProps> = ({ project }) => {
                 className="w-full text-xs border border-electric-300 rounded px-1 py-0.5"
               />
             </td>
-            <td className="p-1 border-r border-gray-100">
+            <td className="p-1 border-r border-slate-700">
               <select
                 value={editForm.loadType || 'O'}
                 onChange={e => setEditForm({...editForm, loadType: e.target.value as LoadTypeCode})}
@@ -551,7 +551,7 @@ export const PanelSchedule: React.FC<PanelScheduleProps> = ({ project }) => {
                 ))}
               </select>
             </td>
-            <td colSpan={3} className="p-1 border-r border-gray-200">
+            <td colSpan={3} className="p-1 border-r border-slate-700">
               <input
                 type="number"
                 value={editForm.loadWatts || ''}
@@ -566,7 +566,7 @@ export const PanelSchedule: React.FC<PanelScheduleProps> = ({ project }) => {
 
       return (
         <>
-          <td className="p-1 border-r border-gray-100 text-xs group">
+          <td className="p-1 border-r border-slate-700 text-xs group">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-1">
                 {leftCkt.pole > 1 && (
@@ -584,16 +584,16 @@ export const PanelSchedule: React.FC<PanelScheduleProps> = ({ project }) => {
               </div>
             </div>
           </td>
-          <td className={`p-1 border-r border-gray-100 text-center text-[10px] font-bold ${getLoadTypeColor(loadType)} border`}>
+          <td className={`p-1 border-r border-slate-700 text-center text-[10px] font-bold ${getLoadTypeColor(loadType)} border`}>
             {loadType}
           </td>
-          <td className="p-1 border-r border-gray-100 text-center text-xs font-mono bg-gray-50 text-gray-600">
+          <td className="p-1 border-r border-slate-700 text-center text-xs font-mono bg-slate-800/50 text-slate-400">
             {getLoadPerPhase(leftCkt, 'A') || ''}
           </td>
-          <td className="p-1 border-r border-gray-100 text-center text-xs font-mono bg-gray-50 text-gray-600">
+          <td className="p-1 border-r border-slate-700 text-center text-xs font-mono bg-slate-800/50 text-slate-400">
             {getLoadPerPhase(leftCkt, 'B') || ''}
           </td>
-          <td className="p-1 border-r border-gray-200 text-center text-xs font-mono bg-gray-50 text-gray-600">
+          <td className="p-1 border-r border-slate-700 text-center text-xs font-mono bg-slate-800/50 text-slate-400">
             {selectedPanel?.phase === 3 ? (getLoadPerPhase(leftCkt, 'C') || '') : ''}
           </td>
         </>
@@ -605,7 +605,7 @@ export const PanelSchedule: React.FC<PanelScheduleProps> = ({ project }) => {
       if (rightMultiPoleAbove) {
         return (
           <>
-            <td colSpan={5} className="p-1 bg-gray-50 text-center text-xs text-gray-400 italic border-l border-gray-200">
+            <td colSpan={5} className="p-1 bg-slate-800/50 text-center text-xs text-gray-400 italic border-l border-slate-700">
               ↑ {rightMultiPoleAbove.pole}P
             </td>
           </>
@@ -614,11 +614,11 @@ export const PanelSchedule: React.FC<PanelScheduleProps> = ({ project }) => {
       if (!rightCkt) {
         return (
           <>
-            <td className="p-1 border-l border-gray-200 text-center text-xs font-mono bg-gray-50"></td>
-            <td className="p-1 border-l border-gray-100 text-center text-xs font-mono bg-gray-50"></td>
-            <td className="p-1 border-l border-gray-100 text-center text-xs font-mono bg-gray-50"></td>
-            <td className="p-1 border-l border-gray-100 text-center text-xs"></td>
-            <td className="p-1 border-l border-gray-100 text-xs text-gray-300 text-right">SPARE</td>
+            <td className="p-1 border-l border-slate-700 text-center text-xs font-mono bg-slate-800/50"></td>
+            <td className="p-1 border-l border-slate-700 text-center text-xs font-mono bg-slate-800/50"></td>
+            <td className="p-1 border-l border-slate-700 text-center text-xs font-mono bg-slate-800/50"></td>
+            <td className="p-1 border-l border-slate-700 text-center text-xs"></td>
+            <td className="p-1 border-l border-slate-700 text-xs text-gray-300 text-right">SPARE</td>
           </>
         );
       }
@@ -628,7 +628,7 @@ export const PanelSchedule: React.FC<PanelScheduleProps> = ({ project }) => {
       if (isEditing(rightCkt)) {
         return (
           <>
-            <td colSpan={3} className="p-1 border-l border-gray-200">
+            <td colSpan={3} className="p-1 border-l border-slate-700">
               <input
                 type="number"
                 value={editForm.loadWatts || ''}
@@ -637,7 +637,7 @@ export const PanelSchedule: React.FC<PanelScheduleProps> = ({ project }) => {
                 placeholder="VA"
               />
             </td>
-            <td className="p-1 border-l border-gray-100">
+            <td className="p-1 border-l border-slate-700">
               <select
                 value={editForm.loadType || 'O'}
                 onChange={e => setEditForm({...editForm, loadType: e.target.value as LoadTypeCode})}
@@ -648,7 +648,7 @@ export const PanelSchedule: React.FC<PanelScheduleProps> = ({ project }) => {
                 ))}
               </select>
             </td>
-            <td className="p-1 border-l border-gray-100">
+            <td className="p-1 border-l border-slate-700">
               <input
                 type="text"
                 value={editForm.description || ''}
@@ -662,19 +662,19 @@ export const PanelSchedule: React.FC<PanelScheduleProps> = ({ project }) => {
 
       return (
         <>
-          <td className="p-1 border-l border-gray-200 text-center text-xs font-mono bg-gray-50 text-gray-600">
+          <td className="p-1 border-l border-slate-700 text-center text-xs font-mono bg-slate-800/50 text-slate-400">
             {selectedPanel?.phase === 3 ? (getLoadPerPhase(rightCkt, 'C') || '') : ''}
           </td>
-          <td className="p-1 border-l border-gray-100 text-center text-xs font-mono bg-gray-50 text-gray-600">
+          <td className="p-1 border-l border-slate-700 text-center text-xs font-mono bg-slate-800/50 text-slate-400">
             {getLoadPerPhase(rightCkt, 'B') || ''}
           </td>
-          <td className="p-1 border-l border-gray-100 text-center text-xs font-mono bg-gray-50 text-gray-600">
+          <td className="p-1 border-l border-slate-700 text-center text-xs font-mono bg-slate-800/50 text-slate-400">
             {getLoadPerPhase(rightCkt, 'A') || ''}
           </td>
-          <td className={`p-1 border-l border-gray-100 text-center text-[10px] font-bold ${getLoadTypeColor(loadType)} border`}>
+          <td className={`p-1 border-l border-slate-700 text-center text-[10px] font-bold ${getLoadTypeColor(loadType)} border`}>
             {loadType}
           </td>
-          <td className="p-1 border-l border-gray-100 text-xs text-right group">
+          <td className="p-1 border-l border-slate-700 text-xs text-right group">
             <div className="flex items-center justify-between">
               <div className="flex gap-0.5 opacity-0 group-hover:opacity-100">
                 <button onClick={() => startEdit(rightCkt)} className="hover:text-electric-500">
@@ -697,9 +697,9 @@ export const PanelSchedule: React.FC<PanelScheduleProps> = ({ project }) => {
     };
 
     return (
-      <tr key={rowNum} className="border-b border-gray-100 hover:bg-gray-50/50">
+      <tr key={rowNum} className="border-b border-slate-700 hover:bg-slate-800/50/50">
         {/* Left Circuit Number */}
-        <td className="p-1 w-8 text-center text-xs font-mono text-gray-500 bg-gray-50 border-r border-gray-200">
+        <td className="p-1 w-8 text-center text-xs font-mono text-slate-500 bg-slate-800/50 border-r border-slate-700">
           {leftCkt && isEditing(leftCkt) ? (
             <input
               type="number"
@@ -715,23 +715,23 @@ export const PanelSchedule: React.FC<PanelScheduleProps> = ({ project }) => {
         {renderLeftCircuit()}
         
         {/* Breaker columns */}
-        <td className="p-1 w-10 text-center text-xs font-mono border-r border-gray-100 bg-white">
+        <td className="p-1 w-10 text-center text-xs font-mono border-r border-slate-700 bg-slate-800">
           {leftCkt?.breaker_amps || ''}
         </td>
-        <td className="p-1 w-10 text-center text-xs font-mono border-r border-gray-100 bg-white">
+        <td className="p-1 w-10 text-center text-xs font-mono border-r border-slate-700 bg-slate-800">
           {leftCkt?.pole || ''}
         </td>
         
         {/* Center Phase indicator */}
-        <td className="p-1 w-8 text-center text-xs font-bold bg-electric-50 text-electric-700 border-x border-gray-300">
+        <td className="p-1 w-8 text-center text-xs font-bold bg-electric-50 text-electric-700 border-x border-slate-600">
           {phase}
         </td>
         
         {/* Right breaker columns */}
-        <td className="p-1 w-10 text-center text-xs font-mono border-l border-gray-100 bg-white">
+        <td className="p-1 w-10 text-center text-xs font-mono border-l border-slate-700 bg-slate-800">
           {rightCkt?.pole || ''}
         </td>
-        <td className="p-1 w-10 text-center text-xs font-mono border-l border-gray-100 bg-white">
+        <td className="p-1 w-10 text-center text-xs font-mono border-l border-slate-700 bg-slate-800">
           {rightCkt?.breaker_amps || ''}
         </td>
         
@@ -739,7 +739,7 @@ export const PanelSchedule: React.FC<PanelScheduleProps> = ({ project }) => {
         {renderRightCircuit()}
 
         {/* Right Circuit Number */}
-        <td className="p-1 w-8 text-center text-xs font-mono text-gray-500 bg-gray-50 border-l border-gray-200">
+        <td className="p-1 w-8 text-center text-xs font-mono text-slate-500 bg-slate-800/50 border-l border-slate-700">
           {rightCkt && isEditing(rightCkt) ? (
             <input
               type="number"
@@ -759,7 +759,7 @@ export const PanelSchedule: React.FC<PanelScheduleProps> = ({ project }) => {
       <div className="flex items-center justify-center h-96">
         <div className="text-center">
           <LayoutGrid className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-          <p className="text-gray-500">No panels available. Add panels in Circuit Design tab.</p>
+          <p className="text-slate-500">No panels available. Add panels in Circuit Design tab.</p>
         </div>
       </div>
     );
@@ -770,7 +770,7 @@ export const PanelSchedule: React.FC<PanelScheduleProps> = ({ project }) => {
   return (
     <div className="space-y-4 animate-in fade-in duration-500">
       {/* Panel Tabs */}
-      <div className="flex gap-2 border-b border-gray-200 overflow-x-auto">
+      <div className="flex gap-2 border-b border-slate-700 overflow-x-auto">
         {panels.map(panel => (
           <button
             key={panel.id}
@@ -778,7 +778,7 @@ export const PanelSchedule: React.FC<PanelScheduleProps> = ({ project }) => {
             className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${
               selectedPanelId === panel.id
                 ? 'border-electric-500 text-electric-600'
-                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                : 'border-transparent text-slate-500 hover:text-slate-300 hover:border-slate-600'
             }`}
           >
             {panel.name}
@@ -790,32 +790,32 @@ export const PanelSchedule: React.FC<PanelScheduleProps> = ({ project }) => {
       </div>
 
       {/* Panel Header Info */}
-      <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 p-4 bg-gray-50 border-b border-gray-200">
+      <div className="bg-slate-800 border border-slate-700 rounded-lg overflow-hidden">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 p-4 bg-slate-800/50 border-b border-slate-700">
           <div>
-            <span className="text-[10px] uppercase text-gray-500 font-semibold">Main Breaker</span>
+            <span className="text-[10px] uppercase text-slate-500 font-semibold">Main Breaker</span>
             <div className="text-sm font-bold">{selectedPanel.main_breaker_amps || 'MLO'} A</div>
           </div>
           <div>
-            <span className="text-[10px] uppercase text-gray-500 font-semibold">Voltage</span>
+            <span className="text-[10px] uppercase text-slate-500 font-semibold">Voltage</span>
             <div className="text-sm font-bold">{selectedPanel.voltage}V / {selectedPanel.phase === 3 ? '120V' : '120V'}</div>
           </div>
           <div>
-            <span className="text-[10px] uppercase text-gray-500 font-semibold">Bus Rating</span>
+            <span className="text-[10px] uppercase text-slate-500 font-semibold">Bus Rating</span>
             <div className="text-sm font-bold">{selectedPanel.bus_rating} A</div>
           </div>
           <div>
-            <span className="text-[10px] uppercase text-gray-500 font-semibold">Phase / Wire</span>
+            <span className="text-[10px] uppercase text-slate-500 font-semibold">Phase / Wire</span>
             <div className="text-sm font-bold">{selectedPanel.phase}Φ / {selectedPanel.phase === 3 ? 4 : 3}W</div>
           </div>
         </div>
 
         {/* Actions */}
-        <div className="flex justify-between items-center p-3 border-b border-gray-200">
+        <div className="flex justify-between items-center p-3 border-b border-slate-700">
           <div className="flex items-center gap-4">
-            <h2 className="text-lg font-bold text-gray-900">{selectedPanel.name}</h2>
+            <h2 className="text-lg font-bold text-white">{selectedPanel.name}</h2>
             {selectedPanel.location && (
-              <span className="text-xs text-gray-500">Location: {selectedPanel.location}</span>
+              <span className="text-xs text-slate-500">Location: {selectedPanel.location}</span>
             )}
           </div>
           <div className="flex gap-2">
@@ -829,7 +829,7 @@ export const PanelSchedule: React.FC<PanelScheduleProps> = ({ project }) => {
                 </button>
                 <button
                   onClick={cancelEdit}
-                  className="flex items-center gap-1 px-3 py-1.5 bg-gray-200 text-gray-700 rounded text-xs font-medium hover:bg-gray-300"
+                  className="flex items-center gap-1 px-3 py-1.5 bg-gray-200 text-slate-300 rounded text-xs font-medium hover:bg-gray-300"
                 >
                   <X className="w-3 h-3" /> Cancel
                 </button>
@@ -837,7 +837,7 @@ export const PanelSchedule: React.FC<PanelScheduleProps> = ({ project }) => {
             )}
             <button
               onClick={handleExportPDF}
-              className="flex items-center gap-1 px-3 py-1.5 bg-white border border-gray-200 rounded text-xs font-medium hover:bg-gray-50"
+              className="flex items-center gap-1 px-3 py-1.5 bg-slate-800 border border-slate-700 rounded text-xs font-medium hover:bg-slate-800/50"
             >
               <Download className="w-3 h-3" /> Export PDF
             </button>
@@ -891,7 +891,7 @@ export const PanelSchedule: React.FC<PanelScheduleProps> = ({ project }) => {
                 <th className="p-1 border-l border-gray-600"></th>
               </tr>
             </thead>
-            <tbody className="bg-white">
+            <tbody className="bg-slate-800">
               {Array.from({ length: Math.ceil(totalSlots / 2) }).map((_, i) => renderRow(i + 1))}
 
               {/* Add Circuit Row - Inline */}
@@ -908,7 +908,7 @@ export const PanelSchedule: React.FC<PanelScheduleProps> = ({ project }) => {
                         className={`w-full border rounded px-1.5 py-0.5 text-xs text-center font-medium ${
                           newCircuit.circuitNumber && !isCircuitSlotAvailable(newCircuit.circuitNumber, newCircuit.pole || 1)
                             ? 'border-red-500 bg-red-50'
-                            : 'border-gray-300'
+                            : 'border-slate-600'
                         }`}
                         style={{minWidth: '50px'}}
                         title={
@@ -924,7 +924,7 @@ export const PanelSchedule: React.FC<PanelScheduleProps> = ({ project }) => {
                         value={newCircuit.description || ''}
                         onChange={e => setNewCircuit({...newCircuit, description: e.target.value})}
                         placeholder="Description"
-                        className="w-full border border-gray-300 rounded px-1 py-0.5 text-xs"
+                        className="w-full border border-slate-600 rounded px-1 py-0.5 text-xs"
                         autoFocus
                       />
                     </td>
@@ -932,7 +932,7 @@ export const PanelSchedule: React.FC<PanelScheduleProps> = ({ project }) => {
                       <select
                         value={newCircuit.loadType || 'O'}
                         onChange={e => setNewCircuit({...newCircuit, loadType: e.target.value as LoadTypeCode})}
-                        className="w-full border border-gray-300 rounded px-1 py-0.5 text-[10px]"
+                        className="w-full border border-slate-600 rounded px-1 py-0.5 text-[10px]"
                       >
                         {LOAD_TYPES.map(lt => <option key={lt.code} value={lt.code}>{lt.code}</option>)}
                       </select>
@@ -943,14 +943,14 @@ export const PanelSchedule: React.FC<PanelScheduleProps> = ({ project }) => {
                         value={newCircuit.loadWatts || ''}
                         onChange={e => setNewCircuit({...newCircuit, loadWatts: Number(e.target.value)})}
                         placeholder="VA"
-                        className="w-full border border-gray-300 rounded px-1 py-0.5 text-xs"
+                        className="w-full border border-slate-600 rounded px-1 py-0.5 text-xs"
                       />
                     </td>
                     <td className="p-1">
                       <select
                         value={newCircuit.breakerAmps || 20}
                         onChange={e => setNewCircuit({...newCircuit, breakerAmps: Number(e.target.value)})}
-                        className="w-full border border-gray-300 rounded px-1 py-0.5 text-[10px]"
+                        className="w-full border border-slate-600 rounded px-1 py-0.5 text-[10px]"
                       >
                         <option value="15">15</option>
                         <option value="20">20</option>
@@ -965,7 +965,7 @@ export const PanelSchedule: React.FC<PanelScheduleProps> = ({ project }) => {
                       <select
                         value={newCircuit.pole || 1}
                         onChange={e => handlePoleChange(Number(e.target.value) as 1 | 2 | 3)}
-                        className="w-full border border-gray-300 rounded px-1 py-0.5 text-[10px]"
+                        className="w-full border border-slate-600 rounded px-1 py-0.5 text-[10px]"
                       >
                         <option value="1">1P</option>
                         <option value="2">2P</option>
@@ -997,7 +997,7 @@ export const PanelSchedule: React.FC<PanelScheduleProps> = ({ project }) => {
                       <select
                         value={newCircuit.pole || 1}
                         onChange={e => handlePoleChange(Number(e.target.value) as 1 | 2 | 3)}
-                        className="w-full border border-gray-300 rounded px-1 py-0.5 text-[10px]"
+                        className="w-full border border-slate-600 rounded px-1 py-0.5 text-[10px]"
                       >
                         <option value="1">1P</option>
                         <option value="2">2P</option>
@@ -1008,7 +1008,7 @@ export const PanelSchedule: React.FC<PanelScheduleProps> = ({ project }) => {
                       <select
                         value={newCircuit.breakerAmps || 20}
                         onChange={e => setNewCircuit({...newCircuit, breakerAmps: Number(e.target.value)})}
-                        className="w-full border border-gray-300 rounded px-1 py-0.5 text-[10px]"
+                        className="w-full border border-slate-600 rounded px-1 py-0.5 text-[10px]"
                       >
                         <option value="15">15</option>
                         <option value="20">20</option>
@@ -1025,14 +1025,14 @@ export const PanelSchedule: React.FC<PanelScheduleProps> = ({ project }) => {
                         value={newCircuit.loadWatts || ''}
                         onChange={e => setNewCircuit({...newCircuit, loadWatts: Number(e.target.value)})}
                         placeholder="VA"
-                        className="w-full border border-gray-300 rounded px-1 py-0.5 text-xs"
+                        className="w-full border border-slate-600 rounded px-1 py-0.5 text-xs"
                       />
                     </td>
                     <td className="p-1">
                       <select
                         value={newCircuit.loadType || 'O'}
                         onChange={e => setNewCircuit({...newCircuit, loadType: e.target.value as LoadTypeCode})}
-                        className="w-full border border-gray-300 rounded px-1 py-0.5 text-[10px]"
+                        className="w-full border border-slate-600 rounded px-1 py-0.5 text-[10px]"
                       >
                         {LOAD_TYPES.map(lt => <option key={lt.code} value={lt.code}>{lt.code}</option>)}
                       </select>
@@ -1043,7 +1043,7 @@ export const PanelSchedule: React.FC<PanelScheduleProps> = ({ project }) => {
                         value={newCircuit.description || ''}
                         onChange={e => setNewCircuit({...newCircuit, description: e.target.value})}
                         placeholder="Description"
-                        className="w-full border border-gray-300 rounded px-1 py-0.5 text-xs"
+                        className="w-full border border-slate-600 rounded px-1 py-0.5 text-xs"
                       />
                     </td>
                     <td className="p-1 text-center" style={{minWidth: '55px'}}>
@@ -1055,7 +1055,7 @@ export const PanelSchedule: React.FC<PanelScheduleProps> = ({ project }) => {
                         className={`w-full border rounded px-1.5 py-0.5 text-xs text-center font-medium ${
                           newCircuit.circuitNumber && !isCircuitSlotAvailable(newCircuit.circuitNumber, newCircuit.pole || 1)
                             ? 'border-red-500 bg-red-50'
-                            : 'border-gray-300'
+                            : 'border-slate-600'
                         }`}
                         style={{minWidth: '50px'}}
                         title={
@@ -1095,7 +1095,7 @@ export const PanelSchedule: React.FC<PanelScheduleProps> = ({ project }) => {
                       </button>
                       <button
                         onClick={cancelAddCircuit}
-                        className="flex items-center gap-1 px-3 py-1 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded text-xs font-medium"
+                        className="flex items-center gap-1 px-3 py-1 bg-gray-200 hover:bg-gray-300 text-slate-300 rounded text-xs font-medium"
                       >
                         <X className="w-3 h-3" /> Cancel
                       </button>
@@ -1113,9 +1113,9 @@ export const PanelSchedule: React.FC<PanelScheduleProps> = ({ project }) => {
                     </td>
                   </tr>
                   {feederCircuits.map((feeder, idx) => (
-                    <tr key={feeder.id} className={`${idx % 2 === 0 ? 'bg-purple-50/50' : 'bg-white'} hover:bg-purple-100/50`}>
+                    <tr key={feeder.id} className={`${idx % 2 === 0 ? 'bg-purple-50/50' : 'bg-slate-800'} hover:bg-purple-100/50`}>
                       <td className="p-1 text-center text-xs font-mono text-purple-600">—</td>
-                      <td className="p-1 border-r border-gray-100">
+                      <td className="p-1 border-r border-slate-700">
                         <span className="text-xs font-bold text-purple-800">{feeder.name}</span>
                         <span className="text-[10px] text-purple-500 ml-1">
                           ({feeder.type === 'panel' ? 'Panel' : 'Transformer'})
@@ -1159,7 +1159,7 @@ export const PanelSchedule: React.FC<PanelScheduleProps> = ({ project }) => {
                         {((feeder.loadVA / 1000) / (selectedPanel?.phase === 3 ? 3 : 2)).toFixed(2)}
                       </td>
                       <td className="p-1 text-center text-xs font-mono">{feeder.breakerAmps}A</td>
-                      <td className="p-1 border-l border-gray-100">
+                      <td className="p-1 border-l border-slate-700">
                         <span className="text-xs font-bold text-purple-800">{feeder.name}</span>
                       </td>
                       <td className="p-1 text-center text-xs font-mono text-purple-600">—</td>
@@ -1182,7 +1182,7 @@ export const PanelSchedule: React.FC<PanelScheduleProps> = ({ project }) => {
               )}
 
               {/* Phase Totals Row */}
-              <tr className="bg-gray-100 border-t-2 border-gray-300 font-semibold">
+              <tr className="bg-gray-100 border-t-2 border-slate-600 font-semibold">
                 <td colSpan={3} className="p-2 text-right text-xs">PHASE TOTALS (KVA):</td>
                 <td className="p-2 text-center text-xs font-mono">
                   {demandResult?.phaseLoads.find(p => p.phase === 'A')?.connectedLoad_kVA.toFixed(1) || '0.0'}
@@ -1214,7 +1214,7 @@ export const PanelSchedule: React.FC<PanelScheduleProps> = ({ project }) => {
       {demandResult && showDemandDetails && (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
           {/* Demand Factors by Type */}
-          <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
+          <div className="bg-slate-800 border border-slate-700 rounded-lg overflow-hidden">
             <div className="bg-gray-800 text-white px-4 py-2 flex items-center justify-between">
               <span className="font-semibold text-sm">DEMAND FACTOR CALCULATION (NEC ARTICLE 220)</span>
               <Calculator className="w-4 h-4" />
@@ -1231,7 +1231,7 @@ export const PanelSchedule: React.FC<PanelScheduleProps> = ({ project }) => {
               </thead>
               <tbody>
                 {(demandResult.loadsByType || []).map(lt => (
-                  <tr key={lt.type} className="border-t border-gray-100">
+                  <tr key={lt.type} className="border-t border-slate-700">
                     <td className="p-2">
                       <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold ${getLoadTypeColor(lt.type)} border mr-2`}>
                         {lt.type}
@@ -1245,8 +1245,8 @@ export const PanelSchedule: React.FC<PanelScheduleProps> = ({ project }) => {
                   </tr>
                 ))}
               </tbody>
-              <tfoot className="bg-gray-50 font-semibold">
-                <tr className="border-t-2 border-gray-300">
+              <tfoot className="bg-slate-800/50 font-semibold">
+                <tr className="border-t-2 border-slate-600">
                   <td className="p-2">TOTALS</td>
                   <td className="p-2 text-center font-mono">{demandResult.totalConnectedLoad_kVA.toFixed(2)}</td>
                   <td className="p-2 text-center">—</td>
@@ -1260,18 +1260,18 @@ export const PanelSchedule: React.FC<PanelScheduleProps> = ({ project }) => {
           {/* Summary Stats */}
           <div className="space-y-4">
             {/* Load Summary */}
-            <div className="bg-white border border-gray-200 rounded-lg p-4">
-              <h4 className="font-semibold text-sm text-gray-700 mb-3 flex items-center gap-2">
+            <div className="bg-slate-800 border border-slate-700 rounded-lg p-4">
+              <h4 className="font-semibold text-sm text-slate-300 mb-3 flex items-center gap-2">
                 <Settings className="w-4 h-4" /> PANEL SUMMARY
               </h4>
               <div className="grid grid-cols-2 gap-4">
                 {/* Direct Circuits */}
-                <div className="bg-gray-50 rounded p-3">
-                  <span className="text-[10px] uppercase text-gray-500 block">Direct Circuits Load</span>
-                  <span className="text-xl font-bold text-gray-900">{demandResult.totalConnectedLoad_kVA.toFixed(1)} KVA</span>
+                <div className="bg-slate-800/50 rounded p-3">
+                  <span className="text-[10px] uppercase text-slate-500 block">Direct Circuits Load</span>
+                  <span className="text-xl font-bold text-white">{demandResult.totalConnectedLoad_kVA.toFixed(1)} KVA</span>
                 </div>
                 <div className="bg-electric-50 rounded p-3">
-                  <span className="text-[10px] uppercase text-gray-500 block">Direct Demand Load</span>
+                  <span className="text-[10px] uppercase text-slate-500 block">Direct Demand Load</span>
                   <span className="text-xl font-bold text-electric-600">{demandResult.totalDemandLoad_kVA.toFixed(1)} KVA</span>
                 </div>
                 
@@ -1294,11 +1294,11 @@ export const PanelSchedule: React.FC<PanelScheduleProps> = ({ project }) => {
                 )}
                 
                 <div className="bg-blue-50 rounded p-3">
-                  <span className="text-[10px] uppercase text-gray-500 block">Demand Amps</span>
+                  <span className="text-[10px] uppercase text-slate-500 block">Demand Amps</span>
                   <span className="text-xl font-bold text-blue-600">{demandResult.demandAmps.toFixed(1)} A</span>
                 </div>
                 <div className={`rounded p-3 ${demandResult.percentImbalance > 10 ? 'bg-red-50' : 'bg-green-50'}`}>
-                  <span className="text-[10px] uppercase text-gray-500 block">Phase Imbalance</span>
+                  <span className="text-[10px] uppercase text-slate-500 block">Phase Imbalance</span>
                   <span className={`text-xl font-bold ${demandResult.percentImbalance > 10 ? 'text-red-600' : 'text-green-600'}`}>
                     {demandResult.percentImbalance.toFixed(1)}%
                   </span>
@@ -1317,15 +1317,15 @@ export const PanelSchedule: React.FC<PanelScheduleProps> = ({ project }) => {
                   Demand factors applied to system-wide totals ({aggregatedLoad.occupancyType} occupancy).
                 </p>
                 <div className="grid grid-cols-2 gap-3">
-                  <div className="bg-white/50 rounded p-2">
+                  <div className="bg-slate-800/50 rounded p-2">
                     <span className="text-[10px] uppercase text-amber-600 block">Total Connected</span>
-                    <span className="text-base font-bold text-gray-900">{(aggregatedLoad.totalConnectedVA / 1000).toFixed(1)} kVA</span>
+                    <span className="text-base font-bold text-white">{(aggregatedLoad.totalConnectedVA / 1000).toFixed(1)} kVA</span>
                   </div>
                   <div className="bg-amber-100 rounded p-2">
                     <span className="text-[10px] uppercase text-amber-700 block">Total Demand</span>
                     <span className="text-base font-bold text-amber-900">{(aggregatedLoad.totalDemandVA / 1000).toFixed(1)} kVA</span>
                   </div>
-                  <div className="bg-white/50 rounded p-2 col-span-2">
+                  <div className="bg-slate-800/50 rounded p-2 col-span-2">
                     <span className="text-[10px] uppercase text-amber-600 block">Overall Demand Factor</span>
                     <span className="text-base font-bold text-green-700">{(aggregatedLoad.overallDemandFactor * 100).toFixed(1)}%</span>
                   </div>
@@ -1340,7 +1340,7 @@ export const PanelSchedule: React.FC<PanelScheduleProps> = ({ project }) => {
                         <div key={i} className="flex justify-between items-center text-xs">
                           <span className="text-amber-800 font-medium">{item.loadType}</span>
                           <div className="flex items-center gap-2">
-                            <span className="text-gray-500">{(item.connectedVA / 1000).toFixed(1)} kVA →</span>
+                            <span className="text-slate-500">{(item.connectedVA / 1000).toFixed(1)} kVA →</span>
                             <span className="font-bold text-amber-900">{(item.demandVA / 1000).toFixed(1)} kVA</span>
                             <span className="text-green-600 text-[10px]">({(item.demandFactor * 100).toFixed(0)}%)</span>
                           </div>
@@ -1387,15 +1387,15 @@ export const PanelSchedule: React.FC<PanelScheduleProps> = ({ project }) => {
             )}
 
             {/* Load Type Legend */}
-            <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
-              <h4 className="font-semibold text-sm text-gray-700 mb-2">LOAD TYPE CODES</h4>
+            <div className="bg-slate-800/50 border border-slate-700 rounded-lg p-4">
+              <h4 className="font-semibold text-sm text-slate-300 mb-2">LOAD TYPE CODES</h4>
               <div className="grid grid-cols-3 gap-2 text-xs">
                 {LOAD_TYPES.map(lt => (
                   <div key={lt.code} className="flex items-center gap-1">
                     <span className={`inline-flex items-center justify-center w-5 h-5 rounded text-[10px] font-bold ${getLoadTypeColor(lt.code)} border`}>
                       {lt.code}
                     </span>
-                    <span className="text-gray-600">{lt.label}</span>
+                    <span className="text-slate-400">{lt.label}</span>
                   </div>
                 ))}
               </div>

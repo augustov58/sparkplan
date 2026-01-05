@@ -244,8 +244,8 @@ export const SiteVisitManager: React.FC<SiteVisitManagerProps> = ({ project }) =
       case 'Scheduled': return 'bg-blue-50 text-blue-700';
       case 'In Progress': return 'bg-yellow-50 text-yellow-700';
       case 'Completed': return 'bg-green-50 text-green-700';
-      case 'Cancelled': return 'bg-gray-100 text-gray-600';
-      default: return 'bg-gray-100 text-gray-600';
+      case 'Cancelled': return 'bg-gray-100 text-slate-400';
+      default: return 'bg-gray-100 text-slate-400';
     }
   };
 
@@ -254,8 +254,8 @@ export const SiteVisitManager: React.FC<SiteVisitManagerProps> = ({ project }) =
       case 'Scheduled': return <Calendar className="w-4 h-4 text-blue-500" />;
       case 'In Progress': return <Clock className="w-4 h-4 text-yellow-500" />;
       case 'Completed': return <CheckCircle className="w-4 h-4 text-green-500" />;
-      case 'Cancelled': return <AlertTriangle className="w-4 h-4 text-gray-500" />;
-      default: return <MapPin className="w-4 h-4 text-gray-500" />;
+      case 'Cancelled': return <AlertTriangle className="w-4 h-4 text-slate-500" />;
+      default: return <MapPin className="w-4 h-4 text-slate-500" />;
     }
   };
 
@@ -263,8 +263,8 @@ export const SiteVisitManager: React.FC<SiteVisitManagerProps> = ({ project }) =
     <div className="space-y-6 animate-in fade-in duration-500">
       <div className="flex justify-between items-center">
         <div>
-          <h2 className="text-2xl font-light text-gray-900">Site Visit Logging</h2>
-          <p className="text-gray-500 mt-1">Track site visits, inspections, and field observations.</p>
+          <h2 className="text-2xl font-light text-white">Site Visit Logging</h2>
+          <p className="text-slate-500 mt-1">Track site visits, inspections, and field observations.</p>
         </div>
         <button
           onClick={() => setIsCreating(!isCreating)}
@@ -282,13 +282,13 @@ export const SiteVisitManager: React.FC<SiteVisitManagerProps> = ({ project }) =
 
       {/* Create Site Visit Form */}
       {isCreating && (
-        <div className="bg-gray-50 border border-gray-200 rounded-lg p-6 animate-in slide-in-from-top-2">
-          <h3 className="font-medium text-gray-900 mb-4">New Site Visit</h3>
+        <div className="bg-slate-800/50 border border-slate-700 rounded-lg p-6 animate-in slide-in-from-top-2">
+          <h3 className="font-medium text-white mb-4">New Site Visit</h3>
 
           <div className="space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="md:col-span-2">
-                <label className="block text-sm font-medium text-gray-700 mb-1">Visit Title</label>
+                <label className="block text-sm font-medium text-slate-300 mb-1">Visit Title</label>
                 <input
                   type="text"
                   placeholder="Brief title of the visit..."
@@ -299,7 +299,7 @@ export const SiteVisitManager: React.FC<SiteVisitManagerProps> = ({ project }) =
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Visit Type</label>
+                <label className="block text-sm font-medium text-slate-300 mb-1">Visit Type</label>
                 <select
                   className="input-std w-full"
                   value={newVisit.visit_type}
@@ -314,7 +314,7 @@ export const SiteVisitManager: React.FC<SiteVisitManagerProps> = ({ project }) =
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
+                <label className="block text-sm font-medium text-slate-300 mb-1">Status</label>
                 <select
                   className="input-std w-full"
                   value={newVisit.status}
@@ -328,7 +328,7 @@ export const SiteVisitManager: React.FC<SiteVisitManagerProps> = ({ project }) =
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Visit Date & Time</label>
+                <label className="block text-sm font-medium text-slate-300 mb-1">Visit Date & Time</label>
                 <input
                   type="datetime-local"
                   className="input-std w-full"
@@ -338,7 +338,7 @@ export const SiteVisitManager: React.FC<SiteVisitManagerProps> = ({ project }) =
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Duration (hours)</label>
+                <label className="block text-sm font-medium text-slate-300 mb-1">Duration (hours)</label>
                 <input
                   type="number"
                   step="0.5"
@@ -350,7 +350,7 @@ export const SiteVisitManager: React.FC<SiteVisitManagerProps> = ({ project }) =
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Inspector Name</label>
+                <label className="block text-sm font-medium text-slate-300 mb-1">Inspector Name</label>
                 <input
                   type="text"
                   placeholder="Inspector's name..."
@@ -361,7 +361,7 @@ export const SiteVisitManager: React.FC<SiteVisitManagerProps> = ({ project }) =
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Weather Conditions</label>
+                <label className="block text-sm font-medium text-slate-300 mb-1">Weather Conditions</label>
                 <input
                   type="text"
                   placeholder="e.g., Sunny, 72°F"
@@ -372,7 +372,7 @@ export const SiteVisitManager: React.FC<SiteVisitManagerProps> = ({ project }) =
               </div>
 
               <div className="md:col-span-2">
-                <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
+                <label className="block text-sm font-medium text-slate-300 mb-1">Description</label>
                 <textarea
                   placeholder="Detailed description of the visit..."
                   className="input-std w-full min-h-[100px]"
@@ -383,7 +383,7 @@ export const SiteVisitManager: React.FC<SiteVisitManagerProps> = ({ project }) =
 
               {/* Attendees */}
               <div className="md:col-span-2">
-                <label className="block text-sm font-medium text-gray-700 mb-1">Attendees</label>
+                <label className="block text-sm font-medium text-slate-300 mb-1">Attendees</label>
                 <div className="flex gap-2 mb-2">
                   <input
                     type="text"
@@ -396,7 +396,7 @@ export const SiteVisitManager: React.FC<SiteVisitManagerProps> = ({ project }) =
                   <button
                     type="button"
                     onClick={addAttendee}
-                    className="bg-gray-200 text-gray-700 px-4 py-2 rounded text-sm hover:bg-gray-300 transition-colors"
+                    className="bg-gray-200 text-slate-300 px-4 py-2 rounded text-sm hover:bg-gray-300 transition-colors"
                   >
                     Add
                   </button>
@@ -413,7 +413,7 @@ export const SiteVisitManager: React.FC<SiteVisitManagerProps> = ({ project }) =
 
               {/* Issues Found */}
               <div className="md:col-span-2">
-                <label className="block text-sm font-medium text-gray-700 mb-1">Issues Found</label>
+                <label className="block text-sm font-medium text-slate-300 mb-1">Issues Found</label>
                 <div className="flex gap-2 mb-2">
                   <input
                     type="text"
@@ -426,7 +426,7 @@ export const SiteVisitManager: React.FC<SiteVisitManagerProps> = ({ project }) =
                   <button
                     type="button"
                     onClick={addIssue}
-                    className="bg-gray-200 text-gray-700 px-4 py-2 rounded text-sm hover:bg-gray-300 transition-colors"
+                    className="bg-gray-200 text-slate-300 px-4 py-2 rounded text-sm hover:bg-gray-300 transition-colors"
                   >
                     Add
                   </button>
@@ -443,7 +443,7 @@ export const SiteVisitManager: React.FC<SiteVisitManagerProps> = ({ project }) =
 
               {/* Action Items */}
               <div className="md:col-span-2">
-                <label className="block text-sm font-medium text-gray-700 mb-1">Action Items</label>
+                <label className="block text-sm font-medium text-slate-300 mb-1">Action Items</label>
                 <div className="flex gap-2 mb-2">
                   <input
                     type="text"
@@ -456,7 +456,7 @@ export const SiteVisitManager: React.FC<SiteVisitManagerProps> = ({ project }) =
                   <button
                     type="button"
                     onClick={addAction}
-                    className="bg-gray-200 text-gray-700 px-4 py-2 rounded text-sm hover:bg-gray-300 transition-colors"
+                    className="bg-gray-200 text-slate-300 px-4 py-2 rounded text-sm hover:bg-gray-300 transition-colors"
                   >
                     Add
                   </button>
@@ -566,7 +566,7 @@ export const SiteVisitManager: React.FC<SiteVisitManagerProps> = ({ project }) =
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Next Visit Date (optional)</label>
+                <label className="block text-sm font-medium text-slate-300 mb-1">Next Visit Date (optional)</label>
                 <input
                   type="date"
                   className="input-std w-full"
@@ -579,7 +579,7 @@ export const SiteVisitManager: React.FC<SiteVisitManagerProps> = ({ project }) =
             <div className="flex justify-end gap-2 pt-2">
               <button
                 onClick={() => setIsCreating(false)}
-                className="px-4 py-2 text-sm text-gray-600 hover:text-gray-900 transition-colors"
+                className="px-4 py-2 text-sm text-slate-400 hover:text-white transition-colors"
               >
                 Cancel
               </button>
@@ -595,7 +595,7 @@ export const SiteVisitManager: React.FC<SiteVisitManagerProps> = ({ project }) =
       )}
 
       {/* Search and Filter */}
-      <div className="flex gap-4 items-center bg-white p-2 rounded-lg border border-gray-100 shadow-sm">
+      <div className="flex gap-4 items-center bg-slate-800 p-2 rounded-lg border border-slate-700 shadow-sm">
         <div className="relative flex-1">
           <Search className="w-4 h-4 absolute left-3 top-3 text-gray-400" />
           <input
@@ -611,7 +611,7 @@ export const SiteVisitManager: React.FC<SiteVisitManagerProps> = ({ project }) =
               key={f}
               onClick={() => setFilter(f)}
               className={`px-3 py-1.5 rounded text-xs font-medium transition-colors ${
-                filter === f ? 'bg-gray-900 text-white' : 'text-gray-500 hover:bg-gray-100'
+                filter === f ? 'bg-gray-900 text-white' : 'text-slate-500 hover:bg-gray-100'
               }`}
             >
               {f}
@@ -642,21 +642,21 @@ export const SiteVisitManager: React.FC<SiteVisitManagerProps> = ({ project }) =
         {!loading && filteredVisits.map(visit => (
           <div
             key={visit.id}
-            className={`bg-white border rounded-lg p-4 transition-all hover:shadow-md ${
+            className={`bg-slate-800 border rounded-lg p-4 transition-all hover:shadow-md ${
               visit.status === 'Completed'
-                ? 'border-gray-100 opacity-80'
+                ? 'border-slate-700 opacity-80'
                 : visit.status === 'Scheduled'
                 ? 'border-l-4 border-l-blue-500 border-y-gray-100 border-r-gray-100'
                 : visit.status === 'In Progress'
                 ? 'border-l-4 border-l-yellow-500 border-y-gray-100 border-r-gray-100'
-                : 'border-gray-100'
+                : 'border-slate-700'
             }`}
           >
             {/* Visit Header */}
             <div className="flex items-start justify-between gap-4 mb-3">
               <div className="flex items-center gap-2">
                 {getStatusIcon(visit.status)}
-                <h3 className="font-medium text-gray-900">{visit.title}</h3>
+                <h3 className="font-medium text-white">{visit.title}</h3>
 
                 {/* Status Selector */}
                 <select
@@ -670,7 +670,7 @@ export const SiteVisitManager: React.FC<SiteVisitManagerProps> = ({ project }) =
                   <option value="Cancelled">Cancelled</option>
                 </select>
 
-                <span className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded">
+                <span className="text-xs bg-gray-100 text-slate-400 px-2 py-0.5 rounded">
                   {visit.visit_type}
                 </span>
               </div>
@@ -684,7 +684,7 @@ export const SiteVisitManager: React.FC<SiteVisitManagerProps> = ({ project }) =
             </div>
 
             {/* Visit Metadata */}
-            <div className="flex items-center gap-4 text-xs text-gray-500 mb-3">
+            <div className="flex items-center gap-4 text-xs text-slate-500 mb-3">
               <span className="flex items-center gap-1">
                 <Calendar className="w-3 h-3" />
                 {new Date(visit.visit_date).toLocaleString()}
@@ -697,7 +697,7 @@ export const SiteVisitManager: React.FC<SiteVisitManagerProps> = ({ project }) =
               )}
               {visit.inspector_name && (
                 <span className="flex items-center gap-1">
-                  Inspector: <span className="font-medium text-gray-700">{visit.inspector_name}</span>
+                  Inspector: <span className="font-medium text-slate-300">{visit.inspector_name}</span>
                 </span>
               )}
               {visit.weather_conditions && (
@@ -706,12 +706,12 @@ export const SiteVisitManager: React.FC<SiteVisitManagerProps> = ({ project }) =
             </div>
 
             {/* Description */}
-            <p className="text-sm text-gray-700 mb-3">{visit.description}</p>
+            <p className="text-sm text-slate-300 mb-3">{visit.description}</p>
 
             {/* Photos */}
             {visit.photos && visit.photos.length > 0 && (
               <div className="mb-3">
-                <p className="text-xs font-medium text-gray-500 mb-2 flex items-center gap-1">
+                <p className="text-xs font-medium text-slate-500 mb-2 flex items-center gap-1">
                   <ImageIcon className="w-3 h-3" /> PHOTOS:
                 </p>
                 <div className="grid grid-cols-3 gap-2">
@@ -720,7 +720,7 @@ export const SiteVisitManager: React.FC<SiteVisitManagerProps> = ({ project }) =
                       key={i}
                       src={url}
                       alt={`Site photo ${i + 1}`}
-                      className="w-full h-24 object-cover rounded border border-gray-200 cursor-pointer hover:opacity-80 transition-opacity"
+                      className="w-full h-24 object-cover rounded border border-slate-700 cursor-pointer hover:opacity-80 transition-opacity"
                       onClick={() => window.open(url, '_blank')}
                     />
                   ))}
@@ -731,7 +731,7 @@ export const SiteVisitManager: React.FC<SiteVisitManagerProps> = ({ project }) =
             {/* Attendees */}
             {visit.attendees && visit.attendees.length > 0 && (
               <div className="mb-3">
-                <p className="text-xs font-medium text-gray-500 mb-1 flex items-center gap-1">
+                <p className="text-xs font-medium text-slate-500 mb-1 flex items-center gap-1">
                   <Users className="w-3 h-3" /> ATTENDEES:
                 </p>
                 <div className="flex flex-wrap gap-2">
@@ -778,9 +778,9 @@ export const SiteVisitManager: React.FC<SiteVisitManagerProps> = ({ project }) =
 
             {/* Next Visit */}
             {visit.next_visit_date && (
-              <div className="text-xs text-gray-500">
+              <div className="text-xs text-slate-500">
                 <span className="flex items-center gap-1">
-                  Next visit scheduled: <span className="font-medium text-gray-700">
+                  Next visit scheduled: <span className="font-medium text-slate-300">
                     {new Date(visit.next_visit_date).toLocaleDateString()}
                   </span>
                 </span>
@@ -788,7 +788,7 @@ export const SiteVisitManager: React.FC<SiteVisitManagerProps> = ({ project }) =
             )}
 
             {/* Action Buttons */}
-            <div className="flex gap-2 mt-3 pt-3 border-t border-gray-100">
+            <div className="flex gap-2 mt-3 pt-3 border-t border-slate-700">
               {visit.status !== 'Completed' && (
                 <button
                   onClick={() => completeVisit(visit.id)}

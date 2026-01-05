@@ -90,7 +90,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ project }) => {
       case 'Site Visit':
         return 'text-orange-600 bg-orange-50';
       default:
-        return 'text-gray-600 bg-gray-50';
+        return 'text-slate-400 bg-slate-800/50';
     }
   };
 
@@ -119,7 +119,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ project }) => {
       <div className="flex items-center justify-center py-12">
         <div className="text-center">
           <Calendar className="w-12 h-12 text-gray-400 mx-auto mb-3 animate-pulse" />
-          <p className="text-gray-500">Loading calendar...</p>
+          <p className="text-slate-500">Loading calendar...</p>
         </div>
       </div>
     );
@@ -130,11 +130,11 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ project }) => {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
+          <h2 className="text-2xl font-bold text-white flex items-center gap-2">
             <Calendar className="w-6 h-6 text-electric-500" />
             {project ? `${project.name} - Calendar` : 'All Projects Calendar'}
           </h2>
-          <p className="text-sm text-gray-500 mt-1">
+          <p className="text-sm text-slate-500 mt-1">
             {project
               ? 'Track deadlines, inspections, and important dates for this project'
               : 'View all calendar events across all your projects'
@@ -160,12 +160,12 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ project }) => {
 
       {/* Create Event Form */}
       {isCreating && (
-        <div className="bg-gray-50 border border-gray-200 rounded-lg p-6">
+        <div className="bg-slate-800/50 border border-slate-700 rounded-lg p-6">
           <div className="flex items-center justify-between mb-4">
-            <h3 className="font-medium text-gray-900">New Calendar Event</h3>
+            <h3 className="font-medium text-white">New Calendar Event</h3>
             <button
               onClick={() => setIsCreating(false)}
-              className="text-gray-400 hover:text-gray-600 transition-colors"
+              className="text-gray-400 hover:text-slate-400 transition-colors"
             >
               <X className="w-5 h-5" />
             </button>
@@ -174,7 +174,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ project }) => {
           <div className="space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="md:col-span-2">
-                <label className="block text-sm font-medium text-gray-700 mb-1">Title</label>
+                <label className="block text-sm font-medium text-slate-300 mb-1">Title</label>
                 <input
                   type="text"
                   placeholder="Event title..."
@@ -185,7 +185,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ project }) => {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Event Type</label>
+                <label className="block text-sm font-medium text-slate-300 mb-1">Event Type</label>
                 <select
                   className="input-std w-full"
                   value={newEvent.event_type}
@@ -200,7 +200,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ project }) => {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Date & Time</label>
+                <label className="block text-sm font-medium text-slate-300 mb-1">Date & Time</label>
                 <input
                   type="datetime-local"
                   className="input-std w-full"
@@ -210,7 +210,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ project }) => {
               </div>
 
               <div className="md:col-span-2">
-                <label className="block text-sm font-medium text-gray-700 mb-1">Location (Optional)</label>
+                <label className="block text-sm font-medium text-slate-300 mb-1">Location (Optional)</label>
                 <input
                   type="text"
                   placeholder="Meeting room, job site, etc..."
@@ -221,7 +221,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ project }) => {
               </div>
 
               <div className="md:col-span-2">
-                <label className="block text-sm font-medium text-gray-700 mb-1">Description (Optional)</label>
+                <label className="block text-sm font-medium text-slate-300 mb-1">Description (Optional)</label>
                 <textarea
                   placeholder="Event details..."
                   className="input-std w-full min-h-[80px]"
@@ -253,7 +253,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ project }) => {
       {/* Upcoming Events */}
       {upcomingEvents.length > 0 && (
         <div>
-          <h3 className="text-lg font-semibold text-gray-900 mb-3">Upcoming Events</h3>
+          <h3 className="text-lg font-semibold text-white mb-3">Upcoming Events</h3>
           <div className="space-y-3">
             {upcomingEvents.map(event => (
               <EventCard
@@ -274,7 +274,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ project }) => {
       {/* Past/Completed Events */}
       {pastEvents.length > 0 && (
         <div>
-          <h3 className="text-lg font-semibold text-gray-900 mb-3">Past Events</h3>
+          <h3 className="text-lg font-semibold text-white mb-3">Past Events</h3>
           <div className="space-y-3 opacity-60">
             {pastEvents.map(event => (
               <EventCard
@@ -293,10 +293,10 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ project }) => {
       )}
 
       {events.length === 0 && !isCreating && (
-        <div className="text-center py-12 bg-gray-50 rounded-lg border-2 border-dashed border-gray-300">
+        <div className="text-center py-12 bg-slate-800/50 rounded-lg border-2 border-dashed border-slate-600">
           <Calendar className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-          <h3 className="text-lg font-medium text-gray-900 mb-2">No events scheduled</h3>
-          <p className="text-gray-500 mb-4">
+          <h3 className="text-lg font-medium text-white mb-2">No events scheduled</h3>
+          <p className="text-slate-500 mb-4">
             {project
               ? 'Add your first event to start tracking deadlines and meetings'
               : 'No events found across your projects'
@@ -338,7 +338,7 @@ const EventCard: React.FC<EventCardProps> = ({
   formatEventDate
 }) => {
   return (
-    <div className={`bg-white border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow ${
+    <div className={`bg-slate-800 border border-slate-700 rounded-lg p-4 hover:shadow-md transition-shadow ${
       event.completed ? 'opacity-50' : ''
     }`}>
       <div className="flex items-start justify-between gap-3">
@@ -348,11 +348,11 @@ const EventCard: React.FC<EventCardProps> = ({
               {getEventIcon(event.event_type)}
             </span>
             <div>
-              <h4 className={`font-medium text-gray-900 ${event.completed ? 'line-through' : ''}`}>
+              <h4 className={`font-medium text-white ${event.completed ? 'line-through' : ''}`}>
                 {event.title}
               </h4>
               <div className="flex items-center gap-2">
-                <p className="text-xs text-gray-500">{event.event_type}</p>
+                <p className="text-xs text-slate-500">{event.event_type}</p>
                 {showProject && event.projects && (
                   <>
                     <span className="text-xs text-gray-400">•</span>
@@ -363,7 +363,7 @@ const EventCard: React.FC<EventCardProps> = ({
             </div>
           </div>
 
-          <div className="space-y-1 text-sm text-gray-600 ml-10">
+          <div className="space-y-1 text-sm text-slate-400 ml-10">
             <div className="flex items-center gap-2">
               <Clock className="w-3 h-3" />
               {formatEventDate(event.event_date)}
@@ -388,7 +388,7 @@ const EventCard: React.FC<EventCardProps> = ({
             onClick={onToggleComplete}
             className={`p-2 rounded transition-colors ${
               event.completed
-                ? 'text-gray-400 hover:text-gray-600'
+                ? 'text-gray-400 hover:text-slate-400'
                 : 'text-green-600 hover:text-green-700 hover:bg-green-50'
             }`}
             title={event.completed ? 'Mark as incomplete' : 'Mark as complete'}
