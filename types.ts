@@ -454,6 +454,86 @@ export interface LoadTemplate {
 }
 
 // ==========================
+// Circuit Sharing Calculator
+// ==========================
+
+/**
+ * Circuit Sharing - Share EV charger circuit with dryer/HVAC
+ * Devices: NeoCharge Smart Splitter ($450), DCC-9 ($400), Tesla Wall Connector
+ *
+ * NEC References:
+ * - NEC 625.42 - Electric Vehicle Branch Circuit
+ * - NEC 220.87 - Determining Existing Loads
+ */
+
+export type CircuitShareDevice = 'dryer' | 'hvac' | 'water_heater' | 'range';
+
+export type CircuitSharingDeviceType =
+  | 'neocharge'        // NeoCharge Smart Splitter
+  | 'dcc9'             // DCC-9 by Enel X
+  | 'tesla_splitter'   // Tesla Wall Connector with load sharing
+  | 'splitvolt';       // SplitVolt
+
+export interface CircuitSharingInput {
+  // Current service
+  serviceRating: number;           // 100A, 150A, 200A
+  currentUtilization: number;      // Percentage (from Service Upgrade calc)
+
+  // EV Charger
+  proposedEVChargerAmps: number;   // 32A, 40A, 48A, 50A
+
+  // Share with existing circuit
+  shareWith: CircuitShareDevice;
+  existingCircuitAmps: number;     // 30A for dryer, 40A for HVAC, etc.
+
+  // Usage patterns (for compatibility analysis)
+  dryerUsagePattern: 'daytime' | 'evening' | 'variable';
+  evChargingSchedule: 'overnight' | 'daytime' | 'flexible';
+}
+
+export interface CircuitSharingResult {
+  // Compatibility
+  isCompatible: boolean;
+  compatibilityScore: number;      // 0-100 (higher = better fit)
+  incompatibilityReason?: string;
+
+  // Recommended device
+  recommendedDevice: CircuitSharingDeviceType;
+  deviceName: string;
+  deviceCost: { min: number; max: number };
+
+  // Installation details
+  installationNotes: string[];
+  circuitRequirements: {
+    circuitAmps: number;           // Required circuit size
+    wireSize: string;              // Required wire gauge
+    breakerType: string;           // Single-pole, double-pole, GFCI
+  };
+
+  // Expected performance
+  expectedChargingHours: number;   // Hours to add ~30 miles range
+  chargingPausesExpected: 'rare' | 'occasional' | 'frequent';
+
+  // Cost comparison
+  costComparison: {
+    circuitSharingCost: number;    // Total installed cost
+    serviceUpgradeCost: { min: number; max: number };
+    savings: { min: number; max: number };
+  };
+
+  // Alternative if not compatible
+  upgradeAlternative?: {
+    newServiceSize: number;
+    estimatedCost: { min: number; max: number };
+    timeline: string;
+  };
+
+  // NEC compliance
+  necReferences: string[];
+  warnings: string[];
+}
+
+// ==========================
 // Phase 0: Basic PM Features
 // ==========================
 

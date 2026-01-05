@@ -35,7 +35,7 @@ import {
 } from '../services/calculations/arcFlash';
 import { EVEMSLoadManagement } from './EVEMSLoadManagement';
 import { ServiceUpgradeWizard } from './ServiceUpgradeWizard';
-import { CommercialLoadCalculator } from './CommercialLoadCalculator';
+import { CircuitSharingCalculator } from './CircuitSharingCalculator';
 import { useShortCircuitCalculations } from '../hooks/useShortCircuitCalculations';
 import { usePanels } from '../hooks/usePanels';
 import { useProjects } from '../hooks/useProjects';
@@ -52,7 +52,7 @@ export const Calculators: React.FC<CalculatorsProps> = ({ projectId }) => {
   const { getProjectById } = useProjects();
   const project = projectId ? getProjectById(projectId) : undefined;
 
-  const [activeTab, setActiveTab] = useState<'voltage-drop' | 'conduit-fill' | 'conductor-sizing' | 'short-circuit' | 'ev-charging' | 'solar-pv' | 'arc-flash' | 'evems' | 'service-upgrade' | 'commercial-load' | 'change-impact' | 'ev-panel-builder'>('voltage-drop');
+  const [activeTab, setActiveTab] = useState<'voltage-drop' | 'conduit-fill' | 'conductor-sizing' | 'short-circuit' | 'ev-charging' | 'solar-pv' | 'arc-flash' | 'evems' | 'service-upgrade' | 'circuit-sharing' | 'change-impact' | 'ev-panel-builder'>('voltage-drop');
 
   // Default project settings for calculator mode
   const defaultSettings: ProjectSettings = {
@@ -77,7 +77,7 @@ export const Calculators: React.FC<CalculatorsProps> = ({ projectId }) => {
     { value: 'arc-flash', label: 'Arc Flash (NFPA 70E)' },
     { value: 'evems', label: 'EVEMS Load Mgmt (NEC 625.42)' },
     { value: 'service-upgrade', label: 'Service Upgrade (NEC 230.42)' },
-    { value: 'commercial-load', label: 'Commercial Load (NEC 220.40)' },
+    { value: 'circuit-sharing', label: 'Circuit Sharing (NEC 625)' },
     { value: 'change-impact', label: 'Change Impact Analyzer (AI)' },
   ];
 
@@ -171,10 +171,10 @@ export const Calculators: React.FC<CalculatorsProps> = ({ projectId }) => {
             <span className="flex items-center gap-2"><TrendingUp className="w-4 h-4" /> Service Upgrade (NEC 230.42)</span>
           </button>
           <button
-            onClick={() => setActiveTab('commercial-load')}
-            className={`w-full text-left px-3 py-2.5 text-sm font-medium border-l-4 transition-colors ${activeTab === 'commercial-load' ? 'border-electric-500 bg-electric-50 text-gray-900' : 'border-transparent text-gray-500 hover:bg-gray-50 hover:text-gray-700'}`}
+            onClick={() => setActiveTab('circuit-sharing')}
+            className={`w-full text-left px-3 py-2.5 text-sm font-medium border-l-4 transition-colors ${activeTab === 'circuit-sharing' ? 'border-electric-500 bg-electric-50 text-gray-900' : 'border-transparent text-gray-500 hover:bg-gray-50 hover:text-gray-700'}`}
           >
-            <span className="flex items-center gap-2"><Calculator className="w-4 h-4" /> Commercial Load (NEC 220.40)</span>
+            <span className="flex items-center gap-2"><Zap className="w-4 h-4" /> Circuit Sharing (NEC 625)</span>
           </button>
 
           {/* AI-Powered Tools Section */}
@@ -199,8 +199,8 @@ export const Calculators: React.FC<CalculatorsProps> = ({ projectId }) => {
           {activeTab === 'solar-pv' && <SolarPVCalculator />}
           {activeTab === 'arc-flash' && <ArcFlashCalculator />}
           {activeTab === 'evems' && <EVEMSLoadManagement />}
-          {activeTab === 'service-upgrade' && <ServiceUpgradeWizard />}
-          {activeTab === 'commercial-load' && <CommercialLoadCalculator />}
+          {activeTab === 'service-upgrade' && <ServiceUpgradeWizard projectId={projectId} />}
+          {activeTab === 'circuit-sharing' && <CircuitSharingCalculator />}
           {activeTab === 'change-impact' && <ChangeImpactAnalyzer projectId={projectId} />}
           {activeTab === 'ev-panel-builder' && project && <EVPanelTemplates project={project} />}
           {activeTab === 'ev-panel-builder' && !project && (
