@@ -69,8 +69,8 @@ export const LoadingSpinner: React.FC<LoadingSpinnerProps> = ({
 
   if (fullscreen) {
     return (
-      <div className="fixed inset-0 bg-black/30 backdrop-blur-sm flex items-center justify-center z-50">
-        <div className="bg-white rounded-lg shadow-2xl p-8">
+      <div className="fixed inset-0 bg-black/30 flex items-center justify-center z-50">
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-8">
           {spinner}
         </div>
       </div>
@@ -96,7 +96,7 @@ export const InlineSpinner: React.FC<{ size?: 'sm' | 'md' }> = ({ size = 'sm' })
  */
 export const LoadingOverlay: React.FC<{ text?: string }> = ({ text }) => {
   return (
-    <div className="absolute inset-0 bg-white/80 backdrop-blur-sm flex items-center justify-center z-10">
+    <div className="absolute inset-0 bg-white/90 flex items-center justify-center z-10">
       <LoadingSpinner size="lg" text={text} />
     </div>
   );

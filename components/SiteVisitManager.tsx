@@ -481,14 +481,14 @@ export const SiteVisitManager: React.FC<SiteVisitManagerProps> = ({ project }) =
 
                 {/* AI Photo Analysis */}
                 {newVisit.photos.length > 0 && (
-                  <div className="mt-4 bg-purple-50 border border-purple-200 rounded-lg p-4">
+                  <div className="mt-4 bg-gray-50 border border-gray-200 rounded-lg p-4">
                     <div className="flex items-start justify-between gap-4">
                       <div>
                         <div className="flex items-center gap-2 mb-1">
-                          <Sparkles className="w-4 h-4 text-purple-600" />
-                          <h4 className="text-sm font-medium text-purple-900">AI Photo Analysis Available</h4>
+                          <Sparkles className="w-4 h-4 text-electric-600" />
+                          <h4 className="text-sm font-medium text-gray-900">AI Photo Analysis Available</h4>
                         </div>
-                        <p className="text-xs text-purple-700">
+                        <p className="text-xs text-gray-700">
                           {newVisit.photos.length} photo{newVisit.photos.length > 1 ? 's' : ''} uploaded.
                           Analyze for NEC violations, equipment identification, and safety concerns.
                         </p>
@@ -546,7 +546,7 @@ export const SiteVisitManager: React.FC<SiteVisitManagerProps> = ({ project }) =
                           }
                         }}
                         disabled={analyzingPhotos}
-                        className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded text-xs font-medium hover:shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
+                        className="flex items-center gap-2 px-4 py-2 bg-electric-500 hover:bg-electric-600 text-white rounded text-xs font-medium transition-all disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
                       >
                         {analyzingPhotos ? (
                           <>

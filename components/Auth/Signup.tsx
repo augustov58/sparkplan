@@ -49,9 +49,9 @@ export function Signup({ onSuccess }: SignupProps) {
 
   if (success) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-900 to-slate-800 px-4">
+      <div className="min-h-screen flex items-center justify-center bg-gray-100 px-4">
         <div className="max-w-md w-full">
-          <div className="bg-white rounded-lg shadow-xl p-8 text-center">
+          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-8 text-center">
             <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
               <span className="text-3xl">✓</span>
             </div>
@@ -73,9 +73,9 @@ export function Signup({ onSuccess }: SignupProps) {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-900 to-slate-800 px-4">
+    <div className="min-h-screen flex items-center justify-center bg-gray-100 px-4">
       <div className="max-w-md w-full">
-        <div className="bg-white rounded-lg shadow-xl p-8">
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-8">
           <div className="text-center mb-8">
             <div className="inline-flex items-center gap-2 mb-2">
               <div className="w-10 h-10 bg-electric rounded-lg flex items-center justify-center">

@@ -18,7 +18,7 @@ export const ComplianceReport: React.FC<ReportProps> = ({ project }) => {
             <p className="text-gray-500">Generated for Local Authority Having Jurisdiction (AHJ)</p>
         </div>
 
-        <div className="bg-white border-2 border-gray-100 p-12 shadow-xl relative overflow-hidden">
+        <div className="bg-white border border-gray-200 p-12 shadow-sm relative overflow-hidden">
             {/* Watermark */}
             <div className="absolute top-10 right-10 opacity-5">
                 <CheckCircle2 className="w-64 h-64 text-gray-900" />

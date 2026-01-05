@@ -2234,7 +2234,7 @@ const ChangeImpactAnalyzer: React.FC<ChangeImpactAnalyzerProps> = ({ projectId }
       <button
         onClick={handleAnalyze}
         disabled={analyzing || !changeDescription.trim() || proposedLoads.some(l => !l.type || l.amps <= 0)}
-        className="w-full flex items-center justify-center gap-2 px-6 py-3 bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-lg font-medium shadow-lg hover:shadow-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+        className="w-full flex items-center justify-center gap-2 px-6 py-3 bg-electric-500 hover:bg-electric-600 text-white rounded-lg font-medium transition-all disabled:opacity-50 disabled:cursor-not-allowed"
       >
         {analyzing ? (
           <>
@@ -2250,9 +2250,9 @@ const ChangeImpactAnalyzer: React.FC<ChangeImpactAnalyzerProps> = ({ projectId }
       </button>
 
       {/* Example Section */}
-      <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-        <h4 className="text-sm font-medium text-blue-900 mb-2">Example Use Cases:</h4>
-        <ul className="text-sm text-blue-800 space-y-1">
+      <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
+        <h4 className="text-sm font-medium text-gray-900 mb-2">Example Use Cases:</h4>
+        <ul className="text-sm text-gray-700 space-y-1">
           <li>• "Add 5x Level 2 EV chargers in parking lot" → Determines if service upgrade needed</li>
           <li>• "Install 15-ton rooftop HVAC unit" → Analyzes feeder sizing and voltage drop</li>
           <li>• "Add commercial kitchen equipment" → Calculates panel capacity and circuit requirements</li>

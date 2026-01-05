@@ -211,12 +211,12 @@ export const RFIManager: React.FC<RFIManagerProps> = ({ project }) => {
           ) : creationMode === 'ai' ? (
             <div className="space-y-4">
               {/* AI Drafting Form */}
-              <div className="bg-purple-50 border border-purple-200 rounded-lg p-4 mb-4">
+              <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 mb-4">
                 <div className="flex items-start gap-2">
-                  <Sparkles className="w-5 h-5 text-purple-600 flex-shrink-0 mt-0.5" />
+                  <Sparkles className="w-5 h-5 text-electric-600 flex-shrink-0 mt-0.5" />
                   <div>
-                    <h4 className="text-sm font-medium text-purple-900">AI RFI Drafter</h4>
-                    <p className="text-xs text-purple-700 mt-1">
+                    <h4 className="text-sm font-medium text-gray-900">AI RFI Drafter</h4>
+                    <p className="text-xs text-gray-700 mt-1">
                       Describe what you need clarification about, and AI will generate a professional RFI with NEC references.
                     </p>
                   </div>
@@ -289,7 +289,7 @@ export const RFIManager: React.FC<RFIManagerProps> = ({ project }) => {
                     }
                   }}
                   disabled={aiDrafting || !aiTopic.trim()}
-                  className="flex-1 bg-gradient-to-r from-purple-600 to-pink-600 text-white px-4 py-2 rounded text-sm font-medium flex items-center justify-center gap-2 hover:shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="flex-1 bg-electric-500 hover:bg-electric-600 text-white px-4 py-2 rounded text-sm font-medium flex items-center justify-center gap-2 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {aiDrafting ? (
                     <>

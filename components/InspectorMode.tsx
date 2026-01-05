@@ -408,7 +408,7 @@ export const InspectorMode: React.FC<InspectorModeProps> = ({
           <button
             onClick={runAudit}
             disabled={loading || dataLoading}
-            className="inline-flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-xl font-medium shadow-lg shadow-indigo-200 hover:shadow-xl hover:shadow-indigo-300 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+            className="inline-flex items-center gap-2 px-5 py-2.5 bg-electric-500 hover:bg-electric-600 text-white rounded-lg font-medium transition-all disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {loading ? (
               <>
@@ -426,7 +426,7 @@ export const InspectorMode: React.FC<InspectorModeProps> = ({
           <button
             onClick={runAIPrediction}
             disabled={aiPredicting || dataLoading}
-            className="inline-flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-xl font-medium shadow-lg shadow-purple-200 hover:shadow-xl hover:shadow-purple-300 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+            className="inline-flex items-center gap-2 px-5 py-2.5 bg-electric-500 hover:bg-electric-600 text-white rounded-lg font-medium transition-all disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {aiPredicting ? (
               <>

@@ -722,14 +722,14 @@ export const ServiceUpgradeWizard: React.FC<ServiceUpgradeWizardProps> = ({ proj
                 );
                 if (circuitSharingCheck.recommended && proposedLoadAmps >= 24) {
                   return (
-                    <div className="bg-purple-50 border border-purple-200 rounded-lg p-4">
+                    <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
                       <div className="flex items-start gap-3">
-                        <Zap className="w-5 h-5 text-purple-600 flex-shrink-0 mt-0.5" />
+                        <Zap className="w-5 h-5 text-electric-600 flex-shrink-0 mt-0.5" />
                         <div className="flex-1">
-                          <h4 className="font-semibold text-purple-900 mb-1 text-sm">
+                          <h4 className="font-semibold text-gray-900 mb-1 text-sm">
                             Consider Circuit Sharing
                           </h4>
-                          <p className="text-xs text-purple-800 mb-3">
+                          <p className="text-xs text-gray-700 mb-3">
                             {circuitSharingCheck.reason}. Share your EV charger circuit with an existing 240V appliance
                             (dryer, HVAC, water heater) for <strong>$300-$500</strong> instead of a service upgrade.
                           </p>

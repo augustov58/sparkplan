@@ -28,7 +28,7 @@ export const LandingPage: React.FC = () => {
     <div className="min-h-screen bg-white font-sans text-gray-900 selection:bg-electric-200">
       
       {/* 1. Navbar */}
-      <nav className="fixed top-0 left-0 right-0 h-16 bg-white/90 backdrop-blur-md border-b border-gray-100 z-50 flex items-center justify-between px-6 lg:px-12">
+      <nav className="fixed top-0 left-0 right-0 h-16 bg-white border-b border-gray-200 z-50 flex items-center justify-between px-6 lg:px-12">
         <div className="flex items-center gap-2 cursor-pointer" onClick={() => window.scrollTo(0,0)}>
           <div className="bg-electric-500 w-8 h-8 rounded flex items-center justify-center">
             <Bolt className="text-white w-5 h-5 fill-current" />
@@ -88,7 +88,7 @@ export const LandingPage: React.FC = () => {
         <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
           <button
             onClick={() => navigate('/signup')}
-            className="w-full sm:w-auto bg-electric-400 hover:bg-electric-500 text-gray-900 px-8 py-4 text-base font-semibold rounded-sm shadow-lg shadow-electric-200 transition-all hover:-translate-y-1"
+            className="w-full sm:w-auto bg-electric-400 hover:bg-electric-500 text-gray-900 px-8 py-4 text-base font-semibold rounded-sm transition-all hover:-translate-y-1"
           >
             Get Started Free
           </button>
@@ -102,7 +102,7 @@ export const LandingPage: React.FC = () => {
       </section>
 
       {/* 3. Social Proof */}
-      <section className="border-y border-gray-100 bg-gray-50/50 py-12">
+      <section className="border-y border-gray-200 bg-gray-50/50 py-12">
         <div className="max-w-7xl mx-auto px-6 text-center">
           <p className="text-sm font-semibold text-gray-400 uppercase tracking-widest mb-8">Trusted by modern electrical contractors and engineering teams</p>
           <div className="flex flex-wrap justify-center gap-12 md:gap-20 opacity-40 grayscale hover:grayscale-0 transition-all duration-500">
@@ -182,7 +182,7 @@ export const LandingPage: React.FC = () => {
             </div>
 
             {/* Pro */}
-            <div className="bg-gray-800 p-8 rounded-lg border border-electric-500 relative flex flex-col shadow-2xl shadow-electric-500/10">
+            <div className="bg-gray-800 p-8 rounded-lg border border-electric-500 relative flex flex-col shadow-sm">
               <div className="absolute top-0 right-0 bg-electric-500 text-gray-900 text-xs font-bold px-3 py-1 rounded-bl-lg rounded-tr-lg">POPULAR</div>
               <div className="mb-6">
                 <h3 className="text-xl font-bold text-white">Pro</h3>
@@ -216,7 +216,7 @@ export const LandingPage: React.FC = () => {
             { q: "Is my data secure?", a: "We use bank-level encryption (AES-256) for all project data and documents." },
             { q: "Does this replace an inspector?", a: "No. It supports your engineering workflow, but final approval depends on the AHJ." }
           ].map((faq, i) => (
-            <div key={i} className="border border-gray-100 rounded-lg p-6 hover:shadow-sm transition-shadow">
+            <div key={i} className="border border-gray-200 rounded-lg p-6 hover:shadow-sm transition-shadow">
               <h3 className="font-semibold text-lg text-gray-900 mb-2">{faq.q}</h3>
               <p className="text-gray-600 leading-relaxed">{faq.a}</p>
             </div>
@@ -225,7 +225,7 @@ export const LandingPage: React.FC = () => {
       </section>
 
       {/* 7. Footer */}
-      <footer className="bg-gray-50 border-t border-gray-100 py-12 px-6 lg:px-12">
+      <footer className="bg-gray-50 border-t border-gray-200 py-12 px-6 lg:px-12">
         <div className="max-w-7xl mx-auto grid md:grid-cols-4 gap-8">
           <div className="col-span-1">
              <div className="flex items-center gap-2 mb-4">

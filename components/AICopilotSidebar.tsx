@@ -138,9 +138,9 @@ export const AICopilotSidebar: React.FC = () => {
       />
 
       {/* Sidebar */}
-      <div className="fixed right-0 top-16 bottom-0 w-full max-w-sm md:w-96 bg-white border-l border-gray-200 shadow-xl z-50 flex flex-col">
+      <div className="fixed right-0 top-16 bottom-0 w-full max-w-sm md:w-96 bg-white border-l border-gray-200 shadow-sm z-50 flex flex-col">
       {/* Header */}
-      <div className="p-4 border-b border-gray-200 flex items-center justify-between bg-gradient-to-r from-electric-50 to-blue-50">
+      <div className="p-4 border-b border-gray-200 flex items-center justify-between bg-gray-50">
         <div className="flex items-center gap-2">
           <Sparkles className="w-5 h-5 text-electric-500" />
           <h2 className="font-semibold text-gray-900">AI Copilot</h2>
@@ -214,7 +214,7 @@ const RFIDraftView: React.FC<RFIDraftViewProps> = ({ draft }) => {
   return (
     <div className="space-y-3">
       {/* Priority & Subject */}
-      <div className="bg-gradient-to-r from-gray-50 to-blue-50 rounded-lg p-3 border border-gray-200">
+      <div className="bg-gray-50 rounded-lg p-3 border border-gray-200">
         <div className="flex items-start justify-between gap-2 mb-2">
           <span className={`px-3 py-1 rounded-full text-xs font-bold border ${getPriorityColor(draft.priority)}`}>
             {draft.priority} Priority
@@ -241,14 +241,14 @@ const RFIDraftView: React.FC<RFIDraftViewProps> = ({ draft }) => {
 
       {/* NEC References */}
       {draft.related_nec_articles.length > 0 && (
-        <div className="bg-blue-50 rounded-lg p-3 border border-blue-200">
-          <h5 className="text-xs font-bold text-blue-800 mb-1.5 flex items-center gap-1">
+        <div className="bg-gray-50 rounded-lg p-3 border border-gray-200">
+          <h5 className="text-xs font-bold text-gray-700 mb-1.5 flex items-center gap-1">
             <BookOpen className="w-3 h-3" />
             Related NEC Articles:
           </h5>
           <div className="flex flex-wrap gap-1.5">
             {draft.related_nec_articles.map((article, index) => (
-              <span key={index} className="text-xs px-2 py-0.5 bg-blue-100 text-blue-700 rounded font-mono">
+              <span key={index} className="text-xs px-2 py-0.5 bg-gray-100 text-gray-700 rounded font-mono">
                 {article}
               </span>
             ))}
@@ -301,7 +301,7 @@ const PhotoAnalysisView: React.FC<PhotoAnalysisViewProps> = ({ analysis }) => {
   return (
     <div className="space-y-3">
       {/* Summary & Overall Severity */}
-      <div className="bg-gradient-to-r from-gray-50 to-purple-50 rounded-lg p-3 border border-gray-200">
+      <div className="bg-gray-50 rounded-lg p-3 border border-gray-200">
         <div className="flex items-start justify-between mb-2">
           <span className={`px-3 py-1 rounded-full text-xs font-bold border ${getSeverityColor(analysis.severity)}`}>
             {analysis.severity}
@@ -399,14 +399,14 @@ const PhotoAnalysisView: React.FC<PhotoAnalysisViewProps> = ({ analysis }) => {
 
       {/* Recommended Actions */}
       {analysis.suggested_actions.length > 0 && (
-        <div className="bg-green-50 rounded-lg p-3 border border-green-200">
-          <h4 className="text-xs font-bold text-green-800 mb-1.5 flex items-center gap-1">
+        <div className="bg-gray-50 rounded-lg p-3 border border-gray-200">
+          <h4 className="text-xs font-bold text-gray-700 mb-1.5 flex items-center gap-1">
             <CheckSquare className="w-3 h-3" />
             Suggested Actions
           </h4>
           <ul className="space-y-1">
             {analysis.suggested_actions.map((action, index) => (
-              <li key={index} className="flex items-start gap-2 text-xs text-green-900">
+              <li key={index} className="flex items-start gap-2 text-xs text-gray-700">
                 <Check className="w-3 h-3 text-green-600 flex-shrink-0 mt-0.5" />
                 <span>{action}</span>
               </li>
@@ -417,9 +417,9 @@ const PhotoAnalysisView: React.FC<PhotoAnalysisViewProps> = ({ analysis }) => {
 
       {/* General Recommendations */}
       {analysis.recommendations.length > 0 && (
-        <div className="bg-blue-50 rounded-lg p-3 border border-blue-200">
-          <h4 className="text-xs font-bold text-blue-800 mb-1.5">General Recommendations:</h4>
-          <ul className="text-xs text-blue-900 space-y-1">
+        <div className="bg-gray-50 rounded-lg p-3 border border-gray-200">
+          <h4 className="text-xs font-bold text-gray-700 mb-1.5">General Recommendations:</h4>
+          <ul className="text-xs text-gray-700 space-y-1">
             {analysis.recommendations.map((rec, index) => (
               <li key={index}>• {rec}</li>
             ))}
@@ -471,7 +471,7 @@ const InspectionPredictionView: React.FC<InspectionPredictionViewProps> = ({ pre
   return (
     <div className="space-y-3">
       {/* Risk Level & Failure Likelihood */}
-      <div className="bg-gradient-to-r from-gray-50 to-blue-50 rounded-lg p-3 border border-gray-200">
+      <div className="bg-gray-50 rounded-lg p-3 border border-gray-200">
         <div className="flex items-center justify-between mb-3">
           <span className={`px-3 py-1 rounded-full text-xs font-bold border ${getRiskColor(prediction.risk_level)}`}>
             {prediction.risk_level} Risk
@@ -553,12 +553,12 @@ const InspectionPredictionView: React.FC<InspectionPredictionViewProps> = ({ pre
                     <p className="text-xs text-gray-700">{issue.description}</p>
                   </div>
 
-                  <div className="bg-blue-50 rounded p-2 border border-blue-100">
-                    <p className="text-xs text-blue-700 font-medium mb-0.5 flex items-center gap-1">
+                  <div className="bg-gray-50 rounded p-2 border border-gray-200">
+                    <p className="text-xs text-gray-700 font-medium mb-0.5 flex items-center gap-1">
                       <BookOpen className="w-3 h-3" />
                       Suggested Fix:
                     </p>
-                    <p className="text-xs text-blue-900">{issue.suggested_fix}</p>
+                    <p className="text-xs text-gray-700">{issue.suggested_fix}</p>
                   </div>
 
                   <div className="flex items-center gap-1 text-xs text-gray-500">
@@ -574,14 +574,14 @@ const InspectionPredictionView: React.FC<InspectionPredictionViewProps> = ({ pre
 
       {/* Preparation Checklist */}
       {prediction.preparation_checklist && prediction.preparation_checklist.length > 0 && (
-        <div className="bg-green-50 rounded-lg p-3 border border-green-200">
-          <h4 className="text-xs font-bold text-green-800 mb-2 flex items-center gap-1">
+        <div className="bg-gray-50 rounded-lg p-3 border border-gray-200">
+          <h4 className="text-xs font-bold text-gray-700 mb-2 flex items-center gap-1">
             <CheckSquare className="w-3 h-3" />
             Preparation Checklist
           </h4>
           <ul className="space-y-1">
             {prediction.preparation_checklist.map((item, index) => (
-              <li key={index} className="flex items-start gap-2 text-xs text-green-900">
+              <li key={index} className="flex items-start gap-2 text-xs text-gray-700">
                 <Check className="w-3 h-3 text-green-600 flex-shrink-0 mt-0.5" />
                 <span>{item}</span>
               </li>
@@ -663,12 +663,12 @@ const ActionCard: React.FC<ActionCardProps> = ({
         <div className="p-3 pt-0 space-y-3 bg-white">
           {/* Reasoning */}
           {action.reasoning && (
-            <div className="bg-blue-50 rounded p-3 text-xs border border-blue-100">
-              <p className="text-blue-700 font-medium mb-1 flex items-center gap-1">
+            <div className="bg-gray-50 rounded p-3 text-xs border border-gray-200">
+              <p className="text-gray-700 font-medium mb-1 flex items-center gap-1">
                 <Info className="w-3 h-3" />
                 AI Reasoning:
               </p>
-              <p className="text-blue-900">{action.reasoning}</p>
+              <p className="text-gray-700">{action.reasoning}</p>
             </div>
           )}
 

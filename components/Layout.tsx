@@ -195,7 +195,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, title, showBack, onSig
   ] : [];
 
   return (
-    <div className="min-h-screen bg-white flex flex-row font-sans">
+    <div className="min-h-screen bg-[var(--color-paper)] flex flex-row font-sans">
       {/* Mobile Menu Overlay */}
       {isMobileMenuOpen && (
         <div
@@ -206,12 +206,12 @@ export const Layout: React.FC<LayoutProps> = ({ children, title, showBack, onSig
 
       {/* Sidebar */}
       <aside className={`
-        w-64 border-r border-gray-100 h-screen flex flex-col bg-white z-50
+        w-64 border-r border-gray-200 h-screen flex flex-col bg-white z-50
         fixed md:sticky top-0
         transition-transform duration-300 ease-in-out
         ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}
       `}>
-        <div className="p-6 border-b border-gray-50">
+        <div className="p-6 border-b border-gray-200">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2 cursor-pointer" onClick={() => navigate('/')}>
               <div className="w-8 h-8 bg-electric-500 rounded flex items-center justify-center">
@@ -302,7 +302,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, title, showBack, onSig
           )}
         </div>
 
-        <div className="p-4 border-t border-gray-50">
+        <div className="p-4 border-t border-gray-200">
           <div className="flex items-center gap-3 mb-3">
             <div className="w-8 h-8 rounded-full bg-electric-100 flex items-center justify-center text-xs font-bold text-electric-700">
               {getUserInitials()}
@@ -324,17 +324,8 @@ export const Layout: React.FC<LayoutProps> = ({ children, title, showBack, onSig
       </aside>
 
       {/* Main Content */}
-      <main className="flex-1 min-w-0 bg-gradient-to-br from-gray-50 via-white to-blue-50/30 relative">
-        {/* Subtle background pattern */}
-        <div
-          className="absolute inset-0 opacity-[0.015] pointer-events-none"
-          style={{
-            backgroundImage: `radial-gradient(circle at 1px 1px, rgb(0 0 0) 1px, transparent 0)`,
-            backgroundSize: '32px 32px'
-          }}
-        />
-
-        <header className="h-16 border-b border-gray-100 flex items-center px-4 md:px-8 justify-between sticky top-0 bg-white/80 backdrop-blur-sm z-10">
+      <main className="flex-1 min-w-0 bg-[var(--color-paper)]">
+        <header className="h-16 border-b border-gray-200 flex items-center px-4 md:px-8 justify-between sticky top-0 bg-white z-10">
           <div className="flex items-center gap-3">
             {/* Hamburger menu button - only show on mobile */}
             <button
@@ -350,8 +341,11 @@ export const Layout: React.FC<LayoutProps> = ({ children, title, showBack, onSig
              {/* Header Actions Could Go Here */}
           </div>
         </header>
-        <div className="p-4 md:p-8 max-w-[1600px] mx-auto relative z-0">
-          {children}
+        <div className="p-4 md:p-8 max-w-[1600px] mx-auto">
+          {/* Content Panel - white paper with subtle border */}
+          <div className="bg-white border border-gray-200 rounded-lg p-6 shadow-sm">
+            {children}
+          </div>
         </div>
       </main>
 

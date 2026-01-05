@@ -62,9 +62,9 @@ export const WelcomeModal: React.FC<WelcomeModalProps> = ({ onClose, onCreatePro
       content: (
         <div className="space-y-4">
           <div className="grid grid-cols-2 gap-4">
-            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-              <h4 className="font-semibold text-blue-900 text-sm mb-2">Calculations</h4>
-              <ul className="space-y-1 text-xs text-blue-800">
+            <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
+              <h4 className="font-semibold text-gray-900 text-sm mb-2">Calculations</h4>
+              <ul className="space-y-1 text-xs text-gray-700">
                 <li>• Voltage Drop</li>
                 <li>• Short Circuit</li>
                 <li>• Arc Flash</li>
@@ -72,27 +72,27 @@ export const WelcomeModal: React.FC<WelcomeModalProps> = ({ onClose, onCreatePro
                 <li>• EV Charging</li>
               </ul>
             </div>
-            <div className="bg-green-50 border border-green-200 rounded-lg p-4">
-              <h4 className="font-semibold text-green-900 text-sm mb-2">Project Management</h4>
-              <ul className="space-y-1 text-xs text-green-800">
+            <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
+              <h4 className="font-semibold text-gray-900 text-sm mb-2">Project Management</h4>
+              <ul className="space-y-1 text-xs text-gray-700">
                 <li>• RFI Tracking</li>
                 <li>• Site Visit Logs</li>
                 <li>• Calendar Events</li>
                 <li>• Inspector AI</li>
               </ul>
             </div>
-            <div className="bg-purple-50 border border-purple-200 rounded-lg p-4">
-              <h4 className="font-semibold text-purple-900 text-sm mb-2">Export & Sharing</h4>
-              <ul className="space-y-1 text-xs text-purple-800">
+            <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
+              <h4 className="font-semibold text-gray-900 text-sm mb-2">Export & Sharing</h4>
+              <ul className="space-y-1 text-xs text-gray-700">
                 <li>• PDF Export</li>
                 <li>• Permit Packets</li>
                 <li>• Panel Schedules</li>
                 <li>• One-Line Diagrams</li>
               </ul>
             </div>
-            <div className="bg-orange-50 border border-orange-200 rounded-lg p-4">
-              <h4 className="font-semibold text-orange-900 text-sm mb-2">Compliance</h4>
-              <ul className="space-y-1 text-xs text-orange-800">
+            <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
+              <h4 className="font-semibold text-gray-900 text-sm mb-2">Compliance</h4>
+              <ul className="space-y-1 text-xs text-gray-700">
                 <li>• Grounding System</li>
                 <li>• Pre-Inspection Check</li>
                 <li>• NEC Validation</li>
@@ -194,19 +194,19 @@ export const WelcomeModal: React.FC<WelcomeModalProps> = ({ onClose, onCreatePro
             </button>
           </div>
 
-          <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mt-4">
-            <p className="text-xs text-blue-800">
+          <div className="bg-gray-50 border border-gray-200 rounded-lg p-3 mt-4">
+            <p className="text-xs text-gray-700">
               <strong>Sample projects include:</strong> Pre-configured loads, grounding system, and project settings.
               You can modify everything after creation!
             </p>
           </div>
 
-          <div className="bg-electric-50 border border-electric-200 rounded-lg p-4 mt-4">
-            <h4 className="font-semibold text-electric-900 text-sm mb-2 flex items-center gap-2">
+          <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 mt-4">
+            <h4 className="font-semibold text-gray-900 text-sm mb-2 flex items-center gap-2">
               <Zap className="w-4 h-4" />
               Pro Tip
             </h4>
-            <p className="text-xs text-electric-800">
+            <p className="text-xs text-gray-700">
               Use the AI NEC Assistant (chat icon in bottom-right) to ask code questions while you work!
             </p>
           </div>
@@ -218,10 +218,10 @@ export const WelcomeModal: React.FC<WelcomeModalProps> = ({ onClose, onCreatePro
   const currentStepData = steps[currentStep];
 
   return (
-    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-xl shadow-sm border border-gray-200 max-w-2xl w-full max-h-[90vh] overflow-y-auto">
         {/* Header */}
-        <div className="sticky top-0 bg-white border-b border-gray-100 px-6 py-4 flex items-center justify-between">
+        <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 bg-electric-500 rounded flex items-center justify-center">
               <Zap className="text-white w-6 h-6 fill-current" />
@@ -274,7 +274,7 @@ export const WelcomeModal: React.FC<WelcomeModalProps> = ({ onClose, onCreatePro
         </div>
 
         {/* Footer */}
-        <div className="sticky bottom-0 bg-gray-50 border-t border-gray-100 px-6 py-4 flex items-center justify-between">
+        <div className="sticky bottom-0 bg-gray-50 border-t border-gray-200 px-6 py-4 flex items-center justify-between">
           <button
             onClick={() => setCurrentStep(Math.max(0, currentStep - 1))}
             disabled={currentStep === 0}

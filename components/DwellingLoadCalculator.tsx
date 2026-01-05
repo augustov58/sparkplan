@@ -501,14 +501,14 @@ export const DwellingLoadCalculator: React.FC<DwellingLoadCalculatorProps> = ({
           {!isSingleFamily && (
             <div className="space-y-4">
               {/* Instructions Card */}
-              <div className="bg-purple-50 border border-purple-200 rounded-lg p-4">
-                <h3 className="font-medium text-purple-900 flex items-center gap-2 mb-2">
+              <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
+                <h3 className="font-medium text-gray-900 flex items-center gap-2 mb-2">
                   <Users className="w-5 h-5" />
                   Multi-Family Calculation (NEC 220.84)
                 </h3>
-                <div className="text-sm text-purple-800 space-y-2">
+                <div className="text-sm text-gray-700 space-y-2">
                   <p><strong>How it works:</strong></p>
-                  <ol className="list-decimal list-inside space-y-1 text-purple-700">
+                  <ol className="list-decimal list-inside space-y-1 text-gray-600">
                     <li>Define unit types below (e.g., "Studio", "1BR", "2BR")</li>
                     <li>Set square footage and count for each type</li>
                     <li>Configure appliances using the section below (applies to ALL units)</li>
@@ -1087,7 +1087,7 @@ export const DwellingLoadCalculator: React.FC<DwellingLoadCalculatorProps> = ({
       {/* Generated Panel Schedule Modal */}
       {showGenerated && generatedCircuits.length > 0 && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg shadow-xl max-w-4xl w-full max-h-[90vh] overflow-hidden">
+          <div className="bg-white rounded-lg shadow-sm border border-gray-200 max-w-4xl w-full max-h-[90vh] overflow-hidden">
             <div className="p-4 border-b border-gray-200 flex justify-between items-center">
               <h3 className="text-lg font-medium">Generated Panel Schedule</h3>
               <button
