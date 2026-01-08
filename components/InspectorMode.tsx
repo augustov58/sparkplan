@@ -51,7 +51,6 @@ import {
   IssueSeverity
 } from '../services/inspection/inspectorMode';
 import { askNecAssistant } from '../services/geminiService';
-import { predictInspection } from '../services/api/pythonBackend';
 
 interface InspectorModeProps {
   projectId: string;
@@ -261,7 +260,6 @@ export const InspectorMode: React.FC<InspectorModeProps> = ({
 }) => {
   const [result, setResult] = useState<InspectionResult | null>(null);
   const [loading, setLoading] = useState(false);
-  const [aiPredicting, setAiPredicting] = useState(false);
   const [aiExplanation, setAiExplanation] = useState<string | null>(null);
   const [explainingIssueId, setExplainingIssueId] = useState<string | null>(null);
   const [filter, setFilter] = useState<'all' | 'critical' | 'warning'>('all');
@@ -331,26 +329,6 @@ export const InspectorMode: React.FC<InspectorModeProps> = ({
     setLoading(false);
   };
 
-  // Run AI Predictive Inspector
-  const runAIPrediction = async () => {
-    setAiPredicting(true);
-    setAiExplanation(null);
-
-    try {
-      // Call Python backend to trigger Predictive Inspector agent
-      await predictInspection(projectId);
-
-      // Success! The result will appear in the AI Copilot sidebar
-      // Show success message
-      alert('AI Prediction started! Check the AI Copilot sidebar (right side) for results.');
-    } catch (error: any) {
-      console.error('AI Prediction error:', error);
-      alert(`Failed to run AI prediction: ${error.message || 'Unknown error'}\n\nMake sure the Python backend is running at http://localhost:8000`);
-    } finally {
-      setAiPredicting(false);
-    }
-  };
-  
   // Get AI explanation for an issue
   const handleExplain = async (issue: InspectionIssue) => {
     setExplainingIssueId(issue.id);
@@ -423,23 +401,6 @@ export const InspectorMode: React.FC<InspectorModeProps> = ({
             )}
           </button>
 
-          <button
-            onClick={runAIPrediction}
-            disabled={aiPredicting || dataLoading}
-            className="inline-flex items-center gap-2 px-5 py-2.5 bg-electric-500 hover:bg-electric-600 text-white rounded-lg font-medium transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            {aiPredicting ? (
-              <>
-                <RefreshCw className="w-4 h-4 animate-spin" />
-                AI Analyzing...
-              </>
-            ) : (
-              <>
-                <Sparkles className="w-4 h-4" />
-                AI Predict Inspection
-              </>
-            )}
-          </button>
         </div>
       </div>
       
