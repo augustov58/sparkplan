@@ -161,43 +161,81 @@ export const LandingPage: React.FC = () => {
             <p className="text-gray-400">Choose the plan that fits your team size.</p>
           </div>
 
-          <div className="grid md:grid-cols-2 gap-8 max-w-4xl mx-auto">
-            {/* Starter */}
-            <div className="bg-gray-800 p-8 rounded-lg border border-gray-700 flex flex-col">
-              <div className="mb-6">
-                <h3 className="text-xl font-bold text-white">Starter</h3>
-                <p className="text-gray-400 mt-2 text-sm h-10">Ideal for electricians or small teams beginning their NEC compliance workflow.</p>
+          <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6 max-w-6xl mx-auto">
+            {/* Free */}
+            <div className="bg-gray-800 p-6 rounded-lg border border-gray-700 flex flex-col">
+              <div className="mb-4">
+                <h3 className="text-lg font-bold text-white">Free</h3>
+                <p className="text-gray-400 mt-2 text-sm h-12">Explore the platform with basic calculators.</p>
               </div>
-              <div className="text-4xl font-bold mb-8">$29<span className="text-lg text-gray-500 font-normal">/mo</span></div>
-              <ul className="space-y-4 mb-8 flex-1">
-                {['Guided NEC Workflows', 'Project Dashboard', 'Document Storage (2GB)', 'Load Calculation Templates', '2 Team Members'].map(item => (
-                  <li key={item} className="flex items-center gap-3 text-sm text-gray-300">
-                    <Check className="w-4 h-4 text-electric-400" /> {item}
+              <div className="text-3xl font-bold mb-6">$0<span className="text-lg text-gray-500 font-normal">/mo</span></div>
+              <ul className="space-y-3 mb-6 flex-1 text-sm">
+                {['Explore platform features', '3 projects max', 'Voltage drop calculator', 'Conductor sizing', 'NEC code search'].map(item => (
+                  <li key={item} className="flex items-center gap-2 text-gray-300">
+                    <Check className="w-4 h-4 text-electric-400 flex-shrink-0" /> {item}
                   </li>
                 ))}
               </ul>
-              <button onClick={() => navigate('/signup')} className="w-full bg-white text-gray-900 hover:bg-gray-100 py-3 rounded-sm font-semibold transition-colors">
+              <button onClick={() => navigate('/signup')} className="w-full bg-gray-700 text-white hover:bg-gray-600 py-2.5 rounded-sm font-semibold transition-colors">
                 Get Started
               </button>
             </div>
 
-            {/* Pro */}
-            <div className="bg-gray-800 p-8 rounded-lg border border-electric-500 relative flex flex-col shadow-sm">
-              <div className="absolute top-0 right-0 bg-electric-500 text-gray-900 text-xs font-bold px-3 py-1 rounded-bl-lg rounded-tr-lg">POPULAR</div>
-              <div className="mb-6">
-                <h3 className="text-xl font-bold text-white">Pro</h3>
-                <p className="text-gray-400 mt-2 text-sm h-10">Automation for contractors managing multiple installations and large project scopes.</p>
+            {/* Starter */}
+            <div className="bg-gray-800 p-6 rounded-lg border border-gray-700 flex flex-col">
+              <div className="mb-4">
+                <h3 className="text-lg font-bold text-white">Starter</h3>
+                <p className="text-gray-400 mt-2 text-sm h-12">Full residential workflow with permits.</p>
               </div>
-              <div className="text-4xl font-bold mb-8">$79<span className="text-lg text-gray-500 font-normal">/mo</span></div>
-              <ul className="space-y-4 mb-8 flex-1">
-                {['Automated Validation Engine', 'Multi-Project Support (Up to 5)', 'Grounding & Fault Calculators', 'Digital Inspection Reports', 'Document Storage (10GB)', '5 Team Members'].map(item => (
-                  <li key={item} className="flex items-center gap-3 text-sm text-gray-300">
-                    <Check className="w-4 h-4 text-electric-400" /> {item}
+              <div className="text-3xl font-bold mb-6">$29<span className="text-lg text-gray-500 font-normal">/mo</span></div>
+              <ul className="space-y-3 mb-6 flex-1 text-sm">
+                {['10 permits/month', '10 projects', 'All residential calculators', 'Permit Packet Generator', 'Jurisdiction Wizard', 'Panel schedules & diagrams'].map(item => (
+                  <li key={item} className="flex items-center gap-2 text-gray-300">
+                    <Check className="w-4 h-4 text-electric-400 flex-shrink-0" /> {item}
                   </li>
                 ))}
               </ul>
-              <button onClick={() => navigate('/signup')} className="w-full bg-electric-400 hover:bg-electric-500 text-gray-900 py-3 rounded-sm font-semibold transition-colors">
+              <button onClick={() => navigate('/signup')} className="w-full bg-white text-gray-900 hover:bg-gray-100 py-2.5 rounded-sm font-semibold transition-colors">
+                Start Free Trial
+              </button>
+            </div>
+
+            {/* Pro */}
+            <div className="bg-gray-800 p-6 rounded-lg border-2 border-electric-500 relative flex flex-col shadow-sm">
+              <div className="absolute top-0 right-0 bg-electric-500 text-gray-900 text-xs font-bold px-2 py-1 rounded-bl-lg rounded-tr-lg">POPULAR</div>
+              <div className="mb-4">
+                <h3 className="text-lg font-bold text-white">Pro</h3>
+                <p className="text-gray-400 mt-2 text-sm h-12">Unlimited permits with AI-powered tools.</p>
+              </div>
+              <div className="text-3xl font-bold mb-6">$49<span className="text-lg text-gray-500 font-normal">/mo</span></div>
+              <ul className="space-y-3 mb-6 flex-1 text-sm">
+                {['Unlimited permits & projects', 'Everything in Starter', 'AI Inspector Mode', 'Service Upgrade Wizard', 'EVEMS Calculator', 'EV Panel Templates', 'Pre-Inspection Checklist', 'Priority support'].map(item => (
+                  <li key={item} className="flex items-center gap-2 text-gray-300">
+                    <Check className="w-4 h-4 text-electric-400 flex-shrink-0" /> {item}
+                  </li>
+                ))}
+              </ul>
+              <button onClick={() => navigate('/signup')} className="w-full bg-electric-400 hover:bg-electric-500 text-gray-900 py-2.5 rounded-sm font-semibold transition-colors">
                 Start Pro Trial
+              </button>
+            </div>
+
+            {/* Business */}
+            <div className="bg-gray-800 p-6 rounded-lg border border-gray-700 flex flex-col">
+              <div className="mb-4">
+                <h3 className="text-lg font-bold text-white">Business</h3>
+                <p className="text-gray-400 mt-2 text-sm h-12">Teams with PM suite & commercial tools.</p>
+              </div>
+              <div className="text-3xl font-bold mb-6">$149<span className="text-lg text-gray-500 font-normal">/mo</span></div>
+              <ul className="space-y-3 mb-6 flex-1 text-sm">
+                {['Everything in Pro', 'Project Management Suite', 'RFIs, Site Visits, Calendar', 'Arc Flash Calculator', 'Advanced Short Circuit', 'Team collaboration (5 users)'].map(item => (
+                  <li key={item} className="flex items-center gap-2 text-gray-300">
+                    <Check className="w-4 h-4 text-electric-400 flex-shrink-0" /> {item}
+                  </li>
+                ))}
+              </ul>
+              <button onClick={() => navigate('/signup')} className="w-full bg-white text-gray-900 hover:bg-gray-100 py-2.5 rounded-sm font-semibold transition-colors">
+                Contact Sales
               </button>
             </div>
           </div>

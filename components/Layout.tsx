@@ -32,6 +32,7 @@ import {
 import { useAuthContext } from './Auth/AuthProvider';
 import { ProjectType } from '../types';
 import { AICopilotSidebar } from './AICopilotSidebar';
+import { TrialBanner } from './TrialBanner';
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -325,6 +326,9 @@ export const Layout: React.FC<LayoutProps> = ({ children, title, showBack, onSig
 
       {/* Main Content */}
       <main className="flex-1 min-w-0 bg-[var(--color-paper)]">
+        {/* Trial Banner - shows for users on trial */}
+        <TrialBanner />
+
         <header className="h-16 border-b border-gray-200 flex items-center px-4 md:px-8 justify-between sticky top-0 bg-white z-10">
           <div className="flex items-center gap-3">
             {/* Hamburger menu button - only show on mobile */}

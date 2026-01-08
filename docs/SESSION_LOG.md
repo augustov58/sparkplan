@@ -2,12 +2,124 @@
 
 **Purpose**: This document tracks changes made during development sessions for seamless handoff between Claude instances.
 
-**Last Updated**: 2025-12-17
-**Current Branch**: `cursor-features`
+**Last Updated**: 2026-01-07
+**Current Branch**: `feature/monetization`
 
 ---
 
 ## 📋 Current Session Status
+
+### Session: 2026-01-07 - Complete Monetization System ✅ COMPLETE
+
+**Session Focus**: Implement full SaaS monetization with Stripe, feature gating, trials, and promo codes
+**Status**: ✅ Complete and deployed
+
+#### Completed This Session
+
+**💳 Stripe Integration:**
+- Created `stripe-checkout` Edge Function for payment sessions
+- Created `stripe-webhook` Edge Function for event handling
+- Created `stripe-portal` Edge Function for billing management
+- Documentation: `docs/STRIPE_SETUP.md`
+
+**🔐 Feature Gating System:**
+- Created `FeatureGate` component (full/subtle/inline modes)
+- Applied gates to all premium routes in `App.tsx`
+- Tier structure:
+  - **Free ($0)**: Basic calculators, NEC search, 3 projects, 0 permits
+  - **Starter ($29)**: 10 permits, residential workflow, permit packets
+  - **Pro ($49)**: Unlimited, AI Inspector, EVEMS, Service Upgrade
+  - **Business ($149)**: PM Suite, Arc Flash, team collaboration
+
+**🎁 Free Trial System (14 days):**
+- New users automatically get Pro trial on signup
+- `TrialBanner` component shows countdown with urgency styling
+- Falls back to Free tier when trial expires
+- Trial status tracked in `useSubscription` hook
+
+**🏷️ Promo Code System:**
+- `promo_codes` table with usage tracking
+- `redeem_promo_code()` database function
+- `PromoCodeInput` component on Pricing page
+- Pre-seeded codes: `WELCOME2024`, `ELECTRICIAN50`, `CONTRACTOR90`, `BETA2024`
+
+**📄 Files Created:**
+- `components/FeatureGate.tsx` - Feature access control component
+- `components/PricingPage.tsx` - Subscription management UI
+- `components/TrialBanner.tsx` - Trial status banner + promo code input
+- `hooks/useSubscription.ts` - Complete subscription state management
+- `docs/STRIPE_SETUP.md` - Stripe configuration guide
+- `supabase/functions/stripe-checkout/index.ts`
+- `supabase/functions/stripe-webhook/index.ts`
+- `supabase/functions/stripe-portal/index.ts`
+- `supabase/migrations/20260105_subscriptions.sql`
+
+**📄 Files Modified:**
+- `App.tsx` - Added FeatureGate to all premium routes
+- `components/Layout.tsx` - Added TrialBanner
+- `components/LandingPage.tsx` - Updated pricing tiers
+
+**Database Changes:**
+- `subscriptions` table with Stripe fields
+- `promo_codes` table for promotional codes
+- `promo_code_redemptions` table for tracking
+- Auto-create subscription trigger on user signup
+
+**Build Status:** ✅ Passing
+
+---
+
+### Session: 2025-12-30 - UI/UX Improvements (Issues #24-27) ✅ COMPLETE
+
+**Session Focus**: Resolve remaining ISSUES.md items
+**Status**: ✅ Complete
+
+#### Completed This Session
+
+- **Issue #24**: One-Line Diagram separation (diagramOnly prop)
+- **Issue #25**: Inline circuit addition in panel schedules
+- **Issue #26**: Circuit Design 2-column layout with sticky diagram
+- **Issue #27**: Site Visit status management + calendar integration
+
+---
+
+### Session: 2025-12-26 - Python AI Backend Deployment ✅ COMPLETE
+
+**Session Focus**: Deploy Pydantic AI agents to production
+**Status**: ✅ Complete - All 4 agents live on Railway
+
+**Deployment URL**: https://neccompliance-production.up.railway.app
+
+#### Completed This Session
+
+- ✅ Python FastAPI backend deployed to Railway
+- ✅ 4 Pydantic AI agents operational:
+  - Change Impact Analyzer
+  - RFI Drafter
+  - Photo Analyzer
+  - Predictive Inspector
+- ✅ Supabase integration (service role + RLS)
+- ✅ Gemini AI 2.0 connected
+- ✅ Real-time WebSocket subscriptions
+- ✅ Security fixes (removed .env from git)
+
+See: `/docs/PYDANTIC_AI_MIGRATION.md` (updated to COMPLETE status)
+
+---
+
+### Session: 2025-12-20 - Agentic PM System Phase 0 ✅ COMPLETE
+
+**Session Focus**: Basic project management features
+**Status**: ✅ Complete
+
+#### Completed This Session
+
+- RFI Tracking with AI PDF extraction (Gemini Vision)
+- Site Visit Logging with drag-and-drop photo upload
+- Open Items Dashboard (cross-project aggregation)
+- Calendar/Timeline with events, deadlines, meetings
+
+---
 
 ### Session: 2025-12-17 - TypeScript Strictness Phase 1 ✅ COMPLETE
 
