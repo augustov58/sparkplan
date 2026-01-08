@@ -142,11 +142,12 @@ async def calculate_total_panel_load(supabase: Client, panel_id: str) -> float:
         panel_id: Panel UUID
 
     Returns:
-        Total load in VA
+        Total load in VA (uses load_watts if load_va not available)
     """
     try:
         circuits = await get_panel_circuits(supabase, panel_id)
-        total_load = sum(c.get('load_va', 0) for c in circuits)
+        # Circuits typically store load_watts, not load_va
+        total_load = sum(c.get('load_va') or c.get('load_watts') or 0 for c in circuits)
         return total_load
     except Exception as e:
         logger.error(f"Error calculating panel load for {panel_id}: {e}")
@@ -170,9 +171,10 @@ async def get_service_utilization(supabase: Client, project_id: str) -> Dict[str
         if not project:
             return {"error": "Project not found"}
 
-        service_size = project.get('service_size', 200)
-        voltage = project.get('voltage', 240)
-        phases = project.get('phases', 1)
+        # Note: Database field is 'service_amps', not 'service_size'
+        service_size = project.get('service_amps') or project.get('service_size') or 200
+        voltage = project.get('voltage') or 240
+        phases = project.get('phases') or 1
 
         # Get all panels
         panels = await get_all_panels(supabase, project_id)
@@ -243,13 +245,13 @@ async def get_panel_utilization(supabase: Client, panel_id: str) -> Dict[str, An
         # Get circuits for this panel
         circuits = await get_panel_circuits(supabase, panel_id)
 
-        bus_rating = panel.get('bus_rating', 200)
-        voltage = panel.get('voltage', 240)
-        phases = panel.get('phase', 1)
-        max_spaces = panel.get('spaces', 42)
+        bus_rating = panel.get('bus_rating') or 200
+        voltage = panel.get('voltage') or 240
+        phases = panel.get('phase') or panel.get('phases') or 1
+        max_spaces = panel.get('spaces') or 42
 
-        # Calculate load
-        total_load_va = sum(c.get('load_va', c.get('load_watts', 0)) for c in circuits)
+        # Calculate load - circuits use load_watts
+        total_load_va = sum(c.get('load_va') or c.get('load_watts') or 0 for c in circuits)
         total_poles_used = sum(c.get('pole', 1) for c in circuits)
 
         # Calculate capacity
