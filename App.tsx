@@ -28,6 +28,7 @@ const SiteVisitManager = lazy(() => import('./components/SiteVisitManager').then
 const CalendarView = lazy(() => import('./components/CalendarView').then(m => ({ default: m.CalendarView })));
 const AgentActivityLog = lazy(() => import('./components/AgentActivityLog').then(m => ({ default: m.AgentActivityLog })));
 const UtilityInterconnectionForm = lazy(() => import('./components/UtilityInterconnectionForm').then(m => ({ default: m.UtilityInterconnectionForm })));
+const PricingPage = lazy(() => import('./components/PricingPage').then(m => ({ default: m.PricingPage })));
 // EVPanelTemplates moved to Calculators component
 import { Project, ProjectStatus, ProjectType } from './types';
 import { askNecAssistant } from './services/geminiService';
@@ -46,6 +47,7 @@ import { Signup } from './components/Auth/Signup';
 import { ProtectedRoute } from './components/Auth/ProtectedRoute';
 import { useProjects } from './hooks/useProjects';
 import { ErrorBoundary, FeatureErrorBoundary } from './components/ErrorBoundary';
+import { FeatureGate } from './components/FeatureGate';
 import { TemplateSelector } from './components/TemplateSelector';
 import type { ProjectTemplate } from './data/project-templates';
 import { Toaster } from 'react-hot-toast';
@@ -86,30 +88,36 @@ const ProjectWrapper = ({ projects, updateProject, deleteProject, onSignOut }: {
                 } />
                 <Route path="/load-calc" element={
                     <FeatureErrorBoundary>
-                        <Suspense fallback={<LoadingSpinner />}>
-                            {/* Residential projects use DwellingLoadCalculator, Commercial/Industrial use CommercialLoadCalculator */}
-                            {project.type === ProjectType.RESIDENTIAL ? (
-                                <DwellingLoadCalculator project={project} updateProject={updateProject} />
-                            ) : project.type === ProjectType.COMMERCIAL || project.type === ProjectType.INDUSTRIAL ? (
-                                <CommercialLoadCalculator projectId={project.id} />
-                            ) : (
-                                <LoadCalculator project={project} updateProject={updateProject} />
-                            )}
-                        </Suspense>
+                        <FeatureGate feature="dwelling-load-calc" message="NEC load calculations for residential, commercial, and industrial projects. Available in Starter plan.">
+                            <Suspense fallback={<LoadingSpinner />}>
+                                {/* Residential projects use DwellingLoadCalculator, Commercial/Industrial use CommercialLoadCalculator */}
+                                {project.type === ProjectType.RESIDENTIAL ? (
+                                    <DwellingLoadCalculator project={project} updateProject={updateProject} />
+                                ) : project.type === ProjectType.COMMERCIAL || project.type === ProjectType.INDUSTRIAL ? (
+                                    <CommercialLoadCalculator projectId={project.id} />
+                                ) : (
+                                    <LoadCalculator project={project} updateProject={updateProject} />
+                                )}
+                            </Suspense>
+                        </FeatureGate>
                     </FeatureErrorBoundary>
                 } />
                 <Route path="/circuits" element={
                     <FeatureErrorBoundary>
-                        <Suspense fallback={<LoadingSpinner />}>
-                            <OneLineDiagram project={project} updateProject={updateProject} />
-                        </Suspense>
+                        <FeatureGate feature="circuit-design" message="Design branch circuits with NEC-compliant sizing and wire selection. Available in Starter plan.">
+                            <Suspense fallback={<LoadingSpinner />}>
+                                <OneLineDiagram project={project} updateProject={updateProject} />
+                            </Suspense>
+                        </FeatureGate>
                     </FeatureErrorBoundary>
                 } />
                 <Route path="/diagram" element={
                     <FeatureErrorBoundary>
-                        <Suspense fallback={<LoadingSpinner />}>
-                            <OneLineDiagram project={project} updateProject={updateProject} diagramOnly={true} />
-                        </Suspense>
+                        <FeatureGate feature="one-line-diagram" message="Generate professional one-line diagrams for your electrical system. Available in Starter plan.">
+                            <Suspense fallback={<LoadingSpinner />}>
+                                <OneLineDiagram project={project} updateProject={updateProject} diagramOnly={true} />
+                            </Suspense>
+                        </FeatureGate>
                     </FeatureErrorBoundary>
                 } />
                 <Route path="/tools" element={
@@ -133,63 +141,79 @@ const ProjectWrapper = ({ projects, updateProject, deleteProject, onSignOut }: {
                 } /> */}
                 <Route path="/grounding" element={
                     <FeatureErrorBoundary>
-                        <Suspense fallback={<LoadingSpinner />}>
-                            <GroundingBonding project={project} updateProject={updateProject} />
-                        </Suspense>
+                        <FeatureGate feature="grounding-calc" message="Design NEC Article 250 compliant grounding systems. Available in Starter plan.">
+                            <Suspense fallback={<LoadingSpinner />}>
+                                <GroundingBonding project={project} updateProject={updateProject} />
+                            </Suspense>
+                        </FeatureGate>
                     </FeatureErrorBoundary>
                 } />
                 <Route path="/panel" element={
                     <FeatureErrorBoundary>
-                        <Suspense fallback={<LoadingSpinner />}>
-                            <PanelSchedule project={project} />
-                        </Suspense>
+                        <FeatureGate feature="panel-schedules" message="Create professional panel schedules with automatic load balancing. Available in Starter plan.">
+                            <Suspense fallback={<LoadingSpinner />}>
+                                <PanelSchedule project={project} />
+                            </Suspense>
+                        </FeatureGate>
                     </FeatureErrorBoundary>
                 } />
                 <Route path="/issues" element={
                     <FeatureErrorBoundary>
-                        <Suspense fallback={<LoadingSpinner />}>
-                            <IssuesLog project={project} updateProject={updateProject} />
-                        </Suspense>
+                        <FeatureGate feature="issues-log" message="Track project issues, inspection findings, and action items with our Issues Log. Available in Business plan.">
+                            <Suspense fallback={<LoadingSpinner />}>
+                                <IssuesLog project={project} updateProject={updateProject} />
+                            </Suspense>
+                        </FeatureGate>
                     </FeatureErrorBoundary>
                 } />
                 <Route path="/rfis" element={
                     <FeatureErrorBoundary>
-                        <Suspense fallback={<LoadingSpinner />}>
-                            <RFIManager project={project} />
-                        </Suspense>
+                        <FeatureGate feature="rfi-tracking" message="Manage Requests for Information (RFIs) with AI-powered PDF extraction. Available in Business plan.">
+                            <Suspense fallback={<LoadingSpinner />}>
+                                <RFIManager project={project} />
+                            </Suspense>
+                        </FeatureGate>
                     </FeatureErrorBoundary>
                 } />
                 <Route path="/site-visits" element={
                     <FeatureErrorBoundary>
-                        <Suspense fallback={<LoadingSpinner />}>
-                            <SiteVisitManager project={project} />
-                        </Suspense>
+                        <FeatureGate feature="site-visits" message="Log site visits with photo uploads and field observations. Available in Business plan.">
+                            <Suspense fallback={<LoadingSpinner />}>
+                                <SiteVisitManager project={project} />
+                            </Suspense>
+                        </FeatureGate>
                     </FeatureErrorBoundary>
                 } />
                 <Route path="/calendar" element={
                     <FeatureErrorBoundary>
-                        <Suspense fallback={<LoadingSpinner />}>
-                            <CalendarView project={project} />
-                        </Suspense>
+                        <FeatureGate feature="project-calendar" message="Track project milestones, inspections, and deadlines with the Project Calendar. Available in Business plan.">
+                            <Suspense fallback={<LoadingSpinner />}>
+                                <CalendarView project={project} />
+                            </Suspense>
+                        </FeatureGate>
                     </FeatureErrorBoundary>
                 } />
                 <Route path="/check" element={
                     <FeatureErrorBoundary>
-                        <Suspense fallback={<LoadingSpinner />}>
-                            <PreInspection project={project} updateProject={updateProject} />
-                        </Suspense>
+                        <FeatureGate feature="pre-inspection-check" message="Pre-inspection checklists help you prepare for inspections with AI-powered analysis.">
+                            <Suspense fallback={<LoadingSpinner />}>
+                                <PreInspection project={project} updateProject={updateProject} />
+                            </Suspense>
+                        </FeatureGate>
                     </FeatureErrorBoundary>
                 } />
                 <Route path="/inspector" element={
                     <FeatureErrorBoundary>
-                        <Suspense fallback={<LoadingSpinner />}>
-                            <InspectorMode
-                                projectId={project.id}
-                                projectType={project.type}
-                                serviceVoltage={project.serviceVoltage}
-                                servicePhase={project.servicePhase}
-                            />
-                        </Suspense>
+                        <FeatureGate feature="ai-inspector" message="AI Inspector Mode uses advanced AI to analyze your project and identify potential code violations before inspection.">
+                            <Suspense fallback={<LoadingSpinner />}>
+                                <InspectorMode
+                                    projectId={project.id}
+                                    projectType={project.type}
+                                    serviceVoltage={project.serviceVoltage}
+                                    servicePhase={project.servicePhase}
+                                />
+                            </Suspense>
+                        </FeatureGate>
                     </FeatureErrorBoundary>
                 } />
                 {/* Activity log merged into Inspector Mode - route kept for backwards compatibility */}
@@ -205,27 +229,33 @@ const ProjectWrapper = ({ projects, updateProject, deleteProject, onSignOut }: {
                 } />
                 <Route path="/feeders" element={
                     <FeatureErrorBoundary>
-                        <Suspense fallback={<LoadingSpinner />}>
-                            <FeederManager
-                                projectId={project.id}
-                                projectVoltage={project.serviceVoltage}
-                                projectPhase={project.servicePhase}
-                            />
-                        </Suspense>
+                        <FeatureGate feature="feeder-sizing" message="Design and size feeder cables between panels with NEC compliance. Available in Starter plan.">
+                            <Suspense fallback={<LoadingSpinner />}>
+                                <FeederManager
+                                    projectId={project.id}
+                                    projectVoltage={project.serviceVoltage}
+                                    projectPhase={project.servicePhase}
+                                />
+                            </Suspense>
+                        </FeatureGate>
                     </FeatureErrorBoundary>
                 } />
                 <Route path="/permit-packet" element={
                     <FeatureErrorBoundary>
-                        <Suspense fallback={<LoadingSpinner />}>
-                            <PermitPacketGenerator projectId={project.id} />
-                        </Suspense>
+                        <FeatureGate feature="permit-packet" message="Generate complete permit packages with all required documentation. Available in Starter plan.">
+                            <Suspense fallback={<LoadingSpinner />}>
+                                <PermitPacketGenerator projectId={project.id} />
+                            </Suspense>
+                        </FeatureGate>
                     </FeatureErrorBoundary>
                 } />
                 <Route path="/short-circuit" element={
                     <FeatureErrorBoundary>
-                        <Suspense fallback={<LoadingSpinner />}>
-                            <ShortCircuitResults />
-                        </Suspense>
+                        <FeatureGate feature="short-circuit-basic" message="Calculate available fault current per NEC 110.9 requirements. Available in Starter plan.">
+                            <Suspense fallback={<LoadingSpinner />}>
+                                <ShortCircuitResults />
+                            </Suspense>
+                        </FeatureGate>
                     </FeatureErrorBoundary>
                 } />
             </Routes>
@@ -756,6 +786,17 @@ function AppContent() {
             <Layout title="Calendar - All Projects" onSignOut={handleSignOut}>
               <Suspense fallback={<LoadingSpinner />}>
                 <CalendarView />
+              </Suspense>
+            </Layout>
+          </ProtectedRoute>
+        } />
+
+        {/* Pricing page - subscription management */}
+        <Route path="/pricing" element={
+          <ProtectedRoute>
+            <Layout title="Pricing & Plans" onSignOut={handleSignOut}>
+              <Suspense fallback={<LoadingSpinner />}>
+                <PricingPage />
               </Suspense>
             </Layout>
           </ProtectedRoute>
