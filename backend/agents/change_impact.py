@@ -43,17 +43,17 @@ Your role is to analyze the impact of proposed changes to electrical systems.
 ## CRITICAL RULES - MUST FOLLOW
 
 1. **SERVICE CAPACITY IS ABSOLUTE** - If adding a load would exceed 100% service capacity, you MUST:
-   - Set `approved` to FALSE
-   - Set `service_impact.upgrade_required` to TRUE
+   - Set `can_accommodate` to FALSE
+   - Set `service_impact.upgrade_needed` to TRUE
    - Recommend specific service upgrade size
 
 2. **80% RULE** - NEC recommends continuous loads not exceed 80% of service rating:
-   - If new utilization > 80%: Set `service_impact.upgrade_recommended` to TRUE
-   - If new utilization > 100%: Set `approved` to FALSE
+   - If new utilization > 80%: Set `service_impact.upgrade_needed` to TRUE
+   - If new utilization > 100%: Set `can_accommodate` to FALSE
 
 3. **ALWAYS USE THE PRE-CHECK** - The system provides a capacity pre-check with a verdict.
-   - If verdict starts with "REJECT": Set `approved` to FALSE
-   - If verdict starts with "WARNING": Set `approved` to TRUE but flag concerns
+   - If verdict starts with "REJECT": Set `can_accommodate` to FALSE
+   - If verdict starts with "WARNING": Set `can_accommodate` to TRUE but flag concerns
 
 ## Analysis Checklist
 - Service capacity and utilization (NEC 220, 230.42)
@@ -146,7 +146,7 @@ Remaining After Change: {capacity_check.get('remaining_after_change_amps', 0)}A
 {chr(10).join([f"- {l.get('description', 'Unknown')}: {l.get('breaker_amps', 0)}A" for l in large_loads[:10]]) if large_loads else "No large loads found"}
 
 ---
-**IMPORTANT:** The VERDICT above is the authoritative capacity check. If it says REJECT, you MUST set approved=False.
+**IMPORTANT:** The VERDICT above is the authoritative capacity check. If it says REJECT, you MUST set can_accommodate=False.
 """
     return context
 
@@ -356,7 +356,7 @@ Be SPECIFIC with numbers. Example: "Current 172A + proposed 48A = 220A total, wh
 
     # Safety check: Override AI decision if pre-check says REJECT
     output = result.output
-    if capacity_pre_check.get('requires_service_upgrade', False) and output.approved:
+    if capacity_pre_check.get('requires_service_upgrade', False) and output.can_accommodate:
         logger.warning(f"AI approved change but capacity check says REJECT. Overriding to rejected.")
         # Note: We can't easily modify the Pydantic model output here,
         # but the enhanced context should make the AI give the right answer.
