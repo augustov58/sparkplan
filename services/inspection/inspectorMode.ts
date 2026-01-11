@@ -601,8 +601,8 @@ function checkMainPanelGrounding(
     });
   }
   
-  // Check for required bonding
-  if (!grounding?.bonding || !grounding.bonding.includes('Water Pipe')) {
+  // Check for required bonding - "Interior Water Piping" is the actual value stored
+  if (!grounding?.bonding || !grounding.bonding.includes('Interior Water Piping')) {
     issues.push({
       id: generateId(),
       category: 'grounding',
@@ -611,7 +611,7 @@ function checkMainPanelGrounding(
       title: 'Metal Water Pipe Bonding Not Specified',
       description: `Bonding of metal water piping system is required per NEC 250.104(A) if present in structure.`,
       location: panel.name,
-      recommendation: `If metal water piping is present, ensure it is bonded to the grounding electrode system.`,
+      recommendation: `If metal water piping is present, ensure it is bonded to the grounding electrode system. Check the "Interior Water Piping" option in Grounding & Bonding.`,
       autoFixable: false,
     });
   }
@@ -682,6 +682,34 @@ function checkServiceCapacity(
     };
   }
   
+  return null;
+}
+
+/**
+ * Sub-Panel Missing Feeder Check
+ * Sub-panels (non-main panels) should have a feeder defined
+ */
+function checkSubPanelFeeder(panel: Panel, feeders: Feeder[]): InspectionIssue | null {
+  // Main panel doesn't need an incoming feeder
+  if (panel.is_main) return null;
+
+  // Check if any feeder has this panel as destination
+  const hasFeeder = feeders.some(f => f.destination_panel_id === panel.id);
+
+  if (!hasFeeder) {
+    return {
+      id: generateId(),
+      category: 'feeder',
+      severity: 'warning',
+      necArticle: 'NEC 215.2',
+      title: 'Sub-Panel Missing Feeder Definition',
+      description: `Sub-panel "${panel.name}" does not have a feeder defined. Feeders must be properly sized per NEC 215.2.`,
+      location: panel.name,
+      recommendation: `Define a feeder from the source panel to "${panel.name}" in the Feeder Management section. Include conductor size, length, and EGC.`,
+      autoFixable: false,
+    };
+  }
+
   return null;
 }
 
@@ -784,7 +812,23 @@ export function runInspection(data: ProjectInspectionData): InspectionResult {
       issues.push(threePoleIssue);
       necArticlesReferenced.add('NEC 210.4');
     }
-    
+
+    // Sub-panel feeder check
+    const feederIssue = checkSubPanelFeeder(panel, data.feeders);
+    if (feederIssue) {
+      issues.push(feederIssue);
+      necArticlesReferenced.add('NEC 215.2');
+    } else if (!panel.is_main) {
+      // Sub-panel has a feeder defined
+      passedChecks.push({
+        id: generateId(),
+        category: 'feeder',
+        necArticle: 'NEC 215.2',
+        description: `Sub-panel ${panel.name}: Feeder defined`,
+        passed: true,
+      });
+    }
+
     // Main panel grounding
     if (panel.is_main) {
       const groundingIssues = checkMainPanelGrounding(panel, data.grounding);
@@ -810,29 +854,17 @@ export function runInspection(data: ProjectInspectionData): InspectionResult {
   data.circuits.forEach(circuit => {
     const panel = data.panels.find(p => p.id === circuit.panel_id);
     const panelName = panel?.name || 'Unknown Panel';
-    
+
     // Conductor protection
     const conductorIssue = checkConductorProtection(circuit, panelName);
     if (conductorIssue) {
       issues.push(conductorIssue);
       necArticlesReferenced.add('NEC 240.4(D)');
     }
-    
-    // EGC sizing
-    const egcIssue = checkEgcSizing(circuit, panelName);
-    if (egcIssue) {
-      issues.push(egcIssue);
-    } else if (circuit.egc_size) {
-      passedChecks.push({
-        id: generateId(),
-        category: 'grounding',
-        necArticle: 'NEC 250.122',
-        description: `Circuit ${circuit.circuit_number}: EGC properly sized`,
-        passed: true,
-      });
-    }
-    necArticlesReferenced.add('NEC 250.122');
-    
+
+    // NOTE: EGC sizing is NOT checked at circuit level - we don't track EGC for branch circuits
+    // EGC is only specified on feeders, which are checked in the FEEDER CHECKS section below
+
     // Receptacle loading
     const receptacleIssue = checkReceptacleLoading(circuit, panelName);
     if (receptacleIssue) {

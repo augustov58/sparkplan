@@ -894,10 +894,25 @@ const AIActivitySection: React.FC<AIActivitySectionProps> = ({ projectId }) => {
                       <span className="text-sm font-medium text-gray-900">
                         {action.title}
                       </span>
-                      <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium border ${getStatusColor(action.status)}`}>
-                        {getStatusIcon(action.status)}
-                        {getStatusLabel(action.status)}
-                      </span>
+                      {/* For Change Impact, show capacity verdict; for others show approval status */}
+                      {action.agent_name === 'change_impact' && action.impact_analysis ? (
+                        <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium border ${
+                          action.impact_analysis.can_accommodate
+                            ? 'bg-green-100 text-green-800 border-green-200'
+                            : 'bg-red-100 text-red-800 border-red-200'
+                        }`}>
+                          {action.impact_analysis.can_accommodate
+                            ? <CheckCircle className="w-4 h-4 text-green-600" />
+                            : <XCircle className="w-4 h-4 text-red-600" />
+                          }
+                          {action.impact_analysis.can_accommodate ? 'Can Accommodate' : 'Cannot Accommodate'}
+                        </span>
+                      ) : (
+                        <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium border ${getStatusColor(action.status)}`}>
+                          {getStatusIcon(action.status)}
+                          {getStatusLabel(action.status)}
+                        </span>
+                      )}
                       {action.confidence_score && (
                         <span className="text-xs text-gray-500">
                           {Math.round(action.confidence_score * 100)}% confidence
