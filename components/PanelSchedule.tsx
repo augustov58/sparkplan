@@ -38,7 +38,7 @@ interface PanelScheduleProps {
 }
 
 export const PanelSchedule: React.FC<PanelScheduleProps> = ({ project }) => {
-  const { panels } = usePanels(project.id);
+  const { panels, updatePanel } = usePanels(project.id);
   const { circuits, createCircuit, updateCircuit, deleteCircuit } = useCircuits(project.id);
   const { transformers } = useTransformers(project.id);
 
@@ -68,6 +68,8 @@ export const PanelSchedule: React.FC<PanelScheduleProps> = ({ project }) => {
     pole: 1,
     conductorSize: '12 AWG',
   });
+  // State for breaker slot assignment
+  const [assigningFeederId, setAssigningFeederId] = useState<string | null>(null);
 
   // Select first panel by default
   React.useEffect(() => {
@@ -156,6 +158,30 @@ export const PanelSchedule: React.FC<PanelScheduleProps> = ({ project }) => {
     return feeders;
   }, [downstreamPanels, downstreamTransformers, panels, circuits, transformers, selectedPanel, project.settings?.occupancyType]);
 
+  // Split feeder circuits into breaker-fed (assigned to specific slot) and lug-fed (feed-thru lug)
+  const { breakerFedPanels, lugFedPanels } = useMemo(() => {
+    const breaker: typeof feederCircuits = [];
+    const lug: typeof feederCircuits = [];
+
+    feederCircuits.forEach(f => {
+      if (f.type === 'panel') {
+        const panel = panels.find(p => p.id === f.targetId);
+        if (panel?.fed_from_circuit_number) {
+          // Panel is fed from a specific breaker - show in circuit grid
+          breaker.push({ ...f, circuitNumber: panel.fed_from_circuit_number });
+        } else {
+          // Panel is fed via feed-thru lug - show in separate section
+          lug.push(f);
+        }
+      } else {
+        // Transformers always go to lug section for now (could extend later)
+        lug.push(f);
+      }
+    });
+
+    return { breakerFedPanels: breaker, lugFedPanels: lug };
+  }, [feederCircuits, panels]);
+
   // Calculate demand factors (direct circuits only - feeders calculated separately)
   const demandResult = useMemo(() => {
     if (!selectedPanel) return null;
@@ -228,6 +254,10 @@ export const PanelSchedule: React.FC<PanelScheduleProps> = ({ project }) => {
   // Helper to find circuit at specific slot number
   const getCircuit = (num: number) => panelCircuits.find(c => c.circuit_number === num);
 
+  // Helper to find breaker-fed panel at specific slot number
+  const getFeederAtSlot = (slotNum: number) =>
+    breakerFedPanels.find(f => f.circuitNumber === slotNum);
+
   // Get phase letter for a row
   const getPhaseForRow = (rowNum: number) => {
     if (!selectedPanel) return 'A';
@@ -295,12 +325,13 @@ export const PanelSchedule: React.FC<PanelScheduleProps> = ({ project }) => {
     }
   };
 
-  // Get all occupied slot numbers (including multi-pole circuit expansions)
+  // Get all occupied slot numbers (including multi-pole circuit expansions and breaker-fed panels)
   const getOccupiedSlots = (): Set<number> => {
     if (!selectedPanelId) return new Set();
     const panelCkts = circuits.filter(c => c.panel_id === selectedPanelId);
     const occupied = new Set<number>();
 
+    // Add slots occupied by direct circuits
     panelCkts.forEach(ckt => {
       // Add the circuit's base number
       occupied.add(ckt.circuit_number);
@@ -312,6 +343,19 @@ export const PanelSchedule: React.FC<PanelScheduleProps> = ({ project }) => {
       if (ckt.pole > 1) {
         for (let i = 1; i < ckt.pole; i++) {
           occupied.add(ckt.circuit_number + (i * 2));
+        }
+      }
+    });
+
+    // Add slots occupied by breaker-fed panels
+    breakerFedPanels.forEach(f => {
+      if (f.circuitNumber) {
+        occupied.add(f.circuitNumber);
+        // Handle multi-pole feeders (2P or 3P breakers)
+        if (f.pole > 1) {
+          for (let i = 1; i < f.pole; i++) {
+            occupied.add(f.circuitNumber + (i * 2));
+          }
         }
       }
     });
@@ -457,6 +501,52 @@ export const PanelSchedule: React.FC<PanelScheduleProps> = ({ project }) => {
     setAddingCircuit(null);
   };
 
+  // Get available slots for feeder assignment (returns slots that can fit a given pole count)
+  const getAvailableSlotsForFeeder = (pole: number) => {
+    const occupied = getOccupiedSlots();
+    const available: number[] = [];
+
+    // Check both left (odd) and right (even) sides
+    for (let num = 1; num <= totalSlots; num++) {
+      // Check if this slot and all required slots are free
+      let canFit = true;
+      for (let i = 0; i < pole; i++) {
+        const slotToCheck = num + (i * 2);
+        if (occupied.has(slotToCheck) || slotToCheck > totalSlots) {
+          canFit = false;
+          break;
+        }
+      }
+      if (canFit) {
+        available.push(num);
+      }
+    }
+
+    return available;
+  };
+
+  // Assign a feeder panel to a specific breaker slot
+  const assignFeederToSlot = async (panelId: string, circuitNumber: number) => {
+    try {
+      await updatePanel(panelId, { fed_from_circuit_number: circuitNumber });
+      setAssigningFeederId(null);
+    } catch (error) {
+      console.error('Failed to assign feeder to slot:', error);
+      alert('Failed to assign feeder to breaker slot');
+    }
+  };
+
+  // Unassign a feeder panel from its breaker slot (move back to feed-thru lug)
+  const unassignFeederFromSlot = async (panelId: string) => {
+    if (!confirm('Move this panel to feed-thru lug connection?')) return;
+    try {
+      await updatePanel(panelId, { fed_from_circuit_number: null });
+    } catch (error) {
+      console.error('Failed to unassign feeder from slot:', error);
+      alert('Failed to unassign feeder from breaker slot');
+    }
+  };
+
   // Check if a slot is occupied by a multi-pole circuit above it
   const getMultiPoleCircuitAbove = (slotNumber: number) => {
     for (let i = 1; i < slotNumber; i++) {
@@ -468,6 +558,22 @@ export const PanelSchedule: React.FC<PanelScheduleProps> = ({ project }) => {
         }
         if (occupiedSlots.includes(slotNumber)) {
           return ckt;
+        }
+      }
+    }
+    return null;
+  };
+
+  // Check if a slot is occupied by a multi-pole feeder breaker above it
+  const getMultiPoleFeederAbove = (slotNumber: number) => {
+    for (const feeder of breakerFedPanels) {
+      if (feeder.circuitNumber && feeder.pole > 1 && feeder.circuitNumber < slotNumber) {
+        const occupiedSlots = [];
+        for (let j = 0; j < feeder.pole; j++) {
+          occupiedSlots.push(feeder.circuitNumber + (j * 2));
+        }
+        if (occupiedSlots.includes(slotNumber)) {
+          return feeder;
         }
       }
     }
@@ -499,13 +605,18 @@ export const PanelSchedule: React.FC<PanelScheduleProps> = ({ project }) => {
     const rightNum = rowNum * 2;
     const leftCkt = getCircuit(leftNum);
     const rightCkt = getCircuit(rightNum);
+    const leftFeeder = getFeederAtSlot(leftNum);
+    const rightFeeder = getFeederAtSlot(rightNum);
     const leftMultiPoleAbove = getMultiPoleCircuitAbove(leftNum);
     const rightMultiPoleAbove = getMultiPoleCircuitAbove(rightNum);
+    const leftMultiPoleFeederAbove = getMultiPoleFeederAbove(leftNum);
+    const rightMultiPoleFeederAbove = getMultiPoleFeederAbove(rightNum);
     const phase = getPhaseForRow(rowNum);
     const isEditing = (ckt: any) => ckt && editingCircuit === ckt.id;
 
     // Left side circuit cell
     const renderLeftCircuit = () => {
+      // Check for multi-pole circuit continuation from above
       if (leftMultiPoleAbove) {
         return (
           <>
@@ -515,6 +626,55 @@ export const PanelSchedule: React.FC<PanelScheduleProps> = ({ project }) => {
           </>
         );
       }
+      // Check for multi-pole feeder continuation from above
+      if (leftMultiPoleFeederAbove) {
+        return (
+          <>
+            <td colSpan={5} className="p-1 bg-purple-50 text-center text-xs text-purple-400 italic border-r border-gray-200">
+              ↑ {leftMultiPoleFeederAbove.pole}P FDR
+            </td>
+          </>
+        );
+      }
+      // Check for breaker-fed panel at this slot
+      if (leftFeeder) {
+        return (
+          <>
+            <td className="p-1 border-r border-gray-100 text-xs bg-purple-50 group">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-1">
+                  {leftFeeder.pole > 1 && (
+                    <span className="text-[10px] font-bold text-purple-600">{leftFeeder.pole}P</span>
+                  )}
+                  <span className="font-bold text-purple-800 truncate max-w-[100px]" title={leftFeeder.name}>
+                    {leftFeeder.name}
+                  </span>
+                </div>
+                <button
+                  onClick={() => unassignFeederFromSlot(leftFeeder.targetId)}
+                  className="opacity-0 group-hover:opacity-100 text-[10px] px-1 py-0.5 bg-purple-200 hover:bg-purple-300 text-purple-700 rounded transition-opacity"
+                  title="Move to feed-thru lug"
+                >
+                  ✕
+                </button>
+              </div>
+            </td>
+            <td className="p-1 border-r border-gray-100 text-center text-[10px] font-bold bg-purple-100 text-purple-700 border border-purple-300">
+              FDR
+            </td>
+            <td className="p-1 border-r border-gray-100 text-center text-xs font-mono bg-purple-50/50 text-purple-600">
+              {((leftFeeder.loadVA / 1000) / (selectedPanel?.phase === 3 ? 3 : 2)).toFixed(2)}
+            </td>
+            <td className="p-1 border-r border-gray-100 text-center text-xs font-mono bg-purple-50/50 text-purple-600">
+              {((leftFeeder.loadVA / 1000) / (selectedPanel?.phase === 3 ? 3 : 2)).toFixed(2)}
+            </td>
+            <td className="p-1 border-r border-gray-200 text-center text-xs font-mono bg-purple-50/50 text-purple-600">
+              {selectedPanel?.phase === 3 ? ((leftFeeder.loadVA / 1000) / 3).toFixed(2) : ''}
+            </td>
+          </>
+        );
+      }
+      // Empty slot (SPARE)
       if (!leftCkt) {
         return (
           <>
@@ -602,6 +762,7 @@ export const PanelSchedule: React.FC<PanelScheduleProps> = ({ project }) => {
 
     // Right side circuit cell (mirrored)
     const renderRightCircuit = () => {
+      // Check for multi-pole circuit continuation from above
       if (rightMultiPoleAbove) {
         return (
           <>
@@ -611,6 +772,55 @@ export const PanelSchedule: React.FC<PanelScheduleProps> = ({ project }) => {
           </>
         );
       }
+      // Check for multi-pole feeder continuation from above
+      if (rightMultiPoleFeederAbove) {
+        return (
+          <>
+            <td colSpan={5} className="p-1 bg-purple-50 text-center text-xs text-purple-400 italic border-l border-gray-200">
+              ↑ {rightMultiPoleFeederAbove.pole}P FDR
+            </td>
+          </>
+        );
+      }
+      // Check for breaker-fed panel at this slot
+      if (rightFeeder) {
+        return (
+          <>
+            <td className="p-1 border-l border-gray-200 text-center text-xs font-mono bg-purple-50/50 text-purple-600">
+              {selectedPanel?.phase === 3 ? ((rightFeeder.loadVA / 1000) / 3).toFixed(2) : ''}
+            </td>
+            <td className="p-1 border-l border-gray-100 text-center text-xs font-mono bg-purple-50/50 text-purple-600">
+              {((rightFeeder.loadVA / 1000) / (selectedPanel?.phase === 3 ? 3 : 2)).toFixed(2)}
+            </td>
+            <td className="p-1 border-l border-gray-100 text-center text-xs font-mono bg-purple-50/50 text-purple-600">
+              {((rightFeeder.loadVA / 1000) / (selectedPanel?.phase === 3 ? 3 : 2)).toFixed(2)}
+            </td>
+            <td className="p-1 border-l border-gray-100 text-center text-[10px] font-bold bg-purple-100 text-purple-700 border border-purple-300">
+              FDR
+            </td>
+            <td className="p-1 border-l border-gray-100 text-xs text-right bg-purple-50 group">
+              <div className="flex items-center justify-between">
+                <button
+                  onClick={() => unassignFeederFromSlot(rightFeeder.targetId)}
+                  className="opacity-0 group-hover:opacity-100 text-[10px] px-1 py-0.5 bg-purple-200 hover:bg-purple-300 text-purple-700 rounded transition-opacity"
+                  title="Move to feed-thru lug"
+                >
+                  ✕
+                </button>
+                <div className="flex items-center gap-1">
+                  <span className="font-bold text-purple-800 truncate max-w-[100px]" title={rightFeeder.name}>
+                    {rightFeeder.name}
+                  </span>
+                  {rightFeeder.pole > 1 && (
+                    <span className="text-[10px] font-bold text-purple-600">{rightFeeder.pole}P</span>
+                  )}
+                </div>
+              </div>
+            </td>
+          </>
+        );
+      }
+      // Empty slot (SPARE)
       if (!rightCkt) {
         return (
           <>
@@ -713,26 +923,26 @@ export const PanelSchedule: React.FC<PanelScheduleProps> = ({ project }) => {
 
         {/* Left Circuit Data */}
         {renderLeftCircuit()}
-        
-        {/* Breaker columns */}
-        <td className="p-1 w-10 text-center text-xs font-mono border-r border-gray-100 bg-white">
-          {leftCkt?.breaker_amps || ''}
+
+        {/* Breaker columns - show circuit or feeder data */}
+        <td className={`p-1 w-10 text-center text-xs font-mono border-r border-gray-100 ${leftFeeder ? 'bg-purple-50 text-purple-700' : 'bg-white'}`}>
+          {leftFeeder ? leftFeeder.breakerAmps : (leftCkt?.breaker_amps || '')}
         </td>
-        <td className="p-1 w-10 text-center text-xs font-mono border-r border-gray-100 bg-white">
-          {leftCkt?.pole || ''}
+        <td className={`p-1 w-10 text-center text-xs font-mono border-r border-gray-100 ${leftFeeder ? 'bg-purple-50 text-purple-700' : 'bg-white'}`}>
+          {leftFeeder ? leftFeeder.pole : (leftCkt?.pole || '')}
         </td>
-        
+
         {/* Center Phase indicator */}
         <td className="p-1 w-8 text-center text-xs font-bold bg-electric-50 text-electric-700 border-x border-gray-300">
           {phase}
         </td>
-        
-        {/* Right breaker columns */}
-        <td className="p-1 w-10 text-center text-xs font-mono border-l border-gray-100 bg-white">
-          {rightCkt?.pole || ''}
+
+        {/* Right breaker columns - show circuit or feeder data */}
+        <td className={`p-1 w-10 text-center text-xs font-mono border-l border-gray-100 ${rightFeeder ? 'bg-purple-50 text-purple-700' : 'bg-white'}`}>
+          {rightFeeder ? rightFeeder.pole : (rightCkt?.pole || '')}
         </td>
-        <td className="p-1 w-10 text-center text-xs font-mono border-l border-gray-100 bg-white">
-          {rightCkt?.breaker_amps || ''}
+        <td className={`p-1 w-10 text-center text-xs font-mono border-l border-gray-100 ${rightFeeder ? 'bg-purple-50 text-purple-700' : 'bg-white'}`}>
+          {rightFeeder ? rightFeeder.breakerAmps : (rightCkt?.breaker_amps || '')}
         </td>
         
         {/* Right Circuit Data */}
@@ -1104,17 +1314,46 @@ export const PanelSchedule: React.FC<PanelScheduleProps> = ({ project }) => {
                 </tr>
               )}
 
-              {/* Feeder Circuits Section - Downstream Panels & Transformers */}
-              {feederCircuits.length > 0 && (
+              {/* Feed-Thru Lug Section - Panels/Transformers NOT assigned to breaker slots */}
+              {lugFedPanels.length > 0 && (
                 <>
                   <tr className="bg-purple-50 border-t-2 border-purple-300">
                     <td colSpan={17} className="p-2 text-xs font-bold text-purple-800">
-                      ⚡ FEEDER CIRCUITS (Downstream Equipment)
+                      ⚡ FEED-THRU LUGS (Not Breaker-Fed)
                     </td>
                   </tr>
-                  {feederCircuits.map((feeder, idx) => (
+                  {lugFedPanels.map((feeder, idx) => (
                     <tr key={feeder.id} className={`${idx % 2 === 0 ? 'bg-purple-50/50' : 'bg-white'} hover:bg-purple-100/50`}>
-                      <td className="p-1 text-center text-xs font-mono text-purple-600">—</td>
+                      <td className="p-1 text-center text-xs font-mono text-purple-600">
+                        {feeder.type === 'panel' && assigningFeederId === feeder.targetId ? (
+                          <select
+                            className="w-full text-[10px] border border-purple-300 rounded px-0.5 py-0.5 bg-white"
+                            value=""
+                            onChange={(e) => {
+                              if (e.target.value) {
+                                assignFeederToSlot(feeder.targetId, parseInt(e.target.value));
+                              }
+                            }}
+                            onBlur={() => setAssigningFeederId(null)}
+                            autoFocus
+                          >
+                            <option value="">Slot #</option>
+                            {getAvailableSlotsForFeeder(feeder.pole).map(slot => (
+                              <option key={slot} value={slot}>
+                                {slot} ({slot % 2 === 1 ? 'L' : 'R'})
+                              </option>
+                            ))}
+                          </select>
+                        ) : feeder.type === 'panel' ? (
+                          <button
+                            onClick={() => setAssigningFeederId(feeder.targetId)}
+                            className="text-[10px] px-1 py-0.5 bg-purple-200 hover:bg-purple-300 text-purple-700 rounded"
+                            title="Assign to breaker slot"
+                          >
+                            +BKR
+                          </button>
+                        ) : '—'}
+                      </td>
                       <td className="p-1 border-r border-gray-100">
                         <span className="text-xs font-bold text-purple-800">{feeder.name}</span>
                         <span className="text-[10px] text-purple-500 ml-1">
@@ -1140,7 +1379,7 @@ export const PanelSchedule: React.FC<PanelScheduleProps> = ({ project }) => {
                       </td>
                       {/* Center bus bar section */}
                       <td className="p-1 bg-electric-500 text-electric-100 text-center text-[10px] font-mono">
-                        FDR
+                        LUG
                       </td>
                       <td className="p-1 text-center">
                         <span className={`text-[10px] px-1 py-0.5 rounded ${feeder.type === 'panel' ? 'bg-blue-100 text-blue-700' : 'bg-orange-100 text-orange-700'}`}>
@@ -1167,14 +1406,14 @@ export const PanelSchedule: React.FC<PanelScheduleProps> = ({ project }) => {
                   ))}
                   <tr className="bg-purple-100 border-b border-purple-300">
                     <td colSpan={6} className="p-2 text-right text-xs font-semibold text-purple-800">
-                      FEEDER TOTAL:
+                      FEED-THRU TOTAL:
                     </td>
                     <td className="p-2 text-center text-xs font-mono font-bold text-purple-900">
-                      {(feederCircuits.reduce((sum, f) => sum + f.loadVA, 0) / 1000).toFixed(1)} kVA
+                      {(lugFedPanels.reduce((sum, f) => sum + f.loadVA, 0) / 1000).toFixed(1)} kVA
                     </td>
                     <td colSpan={3}></td>
                     <td className="p-2 text-center text-xs font-mono font-bold text-purple-900">
-                      {(feederCircuits.reduce((sum, f) => sum + f.loadVA, 0) / 1000).toFixed(1)} kVA
+                      {(lugFedPanels.reduce((sum, f) => sum + f.loadVA, 0) / 1000).toFixed(1)} kVA
                     </td>
                     <td colSpan={6}></td>
                   </tr>

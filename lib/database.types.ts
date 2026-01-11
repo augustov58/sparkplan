@@ -721,6 +721,7 @@ export type Database = {
           fed_from: string | null
           fed_from_transformer_id: string | null
           fed_from_type: string | null
+          fed_from_circuit_number: number | null
           feeder_breaker_amps: number | null
           feeder_conductor_size: string | null
           feeder_conduit: string | null
@@ -748,6 +749,7 @@ export type Database = {
           fed_from?: string | null
           fed_from_transformer_id?: string | null
           fed_from_type?: string | null
+          fed_from_circuit_number?: number | null
           feeder_breaker_amps?: number | null
           feeder_conductor_size?: string | null
           feeder_conduit?: string | null
@@ -775,6 +777,7 @@ export type Database = {
           fed_from?: string | null
           fed_from_transformer_id?: string | null
           fed_from_type?: string | null
+          fed_from_circuit_number?: number | null
           feeder_breaker_amps?: number | null
           feeder_conductor_size?: string | null
           feeder_conduit?: string | null

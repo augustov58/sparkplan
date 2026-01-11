@@ -197,7 +197,8 @@ export const OneLineDiagram: React.FC<OneLineDiagramProps> = ({ project, updateP
     phase: project.servicePhase,
     isMain: false,
     fedFromType: 'panel' as 'panel' | 'transformer' | 'service',
-    fedFromId: '' // Can be panel ID or transformer ID depending on fedFromType
+    fedFromId: '', // Can be panel ID or transformer ID depending on fedFromType
+    fedFromCircuitNumber: null as number | null // Breaker slot in parent panel, null = feed-thru lug
   });
 
   // Circuit Editor State
@@ -935,7 +936,8 @@ export const OneLineDiagram: React.FC<OneLineDiagramProps> = ({ project, updateP
       fed_from: fedFrom,
       fed_from_transformer_id: fedFromTransformerId,
       fed_from_type: fedFromType,
-      is_main: newPanel.isMain
+      is_main: newPanel.isMain,
+      fed_from_circuit_number: fedFromType === 'panel' ? newPanel.fedFromCircuitNumber : null
     };
 
     await createPanel(panelData);
@@ -948,7 +950,8 @@ export const OneLineDiagram: React.FC<OneLineDiagramProps> = ({ project, updateP
       phase: project.servicePhase,
       isMain: false,
       fedFromType: 'panel',
-      fedFromId: ''
+      fedFromId: '',
+      fedFromCircuitNumber: null
     });
   };
 
@@ -1095,6 +1098,57 @@ export const OneLineDiagram: React.FC<OneLineDiagramProps> = ({ project, updateP
     }
 
     return occupied;
+  };
+
+  // Helper to get available slots for feeder panel assignment
+  // Includes slots occupied by circuits AND other breaker-fed sub-panels
+  const getAvailableSlotsForFeeder = (parentPanelId: string, pole: number) => {
+    if (!parentPanelId) return [];
+
+    const parentPanel = panels.find(p => p.id === parentPanelId);
+    if (!parentPanel) return [];
+
+    // Get slots occupied by circuits
+    const occupiedByCircuits = getOccupiedSlots(parentPanelId);
+
+    // Get slots occupied by other breaker-fed sub-panels
+    const breakerFedPanels = panels.filter(
+      p => p.fed_from_type === 'panel' && p.fed_from === parentPanelId && p.fed_from_circuit_number
+    );
+
+    const occupiedByFeeders = new Set<number>();
+    for (const panel of breakerFedPanels) {
+      if (panel.fed_from_circuit_number) {
+        const feederPole = panel.phase === 3 ? 3 : 2; // Feeder breaker is 2P or 3P
+        for (let i = 0; i < feederPole; i++) {
+          occupiedByFeeders.add(panel.fed_from_circuit_number + (i * 2));
+        }
+      }
+    }
+
+    // Combine all occupied slots
+    const allOccupied = new Set([...occupiedByCircuits, ...occupiedByFeeders]);
+
+    // Calculate total slots based on panel size
+    const totalSlots = parentPanel.is_main ? 30 : 42;
+
+    // Find available slots
+    const available: number[] = [];
+    for (let num = 1; num <= totalSlots; num++) {
+      let canFit = true;
+      for (let i = 0; i < pole; i++) {
+        const slotToCheck = num + (i * 2);
+        if (allOccupied.has(slotToCheck) || slotToCheck > totalSlots) {
+          canFit = false;
+          break;
+        }
+      }
+      if (canFit) {
+        available.push(num);
+      }
+    }
+
+    return available;
   };
 
   // Helper to find next available circuit number
@@ -2396,6 +2450,44 @@ export const OneLineDiagram: React.FC<OneLineDiagramProps> = ({ project, updateP
                        ))}
                      </select>
                    </div>
+                   {/* Breaker slot selection - only for panel-fed sub-panels */}
+                   {newPanel.fedFromType === 'panel' && (
+                     <div>
+                       <label className="text-xs font-semibold text-gray-500 uppercase">
+                         Connection Type
+                       </label>
+                       <select
+                         value={newPanel.fedFromCircuitNumber === null ? 'lug' : String(newPanel.fedFromCircuitNumber)}
+                         onChange={e => {
+                           const value = e.target.value;
+                           setNewPanel({
+                             ...newPanel,
+                             fedFromCircuitNumber: value === 'lug' ? null : parseInt(value)
+                           });
+                         }}
+                         className="w-full border-gray-200 rounded text-sm py-2"
+                       >
+                         <option value="lug">Feed-Thru Lug (no breaker)</option>
+                         <optgroup label="Breaker Slot">
+                           {(() => {
+                             const parentId = newPanel.fedFromId || panels.find(p => p.is_main)?.id || '';
+                             const pole = newPanel.phase === 3 ? 3 : 2;
+                             const slots = getAvailableSlotsForFeeder(parentId, pole);
+                             return slots.map(slot => (
+                               <option key={slot} value={slot}>
+                                 Slot {slot} ({slot % 2 === 1 ? 'Left' : 'Right'} side)
+                               </option>
+                             ));
+                           })()}
+                         </optgroup>
+                       </select>
+                       <p className="text-[10px] text-gray-400 mt-1">
+                         {newPanel.fedFromCircuitNumber === null
+                           ? 'Panel will connect via feed-thru lugs'
+                           : `Panel will use breaker at slot ${newPanel.fedFromCircuitNumber}`}
+                       </p>
+                     </div>
+                   )}
                  </>
                )}
 
