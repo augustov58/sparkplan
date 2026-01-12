@@ -6,7 +6,9 @@
 
 import React, { useState, useMemo, useCallback } from 'react';
 import { Project } from '../types';
-import { LayoutGrid, Download, Edit2, Save, X, Trash2, Settings, Calculator, Info, ArrowDown, Plus } from 'lucide-react';
+import { LayoutGrid, Download, Edit2, Save, X, Trash2, Settings, Calculator, Info, ArrowDown, Plus, Camera } from 'lucide-react';
+import { PanelPhotoImporter } from './PanelPhotoImporter';
+import type { ExtractedCircuit } from '@/services/panelOcrService';
 import { usePanels } from '../hooks/usePanels';
 import { useCircuits } from '../hooks/useCircuits';
 import { useTransformers } from '../hooks/useTransformers';
@@ -70,6 +72,8 @@ export const PanelSchedule: React.FC<PanelScheduleProps> = ({ project }) => {
   });
   // State for breaker slot assignment
   const [assigningFeederId, setAssigningFeederId] = useState<string | null>(null);
+  // State for photo importer modal
+  const [showPhotoImporter, setShowPhotoImporter] = useState(false);
 
   // Select first panel by default
   React.useEffect(() => {
@@ -323,6 +327,34 @@ export const PanelSchedule: React.FC<PanelScheduleProps> = ({ project }) => {
     } catch (error) {
       alert(`Failed to export PDF: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
+  };
+
+  // Handle photo import - delete existing circuits and create new ones
+  const handlePhotoImport = async (extractedCircuits: ExtractedCircuit[]) => {
+    if (!selectedPanelId) return;
+
+    // Delete existing circuits for this panel
+    const existingCircuits = circuits.filter(c => c.panel_id === selectedPanelId);
+    for (const circuit of existingCircuits) {
+      await deleteCircuit(circuit.id);
+    }
+
+    // Create new circuits from extraction
+    for (const extracted of extractedCircuits) {
+      await createCircuit({
+        panel_id: selectedPanelId,
+        project_id: project.id,
+        circuit_number: extracted.circuit_number,
+        description: extracted.description || '',
+        breaker_amps: extracted.breaker_amps || 20,
+        load_watts: extracted.load_watts || 0,
+        load_type: (extracted.load_type as any) || 'O',
+        pole: extracted.pole || 1,
+        conductor_size: extracted.conductor_size || '12 AWG',
+      });
+    }
+
+    setShowPhotoImporter(false);
   };
 
   // Get all occupied slot numbers (including multi-pole circuit expansions and breaker-fed panels)
@@ -714,10 +746,11 @@ export const PanelSchedule: React.FC<PanelScheduleProps> = ({ project }) => {
             <td colSpan={3} className="p-1 border-r border-gray-200">
               <input
                 type="number"
+                step="any"
                 value={editForm.loadWatts || ''}
-                onChange={e => setEditForm({...editForm, loadWatts: Number(e.target.value)})}
+                onChange={e => setEditForm({...editForm, loadWatts: parseFloat(e.target.value) || 0})}
                 className="w-full text-xs border border-electric-300 rounded px-1 py-0.5 text-center"
-                placeholder="VA"
+                placeholder="Watts"
               />
             </td>
           </>
@@ -841,10 +874,11 @@ export const PanelSchedule: React.FC<PanelScheduleProps> = ({ project }) => {
             <td colSpan={3} className="p-1 border-l border-gray-200">
               <input
                 type="number"
+                step="any"
                 value={editForm.loadWatts || ''}
-                onChange={e => setEditForm({...editForm, loadWatts: Number(e.target.value)})}
+                onChange={e => setEditForm({...editForm, loadWatts: parseFloat(e.target.value) || 0})}
                 className="w-full text-xs border border-electric-300 rounded px-1 py-0.5 text-center"
-                placeholder="VA"
+                placeholder="Watts"
               />
             </td>
             <td className="p-1 border-l border-gray-100">
@@ -1051,6 +1085,12 @@ export const PanelSchedule: React.FC<PanelScheduleProps> = ({ project }) => {
             >
               <Download className="w-3 h-3" /> Export PDF
             </button>
+            <button
+              onClick={() => setShowPhotoImporter(true)}
+              className="flex items-center gap-1 px-3 py-1.5 bg-purple-100 text-purple-700 border border-purple-200 rounded text-xs font-medium hover:bg-purple-200"
+            >
+              <Camera className="w-3 h-3" /> Import from Photo
+            </button>
             {panels.length > 1 && (
               <button
                 onClick={handleExportAllPanels}
@@ -1150,9 +1190,10 @@ export const PanelSchedule: React.FC<PanelScheduleProps> = ({ project }) => {
                     <td colSpan={3} className="p-1">
                       <input
                         type="number"
+                        step="any"
                         value={newCircuit.loadWatts || ''}
-                        onChange={e => setNewCircuit({...newCircuit, loadWatts: Number(e.target.value)})}
-                        placeholder="VA"
+                        onChange={e => setNewCircuit({...newCircuit, loadWatts: parseFloat(e.target.value) || 0})}
+                        placeholder="Watts"
                         className="w-full border border-gray-300 rounded px-1 py-0.5 text-xs"
                       />
                     </td>
@@ -1232,9 +1273,10 @@ export const PanelSchedule: React.FC<PanelScheduleProps> = ({ project }) => {
                     <td colSpan={3} className="p-1">
                       <input
                         type="number"
+                        step="any"
                         value={newCircuit.loadWatts || ''}
-                        onChange={e => setNewCircuit({...newCircuit, loadWatts: Number(e.target.value)})}
-                        placeholder="VA"
+                        onChange={e => setNewCircuit({...newCircuit, loadWatts: parseFloat(e.target.value) || 0})}
+                        placeholder="Watts"
                         className="w-full border border-gray-300 rounded px-1 py-0.5 text-xs"
                       />
                     </td>
@@ -1641,6 +1683,18 @@ export const PanelSchedule: React.FC<PanelScheduleProps> = ({ project }) => {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Photo Importer Modal */}
+      {showPhotoImporter && selectedPanel && (
+        <PanelPhotoImporter
+          panelId={selectedPanel.id}
+          panelName={selectedPanel.name}
+          maxCircuits={42}
+          existingCircuitCount={panelCircuits.length}
+          onImport={handlePhotoImport}
+          onClose={() => setShowPhotoImporter(false)}
+        />
       )}
     </div>
   );
