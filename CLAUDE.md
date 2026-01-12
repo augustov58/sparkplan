@@ -49,6 +49,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ### Core Documentation
 - **[Architecture Overview](/docs/architecture.md)** - State management, data flow, optimistic updates
 - **[AI Agent Architecture](/docs/AI_AGENT_ARCHITECTURE.md)** - Pydantic AI agents, dual AI systems
+- **[Enhanced AI Chatbot Spec](/docs/ENHANCED_AI_CHATBOT_SPEC.md)** - Conversation memory, agentic actions, RAG
 - **[Development Guide](/docs/development-guide.md)** - Step-by-step workflows
 - **[Database Architecture](/docs/database-architecture.md)** - Schema, RLS policies, migrations
 - **[Security Guide](/docs/security.md)** - Security audit, API protection
@@ -134,6 +135,37 @@ GOOGLE_API_KEY=your_gemini_api_key_here     # For Pydantic AI agents
 | Jurisdiction Requirement Wizard | ✅ COMPLETE (6 jurisdictions seeded) | 🥉 Nice-to-have |
 
 **Result**: 100% commercial permit readiness - all jurisdiction requirements deliverable!
+
+### ⏳ Phase 2.5: Enhanced AI Chatbot - IN PROGRESS (Jan 2026)
+**Spec**: `/docs/ENHANCED_AI_CHATBOT_SPEC.md`
+**Branch**: `feature/enhanced-ai-chatbot`
+
+Transform the NEC Assistant from stateless Q&A to intelligent copilot with memory and actions.
+
+| Feature | Status | Effort | Impact |
+|---------|--------|--------|--------|
+| **Conversation Memory** | 🔄 In Progress | 4h | High - Multi-turn conversations |
+| **Agentic Actions** | 🔄 In Progress | 35h | Very High - Execute calculations via chat |
+| **Streaming Responses** | ⏳ Pending | 4h | Medium - Faster perceived response |
+| **Core NEC Tables RAG** | ⏳ Pending | 20h | High - Accurate table lookups |
+| **Full NEC RAG** | ⏳ Pending | 60h | Very High - Complete knowledge base |
+
+**Phase 2.5.1: Conversation Memory**
+- Chat history state management (`useChat` hook)
+- Conversation context builder
+- Multi-turn conversation support
+- Optional database persistence
+
+**Phase 2.5.2: Agentic Actions**
+- Tool definitions with Zod schemas
+- 7 core tools: voltage drop, short circuit, panel capacity, inspection, conductor sizing, arc flash, service upgrade
+- Gemini function calling integration
+- Confirmation flow for write operations
+
+**Phase 2.5.3: RAG Integration** (Future)
+- pgvector embeddings for NEC tables
+- Semantic search for relevant articles
+- Multi-edition support (2020, 2023, 2026)
 
 ### 🔮 Phase 3: Design Copilot (Future)
 AI-powered auto-design: "Design 15,000 sq ft medical office with X-ray room" → Complete electrical design
