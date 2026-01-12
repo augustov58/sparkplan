@@ -191,3 +191,123 @@ Answer strictly based on the NEC. Cite the article number.
 
   return await callGeminiProxy(prompt, enhancedSystemInstruction);
 };
+
+// ============================================================================
+// ENHANCED CHATBOT WITH CONVERSATION MEMORY (Phase 2.5)
+// ============================================================================
+
+/**
+ * Ask NEC Assistant with conversation memory support
+ *
+ * This enhanced version maintains conversation context across multiple turns,
+ * allowing for natural follow-up questions and context-aware responses.
+ *
+ * @param question - The user's current question
+ * @param conversationHistory - Formatted string of previous conversation
+ * @param projectContext - Project context (panels, circuits, etc.)
+ * @param isFirstMessage - Whether this is the first message in conversation
+ * @returns AI response string
+ */
+export const askNecAssistantWithMemory = async (
+  question: string,
+  conversationHistory: string,
+  projectContext?: string,
+  isFirstMessage: boolean = true
+): Promise<string> => {
+  // Build system instruction with conversation awareness
+  const systemInstruction = buildMemoryAwareSystemInstruction(projectContext, isFirstMessage);
+
+  // Build the prompt with conversation history
+  const prompt = buildMemoryAwarePrompt(question, conversationHistory, projectContext, isFirstMessage);
+
+  return await callGeminiProxy(prompt, systemInstruction);
+};
+
+/**
+ * Builds system instruction for memory-aware conversations
+ */
+function buildMemoryAwareSystemInstruction(
+  projectContext?: string,
+  isFirstMessage: boolean = true
+): string {
+  return `
+You are a Senior Electrical Engineer and Master Electrician working as an AI copilot for NEC compliance.
+You specialize in the National Electrical Code (NEC) and help design safe, compliant electrical systems.
+
+CONVERSATION CAPABILITIES:
+- You have memory of our conversation and can reference previous questions/answers
+- Build on prior context instead of repeating information
+- If the user references something discussed earlier, acknowledge and connect to it
+- Track decisions, recommendations, and calculations made during our conversation
+- Use phrases like "As we discussed..." or "Building on the earlier analysis..." when appropriate
+
+${projectContext && isFirstMessage ? `
+PROJECT CONTEXT AVAILABLE:
+You have access to the user's current project data including panels, circuits, feeders, and transformers.
+- Reference specific equipment by name when relevant (e.g., "Panel H1", "Circuit 14")
+- Check if questions relate to their actual project configuration
+- Provide specific recommendations based on their project data
+` : ''}
+
+${!isFirstMessage ? `
+FOLLOW-UP CONTEXT:
+This is a follow-up message in an ongoing conversation. The user may be:
+- Asking for clarification on a previous answer
+- Building on a previous recommendation
+- Requesting additional calculations or analysis
+- Changing parameters from an earlier scenario
+` : ''}
+
+RESPONSE GUIDELINES:
+- Always reference specific NEC articles (2023 edition unless specified)
+- Be concise, technical, and professional
+- When appropriate, suggest related considerations they might not have asked about
+- If you need clarification about something discussed earlier, ask
+  `.trim();
+}
+
+/**
+ * Builds the prompt with conversation history and context
+ */
+function buildMemoryAwarePrompt(
+  question: string,
+  conversationHistory: string,
+  projectContext?: string,
+  isFirstMessage: boolean = true
+): string {
+  let prompt = '';
+
+  // Include full project context on first message
+  if (isFirstMessage && projectContext) {
+    prompt += `${projectContext}\n\n`;
+  }
+
+  // Include conversation history for follow-up messages
+  if (conversationHistory && !isFirstMessage) {
+    prompt += `PREVIOUS CONVERSATION:\n${conversationHistory}\n\n`;
+  }
+
+  // Add the current question
+  prompt += `CURRENT QUESTION: ${question}`;
+
+  // Add contextual instructions
+  if (!isFirstMessage) {
+    prompt += `
+
+FOLLOW-UP INSTRUCTIONS:
+- Reference previous messages when relevant
+- Build on prior context instead of repeating
+- If the user references something from earlier, acknowledge it
+- Keep track of any decisions or recommendations made`;
+  } else if (projectContext) {
+    prompt += `
+
+INSTRUCTIONS:
+- If the question references specific equipment, look it up in the project context
+- Provide specific answers based on their actual project configuration
+- Cite relevant NEC articles
+- Mention if something applies specifically to their project`;
+  }
+
+  return prompt;
+}

@@ -11,8 +11,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - Recent changes made by previous Claude instances
 - Pending tasks and context from last session
 
-**Current Branch**: `feature/agentic-pm-system`
-**Last Session**: 2025-12-30 (UI/UX Improvements - Issues #24-27)
+**Current Branch**: `feature/enhanced-ai-chatbot`
+**Last Session**: 2025-01-12 (Enhanced AI Chatbot - Phase 2.5)
 
 ---
 

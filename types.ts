@@ -1079,3 +1079,114 @@ export const CALCULATION_LABELS: Record<CalculationType, string> = {
   conductor_sizing: 'Conductor Ampacity Sizing (NEC 310)',
   conduit_fill: 'Conduit Fill Calculation (NEC 310)',
 };
+
+// ============================================================================
+// ENHANCED AI CHATBOT TYPES (Phase 2.5)
+// ============================================================================
+
+/**
+ * Chat Message
+ * Individual message in a chat conversation
+ */
+export interface ChatMessage {
+  id: string;
+  role: 'user' | 'assistant' | 'system';
+  content: string;
+  timestamp: Date;
+  metadata?: ChatMessageMetadata;
+}
+
+/**
+ * Chat Message Metadata
+ * Additional data attached to chat messages
+ */
+export interface ChatMessageMetadata {
+  /** Tool calls made by the assistant (Phase 2 - Agentic Actions) */
+  toolCalls?: ToolCall[];
+  /** NEC article citations (Phase 4 - RAG) */
+  citations?: NECCitation[];
+  /** Whether project context was included in this message */
+  projectContextIncluded?: boolean;
+  /** Processing time in milliseconds */
+  processingTimeMs?: number;
+}
+
+/**
+ * Tool Call
+ * Record of an agentic tool call made by the assistant
+ */
+export interface ToolCall {
+  name: string;
+  args: Record<string, unknown>;
+  result?: ToolResult;
+  status: 'pending' | 'executing' | 'completed' | 'failed' | 'pending_confirmation';
+}
+
+/**
+ * Tool Result
+ * Result from executing a chat tool
+ */
+export interface ToolResult {
+  success: boolean;
+  data?: Record<string, unknown>;
+  error?: string;
+  display?: ToolResultDisplay;
+}
+
+/**
+ * Tool Result Display
+ * How to display the tool result in the UI
+ */
+export interface ToolResultDisplay {
+  type: 'text' | 'table' | 'chart' | 'confirmation';
+  content: unknown;
+}
+
+/**
+ * NEC Citation
+ * Reference to an NEC article (for RAG integration)
+ */
+export interface NECCitation {
+  articleNumber: string;   // e.g., "250.66"
+  articleTitle: string;    // e.g., "Size of Alternating-Current Grounding Electrode Conductor"
+  edition: number;         // e.g., 2023
+  excerpt?: string;        // Relevant excerpt from the article
+  confidence?: number;     // RAG retrieval confidence 0-1
+}
+
+/**
+ * Chat Session
+ * A conversation session with the NEC Assistant
+ */
+export interface ChatSession {
+  id: string;
+  projectId: string;
+  userId: string;
+  messages: ChatMessage[];
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+/**
+ * Chat Tool Definition
+ * Definition of an agentic tool available to the chatbot
+ */
+export interface ChatToolDefinition {
+  name: string;
+  description: string;
+  parameters: Record<string, unknown>;
+  requiresConfirmation?: boolean;
+}
+
+/**
+ * Conversation Context Settings
+ * Configuration for how conversation context is managed
+ */
+export interface ConversationContextSettings {
+  /** Maximum number of messages to include in history */
+  maxHistoryMessages: number;
+  /** Whether to include project context */
+  includeProjectContext: boolean;
+  /** How often to include full project context */
+  projectContextFrequency: 'first' | 'always' | 'summarized';
+}
