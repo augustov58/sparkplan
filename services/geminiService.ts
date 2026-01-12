@@ -311,3 +311,208 @@ INSTRUCTIONS:
 
   return prompt;
 }
+
+// ============================================================================
+// AGENTIC ACTIONS - FUNCTION CALLING (Phase 2.5.2)
+// ============================================================================
+
+import { getToolDefinitionsForGemini, executeTool, type ToolContext } from './ai/chatTools';
+import { buildProjectContext, formatContextForAI, type ProjectContext } from './ai/projectContextBuilder';
+
+interface FunctionCall {
+  name: string;
+  args: Record<string, unknown>;
+}
+
+interface GeminiWithToolsResponse {
+  response?: string;
+  functionCall?: FunctionCall;
+}
+
+/**
+ * Call Gemini API with function calling support
+ */
+async function callGeminiProxyWithTools(
+  prompt: string,
+  systemInstruction: string,
+  tools: ReturnType<typeof getToolDefinitionsForGemini>
+): Promise<GeminiWithToolsResponse> {
+  try {
+    const { data: { session } } = await supabase.auth.getSession();
+
+    if (!session) {
+      return { response: "Authentication required. Please log in." };
+    }
+
+    const response = await supabase.functions.invoke('gemini-proxy', {
+      body: {
+        prompt,
+        systemInstruction,
+        model: 'gemini-2.0-flash-exp',
+        tools,
+      }
+    });
+
+    if (response.error) {
+      console.error('Gemini proxy error:', response.error);
+      return { response: `AI service error: ${response.error.message}` };
+    }
+
+    // Check if response contains a function call
+    if (response.data?.functionCall) {
+      return { functionCall: response.data.functionCall };
+    }
+
+    return { response: response.data?.response || "No response generated." };
+  } catch (error) {
+    console.error("Error calling Gemini proxy with tools:", error);
+    return { response: "Unable to connect to AI service." };
+  }
+}
+
+/**
+ * Call Gemini API with tool result to continue the conversation
+ */
+async function callGeminiProxyWithToolResult(
+  originalPrompt: string,
+  systemInstruction: string,
+  toolName: string,
+  toolResult: unknown
+): Promise<string> {
+  try {
+    const { data: { session } } = await supabase.auth.getSession();
+
+    if (!session) {
+      return "Authentication required. Please log in.";
+    }
+
+    const response = await supabase.functions.invoke('gemini-proxy', {
+      body: {
+        prompt: originalPrompt,
+        systemInstruction,
+        model: 'gemini-2.0-flash-exp',
+        toolResult: {
+          toolName,
+          result: toolResult,
+        },
+      }
+    });
+
+    if (response.error) {
+      console.error('Gemini proxy error:', response.error);
+      return `AI service error: ${response.error.message}`;
+    }
+
+    return response.data?.response || "No response generated.";
+  } catch (error) {
+    console.error("Error calling Gemini proxy with tool result:", error);
+    return "Unable to connect to AI service.";
+  }
+}
+
+/**
+ * Ask NEC Assistant with agentic tool support
+ *
+ * This function enables the AI to execute calculations and actions
+ * by calling tools defined in chatTools.ts.
+ *
+ * @param question - The user's question
+ * @param conversationHistory - Formatted conversation history
+ * @param projectContext - Project context object (not string)
+ * @param isFirstMessage - Whether this is the first message
+ * @returns AI response string (after executing any necessary tools)
+ */
+export const askNecAssistantWithTools = async (
+  question: string,
+  conversationHistory: string,
+  projectContext: ProjectContext,
+  isFirstMessage: boolean = true
+): Promise<{ response: string; toolUsed?: { name: string; result: unknown } }> => {
+  // Build tool context
+  const toolContext: ToolContext = {
+    projectId: projectContext.projectId,
+    projectContext,
+  };
+
+  // Build system instruction with tool awareness
+  const systemInstruction = buildAgenticSystemInstruction(projectContext, isFirstMessage);
+
+  // Build the prompt
+  const prompt = buildMemoryAwarePrompt(
+    question,
+    conversationHistory,
+    isFirstMessage ? formatContextForAI(projectContext) : undefined,
+    isFirstMessage
+  );
+
+  // Get tool definitions
+  const tools = getToolDefinitionsForGemini();
+
+  // First call - may return function call or direct response
+  const initialResponse = await callGeminiProxyWithTools(prompt, systemInstruction, tools);
+
+  // If Gemini wants to call a tool
+  if (initialResponse.functionCall) {
+    const { name, args } = initialResponse.functionCall;
+
+    // Execute the tool
+    const toolResult = await executeTool(name, args, toolContext);
+
+    // Send tool result back to Gemini for natural language response
+    const finalResponse = await callGeminiProxyWithToolResult(
+      question,
+      systemInstruction,
+      name,
+      toolResult.data || { error: toolResult.error }
+    );
+
+    return {
+      response: finalResponse,
+      toolUsed: { name, result: toolResult },
+    };
+  }
+
+  // Direct response (no tool needed)
+  return { response: initialResponse.response || "No response generated." };
+};
+
+/**
+ * Builds system instruction for agentic conversations
+ */
+function buildAgenticSystemInstruction(
+  projectContext: ProjectContext,
+  isFirstMessage: boolean
+): string {
+  return `
+You are a Senior Electrical Engineer and NEC compliance AI copilot with access to calculation tools.
+You can execute real calculations and checks on the user's project data.
+
+AVAILABLE TOOLS:
+- calculate_voltage_drop: Calculate voltage drop for circuits
+- check_panel_capacity: Check if panel can handle additional load
+- check_conductor_sizing: Verify conductor sizing per Table 310.16
+- check_service_upgrade: Analyze service upgrade needs
+- run_quick_inspection: Run NEC compliance check on the project
+- get_project_summary: Get overview of the project
+
+WHEN TO USE TOOLS:
+- User asks about specific values (voltage drop, capacity, etc.)
+- User wants to check compliance or sizing
+- User asks "what if" scenarios about adding loads
+- User wants to run calculations or inspections
+
+WHEN NOT TO USE TOOLS:
+- General NEC questions (just answer directly)
+- Explaining concepts or requirements
+- User explicitly says "don't calculate" or "just explain"
+
+PROJECT CONTEXT:
+${formatContextForAI(projectContext)}
+
+RESPONSE GUIDELINES:
+- After using a tool, explain the results in plain language
+- Always cite relevant NEC articles
+- Be concise but thorough
+- If a tool result shows an issue, explain the implications and recommendations
+  `.trim();
+}

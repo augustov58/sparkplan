@@ -21,6 +21,21 @@ interface GeminiRequest {
   model?: string
   pdfData?: string // Base64 encoded PDF
   imageData?: string // Base64 encoded image
+  tools?: ToolDefinition[] // Function calling tools
+  toolResult?: { // Result from a tool call to continue conversation
+    toolName: string
+    result: any
+  }
+}
+
+interface ToolDefinition {
+  name: string
+  description: string
+  parameters: {
+    type: string
+    properties: Record<string, any>
+    required?: string[]
+  }
 }
 
 serve(async (req) => {
@@ -64,7 +79,7 @@ serve(async (req) => {
     }
 
     // Parse request body
-    const { prompt, systemInstruction, model = 'gemini-2.0-flash-exp', pdfData, imageData }: GeminiRequest = await req.json()
+    const { prompt, systemInstruction, model = 'gemini-2.0-flash-exp', pdfData, imageData, tools, toolResult }: GeminiRequest = await req.json()
 
     if (!prompt) {
       throw new Error('Prompt is required')
@@ -96,10 +111,37 @@ serve(async (req) => {
       })
     }
 
-    const geminiPayload = {
-      contents: [{
-        parts: parts
-      }],
+    // Build contents array - handle tool result continuation
+    let contents: any[] = []
+    if (toolResult) {
+      // This is a continuation after a tool call
+      contents = [
+        { role: 'user', parts: [{ text: prompt }] },
+        {
+          role: 'model',
+          parts: [{
+            functionCall: {
+              name: toolResult.toolName,
+              args: {}
+            }
+          }]
+        },
+        {
+          role: 'function',
+          parts: [{
+            functionResponse: {
+              name: toolResult.toolName,
+              response: toolResult.result
+            }
+          }]
+        }
+      ]
+    } else {
+      contents = [{ parts: parts }]
+    }
+
+    const geminiPayload: any = {
+      contents,
       ...(systemInstruction && {
         systemInstruction: {
           parts: [{ text: systemInstruction }]
@@ -110,6 +152,22 @@ serve(async (req) => {
         topK: 40,
         topP: 0.95,
         maxOutputTokens: 8192,
+      }
+    }
+
+    // Add function calling tools if provided
+    if (tools && tools.length > 0) {
+      geminiPayload.tools = [{
+        functionDeclarations: tools.map(tool => ({
+          name: tool.name,
+          description: tool.description,
+          parameters: tool.parameters
+        }))
+      }]
+      geminiPayload.toolConfig = {
+        functionCallingConfig: {
+          mode: 'AUTO' // Let Gemini decide when to call tools
+        }
       }
     }
 
@@ -152,8 +210,30 @@ serve(async (req) => {
 
     const data = await geminiResponse.json()
 
+    // Check for function call response
+    const candidate = data.candidates?.[0]
+    const parts = candidate?.content?.parts || []
+
+    // Check if the response contains a function call
+    const functionCallPart = parts.find((part: any) => part.functionCall)
+    if (functionCallPart) {
+      // Return the function call for the client to execute
+      return new Response(
+        JSON.stringify({
+          functionCall: {
+            name: functionCallPart.functionCall.name,
+            args: functionCallPart.functionCall.args || {}
+          }
+        }),
+        {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 200,
+        }
+      )
+    }
+
     // Extract response text
-    const responseText = data.candidates?.[0]?.content?.parts?.[0]?.text || 'No response generated'
+    const responseText = parts.find((part: any) => part.text)?.text || 'No response generated'
 
     return new Response(
       JSON.stringify({ response: responseText }),
