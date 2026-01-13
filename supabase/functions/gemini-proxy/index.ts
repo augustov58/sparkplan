@@ -88,12 +88,12 @@ serve(async (req) => {
     // Call Gemini API
     const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${geminiApiKey}`
 
-    // Build parts array for multimodal input
-    const parts: any[] = [{ text: prompt }]
+    // Build input parts array for multimodal input
+    const inputParts: any[] = [{ text: prompt }]
 
     // Add PDF if provided
     if (pdfData) {
-      parts.push({
+      inputParts.push({
         inline_data: {
           mime_type: "application/pdf",
           data: pdfData
@@ -103,7 +103,7 @@ serve(async (req) => {
 
     // Add image if provided
     if (imageData) {
-      parts.push({
+      inputParts.push({
         inline_data: {
           mime_type: "image/jpeg", // Assume JPEG, could be enhanced
           data: imageData
@@ -137,7 +137,7 @@ serve(async (req) => {
         }
       ]
     } else {
-      contents = [{ parts: parts }]
+      contents = [{ parts: inputParts }]
     }
 
     const geminiPayload: any = {
@@ -212,10 +212,10 @@ serve(async (req) => {
 
     // Check for function call response
     const candidate = data.candidates?.[0]
-    const parts = candidate?.content?.parts || []
+    const responseParts = candidate?.content?.parts || []
 
     // Check if the response contains a function call
-    const functionCallPart = parts.find((part: any) => part.functionCall)
+    const functionCallPart = responseParts.find((part: any) => part.functionCall)
     if (functionCallPart) {
       // Return the function call for the client to execute
       return new Response(
@@ -233,7 +233,7 @@ serve(async (req) => {
     }
 
     // Extract response text
-    const responseText = parts.find((part: any) => part.text)?.text || 'No response generated'
+    const responseText = responseParts.find((part: any) => part.text)?.text || 'No response generated'
 
     return new Response(
       JSON.stringify({ response: responseText }),

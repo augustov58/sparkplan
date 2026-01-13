@@ -49,7 +49,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ### Core Documentation
 - **[Architecture Overview](/docs/architecture.md)** - State management, data flow, optimistic updates
 - **[AI Agent Architecture](/docs/AI_AGENT_ARCHITECTURE.md)** - Pydantic AI agents, dual AI systems
-- **[Enhanced AI Chatbot Spec](/docs/ENHANCED_AI_CHATBOT_SPEC.md)** - Conversation memory, agentic actions, RAG
+- **[AI Chatbot Tools](/docs/AI_CHATBOT_TOOLS.md)** - NEC Copilot action tools reference
 - **[Development Guide](/docs/development-guide.md)** - Step-by-step workflows
 - **[Database Architecture](/docs/database-architecture.md)** - Schema, RLS policies, migrations
 - **[Security Guide](/docs/security.md)** - Security audit, API protection

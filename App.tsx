@@ -31,8 +31,9 @@ const UtilityInterconnectionForm = lazy(() => import('./components/UtilityInterc
 const PricingPage = lazy(() => import('./components/PricingPage').then(m => ({ default: m.PricingPage })));
 // EVPanelTemplates moved to Calculators component
 import { Project, ProjectStatus, ProjectType } from './types';
-import { askNecAssistant } from './services/geminiService';
-import { buildProjectContext, formatContextForAI } from './services/ai/projectContextBuilder';
+import { askNecAssistantWithTools } from './services/geminiService';
+import { buildProjectContext, formatContextForAI, type ProjectContext } from './services/ai/projectContextBuilder';
+import { buildConversationHistory } from './services/ai/conversationBuilder';
 import { usePanels } from './hooks/usePanels';
 import { useCircuits } from './hooks/useCircuits';
 import { useFeeders } from './hooks/useFeeders';
@@ -268,6 +269,10 @@ interface Message {
     role: 'user' | 'ai';
     text: string;
     timestamp: Date;
+    toolUsed?: {
+        name: string;
+        result: unknown;
+    };
 }
 
 const NecAssistant = () => {
@@ -367,19 +372,69 @@ const NecAssistant = () => {
     const handleAsk = async (question?: string) => {
         const q = question || query.trim();
         if (!q) return;
-        
+
         setQuery('');
-        setHistory(prev => [...prev, { role: 'user', text: q, timestamp: new Date() }]);
+        const newUserMessage: Message = { role: 'user', text: q, timestamp: new Date() };
+        setHistory(prev => [...prev, newUserMessage]);
         setLoading(true);
-        
-        // Build context string if available
-        const contextString = projectContext 
-            ? formatContextForAI(projectContext)
-            : undefined;
-        
-        const ans = await askNecAssistant(q, contextString);
-        setLoading(false);
-        setHistory(prev => [...prev, { role: 'ai', text: ans || 'Sorry, I could not retrieve that information.', timestamp: new Date() }]);
+
+        try {
+            // Build conversation history for memory (format for AI)
+            const conversationHistory = buildConversationHistory(
+                history.map(m => ({
+                    id: nanoid(),
+                    role: m.role === 'ai' ? 'assistant' : 'user',
+                    content: m.text,
+                    timestamp: m.timestamp
+                })),
+                10 // Keep last 10 messages for context
+            );
+
+            // Determine if this is the first message (for context inclusion)
+            const isFirstMessage = history.length === 0;
+
+            // Build project context for tools (or empty fallback)
+            const context: ProjectContext = projectContext || {
+                projectId: '',
+                projectName: 'General',
+                projectType: 'Commercial',
+                serviceVoltage: 480,
+                servicePhase: 3,
+                summary: 'No project selected',
+                panels: [],
+                circuits: [],
+                feeders: [],
+                transformers: [],
+                totalLoad: { connectedVA: 0, demandVA: 0 }
+            };
+
+            // Call with tools for agentic capabilities
+            const result = await askNecAssistantWithTools(
+                q,
+                conversationHistory,
+                context,
+                isFirstMessage
+            );
+
+            // Build response message with tool info
+            const aiMessage: Message = {
+                role: 'ai',
+                text: result.response || 'Sorry, I could not retrieve that information.',
+                timestamp: new Date(),
+                toolUsed: result.toolUsed
+            };
+
+            setHistory(prev => [...prev, aiMessage]);
+        } catch (error) {
+            console.error('Chat error:', error);
+            setHistory(prev => [...prev, {
+                role: 'ai',
+                text: 'Sorry, I encountered an error. Please try again.',
+                timestamp: new Date()
+            }]);
+        } finally {
+            setLoading(false);
+        }
     };
 
     return (
@@ -534,6 +589,12 @@ const NecAssistant = () => {
                                         <span className="text-xs text-gray-400 px-1">
                                             {formatTime(msg.timestamp)}
                                         </span>
+                                        {msg.toolUsed && (
+                                            <span className="text-xs bg-purple-100 text-purple-700 px-2 py-0.5 rounded-full font-medium flex items-center gap-1">
+                                                <Sparkles className="w-3 h-3" />
+                                                {msg.toolUsed.name.replace(/_/g, ' ')}
+                                            </span>
+                                        )}
                                         {msg.role === 'ai' && (
                                             <button
                                                 onClick={() => handleCopy(msg.text, idx)}

@@ -31,7 +31,7 @@ import {
 } from 'lucide-react';
 import { useAuthContext } from './Auth/AuthProvider';
 import { ProjectType } from '../types';
-import { AICopilotSidebar } from './AICopilotSidebar';
+// AICopilotSidebar removed - AI features unified in NEC Copilot chatbot
 import { TrialBanner } from './TrialBanner';
 
 interface LayoutProps {
@@ -353,8 +353,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, title, showBack, onSig
         </div>
       </main>
 
-      {/* AI Copilot Sidebar - Only show on project routes */}
-      {isProjectRoute && <AICopilotSidebar />}
+      {/* AI Copilot Sidebar removed - features unified in NEC Copilot chatbot */}
     </div>
   );
 };

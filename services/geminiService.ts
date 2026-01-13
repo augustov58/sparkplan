@@ -455,8 +455,16 @@ export const askNecAssistantWithTools = async (
   if (initialResponse.functionCall) {
     const { name, args } = initialResponse.functionCall;
 
+    console.log('[askNecAssistantWithTools] Tool call requested:', name);
+    console.log('[askNecAssistantWithTools] Tool args:', JSON.stringify(args, null, 2));
+
     // Execute the tool
     const toolResult = await executeTool(name, args, toolContext);
+
+    console.log('[askNecAssistantWithTools] Tool result success:', toolResult.success);
+    if (!toolResult.success) {
+      console.log('[askNecAssistantWithTools] Tool error:', toolResult.error);
+    }
 
     // Send tool result back to Gemini for natural language response
     const finalResponse = await callGeminiProxyWithToolResult(
@@ -488,18 +496,45 @@ You are a Senior Electrical Engineer and NEC compliance AI copilot with access t
 You can execute real calculations and checks on the user's project data.
 
 AVAILABLE TOOLS:
-- calculate_voltage_drop: Calculate voltage drop for circuits
+
+**Read/Check Tools:**
+- calculate_feeder_voltage_drop: Get voltage drop info for feeders
 - check_panel_capacity: Check if panel can handle additional load
 - check_conductor_sizing: Verify conductor sizing per Table 310.16
 - check_service_upgrade: Analyze service upgrade needs
 - run_quick_inspection: Run NEC compliance check on the project
 - get_project_summary: Get overview of the project
 
+**AI Agent Tools (Python Backend):**
+- analyze_change_impact: Analyze impact of adding new loads (EV chargers, HVAC, etc.)
+- draft_rfi: Draft professional RFI with NEC references
+- predict_inspection: Predict inspection failures and get preparation checklist
+
+**Action Tools (Modify Data):**
+- add_circuit: Create a new circuit in a panel
+- add_panel: Create a sub-panel fed from another panel OR transformer (voltage auto-set from source)
+- fill_panel_with_test_loads: Bulk add test circuits to a panel (lighting, receptacles, HVAC, mixed) - respects slot limits
+- empty_panel: Remove all circuits from a panel (clear/reset panel)
+- fill_with_spares: Fill remaining empty slots with SPARE circuits (no load, placeholder breakers)
+
 WHEN TO USE TOOLS:
-- User asks about specific values (voltage drop, capacity, etc.)
-- User wants to check compliance or sizing
-- User asks "what if" scenarios about adding loads
-- User wants to run calculations or inspections
+- User asks about feeder voltage drop → calculate_feeder_voltage_drop
+- User asks "what if I add..." → analyze_change_impact
+- User wants to create an RFI → draft_rfi
+- User asks about inspection prep → predict_inspection
+- User says "add a circuit for..." → add_circuit
+- User says "create a panel..." or "add panel fed from transformer" → add_panel
+- User says "fill panel with test loads" or "fill the MDP" → fill_panel_with_test_loads
+  (Note: "MDP" refers to main panel. If user says "fill it" after discussing a panel, include that panel_name)
+- User says "empty panel X", "clear panel X", "delete all circuits from X" → empty_panel
+- User says "fill with spares", "add spare circuits", "fill remaining with spares" → fill_with_spares
+- User wants project overview → get_project_summary
+
+IMPORTANT FOR ACTION TOOLS:
+- When calling action tools, ALWAYS include all required parameters
+- For fill_panel_with_test_loads: if user mentioned a panel earlier (like "MDP"), include it as panel_name
+- If user provides load_type or target_utilization in their follow-up message, include those too
+- Panel slot limits: MDP/Main = 30 slots, Branch panels = 42 slots. Tools will respect these limits.
 
 WHEN NOT TO USE TOOLS:
 - General NEC questions (just answer directly)
