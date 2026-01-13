@@ -706,11 +706,11 @@ export const PanelSchedule: React.FC<PanelScheduleProps> = ({ project }) => {
           </>
         );
       }
-      // Empty slot (SPARE)
+      // Empty slot (SPACE) - no circuit assigned, just an available position
       if (!leftCkt) {
         return (
           <>
-            <td className="p-1 border-r border-gray-100 text-xs text-gray-300">SPARE</td>
+            <td className="p-1 border-r border-gray-100 text-xs text-gray-300">SPACE</td>
             <td className="p-1 border-r border-gray-100 text-center text-xs"></td>
             <td className="p-1 border-r border-gray-100 text-center text-xs font-mono bg-gray-50"></td>
             <td className="p-1 border-r border-gray-100 text-center text-xs font-mono bg-gray-50"></td>
@@ -853,7 +853,7 @@ export const PanelSchedule: React.FC<PanelScheduleProps> = ({ project }) => {
           </>
         );
       }
-      // Empty slot (SPARE)
+      // Empty slot (SPACE) - no circuit assigned, just an available position
       if (!rightCkt) {
         return (
           <>
@@ -861,7 +861,7 @@ export const PanelSchedule: React.FC<PanelScheduleProps> = ({ project }) => {
             <td className="p-1 border-l border-gray-100 text-center text-xs font-mono bg-gray-50"></td>
             <td className="p-1 border-l border-gray-100 text-center text-xs font-mono bg-gray-50"></td>
             <td className="p-1 border-l border-gray-100 text-center text-xs"></td>
-            <td className="p-1 border-l border-gray-100 text-xs text-gray-300 text-right">SPARE</td>
+            <td className="p-1 border-l border-gray-100 text-xs text-gray-300 text-right">SPACE</td>
           </>
         );
       }

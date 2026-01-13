@@ -71,10 +71,11 @@
  * @see {@link /docs/database-architecture.md} - Database schema details
  */
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
 import type { Database } from '@/lib/database.types';
 import { showToast, toastMessages } from '@/lib/toast';
+import { dataRefreshEvents } from '@/lib/dataRefreshEvents';
 
 type Panel = Database['public']['Tables']['panels']['Row'];
 type PanelInsert = Database['public']['Tables']['panels']['Insert'];
@@ -186,6 +187,26 @@ export function usePanels(projectId: string | undefined): UsePanelsReturn {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  const fetchPanels = useCallback(async () => {
+    if (!projectId) return;
+
+    try {
+      const { data, error } = await supabase
+        .from('panels')
+        .select('*')
+        .eq('project_id', projectId)
+        .order('created_at', { ascending: true });
+
+      if (error) throw error;
+      setPanels(data || []);
+      setError(null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to fetch panels');
+    } finally {
+      setLoading(false);
+    }
+  }, [projectId]);
+
   useEffect(() => {
     if (!projectId) {
       setPanels([]);
@@ -212,30 +233,16 @@ export function usePanels(projectId: string | undefined): UsePanelsReturn {
       )
       .subscribe();
 
+    // Subscribe to manual refresh events (from chatbot tools)
+    const unsubscribeRefresh = dataRefreshEvents.subscribe('panels', () => {
+      fetchPanels();
+    });
+
     return () => {
       subscription.unsubscribe();
+      unsubscribeRefresh();
     };
-  }, [projectId]);
-
-  const fetchPanels = async () => {
-    if (!projectId) return;
-
-    try {
-      const { data, error } = await supabase
-        .from('panels')
-        .select('*')
-        .eq('project_id', projectId)
-        .order('created_at', { ascending: true });
-
-      if (error) throw error;
-      setPanels(data || []);
-      setError(null);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to fetch panels');
-    } finally {
-      setLoading(false);
-    }
-  };
+  }, [projectId, fetchPanels]);
 
   const createPanel = async (panel: Omit<PanelInsert, 'id'>): Promise<Panel | null> => {
     try {

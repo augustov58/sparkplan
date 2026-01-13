@@ -3,10 +3,11 @@
  * CRUD operations for project circuits with Supabase
  */
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
 import type { Database } from '@/lib/database.types';
 import { showToast, toastMessages } from '@/lib/toast';
+import { dataRefreshEvents } from '@/lib/dataRefreshEvents';
 
 type Circuit = Database['public']['Tables']['circuits']['Row'];
 type CircuitInsert = Database['public']['Tables']['circuits']['Insert'];
@@ -21,12 +22,34 @@ export interface UseCircuitsReturn {
   deleteCircuit: (id: string) => Promise<void>;
   /** Delete all circuits for a specific panel - useful for regenerating panel schedules */
   deleteCircuitsByPanel: (panelId: string) => Promise<void>;
+  /** Manually trigger a refetch of circuits data */
+  refetch: () => Promise<void>;
 }
 
 export function useCircuits(projectId: string | undefined): UseCircuitsReturn {
   const [circuits, setCircuits] = useState<Circuit[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  const fetchCircuits = useCallback(async () => {
+    if (!projectId) return;
+
+    try {
+      const { data, error } = await supabase
+        .from('circuits')
+        .select('*')
+        .eq('project_id', projectId)
+        .order('circuit_number', { ascending: true });
+
+      if (error) throw error;
+      setCircuits(data || []);
+      setError(null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to fetch circuits');
+    } finally {
+      setLoading(false);
+    }
+  }, [projectId]);
 
   useEffect(() => {
     if (!projectId) {
@@ -54,30 +77,16 @@ export function useCircuits(projectId: string | undefined): UseCircuitsReturn {
       )
       .subscribe();
 
+    // Subscribe to manual refresh events (from chatbot tools)
+    const unsubscribeRefresh = dataRefreshEvents.subscribe('circuits', () => {
+      fetchCircuits();
+    });
+
     return () => {
       subscription.unsubscribe();
+      unsubscribeRefresh();
     };
-  }, [projectId]);
-
-  const fetchCircuits = async () => {
-    if (!projectId) return;
-
-    try {
-      const { data, error } = await supabase
-        .from('circuits')
-        .select('*')
-        .eq('project_id', projectId)
-        .order('circuit_number', { ascending: true });
-
-      if (error) throw error;
-      setCircuits(data || []);
-      setError(null);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to fetch circuits');
-    } finally {
-      setLoading(false);
-    }
-  };
+  }, [projectId, fetchCircuits]);
 
   const createCircuit = async (circuit: Omit<CircuitInsert, 'id'>): Promise<Circuit | null> => {
     try {
@@ -195,5 +204,6 @@ export function useCircuits(projectId: string | undefined): UseCircuitsReturn {
     updateCircuit,
     deleteCircuit,
     deleteCircuitsByPanel,
+    refetch: fetchCircuits,
   };
 }

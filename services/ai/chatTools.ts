@@ -11,6 +11,7 @@ import type { ProjectContext } from './projectContextBuilder';
 import type { ToolResult, ToolResultDisplay } from '@/types';
 import { analyzeChangeImpact, draftRFI, predictInspection } from '../api/pythonBackend';
 import { supabase } from '@/lib/supabase';
+import { notifyDataRefresh } from '@/lib/dataRefreshEvents';
 
 // ============================================================================
 // TOOL CONTEXT & TYPES
@@ -907,6 +908,9 @@ Requires panel name, circuit description, breaker size, and load.`,
           return { success: false, error: `Failed to add circuit: ${error.message}` };
         }
 
+        // Notify UI to refresh circuit data
+        notifyDataRefresh('circuits');
+
         return {
           success: true,
           data: {
@@ -1059,6 +1063,9 @@ Can be fed from:
         if (error) {
           return { success: false, error: `Failed to add panel: ${error.message}` };
         }
+
+        // Notify UI to refresh panel data
+        notifyDataRefresh('panels');
 
         return {
           success: true,
@@ -1494,6 +1501,9 @@ Can specify:
 
         console.log('[fill_panel_with_test_loads] Success! Added', newCircuits?.length, 'circuits');
 
+        // Notify UI to refresh circuit data
+        notifyDataRefresh('circuits');
+
         const newTotalLoad = currentLoadVA + addedLoadVA;
         const newUtilization = Math.round((newTotalLoad / panelCapacityVA) * 100);
 
@@ -1616,9 +1626,17 @@ Examples: "empty panel H7", "clear the MDP", "delete all circuits from Panel A"`
         }
       }
 
-      // Get existing circuits
-      const existingCircuits = context.projectContext.circuits.filter(c => c.panelName === panel!.name);
-      const circuitCount = existingCircuits.length;
+      // Get existing circuits DIRECTLY from database (not context) to ensure fresh data
+      const { data: existingCircuits, error: circuitsError } = await supabase
+        .from('circuits')
+        .select('id, circuit_number, description, pole')
+        .eq('panel_id', dbPanel.id);
+
+      if (circuitsError) {
+        return { success: false, error: `Failed to fetch circuits: ${circuitsError.message}` };
+      }
+
+      const circuitCount = existingCircuits?.length || 0;
 
       if (circuitCount === 0) {
         return {
@@ -1631,12 +1649,23 @@ Examples: "empty panel H7", "clear the MDP", "delete all circuits from Panel A"`
         };
       }
 
-      // Determine which circuits to delete
+      // Determine which circuits to delete (using database field name circuit_number)
       const circuitsToDelete = preserve_feeders
-        ? existingCircuits.filter(c => !feederCircuitNumbers.has(c.circuitNumber))
-        : existingCircuits;
+        ? (existingCircuits || []).filter(c => !feederCircuitNumbers.has(c.circuit_number))
+        : (existingCircuits || []);
 
-      const circuitsPreserved = existingCircuits.length - circuitsToDelete.length;
+      const circuitsPreserved = (existingCircuits?.length || 0) - circuitsToDelete.length;
+
+      console.log('[empty_panel] Debug:', {
+        panelName: panel.name,
+        existingCircuitsCount: existingCircuits?.length || 0,
+        existingCircuitNumbers: existingCircuits?.map(c => c.circuit_number) || [],
+        feederCircuitNumbers: Array.from(feederCircuitNumbers),
+        circuitsToDeleteCount: circuitsToDelete.length,
+        circuitsToDeleteNumbers: circuitsToDelete.map(c => c.circuit_number),
+        circuitsPreserved,
+        preserve_feeders,
+      });
 
       if (circuitsToDelete.length === 0) {
         return {
@@ -1663,6 +1692,9 @@ Examples: "empty panel H7", "clear the MDP", "delete all circuits from Panel A"`
         if (error) {
           return { success: false, error: `Failed to delete circuits: ${error.message}` };
         }
+
+        // Notify UI to refresh circuit data
+        notifyDataRefresh('circuits');
 
         const response: any = {
           message: `Removed ${circuitsToDelete.length} circuits from ${panel.name}`,
@@ -1749,15 +1781,24 @@ Examples: "fill the rest with spares", "add spare circuits to panel H7", "fill r
       // Panel slot count: MDP/Main = 30 slots, Branch panels = 42 slots
       const totalSlots = panel.isMain ? 30 : 42;
 
+      // Get existing circuits DIRECTLY from database (not context) to ensure fresh data
+      const { data: existingCircuits, error: circuitsError } = await supabase
+        .from('circuits')
+        .select('id, circuit_number, pole')
+        .eq('panel_id', dbPanel.id);
+
+      if (circuitsError) {
+        return { success: false, error: `Failed to fetch circuits: ${circuitsError.message}` };
+      }
+
       // Calculate occupied slots
-      const existingCircuits = context.projectContext.circuits.filter(c => c.panelName === panel!.name);
       const occupiedSlots = new Set<number>();
-      for (const ckt of existingCircuits) {
-        occupiedSlots.add(ckt.circuitNumber);
+      for (const ckt of existingCircuits || []) {
+        occupiedSlots.add(ckt.circuit_number);
         const pole = ckt.pole || 1;
         if (pole > 1) {
           for (let i = 1; i < pole; i++) {
-            occupiedSlots.add(ckt.circuitNumber + (i * 2));
+            occupiedSlots.add(ckt.circuit_number + (i * 2));
           }
         }
       }
@@ -1808,6 +1849,9 @@ Examples: "fill the rest with spares", "add spare circuits to panel H7", "fill r
         if (error) {
           return { success: false, error: `Failed to add spare circuits: ${error.message}` };
         }
+
+        // Notify UI to refresh circuit data
+        notifyDataRefresh('circuits');
 
         return {
           success: true,
