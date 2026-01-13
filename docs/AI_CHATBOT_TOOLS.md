@@ -192,18 +192,22 @@ The tool respects existing circuits and multi-pole slot usage.
 ---
 
 ### `empty_panel`
-Remove all circuits from a panel (clear/reset).
+Remove circuits from a panel (clear/reset). By default, preserves feeder circuits that feed sub-panels.
 
 **Parameters:**
 - `panel_name` (required): Panel to empty
+- `preserve_feeders`: Keep feeder circuits for sub-panels (default: true)
 
 **Example commands:**
-- "Empty panel H7"
-- "Clear the MDP"
-- "Delete all circuits from Panel A"
-- "Reset Panel B"
+- "Empty panel H7" - Deletes all except feeder breakers
+- "Clear the MDP" - Deletes all except feeders to sub-panels
+- "Delete all circuits from Panel A including feeders" - Deletes everything
 
-**Warning:** This permanently deletes all circuits in the panel.
+**Feeder Protection:**
+- By default, feeder breakers that feed sub-panels are preserved
+- The tool identifies feeders by checking `fed_from_circuit_number` on downstream panels
+- Multi-pole feeders (2P, 3P) have all their slots protected
+- Use `preserve_feeders=false` to delete everything (use with caution)
 
 ---
 

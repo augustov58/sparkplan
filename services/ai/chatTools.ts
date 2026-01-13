@@ -1534,18 +1534,20 @@ Can specify:
   // -------------------------------------------------------------------------
   {
     name: 'empty_panel',
-    description: `Remove all circuits from a panel. Use this when the user wants to clear/empty a panel and start fresh.
+    description: `Remove circuits from a panel. By default, preserves feeder circuits that feed sub-panels.
+Use preserve_feeders=false to delete everything including feeder breakers.
 Examples: "empty panel H7", "clear the MDP", "delete all circuits from Panel A"`,
     parameters: {
       type: 'object',
       properties: {
         panel_name: { type: 'string', description: 'Name of the panel to empty (e.g., "Panel H7", "MDP", "Panel A")' },
+        preserve_feeders: { type: 'boolean', description: 'Keep feeder circuits that feed sub-panels (default: true)' },
       },
       required: ['panel_name'],
     },
     requiresConfirmation: true,
     execute: async (params, context) => {
-      const { panel_name } = params as { panel_name: string };
+      const { panel_name, preserve_feeders = true } = params as { panel_name: string; preserve_feeders?: boolean };
 
       if (!context.projectId) {
         return { success: false, error: 'No project selected.' };
@@ -1586,7 +1588,35 @@ Examples: "empty panel H7", "clear the MDP", "delete all circuits from Panel A"`
         return { success: false, error: 'Panel not found in database.' };
       }
 
-      // Count existing circuits
+      // Find downstream panels fed from this panel (to identify feeder circuits)
+      const { data: downstreamPanels } = await supabase
+        .from('panels')
+        .select('id, name, fed_from_circuit_number, phase')
+        .eq('project_id', context.projectId)
+        .eq('fed_from', dbPanel.id)
+        .not('fed_from_circuit_number', 'is', null);
+
+      // Build set of protected circuit numbers (feeder slots)
+      const feederCircuitNumbers = new Set<number>();
+      const feederDetails: Array<{ name: string; circuitNumber: number }> = [];
+
+      if (preserve_feeders && downstreamPanels && downstreamPanels.length > 0) {
+        for (const dp of downstreamPanels) {
+          if (dp.fed_from_circuit_number) {
+            // Add the base slot
+            feederCircuitNumbers.add(dp.fed_from_circuit_number);
+            feederDetails.push({ name: dp.name, circuitNumber: dp.fed_from_circuit_number });
+
+            // Add additional slots for multi-pole feeders (typically 2P or 3P)
+            const feederPoles = dp.phase === 3 ? 3 : 2;
+            for (let i = 1; i < feederPoles; i++) {
+              feederCircuitNumbers.add(dp.fed_from_circuit_number + (i * 2));
+            }
+          }
+        }
+      }
+
+      // Get existing circuits
       const existingCircuits = context.projectContext.circuits.filter(c => c.panelName === panel!.name);
       const circuitCount = existingCircuits.length;
 
@@ -1601,24 +1631,53 @@ Examples: "empty panel H7", "clear the MDP", "delete all circuits from Panel A"`
         };
       }
 
+      // Determine which circuits to delete
+      const circuitsToDelete = preserve_feeders
+        ? existingCircuits.filter(c => !feederCircuitNumbers.has(c.circuitNumber))
+        : existingCircuits;
+
+      const circuitsPreserved = existingCircuits.length - circuitsToDelete.length;
+
+      if (circuitsToDelete.length === 0) {
+        return {
+          success: true,
+          data: {
+            message: `No circuits deleted. All ${circuitCount} circuits in "${panel.name}" are feeder breakers for sub-panels.`,
+            panelName: panel.name,
+            circuitsDeleted: 0,
+            feedersPreserved: feederDetails,
+            hint: 'Use preserve_feeders=false to delete feeder circuits too.',
+          },
+        };
+      }
+
       try {
-        // Delete all circuits in this panel
+        // Delete circuits (excluding feeders if preserve_feeders is true)
+        const circuitIdsToDelete = circuitsToDelete.map(c => c.id);
+
         const { error } = await supabase
           .from('circuits')
           .delete()
-          .eq('panel_id', dbPanel.id);
+          .in('id', circuitIdsToDelete);
 
         if (error) {
           return { success: false, error: `Failed to delete circuits: ${error.message}` };
         }
 
+        const response: any = {
+          message: `Removed ${circuitsToDelete.length} circuits from ${panel.name}`,
+          panelName: panel.name,
+          circuitsDeleted: circuitsToDelete.length,
+        };
+
+        if (circuitsPreserved > 0) {
+          response.feedersPreserved = feederDetails;
+          response.note = `${circuitsPreserved} feeder circuit(s) preserved for sub-panels: ${feederDetails.map(f => f.name).join(', ')}`;
+        }
+
         return {
           success: true,
-          data: {
-            message: `Removed all ${circuitCount} circuits from ${panel.name}`,
-            panelName: panel.name,
-            circuitsDeleted: circuitCount,
-          },
+          data: response,
         };
       } catch (error) {
         return {

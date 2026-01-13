@@ -514,7 +514,7 @@ AVAILABLE TOOLS:
 - add_circuit: Create a new circuit in a panel
 - add_panel: Create a sub-panel fed from another panel OR transformer (voltage auto-set from source)
 - fill_panel_with_test_loads: Bulk add test circuits to a panel (lighting, receptacles, HVAC, mixed) - respects slot limits
-- empty_panel: Remove all circuits from a panel (clear/reset panel)
+- empty_panel: Remove circuits from a panel (preserves feeder breakers for sub-panels by default)
 - fill_with_spares: Fill remaining empty slots with SPARE circuits (no load, placeholder breakers)
 
 WHEN TO USE TOOLS:
