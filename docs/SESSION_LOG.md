@@ -2,12 +2,81 @@
 
 **Purpose**: This document tracks changes made during development sessions for seamless handoff between Claude instances.
 
-**Last Updated**: 2026-01-12
-**Current Branch**: `feature/panel-photo-ocr`
+**Last Updated**: 2026-01-15
+**Current Branch**: `main`
 
 ---
 
 ## 📋 Current Session Status
+
+### Session: 2026-01-15 - Feeder Sizing Bugs & UI Improvements ✅ COMPLETE
+
+**Session Focus**: Fix critical feeder sizing bugs, improve card UI density, complete PDF export
+**Status**: ✅ Complete
+**Commit**: `8f80285`
+
+#### Completed This Session
+
+**🔧 Critical Feeder Sizing Bugs Fixed:**
+
+1. **Transformer Source → Panel Destination Dropdown**
+   - Problem: When transformer is feeder source, destination panel dropdown showed "Select source panel first"
+   - Fix: Updated disabled condition to check both `source_panel_id` AND `source_transformer_id`
+   - File: `components/FeederManager.tsx`
+
+2. **Transformer-to-Panel Connectivity Validation**
+   - Problem: System allowed connecting panels that weren't connected to each other
+   - Fix: Added `getValidPanelDestinationsFromTransformer()` function
+   - File: `services/validation/panelConnectivityValidation.ts`
+   - Impact: Only shows valid downstream panels when transformer is source
+
+3. **Continuous Load % Slider Positioning**
+   - Problem: Continuous load slider appeared for BOTH load-based and capacity-based sizing
+   - Fix: Moved slider to load-based sizing ONLY
+   - Reason: Per NEC 215.2(A)(1), 125% multiplier applies to actual loads, not panel capacity
+
+4. **Transformer Destination Load Aggregation**
+   - Problem: When destination is transformer, calculated load wasn't aggregating secondary side panels
+   - Fix: Added load aggregation from panels fed by transformer's secondary output
+   - File: `components/FeederManager.tsx` (handleCalculateFeeder function)
+
+**📊 UI/UX Improvements:**
+
+1. **Compact Feeder & Short Circuit Cards (50% Height Reduction)**
+   - Redesigned FeederCard with inline layout, smaller padding
+   - Redesigned ShortCircuitResults CalculationCard similarly
+   - Files: `components/FeederManager.tsx`, `components/ShortCircuitResults.tsx`
+   - Impact: More calculations visible on screen, reduced scrolling
+
+2. **Cross-Component Feeder Refresh via Custom Events**
+   - Problem: Creating feeder in one component didn't refresh related components
+   - Fix: Added custom event system in `useFeeders.ts`
+   - Implementation:
+     ```typescript
+     const FEEDER_UPDATE_EVENT = 'feeder-data-updated';
+     // Emit after create/update/delete
+     window.dispatchEvent(new CustomEvent(FEEDER_UPDATE_EVENT, { detail: { projectId } }));
+     ```
+   - Impact: Automatic UI sync across components without page refresh
+
+3. **Voltage Drop PDF Export Fixed**
+   - Problem: Export button wasn't working due to type import errors
+   - Fixes:
+     - Changed imports to use `Database['public']['Tables']['feeders']['Row']` pattern
+     - Fixed field name from `conductor_size` to `phase_conductor_size`
+   - Files: `services/pdfExport/voltageDropPDF.tsx`, `services/pdfExport/VoltageDropDocuments.tsx`
+
+**📄 Files Modified:**
+- `components/FeederManager.tsx` - Bug fixes + compact cards
+- `components/ShortCircuitResults.tsx` - Compact card redesign
+- `hooks/useFeeders.ts` - Custom event system for cross-component sync
+- `services/pdfExport/voltageDropPDF.tsx` - Fixed type imports
+- `services/pdfExport/VoltageDropDocuments.tsx` - Fixed type imports
+- `services/validation/panelConnectivityValidation.ts` - Transformer validation
+
+**Build Status**: ✅ Passing
+
+---
 
 ### Session: 2026-01-12 - AI Chatbot Enhancement & Tools ✅ COMPLETE
 

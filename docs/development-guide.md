@@ -1,7 +1,7 @@
 # Development Guide
 ## NEC Pro Compliance Application
 
-**Last Updated**: 2025-12-03
+**Last Updated**: 2026-01-15
 **For**: Developers, LLMs continuing development
 **Prerequisites**: TypeScript, React, PostgreSQL basics
 
@@ -616,6 +616,62 @@ describe('My Calculation', () => {
 });
 ```
 
+### Cross-Component Synchronization via Custom Events
+
+**Pattern**: When data mutations in one component need to trigger updates in other components without shared state.
+
+**Use Case**: Feeder updates in FeederManager need to refresh OneLineDiagram and other components.
+
+**Implementation** (Added Jan 15, 2026):
+
+```typescript
+// In hook (e.g., /hooks/useFeeders.ts)
+
+// Define event name
+const FEEDER_UPDATE_EVENT = 'feeder-data-updated';
+
+// Emit event after data mutation
+const emitFeederUpdate = useCallback(() => {
+  window.dispatchEvent(new CustomEvent(FEEDER_UPDATE_EVENT, {
+    detail: { projectId }
+  }));
+}, [projectId]);
+
+// Call after create/update/delete operations
+const createFeeder = async (feeder: Feeder) => {
+  const { data, error } = await supabase.from('feeders').insert([feeder]);
+  if (!error) {
+    emitFeederUpdate(); // Notify other components
+  }
+  return data;
+};
+
+// Listen for events in useEffect
+useEffect(() => {
+  const handleFeederUpdate = (event: Event) => {
+    const customEvent = event as CustomEvent<{ projectId: string }>;
+    if (customEvent.detail.projectId === projectId) {
+      fetchFeeders(); // Refresh this component's data
+    }
+  };
+
+  window.addEventListener(FEEDER_UPDATE_EVENT, handleFeederUpdate);
+  return () => window.removeEventListener(FEEDER_UPDATE_EVENT, handleFeederUpdate);
+}, [projectId, fetchFeeders]);
+```
+
+**When to Use**:
+- ✅ Multiple components share same data source
+- ✅ Need real-time sync without global state manager
+- ✅ Data mutations happen in custom hooks
+- ❌ Don't use for simple parent→child communication (use React props)
+
+**Existing Implementations**:
+- `useFeeders.ts` broadcasts `feeder-data-updated` event
+- `usePanels.ts` can listen for feeder changes affecting panel diagrams
+
+---
+
 ### Adding AI Features (Gemini Integration)
 
 **Pattern**: Add function to `geminiService.ts`
@@ -1078,7 +1134,7 @@ npm run type-check
 
 ## Testing Strategy
 
-**Last Updated**: 2025-12-03
+**Last Updated**: 2026-01-15
 **Current Coverage**: ~20% (calculation services only)
 **Target Coverage**: 75%
 **Framework**: Vitest 4.0.14 + React Testing Library

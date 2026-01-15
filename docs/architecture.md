@@ -1,7 +1,7 @@
 # Software Architecture Documentation
 ## NEC Pro Compliance Application
 
-**Last Updated**: 2025-12-03
+**Last Updated**: 2026-01-15
 **Version**: 1.0
 **Technology Stack**: React 19.2.0 + TypeScript 5.8.2 + Supabase + Vite 6.4.1
 
@@ -294,6 +294,50 @@ useEffect(() => {
 4. **Supabase**: Broadcasts final UPDATE event
 5. **Both Tabs**: Refetch, see Tab 2's changes
 6. **Tab 1 User**: Sees their changes overwritten (expected behavior - last write wins)
+
+### Cross-Component Synchronization (Custom Events)
+
+**Added**: January 15, 2026
+
+**Problem**: Components using the same data hook don't automatically sync when one updates data. Supabase real-time handles cross-tab sync, but same-tab cross-component sync requires additional logic.
+
+**Solution**: Browser CustomEvents for intra-application communication.
+
+**Example**: When FeederManager creates a feeder, OneLineDiagram needs to refresh.
+
+**Implementation in `useFeeders.ts`**:
+```typescript
+const FEEDER_UPDATE_EVENT = 'feeder-data-updated';
+
+// Emit after mutations
+const emitFeederUpdate = useCallback(() => {
+  window.dispatchEvent(new CustomEvent(FEEDER_UPDATE_EVENT, {
+    detail: { projectId }
+  }));
+}, [projectId]);
+
+// Listen in useEffect
+useEffect(() => {
+  const handleFeederUpdate = (event: Event) => {
+    const customEvent = event as CustomEvent<{ projectId: string }>;
+    if (customEvent.detail.projectId === projectId) {
+      fetchFeeders();
+    }
+  };
+  window.addEventListener(FEEDER_UPDATE_EVENT, handleFeederUpdate);
+  return () => window.removeEventListener(FEEDER_UPDATE_EVENT, handleFeederUpdate);
+}, [projectId, fetchFeeders]);
+```
+
+**Why Not Use Global State?**
+- ✅ No additional dependencies (Redux, Zustand, Jotai)
+- ✅ Works with existing hook-based architecture
+- ✅ Lightweight (DOM events are native)
+- ✅ Components remain self-contained
+- ❌ Requires manual setup in each hook
+
+**Currently Implemented**:
+- `useFeeders.ts` - `feeder-data-updated` event
 
 ---
 

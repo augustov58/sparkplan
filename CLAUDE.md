@@ -11,8 +11,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - Recent changes made by previous Claude instances
 - Pending tasks and context from last session
 
-**Current Branch**: `feature/enhanced-ai-chatbot`
-**Last Session**: 2025-01-12 (Enhanced AI Chatbot - Phase 2.5)
+**Current Branch**: `main`
+**Last Session**: 2026-01-15 (Feeder Sizing Bugs & UI Improvements)
 
 ---
 
@@ -327,6 +327,51 @@ panels → panels (self-referential via fed_from)
 ---
 
 ## Recent Changes
+
+### 2026-01-15: Feeder Sizing Bugs & UI Improvements ✅
+**Status**: Complete
+**Commit**: `8f80285`
+
+**Bug Fixes**:
+- Fixed transformer source → panel destination dropdown (now correctly enabled)
+- Added `getValidPanelDestinationsFromTransformer()` for connectivity validation
+- Moved continuous load % slider to load-based sizing only (NEC 215.2(A)(1) compliance)
+- Fixed transformer destination load aggregation from secondary side panels
+
+**UI Improvements**:
+- Compact feeder and short circuit cards (50% height reduction)
+- Cross-component feeder refresh via custom events in `useFeeders.ts`
+
+**PDF Export Fixes**:
+- Fixed type imports in `voltageDropPDF.tsx` and `VoltageDropDocuments.tsx`
+- Corrected field name `conductor_size` → `phase_conductor_size`
+
+**Files Modified**:
+- `components/FeederManager.tsx`
+- `components/ShortCircuitResults.tsx`
+- `hooks/useFeeders.ts`
+- `services/pdfExport/voltageDropPDF.tsx`
+- `services/pdfExport/VoltageDropDocuments.tsx`
+- `services/validation/panelConnectivityValidation.ts`
+
+---
+
+### 2026-01-12: AI Chatbot Enhancement & Tools ✅
+**Status**: Complete - NEC Copilot with action tools
+
+**New Action Tools**:
+- `add_circuit`, `add_panel`, `fill_panel_with_test_loads`, `empty_panel`, `fill_with_spares`
+
+**Read/Check Tools**:
+- `get_project_summary`, `check_panel_capacity`, `calculate_feeder_voltage_drop`
+- `check_conductor_sizing`, `check_service_upgrade`, `run_quick_inspection`
+
+**Files Modified**:
+- `components/Layout.tsx` - Removed AICopilotSidebar
+- `services/ai/chatTools.ts` - All action tools
+- `docs/AI_CHATBOT_TOOLS.md` - Tool documentation
+
+---
 
 ### 2025-12-30: UI/UX Improvements - Issues #24-27 ✅
 **Status**: Complete - All ISSUES.md items resolved
