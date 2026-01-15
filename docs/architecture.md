@@ -3,7 +3,7 @@
 
 **Last Updated**: 2026-01-15
 **Version**: 1.0
-**Technology Stack**: React 19.2.0 + TypeScript 5.8.2 + Supabase + Vite 6.4.1
+**Technology Stack**: React 19.2.0 + TypeScript 5.8.3 + Supabase + Vite 6.4.1
 
 ---
 
@@ -410,9 +410,9 @@ export default function PanelList({ panels, onSelect }: PanelListProps) {
 3. **Reusability** - If same UI pattern used elsewhere, extract
 4. **Performance** - If expensive rendering, extract and memoize
 
-**Exception**: `OneLineDiagram.tsx` (1614 lines) - Justified monolith
+**Exception**: `OneLineDiagram.tsx` (~3,342 lines) - Justified monolith
 
-**Why OneLineDiagram.tsx is 1614 lines**:
+**Why OneLineDiagram.tsx is ~3,342 lines**:
 - **Tightly coupled logic**: SVG rendering directly tied to electrical hierarchy traversal
 - **Performance**: Avoids 10+ levels of props drilling (X/Y coordinates, colors, line styles)
 - **Debugging**: All diagram logic in one place (easier to trace rendering bugs)
@@ -777,48 +777,64 @@ setError(errorMessage);
 )}
 ```
 
-### Error Boundaries (NOT IMPLEMENTED)
+### Error Boundaries ✅ IMPLEMENTED
 
-**Current State**: No React Error Boundaries
+**Status**: Implemented (January 2025)
 
-**Risk**: Component errors crash entire app (white screen of death)
+**Components**:
+1. `ErrorBoundary` - Full-page fallback with reload options
+2. `FeatureErrorBoundary` - Inline error UI for specific features
 
-**Example crash scenario**:
+**Implementation** (`components/ErrorBoundary.tsx`):
 ```typescript
-// If panels is undefined, app crashes
-panels.map(p => <div key={p.id}>{p.name}</div>)
-```
-
-**Recommended**: Add Error Boundary at App.tsx level
-
-```typescript
-class ErrorBoundary extends React.Component {
+// Full-page error boundary
+export class ErrorBoundary extends React.Component<Props, State> {
   state = { hasError: false, error: null };
 
-  static getDerivedStateFromError(error) {
+  static getDerivedStateFromError(error: Error) {
     return { hasError: true, error };
+  }
+
+  componentDidCatch(error: Error, errorInfo: ErrorInfo) {
+    console.error('Error caught by boundary:', error, errorInfo);
   }
 
   render() {
     if (this.state.hasError) {
-      return (
-        <div>
-          <h1>Something went wrong</h1>
-          <button onClick={() => window.location.reload()}>
-            Reload App
-          </button>
-        </div>
-      );
+      return <ErrorFallback error={this.state.error} onReset={() => window.location.reload()} />;
     }
     return this.props.children;
   }
 }
 
-// Usage
+// Feature-specific error boundary (inline)
+export function FeatureErrorBoundary({ children, featureName }: FeatureProps) {
+  return (
+    <ErrorBoundary fallback={<FeatureErrorFallback featureName={featureName} />}>
+      {children}
+    </ErrorBoundary>
+  );
+}
+```
+
+**Usage in App.tsx**:
+```typescript
 <ErrorBoundary>
-  <App />
+  <Routes>
+    <Route path="/project/:id/circuits" element={
+      <FeatureErrorBoundary featureName="Circuit Design">
+        <CircuitDesign />
+      </FeatureErrorBoundary>
+    } />
+  </Routes>
 </ErrorBoundary>
 ```
+
+**Benefits**:
+- ✅ Prevents white screen of death
+- ✅ User-friendly error messages
+- ✅ Reload/retry options
+- ✅ Dev mode shows error details
 
 ### Retry Logic
 
@@ -874,35 +890,38 @@ console.error('Failed to create panel:', error);
 
 ### Bundle Size Strategy
 
-**Current**: 2,295 kB (711 kB gzipped)
+**Current** (January 2026):
+- Main bundle: **900 kB** (257 kB gzipped) ✅ Under target
+- react-pdf chunk: **1,492 kB** (499 kB gzipped) - PDF export dependency
+- Total: ~756 kB gzipped (excluding code-split chunks)
 
-**Target**: <1000 kB gzipped for production
+**Target**: <1000 kB gzipped for main bundle ✅ ACHIEVED
 
-**Optimization Plan**:
-1. **Remove Tailwind CDN** - Compile Tailwind locally (saves ~400 kB)
-2. **Code splitting** - Use `React.lazy()` for routes (load on demand)
-3. **Tree shaking** - Vite handles automatically (import only what's used)
-4. **Font optimization** - Self-host fonts instead of Google Fonts CDN
+**Completed Optimizations**:
+1. ✅ **Tailwind compiled locally** - No longer using CDN
+2. ✅ **Tree shaking** - Vite handles automatically
+3. ✅ **React 19 optimizations** - Automatic memoization improvements
 
-**Example code splitting**:
+**Known Large Dependencies**:
+- `@react-pdf/renderer` - ~1.5 MB (required for PDF export feature)
+- Consider lazy loading PDF export to reduce initial bundle
+
+**Future Optimization**:
 ```typescript
-const OneLineDiagram = React.lazy(() => import('./components/OneLineDiagram'));
-
-<Suspense fallback={<div>Loading diagram...</div>}>
-  <OneLineDiagram />
-</Suspense>
+// Lazy load PDF export (not yet implemented)
+const PDFExport = React.lazy(() => import('./services/pdfExport'));
 ```
 
 ### Lazy Loading Strategy
 
-**Current**: All components loaded upfront
+**Current**: Route-level code splitting implemented
 
-**Candidates for lazy loading**:
-1. **OneLineDiagram** - Large component (1614 lines), only used in Circuit Design tab
-2. **CalculationBreakdown** - Only rendered after Load Calc performed
-3. **Calculators** - Multiple calculators, lazy load per tab
+**Candidates for additional lazy loading**:
+1. **PDF Export** - Only needed when user clicks export button
+2. **OneLineDiagram** - Large component (~3,342 lines), used in Circuit Design
+3. **Calculators** - Multiple calculators, could lazy load per tab
 
-**Expected savings**: 30-40% faster initial page load
+**Expected savings**: 20-30% faster initial page load if PDF export lazy loaded
 
 ### Performance Monitoring
 
@@ -959,8 +978,11 @@ This architecture prioritizes:
 - ❌ Optimistic updates can briefly show wrong data → ✅ Instant UI feedback
 - ❌ Ugly URLs (hash router) → ✅ Simple deployment (static hosting)
 
+**Completed Improvements**:
+- ✅ Error Boundaries (prevents white screen crashes)
+- ✅ Tailwind compiled locally (reduced bundle size)
+
 **Future Improvements**:
-- Add Error Boundaries (prevent white screen crashes)
 - Add Sentry logging (production error tracking)
-- Compile Tailwind locally (reduce bundle size)
+- Lazy load PDF export (reduce initial bundle)
 - Add React Query (if real-time subscriptions prove problematic)

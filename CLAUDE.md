@@ -261,18 +261,26 @@ AI-powered auto-design: "Design 15,000 sq ft medical office with X-ray room" →
 - `loads` - Load entries for NEC calculations
 - `feeders` - Feeder cables between panels
 - `short_circuit_calculations` - SCC results tracking
+- `grounding_details` - Grounding system design data
 
 ### Project Management Tables
 - `rfis` - Request for Information tracking
 - `site_visits` - Site visit logging with photos
 - `calendar_events` - Important dates/deadlines
 - `project_photos` - Photo storage with Vision AI analysis
+- `issues` - Project issues tracking
+
+### Inspector & Compliance Tables
+- `inspection_items` - Inspection checklist items
+- `inspector_reports` - Inspector mode reports
 
 ### AI Agent Tables (Pydantic AI System)
 - `agent_actions` - Queue of AI suggestions (pending/approved/rejected)
 - `agent_analysis_cache` - 24-hour cache (90% cost savings)
 - `agent_activity_log` - Audit trail
-- `project_photos` - Photo storage with analysis results
+
+### Billing Tables
+- `subscriptions` - User subscription/billing data
 
 ### Panel Hierarchy
 ```sql
