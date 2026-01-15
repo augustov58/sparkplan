@@ -16,9 +16,14 @@ import {
   StyleSheet,
   Font
 } from '@react-pdf/renderer';
-import type { Feeder, Panel, Transformer } from '../../lib/database.types';
+import type { Database } from '../../lib/database.types';
 import { calculateFeederSizing } from '../calculations/feederSizing';
 import type { FeederCalculationInput, FeederCalculationResult } from '../../types';
+
+// Type aliases from database schema
+type Feeder = Database['public']['Tables']['feeders']['Row'];
+type Panel = Database['public']['Tables']['panels']['Row'];
+type Transformer = Database['public']['Tables']['transformers']['Row'];
 
 // ============================================================================
 // STYLES

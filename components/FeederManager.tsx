@@ -18,7 +18,7 @@ import { useTransformers } from '../hooks/useTransformers';
 import { useCircuits } from '../hooks/useCircuits';
 import { calculateFeederSizing } from '../services/calculations';
 import { validateFeederForm, showValidationErrors } from '../lib/validation-utils';
-import { validateFeederConnectivityEnhanced, getValidFeederDestinations } from '../services/validation/panelConnectivityValidation';
+import { validateFeederConnectivityEnhanced, getValidFeederDestinations, getValidPanelDestinationsFromTransformer } from '../services/validation/panelConnectivityValidation';
 import { checkFeederLoadStatus, getStaleFeedersList } from '../services/feeder/feederLoadSync';
 import { calculateAggregatedLoad } from '../services/calculations/upstreamLoadAggregation';
 import { exportVoltageDropReport, hasVoltageDropData } from '../services/pdfExport/voltageDropPDF';
@@ -75,11 +75,16 @@ export const FeederManager: React.FC<FeederManagerProps> = ({
     return getStaleFeedersList(feeders, circuits, panels, 5); // 5% threshold
   }, [feeders, circuits, panels]);
 
-  // Get valid destination panels based on selected source (panel only - for now keep simple)
+  // Get valid destination panels based on selected source (panel or transformer)
   const validDestinations = useMemo(() => {
-    if (!formData.source_panel_id) return [];
-    return getValidFeederDestinations(formData.source_panel_id, panels, transformers);
-  }, [formData.source_panel_id, panels, transformers]);
+    if (formData.source_panel_id) {
+      return getValidFeederDestinations(formData.source_panel_id, panels, transformers);
+    }
+    if (formData.source_transformer_id) {
+      return getValidPanelDestinationsFromTransformer(formData.source_transformer_id, panels, transformers);
+    }
+    return [];
+  }, [formData.source_panel_id, formData.source_transformer_id, panels, transformers]);
 
   // Auto-generate feeder name when source and destination are selected
   useEffect(() => {
@@ -378,6 +383,10 @@ export const FeederManager: React.FC<FeederManagerProps> = ({
 
       if (sizingBasis === 'capacity') {
         // Use maximum capacity of destination (panel or transformer)
+        // NOTE: For capacity-based sizing, we DO NOT apply the 125% continuous load multiplier
+        // because we're sizing to match the panel's rating, not actual loads.
+        // The panel's main breaker is the limiting factor - it can never deliver more than its rating.
+        // Treating all capacity as "noncontinuous" ensures the feeder matches the panel's capacity exactly.
         if (destPanel) {
           // Use panel's maximum capacity (main breaker or bus rating)
           const panelCapacityAmps = destPanel.main_breaker_amps || destPanel.bus_rating;
@@ -386,36 +395,74 @@ export const FeederManager: React.FC<FeederManagerProps> = ({
             ? panelCapacityAmps * destVoltage * Math.sqrt(3)
             : panelCapacityAmps * destVoltage;
 
-          // Apply continuous load percentage from advanced options
-          const continuousVA = capacityVA * (continuousLoadPercent / 100);
-          const noncontinuousVA = capacityVA - continuousVA;
-
+          // Treat all as noncontinuous - no 125% multiplier applied
+          // The feeder is sized to match the panel's maximum rated capacity
           loads = {
             totalVA: capacityVA,
-            continuousVA: continuousVA,
-            noncontinuousVA: noncontinuousVA
+            continuousVA: 0,
+            noncontinuousVA: capacityVA
           };
         } else if (destTransformer) {
           // Use transformer's maximum capacity (kVA rating)
           const capacityVA = destTransformer.kva_rating * 1000;
 
-          // Apply continuous load percentage from advanced options
-          const continuousVA = capacityVA * (continuousLoadPercent / 100);
-          const noncontinuousVA = capacityVA - continuousVA;
-
+          // Treat all as noncontinuous - feeder sized to match transformer's rated kVA
           loads = {
             totalVA: capacityVA,
-            continuousVA: continuousVA,
-            noncontinuousVA: noncontinuousVA
+            continuousVA: 0,
+            noncontinuousVA: capacityVA
           };
         } else {
           loads = { totalVA: 0, continuousVA: 0, noncontinuousVA: 0 };
         }
       } else {
-        // Use calculated panel loads (or zero for transformers without connected load data)
-        loads = destPanel && feeder.destination_panel_id
-          ? calculatePanelLoads(feeder.destination_panel_id)
-          : { totalVA: 0, continuousVA: 0, noncontinuousVA: 0 };
+        // Use calculated loads based on destination type
+        if (destPanel && feeder.destination_panel_id) {
+          // Destination is a panel - use panel loads
+          loads = calculatePanelLoads(feeder.destination_panel_id);
+        } else if (destTransformer && feeder.destination_transformer_id) {
+          // Destination is a transformer - calculate loads from secondary side panels
+          const secondarySidePanels = panels.filter(
+            p => p.fed_from_type === 'transformer' && p.fed_from_transformer_id === feeder.destination_transformer_id
+          );
+
+          if (secondarySidePanels.length > 0) {
+            // Sum loads from all panels on the transformer's secondary side
+            let totalVA = 0;
+            let continuousVA = 0;
+            let noncontinuousVA = 0;
+
+            secondarySidePanels.forEach(panel => {
+              const panelLoads = calculatePanelLoads(panel.id);
+              totalVA += panelLoads.totalVA;
+              continuousVA += panelLoads.continuousVA;
+              noncontinuousVA += panelLoads.noncontinuousVA;
+            });
+
+            // If secondary panels have load, use it; otherwise default to transformer capacity
+            if (totalVA > 0) {
+              loads = { totalVA, continuousVA, noncontinuousVA };
+            } else {
+              // No load on secondary panels - default to transformer max capacity (as non-continuous)
+              const transformerCapacityVA = destTransformer.kva_rating * 1000;
+              loads = {
+                totalVA: transformerCapacityVA,
+                continuousVA: 0,
+                noncontinuousVA: transformerCapacityVA
+              };
+            }
+          } else {
+            // No panels connected to transformer secondary - default to transformer max capacity
+            const transformerCapacityVA = destTransformer.kva_rating * 1000;
+            loads = {
+              totalVA: transformerCapacityVA,
+              continuousVA: 0,
+              noncontinuousVA: transformerCapacityVA
+            };
+          }
+        } else {
+          loads = { totalVA: 0, continuousVA: 0, noncontinuousVA: 0 };
+        }
       }
 
       // Calculate feeder sizing
@@ -804,12 +851,12 @@ export const FeederManager: React.FC<FeederManagerProps> = ({
                     className={`w-full rounded-md focus:border-electric-500 focus:ring-electric-500 text-sm py-2 ${
                       connectivityError ? 'border-red-300 bg-red-50' : 'border-gray-200'
                     }`}
-                    disabled={!formData.source_panel_id}
+                    disabled={!formData.source_panel_id && !formData.source_transformer_id}
                   >
                     <option value="">
-                      {formData.source_panel_id ? 'Select Destination Panel' : 'Select source panel first'}
+                      {(formData.source_panel_id || formData.source_transformer_id) ? 'Select Destination Panel' : 'Select source first'}
                     </option>
-                    {formData.source_panel_id && panels
+                    {(formData.source_panel_id || formData.source_transformer_id) && panels
                       .filter(p => p.id !== formData.source_panel_id)
                       .map(panel => {
                         const isValid = validDestinations.some(vd => vd.id === panel.id);
@@ -827,10 +874,12 @@ export const FeederManager: React.FC<FeederManagerProps> = ({
                       })}
                   </select>
                   {/* Connectivity helper text */}
-                  {formData.source_panel_id && validDestinations.length === 0 && (
+                  {(formData.source_panel_id || formData.source_transformer_id) && validDestinations.length === 0 && (
                     <p className="text-xs text-amber-600 mt-1 flex items-center gap-1">
                       <Info className="w-3 h-3" />
-                      No panels are directly connected to this source. Panels must be on the same electrical branch.
+                      {formData.source_transformer_id
+                        ? 'No panels are fed from this transformer. Check that panels have this transformer set as their source.'
+                        : 'No panels are directly connected to this source. Panels must be on the same electrical branch.'}
                     </p>
                   )}
                 </>
@@ -987,8 +1036,8 @@ export const FeederManager: React.FC<FeederManagerProps> = ({
                   </p>
                 </div>
 
-                {/* Continuous Load Percentage (only for capacity-based sizing) */}
-                {sizingBasis === 'capacity' && (
+                {/* Continuous Load Percentage (only for load-based sizing) */}
+                {sizingBasis === 'load' && (
                   <div>
                     <label className="block text-xs font-semibold text-gray-500 mb-1 uppercase tracking-wider">
                       Continuous Load Percentage
@@ -1006,27 +1055,43 @@ export const FeederManager: React.FC<FeederManagerProps> = ({
                       <span className="text-sm font-medium w-12 text-right">{continuousLoadPercent}%</span>
                     </div>
                     <p className="text-xs text-gray-500 mt-1">
-                      % of panel capacity that operates continuously (&gt;3 hrs). Continuous loads get 125% multiplier (NEC 215.2(A)(1))
+                      % of calculated load that operates continuously (&gt;3 hrs). Continuous loads get 125% multiplier (NEC 215.2(A)(1))
                     </p>
-                    <div className="text-xs text-gray-600 mt-2 space-y-1">
-                      <div className="flex justify-between">
-                        <span>Continuous: {Math.round(((formData.destination_panel_id ? panels.find(p => p.id === formData.destination_panel_id)?.main_breaker_amps : 200) || 200) * (continuousLoadPercent / 100))}A × 1.25</span>
-                        <span>Non-continuous: {Math.round(((formData.destination_panel_id ? panels.find(p => p.id === formData.destination_panel_id)?.main_breaker_amps : 200) || 200) * (1 - continuousLoadPercent / 100))}A × 1.0</span>
+                  </div>
+                )}
+
+                {/* Capacity-based sizing explanation */}
+                {sizingBasis === 'capacity' && (
+                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                    <div className="flex items-start gap-2">
+                      <Info className="w-4 h-4 text-blue-600 mt-0.5 shrink-0" />
+                      <div className="text-xs text-blue-700">
+                        <p className="font-semibold">Capacity-Based Sizing</p>
+                        <p className="mt-1">
+                          Feeder is sized to match the destination's maximum rated capacity (main breaker or kVA rating).
+                          No 125% continuous load multiplier is applied because the panel's breaker is the limiting factor -
+                          it can never deliver more than its rated capacity.
+                        </p>
+                        <p className="mt-1 italic">
+                          Use this when you want to future-proof the feeder for the panel's full capacity regardless of current loads.
+                        </p>
                       </div>
                     </div>
                   </div>
                 )}
 
                 {/* Info box explaining the calculation */}
-                <div className="md:col-span-2 bg-blue-50 border border-blue-200 rounded-lg p-3">
+                <div className="md:col-span-2 bg-gray-50 border border-gray-200 rounded-lg p-3">
                   <div className="flex items-start gap-2">
-                    <Info className="w-4 h-4 text-blue-600 mt-0.5 flex-shrink-0" />
-                    <div className="text-xs text-blue-700 space-y-1">
-                      <p className="font-semibold">Calculation Multipliers:</p>
+                    <Info className="w-4 h-4 text-gray-600 mt-0.5 shrink-0" />
+                    <div className="text-xs text-gray-700 space-y-1">
+                      <p className="font-semibold">Derating Factors Applied:</p>
                       <ul className="list-disc ml-4 space-y-1">
-                        <li>
-                          <strong>Continuous load factor:</strong> {continuousLoadPercent}% × 1.25 = {(continuousLoadPercent / 100 * 1.25).toFixed(2)} (NEC 215.2(A)(1))
-                        </li>
+                        {sizingBasis === 'load' && (
+                          <li>
+                            <strong>Continuous load (125%):</strong> {continuousLoadPercent}% of load treated as continuous (NEC 215.2(A)(1))
+                          </li>
+                        )}
                         <li>
                           <strong>Bundling adjustment:</strong> {formData.num_current_carrying || 4} conductors = {
                             (formData.num_current_carrying || 4) <= 3 ? '100%' :
@@ -1036,12 +1101,9 @@ export const FeederManager: React.FC<FeederManagerProps> = ({
                           } (NEC 310.15(C)(1))
                         </li>
                         <li>
-                          <strong>Temperature correction:</strong> {formData.ambient_temperature_c || 30}°C @ {temperatureRating}°C insulation
+                          <strong>Temperature correction:</strong> {formData.ambient_temperature_c || 30}°C ambient @ {temperatureRating}°C insulation rating
                         </li>
                       </ul>
-                      <p className="mt-2 pt-2 border-t border-blue-300">
-                        <strong>Example:</strong> 200A panel → {Math.round(200 * (continuousLoadPercent / 100) * 1.25 + 200 * (1 - continuousLoadPercent / 100))}A design load → {Math.round((200 * (continuousLoadPercent / 100) * 1.25 + 200 * (1 - continuousLoadPercent / 100)) / ((formData.num_current_carrying || 4) <= 3 ? 1.0 : (formData.num_current_carrying || 4) <= 6 ? 0.8 : 0.7))}A base ampacity needed
-                      </p>
                     </div>
                   </div>
                 </div>
@@ -1157,133 +1219,126 @@ const FeederCard: React.FC<FeederCardProps> = ({
   const vdCompliant = (feeder.voltage_drop_percent || 0) <= 3.0;
 
   return (
-    <div className={`bg-white border rounded-lg p-6 ${
+    <div className={`bg-white border rounded-lg p-3 ${
       isEditing ? 'border-electric-500 border-2' :
       staleStatus.isStale ? 'border-amber-300 border-2' :
       'border-gray-200'
     }`}>
-      {/* Stale Warning Badge */}
+      {/* Stale Warning Badge - Compact */}
       {staleStatus.isStale && (
-        <div className="flex items-center justify-between bg-amber-50 border border-amber-200 rounded-lg p-3 mb-4">
-          <div className="flex items-center gap-2">
-            <AlertTriangle className="w-4 h-4 text-amber-600" />
-            <span className="text-sm text-amber-800">
-              Load changed: {staleStatus.cachedConnectedVA.toLocaleString()} VA → {staleStatus.currentConnectedVA.toLocaleString()} VA
+        <div className="flex items-center justify-between bg-amber-50 border border-amber-200 rounded px-2 py-1.5 mb-2 text-xs">
+          <div className="flex items-center gap-1.5">
+            <AlertTriangle className="w-3.5 h-3.5 text-amber-600" />
+            <span className="text-amber-800">
+              Load: {staleStatus.cachedConnectedVA.toLocaleString()} → {staleStatus.currentConnectedVA.toLocaleString()} VA
               ({staleStatus.loadDifferencePercent > 0 ? '+' : ''}{staleStatus.loadDifferencePercent}%)
             </span>
           </div>
           <button
             onClick={() => onRecalculate(feeder)}
-            className="flex items-center gap-1 px-3 py-1 bg-amber-100 text-amber-800 rounded hover:bg-amber-200 transition-colors text-sm font-medium"
+            className="flex items-center gap-1 px-2 py-0.5 bg-amber-100 text-amber-800 rounded hover:bg-amber-200 transition-colors font-medium"
           >
             <RefreshCw className="w-3 h-3" />
-            Recalculate
+            Recalc
           </button>
         </div>
       )}
 
-      {/* Header */}
-      <div className="flex items-start justify-between mb-4">
-        <div>
-          <h4 className="font-bold text-gray-900 text-lg flex items-center gap-2">
+      {/* Header - Compact single row */}
+      <div className="flex items-center justify-between mb-2">
+        <div className="flex items-center gap-2 min-w-0">
+          <h4 className="font-semibold text-gray-900 truncate">
             {feeder.name}
-            {staleStatus.isStale && (
-              <span className="text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full">
-                Outdated
-              </span>
-            )}
           </h4>
-          <p className="text-sm text-gray-500 mt-1">
+          <span className="text-xs text-gray-500 shrink-0">
             {sourceLabel} → {destLabel}
-          </p>
+          </span>
+          {staleStatus.isStale && (
+            <span className="text-xs bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded-full shrink-0">
+              Outdated
+            </span>
+          )}
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-1 shrink-0">
           <button
             onClick={() => onRecalculate(feeder)}
-            className="p-2 text-gray-500 hover:text-electric-600 hover:bg-electric-50 rounded transition-colors"
-            title="Recalculate feeder sizing"
+            className="p-1.5 text-gray-400 hover:text-electric-600 hover:bg-electric-50 rounded transition-colors"
+            title="Recalculate"
           >
-            <RefreshCw className="w-4 h-4" />
+            <RefreshCw className="w-3.5 h-3.5" />
           </button>
           <button
             onClick={() => onEdit(feeder)}
-            className="p-2 text-gray-500 hover:text-electric-600 hover:bg-electric-50 rounded transition-colors"
+            className="p-1.5 text-gray-400 hover:text-electric-600 hover:bg-electric-50 rounded transition-colors"
+            title="Edit"
           >
-            <Edit2 className="w-4 h-4" />
+            <Edit2 className="w-3.5 h-3.5" />
           </button>
           <button
             onClick={() => onDelete(feeder.id)}
-            className="p-2 text-gray-500 hover:text-red-600 hover:bg-red-50 rounded transition-colors"
+            className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors"
+            title="Delete"
           >
-            <Trash2 className="w-4 h-4" />
+            <Trash2 className="w-3.5 h-3.5" />
           </button>
         </div>
       </div>
 
-      {/* Results Grid */}
+      {/* Results Grid - Compact inline */}
       {feeder.phase_conductor_size && (
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
-          <div className="bg-gray-50 rounded p-3">
-            <div className="text-xs text-gray-500 mb-1">Phase Conductor</div>
-            <div className="font-bold text-gray-900">{feeder.phase_conductor_size} AWG</div>
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs mb-2">
+          <div className="flex items-center gap-1">
+            <span className="text-gray-500">Phase:</span>
+            <span className="font-semibold text-gray-900">{feeder.phase_conductor_size}</span>
           </div>
-          <div className="bg-gray-50 rounded p-3">
-            <div className="text-xs text-gray-500 mb-1">Neutral</div>
-            <div className="font-bold text-gray-900">{feeder.neutral_conductor_size} AWG</div>
+          <div className="flex items-center gap-1">
+            <span className="text-gray-500">Neutral:</span>
+            <span className="font-semibold text-gray-900">{feeder.neutral_conductor_size}</span>
           </div>
-          <div className="bg-green-50 rounded p-3">
-            <div className="text-xs text-green-700 mb-1">EGC</div>
-            <div className="font-bold text-green-900">{feeder.egc_size} AWG</div>
+          <div className="flex items-center gap-1">
+            <span className="text-green-700">EGC:</span>
+            <span className="font-semibold text-green-800">{feeder.egc_size}</span>
           </div>
-          <div className="bg-gray-50 rounded p-3">
-            <div className="text-xs text-gray-500 mb-1">Conduit</div>
-            <div className="font-bold text-gray-900">{feeder.conduit_size}</div>
+          <div className="flex items-center gap-1">
+            <span className="text-gray-500">Conduit:</span>
+            <span className="font-semibold text-gray-900">{feeder.conduit_size}</span>
           </div>
+          <div className="flex items-center gap-1">
+            <span className="text-gray-500">Dist:</span>
+            <span className="font-semibold text-gray-900">{feeder.distance_ft} ft</span>
+          </div>
+          <div className="flex items-center gap-1">
+            <span className="text-gray-500">{feeder.conductor_material === 'Cu' ? 'Cu' : 'Al'}</span>
+          </div>
+          {feeder.design_load_va && (
+            <div className="flex items-center gap-1">
+              <span className="text-gray-500">Load:</span>
+              <span className="font-semibold text-gray-900">{(feeder.design_load_va / 1000).toFixed(1)} kVA</span>
+            </div>
+          )}
         </div>
       )}
 
-      {/* Voltage Drop Indicator */}
+      {/* Voltage Drop Indicator - Compact */}
       {feeder.voltage_drop_percent !== undefined && (
-        <div className={`flex items-center justify-between p-3 rounded ${
+        <div className={`flex items-center justify-between px-2 py-1.5 rounded text-xs ${
           vdCompliant ? 'bg-green-50 border border-green-200' : 'bg-red-50 border border-red-200'
         }`}>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5">
             {vdCompliant ? (
-              <CheckCircle className="w-5 h-5 text-green-600" />
+              <CheckCircle className="w-3.5 h-3.5 text-green-600" />
             ) : (
-              <AlertTriangle className="w-5 h-5 text-red-600" />
+              <AlertTriangle className="w-3.5 h-3.5 text-red-600" />
             )}
-            <span className={`text-sm font-medium ${vdCompliant ? 'text-green-900' : 'text-red-900'}`}>
-              Voltage Drop: {feeder.voltage_drop_percent.toFixed(2)}%
+            <span className={`font-medium ${vdCompliant ? 'text-green-900' : 'text-red-900'}`}>
+              VD: {feeder.voltage_drop_percent.toFixed(2)}%
             </span>
           </div>
-          <span className={`text-xs ${vdCompliant ? 'text-green-600' : 'text-red-600'}`}>
-            {vdCompliant ? '≤3% (Compliant)' : '>3% (Exceeds NEC Recommendation)'}
+          <span className={vdCompliant ? 'text-green-600' : 'text-red-600'}>
+            {vdCompliant ? '≤3% OK' : '>3% High'}
           </span>
         </div>
       )}
-
-      {/* Details */}
-      <div className="mt-4 pt-4 border-t border-gray-100 grid grid-cols-2 gap-4 text-sm">
-        <div>
-          <span className="text-gray-500">Distance:</span>
-          <span className="ml-2 font-semibold text-gray-900">{feeder.distance_ft} ft</span>
-        </div>
-        <div>
-          <span className="text-gray-500">Material:</span>
-          <span className="ml-2 font-semibold text-gray-900">
-            {feeder.conductor_material === 'Cu' ? 'Copper' : 'Aluminum'}
-          </span>
-        </div>
-        {feeder.design_load_va && (
-          <div>
-            <span className="text-gray-500">Design Load:</span>
-            <span className="ml-2 font-semibold text-gray-900">
-              {(feeder.design_load_va / 1000).toFixed(1)} kVA
-            </span>
-          </div>
-        )}
-      </div>
     </div>
   );
 };

@@ -9,41 +9,12 @@
 
 import { pdf } from '@react-pdf/renderer';
 import { VoltageDropDocument } from './VoltageDropDocuments';
+import type { Database } from '../../lib/database.types';
 
-// ============================================================================
-// TYPES (matching database schema)
-// ============================================================================
-
-interface Feeder {
-  id: string;
-  name: string;
-  from_panel_id: string | null;
-  to_panel_id: string | null;
-  voltage: number;
-  phase: number;
-  calculated_load_va: number | null;
-  length_feet: number | null;
-  conductor_material: string | null;
-  conductor_size: string | null;
-}
-
-interface Panel {
-  id: string;
-  name: string;
-  voltage: number;
-  phase: 1 | 3;
-  bus_rating: number;
-  location?: string;
-}
-
-interface Transformer {
-  id: string;
-  name: string;
-  kva_rating: number;
-  primary_voltage: number;
-  secondary_voltage: number;
-  location?: string;
-}
+// Type aliases from database schema
+type Feeder = Database['public']['Tables']['feeders']['Row'];
+type Panel = Database['public']['Tables']['panels']['Row'];
+type Transformer = Database['public']['Tables']['transformers']['Row'];
 
 // ============================================================================
 // EXPORT FUNCTION
@@ -221,8 +192,8 @@ export function validateFeedersForVoltageDropReport(feeders: Feeder[]): {
     if (!feeder.total_load_va || feeder.total_load_va <= 0) {
       missingFields.push('total_load_va');
     }
-    if (!feeder.conductor_size) {
-      missingFields.push('conductor_size');
+    if (!feeder.phase_conductor_size) {
+      missingFields.push('phase_conductor_size');
     }
     if (!feeder.conductor_material) {
       missingFields.push('conductor_material');

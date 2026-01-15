@@ -206,77 +206,61 @@ const CalculationCard: React.FC<CalculationCardProps> = ({ calculation, panel, p
 
   return (
     <div className="bg-white border border-gray-100 rounded-lg shadow-sm hover:shadow-md transition-shadow">
-      {/* Header */}
-      <div className="p-4 border-b border-gray-100">
-        <div className="flex justify-between items-start">
-          <div className="flex-1">
-            <h4 className="font-medium text-gray-900 text-lg flex items-center gap-2">
+      {/* Header + Metrics - Compact single section */}
+      <div className="p-3">
+        <div className="flex items-center justify-between mb-2">
+          <div className="flex items-center gap-2 min-w-0">
+            <h4 className="font-semibold text-gray-900 truncate">
               {calculation.location_name}
-              {panel && (
-                <span className="text-sm text-gray-500 font-normal">
-                  ({panel.bus_rating}A, {panel.voltage}V)
-                </span>
-              )}
             </h4>
-            <p className="text-xs text-gray-400 mt-1">
-              Calculated {new Date(calculation.created_at).toLocaleDateString()} at {new Date(calculation.created_at).toLocaleTimeString()}
-            </p>
+            {panel && (
+              <span className="text-xs text-gray-500 shrink-0">
+                ({panel.bus_rating}A, {panel.voltage}V)
+              </span>
+            )}
+            <span className="text-xs text-gray-400 shrink-0">
+              {new Date(calculation.created_at).toLocaleDateString()}
+            </span>
           </div>
-          <div className="flex gap-2">
+          <div className="flex gap-1 shrink-0">
             <button
               onClick={handleExportSingle}
-              className="text-gray-400 hover:text-blue-600 transition-colors p-2"
+              className="text-gray-400 hover:text-blue-600 transition-colors p-1.5"
               title="Export to PDF"
             >
-              <FileText className="w-4 h-4" />
+              <FileText className="w-3.5 h-3.5" />
             </button>
             <button
               onClick={onDelete}
-              className="text-gray-400 hover:text-red-600 transition-colors p-2"
+              className="text-gray-400 hover:text-red-600 transition-colors p-1.5"
               title="Delete calculation"
             >
-              <Trash2 className="w-4 h-4" />
+              <Trash2 className="w-3.5 h-3.5" />
             </button>
           </div>
         </div>
-      </div>
 
-      {/* Summary Metrics */}
-      <div className="p-4 bg-gray-50">
-        <div className="grid grid-cols-3 gap-4">
-          <div>
-            <div className="text-xs text-gray-500 mb-1">Fault Current</div>
-            <div className="text-2xl font-light text-gray-900">
-              {(results.faultCurrent / 1000).toFixed(1)} <span className="text-sm text-gray-500">kA</span>
-            </div>
-            <div className="text-xs text-gray-400">
-              {results.faultCurrent.toLocaleString()} A RMS
-            </div>
+        {/* Compact Metrics Row */}
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs">
+          <div className="flex items-center gap-1">
+            <span className="text-gray-500">Fault:</span>
+            <span className="font-semibold text-gray-900">{(results.faultCurrent / 1000).toFixed(1)} kA</span>
+            <span className="text-gray-400">({results.faultCurrent.toLocaleString()} A)</span>
           </div>
-          <div>
-            <div className="text-xs text-gray-500 mb-1">Required AIC</div>
-            <div className="text-2xl font-light text-orange-700">
-              {results.requiredAIC} <span className="text-sm text-orange-600">kA</span>
-            </div>
-            <div className="text-xs text-gray-400">
-              Minimum rating
-            </div>
+          <div className="flex items-center gap-1">
+            <span className="text-gray-500">AIC:</span>
+            <span className="font-semibold text-orange-700">{results.requiredAIC} kA</span>
           </div>
-          <div>
-            <div className="text-xs text-gray-500 mb-1">NEC Compliance</div>
-            <div className={`flex items-center gap-1 ${results.compliance.compliant ? 'text-green-700' : 'text-red-700'}`}>
-              {results.compliance.compliant ? (
-                <CheckCircle className="w-5 h-5" />
-              ) : (
-                <AlertTriangle className="w-5 h-5" />
-              )}
-              <span className="text-sm font-medium">
-                {results.compliance.compliant ? 'Compliant' : 'Review'}
-              </span>
-            </div>
-            <div className="text-xs text-gray-400">
-              {results.compliance.necArticle}
-            </div>
+          <div className={`flex items-center gap-1 ${results.compliance.compliant ? 'text-green-700' : 'text-red-700'}`}>
+            {results.compliance.compliant ? (
+              <CheckCircle className="w-3.5 h-3.5" />
+            ) : (
+              <AlertTriangle className="w-3.5 h-3.5" />
+            )}
+            <span className="font-medium">
+              {results.compliance.compliant ? 'Compliant' : 'Review'}
+            </span>
+            <span className="text-gray-400">({results.compliance.necArticle})</span>
           </div>
         </div>
       </div>
@@ -285,17 +269,17 @@ const CalculationCard: React.FC<CalculationCardProps> = ({ calculation, panel, p
       <div className="border-t border-gray-100">
         <button
           onClick={() => setExpanded(!expanded)}
-          className="w-full px-4 py-2 text-xs text-gray-600 hover:bg-gray-50 transition-colors text-left"
+          className="w-full px-3 py-1.5 text-xs text-gray-500 hover:bg-gray-50 transition-colors text-left"
         >
-          {expanded ? '▼' : '▶'} {expanded ? 'Hide' : 'Show'} Calculation Details
+          {expanded ? '▼' : '▶'} {expanded ? 'Hide' : 'Show'} Details
         </button>
 
         {expanded && (
-          <div className="px-4 pb-4 space-y-4">
+          <div className="px-3 pb-3 space-y-2">
             {/* Input Parameters */}
-            <div className="bg-white border border-gray-200 rounded p-3">
-              <div className="text-xs font-bold text-gray-700 mb-2">INPUT PARAMETERS</div>
-              <div className="grid grid-cols-2 gap-2 text-xs">
+            <div className="bg-gray-50 rounded p-2">
+              <div className="text-xs font-bold text-gray-600 mb-1">INPUT</div>
+              <div className="grid grid-cols-2 gap-x-4 gap-y-0.5 text-xs">
                 {calculation.calculation_type === 'service' ? (
                   <>
                     <span className="text-gray-500">Service:</span>
@@ -310,14 +294,8 @@ const CalculationCard: React.FC<CalculationCardProps> = ({ calculation, panel, p
 
                     {calculation.service_conductor_length && (
                       <>
-                        <span className="text-gray-500">Service Conductor:</span>
-                        <span className="font-mono">{calculation.service_conductor_size} {calculation.service_conductor_material}</span>
-
-                        <span className="text-gray-500">Conductor Length:</span>
-                        <span className="font-mono">{calculation.service_conductor_length} ft</span>
-
-                        <span className="text-gray-500">Conduit:</span>
-                        <span className="font-mono">{calculation.service_conduit_type}</span>
+                        <span className="text-gray-500">Conductor:</span>
+                        <span className="font-mono">{calculation.service_conductor_size} {calculation.service_conductor_material}, {calculation.service_conductor_length} ft</span>
                       </>
                     )}
                   </>
@@ -327,22 +305,19 @@ const CalculationCard: React.FC<CalculationCardProps> = ({ calculation, panel, p
                     <span className="font-mono">{calculation.source_fault_current?.toLocaleString()} A</span>
 
                     <span className="text-gray-500">Feeder:</span>
-                    <span className="font-mono">{calculation.feeder_conductor_size} {calculation.feeder_material}</span>
+                    <span className="font-mono">{calculation.feeder_conductor_size} {calculation.feeder_material}, {calculation.feeder_length} ft</span>
 
-                    <span className="text-gray-500">Length:</span>
-                    <span className="font-mono">{calculation.feeder_length} ft</span>
-
-                    <span className="text-gray-500">Voltage/Phase:</span>
+                    <span className="text-gray-500">System:</span>
                     <span className="font-mono">{calculation.feeder_voltage}V, {calculation.feeder_phase}φ</span>
                   </>
                 )}
               </div>
             </div>
 
-            {/* Calculation Details */}
-            <div className="bg-white border border-gray-200 rounded p-3">
-              <div className="text-xs font-bold text-gray-700 mb-2">CALCULATION BREAKDOWN</div>
-              <div className="grid grid-cols-2 gap-2 text-xs">
+            {/* Calculation Breakdown */}
+            <div className="bg-gray-50 rounded p-2">
+              <div className="text-xs font-bold text-gray-600 mb-1">CALCULATION</div>
+              <div className="grid grid-cols-2 gap-x-4 gap-y-0.5 text-xs">
                 <span className="text-gray-500">Source If:</span>
                 <span className="font-mono">{results.details.sourceFaultCurrent.toLocaleString()} A</span>
 
@@ -362,24 +337,24 @@ const CalculationCard: React.FC<CalculationCardProps> = ({ calculation, panel, p
             </div>
 
             {/* Compliance */}
-            <div className={`border rounded p-3 ${
+            <div className={`rounded p-2 text-xs ${
               results.compliance.compliant
-                ? 'bg-green-50 border-green-200'
-                : 'bg-red-50 border-red-200'
+                ? 'bg-green-50 border border-green-200'
+                : 'bg-red-50 border border-red-200'
             }`}>
-              <div className="text-xs font-bold mb-1" style={{ color: results.compliance.compliant ? '#166534' : '#991b1b' }}>
-                {results.compliance.necArticle}
-              </div>
-              <div className="text-xs" style={{ color: results.compliance.compliant ? '#15803d' : '#b91c1c' }}>
+              <span className="font-bold" style={{ color: results.compliance.compliant ? '#166534' : '#991b1b' }}>
+                {results.compliance.necArticle}:
+              </span>{' '}
+              <span style={{ color: results.compliance.compliant ? '#15803d' : '#b91c1c' }}>
                 {results.compliance.message}
-              </div>
+              </span>
             </div>
 
             {/* Notes */}
             {calculation.notes && (
-              <div className="bg-blue-50 border border-blue-200 rounded p-3">
-                <div className="text-xs font-bold text-blue-900 mb-1">NOTES</div>
-                <div className="text-xs text-blue-800">{calculation.notes}</div>
+              <div className="bg-blue-50 border border-blue-200 rounded p-2 text-xs">
+                <span className="font-bold text-blue-900">Notes:</span>{' '}
+                <span className="text-blue-800">{calculation.notes}</span>
               </div>
             )}
           </div>

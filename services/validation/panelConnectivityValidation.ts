@@ -656,6 +656,36 @@ function isPanelDownstreamOfTransformer(
 }
 
 /**
+ * Gets all panels that can be valid feeder destinations from a source transformer
+ *
+ * @param sourceTransformerId - The source transformer ID
+ * @param panels - All panels in the project
+ * @param transformers - All transformers in the project
+ * @returns Array of valid destination panels
+ */
+export function getValidPanelDestinationsFromTransformer(
+  sourceTransformerId: string,
+  panels: Panel[],
+  transformers: Transformer[]
+): Panel[] {
+  const validDestinations: Panel[] = [];
+  const sourceTransformer = transformers.find(t => t.id === sourceTransformerId);
+
+  if (!sourceTransformer) return validDestinations;
+
+  panels.forEach(panel => {
+    // Check if panel is downstream of this transformer
+    const isDownstream = isPanelDownstreamOfTransformer(sourceTransformerId, panel.id, panels, transformers);
+
+    if (isDownstream) {
+      validDestinations.push(panel);
+    }
+  });
+
+  return validDestinations;
+}
+
+/**
  * Check if a transformer is downstream of another transformer
  * (through intermediate panels on the secondary side)
  */
