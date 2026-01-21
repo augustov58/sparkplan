@@ -11,8 +11,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - Recent changes made by previous Claude instances
 - Pending tasks and context from last session
 
-**Current Branch**: `main`
-**Last Session**: 2026-01-15 (Feeder Sizing Bugs & UI Improvements)
+**Current Branch**: `feature/multi-family-ev`
+**Last Session**: 2026-01-21 (Multi-Family EV Calculator - Phase 2.5)
 
 ---
 
@@ -136,33 +136,72 @@ GOOGLE_API_KEY=your_gemini_api_key_here     # For Pydantic AI agents
 
 **Result**: 100% commercial permit readiness - all jurisdiction requirements deliverable!
 
-### ⏳ Phase 2.5: Enhanced AI Chatbot - IN PROGRESS (Jan 2026)
-**Spec**: `/docs/ENHANCED_AI_CHATBOT_SPEC.md`
-**Branch**: `feature/enhanced-ai-chatbot`
+### ⏳ Phase 2.5: Multi-Family EV Domination - IN PROGRESS (Jan 2026)
+**Spec**: `STRATEGIC_ANALYSIS.md` (Forum-Validated)
+**Branch**: `feature/multi-family-ev`
 
-Transform the NEC Assistant from stateless Q&A to intelligent copilot with memory and actions.
+Capture the highest-pain, highest-WTP segment validated via Mike Holt Forums & Electrician Talk.
+Contractors are turning down $10K-50K jobs due to complexity - we automate the $2-10K engineering calculation.
+
+| Feature | NEC Reference | Status | Effort | Impact |
+|---------|---------------|--------|--------|--------|
+| **Multi-Family EV Readiness Calculator** | 220.84 + 220.57 + 625.42 | ⏳ Pending | 15-20h | Very High - Automates demand factor calcs |
+| **Building Service Analysis Mode** | 220.84 | ⏳ Pending | 8-10h | High - Total building capacity |
+| **EVEMS Right-Sizing (Multi-Unit)** | 625.42 | ⏳ Pending | 6-8h | High - Avoid $100K+ quotes |
+| **Utility Coordination Package** | Varies by utility | ⏳ Pending | 10-12h | Medium - Documentation utilities require |
+
+**Phase 2.5.1: Multi-Family EV Readiness Calculator**
+- NEC 220.57 demand factors for EV charging (0.40-1.00 based on count)
+- NEC 220.84 multi-family optional calculation integration
+- Building service upgrade recommendation
+- Cost comparison: EVEMS vs full service upgrade
+
+**Phase 2.5.2: Building Service Analysis Mode**
+- Total building demand calculation (existing + EV)
+- Required service amps calculation
+- Upgrade type recommendation (none/panel-only/full-service)
+
+**Phase 2.5.3: EVEMS Right-Sizing**
+- Calculate max chargers without service upgrade
+- Compare scenarios with/without load management
+- Simultaneous charging reduction factors
+
+**Phase 2.5.4: Utility Coordination Package**
+- Generate documentation for utility approval
+- Service upgrade justification letter
+- Load calculation summary for AHJ
+
+### ✅ Phase 2.6: Enhanced AI Chatbot - COMPLETE (Jan 2026)
+**Spec**: `/docs/ENHANCED_AI_CHATBOT_SPEC.md`
+
+Transformed NEC Assistant from stateless Q&A to intelligent copilot with memory and actions.
 
 | Feature | Status | Effort | Impact |
 |---------|--------|--------|--------|
-| **Conversation Memory** | 🔄 In Progress | 4h | High - Multi-turn conversations |
-| **Agentic Actions** | 🔄 In Progress | 35h | Very High - Execute calculations via chat |
+| **Conversation Memory** | ✅ Complete | 4h | High - Multi-turn conversations |
+| **Agentic Actions** | ✅ Complete | 35h | Very High - Execute calculations via chat |
 | **Streaming Responses** | ⏳ Pending | 4h | Medium - Faster perceived response |
 | **Core NEC Tables RAG** | ⏳ Pending | 20h | High - Accurate table lookups |
 | **Full NEC RAG** | ⏳ Pending | 60h | Very High - Complete knowledge base |
 
-**Phase 2.5.1: Conversation Memory**
-- Chat history state management (`useChat` hook)
-- Conversation context builder
-- Multi-turn conversation support
-- Optional database persistence
+**Phase 2.6.1: Conversation Memory** ✅ COMPLETE
+- `hooks/useChat.ts` - Full chat state management
+- `services/ai/conversationBuilder.ts` - Context builder with token limits
+- Multi-turn conversation support (10 messages default)
+- Project context integration on first message
 
-**Phase 2.5.2: Agentic Actions**
-- Tool definitions with Zod schemas
-- 7 core tools: voltage drop, short circuit, panel capacity, inspection, conductor sizing, arc flash, service upgrade
-- Gemini function calling integration
+**Phase 2.6.2: Agentic Actions** ✅ COMPLETE
+- `services/ai/chatTools.ts` - 12 tools defined (1900+ lines)
+- Read tools: voltage drop, panel capacity, conductor sizing, service upgrade, inspection, project summary
+- Action tools: add_circuit, add_panel, fill_panel_with_test_loads, empty_panel, fill_with_spares
+- Agent tools: analyze_change_impact, draft_rfi, predict_inspection
 - Confirmation flow for write operations
 
-**Phase 2.5.3: RAG Integration** (Future)
+**Phase 2.6.3: Streaming Responses** (Future)
+- Server-sent events for progressive response display
+- Improved perceived latency
+
+**Phase 2.6.4: RAG Integration** (Future)
 - pgvector embeddings for NEC tables
 - Semantic search for relevant articles
 - Multi-edition support (2020, 2023, 2026)
