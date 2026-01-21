@@ -1,6 +1,6 @@
 
 import React, { useState } from 'react';
-import { Calculator, ArrowRight, CheckCircle, XCircle, AlertTriangle, Zap, Car, Sun, Shield, Save, X, Plus, Trash2, TrendingUp, Sparkles, Info, Menu } from 'lucide-react';
+import { Calculator, ArrowRight, CheckCircle, XCircle, AlertTriangle, Zap, Car, Sun, Shield, Save, X, Plus, Trash2, TrendingUp, Sparkles, Info, Menu, Building2 } from 'lucide-react';
 import { calculateVoltageDropAC, compareVoltageDropMethods, VoltageDropResult } from '../services/calculations';
 import { ConductorSizingTool } from './ConductorSizingTool';
 import { ProjectSettings } from '../types';
@@ -43,6 +43,7 @@ import { getConduitDimensions } from '../data/nec/chapter9-conduit-dimensions';
 import { getConductorDimensions, STANDARD_WIRE_SIZES } from '../data/nec/chapter9-conductor-dimensions';
 import { analyzeChangeImpact } from '../services/api/pythonBackend';
 import { EVPanelTemplates } from './EVPanelTemplates';
+import { MultiFamilyEVCalculator } from './MultiFamilyEVCalculator';
 
 interface CalculatorsProps {
   projectId?: string;
@@ -52,7 +53,7 @@ export const Calculators: React.FC<CalculatorsProps> = ({ projectId }) => {
   const { getProjectById } = useProjects();
   const project = projectId ? getProjectById(projectId) : undefined;
 
-  const [activeTab, setActiveTab] = useState<'voltage-drop' | 'conduit-fill' | 'conductor-sizing' | 'short-circuit' | 'ev-charging' | 'solar-pv' | 'arc-flash' | 'evems' | 'service-upgrade' | 'circuit-sharing' | 'change-impact' | 'ev-panel-builder'>('voltage-drop');
+  const [activeTab, setActiveTab] = useState<'voltage-drop' | 'conduit-fill' | 'conductor-sizing' | 'short-circuit' | 'ev-charging' | 'solar-pv' | 'arc-flash' | 'evems' | 'service-upgrade' | 'circuit-sharing' | 'change-impact' | 'ev-panel-builder' | 'multi-family-ev'>('voltage-drop');
 
   // Default project settings for calculator mode
   const defaultSettings: ProjectSettings = {
@@ -73,6 +74,7 @@ export const Calculators: React.FC<CalculatorsProps> = ({ projectId }) => {
     { value: 'short-circuit', label: 'Short Circuit (NEC 110.9)' },
     { value: 'ev-charging', label: 'EV Charging (NEC 625)' },
     { value: 'ev-panel-builder', label: 'EV Panel Builder' },
+    { value: 'multi-family-ev', label: 'Multi-Family EV (NEC 220.84)' },
     { value: 'solar-pv', label: 'Solar PV (NEC 690)' },
     { value: 'arc-flash', label: 'Arc Flash (NFPA 70E)' },
     { value: 'evems', label: 'EVEMS Load Mgmt (NEC 625.42)' },
@@ -147,6 +149,12 @@ export const Calculators: React.FC<CalculatorsProps> = ({ projectId }) => {
             <span className="flex items-center gap-2"><Zap className="w-4 h-4" /> EV Panel Builder</span>
           </button>
           <button
+            onClick={() => setActiveTab('multi-family-ev')}
+            className={`w-full text-left px-3 py-2.5 text-sm font-medium border-l-4 transition-colors ${activeTab === 'multi-family-ev' ? 'border-electric-500 bg-electric-50 text-gray-900' : 'border-transparent text-gray-500 hover:bg-gray-50 hover:text-gray-700'}`}
+          >
+            <span className="flex items-center gap-2"><Building2 className="w-4 h-4" /> Multi-Family EV (NEC 220.84)</span>
+          </button>
+          <button
             onClick={() => setActiveTab('solar-pv')}
             className={`w-full text-left px-3 py-2.5 text-sm font-medium border-l-4 transition-colors ${activeTab === 'solar-pv' ? 'border-electric-500 bg-electric-50 text-gray-900' : 'border-transparent text-gray-500 hover:bg-gray-50 hover:text-gray-700'}`}
           >
@@ -201,6 +209,7 @@ export const Calculators: React.FC<CalculatorsProps> = ({ projectId }) => {
           {activeTab === 'evems' && <EVEMSLoadManagement />}
           {activeTab === 'service-upgrade' && <ServiceUpgradeWizard projectId={projectId} />}
           {activeTab === 'circuit-sharing' && <CircuitSharingCalculator />}
+          {activeTab === 'multi-family-ev' && <MultiFamilyEVCalculator projectId={projectId} />}
           {activeTab === 'change-impact' && <ChangeImpactAnalyzer projectId={projectId} />}
           {activeTab === 'ev-panel-builder' && project && <EVPanelTemplates project={project} />}
           {activeTab === 'ev-panel-builder' && !project && (
