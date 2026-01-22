@@ -9,6 +9,7 @@ import { Document } from '@react-pdf/renderer';
 import type { Panel, Circuit, Feeder, Transformer, ShortCircuitCalculation, Database } from '../../lib/database.types';
 import type { Jurisdiction } from '../../types';
 import type { ArcFlashResult } from '../calculations/arcFlash';
+import type { MultiFamilyEVResult } from '../calculations/multiFamilyEV';
 
 type GroundingDetail = Database['public']['Tables']['grounding_details']['Row'];
 import {
@@ -25,6 +26,7 @@ import { JurisdictionRequirementsDocument } from './JurisdictionDocuments';
 import { ShortCircuitCalculationDocument } from './ShortCircuitDocuments';
 import { ArcFlashDocument } from './ArcFlashDocuments';
 import { GroundingPlanDocument } from './GroundingPlanDocuments';
+import { MultiFamilyEVDocument } from './MultiFamilyEVDocuments';
 
 export interface PermitPacketData {
   projectId: string;
@@ -62,6 +64,11 @@ export interface PermitPacketData {
     result: ArcFlashResult;
   };
   groundingSystem?: GroundingDetail; // Grounding electrode system
+  // Multi-Family EV Analysis (NEC 220.84 + 220.57)
+  multiFamilyEVAnalysis?: {
+    result: MultiFamilyEVResult;
+    buildingName?: string;
+  };
 }
 
 /**
@@ -201,6 +208,14 @@ export const generatePermitPacket = async (data: PermitPacketData): Promise<void
             grounding={data.groundingSystem}
             serviceAmperage={sortedPanels.find(p => p.is_main)?.bus_rating || data.serviceVoltage}
             conductorMaterial="Cu"
+          />
+        )}
+
+        {/* Multi-Family EV Analysis (NEC 220.84 + 220.57 + 625.42) */}
+        {data.multiFamilyEVAnalysis && (
+          <MultiFamilyEVDocument
+            result={data.multiFamilyEVAnalysis.result}
+            buildingName={data.multiFamilyEVAnalysis.buildingName || data.projectName}
           />
         )}
 

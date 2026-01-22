@@ -4,7 +4,7 @@
  */
 
 import React, { useState } from 'react';
-import { FileText, Download, Loader2, AlertCircle, CheckCircle, Info } from 'lucide-react';
+import { FileText, Download, Loader2, AlertCircle, CheckCircle, Info, Building2 } from 'lucide-react';
 import { generatePermitPacket, generateLightweightPermitPacket, type PermitPacketData } from '../services/pdfExport/permitPacketGenerator';
 import { usePanels } from '../hooks/usePanels';
 import { useCircuits } from '../hooks/useCircuits';
@@ -15,6 +15,7 @@ import { useProjects } from '../hooks/useProjects';
 import { useJurisdictions } from '../hooks/useJurisdictions';
 import { useShortCircuitCalculations } from '../hooks/useShortCircuitCalculations';
 import { JurisdictionSearchWizard } from './JurisdictionSearchWizard';
+import { calculateMultiFamilyEV, type MultiFamilyEVInput } from '../services/calculations/multiFamilyEV';
 
 interface PermitPacketGeneratorProps {
   projectId: string;
@@ -33,6 +34,13 @@ export const PermitPacketGenerator: React.FC<PermitPacketGeneratorProps> = ({ pr
   const [serviceType, setServiceType] = useState<'overhead' | 'underground'>('overhead');
   const [meterLocation, setMeterLocation] = useState('');
   const [serviceConductorRouting, setServiceConductorRouting] = useState('');
+
+  // Multi-Family EV Analysis state
+  const [includeMultiFamilyEV, setIncludeMultiFamilyEV] = useState(false);
+  const [mfEvDwellingUnits, setMfEvDwellingUnits] = useState(20);
+  const [mfEvChargersPerUnit, setMfEvChargersPerUnit] = useState(1);
+  const [mfEvChargerLevel, setMfEvChargerLevel] = useState<'level1' | 'level2'>('level2');
+  const [mfEvBuildingName, setMfEvBuildingName] = useState('');
 
   // Fetch project data - hooks must be called unconditionally
   const { projects } = useProjects();
@@ -109,6 +117,26 @@ export const PermitPacketGenerator: React.FC<PermitPacketGeneratorProps> = ({ pr
         jurisdiction: jurisdiction,
       };
 
+      // Add Multi-Family EV Analysis if enabled
+      if (includeMultiFamilyEV && mfEvDwellingUnits > 0) {
+        const mfEvInput: MultiFamilyEVInput = {
+          dwellingUnits: mfEvDwellingUnits,
+          evChargersPerUnit: mfEvChargersPerUnit,
+          chargerLevel: mfEvChargerLevel,
+          chargerAmps: mfEvChargerLevel === 'level2' ? 40 : 12,
+          voltage: currentProject.servicePhase === 3 ? 208 : 240,
+          phase: currentProject.servicePhase === 3 ? 3 : 1,
+          squareFeetPerUnit: 1000, // Default assumption
+          includeCommonAreas: true,
+          commonAreaSqFt: Math.round(mfEvDwellingUnits * 50), // Estimate common area
+        };
+        const mfEvResult = calculateMultiFamilyEV(mfEvInput);
+        packetData.multiFamilyEVAnalysis = {
+          result: mfEvResult,
+          buildingName: mfEvBuildingName.trim() || currentProject.name,
+        };
+      }
+
       if (packetType === 'full') {
         await generatePermitPacket(packetData);
       } else {
@@ -167,6 +195,7 @@ export const PermitPacketGenerator: React.FC<PermitPacketGeneratorProps> = ({ pr
               <li>Short circuit analysis (if calculations exist)</li>
               <li>Arc flash analysis (if data available)</li>
               <li>Grounding plan (NEC Article 250)</li>
+              <li>Multi-Family EV analysis (NEC 220.84 + 220.57 + 625.42) if enabled</li>
               <li>Jurisdiction requirements checklist (if jurisdiction selected)</li>
               {packetType === 'full' && <li>Complete panel schedules for all panels</li>}
             </ul>
@@ -359,6 +388,129 @@ export const PermitPacketGenerator: React.FC<PermitPacketGeneratorProps> = ({ pr
             </div>
           </div>
         </div>
+      </div>
+
+      {/* Multi-Family EV Analysis Section */}
+      <div className="bg-white border border-gray-200 rounded-lg p-6 space-y-4">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <Building2 className="w-5 h-5 text-electric-500" />
+            <div>
+              <h3 className="font-bold text-gray-900">Multi-Family EV Analysis</h3>
+              <p className="text-sm text-gray-500">NEC 220.84 + 220.57 + 625.42 compliance</p>
+            </div>
+          </div>
+          <label className="relative inline-flex items-center cursor-pointer">
+            <input
+              type="checkbox"
+              checked={includeMultiFamilyEV}
+              onChange={(e) => setIncludeMultiFamilyEV(e.target.checked)}
+              className="sr-only peer"
+            />
+            <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-electric-500/20 rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-electric-500"></div>
+            <span className="ml-2 text-sm font-medium text-gray-700">Include</span>
+          </label>
+        </div>
+
+        {includeMultiFamilyEV && (
+          <div className="pt-4 border-t border-gray-200 space-y-4">
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+              <p className="text-sm text-blue-800">
+                <strong>Note:</strong> For detailed analysis, use the Multi-Family EV Calculator in the Tools Hub.
+                This section provides quick integration for permit packets with basic parameters.
+              </p>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label htmlFor="mfEvBuildingName" className="block text-sm font-medium text-gray-700 mb-2">
+                  Building Name (Optional)
+                </label>
+                <input
+                  id="mfEvBuildingName"
+                  type="text"
+                  value={mfEvBuildingName}
+                  onChange={(e) => setMfEvBuildingName(e.target.value)}
+                  placeholder="e.g., Parkside Apartments"
+                  className="w-full border border-gray-200 rounded px-3 py-2 text-sm focus:border-electric-500 focus:ring-2 focus:ring-electric-500/20 outline-none"
+                />
+              </div>
+              <div>
+                <label htmlFor="mfEvDwellingUnits" className="block text-sm font-medium text-gray-700 mb-2">
+                  Number of Dwelling Units
+                </label>
+                <input
+                  id="mfEvDwellingUnits"
+                  type="number"
+                  min="3"
+                  max="500"
+                  value={mfEvDwellingUnits}
+                  onChange={(e) => setMfEvDwellingUnits(parseInt(e.target.value) || 20)}
+                  className="w-full border border-gray-200 rounded px-3 py-2 text-sm focus:border-electric-500 focus:ring-2 focus:ring-electric-500/20 outline-none"
+                />
+                <p className="text-xs text-gray-500 mt-1">Min 3 units for NEC 220.84</p>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label htmlFor="mfEvChargersPerUnit" className="block text-sm font-medium text-gray-700 mb-2">
+                  EV Chargers per Unit
+                </label>
+                <select
+                  id="mfEvChargersPerUnit"
+                  value={mfEvChargersPerUnit}
+                  onChange={(e) => setMfEvChargersPerUnit(parseInt(e.target.value))}
+                  className="w-full border border-gray-200 rounded px-3 py-2 text-sm focus:border-electric-500 focus:ring-2 focus:ring-electric-500/20 outline-none"
+                >
+                  <option value="1">1 charger per unit</option>
+                  <option value="2">2 chargers per unit</option>
+                </select>
+              </div>
+              <div>
+                <label htmlFor="mfEvChargerLevel" className="block text-sm font-medium text-gray-700 mb-2">
+                  Charger Level
+                </label>
+                <select
+                  id="mfEvChargerLevel"
+                  value={mfEvChargerLevel}
+                  onChange={(e) => setMfEvChargerLevel(e.target.value as 'level1' | 'level2')}
+                  className="w-full border border-gray-200 rounded px-3 py-2 text-sm focus:border-electric-500 focus:ring-2 focus:ring-electric-500/20 outline-none"
+                >
+                  <option value="level2">Level 2 (40A, 240V) - Recommended</option>
+                  <option value="level1">Level 1 (12A, 120V)</option>
+                </select>
+              </div>
+            </div>
+
+            {/* Preview of calculation impact */}
+            <div className="bg-gray-50 rounded-lg p-3">
+              <p className="text-sm font-medium text-gray-700 mb-2">Estimated Impact Preview:</p>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
+                <div>
+                  <p className="text-gray-500">Total Chargers</p>
+                  <p className="font-semibold">{mfEvDwellingUnits * mfEvChargersPerUnit}</p>
+                </div>
+                <div>
+                  <p className="text-gray-500">Connected Load</p>
+                  <p className="font-semibold">
+                    {((mfEvDwellingUnits * mfEvChargersPerUnit * (mfEvChargerLevel === 'level2' ? 40 : 12) * (mfEvChargerLevel === 'level2' ? 240 : 120)) / 1000).toFixed(1)} kW
+                  </p>
+                </div>
+                <div>
+                  <p className="text-gray-500">Demand Factor</p>
+                  <p className="font-semibold">
+                    {mfEvDwellingUnits <= 10 ? '100%' : mfEvDwellingUnits <= 25 ? '70%' : mfEvDwellingUnits <= 50 ? '50%' : '35%'}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-gray-500">NEC Reference</p>
+                  <p className="font-semibold">220.57</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Error Message */}

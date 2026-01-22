@@ -943,6 +943,65 @@ AI explains WHY each calculation works, training junior engineers.
 | 21-22 | Marketing: "EV Pro" landing page | Niche positioning |
 | 23-24 | Outreach to EV installer communities | Customer acquisition |
 
+### Phase 2.5: Multi-Family EV Domination (Months 6-8) 🆕 **FORUM-VALIDATED**
+*Goal: Capture highest-pain, highest-WTP segment from forum research*
+
+**Target: Multi-Family EV Specialists** (validated via Mike Holt Forums, Electrician Talk)
+- Contractors turning down $10K-50K jobs due to complexity
+- Engineering firms charging $2-10K for load calculations we can automate
+- Multi-family EV is "nightmare scenario" - we solve it
+
+| Week | Feature | NEC Reference | Why |
+|------|---------|---------------|-----|
+| 25-26 | Multi-Family EV Readiness Calculator | NEC 220.84 + 220.57 + 625.42 | Automates demand factor calculations most contractors don't know exist |
+| 27-28 | Building Service Analysis Mode | NEC 220.84 | Calculates TOTAL building service capacity for multi-unit EV installations |
+| 29-30 | Load Management Sizing (EVEMS) | NEC 625.42 | Right-sizes load management systems to avoid $100K+ quotes |
+| 31-32 | Utility Coordination Package | Varies by utility | Generates documentation utilities require for service upgrade approval |
+
+**Key Insight from Forum Research:**
+> "We've stopped installing multi unit ac's and chargers... We can do it but usually tell them it's $2-10k to calculate the demands... Zero customers have been willing to pay so far." — deltasparky, Electrician Talk
+
+**Our Solution:** Automate the $2-10K engineering calculation in 5 minutes.
+
+**Pricing Opportunity:**
+- Per-project pricing: $199-499/analysis (vs $2-10K engineering fees)
+- Or included in Business tier ($149/mo) for contractors doing 3+/year
+
+#### Multi-Family EV Implementation Status (January 2026)
+
+**✅ COMPLETE:**
+| Feature | Status | Integration |
+|---------|--------|-------------|
+| Multi-Family EV Calculator Engine | ✅ Complete | `services/calculations/multiFamilyEV.ts` |
+| NEC 220.84 Demand Factors | ✅ Complete | 15-45% tiered calculation |
+| NEC 220.57 EV Demand Factors | ✅ Complete | 100%→25% based on unit count |
+| NEC 625.42 EVEMS Integration | ✅ Complete | Auto-calculates EVEMS needs |
+| Calculator UI Component | ✅ Complete | `components/MultiFamilyEVCalculator.tsx` |
+| PDF Export (Standalone) | ✅ Complete | 3-page professional report |
+| Permit Packet Integration | ✅ Complete | Included in full permit packet |
+| Tools Hub Integration | ✅ Complete | Available in Calculators.tsx |
+
+**🔮 FUTURE: Auto-Generation Roadmap (30-40 hours total)**
+
+The Multi-Family EV Calculator currently provides service sizing analysis. Future enhancement will auto-generate complete electrical designs.
+
+| Feature | Effort | Complexity | Impact |
+|---------|--------|------------|--------|
+| **Multi-Family Circuit Auto-Gen** | 8-12h | Medium | Generate standard apartment load schedules |
+| **EVEMS Circuit Templates** | 4-6h | Low | Pre-designed EV infrastructure circuits |
+| **Unit Feeder Auto-Sizing** | 3-4h | Low | Size feeders from house panel to units |
+| **Meter Room Panel Generation** | 6-8h | Medium | Create CT cabinet + house panels |
+| **Database Schema Updates** | 2-3h | Low | Store building/unit relationship |
+| **Multi-Family Permit PDFs** | 8-10h | Medium | Unit-specific panel schedules |
+
+**Technical Requirements:**
+1. **New Database Tables**: `buildings`, `dwelling_units`, `ev_infrastructure`
+2. **Dwelling Calculator Expansion**: Add multi-family mode (currently single-family only)
+3. **Panel Hierarchy**: Support building → meter room → unit panel structure
+4. **Auto-Circuit Patterns**: Template-based generation per unit type (studio, 1BR, 2BR, 3BR)
+
+**Prerequisite**: Dwelling Load Calculator must be expanded to support multi-family before auto-generation is possible.
+
 ### Phase 3: AI Leap (Months 7-9)
 *Goal: Launch "Design Copilot" for massive differentiation*
 

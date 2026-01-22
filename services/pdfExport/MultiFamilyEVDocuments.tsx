@@ -658,13 +658,16 @@ export const MultiFamilyEVDocument: React.FC<MultiFamilyEVDocumentProps> = ({
             • This analysis uses NEC 220.84 Optional Calculation for multi-family dwellings (3+ units)
           </Text>
           <Text style={styles.notesText}>
-            • EV demand factors per NEC 220.57 are applied based on the number of EVSE units
+            • EV demand factors per NEC Table 220.57 are applied based on the number of EVSE units
           </Text>
           <Text style={styles.notesText}>
-            • EVEMS scenarios assume NEC 625.42 compliant load management system
+            • EVEMS scenarios assume NEC 625.42 compliant Automatic Load Management System (ALMS)
           </Text>
           <Text style={styles.notesText}>
-            • All branch circuits must still be sized at 125% per NEC 625.40
+            • Branch circuit conductors/OCPD must be sized at 125% per NEC 210.20(A) (continuous loads)
+          </Text>
+          <Text style={styles.notesText}>
+            • Per-EVSE load calculation uses NEC 220.57(A): max(7,200 VA, nameplate rating)
           </Text>
           <Text style={styles.notesText}>
             • Cost estimates are approximate and vary by location and conditions

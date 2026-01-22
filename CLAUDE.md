@@ -136,40 +136,36 @@ GOOGLE_API_KEY=your_gemini_api_key_here     # For Pydantic AI agents
 
 **Result**: 100% commercial permit readiness - all jurisdiction requirements deliverable!
 
-### ⏳ Phase 2.5: Multi-Family EV Domination - IN PROGRESS (Jan 2026)
+### ✅ Phase 2.5: Multi-Family EV Domination - COMPLETE (Jan 2026)
 **Spec**: `STRATEGIC_ANALYSIS.md` (Forum-Validated)
-**Branch**: `feature/multi-family-ev`
+**Branch**: `feature/multi-family-ev` → Merged to `main`
 
-Capture the highest-pain, highest-WTP segment validated via Mike Holt Forums & Electrician Talk.
-Contractors are turning down $10K-50K jobs due to complexity - we automate the $2-10K engineering calculation.
+Captures highest-pain, highest-WTP segment validated via Mike Holt Forums & Electrician Talk.
+Contractors turning down $10K-50K jobs due to complexity - we automate the $2-10K engineering calculation.
 
-| Feature | NEC Reference | Status | Effort | Impact |
-|---------|---------------|--------|--------|--------|
-| **Multi-Family EV Readiness Calculator** | 220.84 + 220.57 + 625.42 | ⏳ Pending | 15-20h | Very High - Automates demand factor calcs |
-| **Building Service Analysis Mode** | 220.84 | ⏳ Pending | 8-10h | High - Total building capacity |
-| **EVEMS Right-Sizing (Multi-Unit)** | 625.42 | ⏳ Pending | 6-8h | High - Avoid $100K+ quotes |
-| **Utility Coordination Package** | Varies by utility | ⏳ Pending | 10-12h | Medium - Documentation utilities require |
+| Feature | NEC Reference | Status | Files |
+|---------|---------------|--------|-------|
+| **Multi-Family EV Calculator** | 220.84 + 220.57 + 625.42 | ✅ Complete | `services/calculations/multiFamilyEV.ts` |
+| **Calculator UI Component** | - | ✅ Complete | `components/MultiFamilyEVCalculator.tsx` |
+| **Tools Hub Integration** | - | ✅ Complete | `components/Calculators.tsx` |
+| **PDF Export (Standalone)** | - | ✅ Complete | `services/pdfExport/MultiFamilyEVDocuments.tsx` |
+| **Permit Packet Integration** | - | ✅ Complete | `components/PermitPacketGenerator.tsx` |
 
-**Phase 2.5.1: Multi-Family EV Readiness Calculator**
-- NEC 220.57 demand factors for EV charging (0.40-1.00 based on count)
-- NEC 220.84 multi-family optional calculation integration
-- Building service upgrade recommendation
-- Cost comparison: EVEMS vs full service upgrade
+**Key Features Delivered:**
+- NEC 220.84 multi-family demand factors (15-45% based on unit count)
+- NEC 220.57 EV demand factors (100% → 25% tiered reduction)
+- NEC 625.42 EVEMS right-sizing (auto-calculates load management needs)
+- Building service upgrade recommendation (none/panel-only/full-service)
+- EV capacity scenarios comparison (with/without EVEMS)
+- 3-page professional PDF export for city permit submittals
+- Integrated into Permit Packet Generator for complete packages
 
-**Phase 2.5.2: Building Service Analysis Mode**
-- Total building demand calculation (existing + EV)
-- Required service amps calculation
-- Upgrade type recommendation (none/panel-only/full-service)
-
-**Phase 2.5.3: EVEMS Right-Sizing**
-- Calculate max chargers without service upgrade
-- Compare scenarios with/without load management
-- Simultaneous charging reduction factors
-
-**Phase 2.5.4: Utility Coordination Package**
-- Generate documentation for utility approval
-- Service upgrade justification letter
-- Load calculation summary for AHJ
+**Future: Auto-Generation Roadmap (30-40 hours)**
+See `STRATEGIC_ANALYSIS.md` for detailed breakdown:
+- Multi-family circuit auto-gen (8-12h)
+- EVEMS circuit templates (4-6h)
+- Unit feeder auto-sizing (3-4h)
+- Database schema updates (2-3h)
 
 ### ✅ Phase 2.6: Enhanced AI Chatbot - COMPLETE (Jan 2026)
 **Spec**: `/docs/ENHANCED_AI_CHATBOT_SPEC.md`
@@ -278,6 +274,7 @@ AI-powered auto-design: "Design 15,000 sq ft medical office with X-ray room" →
 | EVEMS Load Management | NEC 625.42 | ✅ Complete |
 | Service Upgrade Analysis | NEC 220.87, 230.42 | ✅ Complete |
 | Arc Flash Analysis | NFPA 70E | ✅ Complete |
+| Multi-Family EV Analysis | NEC 220.84 + 220.57 + 625.42 | ✅ Complete |
 
 ### Planned Features
 
@@ -374,6 +371,36 @@ panels → panels (self-referential via fed_from)
 ---
 
 ## Recent Changes
+
+### 2026-01-21: Multi-Family EV Calculator (Phase 2.5) ✅
+**Status**: Complete
+**Branch**: `feature/multi-family-ev` → Merged to `main`
+
+**New Features:**
+- Multi-Family EV Readiness Calculator implementing NEC 220.84 + 220.57 + 625.42
+- Building profile inputs (dwelling units, sq ft, common areas)
+- EV charger configuration (Level 1/2, amps, chargers per unit)
+- Building demand analysis with tiered demand factors
+- EV capacity scenarios (with/without EVEMS load management)
+- Service upgrade recommendation (none/panel-only/full-service)
+- 3-page professional PDF export for city permits
+- Integrated into Permit Packet Generator
+
+**Files Created:**
+- `services/calculations/multiFamilyEV.ts` (977 lines - calculation engine)
+- `components/MultiFamilyEVCalculator.tsx` (~893 lines - UI component)
+- `services/pdfExport/MultiFamilyEVDocuments.tsx` (682 lines - PDF document)
+- `services/pdfExport/multiFamilyEVPDF.tsx` (84 lines - export service)
+- `docs/MULTI_FAMILY_EV_SPEC.md` (documentation)
+
+**Files Modified:**
+- `components/Calculators.tsx` - Added Multi-Family EV tab
+- `components/PermitPacketGenerator.tsx` - Added MF EV section toggle
+- `services/pdfExport/permitPacketGenerator.tsx` - Added MF EV document integration
+- `STRATEGIC_ANALYSIS.md` - Added auto-generation roadmap
+- `CLAUDE.md` - Updated Phase 2.5 status
+
+---
 
 ### 2026-01-15: Feeder Sizing Bugs & UI Improvements ✅
 **Status**: Complete

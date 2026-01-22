@@ -21,62 +21,51 @@
 /**
  * NEC Table 220.84 - Multi-Family Dwelling Demand Factors
  * Applied to the sum of all unit loads
+ *
+ * CORRECTED per actual NEC 2020/2023 Table 220.84
+ * Note: Table uses ranges, not individual unit counts
  */
 const MULTI_FAMILY_DEMAND_TABLE: { units: number; factor: number }[] = [
-  { units: 3, factor: 0.45 },    // 3 units: 45%
-  { units: 4, factor: 0.44 },    // 4 units: 44%
-  { units: 5, factor: 0.43 },    // 5 units: 43%
-  { units: 6, factor: 0.42 },
-  { units: 7, factor: 0.41 },
-  { units: 8, factor: 0.40 },
-  { units: 9, factor: 0.39 },
-  { units: 10, factor: 0.38 },
-  { units: 11, factor: 0.37 },
-  { units: 12, factor: 0.36 },
-  { units: 13, factor: 0.35 },
-  { units: 14, factor: 0.34 },
-  { units: 15, factor: 0.33 },
-  { units: 16, factor: 0.32 },
-  { units: 17, factor: 0.31 },
-  { units: 18, factor: 0.30 },
-  { units: 19, factor: 0.29 },
-  { units: 20, factor: 0.28 },
-  { units: 21, factor: 0.27 },
-  { units: 22, factor: 0.26 },
-  { units: 23, factor: 0.25 },
-  { units: 24, factor: 0.24 },
-  { units: 25, factor: 0.23 },
-  { units: 26, factor: 0.22 },
-  { units: 27, factor: 0.21 },
-  { units: 28, factor: 0.20 },
-  { units: 29, factor: 0.19 },
-  { units: 30, factor: 0.18 },
-  { units: 31, factor: 0.17 },
-  { units: 40, factor: 0.16 },
-  { units: Infinity, factor: 0.15 }, // 41+ units: 15%
+  { units: 3, factor: 0.45 },     // 3 units: 45%
+  { units: 4, factor: 0.44 },     // 4 units: 44%
+  { units: 5, factor: 0.43 },     // 5 units: 43%
+  { units: 6, factor: 0.42 },     // 6 units: 42%
+  { units: 8, factor: 0.41 },     // 7-8 units: 41%
+  { units: 10, factor: 0.40 },    // 9-10 units: 40%
+  { units: 11, factor: 0.39 },    // 11 units: 39%
+  { units: 13, factor: 0.38 },    // 12-13 units: 38%
+  { units: 15, factor: 0.37 },    // 14-15 units: 37%
+  { units: 17, factor: 0.36 },    // 16-17 units: 36%
+  { units: 20, factor: 0.35 },    // 18-20 units: 35%
+  { units: 22, factor: 0.34 },    // 21-22 units: 34%
+  { units: 24, factor: 0.33 },    // 23-24 units: 33%
+  { units: 26, factor: 0.32 },    // 25-26 units: 32%
+  { units: 28, factor: 0.31 },    // 27-28 units: 31%
+  { units: 30, factor: 0.30 },    // 29-30 units: 30%
+  { units: 32, factor: 0.29 },    // 31-32 units: 29%
+  { units: 34, factor: 0.28 },    // 33-34 units: 28%
+  { units: 36, factor: 0.27 },    // 35-36 units: 27%
+  { units: 38, factor: 0.26 },    // 37-38 units: 26%
+  { units: 40, factor: 0.25 },    // 39-40 units: 25%
+  { units: Infinity, factor: 0.25 }, // 41+ units: 25%
 ];
 
 /**
- * NEC 220.57 - Electric Vehicle Supply Equipment Demand Factors
+ * NEC Table 220.57 - Electric Vehicle Supply Equipment Demand Factors
  * NEW in 2023 NEC - Allows demand factor for multiple EV chargers
  *
- * Per NEC 220.57: "The demand factor for electric vehicle supply equipment
- * loads shall be permitted to be calculated..."
+ * CORRECTED per actual NEC 2023 Table 220.57
+ * Note: Per-EVSE load calculation uses 220.57(A): max(7,200 VA, nameplate)
+ * These factors apply to the sum of individual EVSE loads per 220.57(B)
  */
 const EV_DEMAND_FACTORS: { count: number; factor: number }[] = [
-  { count: 1, factor: 1.00 },   // 1 EVSE: 100%
-  { count: 2, factor: 1.00 },   // 2 EVSE: 100%
-  { count: 3, factor: 0.90 },   // 3 EVSE: 90%
-  { count: 4, factor: 0.85 },   // 4 EVSE: 85%
-  { count: 5, factor: 0.80 },   // 5 EVSE: 80%
-  { count: 6, factor: 0.75 },   // 6 EVSE: 75%
-  { count: 7, factor: 0.70 },   // 7 EVSE: 70%
-  { count: 8, factor: 0.65 },   // 8-10 EVSE: 65%
-  { count: 11, factor: 0.60 },  // 11-15 EVSE: 60%
-  { count: 16, factor: 0.55 },  // 16-20 EVSE: 55%
-  { count: 21, factor: 0.50 },  // 21-30 EVSE: 50%
-  { count: 31, factor: 0.45 },  // 31-40 EVSE: 45%
-  { count: 41, factor: 0.40 },  // 41+ EVSE: 40%
+  { count: 2, factor: 1.00 },   // 1-2 EVSE: 100%
+  { count: 5, factor: 0.90 },   // 3-5 EVSE: 90%
+  { count: 10, factor: 0.80 },  // 6-10 EVSE: 80%
+  { count: 20, factor: 0.75 },  // 11-20 EVSE: 75%
+  { count: 30, factor: 0.70 },  // 21-30 EVSE: 70%
+  { count: 40, factor: 0.65 },  // 31-40 EVSE: 65%
+  { count: Infinity, factor: 0.60 },  // 41+ EVSE: 60%
 ];
 
 /**
@@ -587,25 +576,25 @@ export function calculateMultiFamilyEV(input: MultiFamilyEVInput): MultiFamilyEV
   // Base unit loads subtotal (before major appliances)
   let baseUnitLoadVA = lightingLoadVA + smallApplianceVA + laundryVA;
 
-  // 1d. Electric cooking (if applicable) - Table 220.55
+  // 1d. Electric cooking (if applicable) - per NEC 220.84(C)(3)
+  // IMPORTANT: For NEC 220.84 Optional Method, cooking equipment is included
+  // at NAMEPLATE rating, NOT reduced per Table 220.55. The Table 220.84
+  // demand factor is applied once to the total.
+  // Table 220.55 is for the Standard Method (220.40-220.60), not 220.84.
   let cookingLoadVA = 0;
   if (hasElectricCooking) {
-    // NEC Table 220.55 Column C for 12 kW or less ranges
-    // Simplified: Use 8 kW for first unit, plus additional per Table
-    if (dwellingUnits <= 12) {
-      cookingLoadVA = (8000 + (dwellingUnits - 1) * 3500); // Approximate
-    } else {
-      cookingLoadVA = 25000 + (dwellingUnits - 12) * 1000; // Approximate for larger buildings
-    }
+    // Include at nameplate rating per NEC 220.84(C)(3)
+    // Assume 12 kW range per dwelling unit
+    const nameplatePerUnit = 12000; // 12 kW = 12,000 VA
+    cookingLoadVA = dwellingUnits * nameplatePerUnit;
     breakdown.push({
       category: 'Electric Cooking',
-      description: `${dwellingUnits} units per Table 220.55`,
-      connectedVA: dwellingUnits * 12000, // Assume 12 kW ranges
-      demandVA: cookingLoadVA,
-      demandFactor: cookingLoadVA / (dwellingUnits * 12000),
-      necReference: 'NEC Table 220.55',
+      description: `${dwellingUnits} units @ 12 kW nameplate each`,
+      connectedVA: cookingLoadVA,
+      demandVA: cookingLoadVA, // Will be factored with all loads via 220.84
+      demandFactor: 1.0, // No separate factor - 220.84 applies to sum
+      necReference: 'NEC 220.84(C)(3)',
     });
-    necArticles.push('NEC Table 220.55');
   }
 
   // 1e. Electric heat (if applicable) - 65% of largest unit per NEC 220.84(C)(4)
@@ -727,52 +716,80 @@ export function calculateMultiFamilyEV(input: MultiFamilyEVInput): MultiFamilyEV
     estimatedCostHigh: Math.max(0, maxChargersNoEVEMS) * 1500,
   };
 
-  // Scenario B: With EVEMS power sharing
+  // Scenario B: With EVEMS power sharing per NEC 625.42
   // EVEMS allows more chargers by sharing available capacity
-  const evemsEfficiencyFactor = 0.90; // 90% of theoretical capacity usable
-  const effectiveCapacityWithEVEMS = availableCapacityAmps * evemsEfficiencyFactor;
+  // Per NEC 625.42: "Automatic load management system (ALMS) shall be permitted
+  // to limit the total power demand from the EVSE equipment to a level that
+  // does not exceed the capacity of the electrical system."
+  const evemsEfficiencyFactor = 0.90; // 90% of theoretical capacity usable (system overhead)
+  const effectiveCapacityWithEVEMS = Math.max(0, availableCapacityAmps) * evemsEfficiencyFactor;
 
   // With power sharing, chargers can be reduced to minimum viable power (e.g., 12A for Level 2)
-  const minViableAmpsPerCharger = 12; // Minimum for Level 2 overnight charging
-  const maxChargersWithEVEMS = Math.floor(effectiveCapacityWithEVEMS / minViableAmpsPerCharger);
-  const powerPerChargerWithEVEMS = evChargers.count > 0
-    ? effectiveCapacityWithEVEMS / Math.min(evChargers.count, maxChargersWithEVEMS)
+  const minViableAmpsPerCharger = 12; // Minimum for Level 2 overnight charging (~2.5 kW)
+  const maxChargersWithEVEMS = effectiveCapacityWithEVEMS > 0
+    ? Math.floor(effectiveCapacityWithEVEMS / minViableAmpsPerCharger)
     : 0;
+
+  // Calculate power per charger for the REQUESTED count (not theoretical max)
+  const actualChargersWithEVEMS = Math.min(evChargers.count, maxChargersWithEVEMS);
+  const powerPerChargerWithEVEMS = actualChargersWithEVEMS > 0
+    ? effectiveCapacityWithEVEMS / actualChargersWithEVEMS
+    : 0;
+
+  const canAccommodateAllWithEVEMS = maxChargersWithEVEMS >= evChargers.count;
 
   const withEVEMSScenario: EVCapacityScenario = {
     name: 'With EVEMS (Power Sharing)',
-    maxChargers: Math.max(0, maxChargersWithEVEMS),
+    maxChargers: actualChargersWithEVEMS, // Show what we can actually accommodate of requested
     powerPerCharger_kW: (evVoltage * powerPerChargerWithEVEMS) / 1000,
     notes: [
-      'Chargers share available capacity dynamically',
-      `${Math.round(effectiveCapacityWithEVEMS)}A shared among all chargers`,
-      `Each charger gets ~${Math.round(powerPerChargerWithEVEMS)}A when all active`,
-      'Overnight charging typically provides 30-50 miles of range',
+      `EVEMS per NEC 625.42 - chargers share ${Math.round(effectiveCapacityWithEVEMS)}A capacity`,
+      `${actualChargersWithEVEMS} chargers @ ~${Math.round(powerPerChargerWithEVEMS)}A each when all active`,
+      `(~${((evVoltage * powerPerChargerWithEVEMS) / 1000).toFixed(1)} kW per charger = ${Math.round((evVoltage * powerPerChargerWithEVEMS) / 1000 * 3)} mi/hr charge rate)`,
+      canAccommodateAllWithEVEMS
+        ? 'EVEMS can accommodate all requested chargers'
+        : `Maximum ${maxChargersWithEVEMS} chargers possible at 12A minimum`,
     ],
-    requiresServiceUpgrade: maxChargersWithEVEMS < evChargers.count,
-    recommendedServiceAmps: maxChargersWithEVEMS < evChargers.count ? recommendedServiceAmps : undefined,
-    estimatedCostLow: 15000 + Math.max(0, Math.min(evChargers.count, maxChargersWithEVEMS)) * 800,
-    estimatedCostHigh: 35000 + Math.max(0, Math.min(evChargers.count, maxChargersWithEVEMS)) * 1500,
+    requiresServiceUpgrade: !canAccommodateAllWithEVEMS,
+    recommendedServiceAmps: !canAccommodateAllWithEVEMS ? recommendedServiceAmps : undefined,
+    estimatedCostLow: 15000 + actualChargersWithEVEMS * 800,
+    estimatedCostHigh: 35000 + actualChargersWithEVEMS * 1500,
   };
 
   // Scenario C: With service upgrade
-  const upgradeServiceAmps = recommendedServiceAmps || roundToStandardServiceSize(totalDemandAmps * 1.25);
+  // Only calculate upgrade if actually needed - never recommend same or lower service size
+  const minUpgradeServiceAmps = roundToStandardServiceSize(totalDemandAmps * 1.25);
+  const actualUpgradeServiceAmps = Math.max(
+    minUpgradeServiceAmps,
+    existingServiceAmps + 100 // Ensure upgrade is at least one step up
+  );
+  // Find next standard size above existing
+  const nextStandardSize = STANDARD_SERVICE_SIZES.find(size => size > existingServiceAmps) || actualUpgradeServiceAmps;
+  const upgradeServiceAmps = Math.max(actualUpgradeServiceAmps, nextStandardSize);
+
   const upgradeCapacityVA = calculateServiceCapacityVA(upgradeServiceAmps, voltage, phase);
   const upgradeAvailableAmps = calculateAmps(upgradeCapacityVA - buildingDemandVA, voltage, phase);
+
+  // Determine if this scenario is even relevant
+  const upgradeNeeded = !canAccommodateAllWithEVEMS || noEVEMSScenario.maxChargers < evChargers.count;
 
   const withUpgradeScenario: EVCapacityScenario = {
     name: 'With Service Upgrade',
     maxChargers: evChargers.count, // Can accommodate all requested chargers
-    notes: [
-      `Upgrade to ${upgradeServiceAmps}A service`,
+    notes: upgradeNeeded ? [
+      `Upgrade from ${existingServiceAmps}A to ${upgradeServiceAmps}A service`,
       `Available capacity after upgrade: ${Math.round(upgradeAvailableAmps)}A`,
-      'Full power to all chargers simultaneously',
-      'Utility coordination required',
+      'Full power to all chargers simultaneously (no load sharing)',
+      'Utility coordination required - contact utility before proceeding',
+    ] : [
+      'Service upgrade not required',
+      `Existing ${existingServiceAmps}A service is adequate`,
+      'Consider EVEMS for optimal charger utilization',
     ],
-    requiresServiceUpgrade: true,
-    recommendedServiceAmps: upgradeServiceAmps,
-    estimatedCostLow: 50000 + evChargers.count * 800,
-    estimatedCostHigh: 150000 + evChargers.count * 1500,
+    requiresServiceUpgrade: upgradeNeeded,
+    recommendedServiceAmps: upgradeNeeded ? upgradeServiceAmps : undefined,
+    estimatedCostLow: upgradeNeeded ? 50000 + evChargers.count * 800 : 0,
+    estimatedCostHigh: upgradeNeeded ? 150000 + evChargers.count * 1500 : 0,
   };
 
   // =========================================================================
@@ -841,6 +858,7 @@ export function calculateMultiFamilyEV(input: MultiFamilyEVInput): MultiFamilyEV
   // STEP 7: Cost Comparison
   // =========================================================================
 
+  // Consistent cost comparison - use same charger counts as scenarios
   const costComparison = [
     {
       scenario: 'No Load Management',
@@ -850,16 +868,16 @@ export function calculateMultiFamilyEV(input: MultiFamilyEVInput): MultiFamilyEV
     },
     {
       scenario: 'With EVEMS',
-      maxChargers: Math.min(evChargers.count, withEVEMSScenario.maxChargers),
+      maxChargers: withEVEMSScenario.maxChargers, // Already uses actualChargersWithEVEMS
       estimatedCostLow: withEVEMSScenario.estimatedCostLow || 0,
       estimatedCostHigh: withEVEMSScenario.estimatedCostHigh || 0,
     },
-    {
+    ...(withUpgradeScenario.requiresServiceUpgrade ? [{
       scenario: 'Service Upgrade',
       maxChargers: evChargers.count,
       estimatedCostLow: withUpgradeScenario.estimatedCostLow || 0,
       estimatedCostHigh: withUpgradeScenario.estimatedCostHigh || 0,
-    },
+    }] : []),
   ];
 
   // =========================================================================
