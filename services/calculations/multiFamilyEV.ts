@@ -22,51 +22,56 @@
  * NEC Table 220.84 - Multi-Family Dwelling Demand Factors
  * Applied to the sum of all unit loads
  *
- * CORRECTED per actual NEC 2020/2023 Table 220.84
- * Note: Table uses ranges, not individual unit counts
+ * VERIFIED per NEC 2020/2023 Table 220.84
+ * Source: NFPA 70-2023, up.codes, Mike Holt forums
+ *
+ * Conditions for use (NEC 220.84):
+ * 1. No dwelling unit supplied by more than one feeder
+ * 2. Each unit has electric cooking equipment
+ * 3. Each unit has electric heat or A/C (or both)
  */
 const MULTI_FAMILY_DEMAND_TABLE: { units: number; factor: number }[] = [
-  { units: 3, factor: 0.45 },     // 3 units: 45%
-  { units: 4, factor: 0.44 },     // 4 units: 44%
-  { units: 5, factor: 0.43 },     // 5 units: 43%
-  { units: 6, factor: 0.42 },     // 6 units: 42%
-  { units: 8, factor: 0.41 },     // 7-8 units: 41%
-  { units: 10, factor: 0.40 },    // 9-10 units: 40%
-  { units: 11, factor: 0.39 },    // 11 units: 39%
-  { units: 13, factor: 0.38 },    // 12-13 units: 38%
-  { units: 15, factor: 0.37 },    // 14-15 units: 37%
-  { units: 17, factor: 0.36 },    // 16-17 units: 36%
-  { units: 20, factor: 0.35 },    // 18-20 units: 35%
-  { units: 22, factor: 0.34 },    // 21-22 units: 34%
-  { units: 24, factor: 0.33 },    // 23-24 units: 33%
-  { units: 26, factor: 0.32 },    // 25-26 units: 32%
-  { units: 28, factor: 0.31 },    // 27-28 units: 31%
-  { units: 30, factor: 0.30 },    // 29-30 units: 30%
-  { units: 32, factor: 0.29 },    // 31-32 units: 29%
-  { units: 34, factor: 0.28 },    // 33-34 units: 28%
-  { units: 36, factor: 0.27 },    // 35-36 units: 27%
-  { units: 38, factor: 0.26 },    // 37-38 units: 26%
-  { units: 40, factor: 0.25 },    // 39-40 units: 25%
-  { units: Infinity, factor: 0.25 }, // 41+ units: 25%
+  { units: 5, factor: 0.45 },     // 3-5 units: 45%
+  { units: 7, factor: 0.44 },     // 6-7 units: 44%
+  { units: 10, factor: 0.43 },    // 8-10 units: 43%
+  { units: 11, factor: 0.42 },    // 11 units: 42%
+  { units: 13, factor: 0.41 },    // 12-13 units: 41%
+  { units: 15, factor: 0.40 },    // 14-15 units: 40%
+  { units: 17, factor: 0.39 },    // 16-17 units: 39%
+  { units: 20, factor: 0.38 },    // 18-20 units: 38%
+  { units: 21, factor: 0.37 },    // 21 units: 37%
+  { units: 23, factor: 0.36 },    // 22-23 units: 36%
+  { units: 25, factor: 0.35 },    // 24-25 units: 35%
+  { units: 27, factor: 0.34 },    // 26-27 units: 34%
+  { units: 30, factor: 0.33 },    // 28-30 units: 33%
+  { units: 31, factor: 0.32 },    // 31 units: 32%
+  { units: 33, factor: 0.31 },    // 32-33 units: 31%
+  { units: 36, factor: 0.30 },    // 34-36 units: 30%
+  { units: 38, factor: 0.29 },    // 37-38 units: 29%
+  { units: 42, factor: 0.28 },    // 39-42 units: 28%
+  { units: 45, factor: 0.27 },    // 43-45 units: 27%
+  { units: 50, factor: 0.26 },    // 46-50 units: 26%
+  { units: 55, factor: 0.25 },    // 51-55 units: 25%
+  { units: 61, factor: 0.24 },    // 56-61 units: 24%
+  { units: Infinity, factor: 0.23 }, // 62+ units: 23%
 ];
 
 /**
- * NEC Table 220.57 - Electric Vehicle Supply Equipment Demand Factors
- * NEW in 2023 NEC - Allows demand factor for multiple EV chargers
+ * NEC 220.57 - Electric Vehicle Branch-Circuit Load (2023 NEC)
  *
- * CORRECTED per actual NEC 2023 Table 220.57
- * Note: Per-EVSE load calculation uses 220.57(A): max(7,200 VA, nameplate)
- * These factors apply to the sum of individual EVSE loads per 220.57(B)
+ * IMPORTANT: NEC 220.57 is NOT a demand factor table!
+ * It specifies how to calculate per-EVSE load:
+ *   "The load for one EVSE shall be calculated at the larger of:
+ *    (1) 7,200 volt-amperes, or
+ *    (2) The nameplate rating of the EVSE"
+ *
+ * For service/feeder calculations:
+ * - WITHOUT EVEMS: Use full connected EV load (sum of per-EVSE loads)
+ * - WITH EVEMS (NEC 625.42): Size to EVEMS setpoint, treated as continuous
+ *
+ * Source: NFPA 70-2023 Article 220.57, Captain Code 2023
  */
-const EV_DEMAND_FACTORS: { count: number; factor: number }[] = [
-  { count: 2, factor: 1.00 },   // 1-2 EVSE: 100%
-  { count: 5, factor: 0.90 },   // 3-5 EVSE: 90%
-  { count: 10, factor: 0.80 },  // 6-10 EVSE: 80%
-  { count: 20, factor: 0.75 },  // 11-20 EVSE: 75%
-  { count: 30, factor: 0.70 },  // 21-30 EVSE: 70%
-  { count: 40, factor: 0.65 },  // 31-40 EVSE: 65%
-  { count: Infinity, factor: 0.60 },  // 41+ EVSE: 60%
-];
+const NEC_220_57_MINIMUM_VA = 7200; // 7,200 VA minimum per EVSE
 
 /**
  * NEC Table 220.12 - General Lighting Loads
@@ -369,19 +374,12 @@ function getMultiFamilyDemandFactor(unitCount: number): number {
 }
 
 /**
- * Get NEC 220.57 EV demand factor based on charger count
+ * Calculate per-EVSE load per NEC 220.57(A)
+ * Load = max(7,200 VA, nameplate VA)
  */
-function getEVDemandFactor(chargerCount: number): number {
-  if (chargerCount <= 0) return 0;
-
-  for (let i = EV_DEMAND_FACTORS.length - 1; i >= 0; i--) {
-    const entry = EV_DEMAND_FACTORS[i];
-    if (entry && chargerCount >= entry.count) {
-      return entry.factor;
-    }
-  }
-
-  return 1.0; // Default to 100% for 1-2 chargers
+function calculatePerEVSELoad(nameplateAmps: number, voltage: number): number {
+  const nameplateVA = nameplateAmps * voltage;
+  return Math.max(NEC_220_57_MINIMUM_VA, nameplateVA);
 }
 
 /**
@@ -648,15 +646,22 @@ export function calculateMultiFamilyEV(input: MultiFamilyEVInput): MultiFamilyEV
   // STEP 2: Calculate EV Load per NEC 220.57
   // =========================================================================
 
-  // EV charger load calculation
+  // EV charger load calculation per NEC 220.57(A)
   // Level 2 charger voltage depends on system (240V single-phase, 208V 3-phase)
   const evVoltage = phase === 3 ? 208 : 240;
-  const singleChargerVA = evVoltage * evChargers.ampsPerCharger;
-  const totalEVConnectedVA = singleChargerVA * evChargers.count;
 
-  // Apply NEC 220.57 demand factor
-  const evDemandFactor = getEVDemandFactor(evChargers.count);
-  const evDemandVA = totalEVConnectedVA * evDemandFactor;
+  // Per NEC 220.57(A): each EVSE load = max(7,200 VA, nameplate rating)
+  const perEVSELoad = calculatePerEVSELoad(evChargers.ampsPerCharger, evVoltage);
+  const totalEVConnectedVA = perEVSELoad * evChargers.count;
+
+  // IMPORTANT: NEC 220.57 does NOT provide demand factors for multiple EVSE!
+  // - Without EVEMS: Use FULL connected EV load in service calculation
+  // - With EVEMS (NEC 625.42): Size to EVEMS setpoint, treated as continuous
+  //
+  // The "evDemandVA" below represents the load for service/feeder sizing.
+  // For the base calculation (no EVEMS), we use 100% of connected load.
+  const evDemandFactor = 1.0; // No NEC-based demand factor for EV loads
+  const evDemandVA = totalEVConnectedVA; // Full connected load per NEC 220.57
   const evLoadAmps = calculateAmps(evDemandVA, voltage, phase);
 
   // =========================================================================
@@ -700,55 +705,73 @@ export function calculateMultiFamilyEV(input: MultiFamilyEVInput): MultiFamilyEV
   // STEP 4: Calculate Scenarios
   // =========================================================================
 
-  // Scenario A: Without EVEMS
-  const maxChargersNoEVEMS = Math.floor(availableCapacityAmps / evChargers.ampsPerCharger);
+  // Per-EVSE amps for calculations (at EV voltage, not service voltage)
+  const perEVSEAmps = perEVSELoad / evVoltage;
+
+  // Scenario A: Without EVEMS (Direct Connection)
+  // Per NEC 220.57: Each EVSE at full nameplate/7200VA, no demand factor
+  const maxChargersNoEVEMS = availableCapacityAmps > 0
+    ? Math.floor(availableCapacityAmps / perEVSEAmps)
+    : 0;
+
   const noEVEMSScenario: EVCapacityScenario = {
     name: 'Direct Connection (No Load Management)',
     maxChargers: Math.max(0, maxChargersNoEVEMS),
+    powerPerCharger_kW: perEVSELoad / 1000,
     notes: [
-      'Each charger operates at full power independently',
-      `Available capacity: ${Math.round(availableCapacityAmps)}A`,
-      'Fixed capacity - no flexibility',
+      'Per NEC 220.57: Each EVSE at full load (no demand factor)',
+      `Per-EVSE load: ${(perEVSELoad / 1000).toFixed(1)} kW (${Math.round(perEVSEAmps)}A @ ${evVoltage}V)`,
+      `Available service capacity: ${Math.round(Math.max(0, availableCapacityAmps))}A`,
+      maxChargersNoEVEMS >= evChargers.count
+        ? `Can accommodate all ${evChargers.count} requested chargers`
+        : `Maximum ${maxChargersNoEVEMS} chargers without service upgrade`,
     ],
     requiresServiceUpgrade: maxChargersNoEVEMS < evChargers.count,
     recommendedServiceAmps: maxChargersNoEVEMS < evChargers.count ? recommendedServiceAmps : undefined,
-    estimatedCostLow: Math.max(0, maxChargersNoEVEMS) * 800,
-    estimatedCostHigh: Math.max(0, maxChargersNoEVEMS) * 1500,
+    estimatedCostLow: Math.max(0, Math.min(evChargers.count, maxChargersNoEVEMS)) * 800,
+    estimatedCostHigh: Math.max(0, Math.min(evChargers.count, maxChargersNoEVEMS)) * 1500,
   };
 
-  // Scenario B: With EVEMS power sharing per NEC 625.42
-  // EVEMS allows more chargers by sharing available capacity
-  // Per NEC 625.42: "Automatic load management system (ALMS) shall be permitted
-  // to limit the total power demand from the EVSE equipment to a level that
-  // does not exceed the capacity of the electrical system."
-  const evemsEfficiencyFactor = 0.90; // 90% of theoretical capacity usable (system overhead)
-  const effectiveCapacityWithEVEMS = Math.max(0, availableCapacityAmps) * evemsEfficiencyFactor;
+  // Scenario B: With EVEMS (Automatic Load Management System) per NEC 625.42
+  //
+  // Per NEC 625.42: "An automatic load management system (ALMS) shall be
+  // permitted to control EVSE loads... Where an ALMS is used, the feeder or
+  // service demand load shall be permitted to be the maximum load permitted
+  // by the ALMS."
+  //
+  // This means: Size feeder/service to the EVEMS SETPOINT, not the sum of all EVSE.
+  // The setpoint becomes the "demand load" for service calculations.
 
-  // With power sharing, chargers can be reduced to minimum viable power (e.g., 12A for Level 2)
-  const minViableAmpsPerCharger = 12; // Minimum for Level 2 overnight charging (~2.5 kW)
-  const maxChargersWithEVEMS = effectiveCapacityWithEVEMS > 0
-    ? Math.floor(effectiveCapacityWithEVEMS / minViableAmpsPerCharger)
+  const evemsEfficiencyFactor = 0.90; // 90% of theoretical capacity (system overhead, safety margin)
+  const evemsSetpointAmps = Math.max(0, availableCapacityAmps) * evemsEfficiencyFactor;
+  const evemsSetpointVA = evemsSetpointAmps * (phase === 3 ? voltage * Math.sqrt(3) : voltage);
+
+  // Minimum viable charging: ~2.5 kW (12A @ 208V) provides ~8-10 miles/hour
+  const minViableAmpsPerCharger = 12;
+  const maxChargersWithEVEMS = evemsSetpointAmps > 0
+    ? Math.floor(evemsSetpointAmps / minViableAmpsPerCharger)
     : 0;
 
-  // Calculate power per charger for the REQUESTED count (not theoretical max)
+  // Calculate what power each charger gets when sharing the EVEMS setpoint
   const actualChargersWithEVEMS = Math.min(evChargers.count, maxChargersWithEVEMS);
   const powerPerChargerWithEVEMS = actualChargersWithEVEMS > 0
-    ? effectiveCapacityWithEVEMS / actualChargersWithEVEMS
+    ? evemsSetpointAmps / actualChargersWithEVEMS
     : 0;
+  const kWPerChargerWithEVEMS = (evVoltage * powerPerChargerWithEVEMS) / 1000;
 
   const canAccommodateAllWithEVEMS = maxChargersWithEVEMS >= evChargers.count;
 
   const withEVEMSScenario: EVCapacityScenario = {
-    name: 'With EVEMS (Power Sharing)',
-    maxChargers: actualChargersWithEVEMS, // Show what we can actually accommodate of requested
-    powerPerCharger_kW: (evVoltage * powerPerChargerWithEVEMS) / 1000,
+    name: 'With EVEMS (NEC 625.42 Load Management)',
+    maxChargers: actualChargersWithEVEMS,
+    powerPerCharger_kW: kWPerChargerWithEVEMS,
     notes: [
-      `EVEMS per NEC 625.42 - chargers share ${Math.round(effectiveCapacityWithEVEMS)}A capacity`,
-      `${actualChargersWithEVEMS} chargers @ ~${Math.round(powerPerChargerWithEVEMS)}A each when all active`,
-      `(~${((evVoltage * powerPerChargerWithEVEMS) / 1000).toFixed(1)} kW per charger = ${Math.round((evVoltage * powerPerChargerWithEVEMS) / 1000 * 3)} mi/hr charge rate)`,
+      `EVEMS setpoint: ${Math.round(evemsSetpointAmps)}A (service demand load per NEC 625.42)`,
+      `${actualChargersWithEVEMS} chargers share capacity: ~${Math.round(powerPerChargerWithEVEMS)}A each (${kWPerChargerWithEVEMS.toFixed(1)} kW)`,
+      `Estimated charge rate: ~${Math.round(kWPerChargerWithEVEMS * 3)} mi/hr when all active`,
       canAccommodateAllWithEVEMS
-        ? 'EVEMS can accommodate all requested chargers'
-        : `Maximum ${maxChargersWithEVEMS} chargers possible at 12A minimum`,
+        ? `✓ EVEMS can accommodate all ${evChargers.count} requested chargers`
+        : `Maximum ${maxChargersWithEVEMS} chargers at 12A minimum viable power`,
     ],
     requiresServiceUpgrade: !canAccommodateAllWithEVEMS,
     recommendedServiceAmps: !canAccommodateAllWithEVEMS ? recommendedServiceAmps : undefined,

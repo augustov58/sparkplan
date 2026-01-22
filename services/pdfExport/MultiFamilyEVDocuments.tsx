@@ -318,10 +318,10 @@ export const MultiFamilyEVDocument: React.FC<MultiFamilyEVDocumentProps> = ({
               </Text>
             </View>
             <View style={styles.gridItem}>
-              <Text style={styles.label}>EV DEMAND (NEC 220.57)</Text>
+              <Text style={styles.label}>EV LOAD (NEC 220.57)</Text>
               <Text style={styles.value}>{result.evLoad.loadAmps}A</Text>
               <Text style={styles.subValue}>
-                {(result.evLoad.demandVA / 1000).toFixed(1)} kVA @ {(result.evLoad.demandFactor * 100).toFixed(0)}% DF
+                {(result.evLoad.demandVA / 1000).toFixed(1)} kVA ({result.input.evChargersRequested} EVSE @ full load)
               </Text>
             </View>
           </View>
@@ -635,20 +635,27 @@ export const MultiFamilyEVDocument: React.FC<MultiFamilyEVDocumentProps> = ({
               <Text style={styles.tableCellValue}>{result.input.evChargersRequested}</Text>
             </View>
             <View style={styles.tableRow}>
+              <Text style={styles.tableCellLabel}>Per-EVSE Load (NEC 220.57(A))</Text>
+              <Text style={styles.tableCellValue}>
+                {(result.evLoad.totalConnectedVA / result.input.evChargersRequested / 1000).toFixed(1)} kVA each
+                (max of 7.2 kVA or nameplate)
+              </Text>
+            </View>
+            <View style={styles.tableRow}>
               <Text style={styles.tableCellLabel}>Total Connected EV Load</Text>
               <Text style={styles.tableCellValue}>{(result.evLoad.totalConnectedVA / 1000).toFixed(1)} kVA</Text>
             </View>
-            <View style={styles.tableRow}>
-              <Text style={styles.tableCellLabel}>NEC 220.57 Demand Factor</Text>
-              <Text style={styles.tableCellValue}>{(result.evLoad.demandFactor * 100).toFixed(0)}%</Text>
-            </View>
             <View style={[styles.tableRow, { backgroundColor: '#f3f4f6' }]}>
-              <Text style={[styles.tableCellLabel, { fontFamily: 'Helvetica-Bold' }]}>Total EV Demand</Text>
+              <Text style={[styles.tableCellLabel, { fontFamily: 'Helvetica-Bold' }]}>Service Demand (No EVEMS)</Text>
               <Text style={[styles.tableCellValue, { fontFamily: 'Helvetica-Bold' }]}>
-                {(result.evLoad.demandVA / 1000).toFixed(1)} kVA ({result.evLoad.loadAmps}A)
+                {(result.evLoad.demandVA / 1000).toFixed(1)} kVA ({result.evLoad.loadAmps}A) - Full load
               </Text>
             </View>
           </View>
+          <Text style={{ fontSize: 8, color: '#666', marginTop: 5 }}>
+            Note: NEC 220.57 does not provide demand factors for multiple EVSE. Use full connected load unless
+            EVEMS (NEC 625.42) is installed, which allows sizing to the EVEMS setpoint.
+          </Text>
         </View>
 
         {/* Notes Box */}

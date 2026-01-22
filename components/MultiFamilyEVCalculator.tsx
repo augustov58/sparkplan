@@ -162,25 +162,48 @@ export const MultiFamilyEVCalculator: React.FC<MultiFamilyEVCalculatorProps> = (
         }`}>
           <div className="flex items-center justify-between flex-wrap gap-4">
             <div className="flex items-center gap-3">
-              {quickCheck.canSupport ? (
+              {result ? (
+                // Use detailed result when available
+                result.scenarios.noEVEMS.maxChargers >= evChargerCount ? (
+                  <CheckCircle className="w-6 h-6 text-green-600" />
+                ) : result.scenarios.withEVEMS.maxChargers >= evChargerCount ? (
+                  <CheckCircle className="w-6 h-6 text-blue-600" />
+                ) : (
+                  <AlertTriangle className="w-6 h-6 text-yellow-600" />
+                )
+              ) : quickCheck.canSupport ? (
                 <CheckCircle className="w-6 h-6 text-green-600" />
               ) : (
                 <AlertTriangle className="w-6 h-6 text-yellow-600" />
               )}
               <div>
                 <div className="font-semibold text-gray-900">
-                  {quickCheck.canSupport
+                  {result ? (
+                    result.scenarios.noEVEMS.maxChargers >= evChargerCount
+                      ? `✓ Can support all ${evChargerCount} chargers (direct connection)`
+                      : result.scenarios.withEVEMS.maxChargers >= evChargerCount
+                        ? `✓ Can support all ${evChargerCount} chargers with EVEMS`
+                        : `Max ${result.scenarios.noEVEMS.maxChargers} direct, ${result.scenarios.withEVEMS.maxChargers} with EVEMS`
+                  ) : quickCheck.canSupport
                     ? `Can support all ${evChargerCount} chargers`
                     : `Max ${quickCheck.maxChargersWithoutUpgrade} chargers without upgrade`}
                 </div>
-                <div className="text-xs text-gray-600">{quickCheck.recommendation}</div>
+                <div className="text-xs text-gray-600">
+                  {result ? (
+                    result.scenarios.noEVEMS.maxChargers >= evChargerCount
+                      ? 'No load management required - each EVSE at full power'
+                      : result.scenarios.withEVEMS.maxChargers >= evChargerCount
+                        ? 'EVEMS load sharing required per NEC 625.42'
+                        : 'Service upgrade recommended for full capacity'
+                  ) : quickCheck.recommendation}
+                </div>
               </div>
             </div>
             <div className="text-right">
               <div className="text-2xl font-bold text-gray-900">
-                {quickCheck.utilizationPercent}%
+                {result ? result.serviceAnalysis.utilizationPercent : quickCheck.utilizationPercent}%
               </div>
-              <div className="text-xs text-gray-500">Service Utilization</div>
+              <div className="text-xs text-gray-500">Service Utilization (w/EV)</div>
             </div>
           </div>
         </div>
@@ -387,7 +410,7 @@ export const MultiFamilyEVCalculator: React.FC<MultiFamilyEVCalculatorProps> = (
                       <option value="24">24A (5.8 kW)</option>
                       <option value="32">32A (7.7 kW)</option>
                       <option value="40">40A (9.6 kW)</option>
-                      <option value="48">48A (11.5 kW)</option>
+                      <option value="48">48A (~10 kW @ 208V)</option>
                       <option value="80">80A (19.2 kW)</option>
                     </>
                   )}
