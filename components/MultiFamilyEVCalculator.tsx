@@ -406,12 +406,12 @@ export const MultiFamilyEVCalculator: React.FC<MultiFamilyEVCalculatorProps> = (
                     </>
                   ) : (
                     <>
-                      <option value="16">16A (3.8 kW)</option>
-                      <option value="24">24A (5.8 kW)</option>
-                      <option value="32">32A (7.7 kW)</option>
-                      <option value="40">40A (9.6 kW)</option>
-                      <option value="48">48A (~10 kW @ 208V)</option>
-                      <option value="80">80A (19.2 kW)</option>
+                      <option value="16">16A (~3.3 kW @ 208V)</option>
+                      <option value="24">24A (~5.0 kW @ 208V)</option>
+                      <option value="32">32A (~6.7 kW @ 208V)</option>
+                      <option value="40">40A (~8.3 kW @ 208V)</option>
+                      <option value="48">48A (~10.0 kW @ 208V)</option>
+                      <option value="80">80A (~16.6 kW @ 208V)</option>
                     </>
                   )}
                 </select>
@@ -465,7 +465,7 @@ export const MultiFamilyEVCalculator: React.FC<MultiFamilyEVCalculatorProps> = (
                       onChange={e => setHasElectricCooking(e.target.checked)}
                       className="rounded border-gray-300 text-electric-500 focus:ring-electric-500"
                     />
-                    <span className="text-sm text-gray-700">Electric Cooking (Table 220.55)</span>
+                    <span className="text-sm text-gray-700">Electric Cooking (12 kW/unit nameplate)</span>
                   </label>
 
                   <div>
@@ -568,12 +568,12 @@ export const MultiFamilyEVCalculator: React.FC<MultiFamilyEVCalculatorProps> = (
                     </div>
                   </div>
                   <div>
-                    <span className="text-gray-600">EV Load (with DF):</span>
+                    <span className="text-gray-600">EV Load (NEC 220.57):</span>
                     <div className="text-2xl font-bold text-green-700 mt-1">
                       {result.evLoad.loadAmps} A
                     </div>
                     <div className="text-xs text-gray-500 mt-1">
-                      {(result.evLoad.demandVA / 1000).toFixed(1)} kVA @ {(result.evLoad.demandFactor * 100).toFixed(0)}% DF (NEC 220.57)
+                      {(result.evLoad.demandVA / 1000).toFixed(1)} kVA (full connected load)
                     </div>
                   </div>
                 </div>
@@ -894,15 +894,17 @@ export const MultiFamilyEVCalculator: React.FC<MultiFamilyEVCalculatorProps> = (
         <div className="text-sm text-gray-700 space-y-3">
           <p>
             <strong>NEC 220.84 - Multi-Family Demand Factors:</strong> For buildings with 3+ dwelling units,
-            NEC allows significant demand factors (15-45%) on unit loads, recognizing that not all loads operate simultaneously.
+            NEC allows significant demand factors (23-45%) on unit loads, recognizing that not all loads operate simultaneously.
           </p>
           <p>
-            <strong>NEC 220.57 - EV Demand Factors (2023 NEC):</strong> New in 2023 NEC, this allows demand factors
-            for multiple EV chargers (40-100%), recognizing that EVs rarely all charge at full power simultaneously.
+            <strong>NEC 220.57 - Per-EVSE Load (2023 NEC):</strong> Specifies that each EVSE load shall be
+            calculated as the larger of 7,200 VA or the nameplate rating. This does NOT provide demand factors
+            for multiple EVSEs - the full connected load must be used without EVEMS.
           </p>
           <p>
-            <strong>NEC 625.42 - EVEMS:</strong> Electric Vehicle Energy Management Systems can further reduce
-            required capacity by intelligently managing charging loads based on available power.
+            <strong>NEC 625.42 - EVEMS:</strong> Electric Vehicle Energy Management Systems allow sizing
+            the service/feeder to the EVEMS setpoint instead of the full connected load. This is the NEC-compliant
+            way to add more chargers than direct connection would allow.
           </p>
           <div className="mt-4 bg-white rounded p-3 border border-blue-200">
             <strong>Why This Matters:</strong> This calculator automates calculations that typically cost

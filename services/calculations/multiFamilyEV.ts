@@ -705,13 +705,21 @@ export function calculateMultiFamilyEV(input: MultiFamilyEVInput): MultiFamilyEV
   // STEP 4: Calculate Scenarios
   // =========================================================================
 
-  // Per-EVSE amps for calculations (at EV voltage, not service voltage)
-  const perEVSEAmps = perEVSELoad / evVoltage;
+  // Per-EVSE amps in TWO reference frames:
+  // 1. "EVSE amps" - the actual charger current at EV voltage (for charger specs)
+  // 2. "Service-equivalent amps" - contribution to 3-phase service capacity
+  //
+  // For 3-phase systems: a single-phase 208V L-L EVSE draws current from two phases.
+  // Its service-equivalent contribution is: VA / (√3 × V_service)
+  // NOT: VA / V_evse (which would be the single-phase L-L current)
+  const perEVSEAmpsAtCharger = perEVSELoad / evVoltage; // For charger spec display
+  const perEVSEServiceEquivalentAmps = calculateAmps(perEVSELoad, voltage, phase); // For capacity calc
 
   // Scenario A: Without EVEMS (Direct Connection)
   // Per NEC 220.57: Each EVSE at full nameplate/7200VA, no demand factor
+  // Use service-equivalent amps for capacity calculation
   const maxChargersNoEVEMS = availableCapacityAmps > 0
-    ? Math.floor(availableCapacityAmps / perEVSEAmps)
+    ? Math.floor(availableCapacityAmps / perEVSEServiceEquivalentAmps)
     : 0;
 
   const noEVEMSScenario: EVCapacityScenario = {
@@ -720,7 +728,8 @@ export function calculateMultiFamilyEV(input: MultiFamilyEVInput): MultiFamilyEV
     powerPerCharger_kW: perEVSELoad / 1000,
     notes: [
       'Per NEC 220.57: Each EVSE at full load (no demand factor)',
-      `Per-EVSE load: ${(perEVSELoad / 1000).toFixed(1)} kW (${Math.round(perEVSEAmps)}A @ ${evVoltage}V)`,
+      `Per-EVSE load: ${(perEVSELoad / 1000).toFixed(1)} kVA (${Math.round(perEVSEAmpsAtCharger)}A @ ${evVoltage}V)`,
+      `Service-equivalent: ${perEVSEServiceEquivalentAmps.toFixed(1)}A per EVSE @ ${voltage}V ${phase}φ`,
       `Available service capacity: ${Math.round(Math.max(0, availableCapacityAmps))}A`,
       maxChargersNoEVEMS >= evChargers.count
         ? `Can accommodate all ${evChargers.count} requested chargers`

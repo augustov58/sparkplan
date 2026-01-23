@@ -973,15 +973,42 @@ AI explains WHY each calculation works, training junior engineers.
 | Feature | Status | Integration |
 |---------|--------|-------------|
 | Multi-Family EV Calculator Engine | ✅ Complete | `services/calculations/multiFamilyEV.ts` |
-| NEC 220.84 Demand Factors | ✅ Complete | 15-45% tiered calculation |
-| NEC 220.57 EV Demand Factors | ✅ Complete | 100%→25% based on unit count |
-| NEC 625.42 EVEMS Integration | ✅ Complete | Auto-calculates EVEMS needs |
+| NEC 220.84 Demand Factors | ✅ Complete | 23-45% tiered calculation (3-62+ units) |
+| NEC 220.57 Per-EVSE Load | ✅ Complete | max(7,200 VA, nameplate) per EVSE |
+| NEC 625.42 EVEMS Integration | ✅ Complete | Size to setpoint, not connected load |
 | Calculator UI Component | ✅ Complete | `components/MultiFamilyEVCalculator.tsx` |
 | PDF Export (Standalone) | ✅ Complete | 3-page professional report |
 | Permit Packet Integration | ✅ Complete | Included in full permit packet |
 | Tools Hub Integration | ✅ Complete | Available in Calculators.tsx |
 
+**⏳ PREREQUISITE: Multi-Family Dwelling Calculator (18-25 hours)**
+
+The current Dwelling Load Calculator only supports single-family dwellings (NEC 220.82). A full multi-family dwelling calculator using NEC 220.84 is required before auto-generation features can be built.
+
+| Feature | Effort | Complexity | Impact |
+|---------|--------|------------|--------|
+| **NEC 220.84 Calculation Engine** | 8-10h | Medium | Full dwelling unit load calc with proper demand factors |
+| **Unit Count & Load Aggregation** | 4-6h | Medium | Support 3-62+ units with tiered demand factors |
+| **Load Category Breakdown** | 2-3h | Low | General lighting, small appliances, laundry, cooking, A/C, heat |
+| **Multi-Family PDF Reports** | 4-6h | Medium | Per-unit and aggregate load schedules |
+
+**NEC 220.84 Requirements:**
+- Applies to multi-family dwellings with **3 or more units**
+- Each unit must be equipped with electric cooking AND either electric space heating or A/C
+- Demand factors range from 45% (3-5 units) down to 23% (62+ units)
+- Loads included: general lighting (3 VA/sq ft), small appliances (1,500 VA × 2), laundry (1,500 VA), nameplate ratings for appliances
+
+**Integration Points:**
+- Expand `DwellingLoadCalculator.tsx` with multi-family mode toggle
+- New `services/calculations/multiFamilyDwelling.ts` calculation engine
+- Reuse NEC 220.84 demand factor table from `multiFamilyEV.ts`
+- Service sizing output feeds into panel/feeder design
+
+---
+
 **🔮 FUTURE: Auto-Generation Roadmap (30-40 hours total)**
+
+*Requires Multi-Family Dwelling Calculator above to be complete first.*
 
 The Multi-Family EV Calculator currently provides service sizing analysis. Future enhancement will auto-generate complete electrical designs.
 
@@ -996,11 +1023,8 @@ The Multi-Family EV Calculator currently provides service sizing analysis. Futur
 
 **Technical Requirements:**
 1. **New Database Tables**: `buildings`, `dwelling_units`, `ev_infrastructure`
-2. **Dwelling Calculator Expansion**: Add multi-family mode (currently single-family only)
-3. **Panel Hierarchy**: Support building → meter room → unit panel structure
-4. **Auto-Circuit Patterns**: Template-based generation per unit type (studio, 1BR, 2BR, 3BR)
-
-**Prerequisite**: Dwelling Load Calculator must be expanded to support multi-family before auto-generation is possible.
+2. **Panel Hierarchy**: Support building → meter room → unit panel structure
+3. **Auto-Circuit Patterns**: Template-based generation per unit type (studio, 1BR, 2BR, 3BR)
 
 ### Phase 3: AI Leap (Months 7-9)
 *Goal: Launch "Design Copilot" for massive differentiation*

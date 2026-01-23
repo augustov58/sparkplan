@@ -152,13 +152,21 @@ Contractors turning down $10K-50K jobs due to complexity - we automate the $2-10
 | **Permit Packet Integration** | - | ✅ Complete | `components/PermitPacketGenerator.tsx` |
 
 **Key Features Delivered:**
-- NEC 220.84 multi-family demand factors (15-45% based on unit count)
-- NEC 220.57 EV demand factors (100% → 25% tiered reduction)
-- NEC 625.42 EVEMS right-sizing (auto-calculates load management needs)
+- NEC 220.84 multi-family demand factors (23-45% based on unit count)
+- NEC 220.57 per-EVSE load calculation (max of 7,200 VA or nameplate)
+- NEC 625.42 EVEMS right-sizing (size to setpoint, not full connected load)
 - Building service upgrade recommendation (none/panel-only/full-service)
 - EV capacity scenarios comparison (with/without EVEMS)
 - 3-page professional PDF export for city permit submittals
 - Integrated into Permit Packet Generator for complete packages
+
+**⏳ PREREQUISITE: Multi-Family Dwelling Calculator (18-25 hours)**
+Current Dwelling Load Calculator only supports single-family (NEC 220.82).
+Multi-family support (NEC 220.84) required before auto-generation:
+- NEC 220.84 calculation engine (8-10h)
+- Unit count & load aggregation (4-6h)
+- Load category breakdown (2-3h)
+- Multi-family PDF reports (4-6h)
 
 **Future: Auto-Generation Roadmap (30-40 hours)**
 See `STRATEGIC_ANALYSIS.md` for detailed breakdown:
