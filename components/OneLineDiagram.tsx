@@ -155,7 +155,7 @@ export const OneLineDiagram: React.FC<OneLineDiagramProps> = ({ project, updateP
   // Use panels, circuits, transformers, and feeders from database
   const { panels, createPanel, updatePanel, deletePanel, getMainPanel } = usePanels(project.id);
   const { circuits, createCircuit, deleteCircuit } = useCircuits(project.id);
-  const { transformers, createTransformer, deleteTransformer } = useTransformers(project.id);
+  const { transformers, createTransformer, updateTransformer, deleteTransformer } = useTransformers(project.id);
   const { feeders } = useFeeders(project.id);
 
   const [description, setDescription] = useState<string | null>(null);
@@ -183,6 +183,21 @@ export const OneLineDiagram: React.FC<OneLineDiagramProps> = ({ project, updateP
   // Equipment Specifications Editor State
   const [showEquipmentSpecs, setShowEquipmentSpecs] = useState(false);
   const [editingEquipmentSpecs, setEditingEquipmentSpecs] = useState<any>(null);
+
+  // Transformer Editor State (for editing existing transformers)
+  const [editingTransformer, setEditingTransformer] = useState<{
+    id: string;
+    name: string;
+    location: string;
+    kvaRating: number;
+    primaryVoltage: number;
+    primaryPhase: 1 | 3;
+    primaryBreakerAmps: number;
+    secondaryVoltage: number;
+    secondaryPhase: 1 | 3;
+    fedFromPanelId: string;
+    fedFromCircuitNumber: number | null;  // Breaker slot in parent panel, null = feed-thru lug
+  } | null>(null);
 
   // Check if project is residential (affects allowed configurations)
   const isResidentialProject = project.type === ProjectType.RESIDENTIAL;
@@ -223,7 +238,8 @@ export const OneLineDiagram: React.FC<OneLineDiagramProps> = ({ project, updateP
     primaryBreakerAmps: 100,
     secondaryVoltage: 208,
     secondaryPhase: 3 as 1 | 3,
-    fedFromPanelId: ''
+    fedFromPanelId: '',
+    fedFromCircuitNumber: null as number | null  // Breaker slot in parent panel, null = feed-thru lug
   });
 
   // Bulk Circuit Creator State
@@ -1081,6 +1097,97 @@ export const OneLineDiagram: React.FC<OneLineDiagramProps> = ({ project, updateP
     }
   };
 
+  // Start editing a transformer
+  const startEditTransformer = (transformerId: string) => {
+    const transformer = transformers.find(t => t.id === transformerId);
+    if (!transformer) return;
+
+    setEditingTransformer({
+      id: transformer.id,
+      name: transformer.name,
+      location: transformer.location || '',
+      kvaRating: transformer.kva_rating,
+      primaryVoltage: transformer.primary_voltage,
+      primaryPhase: transformer.primary_phase as 1 | 3,
+      primaryBreakerAmps: transformer.primary_breaker_amps || 100,
+      secondaryVoltage: transformer.secondary_voltage,
+      secondaryPhase: transformer.secondary_phase as 1 | 3,
+      fedFromPanelId: transformer.fed_from_panel_id || '',
+      fedFromCircuitNumber: transformer.fed_from_circuit_number || null
+    });
+  };
+
+  // Cancel editing transformer
+  const cancelEditTransformer = () => {
+    setEditingTransformer(null);
+  };
+
+  // Save transformer edits
+  const saveEditTransformer = async () => {
+    if (!editingTransformer) return;
+
+    const transformer = transformers.find(t => t.id === editingTransformer.id);
+    if (!transformer) return;
+
+    // Validation
+    if (!editingTransformer.name.trim()) {
+      alert('Transformer name is required.');
+      return;
+    }
+
+    if (!editingTransformer.fedFromPanelId) {
+      alert('Please select a source panel for the transformer.');
+      return;
+    }
+
+    // Voltage validation: transformer primary voltage must match source panel voltage
+    const sourcePanel = panels.find(p => p.id === editingTransformer.fedFromPanelId);
+    if (sourcePanel && sourcePanel.voltage !== editingTransformer.primaryVoltage) {
+      alert(
+        `⚠️ Voltage Mismatch\n\n` +
+        `Transformer primary voltage (${editingTransformer.primaryVoltage}V) must match ` +
+        `source panel "${sourcePanel.name}" voltage (${sourcePanel.voltage}V).\n\n` +
+        `Either change the transformer primary voltage to ${sourcePanel.voltage}V, ` +
+        `or select a different source panel.`
+      );
+      return;
+    }
+
+    // Check if voltage change affects downstream panels
+    if (transformer.secondary_voltage !== editingTransformer.secondaryVoltage) {
+      const downstreamPanels = panels.filter(p => p.fed_from_transformer_id === editingTransformer.id);
+      if (downstreamPanels.length > 0) {
+        const confirmed = confirm(
+          `Changing secondary voltage will affect ${downstreamPanels.length} downstream panel(s):\n\n` +
+          `${downstreamPanels.map(p => p.name).join(', ')}\n\n` +
+          `These panels may need to be updated or deleted.\n\n` +
+          `Continue with the change?`
+        );
+        if (!confirmed) return;
+      }
+    }
+
+    try {
+      await updateTransformer(editingTransformer.id, {
+        name: editingTransformer.name,
+        location: editingTransformer.location,
+        kva_rating: editingTransformer.kvaRating,
+        primary_voltage: editingTransformer.primaryVoltage,
+        primary_phase: editingTransformer.primaryPhase,
+        primary_breaker_amps: editingTransformer.primaryBreakerAmps,
+        secondary_voltage: editingTransformer.secondaryVoltage,
+        secondary_phase: editingTransformer.secondaryPhase,
+        fed_from_panel_id: editingTransformer.fedFromPanelId,
+        fed_from_circuit_number: editingTransformer.fedFromCircuitNumber
+      });
+
+      setEditingTransformer(null);
+    } catch (error) {
+      console.error('Failed to update transformer:', error);
+      alert('Failed to update transformer. Please try again.');
+    }
+  };
+
   // Helper to get all occupied slots for a panel (including multi-pole spans)
   const getOccupiedSlots = (panelId: string) => {
     const panelCircuits = circuits.filter(c => c.panel_id === panelId);
@@ -1100,9 +1207,9 @@ export const OneLineDiagram: React.FC<OneLineDiagramProps> = ({ project, updateP
     return occupied;
   };
 
-  // Helper to get available slots for feeder panel assignment
-  // Includes slots occupied by circuits AND other breaker-fed sub-panels
-  const getAvailableSlotsForFeeder = (parentPanelId: string, pole: number) => {
+  // Helper to get available slots for feeder panel/transformer assignment
+  // Includes slots occupied by circuits, breaker-fed sub-panels, AND breaker-fed transformers
+  const getAvailableSlotsForFeeder = (parentPanelId: string, pole: number, excludeTransformerId?: string) => {
     if (!parentPanelId) return [];
 
     const parentPanel = panels.find(p => p.id === parentPanelId);
@@ -1122,6 +1229,20 @@ export const OneLineDiagram: React.FC<OneLineDiagramProps> = ({ project, updateP
         const feederPole = panel.phase === 3 ? 3 : 2; // Feeder breaker is 2P or 3P
         for (let i = 0; i < feederPole; i++) {
           occupiedByFeeders.add(panel.fed_from_circuit_number + (i * 2));
+        }
+      }
+    }
+
+    // Get slots occupied by breaker-fed transformers
+    const breakerFedTransformers = transformers.filter(
+      t => t.fed_from_panel_id === parentPanelId && t.fed_from_circuit_number && t.id !== excludeTransformerId
+    );
+
+    for (const xfmr of breakerFedTransformers) {
+      if (xfmr.fed_from_circuit_number) {
+        const xfmrPole = xfmr.primary_phase === 3 ? 3 : 2; // Transformer primary breaker is 2P or 3P
+        for (let i = 0; i < xfmrPole; i++) {
+          occupiedByFeeders.add(xfmr.fed_from_circuit_number + (i * 2));
         }
       }
     }
@@ -1444,6 +1565,19 @@ export const OneLineDiagram: React.FC<OneLineDiagramProps> = ({ project, updateP
   const addTransformer = async () => {
     if (!newTransformer.name || !newTransformer.fedFromPanelId) return;
 
+    // Voltage validation: transformer primary voltage must match source panel voltage
+    const sourcePanel = panels.find(p => p.id === newTransformer.fedFromPanelId);
+    if (sourcePanel && sourcePanel.voltage !== newTransformer.primaryVoltage) {
+      alert(
+        `⚠️ Voltage Mismatch\n\n` +
+        `Transformer primary voltage (${newTransformer.primaryVoltage}V) must match ` +
+        `source panel "${sourcePanel.name}" voltage (${sourcePanel.voltage}V).\n\n` +
+        `Either change the transformer primary voltage to ${sourcePanel.voltage}V, ` +
+        `or select a different source panel.`
+      );
+      return;
+    }
+
     // Validate transformer data
     const validation = validateTransformerForm({
       name: newTransformer.name,
@@ -1471,6 +1605,7 @@ export const OneLineDiagram: React.FC<OneLineDiagramProps> = ({ project, updateP
       secondary_voltage: newTransformer.secondaryVoltage,
       secondary_phase: newTransformer.secondaryPhase,
       fed_from_panel_id: newTransformer.fedFromPanelId,
+      fed_from_circuit_number: newTransformer.fedFromCircuitNumber,
       connection_type: 'delta-wye' as const
     };
 
@@ -1484,7 +1619,8 @@ export const OneLineDiagram: React.FC<OneLineDiagramProps> = ({ project, updateP
       primaryBreakerAmps: 100,
       secondaryVoltage: 208,
       secondaryPhase: 3,
-      fedFromPanelId: ''
+      fedFromPanelId: '',
+      fedFromCircuitNumber: null
     });
   };
 
@@ -2520,7 +2656,7 @@ export const OneLineDiagram: React.FC<OneLineDiagramProps> = ({ project, updateP
                  <label className="text-xs font-semibold text-gray-500 uppercase">Fed From Panel</label>
                  <select
                     value={newTransformer.fedFromPanelId}
-                    onChange={e => setNewTransformer({...newTransformer, fedFromPanelId: e.target.value})}
+                    onChange={e => setNewTransformer({...newTransformer, fedFromPanelId: e.target.value, fedFromCircuitNumber: null})}
                     className="w-full border-gray-200 rounded text-sm py-2"
                  >
                    <option value="">Select panel...</option>
@@ -2531,6 +2667,45 @@ export const OneLineDiagram: React.FC<OneLineDiagramProps> = ({ project, updateP
                    ))}
                  </select>
                </div>
+
+               {/* Circuit Number / Feed-Thru Lug Selection */}
+               {newTransformer.fedFromPanelId && (
+                 <div>
+                   <label className="text-xs font-semibold text-gray-500 uppercase">
+                     Connection Type
+                   </label>
+                   <select
+                     value={newTransformer.fedFromCircuitNumber === null ? 'lug' : String(newTransformer.fedFromCircuitNumber)}
+                     onChange={e => {
+                       const value = e.target.value;
+                       setNewTransformer({
+                         ...newTransformer,
+                         fedFromCircuitNumber: value === 'lug' ? null : parseInt(value)
+                       });
+                     }}
+                     className="w-full border-gray-200 rounded text-sm py-2"
+                   >
+                     <option value="lug">Feed-Thru Lug (no breaker)</option>
+                     <optgroup label="Breaker Slot">
+                       {(() => {
+                         const pole = newTransformer.primaryPhase === 3 ? 3 : 2;
+                         const slots = getAvailableSlotsForFeeder(newTransformer.fedFromPanelId, pole);
+                         return slots.map(slot => (
+                           <option key={slot} value={slot}>
+                             Slot {slot} ({slot % 2 === 1 ? 'Left' : 'Right'} side)
+                           </option>
+                         ));
+                       })()}
+                     </optgroup>
+                   </select>
+                   <p className="text-[10px] text-gray-400 mt-1">
+                     {newTransformer.fedFromCircuitNumber === null
+                       ? 'Transformer will connect via feed-thru lugs'
+                       : `Transformer will use breaker at slot ${newTransformer.fedFromCircuitNumber}`}
+                   </p>
+                 </div>
+               )}
+
                <div className="grid grid-cols-2 gap-3">
                  <div>
                    <label className="text-xs font-semibold text-gray-500 uppercase">kVA Rating</label>
@@ -2613,24 +2788,179 @@ export const OneLineDiagram: React.FC<OneLineDiagramProps> = ({ project, updateP
                <div className="bg-gray-50 px-4 py-2 border-b border-gray-100 text-xs font-medium text-gray-500 uppercase">
                  Transformers ({transformers.length})
                </div>
-               <div className="divide-y divide-gray-50 max-h-[200px] overflow-y-auto">
+               <div className="divide-y divide-gray-50 max-h-[300px] overflow-y-auto">
                  {transformers.map(xfmr => {
                    const sourcePanel = panels.find(p => p.id === xfmr.fed_from_panel_id);
+                   const isEditing = editingTransformer?.id === xfmr.id;
+
                    return (
-                     <div key={xfmr.id} className="p-3 flex justify-between items-center hover:bg-gray-50 group">
-                       <div>
-                         <div className="flex items-center gap-2">
-                            <Bolt className="w-4 h-4 text-orange-500" />
-                            <span className="text-sm font-medium text-gray-900">{xfmr.name}</span>
+                     <div key={xfmr.id} className={`p-3 ${isEditing ? 'bg-orange-50 border-l-4 border-orange-500' : 'hover:bg-gray-50'} group`}>
+                       {isEditing ? (
+                         // Edit form for transformer
+                         <div className="space-y-3">
+                           <div className="flex items-center justify-between">
+                             <span className="text-xs font-semibold text-orange-700 uppercase">Editing Transformer</span>
+                             <button onClick={cancelEditTransformer} className="text-gray-400 hover:text-gray-600">
+                               <X className="w-4 h-4" />
+                             </button>
+                           </div>
+                           <input
+                             type="text"
+                             value={editingTransformer.name}
+                             onChange={e => setEditingTransformer({ ...editingTransformer, name: e.target.value })}
+                             className="w-full border-gray-200 rounded text-sm py-1.5 px-2"
+                             placeholder="Transformer Name"
+                           />
+
+                           {/* Fed From Panel - KEY FEATURE */}
+                           <div>
+                             <label className="text-[10px] text-gray-500 uppercase">Fed From Panel</label>
+                             <select
+                               value={editingTransformer.fedFromPanelId}
+                               onChange={e => setEditingTransformer({ ...editingTransformer, fedFromPanelId: e.target.value, fedFromCircuitNumber: null })}
+                               className="w-full border-gray-200 rounded text-xs py-1.5"
+                             >
+                               <option value="">Select Panel...</option>
+                               {panels.map(panel => (
+                                 <option key={panel.id} value={panel.id}>
+                                   {panel.name} ({panel.voltage}V {panel.phase}Φ)
+                                 </option>
+                               ))}
+                             </select>
+                           </div>
+
+                           {/* Circuit Number / Feed-Thru Lug Selection */}
+                           {editingTransformer.fedFromPanelId && (
+                             <div>
+                               <label className="text-[10px] text-gray-500 uppercase">Connection Type</label>
+                               <select
+                                 value={editingTransformer.fedFromCircuitNumber === null ? 'lug' : String(editingTransformer.fedFromCircuitNumber)}
+                                 onChange={e => {
+                                   const value = e.target.value;
+                                   setEditingTransformer({
+                                     ...editingTransformer,
+                                     fedFromCircuitNumber: value === 'lug' ? null : parseInt(value)
+                                   });
+                                 }}
+                                 className="w-full border-gray-200 rounded text-xs py-1.5"
+                               >
+                                 <option value="lug">Feed-Thru Lug (no breaker)</option>
+                                 <optgroup label="Breaker Slot">
+                                   {(() => {
+                                     const pole = editingTransformer.primaryPhase === 3 ? 3 : 2;
+                                     const slots = getAvailableSlotsForFeeder(editingTransformer.fedFromPanelId, pole, editingTransformer.id);
+                                     return slots.map(slot => (
+                                       <option key={slot} value={slot}>
+                                         Slot {slot} ({slot % 2 === 1 ? 'Left' : 'Right'} side)
+                                       </option>
+                                     ));
+                                   })()}
+                                 </optgroup>
+                               </select>
+                               <p className="text-[10px] text-gray-400 mt-1">
+                                 {editingTransformer.fedFromCircuitNumber === null
+                                   ? 'Via feed-thru lugs'
+                                   : `Breaker at slot ${editingTransformer.fedFromCircuitNumber}`}
+                               </p>
+                             </div>
+                           )}
+
+                           <div className="grid grid-cols-2 gap-2">
+                             <div>
+                               <label className="text-[10px] text-gray-500 uppercase">kVA Rating</label>
+                               <input
+                                 type="number"
+                                 value={editingTransformer.kvaRating}
+                                 onChange={e => setEditingTransformer({ ...editingTransformer, kvaRating: Number(e.target.value) })}
+                                 className="w-full border-gray-200 rounded text-xs py-1 px-2"
+                               />
+                             </div>
+                             <div>
+                               <label className="text-[10px] text-gray-500 uppercase">Primary Breaker</label>
+                               <input
+                                 type="number"
+                                 value={editingTransformer.primaryBreakerAmps}
+                                 onChange={e => setEditingTransformer({ ...editingTransformer, primaryBreakerAmps: Number(e.target.value) })}
+                                 className="w-full border-gray-200 rounded text-xs py-1 px-2"
+                               />
+                             </div>
+                           </div>
+
+                           <div className="grid grid-cols-2 gap-2">
+                             <div>
+                               <label className="text-[10px] text-gray-500 uppercase">Secondary Voltage</label>
+                               <select
+                                 value={editingTransformer.secondaryVoltage}
+                                 onChange={e => setEditingTransformer({ ...editingTransformer, secondaryVoltage: Number(e.target.value) })}
+                                 className="w-full border-gray-200 rounded text-xs py-1"
+                               >
+                                 <option value="120">120V</option>
+                                 <option value="208">208V</option>
+                                 <option value="240">240V</option>
+                                 <option value="277">277V</option>
+                                 <option value="480">480V</option>
+                               </select>
+                             </div>
+                             <div>
+                               <label className="text-[10px] text-gray-500 uppercase">Secondary Phase</label>
+                               <select
+                                 value={editingTransformer.secondaryPhase}
+                                 onChange={e => setEditingTransformer({ ...editingTransformer, secondaryPhase: Number(e.target.value) as 1 | 3 })}
+                                 className="w-full border-gray-200 rounded text-xs py-1"
+                               >
+                                 <option value="1">1Φ</option>
+                                 <option value="3">3Φ</option>
+                               </select>
+                             </div>
+                           </div>
+
+                           <input
+                             type="text"
+                             value={editingTransformer.location}
+                             onChange={e => setEditingTransformer({ ...editingTransformer, location: e.target.value })}
+                             className="w-full border-gray-200 rounded text-xs py-1 px-2"
+                             placeholder="Location (optional)"
+                           />
+
+                           <button
+                             onClick={saveEditTransformer}
+                             className="w-full bg-orange-500 text-white text-xs font-medium py-1.5 rounded hover:bg-orange-600 flex items-center justify-center gap-1"
+                           >
+                             <Save className="w-3 h-3" />
+                             Save Changes
+                           </button>
                          </div>
-                         <div className="text-xs text-gray-500 ml-6">
-                           {xfmr.kva_rating} kVA • {xfmr.primary_voltage}V → {xfmr.secondary_voltage}V
-                           {sourcePanel && ` • From ${sourcePanel.name}`}
+                       ) : (
+                         // Normal transformer display
+                         <div className="flex justify-between items-center">
+                           <div>
+                             <div className="flex items-center gap-2">
+                                <Bolt className="w-4 h-4 text-orange-500" />
+                                <span className="text-sm font-medium text-gray-900">{xfmr.name}</span>
+                             </div>
+                             <div className="text-xs text-gray-500 ml-6">
+                               {xfmr.kva_rating} kVA • {xfmr.primary_voltage}V → {xfmr.secondary_voltage}V
+                               {sourcePanel && ` • From ${sourcePanel.name}`}
+                             </div>
+                           </div>
+                           <div className="flex gap-1 opacity-0 group-hover:opacity-100">
+                             <button
+                               onClick={() => startEditTransformer(xfmr.id)}
+                               className="text-gray-300 hover:text-orange-500"
+                               title="Edit transformer"
+                             >
+                               <Edit2 className="w-4 h-4" />
+                             </button>
+                             <button
+                               onClick={() => removeTransformer(xfmr.id)}
+                               className="text-gray-300 hover:text-red-500"
+                               title="Delete transformer"
+                             >
+                               <Trash2 className="w-4 h-4" />
+                             </button>
+                           </div>
                          </div>
-                       </div>
-                       <button onClick={() => removeTransformer(xfmr.id)} className="text-gray-300 hover:text-red-500 opacity-0 group-hover:opacity-100">
-                         <Trash2 className="w-4 h-4" />
-                       </button>
+                       )}
                      </div>
                    );
                  })}

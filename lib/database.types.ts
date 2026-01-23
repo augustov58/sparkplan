@@ -1222,6 +1222,7 @@ export type Database = {
           connection_type: string | null
           cooling_type: string | null
           created_at: string | null
+          fed_from_circuit_number: number | null
           fed_from_panel_id: string | null
           id: string
           impedance_percent: number | null
@@ -1250,6 +1251,7 @@ export type Database = {
           connection_type?: string | null
           cooling_type?: string | null
           created_at?: string | null
+          fed_from_circuit_number?: number | null
           fed_from_panel_id?: string | null
           id?: string
           impedance_percent?: number | null
@@ -1278,6 +1280,7 @@ export type Database = {
           connection_type?: string | null
           cooling_type?: string | null
           created_at?: string | null
+          fed_from_circuit_number?: number | null
           fed_from_panel_id?: string | null
           id?: string
           impedance_percent?: number | null
