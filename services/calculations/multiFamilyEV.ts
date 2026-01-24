@@ -1132,42 +1132,76 @@ export function calculateMultiFamilyEV(input: MultiFamilyEVInput): MultiFamilyEV
   //
   // This means: Size feeder/service to the EVEMS SETPOINT, not the sum of all EVSE.
   // The setpoint becomes the "demand load" for service calculations.
+  //
+  // IMPORTANT: EVEMS only provides value when direct connection can't support
+  // the requested chargers. If direct already works, EVEMS adds cost without benefit.
 
   const evemsEfficiencyFactor = 0.90; // 90% of theoretical capacity (system overhead, safety margin)
   const evemsSetpointAmps = Math.max(0, availableCapacityAmps) * evemsEfficiencyFactor;
-  const evemsSetpointVA = evemsSetpointAmps * (phase === 3 ? voltage * Math.sqrt(3) : voltage);
 
   // Minimum viable charging: ~2.5 kW (12A @ 208V) provides ~8-10 miles/hour
   const minViableAmpsPerCharger = 12;
-  const maxChargersWithEVEMS = evemsSetpointAmps > 0
+
+  // Maximum chargers EVEMS can support at minimum viable power
+  const maxChargersWithEVEMSAtMinPower = evemsSetpointAmps > 0
     ? Math.floor(evemsSetpointAmps / minViableAmpsPerCharger)
     : 0;
 
+  // Check if direct connection already supports all requested chargers
+  const directAlreadySufficient = maxChargersNoEVEMS >= evChargers.count;
+
   // Calculate what power each charger gets when sharing the EVEMS setpoint
-  const actualChargersWithEVEMS = Math.min(evChargers.count, maxChargersWithEVEMS);
-  const powerPerChargerWithEVEMS = actualChargersWithEVEMS > 0
+  // CRITICAL: Cap at the charger's physical maximum - EVEMS can't make a 32A charger output 48A!
+  const perEVSEMaxKW = perEVSELoad / 1000; // Physical charger limit (e.g., 7.68 kW for 32A @ 240V)
+
+  const actualChargersWithEVEMS = evChargers.count; // EVEMS can always support requested count (at reduced power)
+  const theoreticalAmpsPerCharger = actualChargersWithEVEMS > 0
     ? evemsSetpointAmps / actualChargersWithEVEMS
     : 0;
-  const kWPerChargerWithEVEMS = (evVoltage * powerPerChargerWithEVEMS) / 1000;
+  const theoreticalKWPerCharger = (evVoltage * theoreticalAmpsPerCharger) / 1000;
 
-  const canAccommodateAllWithEVEMS = maxChargersWithEVEMS >= evChargers.count;
+  // Cap at charger's physical maximum
+  const actualKWPerChargerWithEVEMS = Math.min(perEVSEMaxKW, theoreticalKWPerCharger);
+  const actualAmpsPerChargerWithEVEMS = (actualKWPerChargerWithEVEMS * 1000) / evVoltage;
+
+  // EVEMS is beneficial only when it allows more chargers than direct, or when
+  // direct can't support the requested count
+  const evemsProvidesBenefit = !directAlreadySufficient ||
+    maxChargersWithEVEMSAtMinPower > maxChargersNoEVEMS;
+
+  // Build scenario notes based on whether EVEMS provides value
+  const evemsNotes: string[] = [];
+  if (directAlreadySufficient) {
+    // Direct connection already works - EVEMS not needed
+    evemsNotes.push(`Direct connection already supports all ${evChargers.count} chargers at full power`);
+    evemsNotes.push(`EVEMS not required - adds cost without benefit in this scenario`);
+    if (maxChargersWithEVEMSAtMinPower > maxChargersNoEVEMS) {
+      evemsNotes.push(`EVEMS could support up to ${maxChargersWithEVEMSAtMinPower} chargers at ${minViableAmpsPerCharger}A minimum`);
+    }
+  } else {
+    // EVEMS needed to support requested chargers
+    evemsNotes.push(`EVEMS setpoint: ${Math.round(evemsSetpointAmps)}A (service demand load per NEC 625.42)`);
+    if (actualKWPerChargerWithEVEMS >= perEVSEMaxKW * 0.99) {
+      // Chargers can run at full power
+      evemsNotes.push(`${actualChargersWithEVEMS} chargers at full power: ${perEVSEMaxKW.toFixed(1)} kW each`);
+    } else {
+      // Power sharing required
+      evemsNotes.push(`${actualChargersWithEVEMS} chargers share capacity: ~${Math.round(actualAmpsPerChargerWithEVEMS)}A each (${actualKWPerChargerWithEVEMS.toFixed(1)} kW)`);
+      evemsNotes.push(`Estimated charge rate: ~${Math.round(actualKWPerChargerWithEVEMS * 3)} mi/hr when all active`);
+    }
+    evemsNotes.push(`Max chargers at ${minViableAmpsPerCharger}A minimum: ${maxChargersWithEVEMSAtMinPower}`);
+  }
 
   const withEVEMSScenario: EVCapacityScenario = {
     name: 'With EVEMS (NEC 625.42 Load Management)',
-    maxChargers: actualChargersWithEVEMS,
-    powerPerCharger_kW: kWPerChargerWithEVEMS,
-    notes: [
-      `EVEMS setpoint: ${Math.round(evemsSetpointAmps)}A (service demand load per NEC 625.42)`,
-      `${actualChargersWithEVEMS} chargers share capacity: ~${Math.round(powerPerChargerWithEVEMS)}A each (${kWPerChargerWithEVEMS.toFixed(1)} kW)`,
-      `Estimated charge rate: ~${Math.round(kWPerChargerWithEVEMS * 3)} mi/hr when all active`,
-      canAccommodateAllWithEVEMS
-        ? `✓ EVEMS can accommodate all ${evChargers.count} requested chargers`
-        : `Maximum ${maxChargersWithEVEMS} chargers at 12A minimum viable power`,
-    ],
-    requiresServiceUpgrade: !canAccommodateAllWithEVEMS,
-    recommendedServiceAmps: !canAccommodateAllWithEVEMS ? recommendedServiceAmps : undefined,
-    estimatedCostLow: 15000 + actualChargersWithEVEMS * 800,
-    estimatedCostHigh: 35000 + actualChargersWithEVEMS * 1500,
+    maxChargers: directAlreadySufficient ? maxChargersWithEVEMSAtMinPower : actualChargersWithEVEMS,
+    powerPerCharger_kW: actualKWPerChargerWithEVEMS,
+    notes: evemsNotes,
+    requiresServiceUpgrade: false, // EVEMS by definition avoids service upgrade
+    recommendedServiceAmps: undefined,
+    // Only show EVEMS cost if it provides value
+    estimatedCostLow: evemsProvidesBenefit ? 15000 + actualChargersWithEVEMS * 800 : 0,
+    estimatedCostHigh: evemsProvidesBenefit ? 35000 + actualChargersWithEVEMS * 1500 : 0,
   };
 
   // Scenario C: With service upgrade
