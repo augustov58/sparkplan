@@ -19,13 +19,18 @@ import {
   Settings,
   Battery,
   FileDown,
-  Loader
+  Loader,
+  Plus,
+  Trash2,
+  List
 } from 'lucide-react';
 import {
   calculateMultiFamilyEV,
   quickMultiFamilyEVCheck,
   type MultiFamilyEVInput,
-  type MultiFamilyEVResult
+  type MultiFamilyEVResult,
+  type CommonAreaLoadItem,
+  type CommonAreaCategory
 } from '../services/calculations/multiFamilyEV';
 import { exportMultiFamilyEVAnalysis } from '../services/pdfExport/multiFamilyEVPDF';
 
@@ -51,6 +56,10 @@ export const MultiFamilyEVCalculator: React.FC<MultiFamilyEVCalculatorProps> = (
   const [hasElectricHeat, setHasElectricHeat] = useState(false);
   const [hasElectricCooking, setHasElectricCooking] = useState(true);
   const [commonAreaLoadVA, setCommonAreaLoadVA] = useState(15000);
+
+  // Itemized common area loads
+  const [useItemizedCommonArea, setUseItemizedCommonArea] = useState(false);
+  const [commonAreaItems, setCommonAreaItems] = useState<CommonAreaLoadItem[]>([]);
 
   // Optional transformer info
   const [hasTransformer, setHasTransformer] = useState(false);
@@ -82,7 +91,9 @@ export const MultiFamilyEVCalculator: React.FC<MultiFamilyEVCalculatorProps> = (
         },
         hasElectricHeat,
         hasElectricCooking,
-        commonAreaLoadVA,
+        // Use itemized loads if enabled and has items, otherwise use simple VA
+        commonAreaLoadVA: useItemizedCommonArea ? 0 : commonAreaLoadVA,
+        commonAreaLoads: useItemizedCommonArea && commonAreaItems.length > 0 ? commonAreaItems : undefined,
         transformer: hasTransformer ? { kvaRating: transformerKVA } : undefined,
         useEVEMS,
       };
@@ -96,6 +107,7 @@ export const MultiFamilyEVCalculator: React.FC<MultiFamilyEVCalculatorProps> = (
     buildingName, dwellingUnits, avgUnitSqFt, voltage, phase, existingServiceAmps,
     evChargerCount, evChargerLevel, evAmpsPerCharger,
     hasElectricHeat, hasElectricCooking, commonAreaLoadVA,
+    useItemizedCommonArea, commonAreaItems,
     hasTransformer, transformerKVA, useEVEMS
   ]);
 
@@ -468,19 +480,238 @@ export const MultiFamilyEVCalculator: React.FC<MultiFamilyEVCalculatorProps> = (
                     <span className="text-sm text-gray-700">Electric Cooking (12 kW/unit nameplate)</span>
                   </label>
 
-                  <div>
-                    <label className="block text-xs font-semibold text-gray-500 uppercase mb-1">
-                      Common Area Load (VA)
-                    </label>
-                    <input
-                      type="number"
-                      value={commonAreaLoadVA}
-                      onChange={e => setCommonAreaLoadVA(Number(e.target.value))}
-                      min="0"
-                      step="1000"
-                      className="w-full border-gray-200 rounded text-sm py-2 px-3 focus:border-electric-500 focus:ring-electric-500"
-                    />
-                    <p className="text-xs text-gray-500 mt-1">Lighting, elevators, pool, gym, etc.</p>
+                  {/* Common Area Load Section */}
+                  <div className="border-t border-gray-200 pt-4 mt-4">
+                    <div className="flex items-center justify-between mb-3">
+                      <label className="block text-xs font-semibold text-gray-500 uppercase">
+                        Common Area Loads
+                      </label>
+                      <label className="flex items-center gap-2 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={useItemizedCommonArea}
+                          onChange={e => setUseItemizedCommonArea(e.target.checked)}
+                          className="rounded border-gray-300 text-electric-500 focus:ring-electric-500"
+                        />
+                        <span className="text-xs text-gray-600">Itemize with NEC demand factors</span>
+                      </label>
+                    </div>
+
+                    {!useItemizedCommonArea ? (
+                      // Simple VA input
+                      <div>
+                        <input
+                          type="number"
+                          value={commonAreaLoadVA}
+                          onChange={e => setCommonAreaLoadVA(Number(e.target.value))}
+                          min="0"
+                          step="1000"
+                          className="w-full border-gray-200 rounded text-sm py-2 px-3 focus:border-electric-500 focus:ring-electric-500"
+                        />
+                        <p className="text-xs text-gray-500 mt-1">
+                          Quick entry: Total VA for lighting, elevators, pool, gym, etc.
+                        </p>
+                      </div>
+                    ) : (
+                      // Itemized common area loads
+                      <div className="space-y-3">
+                        {commonAreaItems.length === 0 && (
+                          <p className="text-xs text-gray-500 italic">
+                            No common area loads added. Click "Add Load" to itemize.
+                          </p>
+                        )}
+
+                        {/* List of items */}
+                        {commonAreaItems.map((item, index) => (
+                          <div key={index} className="bg-white border border-gray-200 rounded-lg p-3 space-y-2">
+                            <div className="flex items-center justify-between">
+                              <span className="text-xs font-medium text-gray-700">{item.description || `Load ${index + 1}`}</span>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const newItems = [...commonAreaItems];
+                                  newItems.splice(index, 1);
+                                  setCommonAreaItems(newItems);
+                                }}
+                                className="text-red-400 hover:text-red-600"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </button>
+                            </div>
+                            <div className="grid grid-cols-2 gap-2">
+                              <select
+                                value={item.category}
+                                onChange={e => {
+                                  const newItems = [...commonAreaItems];
+                                  newItems[index] = {
+                                    ...item,
+                                    category: e.target.value as CommonAreaCategory,
+                                    inputType: ['lighting_indoor', 'lighting_outdoor'].includes(e.target.value) ? 'sqft' :
+                                               ['elevators', 'pool_spa', 'motors', 'fire_pump'].includes(e.target.value) ? 'hp' :
+                                               e.target.value === 'hvac' ? 'tons' : 'va'
+                                  };
+                                  setCommonAreaItems(newItems);
+                                }}
+                                className="border-gray-200 rounded text-xs py-1"
+                              >
+                                <option value="lighting_indoor">Indoor Lighting</option>
+                                <option value="lighting_outdoor">Outdoor Lighting</option>
+                                <option value="receptacles">Receptacles</option>
+                                <option value="elevators">Elevators</option>
+                                <option value="pool_spa">Pool/Spa</option>
+                                <option value="hvac">HVAC</option>
+                                <option value="fire_pump">Fire Pump</option>
+                                <option value="motors">Motors</option>
+                                <option value="other">Other</option>
+                              </select>
+                              <input
+                                type="text"
+                                placeholder="Description"
+                                value={item.description}
+                                onChange={e => {
+                                  const newItems = [...commonAreaItems];
+                                  newItems[index] = { ...item, description: e.target.value };
+                                  setCommonAreaItems(newItems);
+                                }}
+                                className="border-gray-200 rounded text-xs py-1 px-2"
+                              />
+                            </div>
+                            <div className="grid grid-cols-3 gap-2">
+                              <div>
+                                <label className="block text-[10px] text-gray-500 mb-0.5">
+                                  {item.inputType === 'sqft' ? 'Sq Ft' :
+                                   item.inputType === 'hp' ? 'HP' :
+                                   item.inputType === 'tons' ? 'Tons' : 'VA'}
+                                </label>
+                                <input
+                                  type="number"
+                                  value={item.value}
+                                  onChange={e => {
+                                    const newItems = [...commonAreaItems];
+                                    newItems[index] = { ...item, value: Number(e.target.value) };
+                                    setCommonAreaItems(newItems);
+                                  }}
+                                  min="0"
+                                  className="w-full border-gray-200 rounded text-xs py-1 px-2"
+                                />
+                              </div>
+                              <div>
+                                <label className="block text-[10px] text-gray-500 mb-0.5">Qty</label>
+                                <input
+                                  type="number"
+                                  value={item.quantity || 1}
+                                  onChange={e => {
+                                    const newItems = [...commonAreaItems];
+                                    newItems[index] = { ...item, quantity: Number(e.target.value) || 1 };
+                                    setCommonAreaItems(newItems);
+                                  }}
+                                  min="1"
+                                  className="w-full border-gray-200 rounded text-xs py-1 px-2"
+                                />
+                              </div>
+                              {item.inputType === 'sqft' && (
+                                <div>
+                                  <label className="block text-[10px] text-gray-500 mb-0.5">Space Type</label>
+                                  <select
+                                    value={item.spaceType || 'corridor'}
+                                    onChange={e => {
+                                      const newItems = [...commonAreaItems];
+                                      newItems[index] = { ...item, spaceType: e.target.value as any };
+                                      setCommonAreaItems(newItems);
+                                    }}
+                                    className="w-full border-gray-200 rounded text-[10px] py-1"
+                                  >
+                                    <option value="corridor">Corridor (0.5)</option>
+                                    <option value="lobby">Lobby (2.0)</option>
+                                    <option value="stairwell">Stairwell (0.5)</option>
+                                    <option value="parking_indoor">Parking Indoor (0.2)</option>
+                                    <option value="parking_outdoor">Parking Outdoor (0.1)</option>
+                                    <option value="amenity">Amenity (1.5)</option>
+                                    <option value="laundry">Laundry (1.5)</option>
+                                    <option value="mechanical">Mechanical (0.5)</option>
+                                    <option value="office">Office (1.5)</option>
+                                    <option value="pool_area">Pool Area (1.0)</option>
+                                  </select>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        ))}
+
+                        {/* Add load button */}
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setCommonAreaItems([
+                              ...commonAreaItems,
+                              {
+                                category: 'lighting_indoor',
+                                description: '',
+                                inputType: 'sqft',
+                                value: 0,
+                                quantity: 1,
+                                spaceType: 'corridor'
+                              }
+                            ]);
+                          }}
+                          className="w-full py-2 border-2 border-dashed border-gray-300 rounded-lg text-gray-500 hover:border-electric-500 hover:text-electric-600 text-xs font-medium flex items-center justify-center gap-1"
+                        >
+                          <Plus className="w-4 h-4" />
+                          Add Common Area Load
+                        </button>
+
+                        {/* Quick templates */}
+                        <div className="flex flex-wrap gap-1">
+                          <span className="text-[10px] text-gray-500">Templates:</span>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setCommonAreaItems([
+                                { category: 'lighting_indoor', description: 'Corridors', inputType: 'sqft', value: 2000, quantity: 1, spaceType: 'corridor' },
+                                { category: 'lighting_indoor', description: 'Lobby', inputType: 'sqft', value: 500, quantity: 1, spaceType: 'lobby' },
+                                { category: 'receptacles', description: 'Common area outlets', inputType: 'va', value: 5000, quantity: 1 },
+                              ]);
+                            }}
+                            className="text-[10px] text-electric-600 hover:text-electric-700 underline"
+                          >
+                            Low-Rise
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setCommonAreaItems([
+                                { category: 'lighting_indoor', description: 'Corridors', inputType: 'sqft', value: 4000, quantity: 1, spaceType: 'corridor' },
+                                { category: 'lighting_indoor', description: 'Lobby', inputType: 'sqft', value: 800, quantity: 1, spaceType: 'lobby' },
+                                { category: 'elevators', description: 'Passenger Elevator', inputType: 'hp', value: 15, quantity: 2 },
+                                { category: 'pool_spa', description: 'Pool Pump', inputType: 'hp', value: 3, quantity: 1 },
+                                { category: 'receptacles', description: 'Common area outlets', inputType: 'va', value: 10000, quantity: 1 },
+                              ]);
+                            }}
+                            className="text-[10px] text-electric-600 hover:text-electric-700 underline"
+                          >
+                            Mid-Rise
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setCommonAreaItems([
+                                { category: 'lighting_indoor', description: 'Corridors', inputType: 'sqft', value: 8000, quantity: 1, spaceType: 'corridor' },
+                                { category: 'lighting_indoor', description: 'Lobby', inputType: 'sqft', value: 1500, quantity: 1, spaceType: 'lobby' },
+                                { category: 'lighting_outdoor', description: 'Parking', inputType: 'sqft', value: 20000, quantity: 1, spaceType: 'parking_outdoor' },
+                                { category: 'elevators', description: 'Passenger Elevator', inputType: 'hp', value: 25, quantity: 4 },
+                                { category: 'hvac', description: 'Common Area HVAC', inputType: 'tons', value: 10, quantity: 1 },
+                                { category: 'pool_spa', description: 'Pool Equipment', inputType: 'hp', value: 5, quantity: 2 },
+                                { category: 'fire_pump', description: 'Fire Pump', inputType: 'hp', value: 50, quantity: 1 },
+                                { category: 'receptacles', description: 'Common area outlets', inputType: 'va', value: 15000, quantity: 1 },
+                              ]);
+                            }}
+                            className="text-[10px] text-electric-600 hover:text-electric-700 underline"
+                          >
+                            High-Rise
+                          </button>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>

@@ -97,6 +97,90 @@ const LAUNDRY_CIRCUIT_VA = 1500;
 const STANDARD_SERVICE_SIZES = [100, 125, 150, 200, 225, 300, 400, 600, 800, 1000, 1200, 1600, 2000, 2500, 3000, 4000];
 
 // ============================================================================
+// COMMON AREA LOAD CONSTANTS
+// ============================================================================
+
+/**
+ * NEC Table 220.12 - General Lighting Loads (Commercial/Common Areas)
+ * These are for common areas, NOT dwelling units
+ */
+const COMMON_AREA_LIGHTING_VA_PER_SQFT: Record<string, number> = {
+  'corridor': 0.5,      // Corridors, hallways
+  'lobby': 2.0,         // Lobbies, reception areas
+  'stairwell': 0.5,     // Stairwells
+  'parking_indoor': 0.2, // Indoor parking/garage
+  'parking_outdoor': 0.1, // Outdoor parking (pole lights)
+  'amenity': 1.5,       // Gym, clubhouse, party room
+  'laundry': 1.5,       // Common laundry room
+  'mechanical': 0.5,    // Mechanical/electrical rooms
+  'office': 1.5,        // Leasing/management office
+  'pool_area': 1.0,     // Pool deck lighting
+};
+
+/**
+ * Motor HP to VA conversion (approximate)
+ * Based on typical motor efficiency and power factor
+ */
+const HP_TO_VA = 746 * 1.25; // 746 W/HP × 1.25 (PF/efficiency factor) ≈ 932 VA/HP
+
+/**
+ * HVAC tons to VA conversion
+ * Approximate: 1 ton = 12,000 BTU/hr ≈ 1,500 VA (including fan)
+ */
+const TONS_TO_VA = 1500;
+
+/**
+ * Common area load category types
+ */
+export type CommonAreaCategory =
+  | 'lighting_indoor'
+  | 'lighting_outdoor'
+  | 'receptacles'
+  | 'elevators'
+  | 'pool_spa'
+  | 'hvac'
+  | 'fire_pump'
+  | 'motors'
+  | 'other';
+
+/**
+ * Common area load item for itemized input
+ */
+export interface CommonAreaLoadItem {
+  /** Load category */
+  category: CommonAreaCategory;
+
+  /** Description (e.g., "Lobby lighting", "Elevator #1") */
+  description: string;
+
+  /** Input type determines how value is interpreted */
+  inputType: 'va' | 'sqft' | 'hp' | 'tons';
+
+  /** Primary value (VA, sq ft, HP, or tons depending on inputType) */
+  value: number;
+
+  /** Quantity for multiple units (e.g., 2 elevators) */
+  quantity?: number;
+
+  /** Space type for lighting (determines VA/sq ft) */
+  spaceType?: keyof typeof COMMON_AREA_LIGHTING_VA_PER_SQFT;
+}
+
+/**
+ * Common area load calculation result
+ */
+export interface CommonAreaLoadResult {
+  /** Individual load items with demand factors applied */
+  items: LoadBreakdownItem[];
+
+  /** Total connected load (before demand factors) */
+  totalConnectedVA: number;
+
+  /** Total demand load (after demand factors) */
+  totalDemandVA: number;
+}
+
+// ============================================================================
 // INTERFACES
 // ============================================================================
 
@@ -138,8 +222,11 @@ export interface MultiFamilyEVInput {
   /** Optional: Electric cooking in units */
   hasElectricCooking?: boolean;
 
-  /** Optional: Common area loads in VA (lighting, elevators, pool, etc.) */
+  /** Optional: Common area loads in VA (lighting, elevators, pool, etc.) - simple entry */
   commonAreaLoadVA?: number;
+
+  /** Optional: Itemized common area loads with NEC demand factors */
+  commonAreaLoads?: CommonAreaLoadItem[];
 
   /** Optional: Transformer information (for capacity check) */
   transformer?: {
@@ -497,6 +584,283 @@ function checkTransformerCapacity(
   };
 }
 
+/**
+ * Calculate common area loads with proper NEC demand factors
+ *
+ * NEC Demand Factor References:
+ * - Lighting: 220.42 "All Others" = 100%
+ * - Receptacles: 220.44 = 100% first 10 kVA, 50% remainder
+ * - Elevators: 620.14 = Largest @ 100%, others @ 50%
+ * - Motors: 430.24 = Largest @ 125%, others @ 100%
+ * - Pool/Spa: 680 = 100% (largest motor @ 125% if multiple)
+ * - HVAC: 440 = 100% per nameplate
+ * - Fire Pump: 695.7 = 100%
+ *
+ * @param items - Array of common area load items
+ * @returns Calculated loads with demand factors applied
+ */
+export function calculateCommonAreaLoads(items: CommonAreaLoadItem[]): CommonAreaLoadResult {
+  if (!items || items.length === 0) {
+    return {
+      items: [],
+      totalConnectedVA: 0,
+      totalDemandVA: 0,
+    };
+  }
+
+  const breakdownItems: LoadBreakdownItem[] = [];
+
+  // Group items by category for demand factor calculations
+  const byCategory: Record<CommonAreaCategory, { connectedVA: number; items: CommonAreaLoadItem[] }> = {
+    lighting_indoor: { connectedVA: 0, items: [] },
+    lighting_outdoor: { connectedVA: 0, items: [] },
+    receptacles: { connectedVA: 0, items: [] },
+    elevators: { connectedVA: 0, items: [] },
+    pool_spa: { connectedVA: 0, items: [] },
+    hvac: { connectedVA: 0, items: [] },
+    fire_pump: { connectedVA: 0, items: [] },
+    motors: { connectedVA: 0, items: [] },
+    other: { connectedVA: 0, items: [] },
+  };
+
+  // First pass: Convert all items to VA and group by category
+  for (const item of items) {
+    let connectedVA = 0;
+    const qty = item.quantity || 1;
+
+    switch (item.inputType) {
+      case 'va':
+        connectedVA = item.value * qty;
+        break;
+      case 'sqft':
+        // Use space-specific VA/sqft or default
+        const vaPerSqft = item.spaceType
+          ? COMMON_AREA_LIGHTING_VA_PER_SQFT[item.spaceType] || 1.0
+          : (item.category === 'lighting_outdoor' ? 0.25 : 2.0);
+        connectedVA = item.value * vaPerSqft * qty;
+        break;
+      case 'hp':
+        connectedVA = item.value * HP_TO_VA * qty;
+        break;
+      case 'tons':
+        connectedVA = item.value * TONS_TO_VA * qty;
+        break;
+    }
+
+    byCategory[item.category].connectedVA += connectedVA;
+    byCategory[item.category].items.push({ ...item, value: connectedVA / qty }); // Store VA per unit
+  }
+
+  let totalConnectedVA = 0;
+  let totalDemandVA = 0;
+
+  // Process each category with appropriate NEC demand factors
+
+  // LIGHTING (Indoor & Outdoor) - NEC 220.42 "All Others" = 100%
+  for (const lightingCat of ['lighting_indoor', 'lighting_outdoor'] as const) {
+    const data = byCategory[lightingCat];
+    if (data.connectedVA > 0) {
+      const demandVA = data.connectedVA; // 100% for commercial lighting
+      breakdownItems.push({
+        category: lightingCat === 'lighting_indoor' ? 'Common Area - Indoor Lighting' : 'Common Area - Outdoor Lighting',
+        description: data.items.map(i => i.description).join(', '),
+        connectedVA: Math.round(data.connectedVA),
+        demandVA: Math.round(demandVA),
+        demandFactor: 1.0,
+        necReference: 'NEC 220.42',
+      });
+      totalConnectedVA += data.connectedVA;
+      totalDemandVA += demandVA;
+    }
+  }
+
+  // RECEPTACLES - NEC 220.44: 100% first 10 kVA, 50% remainder
+  const receptacleData = byCategory.receptacles;
+  if (receptacleData.connectedVA > 0) {
+    let demandVA: number;
+    let demandFactor: number;
+    if (receptacleData.connectedVA <= 10000) {
+      demandVA = receptacleData.connectedVA;
+      demandFactor = 1.0;
+    } else {
+      demandVA = 10000 + (receptacleData.connectedVA - 10000) * 0.5;
+      demandFactor = demandVA / receptacleData.connectedVA;
+    }
+    breakdownItems.push({
+      category: 'Common Area - Receptacles',
+      description: receptacleData.items.map(i => i.description).join(', ') || 'General receptacles',
+      connectedVA: Math.round(receptacleData.connectedVA),
+      demandVA: Math.round(demandVA),
+      demandFactor: Math.round(demandFactor * 100) / 100,
+      necReference: 'NEC 220.44',
+    });
+    totalConnectedVA += receptacleData.connectedVA;
+    totalDemandVA += demandVA;
+  }
+
+  // ELEVATORS - NEC 620.14: Largest @ 100%, others @ 50%
+  const elevatorData = byCategory.elevators;
+  if (elevatorData.connectedVA > 0) {
+    // Sort items by VA (largest first)
+    const sortedElevators = [...elevatorData.items].sort((a, b) => {
+      const aVA = a.value * (a.quantity || 1);
+      const bVA = b.value * (b.quantity || 1);
+      return bVA - aVA;
+    });
+
+    let demandVA = 0;
+    let isFirst = true;
+    for (const elev of sortedElevators) {
+      const elevVA = elev.value * (elev.quantity || 1);
+      if (isFirst) {
+        demandVA += elevVA; // 100% for largest
+        isFirst = false;
+      } else {
+        demandVA += elevVA * 0.5; // 50% for others
+      }
+    }
+
+    const demandFactor = demandVA / elevatorData.connectedVA;
+    breakdownItems.push({
+      category: 'Common Area - Elevators',
+      description: elevatorData.items.map(i => i.description).join(', '),
+      connectedVA: Math.round(elevatorData.connectedVA),
+      demandVA: Math.round(demandVA),
+      demandFactor: Math.round(demandFactor * 100) / 100,
+      necReference: 'NEC 620.14',
+    });
+    totalConnectedVA += elevatorData.connectedVA;
+    totalDemandVA += demandVA;
+  }
+
+  // MOTORS (General) - NEC 430.24: Largest @ 125%, others @ 100%
+  const motorData = byCategory.motors;
+  if (motorData.connectedVA > 0) {
+    // Sort by VA (largest first)
+    const sortedMotors = [...motorData.items].sort((a, b) => {
+      const aVA = a.value * (a.quantity || 1);
+      const bVA = b.value * (b.quantity || 1);
+      return bVA - aVA;
+    });
+
+    let demandVA = 0;
+    let isFirst = true;
+    for (const motor of sortedMotors) {
+      const motorVA = motor.value * (motor.quantity || 1);
+      if (isFirst) {
+        demandVA += motorVA * 1.25; // 125% for largest
+        isFirst = false;
+      } else {
+        demandVA += motorVA; // 100% for others
+      }
+    }
+
+    const demandFactor = demandVA / motorData.connectedVA;
+    breakdownItems.push({
+      category: 'Common Area - Motors',
+      description: motorData.items.map(i => i.description).join(', '),
+      connectedVA: Math.round(motorData.connectedVA),
+      demandVA: Math.round(demandVA),
+      demandFactor: Math.round(demandFactor * 100) / 100,
+      necReference: 'NEC 430.24',
+    });
+    totalConnectedVA += motorData.connectedVA;
+    totalDemandVA += demandVA;
+  }
+
+  // POOL/SPA - NEC 680: 100% (motor loads should use 430.24 if multiple)
+  const poolData = byCategory.pool_spa;
+  if (poolData.connectedVA > 0) {
+    // If multiple pool motors, apply largest @ 125%, others @ 100%
+    let demandVA: number;
+    let demandFactor: number;
+    if (poolData.items.length > 1) {
+      const sortedPool = [...poolData.items].sort((a, b) => {
+        const aVA = a.value * (a.quantity || 1);
+        const bVA = b.value * (b.quantity || 1);
+        return bVA - aVA;
+      });
+      demandVA = 0;
+      let isFirst = true;
+      for (const pool of sortedPool) {
+        const poolVA = pool.value * (pool.quantity || 1);
+        if (isFirst) {
+          demandVA += poolVA * 1.25;
+          isFirst = false;
+        } else {
+          demandVA += poolVA;
+        }
+      }
+      demandFactor = demandVA / poolData.connectedVA;
+    } else {
+      demandVA = poolData.connectedVA;
+      demandFactor = 1.0;
+    }
+
+    breakdownItems.push({
+      category: 'Common Area - Pool/Spa',
+      description: poolData.items.map(i => i.description).join(', '),
+      connectedVA: Math.round(poolData.connectedVA),
+      demandVA: Math.round(demandVA),
+      demandFactor: Math.round(demandFactor * 100) / 100,
+      necReference: 'NEC 680',
+    });
+    totalConnectedVA += poolData.connectedVA;
+    totalDemandVA += demandVA;
+  }
+
+  // HVAC - NEC 440: 100% per nameplate
+  const hvacData = byCategory.hvac;
+  if (hvacData.connectedVA > 0) {
+    breakdownItems.push({
+      category: 'Common Area - HVAC',
+      description: hvacData.items.map(i => i.description).join(', '),
+      connectedVA: Math.round(hvacData.connectedVA),
+      demandVA: Math.round(hvacData.connectedVA),
+      demandFactor: 1.0,
+      necReference: 'NEC 440',
+    });
+    totalConnectedVA += hvacData.connectedVA;
+    totalDemandVA += hvacData.connectedVA;
+  }
+
+  // FIRE PUMP - NEC 695.7: 100%
+  const firePumpData = byCategory.fire_pump;
+  if (firePumpData.connectedVA > 0) {
+    breakdownItems.push({
+      category: 'Common Area - Fire Pump',
+      description: firePumpData.items.map(i => i.description).join(', '),
+      connectedVA: Math.round(firePumpData.connectedVA),
+      demandVA: Math.round(firePumpData.connectedVA),
+      demandFactor: 1.0,
+      necReference: 'NEC 695.7',
+    });
+    totalConnectedVA += firePumpData.connectedVA;
+    totalDemandVA += firePumpData.connectedVA;
+  }
+
+  // OTHER - 100% (no demand factor)
+  const otherData = byCategory.other;
+  if (otherData.connectedVA > 0) {
+    breakdownItems.push({
+      category: 'Common Area - Other',
+      description: otherData.items.map(i => i.description).join(', '),
+      connectedVA: Math.round(otherData.connectedVA),
+      demandVA: Math.round(otherData.connectedVA),
+      demandFactor: 1.0,
+      necReference: 'NEC 220.84(B)',
+    });
+    totalConnectedVA += otherData.connectedVA;
+    totalDemandVA += otherData.connectedVA;
+  }
+
+  return {
+    items: breakdownItems,
+    totalConnectedVA: Math.round(totalConnectedVA),
+    totalDemandVA: Math.round(totalDemandVA),
+  };
+}
+
 // ============================================================================
 // MAIN CALCULATION FUNCTION
 // ============================================================================
@@ -522,6 +886,7 @@ export function calculateMultiFamilyEV(input: MultiFamilyEVInput): MultiFamilyEV
     hasElectricHeat = false,
     hasElectricCooking = false,
     commonAreaLoadVA = 0,
+    commonAreaLoads,
     transformer,
     useEVEMS = false,
     evemsMode = 'power_sharing',
@@ -625,8 +990,25 @@ export function calculateMultiFamilyEV(input: MultiFamilyEVInput): MultiFamilyEV
     necReference: 'NEC Table 220.84',
   });
 
-  // 1g. Common area loads (100% - no demand factor)
-  if (commonAreaLoadVA > 0) {
+  // 1g. Common area loads
+  // Use itemized loads if provided, otherwise use simple VA input
+  let commonAreaConnectedVA = 0;
+  let commonAreaDemandVA = 0;
+
+  if (commonAreaLoads && commonAreaLoads.length > 0) {
+    // Calculate itemized common area loads with proper NEC demand factors
+    const commonAreaResult = calculateCommonAreaLoads(commonAreaLoads);
+    commonAreaConnectedVA = commonAreaResult.totalConnectedVA;
+    commonAreaDemandVA = commonAreaResult.totalDemandVA;
+
+    // Add each itemized load to the breakdown
+    for (const item of commonAreaResult.items) {
+      breakdown.push(item);
+    }
+  } else if (commonAreaLoadVA > 0) {
+    // Fall back to simple VA input (100% demand factor)
+    commonAreaConnectedVA = commonAreaLoadVA;
+    commonAreaDemandVA = commonAreaLoadVA;
     breakdown.push({
       category: 'Common Area Loads',
       description: 'Lighting, elevators, pool, etc. (100%)',
@@ -638,8 +1020,8 @@ export function calculateMultiFamilyEV(input: MultiFamilyEVInput): MultiFamilyEV
   }
 
   // Total building load
-  const totalConnectedVA = unitLoadsSubtotal + commonAreaLoadVA;
-  const buildingDemandVA = unitLoadsDemandVA + commonAreaLoadVA;
+  const totalConnectedVA = unitLoadsSubtotal + commonAreaConnectedVA;
+  const buildingDemandVA = unitLoadsDemandVA + commonAreaDemandVA;
   const buildingLoadAmps = calculateAmps(buildingDemandVA, voltage, phase);
 
   // =========================================================================
