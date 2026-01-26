@@ -1298,7 +1298,7 @@ export function calculateMultiFamilyEV(input: MultiFamilyEVInput): MultiFamilyEV
   }
 
   // EVEMS recommendation
-  if (!useEVEMS && maxChargersNoEVEMS < evChargers.count && maxChargersWithEVEMS >= evChargers.count) {
+  if (!useEVEMS && maxChargersNoEVEMS < evChargers.count && canEVEMSSupportAll) {
     recommendations.push(`EVEMS can accommodate all ${evChargers.count} chargers without service upgrade`);
   }
 
