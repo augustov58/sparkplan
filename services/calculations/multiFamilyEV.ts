@@ -1219,7 +1219,9 @@ export function calculateMultiFamilyEV(input: MultiFamilyEVInput): MultiFamilyEV
   const upgradeAvailableAmps = calculateAmps(upgradeCapacityVA - buildingDemandVA, voltage, phase);
 
   // Determine if this scenario is even relevant
-  const upgradeNeeded = !canAccommodateAllWithEVEMS || noEVEMSScenario.maxChargers < evChargers.count;
+  // Upgrade needed only if neither direct nor EVEMS can support all requested chargers
+  const canEVEMSSupportAll = maxChargersWithEVEMSAtMinPower >= evChargers.count;
+  const upgradeNeeded = !directAlreadySufficient && !canEVEMSSupportAll;
 
   const withUpgradeScenario: EVCapacityScenario = {
     name: 'With Service Upgrade',
