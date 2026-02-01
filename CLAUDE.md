@@ -11,8 +11,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - Recent changes made by previous Claude instances
 - Pending tasks and context from last session
 
-**Current Branch**: `feature/multi-family-ev`
-**Last Session**: 2026-01-21 (Multi-Family EV Calculator - Phase 2.5)
+**Current Branch**: `main`
+**Last Session**: 2026-01-31 (Multi-Family EV Bug Fixes & Merge)
 
 ---
 
@@ -380,14 +380,38 @@ panels → panels (self-referential via fed_from)
 
 ## Recent Changes
 
-### 2026-01-21: Multi-Family EV Calculator (Phase 2.5) ✅
+### 2026-01-31: Multi-Family EV Bug Fixes & Merge ✅
 **Status**: Complete
 **Branch**: `feature/multi-family-ev` → Merged to `main`
+
+**Critical EVEMS Bug Fixes:**
+- Bug #1: EVEMS showed fewer max chargers than direct connection (backwards!)
+  - Added `directAlreadySufficient` check
+  - Fixed missing variable references (`canAccommodateAllWithEVEMS`, `maxChargersWithEVEMS`)
+- Bug #2: kW per charger exceeded physical charger limits (showed 11.4 kW for 32A @ 240V = 7.68 kW max)
+  - Added cap at charger's physical maximum: `Math.min(perEVSEMaxKW, theoreticalKWPerCharger)`
+
+**UI Cleanup:**
+- Removed Cost Comparison card from calculator (per user request)
+- Cleaned up unused imports
+
+**Commits:** `97ef322`, `5ed2640`, `4578565`, `68da43a`
+
+**Files Modified:**
+- `services/calculations/multiFamilyEV.ts` - EVEMS calculation fixes
+- `components/MultiFamilyEVCalculator.tsx` - Removed Cost Comparison card
+
+---
+
+### 2026-01-21: Multi-Family EV Calculator (Phase 2.5) ✅
+**Status**: Complete
+**Branch**: `feature/multi-family-ev`
 
 **New Features:**
 - Multi-Family EV Readiness Calculator implementing NEC 220.84 + 220.57 + 625.42
 - Building profile inputs (dwelling units, sq ft, common areas)
 - EV charger configuration (Level 1/2, amps, chargers per unit)
+- Itemized common area loads with NEC demand factors (220.42, 220.44, 620.14, 430.24)
 - Building demand analysis with tiered demand factors
 - EV capacity scenarios (with/without EVEMS load management)
 - Service upgrade recommendation (none/panel-only/full-service)
@@ -395,9 +419,9 @@ panels → panels (self-referential via fed_from)
 - Integrated into Permit Packet Generator
 
 **Files Created:**
-- `services/calculations/multiFamilyEV.ts` (977 lines - calculation engine)
-- `components/MultiFamilyEVCalculator.tsx` (~893 lines - UI component)
-- `services/pdfExport/MultiFamilyEVDocuments.tsx` (682 lines - PDF document)
+- `services/calculations/multiFamilyEV.ts` (1400+ lines - calculation engine)
+- `components/MultiFamilyEVCalculator.tsx` (~1100 lines - UI component)
+- `services/pdfExport/MultiFamilyEVDocuments.tsx` (692 lines - PDF document)
 - `services/pdfExport/multiFamilyEVPDF.tsx` (84 lines - export service)
 - `docs/MULTI_FAMILY_EV_SPEC.md` (documentation)
 

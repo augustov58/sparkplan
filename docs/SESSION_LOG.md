@@ -2,17 +2,60 @@
 
 **Purpose**: This document tracks changes made during development sessions for seamless handoff between Claude instances.
 
-**Last Updated**: 2026-01-21
-**Current Branch**: `feature/multi-family-ev`
+**Last Updated**: 2026-01-31
+**Current Branch**: `main`
 
 ---
 
 ## 📋 Current Session Status
 
-### Session: 2026-01-21 - Multi-Family EV Calculator (Phase 2.5) 🔄 IN PROGRESS
+### Session: 2026-01-31 - Multi-Family EV Bug Fixes & Merge ✅ COMPLETE
+
+**Session Focus**: Fix EVEMS calculation bugs, finalize Multi-Family EV Calculator, merge to main
+**Status**: ✅ Complete
+**Branch**: `feature/multi-family-ev` → Merged to `main`
+
+#### Completed This Session
+
+**🐛 EVEMS Calculation Bug Fixes (Critical):**
+
+1. **Bug #1: EVEMS showing fewer max chargers than direct connection**
+   - Problem: EVEMS showed "10 max chargers" when direct showed "16 max chargers" — backwards!
+   - Root cause: Variable `canAccommodateAllWithEVEMS` was removed but still referenced
+   - Fix: Added `directAlreadySufficient` check, shows "EVEMS not required" when direct works
+   - Commits: `97ef322`, `5ed2640`, `4578565`
+
+2. **Bug #2: kW per charger exceeding physical charger limits**
+   - Problem: Showed ~11.4 kW per charger for 32A @ 240V (physically impossible — max is 7.68 kW)
+   - Root cause: Code didn't cap at charger's physical maximum
+   - Fix: Added `const actualKWPerChargerWithEVEMS = Math.min(perEVSEMaxKW, theoreticalKWPerCharger)`
+   - Commit: `97ef322`
+
+**🎨 UI Cleanup:**
+- Removed Cost Comparison card from calculator (per user request)
+- Cleaned up unused `DollarSign` import
+- Commit: `68da43a`
+
+**📤 Merged to Main:**
+- All changes merged to `main` branch
+- Pushed to remote GitHub repository
+- Marketing folder confirmed tracked and pushed
+
+#### Files Modified
+
+- `services/calculations/multiFamilyEV.ts` - EVEMS calculation fixes (3 commits)
+- `components/MultiFamilyEVCalculator.tsx` - Removed Cost Comparison card
+
+#### Build Status
+- ✅ Build passes
+- ✅ 37/37 tests pass
+
+---
+
+### Session: 2026-01-21 - Multi-Family EV Calculator (Phase 2.5) ✅ COMPLETE
 
 **Session Focus**: Implement Multi-Family EV Readiness Calculator - forum-validated high-value feature
-**Status**: 🔄 In Progress
+**Status**: ✅ Complete
 **Branch**: `feature/multi-family-ev`
 
 #### Context & Business Value
@@ -22,57 +65,33 @@
 
 **Our Solution**: Automate the $2-10K engineering calculation in 5 minutes.
 
-**Target Market**: Multi-Family EV Specialists
-- Contractors turning down $10K-50K jobs due to complexity
-- Engineering firms charging $2-10K for load calculations
-- Multi-family EV is "nightmare scenario" - we solve it
+#### Phase 2.5 Implementation - COMPLETE
 
-#### Phase 2.5 Implementation Plan
+| Phase | Feature | NEC Reference | Status |
+|-------|---------|---------------|--------|
+| 2.5.1 | Multi-Family EV Readiness Calculator | 220.84 + 220.57 + 625.42 | ✅ Complete |
+| 2.5.2 | Building Service Analysis Mode | 220.84 | ✅ Complete |
+| 2.5.3 | EVEMS Right-Sizing (Multi-Unit) | 625.42 | ✅ Complete |
+| 2.5.4 | Common Area Load Itemization | 220.42, 220.44, 620.14, 430.24 | ✅ Complete |
 
-| Phase | Feature | NEC Reference | Status | Effort |
-|-------|---------|---------------|--------|--------|
-| 2.5.1 | Multi-Family EV Readiness Calculator | 220.84 + 220.57 + 625.42 | ⏳ Pending | 15-20h |
-| 2.5.2 | Building Service Analysis Mode | 220.84 | ⏳ Pending | 8-10h |
-| 2.5.3 | EVEMS Right-Sizing (Multi-Unit) | 625.42 | ⏳ Pending | 6-8h |
-| 2.5.4 | Utility Coordination Package | Varies | ⏳ Pending | 10-12h |
+#### Key Features Delivered
 
-#### Documentation Updates Made
+- NEC 220.84 multi-family demand factors (23-45% based on unit count)
+- NEC 220.57 per-EVSE load calculation (max of 7,200 VA or nameplate)
+- NEC 625.42 EVEMS right-sizing (size to setpoint, not full connected load)
+- Itemized common area loads with proper NEC demand factors
+- Building service upgrade recommendation (none/panel-only/full-service)
+- EV capacity scenarios comparison (with/without EVEMS)
+- 3-page professional PDF export for city permit submittals
+- Integrated into Permit Packet Generator
 
-1. **CLAUDE.md Updated**:
-   - Renamed "Phase 2.5: Enhanced AI Chatbot" → "Phase 2.6: Enhanced AI Chatbot"
-   - Added "Phase 2.5: Multi-Family EV Domination" with full feature breakdown
-   - Marked Phase 2.6.1 (Conversation Memory) as ✅ COMPLETE
-   - Marked Phase 2.6.2 (Agentic Actions) as ✅ COMPLETE
-   - Updated current branch to `feature/multi-family-ev`
-   - Updated last session date
+#### Files Created
 
-2. **Verification of Phase 2.6 Completion**:
-   - `hooks/useChat.ts` - Full implementation (chat state management)
-   - `services/ai/conversationBuilder.ts` - Full implementation (242 lines)
-   - `services/ai/chatTools.ts` - Full implementation (1922 lines, 12 tools)
-
-#### Files to Create (Implementation)
-
-```
-services/calculations/multiFamilyEV.ts     - Core calculation engine
-components/MultiFamilyEVCalculator.tsx     - UI component
-services/pdfExport/multiFamilyEVPDF.tsx    - PDF export
-```
-
-#### Key NEC Articles
-
-- **NEC 220.57** - EV Charging demand factors (new in 2023 NEC)
-- **NEC 220.84** - Multi-family optional calculation method
-- **NEC 625.42** - EVEMS load management
-
-#### Next Steps
-
-1. ✅ Documentation updated (CLAUDE.md, SESSION_LOG.md)
-2. ⏳ Create feature branch `feature/multi-family-ev`
-3. ⏳ Implement `multiFamilyEV.ts` calculation engine
-4. ⏳ Create `MultiFamilyEVCalculator.tsx` UI component
-5. ⏳ Add to Calculators.tsx tools hub
-6. ⏳ Create PDF export
+- `services/calculations/multiFamilyEV.ts` - Core calculation engine (1400+ lines)
+- `components/MultiFamilyEVCalculator.tsx` - UI component (~1100 lines)
+- `services/pdfExport/MultiFamilyEVDocuments.tsx` - PDF document (692 lines)
+- `services/pdfExport/multiFamilyEVPDF.tsx` - Export service (84 lines)
+- `docs/MULTI_FAMILY_EV_SPEC.md` - Technical specification
 
 ---
 
