@@ -66,21 +66,24 @@ export const Calculators: React.FC<CalculatorsProps> = ({ projectId }) => {
 
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
 
-  // Calculator options for mobile dropdown
+  // Calculator options for mobile dropdown - grouped
   const calculatorOptions = [
-    { value: 'voltage-drop', label: 'Voltage Drop (NEC 210.19)' },
-    { value: 'conductor-sizing', label: 'Conductor Sizing (NEC 310 + 250.122)' },
-    { value: 'conduit-fill', label: 'Conduit Fill (Chapter 9)' },
-    { value: 'short-circuit', label: 'Short Circuit (NEC 110.9)' },
-    { value: 'ev-charging', label: 'EV Charging (NEC 625)' },
-    { value: 'ev-panel-builder', label: 'EV Panel Builder' },
-    { value: 'multi-family-ev', label: 'Multi-Family EV (NEC 220.84)' },
-    { value: 'solar-pv', label: 'Solar PV (NEC 690)' },
-    { value: 'arc-flash', label: 'Arc Flash (NFPA 70E)' },
-    { value: 'evems', label: 'EVEMS Load Mgmt (NEC 625.42)' },
-    { value: 'service-upgrade', label: 'Service Upgrade (NEC 230.42)' },
-    { value: 'circuit-sharing', label: 'Circuit Sharing (NEC 625)' },
-    { value: 'change-impact', label: 'Change Impact Analyzer (AI)' },
+    // General Calculators
+    { value: 'voltage-drop', label: 'Voltage Drop (NEC 210.19)', group: 'general' },
+    { value: 'conductor-sizing', label: 'Conductor Sizing (NEC 310 + 250.122)', group: 'general' },
+    { value: 'conduit-fill', label: 'Conduit Fill (Chapter 9)', group: 'general' },
+    { value: 'short-circuit', label: 'Short Circuit (NEC 110.9)', group: 'general' },
+    { value: 'arc-flash', label: 'Arc Flash (NFPA 70E)', group: 'general' },
+    { value: 'solar-pv', label: 'Solar PV (NEC 690)', group: 'general' },
+    // EV Calculators
+    { value: 'multi-family-ev', label: '⚡ Multi-Family EV (NEC 220.84)', group: 'ev' },
+    { value: 'ev-charging', label: '⚡ EV Charging (NEC 625)', group: 'ev' },
+    { value: 'evems', label: '⚡ EVEMS Load Mgmt (NEC 625.42)', group: 'ev' },
+    { value: 'service-upgrade', label: '⚡ Service Upgrade (NEC 230.42)', group: 'ev' },
+    { value: 'ev-panel-builder', label: '⚡ EV Panel Builder', group: 'ev' },
+    { value: 'circuit-sharing', label: '⚡ Circuit Sharing (NEC 625)', group: 'ev' },
+    // AI
+    { value: 'change-impact', label: '✨ Change Impact Analyzer (AI)', group: 'ai' },
   ];
 
   const handleMobileCalculatorChange = (value: string) => {
@@ -112,6 +115,8 @@ export const Calculators: React.FC<CalculatorsProps> = ({ projectId }) => {
       <div className="grid grid-cols-1 md:grid-cols-[260px_1fr] gap-6">
         {/* Vertical Sidebar Navigation - Hidden on mobile */}
         <div className="hidden md:block space-y-0.5 pr-4 border-r border-gray-200">
+          {/* General Calculators Section */}
+          <p className="px-3 text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">General Calculators</p>
           <button
             onClick={() => setActiveTab('voltage-drop')}
             className={`w-full text-left px-3 py-2.5 text-sm font-medium border-l-4 transition-colors ${activeTab === 'voltage-drop' ? 'border-electric-500 bg-electric-50 text-gray-900' : 'border-transparent text-gray-500 hover:bg-gray-50 hover:text-gray-700'}`}
@@ -137,22 +142,10 @@ export const Calculators: React.FC<CalculatorsProps> = ({ projectId }) => {
             Short Circuit (NEC 110.9)
           </button>
           <button
-            onClick={() => setActiveTab('ev-charging')}
-            className={`w-full text-left px-3 py-2.5 text-sm font-medium border-l-4 transition-colors ${activeTab === 'ev-charging' ? 'border-electric-500 bg-electric-50 text-gray-900' : 'border-transparent text-gray-500 hover:bg-gray-50 hover:text-gray-700'}`}
+            onClick={() => setActiveTab('arc-flash')}
+            className={`w-full text-left px-3 py-2.5 text-sm font-medium border-l-4 transition-colors ${activeTab === 'arc-flash' ? 'border-electric-500 bg-electric-50 text-gray-900' : 'border-transparent text-gray-500 hover:bg-gray-50 hover:text-gray-700'}`}
           >
-            <span className="flex items-center gap-2"><Car className="w-4 h-4" /> EV Charging (NEC 625)</span>
-          </button>
-          <button
-            onClick={() => setActiveTab('ev-panel-builder')}
-            className={`w-full text-left px-3 py-2.5 text-sm font-medium border-l-4 transition-colors ${activeTab === 'ev-panel-builder' ? 'border-electric-500 bg-electric-50 text-gray-900' : 'border-transparent text-gray-500 hover:bg-gray-50 hover:text-gray-700'}`}
-          >
-            <span className="flex items-center gap-2"><Zap className="w-4 h-4" /> EV Panel Builder</span>
-          </button>
-          <button
-            onClick={() => setActiveTab('multi-family-ev')}
-            className={`w-full text-left px-3 py-2.5 text-sm font-medium border-l-4 transition-colors ${activeTab === 'multi-family-ev' ? 'border-electric-500 bg-electric-50 text-gray-900' : 'border-transparent text-gray-500 hover:bg-gray-50 hover:text-gray-700'}`}
-          >
-            <span className="flex items-center gap-2"><Building2 className="w-4 h-4" /> Multi-Family EV (NEC 220.84)</span>
+            <span className="flex items-center gap-2"><Shield className="w-4 h-4" /> Arc Flash (NFPA 70E)</span>
           </button>
           <button
             onClick={() => setActiveTab('solar-pv')}
@@ -160,37 +153,58 @@ export const Calculators: React.FC<CalculatorsProps> = ({ projectId }) => {
           >
             <span className="flex items-center gap-2"><Sun className="w-4 h-4" /> Solar PV (NEC 690)</span>
           </button>
-          <button
-            onClick={() => setActiveTab('arc-flash')}
-            className={`w-full text-left px-3 py-2.5 text-sm font-medium border-l-4 transition-colors ${activeTab === 'arc-flash' ? 'border-electric-500 bg-electric-50 text-gray-900' : 'border-transparent text-gray-500 hover:bg-gray-50 hover:text-gray-700'}`}
-          >
-            <span className="flex items-center gap-2"><Shield className="w-4 h-4" /> Arc Flash (NFPA 70E)</span>
-          </button>
-          <button
-            onClick={() => setActiveTab('evems')}
-            className={`w-full text-left px-3 py-2.5 text-sm font-medium border-l-4 transition-colors ${activeTab === 'evems' ? 'border-electric-500 bg-electric-50 text-gray-900' : 'border-transparent text-gray-500 hover:bg-gray-50 hover:text-gray-700'}`}
-          >
-            <span className="flex items-center gap-2"><Zap className="w-4 h-4" /> EVEMS Load Mgmt (NEC 625.42)</span>
-          </button>
-          <button
-            onClick={() => setActiveTab('service-upgrade')}
-            className={`w-full text-left px-3 py-2.5 text-sm font-medium border-l-4 transition-colors ${activeTab === 'service-upgrade' ? 'border-electric-500 bg-electric-50 text-gray-900' : 'border-transparent text-gray-500 hover:bg-gray-50 hover:text-gray-700'}`}
-          >
-            <span className="flex items-center gap-2"><TrendingUp className="w-4 h-4" /> Service Upgrade (NEC 230.42)</span>
-          </button>
-          <button
-            onClick={() => setActiveTab('circuit-sharing')}
-            className={`w-full text-left px-3 py-2.5 text-sm font-medium border-l-4 transition-colors ${activeTab === 'circuit-sharing' ? 'border-electric-500 bg-electric-50 text-gray-900' : 'border-transparent text-gray-500 hover:bg-gray-50 hover:text-gray-700'}`}
-          >
-            <span className="flex items-center gap-2"><Zap className="w-4 h-4" /> Circuit Sharing (NEC 625)</span>
-          </button>
+
+          {/* EV Calculators Section */}
+          <div className="pt-4 mt-4 border-t border-gray-200">
+            <p className="px-3 text-xs font-bold text-green-600 uppercase tracking-wider mb-2 flex items-center gap-1">
+              <Car className="w-3 h-3" /> EV Calculators
+            </p>
+            <button
+              onClick={() => setActiveTab('multi-family-ev')}
+              className={`w-full text-left px-3 py-2.5 text-sm font-medium border-l-4 transition-colors ${activeTab === 'multi-family-ev' ? 'border-green-500 bg-green-50 text-gray-900' : 'border-transparent text-gray-500 hover:bg-gray-50 hover:text-gray-700'}`}
+            >
+              <span className="flex items-center gap-2"><Building2 className="w-4 h-4" /> Multi-Family EV (NEC 220.84)</span>
+            </button>
+            <button
+              onClick={() => setActiveTab('ev-charging')}
+              className={`w-full text-left px-3 py-2.5 text-sm font-medium border-l-4 transition-colors ${activeTab === 'ev-charging' ? 'border-green-500 bg-green-50 text-gray-900' : 'border-transparent text-gray-500 hover:bg-gray-50 hover:text-gray-700'}`}
+            >
+              <span className="flex items-center gap-2"><Car className="w-4 h-4" /> EV Charging (NEC 625)</span>
+            </button>
+            <button
+              onClick={() => setActiveTab('evems')}
+              className={`w-full text-left px-3 py-2.5 text-sm font-medium border-l-4 transition-colors ${activeTab === 'evems' ? 'border-green-500 bg-green-50 text-gray-900' : 'border-transparent text-gray-500 hover:bg-gray-50 hover:text-gray-700'}`}
+            >
+              <span className="flex items-center gap-2"><Zap className="w-4 h-4" /> EVEMS Load Mgmt (NEC 625.42)</span>
+            </button>
+            <button
+              onClick={() => setActiveTab('service-upgrade')}
+              className={`w-full text-left px-3 py-2.5 text-sm font-medium border-l-4 transition-colors ${activeTab === 'service-upgrade' ? 'border-green-500 bg-green-50 text-gray-900' : 'border-transparent text-gray-500 hover:bg-gray-50 hover:text-gray-700'}`}
+            >
+              <span className="flex items-center gap-2"><TrendingUp className="w-4 h-4" /> Service Upgrade (NEC 230.42)</span>
+            </button>
+            <button
+              onClick={() => setActiveTab('ev-panel-builder')}
+              className={`w-full text-left px-3 py-2.5 text-sm font-medium border-l-4 transition-colors ${activeTab === 'ev-panel-builder' ? 'border-green-500 bg-green-50 text-gray-900' : 'border-transparent text-gray-500 hover:bg-gray-50 hover:text-gray-700'}`}
+            >
+              <span className="flex items-center gap-2"><Zap className="w-4 h-4" /> EV Panel Builder</span>
+            </button>
+            <button
+              onClick={() => setActiveTab('circuit-sharing')}
+              className={`w-full text-left px-3 py-2.5 text-sm font-medium border-l-4 transition-colors ${activeTab === 'circuit-sharing' ? 'border-green-500 bg-green-50 text-gray-900' : 'border-transparent text-gray-500 hover:bg-gray-50 hover:text-gray-700'}`}
+            >
+              <span className="flex items-center gap-2"><Zap className="w-4 h-4" /> Circuit Sharing (NEC 625)</span>
+            </button>
+          </div>
 
           {/* AI-Powered Tools Section */}
           <div className="pt-4 mt-4 border-t border-gray-200">
-            <p className="px-3 text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">AI-Powered Analysis</p>
+            <p className="px-3 text-xs font-bold text-purple-600 uppercase tracking-wider mb-2 flex items-center gap-1">
+              <Sparkles className="w-3 h-3" /> AI-Powered Analysis
+            </p>
             <button
               onClick={() => setActiveTab('change-impact')}
-              className={`w-full text-left px-3 py-2.5 text-sm font-medium border-l-4 transition-colors ${activeTab === 'change-impact' ? 'border-electric-500 bg-electric-50 text-gray-900' : 'border-transparent text-gray-500 hover:bg-gray-50 hover:text-gray-700'}`}
+              className={`w-full text-left px-3 py-2.5 text-sm font-medium border-l-4 transition-colors ${activeTab === 'change-impact' ? 'border-purple-500 bg-purple-50 text-gray-900' : 'border-transparent text-gray-500 hover:bg-gray-50 hover:text-gray-700'}`}
             >
               <span className="flex items-center gap-2"><Sparkles className="w-4 h-4" /> Change Impact Analyzer</span>
             </button>
