@@ -585,7 +585,16 @@ export const MultiFamilyEVDocument: React.FC<MultiFamilyEVDocumentProps> = ({
 
         {/* Load Breakdown Table */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Detailed Load Breakdown (NEC 220.84)</Text>
+          <Text style={styles.sectionTitle}>
+            Detailed Load Breakdown ({result.buildingLoad.loadDeterminationMethod === 'calculated' ? 'NEC 220.84' : 'NEC 220.87(A)'})
+          </Text>
+          {result.buildingLoad.loadDeterminationMethod !== 'calculated' && (
+            <Text style={{ fontSize: 8, color: '#6b21a8', marginBottom: 5 }}>
+              Based on {result.buildingLoad.loadDeterminationMethod === 'utility_bill' ? '12-month utility billing' : '30-day load study'} data
+              {result.buildingLoad.utilityCompany ? ` from ${result.buildingLoad.utilityCompany}` : ''}
+              {result.buildingLoad.measurementPeriod ? ` (${result.buildingLoad.measurementPeriod})` : ''}
+            </Text>
+          )}
           <View style={styles.table}>
             <View style={styles.tableHeader}>
               <Text style={[styles.tableHeaderCell, { width: '30%' }]}>Category</Text>

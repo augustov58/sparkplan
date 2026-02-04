@@ -37,7 +37,89 @@ interface MultiFamilyEVCalculatorProps {
   projectId?: string;
 }
 
+// Building type presets for smart defaults
+type BuildingPresetType = 'custom' | 'studio_apts' | 'one_br_apts' | 'two_br_apts' | 'condos' | 'townhomes' | 'senior_living';
+
+interface BuildingPreset {
+  label: string;
+  description: string;
+  avgSqFt: number;
+  hasElectricCooking: boolean;
+  hasElectricHeat: boolean;
+  commonAreaVA: number;
+  typicalServiceAmps: number;
+}
+
+const BUILDING_PRESETS: Record<BuildingPresetType, BuildingPreset> = {
+  custom: {
+    label: 'Custom / I Know the Details',
+    description: 'Enter exact values for your building',
+    avgSqFt: 900,
+    hasElectricCooking: true,
+    hasElectricHeat: false,
+    commonAreaVA: 15000,
+    typicalServiceAmps: 800,
+  },
+  studio_apts: {
+    label: 'Studio Apartments',
+    description: '~500 sq ft avg, basic amenities',
+    avgSqFt: 500,
+    hasElectricCooking: true,
+    hasElectricHeat: false,
+    commonAreaVA: 10000,
+    typicalServiceAmps: 600,
+  },
+  one_br_apts: {
+    label: '1-Bedroom Apartments',
+    description: '~750 sq ft avg, standard amenities',
+    avgSqFt: 750,
+    hasElectricCooking: true,
+    hasElectricHeat: false,
+    commonAreaVA: 15000,
+    typicalServiceAmps: 800,
+  },
+  two_br_apts: {
+    label: '2-Bedroom Apartments',
+    description: '~1,000 sq ft avg, full amenities',
+    avgSqFt: 1000,
+    hasElectricCooking: true,
+    hasElectricHeat: false,
+    commonAreaVA: 20000,
+    typicalServiceAmps: 1000,
+  },
+  condos: {
+    label: 'Condominiums',
+    description: '~1,200 sq ft avg, upscale amenities',
+    avgSqFt: 1200,
+    hasElectricCooking: true,
+    hasElectricHeat: false,
+    commonAreaVA: 25000,
+    typicalServiceAmps: 1200,
+  },
+  townhomes: {
+    label: 'Townhomes / HOA',
+    description: '~1,500 sq ft avg, minimal common areas',
+    avgSqFt: 1500,
+    hasElectricCooking: true,
+    hasElectricHeat: false,
+    commonAreaVA: 8000,
+    typicalServiceAmps: 1000,
+  },
+  senior_living: {
+    label: 'Senior Living / Assisted',
+    description: '~700 sq ft avg, extensive common areas',
+    avgSqFt: 700,
+    hasElectricCooking: true,
+    hasElectricHeat: true,
+    commonAreaVA: 50000,
+    typicalServiceAmps: 1200,
+  },
+};
+
 export const MultiFamilyEVCalculator: React.FC<MultiFamilyEVCalculatorProps> = ({ projectId }) => {
+  // Building preset type
+  const [buildingPreset, setBuildingPreset] = useState<BuildingPresetType>('custom');
+
   // Building profile state
   const [buildingName, setBuildingName] = useState('');
   const [dwellingUnits, setDwellingUnits] = useState(20);
@@ -45,6 +127,20 @@ export const MultiFamilyEVCalculator: React.FC<MultiFamilyEVCalculatorProps> = (
   const [voltage, setVoltage] = useState<120 | 208 | 240 | 277 | 480>(208);
   const [phase, setPhase] = useState<1 | 3>(3);
   const [existingServiceAmps, setExistingServiceAmps] = useState(800);
+
+  // Apply building preset when selected
+  const applyBuildingPreset = (preset: BuildingPresetType) => {
+    setBuildingPreset(preset);
+    if (preset !== 'custom') {
+      const p = BUILDING_PRESETS[preset];
+      setAvgUnitSqFt(p.avgSqFt);
+      setHasElectricCooking(p.hasElectricCooking);
+      setHasElectricHeat(p.hasElectricHeat);
+      setCommonAreaLoadVA(p.commonAreaVA);
+      setExistingServiceAmps(p.typicalServiceAmps);
+      setUseItemizedCommonArea(false); // Reset to simple entry
+    }
+  };
 
   // EV charger configuration
   const [evChargerCount, setEvChargerCount] = useState(20);
@@ -66,6 +162,12 @@ export const MultiFamilyEVCalculator: React.FC<MultiFamilyEVCalculatorProps> = (
 
   // EVEMS toggle
   const [useEVEMS, setUseEVEMS] = useState(false);
+
+  // NEC 220.87 - Existing Load Determination Method
+  const [existingLoadMethod, setExistingLoadMethod] = useState<'calculated' | 'utility_bill' | 'load_study'>('calculated');
+  const [measuredPeakDemandKW, setMeasuredPeakDemandKW] = useState(0);
+  const [measurementPeriod, setMeasurementPeriod] = useState('');
+  const [utilityCompany, setUtilityCompany] = useState('');
 
   // Quick check mode
   const [mode, setMode] = useState<'quick' | 'detailed'>('detailed');
@@ -95,6 +197,11 @@ export const MultiFamilyEVCalculator: React.FC<MultiFamilyEVCalculatorProps> = (
         commonAreaLoads: useItemizedCommonArea && commonAreaItems.length > 0 ? commonAreaItems : undefined,
         transformer: hasTransformer ? { kvaRating: transformerKVA } : undefined,
         useEVEMS,
+        // NEC 220.87 - Existing Load Determination Method
+        existingLoadMethod,
+        measuredPeakDemandKW: existingLoadMethod !== 'calculated' && measuredPeakDemandKW > 0 ? measuredPeakDemandKW : undefined,
+        measurementPeriod: existingLoadMethod !== 'calculated' && measurementPeriod ? measurementPeriod : undefined,
+        utilityCompany: existingLoadMethod !== 'calculated' && utilityCompany ? utilityCompany : undefined,
       };
 
       return calculateMultiFamilyEV(input);
@@ -258,6 +365,29 @@ export const MultiFamilyEVCalculator: React.FC<MultiFamilyEVCalculatorProps> = (
               Building Profile
             </h4>
 
+            {/* Building Type Preset Selector */}
+            <div className="bg-electric-50 border border-electric-200 rounded-lg p-3">
+              <label className="block text-xs font-semibold text-electric-700 uppercase mb-2">
+                Don&apos;t Know All Details? Select Building Type
+              </label>
+              <select
+                value={buildingPreset}
+                onChange={e => applyBuildingPreset(e.target.value as BuildingPresetType)}
+                className="w-full border-electric-300 rounded text-sm py-2 focus:border-electric-500 focus:ring-electric-500"
+              >
+                {Object.entries(BUILDING_PRESETS).map(([key, preset]) => (
+                  <option key={key} value={key}>
+                    {preset.label} - {preset.description}
+                  </option>
+                ))}
+              </select>
+              {buildingPreset !== 'custom' && (
+                <p className="text-xs text-electric-600 mt-2">
+                  Defaults applied: {BUILDING_PRESETS[buildingPreset].avgSqFt} sq ft avg, {(BUILDING_PRESETS[buildingPreset].commonAreaVA / 1000).toFixed(0)} kVA common area
+                </p>
+              )}
+            </div>
+
             <div className="grid grid-cols-2 gap-4">
               <div className="col-span-2">
                 <label className="block text-xs font-semibold text-gray-500 uppercase mb-1">
@@ -288,12 +418,15 @@ export const MultiFamilyEVCalculator: React.FC<MultiFamilyEVCalculatorProps> = (
 
               <div>
                 <label className="block text-xs font-semibold text-gray-500 uppercase mb-1">
-                  Avg. Unit Sq Ft
+                  Avg. Unit Sq Ft {buildingPreset !== 'custom' && <span className="text-electric-500">(preset)</span>}
                 </label>
                 <input
                   type="number"
                   value={avgUnitSqFt}
-                  onChange={e => setAvgUnitSqFt(Number(e.target.value))}
+                  onChange={e => {
+                    setAvgUnitSqFt(Number(e.target.value));
+                    if (buildingPreset !== 'custom') setBuildingPreset('custom');
+                  }}
                   min="400"
                   max="3000"
                   step="50"
@@ -362,6 +495,92 @@ export const MultiFamilyEVCalculator: React.FC<MultiFamilyEVCalculatorProps> = (
                   <option value="3">3-Phase</option>
                 </select>
               </div>
+            </div>
+          </div>
+
+          {/* NEC 220.87 - Existing Load Determination Method */}
+          <div className="bg-purple-50 border border-purple-200 rounded-lg p-4 space-y-4">
+            <h4 className="font-semibold text-gray-900 text-sm flex items-center gap-2">
+              <TrendingUp className="w-4 h-4 text-purple-600" />
+              Existing Building Load (NEC 220.87)
+            </h4>
+
+            <div className="space-y-3">
+              <div>
+                <label className="block text-xs font-semibold text-gray-500 uppercase mb-1">
+                  Determination Method
+                </label>
+                <select
+                  value={existingLoadMethod}
+                  onChange={e => setExistingLoadMethod(e.target.value as 'calculated' | 'utility_bill' | 'load_study')}
+                  className="w-full border-gray-200 rounded text-sm py-2 focus:border-purple-500 focus:ring-purple-500"
+                >
+                  <option value="calculated">NEC 220.84 Calculation (Standard)</option>
+                  <option value="utility_bill">12-Month Utility Billing (Measured)</option>
+                  <option value="load_study">30-Day Load Study (Measured)</option>
+                </select>
+              </div>
+
+              {/* Info box explaining the method */}
+              {existingLoadMethod === 'calculated' && (
+                <div className="text-xs text-purple-700 bg-purple-100 rounded p-2">
+                  <Info className="w-3 h-3 inline mr-1" />
+                  Standard calculation using NEC 220.84 demand factors. This is conservative and always accepted by AHJs.
+                </div>
+              )}
+
+              {existingLoadMethod !== 'calculated' && (
+                <>
+                  <div className="text-xs text-purple-700 bg-purple-100 rounded p-2">
+                    <Info className="w-3 h-3 inline mr-1" />
+                    {existingLoadMethod === 'utility_bill'
+                      ? 'Using actual utility demand data. Often shows MORE available capacity than calculation. Provide 12-month billing records showing peak kW demand.'
+                      : 'Using recorded load data. Often shows MORE available capacity than calculation. Requires 30-day continuous recording with meter.'}
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-xs font-semibold text-gray-500 uppercase mb-1">
+                        Measured Peak Demand (kW)
+                      </label>
+                      <input
+                        type="number"
+                        value={measuredPeakDemandKW || ''}
+                        onChange={e => setMeasuredPeakDemandKW(Number(e.target.value))}
+                        placeholder="e.g., 185"
+                        min="0"
+                        step="1"
+                        className="w-full border-gray-200 rounded text-sm py-2 px-3 focus:border-purple-500 focus:ring-purple-500"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-semibold text-gray-500 uppercase mb-1">
+                        Utility Company
+                      </label>
+                      <input
+                        type="text"
+                        value={utilityCompany}
+                        onChange={e => setUtilityCompany(e.target.value)}
+                        placeholder="e.g., PG&E, SCE"
+                        className="w-full border-gray-200 rounded text-sm py-2 px-3 focus:border-purple-500 focus:ring-purple-500"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-500 uppercase mb-1">
+                      Measurement Period
+                    </label>
+                    <input
+                      type="text"
+                      value={measurementPeriod}
+                      onChange={e => setMeasurementPeriod(e.target.value)}
+                      placeholder="e.g., Jan 2025 - Dec 2025"
+                      className="w-full border-gray-200 rounded text-sm py-2 px-3 focus:border-purple-500 focus:ring-purple-500"
+                    />
+                  </div>
+                </>
+              )}
             </div>
           </div>
 

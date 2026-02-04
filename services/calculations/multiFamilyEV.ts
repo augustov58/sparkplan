@@ -239,6 +239,37 @@ export interface MultiFamilyEVInput {
 
   /** EVEMS scheduling mode */
   evemsMode?: 'power_sharing' | 'scheduled' | 'dynamic';
+
+  // =========================================================================
+  // NEC 220.87 - Existing Load Determination Method
+  // =========================================================================
+
+  /**
+   * How existing building load is determined per NEC 220.87
+   *
+   * - 'calculated': Use NEC 220.84 calculation (125% multiplier applied)
+   * - 'utility_bill': 12-month utility billing data (no multiplier - actual demand)
+   * - 'load_study': 30-day continuous recording (no multiplier - actual demand)
+   *
+   * Default: 'calculated'
+   */
+  existingLoadMethod?: 'calculated' | 'utility_bill' | 'load_study';
+
+  /**
+   * Measured peak demand in kW (required if utility_bill or load_study)
+   * This is the actual measured building demand from utility records
+   */
+  measuredPeakDemandKW?: number;
+
+  /**
+   * Measurement period description (e.g., "Jan 2025 - Dec 2025")
+   */
+  measurementPeriod?: string;
+
+  /**
+   * Utility company name (for documentation)
+   */
+  utilityCompany?: string;
 }
 
 /**
@@ -337,15 +368,15 @@ export interface MultiFamilyEVResult {
     evChargersRequested: number;
   };
 
-  /** Building load calculation per NEC 220.84 */
+  /** Building load calculation per NEC 220.84 or NEC 220.87 */
   buildingLoad: {
     /** Total connected load before demand factors (VA) */
     totalConnectedVA: number;
 
-    /** Building load after NEC 220.84 demand factor (VA) */
+    /** Building load after demand factor (VA) */
     buildingDemandVA: number;
 
-    /** NEC 220.84 demand factor applied */
+    /** Demand factor applied (1.0 for measured data) */
     buildingDemandFactor: number;
 
     /** Building load in amps */
@@ -353,6 +384,20 @@ export interface MultiFamilyEVResult {
 
     /** Detailed breakdown */
     breakdown: LoadBreakdownItem[];
+
+    /**
+     * Load determination method per NEC 220.87
+     * - 'calculated': NEC 220.84 calculation (default)
+     * - 'utility_bill': 12-month utility billing data (NEC 220.87(A))
+     * - 'load_study': 30-day continuous recording (NEC 220.87(A))
+     */
+    loadDeterminationMethod: 'calculated' | 'utility_bill' | 'load_study';
+
+    /** Measurement period (if using utility_bill or load_study) */
+    measurementPeriod?: string;
+
+    /** Utility company (if using utility_bill or load_study) */
+    utilityCompany?: string;
   };
 
   /** EV load calculation per NEC 220.57 */
@@ -890,6 +935,11 @@ export function calculateMultiFamilyEV(input: MultiFamilyEVInput): MultiFamilyEV
     transformer,
     useEVEMS = false,
     evemsMode = 'power_sharing',
+    // NEC 220.87 - Existing Load Determination Method
+    existingLoadMethod = 'calculated',
+    measuredPeakDemandKW,
+    measurementPeriod,
+    utilityCompany,
   } = input;
 
   const warnings: string[] = [];
@@ -897,131 +947,202 @@ export function calculateMultiFamilyEV(input: MultiFamilyEVInput): MultiFamilyEV
   const necArticles: string[] = ['NEC 220.84', 'NEC 220.57', 'NEC 625.42'];
 
   // =========================================================================
-  // STEP 1: Calculate Building Load per NEC 220.84
+  // STEP 1: Determine Building Load
+  // =========================================================================
+  // Per NEC 220.87:
+  // - 220.87(A): Measurement (utility bill/load study) - use actual demand, NO multiplier
+  // - 220.87(B): Calculation (Article 220.84) - calculate per NEC
+  //
+  // Using measured data often shows MORE available capacity than calculation,
+  // because actual building usage is typically lower than code-calculated demand.
   // =========================================================================
 
   const breakdown: LoadBreakdownItem[] = [];
   const totalSqFt = dwellingUnits * avgUnitSqFt;
 
-  // 1a. General lighting load (3 VA/sq ft per NEC 220.12)
-  const lightingLoadVA = totalSqFt * LIGHTING_LOAD_VA_PER_SQFT;
-  breakdown.push({
-    category: 'General Lighting',
-    description: `${totalSqFt.toLocaleString()} sq ft @ 3 VA/sq ft`,
-    connectedVA: lightingLoadVA,
-    demandVA: lightingLoadVA, // Will be factored later
-    demandFactor: 1.0,
-    necReference: 'NEC Table 220.12',
-  });
+  // Variables for building load (will be populated based on method)
+  let buildingDemandVA: number;
+  let totalConnectedVA: number;
+  let buildingDemandFactor: number;
 
-  // 1b. Small appliance circuits (2 per unit @ 1,500 VA each)
-  const smallApplianceVA = dwellingUnits * 2 * SMALL_APPLIANCE_VA;
-  breakdown.push({
-    category: 'Small Appliance Circuits',
-    description: `${dwellingUnits} units × 2 circuits × 1,500 VA`,
-    connectedVA: smallApplianceVA,
-    demandVA: smallApplianceVA,
-    demandFactor: 1.0,
-    necReference: 'NEC 220.52(A)',
-  });
+  // Check if using measured data (NEC 220.87(A)) or calculation (NEC 220.87(B))
+  const useMeasuredData = (existingLoadMethod === 'utility_bill' || existingLoadMethod === 'load_study')
+    && measuredPeakDemandKW !== undefined && measuredPeakDemandKW > 0;
 
-  // 1c. Laundry circuits (1 per unit @ 1,500 VA)
-  const laundryVA = dwellingUnits * LAUNDRY_CIRCUIT_VA;
-  breakdown.push({
-    category: 'Laundry Circuits',
-    description: `${dwellingUnits} units × 1,500 VA`,
-    connectedVA: laundryVA,
-    demandVA: laundryVA,
-    demandFactor: 1.0,
-    necReference: 'NEC 220.52(B)',
-  });
+  if (useMeasuredData) {
+    // =========================================================================
+    // PATH A: MEASURED DATA (NEC 220.87(A))
+    // =========================================================================
+    // Using actual measured demand from utility billing or load study.
+    // NO 125% multiplier - this IS the actual building demand.
+    //
+    // Benefits of measurement method:
+    // - Often shows MORE available capacity than calculation
+    // - Reflects actual usage patterns (vacancy, efficiency, etc.)
+    // - Widely accepted by AHJs for service upgrade calculations
+    // =========================================================================
 
-  // Base unit loads subtotal (before major appliances)
-  let baseUnitLoadVA = lightingLoadVA + smallApplianceVA + laundryVA;
+    necArticles.push('NEC 220.87(A)');
 
-  // 1d. Electric cooking (if applicable) - per NEC 220.84(C)(3)
-  // IMPORTANT: For NEC 220.84 Optional Method, cooking equipment is included
-  // at NAMEPLATE rating, NOT reduced per Table 220.55. The Table 220.84
-  // demand factor is applied once to the total.
-  // Table 220.55 is for the Standard Method (220.40-220.60), not 220.84.
-  let cookingLoadVA = 0;
-  if (hasElectricCooking) {
-    // Include at nameplate rating per NEC 220.84(C)(3)
-    // Assume 12 kW range per dwelling unit
-    const nameplatePerUnit = 12000; // 12 kW = 12,000 VA
-    cookingLoadVA = dwellingUnits * nameplatePerUnit;
+    const measuredDemandVA = measuredPeakDemandKW * 1000;
+
+    // Create breakdown entry for measured data
+    const methodDescription = existingLoadMethod === 'utility_bill'
+      ? `12-month utility billing${utilityCompany ? ` (${utilityCompany})` : ''}`
+      : `30-day load study${utilityCompany ? ` (${utilityCompany})` : ''}`;
+
+    const periodDescription = measurementPeriod ? ` (${measurementPeriod})` : '';
+
     breakdown.push({
-      category: 'Electric Cooking',
-      description: `${dwellingUnits} units @ 12 kW nameplate each`,
-      connectedVA: cookingLoadVA,
-      demandVA: cookingLoadVA, // Will be factored with all loads via 220.84
-      demandFactor: 1.0, // No separate factor - 220.84 applies to sum
-      necReference: 'NEC 220.84(C)(3)',
+      category: 'Measured Building Demand',
+      description: `${methodDescription}${periodDescription}`,
+      connectedVA: measuredDemandVA, // Best estimate - same as measured
+      demandVA: measuredDemandVA,
+      demandFactor: 1.0, // No factor applied - this is actual demand
+      necReference: 'NEC 220.87(A)',
     });
-  }
 
-  // 1e. Electric heat (if applicable) - 65% of largest unit per NEC 220.84(C)(4)
-  let heatingLoadVA = 0;
-  if (hasElectricHeat) {
-    // Assume 10 kW per unit, apply 65% demand
-    const unitHeatingVA = 10000;
-    heatingLoadVA = dwellingUnits * unitHeatingVA * 0.65;
+    // Set building load values from measured data
+    totalConnectedVA = measuredDemandVA; // We don't know connected, use measured
+    buildingDemandVA = measuredDemandVA;
+    buildingDemandFactor = 1.0; // Not applicable for measured data
+
+    recommendations.push(
+      'Building load based on measured demand (NEC 220.87(A)) - typically shows more available capacity than calculation.'
+    );
+
+    // Note: Common area loads are INCLUDED in measured demand, don't add separately
+
+  } else {
+    // =========================================================================
+    // PATH B: CALCULATED DATA (NEC 220.87(B) via NEC 220.84)
+    // =========================================================================
+    // Calculate building demand using NEC 220.84 Optional Method for
+    // multifamily dwellings. This is the standard calculation method.
+    // =========================================================================
+
+    necArticles.push('NEC 220.87(B)');
+
+    // 1a. General lighting load (3 VA/sq ft per NEC 220.12)
+    const lightingLoadVA = totalSqFt * LIGHTING_LOAD_VA_PER_SQFT;
     breakdown.push({
-      category: 'Electric Heat',
-      description: `${dwellingUnits} units @ 65% demand`,
-      connectedVA: dwellingUnits * unitHeatingVA,
-      demandVA: heatingLoadVA,
-      demandFactor: 0.65,
-      necReference: 'NEC 220.84(C)(4)',
-    });
-  }
-
-  // 1f. Calculate unit subtotal and apply NEC 220.84 demand factor
-  const unitLoadsSubtotal = baseUnitLoadVA + cookingLoadVA + heatingLoadVA;
-  const buildingDemandFactor = getMultiFamilyDemandFactor(dwellingUnits);
-  const unitLoadsDemandVA = unitLoadsSubtotal * buildingDemandFactor;
-
-  breakdown.push({
-    category: 'NEC 220.84 Demand Factor',
-    description: `${dwellingUnits} units @ ${(buildingDemandFactor * 100).toFixed(0)}%`,
-    connectedVA: unitLoadsSubtotal,
-    demandVA: unitLoadsDemandVA,
-    demandFactor: buildingDemandFactor,
-    necReference: 'NEC Table 220.84',
-  });
-
-  // 1g. Common area loads
-  // Use itemized loads if provided, otherwise use simple VA input
-  let commonAreaConnectedVA = 0;
-  let commonAreaDemandVA = 0;
-
-  if (commonAreaLoads && commonAreaLoads.length > 0) {
-    // Calculate itemized common area loads with proper NEC demand factors
-    const commonAreaResult = calculateCommonAreaLoads(commonAreaLoads);
-    commonAreaConnectedVA = commonAreaResult.totalConnectedVA;
-    commonAreaDemandVA = commonAreaResult.totalDemandVA;
-
-    // Add each itemized load to the breakdown
-    for (const item of commonAreaResult.items) {
-      breakdown.push(item);
-    }
-  } else if (commonAreaLoadVA > 0) {
-    // Fall back to simple VA input (100% demand factor)
-    commonAreaConnectedVA = commonAreaLoadVA;
-    commonAreaDemandVA = commonAreaLoadVA;
-    breakdown.push({
-      category: 'Common Area Loads',
-      description: 'Lighting, elevators, pool, etc. (100%)',
-      connectedVA: commonAreaLoadVA,
-      demandVA: commonAreaLoadVA,
+      category: 'General Lighting',
+      description: `${totalSqFt.toLocaleString()} sq ft @ 3 VA/sq ft`,
+      connectedVA: lightingLoadVA,
+      demandVA: lightingLoadVA, // Will be factored later
       demandFactor: 1.0,
-      necReference: 'NEC 220.84(B)',
+      necReference: 'NEC Table 220.12',
     });
-  }
 
-  // Total building load
-  const totalConnectedVA = unitLoadsSubtotal + commonAreaConnectedVA;
-  const buildingDemandVA = unitLoadsDemandVA + commonAreaDemandVA;
+    // 1b. Small appliance circuits (2 per unit @ 1,500 VA each)
+    const smallApplianceVA = dwellingUnits * 2 * SMALL_APPLIANCE_VA;
+    breakdown.push({
+      category: 'Small Appliance Circuits',
+      description: `${dwellingUnits} units × 2 circuits × 1,500 VA`,
+      connectedVA: smallApplianceVA,
+      demandVA: smallApplianceVA,
+      demandFactor: 1.0,
+      necReference: 'NEC 220.52(A)',
+    });
+
+    // 1c. Laundry circuits (1 per unit @ 1,500 VA)
+    const laundryVA = dwellingUnits * LAUNDRY_CIRCUIT_VA;
+    breakdown.push({
+      category: 'Laundry Circuits',
+      description: `${dwellingUnits} units × 1,500 VA`,
+      connectedVA: laundryVA,
+      demandVA: laundryVA,
+      demandFactor: 1.0,
+      necReference: 'NEC 220.52(B)',
+    });
+
+    // Base unit loads subtotal (before major appliances)
+    const baseUnitLoadVA = lightingLoadVA + smallApplianceVA + laundryVA;
+
+    // 1d. Electric cooking (if applicable) - per NEC 220.84(C)(3)
+    // IMPORTANT: For NEC 220.84 Optional Method, cooking equipment is included
+    // at NAMEPLATE rating, NOT reduced per Table 220.55. The Table 220.84
+    // demand factor is applied once to the total.
+    // Table 220.55 is for the Standard Method (220.40-220.60), not 220.84.
+    let cookingLoadVA = 0;
+    if (hasElectricCooking) {
+      // Include at nameplate rating per NEC 220.84(C)(3)
+      // Assume 12 kW range per dwelling unit
+      const nameplatePerUnit = 12000; // 12 kW = 12,000 VA
+      cookingLoadVA = dwellingUnits * nameplatePerUnit;
+      breakdown.push({
+        category: 'Electric Cooking',
+        description: `${dwellingUnits} units @ 12 kW nameplate each`,
+        connectedVA: cookingLoadVA,
+        demandVA: cookingLoadVA, // Will be factored with all loads via 220.84
+        demandFactor: 1.0, // No separate factor - 220.84 applies to sum
+        necReference: 'NEC 220.84(C)(3)',
+      });
+    }
+
+    // 1e. Electric heat (if applicable) - 65% of largest unit per NEC 220.84(C)(4)
+    let heatingLoadVA = 0;
+    if (hasElectricHeat) {
+      // Assume 10 kW per unit, apply 65% demand
+      const unitHeatingVA = 10000;
+      heatingLoadVA = dwellingUnits * unitHeatingVA * 0.65;
+      breakdown.push({
+        category: 'Electric Heat',
+        description: `${dwellingUnits} units @ 65% demand`,
+        connectedVA: dwellingUnits * unitHeatingVA,
+        demandVA: heatingLoadVA,
+        demandFactor: 0.65,
+        necReference: 'NEC 220.84(C)(4)',
+      });
+    }
+
+    // 1f. Calculate unit subtotal and apply NEC 220.84 demand factor
+    const unitLoadsSubtotal = baseUnitLoadVA + cookingLoadVA + heatingLoadVA;
+    buildingDemandFactor = getMultiFamilyDemandFactor(dwellingUnits);
+    const unitLoadsDemandVA = unitLoadsSubtotal * buildingDemandFactor;
+
+    breakdown.push({
+      category: 'NEC 220.84 Demand Factor',
+      description: `${dwellingUnits} units @ ${(buildingDemandFactor * 100).toFixed(0)}%`,
+      connectedVA: unitLoadsSubtotal,
+      demandVA: unitLoadsDemandVA,
+      demandFactor: buildingDemandFactor,
+      necReference: 'NEC Table 220.84',
+    });
+
+    // 1g. Common area loads
+    // Use itemized loads if provided, otherwise use simple VA input
+    let commonAreaConnectedVA = 0;
+    let commonAreaDemandVA = 0;
+
+    if (commonAreaLoads && commonAreaLoads.length > 0) {
+      // Calculate itemized common area loads with proper NEC demand factors
+      const commonAreaResult = calculateCommonAreaLoads(commonAreaLoads);
+      commonAreaConnectedVA = commonAreaResult.totalConnectedVA;
+      commonAreaDemandVA = commonAreaResult.totalDemandVA;
+
+      // Add each itemized load to the breakdown
+      for (const item of commonAreaResult.items) {
+        breakdown.push(item);
+      }
+    } else if (commonAreaLoadVA > 0) {
+      // Fall back to simple VA input (100% demand factor)
+      commonAreaConnectedVA = commonAreaLoadVA;
+      commonAreaDemandVA = commonAreaLoadVA;
+      breakdown.push({
+        category: 'Common Area Loads',
+        description: 'Lighting, elevators, pool, etc. (100%)',
+        connectedVA: commonAreaLoadVA,
+        demandVA: commonAreaLoadVA,
+        demandFactor: 1.0,
+        necReference: 'NEC 220.84(B)',
+      });
+    }
+
+    // Total building load (calculated method)
+    totalConnectedVA = unitLoadsSubtotal + commonAreaConnectedVA;
+    buildingDemandVA = unitLoadsDemandVA + commonAreaDemandVA;
+  }
   const buildingLoadAmps = calculateAmps(buildingDemandVA, voltage, phase);
 
   // =========================================================================
@@ -1347,6 +1468,9 @@ export function calculateMultiFamilyEV(input: MultiFamilyEVInput): MultiFamilyEV
       buildingDemandFactor,
       buildingLoadAmps: Math.round(buildingLoadAmps),
       breakdown,
+      loadDeterminationMethod: existingLoadMethod,
+      measurementPeriod,
+      utilityCompany,
     },
     evLoad: {
       totalConnectedVA: Math.round(totalEVConnectedVA),

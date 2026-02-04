@@ -694,3 +694,150 @@ Based on forum research, refine Level 3 niche from:
 3. **Week 3:** If validated, offer done-for-you service at $500-1,500
 4. **Month 2:** Build automated tool based on learnings
 5. **Month 3:** Launch Multi-Family EV Calculator as premium tier
+
+---
+
+## 11. NEC 220.87 - CALCULATION VS MEASUREMENT (January 21, 2026)
+
+### Critical Discovery: Two Paths to Determine Existing Load
+
+**NEC 220.87** provides two methods for determining existing building demand when adding new loads (like EV charging):
+
+| Method | NEC Reference | Data Source | Multiplier | Result |
+|--------|--------------|-------------|------------|--------|
+| **Measurement** | 220.87(A) | Utility bills or 30-day load study | None | More favorable |
+| **Calculation** | 220.87(B) | Article 220 calculations | 125% | More conservative |
+
+### Why This Matters
+
+**The measurement path often shows MORE available capacity than calculation:**
+
+1. **NEC 220.84 calculations are conservative by design**
+   - Assume all appliances running simultaneously
+   - Include safety margins for worst-case scenarios
+   - Result: Calculated demand often 2-3x actual usage
+
+2. **Utility billing data reflects reality**
+   - Shows what the building actually uses
+   - Accounts for vacancy, efficiency improvements, behavioral patterns
+   - 15-minute interval demand data is most accurate
+
+3. **For EV charging capacity analysis:**
+   - A building calculated at 400A demand might only use 180A peak
+   - This means 220A of capacity for EV charging vs 0A using calculation
+   - **Contractors are concluding "impossible" when "feasible" is correct**
+
+### What Cities Typically Require
+
+Based on forum research and jurisdictional analysis:
+
+| Jurisdiction Type | Calculation Accepted? | Utility Data Accepted? | Preference |
+|-------------------|----------------------|------------------------|------------|
+| **Major metros** (LA, NYC, SF) | Yes | Yes | Either |
+| **Suburban/mid-size** | Yes | Yes (with documentation) | Calculation |
+| **Rural** | Yes | Rarely requested | Calculation |
+| **California (Title 24)** | Yes | Yes | Either |
+
+**Key Insight:** Most AHJs accept EITHER method. The measurement path is underutilized because:
+- Contractors don't know it exists
+- Utility data can be hard to obtain
+- It requires explaining the approach to inspectors
+
+### Feasibility Analysis: What Data Can Contractors Obtain?
+
+| Data Needed | Feasibility | Notes |
+|-------------|------------|-------|
+| **Dwelling unit count** | ✅ Easy | Visual count, HOA records |
+| **Average unit square footage** | ⚠️ Medium | May need property records or estimation |
+| **Existing service size** | ✅ Easy | Read meter/main breaker |
+| **Voltage/Phase** | ✅ Easy | Read meter |
+| **12-month utility billing (kW demand)** | ⚠️ Medium | Requires property owner request to utility |
+| **Individual unit loads** | ❌ Hard | Cannot access other units |
+| **Electric heat/cooking** | ⚠️ Medium | May need to assume based on building type |
+| **Common area loads** | ⚠️ Medium | Need building plans or estimation |
+| **30-day load study** | ⚠️ Medium | Requires metering equipment rental |
+
+### Our Solution: Support Both Paths
+
+**Multi-Family EV Calculator now supports:**
+
+1. **Calculation Path (NEC 220.87(B))**
+   - Uses NEC 220.84 demand factors (23-45% based on unit count)
+   - Conservative - always accepted by AHJs
+   - Default mode when utility data unavailable
+
+2. **Measurement Path (NEC 220.87(A))** ← NEW
+   - Input measured peak demand from utility bills
+   - No 125% multiplier applied
+   - Often shows 30-50% more available capacity
+   - Requires documentation of data source
+
+3. **Smart Defaults** ← NEW
+   - Building type presets (studio, 1BR, 2BR, condos, etc.)
+   - Pre-filled typical values for unit sizes, common area loads
+   - Enables quick estimates when detailed data unavailable
+
+### Implementation Summary
+
+**Code Changes (January 21, 2026):**
+
+| File | Changes |
+|------|---------|
+| `services/calculations/multiFamilyEV.ts` | Added `existingLoadMethod`, `measuredPeakDemandKW`, `measurementPeriod`, `utilityCompany` fields |
+| `components/MultiFamilyEVCalculator.tsx` | Added load determination method UI, building type presets |
+| `services/pdfExport/MultiFamilyEVDocuments.tsx` | Shows load determination method in PDF |
+
+**User Flow:**
+
+```
+1. Select "Existing Building Load" method:
+   - NEC 220.84 Calculation (Standard) ← default
+   - 12-Month Utility Billing (Measured)
+   - 30-Day Load Study (Measured)
+
+2. If Measurement selected:
+   - Enter measured peak demand (kW)
+   - Enter utility company name
+   - Enter measurement period
+
+3. Result shows:
+   - Available capacity (often higher with measurement path)
+   - Clear NEC reference for AHJ
+   - Documentation for permit package
+```
+
+### Impact on Tool Value Proposition
+
+**Before:** Tool only supported calculation - sometimes showing "impossible" results
+
+**After:** Tool supports measurement path - often revealing significant available capacity
+
+**Example Scenario:**
+- 35-unit building with 800A service
+- **Calculation method:** Calculated demand 720A → Only 80A available (1-2 chargers)
+- **Measurement method:** Measured peak 350A → 450A available (9-12 chargers)
+
+**This is the difference between "turn down the job" and "submit the bid."**
+
+### Data Collection Guide for Contractors
+
+When approaching a multi-family EV project, gather:
+
+**Always Needed (Easy to Obtain):**
+- [ ] Number of dwelling units
+- [ ] Existing service amperage (main breaker/meter)
+- [ ] Voltage configuration (120/208V or 277/480V)
+- [ ] Phase configuration (1-phase or 3-phase)
+
+**Helpful if Available (Medium Effort):**
+- [ ] Property records for unit square footage
+- [ ] 12-month utility billing with kW demand (request from property owner)
+- [ ] Common area amenities list (gym, pool, elevators)
+- [ ] Building vintage (affects assumed appliances)
+
+**Nice to Have (Harder to Obtain):**
+- [ ] Original electrical plans
+- [ ] Individual unit load inventories
+- [ ] 30-day metering data
+
+**Key Message to Contractors:** You don't need perfect data. Our tool works with estimates and provides conservative results. The utility billing path often reveals capacity that calculation misses.

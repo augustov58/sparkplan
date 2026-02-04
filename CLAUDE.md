@@ -12,7 +12,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - Pending tasks and context from last session
 
 **Current Branch**: `main`
-**Last Session**: 2026-01-31 (Multi-Family EV Bug Fixes & Merge)
+**Last Session**: 2026-02-04 (NEC 220.87 Measurement Path & Smart Defaults)
 
 ---
 
@@ -137,7 +137,7 @@ GOOGLE_API_KEY=your_gemini_api_key_here     # For Pydantic AI agents
 **Result**: 100% commercial permit readiness - all jurisdiction requirements deliverable!
 
 ### ✅ Phase 2.5: Multi-Family EV Domination - COMPLETE (Jan 2026)
-**Spec**: `STRATEGIC_ANALYSIS.md` (Forum-Validated)
+**Spec**: `STRATEGIC_ANALYSIS.md` (Forum-Validated, Multi-Family EV Focused)
 **Branch**: `feature/multi-family-ev` → Merged to `main`
 
 Captures highest-pain, highest-WTP segment validated via Mike Holt Forums & Electrician Talk.
@@ -150,15 +150,25 @@ Contractors turning down $10K-50K jobs due to complexity - we automate the $2-10
 | **Tools Hub Integration** | - | ✅ Complete | `components/Calculators.tsx` |
 | **PDF Export (Standalone)** | - | ✅ Complete | `services/pdfExport/MultiFamilyEVDocuments.tsx` |
 | **Permit Packet Integration** | - | ✅ Complete | `components/PermitPacketGenerator.tsx` |
+| **NEC 220.87 Measurement Path** | 220.87(A) | ✅ Complete | Utility billing / load study input |
+| **Building Type Presets** | - | ✅ Complete | Smart defaults for common building types |
+| **Common Area Load Itemization** | - | ✅ Complete | NEC demand factors per category |
 
 **Key Features Delivered:**
 - NEC 220.84 multi-family demand factors (23-45% based on unit count)
 - NEC 220.57 per-EVSE load calculation (max of 7,200 VA or nameplate)
 - NEC 625.42 EVEMS right-sizing (size to setpoint, not full connected load)
+- **NEC 220.87 dual-path support**: Calculation (220.87(B)) OR measurement (220.87(A))
+- **Measurement path inputs**: 12-month utility billing, 30-day load study
+- **Building type presets**: Studio, 1BR, 2BR, condos, townhomes, senior living
+- **Itemized common area loads** with NEC demand factors per category
 - Building service upgrade recommendation (none/panel-only/full-service)
 - EV capacity scenarios comparison (with/without EVEMS)
 - 3-page professional PDF export for city permit submittals
 - Integrated into Permit Packet Generator for complete packages
+
+**Key Insight (NEC 220.87):** Measurement path often shows 30-50% MORE available capacity than calculation,
+turning "impossible" projects into "feasible" bids.
 
 **⏳ PREREQUISITE: Multi-Family Dwelling Calculator (18-25 hours)**
 Current Dwelling Load Calculator only supports single-family (NEC 220.82).
@@ -379,6 +389,33 @@ panels → panels (self-referential via fed_from)
 ---
 
 ## Recent Changes
+
+### 2026-02-04: NEC 220.87 Measurement Path & Smart Defaults ✅
+**Status**: Complete
+**Branch**: `main`
+
+**New Features:**
+- **NEC 220.87 Dual-Path Support**: Can now determine building load via calculation (220.87(B)) OR measurement (220.87(A))
+  - 12-month utility billing input (kW demand from utility records)
+  - 30-day load study input (continuous metering data)
+  - Measurement path often shows 30-50% MORE available capacity
+- **Building Type Presets**: Smart defaults for common building types
+  - Studio apartments, 1BR, 2BR, condos, townhomes, senior living
+  - Auto-fills typical sq ft, common area loads, service size
+  - "Don't know the details? Select building type" workflow
+- **Documentation Updates**:
+  - `STRATEGIC_ANALYSIS.md` refocused on Multi-Family EV only
+  - `VALIDATION_ANALYSIS.md` updated with NEC 220.87 findings
+  - Data collection guide for contractors added
+
+**Files Modified:**
+- `services/calculations/multiFamilyEV.ts` - NEC 220.87 measurement path logic
+- `components/MultiFamilyEVCalculator.tsx` - Building presets UI, load method selector
+- `services/pdfExport/MultiFamilyEVDocuments.tsx` - Shows load determination method
+- `youtube-research/VALIDATION_ANALYSIS.md` - Section 11: Calculation vs Measurement
+- `STRATEGIC_ANALYSIS.md` - Complete rewrite focused on Multi-Family EV
+
+---
 
 ### 2026-01-31: Multi-Family EV Bug Fixes & Merge ✅
 **Status**: Complete
