@@ -75,11 +75,11 @@ export const Calculators: React.FC<CalculatorsProps> = ({ projectId }) => {
     { value: 'short-circuit', label: 'Short Circuit (NEC 110.9)', group: 'general' },
     { value: 'arc-flash', label: 'Arc Flash (NFPA 70E)', group: 'general' },
     { value: 'solar-pv', label: 'Solar PV (NEC 690)', group: 'general' },
+    { value: 'service-upgrade', label: 'Service Upgrade (NEC 230.42)', group: 'general' },
     // EV Calculators
     { value: 'multi-family-ev', label: '⚡ Multi-Family EV (NEC 220.84)', group: 'ev' },
     { value: 'ev-charging', label: '⚡ EV Charging (NEC 625)', group: 'ev' },
     { value: 'evems', label: '⚡ EVEMS Load Mgmt (NEC 625.42)', group: 'ev' },
-    { value: 'service-upgrade', label: '⚡ Service Upgrade (NEC 230.42)', group: 'ev' },
     { value: 'ev-panel-builder', label: '⚡ EV Panel Builder', group: 'ev' },
     { value: 'circuit-sharing', label: '⚡ Circuit Sharing (NEC 625)', group: 'ev' },
     // AI
@@ -153,6 +153,12 @@ export const Calculators: React.FC<CalculatorsProps> = ({ projectId }) => {
           >
             <span className="flex items-center gap-2"><Sun className="w-4 h-4" /> Solar PV (NEC 690)</span>
           </button>
+          <button
+            onClick={() => setActiveTab('service-upgrade')}
+            className={`w-full text-left px-3 py-2.5 text-sm font-medium border-l-4 transition-colors ${activeTab === 'service-upgrade' ? 'border-electric-500 bg-electric-50 text-gray-900' : 'border-transparent text-gray-500 hover:bg-gray-50 hover:text-gray-700'}`}
+          >
+            <span className="flex items-center gap-2"><TrendingUp className="w-4 h-4" /> Service Upgrade (NEC 230.42)</span>
+          </button>
 
           {/* EV Calculators Section */}
           <div className="pt-4 mt-4 border-t border-gray-200">
@@ -176,12 +182,6 @@ export const Calculators: React.FC<CalculatorsProps> = ({ projectId }) => {
               className={`w-full text-left px-3 py-2.5 text-sm font-medium border-l-4 transition-colors ${activeTab === 'evems' ? 'border-green-500 bg-green-50 text-gray-900' : 'border-transparent text-gray-500 hover:bg-gray-50 hover:text-gray-700'}`}
             >
               <span className="flex items-center gap-2"><Zap className="w-4 h-4" /> EVEMS Load Mgmt (NEC 625.42)</span>
-            </button>
-            <button
-              onClick={() => setActiveTab('service-upgrade')}
-              className={`w-full text-left px-3 py-2.5 text-sm font-medium border-l-4 transition-colors ${activeTab === 'service-upgrade' ? 'border-green-500 bg-green-50 text-gray-900' : 'border-transparent text-gray-500 hover:bg-gray-50 hover:text-gray-700'}`}
-            >
-              <span className="flex items-center gap-2"><TrendingUp className="w-4 h-4" /> Service Upgrade (NEC 230.42)</span>
             </button>
             <button
               onClick={() => setActiveTab('ev-panel-builder')}
