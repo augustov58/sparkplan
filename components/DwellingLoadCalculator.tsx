@@ -6,6 +6,7 @@
  */
 
 import React, { useState, useEffect, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   Home,
   Zap,
@@ -25,7 +26,11 @@ import {
   Download,
   RefreshCw,
   Users,
-  Cable
+  Cable,
+  Building2,
+  ArrowRight,
+  Info,
+  Loader
 } from 'lucide-react';
 import { 
   Project, 
@@ -45,6 +50,16 @@ import {
 } from '../services/calculations/residentialLoad';
 import { usePanels } from '../hooks/usePanels';
 import { useCircuits } from '../hooks/useCircuits';
+import {
+  generateBasicMultiFamilyProject,
+  type BasicGenerationOptions
+} from '../services/autogeneration/multiFamilyProjectGenerator';
+import {
+  populateProject,
+  projectHasPanels,
+  clearProjectElectricalData,
+  type PopulationProgress
+} from '../services/autogeneration/projectPopulationOrchestrator';
 
 interface DwellingLoadCalculatorProps {
   project: Project;
@@ -82,6 +97,7 @@ export const DwellingLoadCalculator: React.FC<DwellingLoadCalculatorProps> = ({
   updateProject 
 }) => {
   // Hooks
+  const navigate = useNavigate();
   const { panels, createPanel, updatePanel } = usePanels(project.id);
   const mainPanel = panels.find(p => p.is_main);
   const { circuits, createCircuit, deleteCircuitsByPanel } = useCircuits(project.id);
@@ -94,6 +110,12 @@ export const DwellingLoadCalculator: React.FC<DwellingLoadCalculatorProps> = ({
   const [isGenerating, setIsGenerating] = useState(false);
   const [generatedCircuits, setGeneratedCircuits] = useState<GeneratedCircuit[]>([]);
   const [showGenerated, setShowGenerated] = useState(false);
+  const [showMFRedirect, setShowMFRedirect] = useState(false);
+  const [isGeneratingMF, setIsGeneratingMF] = useState(false);
+  const [mfGenerateError, setMfGenerateError] = useState<string | null>(null);
+  const [mfGenerateSuccess, setMfGenerateSuccess] = useState(false);
+  const [mfProgress, setMfProgress] = useState<PopulationProgress | null>(null);
+  const [existingPanelsWarning, setExistingPanelsWarning] = useState(false);
 
   // Get residential settings
   const residentialSettings = project.settings.residential;
@@ -247,18 +269,9 @@ export const DwellingLoadCalculator: React.FC<DwellingLoadCalculatorProps> = ({
       return;
     }
 
-    // Multi-family: different workflow
+    // Multi-family: redirect to MF EV Calculator
     if (!isSingleFamily) {
-      alert(
-        '📋 Multi-Family Service Calculation\n\n' +
-        'For multi-family projects, the calculator provides SERVICE SIZING only (shown on the right).\n\n' +
-        'Multi-family buildings typically have:\n' +
-        '• Meter stack/CT cabinet (not a traditional panel schedule)\n' +
-        '• Individual dwelling unit panels (managed separately per unit)\n' +
-        '• House panel for common areas\n\n' +
-        'Use the Load Breakdown and Service Calculation results for your service entrance design.\n\n' +
-        'Recommended Service: ' + loadResult.recommendedServiceSize + 'A'
-      );
+      setShowMFRedirect(true);
       return;
     }
     
@@ -377,6 +390,84 @@ export const DwellingLoadCalculator: React.FC<DwellingLoadCalculatorProps> = ({
     }
   };
 
+  // Generate multi-family project (no EV)
+  const handleGenerateMFProject = async () => {
+    if (!loadResult) return;
+
+    // Check for existing panels first
+    const hasPanels = await projectHasPanels(project.id);
+    if (hasPanels) {
+      setExistingPanelsWarning(true);
+      return;
+    }
+
+    await doGenerateMFProject();
+  };
+
+  const doGenerateMFProject = async () => {
+    if (!loadResult) return;
+
+    setExistingPanelsWarning(false);
+    setIsGeneratingMF(true);
+    setMfGenerateError(null);
+    setMfGenerateSuccess(false);
+    setMfProgress(null);
+
+    try {
+      // Determine appliance flags from unit templates
+      const hasElectricCooking = unitTemplates.some(t =>
+        t.appliances?.range?.enabled && t.appliances.range.type === 'electric'
+      );
+      const hasElectricHeat = unitTemplates.some(t =>
+        t.appliances?.hvac?.enabled && t.appliances.hvac.type === 'heat_pump'
+      );
+
+      // Calculate total dwelling units
+      const totalUnits = unitTemplates.reduce((sum, t) => sum + t.unitCount, 0);
+      // Weighted average sq ft
+      const avgSqFt = totalUnits > 0
+        ? Math.round(unitTemplates.reduce((sum, t) => sum + t.squareFootage * t.unitCount, 0) / totalUnits)
+        : 1000;
+
+      const options: BasicGenerationOptions = {
+        projectId: project.id,
+        voltage: 240,
+        phase: 1,
+        dwellingUnits: totalUnits,
+        avgUnitSqFt: avgSqFt,
+        buildingName: project.name,
+        serviceAmps: loadResult.serviceAmps,
+        commonAreaLoadVA: housePanelLoad,
+        hasElectricCooking,
+        hasElectricHeat,
+      };
+
+      const generated = generateBasicMultiFamilyProject(options);
+      await populateProject(generated, (progress) => setMfProgress(progress));
+
+      setMfGenerateSuccess(true);
+    } catch (error) {
+      console.error('MF generation error:', error);
+      setMfGenerateError(error instanceof Error ? error.message : 'Unknown error');
+    } finally {
+      setIsGeneratingMF(false);
+    }
+  };
+
+  const handleClearAndGenerateMF = async () => {
+    try {
+      setExistingPanelsWarning(false);
+      setIsGeneratingMF(true);
+      setMfProgress({ step: 'Clearing existing data...', current: 0, total: 1 });
+      await clearProjectElectricalData(project.id);
+      await doGenerateMFProject();
+    } catch (error) {
+      console.error('Clear & generate error:', error);
+      setMfGenerateError(error instanceof Error ? error.message : 'Unknown error');
+      setIsGeneratingMF(false);
+    }
+  };
+
   // Render appliance toggle card
   const renderApplianceCard = (
     key: keyof ResidentialAppliances,
@@ -473,6 +564,113 @@ export const DwellingLoadCalculator: React.FC<DwellingLoadCalculatorProps> = ({
           </button>
         </div>
       </div>
+
+      {/* Multi-Family Project Generation Card */}
+      {showMFRedirect && !isSingleFamily && loadResult && (
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+          <div className="flex items-start gap-3">
+            <Building2 className="w-5 h-5 text-blue-600 mt-0.5 flex-shrink-0" />
+            <div className="flex-1">
+              <h4 className="text-sm font-semibold text-blue-900">
+                Multi-Family Service Sizing: {loadResult.recommendedServiceSize}A
+              </h4>
+              <p className="text-xs text-blue-700 mt-1">
+                Generate a complete project with meter stack, unit panels, and house panel.
+                {' '}If you also need EV charging infrastructure, use the MF EV Calculator instead.
+              </p>
+
+              {/* Existing panels warning */}
+              {existingPanelsWarning && (
+                <div className="mt-3 p-2.5 bg-amber-50 border border-amber-300 rounded-md">
+                  <p className="text-xs font-medium text-amber-800">
+                    <AlertTriangle className="w-3.5 h-3.5 inline mr-1" />
+                    This project already has panels. Generating will clear all existing panels, circuits, feeders, meters, and meter stacks.
+                  </p>
+                  <div className="flex items-center gap-2 mt-2">
+                    <button
+                      onClick={handleClearAndGenerateMF}
+                      className="inline-flex items-center gap-1 px-2.5 py-1 bg-amber-600 text-white text-xs font-medium rounded hover:bg-amber-700 transition-colors"
+                    >
+                      Clear & Replace
+                    </button>
+                    <button
+                      onClick={() => setExistingPanelsWarning(false)}
+                      className="text-xs text-amber-700 hover:text-amber-900"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* Progress bar */}
+              {isGeneratingMF && mfProgress && (
+                <div className="mt-3">
+                  <div className="flex items-center gap-2 text-xs text-blue-700">
+                    <Loader className="w-3.5 h-3.5 animate-spin" />
+                    <span>{mfProgress.step}</span>
+                  </div>
+                  <div className="mt-1 h-1.5 bg-blue-200 rounded-full overflow-hidden">
+                    <div
+                      className="h-full bg-blue-600 rounded-full transition-all duration-300"
+                      style={{ width: `${mfProgress.total > 0 ? (mfProgress.current / mfProgress.total) * 100 : 0}%` }}
+                    />
+                  </div>
+                </div>
+              )}
+
+              {/* Error */}
+              {mfGenerateError && (
+                <p className="mt-2 text-xs text-red-600">Error: {mfGenerateError}</p>
+              )}
+
+              {/* Success */}
+              {mfGenerateSuccess && (
+                <div className="mt-2 flex items-center gap-1.5 text-xs text-green-700">
+                  <CheckCircle className="w-3.5 h-3.5" />
+                  Project generated! Check the Circuit Design and One-Line Diagram tabs.
+                </div>
+              )}
+
+              {/* Action buttons */}
+              {!isGeneratingMF && !mfGenerateSuccess && !existingPanelsWarning && (
+                <div className="flex items-center gap-3 mt-3">
+                  <button
+                    onClick={handleGenerateMFProject}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 text-white text-xs font-medium rounded-md hover:bg-blue-700 transition-colors"
+                  >
+                    <Zap className="w-3.5 h-3.5" />
+                    Generate Multi-Family Project
+                  </button>
+                  <button
+                    onClick={() => navigate('/tools?tab=multi-family-ev')}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 text-blue-600 text-xs font-medium hover:text-blue-800 transition-colors"
+                  >
+                    <ArrowRight className="w-3.5 h-3.5" />
+                    Open MF EV Calculator (with EV)
+                  </button>
+                  <button
+                    onClick={() => setShowMFRedirect(false)}
+                    className="text-xs text-blue-600 hover:text-blue-800"
+                  >
+                    Dismiss
+                  </button>
+                </div>
+              )}
+
+              {/* Reset after success */}
+              {mfGenerateSuccess && (
+                <button
+                  onClick={() => { setMfGenerateSuccess(false); setShowMFRedirect(false); }}
+                  className="mt-2 text-xs text-blue-600 hover:text-blue-800"
+                >
+                  Dismiss
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Main Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -594,9 +792,13 @@ export const DwellingLoadCalculator: React.FC<DwellingLoadCalculatorProps> = ({
                     />
                     <span className="text-xs text-gray-500">VA (common areas: parking, hallways, laundry room)</span>
                   </div>
+                  <p className="text-xs text-gray-500 flex items-center gap-1 mt-1">
+                    <Info className="w-3 h-3 flex-shrink-0" />
+                    For itemized common area loads (elevators, HVAC, pool, lighting by space), use the Multi-Family EV Calculator in Tools & Calculators.
+                  </p>
                 </div>
               </div>
-              
+
               {/* Note about appliances */}
               <div className="bg-amber-50 border border-amber-200 rounded-lg p-3">
                 <p className="text-xs text-amber-800">

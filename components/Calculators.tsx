@@ -1,5 +1,6 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { Calculator, ArrowRight, CheckCircle, XCircle, AlertTriangle, Zap, Car, Sun, Shield, Save, X, Plus, Trash2, TrendingUp, Sparkles, Info, Menu, Building2 } from 'lucide-react';
 import { calculateVoltageDropAC, compareVoltageDropMethods, VoltageDropResult } from '../services/calculations';
 import { ConductorSizingTool } from './ConductorSizingTool';
@@ -49,11 +50,31 @@ interface CalculatorsProps {
   projectId?: string;
 }
 
+type TabKey = 'voltage-drop' | 'conduit-fill' | 'conductor-sizing' | 'short-circuit' | 'ev-charging' | 'solar-pv' | 'arc-flash' | 'evems' | 'service-upgrade' | 'circuit-sharing' | 'change-impact' | 'ev-panel-builder' | 'multi-family-ev';
+
+const VALID_TABS = new Set<string>([
+  'voltage-drop', 'conduit-fill', 'conductor-sizing', 'short-circuit',
+  'ev-charging', 'solar-pv', 'arc-flash', 'evems', 'service-upgrade',
+  'circuit-sharing', 'change-impact', 'ev-panel-builder', 'multi-family-ev'
+]);
+
 export const Calculators: React.FC<CalculatorsProps> = ({ projectId }) => {
   const { getProjectById } = useProjects();
   const project = projectId ? getProjectById(projectId) : undefined;
+  const [searchParams] = useSearchParams();
 
-  const [activeTab, setActiveTab] = useState<'voltage-drop' | 'conduit-fill' | 'conductor-sizing' | 'short-circuit' | 'ev-charging' | 'solar-pv' | 'arc-flash' | 'evems' | 'service-upgrade' | 'circuit-sharing' | 'change-impact' | 'ev-panel-builder' | 'multi-family-ev'>('voltage-drop');
+  const [activeTab, setActiveTab] = useState<TabKey>(() => {
+    const tab = searchParams.get('tab');
+    return tab && VALID_TABS.has(tab) ? tab as TabKey : 'voltage-drop';
+  });
+
+  // Respond to query param changes (e.g. navigation from DwellingLoadCalculator)
+  useEffect(() => {
+    const tab = searchParams.get('tab');
+    if (tab && VALID_TABS.has(tab)) {
+      setActiveTab(tab as TabKey);
+    }
+  }, [searchParams]);
 
   // Default project settings for calculator mode
   const defaultSettings: ProjectSettings = {
@@ -223,7 +244,9 @@ export const Calculators: React.FC<CalculatorsProps> = ({ projectId }) => {
           {activeTab === 'evems' && <EVEMSLoadManagement />}
           {activeTab === 'service-upgrade' && <ServiceUpgradeWizard projectId={projectId} />}
           {activeTab === 'circuit-sharing' && <CircuitSharingCalculator />}
-          {activeTab === 'multi-family-ev' && <MultiFamilyEVCalculator projectId={projectId} />}
+          <div style={{ display: activeTab === 'multi-family-ev' ? 'block' : 'none' }}>
+            <MultiFamilyEVCalculator projectId={projectId} />
+          </div>
           {activeTab === 'change-impact' && <ChangeImpactAnalyzer projectId={projectId} />}
           {activeTab === 'ev-panel-builder' && project && <EVPanelTemplates project={project} />}
           {activeTab === 'ev-panel-builder' && !project && (
