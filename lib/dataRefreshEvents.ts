@@ -5,7 +5,7 @@
  * (e.g., when chatbot tools modify circuits/panels directly via Supabase)
  */
 
-type RefreshEventType = 'circuits' | 'panels' | 'feeders' | 'all';
+type RefreshEventType = 'circuits' | 'panels' | 'feeders' | 'meter_stacks' | 'meters' | 'all';
 type RefreshCallback = () => void;
 
 class DataRefreshEmitter {

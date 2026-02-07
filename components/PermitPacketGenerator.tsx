@@ -14,6 +14,8 @@ import { useGrounding } from '../hooks/useGrounding';
 import { useProjects } from '../hooks/useProjects';
 import { useJurisdictions } from '../hooks/useJurisdictions';
 import { useShortCircuitCalculations } from '../hooks/useShortCircuitCalculations';
+import { useMeterStacks } from '../hooks/useMeterStacks';
+import { useMeters } from '../hooks/useMeters';
 import { JurisdictionSearchWizard } from './JurisdictionSearchWizard';
 import { calculateMultiFamilyEV, type MultiFamilyEVInput } from '../services/calculations/multiFamilyEV';
 
@@ -52,6 +54,8 @@ export const PermitPacketGenerator: React.FC<PermitPacketGeneratorProps> = ({ pr
   const { grounding, loading: groundingLoading } = useGrounding(projectId || '');
   const { getJurisdictionById } = useJurisdictions();
   const { calculations: shortCircuitCalculations } = useShortCircuitCalculations(projectId || '');
+  const { meterStacks } = useMeterStacks(projectId || '');
+  const { meters } = useMeters(projectId || '');
 
   // Early return if no projectId
   if (!projectId) {
@@ -112,6 +116,9 @@ export const PermitPacketGenerator: React.FC<PermitPacketGeneratorProps> = ({ pr
         // Note: arcFlashData would come from a dedicated arc flash calculation
         // For now, we'll leave it undefined until user runs arc flash calculator
         arcFlashData: undefined,
+        // Multi-Family: Meter Stack Schedule
+        meterStacks: meterStacks.length > 0 ? meterStacks : undefined,
+        meters: meters.length > 0 ? meters : undefined,
         // Tier 3: Jurisdiction requirements
         jurisdictionId: currentProject.jurisdiction_id,
         jurisdiction: jurisdiction,

@@ -1320,7 +1320,7 @@ const FeederCard: React.FC<FeederCardProps> = ({
       )}
 
       {/* Voltage Drop Indicator - Compact */}
-      {feeder.voltage_drop_percent !== undefined && (
+      {feeder.voltage_drop_percent != null && (
         <div className={`flex items-center justify-between px-2 py-1.5 rounded text-xs ${
           vdCompliant ? 'bg-green-50 border border-green-200' : 'bg-red-50 border border-red-200'
         }`}>

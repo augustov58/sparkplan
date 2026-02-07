@@ -64,6 +64,22 @@ export const toastMessages = {
     error: 'Failed to update transformer',
   },
 
+  // Meter Stacks
+  meterStack: {
+    created: 'Meter stack added',
+    updated: 'Meter stack updated',
+    deleted: 'Meter stack removed',
+    error: 'Failed to update meter stack',
+  },
+
+  // Meters
+  meter: {
+    created: 'Meter added',
+    updated: 'Meter updated',
+    deleted: 'Meter removed',
+    error: 'Failed to update meter',
+  },
+
   // Feeders
   feeder: {
     created: 'Feeder created',

@@ -123,6 +123,8 @@ import { useCircuits } from '../hooks/useCircuits';
 import { usePanels } from '../hooks/usePanels';
 import { useTransformers } from '../hooks/useTransformers';
 import { useFeeders } from '../hooks/useFeeders';
+import { useMeterStacks } from '../hooks/useMeterStacks';
+import { useMeters } from '../hooks/useMeters';
 import { FeederManager } from './FeederManager';
 import { BulkCircuitCreator } from './BulkCircuitCreator';
 import { EquipmentSpecForm } from './EquipmentSpecForm';
@@ -157,6 +159,8 @@ export const OneLineDiagram: React.FC<OneLineDiagramProps> = ({ project, updateP
   const { circuits, createCircuit, deleteCircuit } = useCircuits(project.id);
   const { transformers, createTransformer, updateTransformer, deleteTransformer } = useTransformers(project.id);
   const { feeders } = useFeeders(project.id);
+  const { meterStacks } = useMeterStacks(project.id);
+  const { meters } = useMeters(project.id);
 
   const [description, setDescription] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -323,47 +327,44 @@ export const OneLineDiagram: React.FC<OneLineDiagramProps> = ({ project, updateP
     return Math.max(minHeight, calculatedHeight);
   }, [calculateMaxDepth]);
 
-  // Dynamic viewBox width based on actual content positions
-  const viewBoxWidth = useMemo(() => {
+  // Dynamic viewBox width and X-origin based on actual content positions
+  const { viewBoxWidth, viewBoxMinX } = useMemo(() => {
     const minWidth = 800; // Minimum width for narrow diagrams
     const SERVICE_X = 400; // Center X position (matches serviceX constant)
 
-    // Calculate maximum X position used by any element
+    // Calculate min/max X positions used by any element
     let maxX = SERVICE_X + 50; // Start with service/MDP center + panel half-width
+    let minX = SERVICE_X - 50;
 
     // Check all tree layout positions + manual offsets
     // IMPORTANT: Actual positions = SERVICE_X + treeLayoutPosition + manualOffset
     treeLayoutPositions.forEach((treePos, nodeId) => {
       const manualOffset = manualOffsets.get(nodeId) || 0;
-      const actualX = SERVICE_X + treePos + manualOffset; // ← Add SERVICE_X!
+      const actualX = SERVICE_X + treePos + manualOffset;
       maxX = Math.max(maxX, actualX);
+      minX = Math.min(minX, actualX);
     });
 
     // Add padding for elements that extend beyond panel centers:
-    // - Panel width: 65px (32.5px on each side from center) - realistic panel proportions
+    // - Panel width: 65px (32.5px on each side from center)
     // - Feeder label boxes: ~100px (extend to the right)
-    // - Right margin: 80px (breathing room)
-    const PANEL_HALF_WIDTH = 33; // Updated to match new PANEL_W (65px)
+    // - Margins: 80px each side
+    const PANEL_HALF_WIDTH = 33;
     const FEEDER_LABEL_EXTENSION = 100;
-    const RIGHT_MARGIN = 80;
+    const MARGIN = 80;
 
-    const calculatedWidth = maxX + PANEL_HALF_WIDTH + FEEDER_LABEL_EXTENSION + RIGHT_MARGIN;
+    const leftEdge = minX - PANEL_HALF_WIDTH - MARGIN;
+    const rightEdge = maxX + PANEL_HALF_WIDTH + FEEDER_LABEL_EXTENSION + MARGIN;
+    const calculatedWidth = rightEdge - leftEdge;
 
     // Round up to nearest 100 for cleaner numbers
     const roundedWidth = Math.ceil(calculatedWidth / 100) * 100;
-
     const finalWidth = Math.max(minWidth, roundedWidth);
 
-    // Debug logging
-    console.log('📐 ViewBox Width Calculation:', {
-      maxElementX: maxX,
-      calculatedWidth,
-      roundedWidth,
-      finalWidth,
-      elementCount: treeLayoutPositions.size
-    });
+    // If content extends left of origin, shift viewBox origin left
+    const finalMinX = leftEdge < 0 ? Math.floor(leftEdge / 100) * 100 : 0;
 
-    return finalWidth;
+    return { viewBoxWidth: finalWidth, viewBoxMinX: finalMinX };
   }, [treeLayoutPositions, manualOffsets]);
 
   // Load manual offsets from localStorage on mount
@@ -2317,7 +2318,7 @@ export const OneLineDiagram: React.FC<OneLineDiagramProps> = ({ project, updateP
             </div>
 
             <DiagramPanZoom className="w-full h-full flex-1">
-            <svg ref={diagramRef} className="w-full bg-white" viewBox={`0 0 ${viewBoxWidth} ${viewBoxHeight}`} preserveAspectRatio="xMidYMid meet" style={{ minWidth: `${viewBoxWidth}px`, minHeight: `${viewBoxHeight}px` }}>
+            <svg ref={diagramRef} className="w-full bg-white" viewBox={`${viewBoxMinX} 0 ${viewBoxWidth} ${viewBoxHeight}`} preserveAspectRatio="xMidYMid meet" style={{ minWidth: `${viewBoxWidth}px`, minHeight: `${viewBoxHeight}px` }}>
                 <defs>
                     <marker id="arrow" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto" markerUnits="strokeWidth">
                         <path d="M0,0 L0,6 L9,3 z" fill="#9CA3AF" />
@@ -2339,12 +2340,78 @@ export const OneLineDiagram: React.FC<OneLineDiagramProps> = ({ project, updateP
                 {/* Service Drop Line */}
                 <line x1={serviceX} y1={70} x2={serviceX} y2={90} stroke="#111827" strokeWidth="3" />
 
-                {/* Meter */}
-                <rect x={serviceX - 20} y={90} width="40" height="30" stroke="#111827" strokeWidth="2" fill="white" />
-                <text x={serviceX} y={110} textAnchor="middle" fontSize="10" fontWeight="bold">M</text>
+                {/* Meter / CT Cabinet */}
+                {meterStacks.length > 0 ? (
+                  (() => {
+                    const ms = meterStacks[0]!;
+                    const msMeters = meters.filter(m => m.meter_stack_id === ms.id);
+                    const meterCount = Math.min(msMeters.length, 8); // Show up to 8 meter taps
+                    const cabinetW = Math.max(80, meterCount * 18 + 20);
+                    const cabinetH = 40;
+                    const cabinetX = serviceX - cabinetW / 2;
+                    const cabinetY = 88;
+
+                    return (
+                      <g>
+                        {/* CT Cabinet enclosure */}
+                        <rect
+                          x={cabinetX} y={cabinetY}
+                          width={cabinetW} height={cabinetH}
+                          stroke="#111827" strokeWidth="2" fill="white"
+                          rx="2" ry="2"
+                        />
+                        {/* Double border for cabinet */}
+                        <rect
+                          x={cabinetX + 2} y={cabinetY + 2}
+                          width={cabinetW - 4} height={cabinetH - 4}
+                          stroke="#111827" strokeWidth="0.5" fill="none"
+                          rx="1" ry="1"
+                        />
+                        {/* CT CABINET label */}
+                        <text x={serviceX} y={cabinetY - 3} textAnchor="middle" fontSize="7" fontWeight="bold" fill="#374151">
+                          CT CABINET
+                        </text>
+                        {/* Bus rating */}
+                        <text x={serviceX} y={cabinetY + cabinetH + 10} textAnchor="middle" fontSize="7" fill="#6B7280">
+                          {ms.bus_rating_amps}A {ms.num_meter_positions} pos.
+                        </text>
+                        {/* Individual meter circles */}
+                        {msMeters.slice(0, 8).map((meter, idx) => {
+                          const meterX = cabinetX + 14 + idx * 18;
+                          const meterY = cabinetY + cabinetH / 2;
+                          return (
+                            <g key={meter.id}>
+                              <circle cx={meterX} cy={meterY} r="6" stroke="#111827" strokeWidth="1" fill="#F3F4F6" />
+                              <text x={meterX} y={meterY + 3} textAnchor="middle" fontSize="5" fontWeight="bold">
+                                {meter.meter_type === 'house' ? 'H' : meter.meter_type === 'ev' ? 'E' : 'U'}
+                              </text>
+                            </g>
+                          );
+                        })}
+                        {msMeters.length > 8 && (
+                          <text x={cabinetX + cabinetW - 8} y={cabinetY + cabinetH / 2 + 3} fontSize="7" fill="#6B7280">
+                            +{msMeters.length - 8}
+                          </text>
+                        )}
+                        {/* Horizontal bus at bottom of cabinet */}
+                        <line
+                          x1={cabinetX + 4} y1={cabinetY + cabinetH - 5}
+                          x2={cabinetX + cabinetW - 4} y2={cabinetY + cabinetH - 5}
+                          stroke="#DC2626" strokeWidth="2"
+                        />
+                      </g>
+                    );
+                  })()
+                ) : (
+                  <>
+                    {/* Single Meter (standard) */}
+                    <rect x={serviceX - 20} y={90} width="40" height="30" stroke="#111827" strokeWidth="2" fill="white" />
+                    <text x={serviceX} y={110} textAnchor="middle" fontSize="10" fontWeight="bold">M</text>
+                  </>
+                )}
 
                 {/* Service Line to First Panel */}
-                <line x1={serviceX} y1={120} x2={serviceX} y2={160} stroke="#111827" strokeWidth="3" />
+                <line x1={serviceX} y1={meterStacks.length > 0 ? 138 : 120} x2={serviceX} y2={160} stroke="#111827" strokeWidth="3" />
 
                 {/* Render System Hierarchy */}
                 {(() => {
@@ -3192,7 +3259,7 @@ export const OneLineDiagram: React.FC<OneLineDiagramProps> = ({ project, updateP
             </div>
             
             <DiagramPanZoom className="w-full h-full flex-1">
-            <svg ref={diagramRef} className="w-full bg-white" viewBox={`0 0 ${viewBoxWidth} ${viewBoxHeight}`} preserveAspectRatio="xMidYMid meet" style={{ minWidth: `${viewBoxWidth}px`, minHeight: `${viewBoxHeight}px` }}>
+            <svg ref={diagramRef} className="w-full bg-white" viewBox={`${viewBoxMinX} 0 ${viewBoxWidth} ${viewBoxHeight}`} preserveAspectRatio="xMidYMid meet" style={{ minWidth: `${viewBoxWidth}px`, minHeight: `${viewBoxHeight}px` }}>
                 <defs>
                     <marker id="arrow" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto" markerUnits="strokeWidth">
                         <path d="M0,0 L0,6 L9,3 z" fill="#9CA3AF" />
@@ -3214,12 +3281,61 @@ export const OneLineDiagram: React.FC<OneLineDiagramProps> = ({ project, updateP
                 {/* Service Drop Line */}
                 <line x1={serviceX} y1={70} x2={serviceX} y2={90} stroke="#111827" strokeWidth="3" />
 
-                {/* Meter */}
-                <rect x={serviceX - 20} y={90} width="40" height="30" stroke="#111827" strokeWidth="2" fill="white" />
-                <text x={serviceX} y={110} textAnchor="middle" fontSize="10" fontWeight="bold">M</text>
+                {/* Meter / CT Cabinet (Print) */}
+                {meterStacks.length > 0 ? (
+                  (() => {
+                    const ms = meterStacks[0]!;
+                    const msMeters = meters.filter(m => m.meter_stack_id === ms.id);
+                    const meterCount = Math.min(msMeters.length, 8);
+                    const cabinetW = Math.max(80, meterCount * 18 + 20);
+                    const cabinetH = 40;
+                    const cabinetX = serviceX - cabinetW / 2;
+                    const cabinetY = 88;
+
+                    return (
+                      <g>
+                        <rect x={cabinetX} y={cabinetY} width={cabinetW} height={cabinetH}
+                          stroke="#111827" strokeWidth="2" fill="white" rx="2" ry="2" />
+                        <rect x={cabinetX + 2} y={cabinetY + 2} width={cabinetW - 4} height={cabinetH - 4}
+                          stroke="#111827" strokeWidth="0.5" fill="none" rx="1" ry="1" />
+                        <text x={serviceX} y={cabinetY - 3} textAnchor="middle" fontSize="7" fontWeight="bold" fill="#374151">
+                          CT CABINET
+                        </text>
+                        <text x={serviceX} y={cabinetY + cabinetH + 10} textAnchor="middle" fontSize="7" fill="#6B7280">
+                          {ms.bus_rating_amps}A {ms.num_meter_positions} pos.
+                        </text>
+                        {msMeters.slice(0, 8).map((meter, idx) => {
+                          const meterX = cabinetX + 14 + idx * 18;
+                          const meterY = cabinetY + cabinetH / 2;
+                          return (
+                            <g key={meter.id}>
+                              <circle cx={meterX} cy={meterY} r="6" stroke="#111827" strokeWidth="1" fill="#F3F4F6" />
+                              <text x={meterX} y={meterY + 3} textAnchor="middle" fontSize="5" fontWeight="bold">
+                                {meter.meter_type === 'house' ? 'H' : meter.meter_type === 'ev' ? 'E' : 'U'}
+                              </text>
+                            </g>
+                          );
+                        })}
+                        {msMeters.length > 8 && (
+                          <text x={cabinetX + cabinetW - 8} y={cabinetY + cabinetH / 2 + 3} fontSize="7" fill="#6B7280">
+                            +{msMeters.length - 8}
+                          </text>
+                        )}
+                        <line x1={cabinetX + 4} y1={cabinetY + cabinetH - 5}
+                          x2={cabinetX + cabinetW - 4} y2={cabinetY + cabinetH - 5}
+                          stroke="#DC2626" strokeWidth="2" />
+                      </g>
+                    );
+                  })()
+                ) : (
+                  <>
+                    <rect x={serviceX - 20} y={90} width="40" height="30" stroke="#111827" strokeWidth="2" fill="white" />
+                    <text x={serviceX} y={110} textAnchor="middle" fontSize="10" fontWeight="bold">M</text>
+                  </>
+                )}
 
                 {/* Service Line to First Panel */}
-                <line x1={serviceX} y1={120} x2={serviceX} y2={160} stroke="#111827" strokeWidth="3" />
+                <line x1={serviceX} y1={meterStacks.length > 0 ? 138 : 120} x2={serviceX} y2={160} stroke="#111827" strokeWidth="3" />
 
                 {/* Render System Hierarchy */}
                 {(() => {

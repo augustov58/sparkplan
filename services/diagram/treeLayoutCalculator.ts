@@ -41,6 +41,7 @@ export function buildTree(
   transformers: Transformer[]
 ): LayoutNode | null {
   // Find MDP (main distribution panel)
+  // MDP can be fed_from_type: 'service' (single-family) or 'meter_stack' (multi-family)
   const mdp = panels.find(p => p.is_main);
   if (!mdp) return null;
 

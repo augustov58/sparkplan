@@ -713,6 +713,123 @@ export type Database = {
           },
         ]
       }
+      meter_stacks: {
+        Row: {
+          id: string
+          project_id: string
+          name: string
+          location: string | null
+          bus_rating_amps: number
+          voltage: number
+          phase: number
+          num_meter_positions: number
+          ct_ratio: string | null
+          manufacturer: string | null
+          model_number: string | null
+          created_at: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          id?: string
+          project_id: string
+          name?: string
+          location?: string | null
+          bus_rating_amps?: number
+          voltage?: number
+          phase?: number
+          num_meter_positions?: number
+          ct_ratio?: string | null
+          manufacturer?: string | null
+          model_number?: string | null
+          created_at?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          id?: string
+          project_id?: string
+          name?: string
+          location?: string | null
+          bus_rating_amps?: number
+          voltage?: number
+          phase?: number
+          num_meter_positions?: number
+          ct_ratio?: string | null
+          manufacturer?: string | null
+          model_number?: string | null
+          created_at?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "meter_stacks_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      meters: {
+        Row: {
+          id: string
+          project_id: string
+          meter_stack_id: string
+          name: string
+          meter_type: string
+          position_number: number | null
+          panel_id: string | null
+          breaker_amps: number | null
+          created_at: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          id?: string
+          project_id: string
+          meter_stack_id: string
+          name: string
+          meter_type?: string
+          position_number?: number | null
+          panel_id?: string | null
+          breaker_amps?: number | null
+          created_at?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          id?: string
+          project_id?: string
+          meter_stack_id?: string
+          name?: string
+          meter_type?: string
+          position_number?: number | null
+          panel_id?: string | null
+          breaker_amps?: number | null
+          created_at?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "meters_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "meters_meter_stack_id_fkey"
+            columns: ["meter_stack_id"]
+            isOneToOne: false
+            referencedRelation: "meter_stacks"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "meters_panel_id_fkey"
+            columns: ["panel_id"]
+            isOneToOne: false
+            referencedRelation: "panels"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       panels: {
         Row: {
           aic_rating: number | null
@@ -722,6 +839,7 @@ export type Database = {
           fed_from_transformer_id: string | null
           fed_from_type: string | null
           fed_from_circuit_number: number | null
+          fed_from_meter_stack_id: string | null
           feeder_breaker_amps: number | null
           feeder_conductor_size: string | null
           feeder_conduit: string | null
@@ -750,6 +868,7 @@ export type Database = {
           fed_from_transformer_id?: string | null
           fed_from_type?: string | null
           fed_from_circuit_number?: number | null
+          fed_from_meter_stack_id?: string | null
           feeder_breaker_amps?: number | null
           feeder_conductor_size?: string | null
           feeder_conduit?: string | null
@@ -778,6 +897,7 @@ export type Database = {
           fed_from_transformer_id?: string | null
           fed_from_type?: string | null
           fed_from_circuit_number?: number | null
+          fed_from_meter_stack_id?: string | null
           feeder_breaker_amps?: number | null
           feeder_conductor_size?: string | null
           feeder_conduit?: string | null
@@ -811,6 +931,13 @@ export type Database = {
             columns: ["fed_from_transformer_id"]
             isOneToOne: false
             referencedRelation: "transformers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "panels_fed_from_meter_stack_id_fkey"
+            columns: ["fed_from_meter_stack_id"]
+            isOneToOne: false
+            referencedRelation: "meter_stacks"
             referencedColumns: ["id"]
           },
           {

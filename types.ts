@@ -207,6 +207,57 @@ export interface Project {
 }
 
 // ============================================================================
+// METER STACK TYPES (Multi-Family - NEC 408, NEC 230)
+// ============================================================================
+
+/**
+ * Meter Stack (CT Cabinet) for Multi-Family Buildings
+ * Contains multiple meter positions for individual dwelling units,
+ * house panels, EV panels, and common areas.
+ */
+export interface MeterStack {
+  id: string;
+  project_id: string;
+  name: string;
+  location?: string | null;
+  bus_rating_amps: number;
+  voltage: number;
+  phase: number;
+  num_meter_positions: number;
+  ct_ratio?: string | null;
+  manufacturer?: string | null;
+  model_number?: string | null;
+  created_at?: string | null;
+  updated_at?: string | null;
+}
+
+/**
+ * Meter Type Classification
+ * - unit: Individual dwelling unit meter
+ * - house: House/common area panel meter
+ * - ev: EV charging panel meter
+ * - common: Other common area meter
+ */
+export type MeterType = 'unit' | 'house' | 'ev' | 'common';
+
+/**
+ * Individual Meter within a Meter Stack
+ * Each meter serves a specific panel (unit, house, EV, etc.)
+ */
+export interface Meter {
+  id: string;
+  project_id: string;
+  meter_stack_id: string;
+  name: string;
+  meter_type: MeterType;
+  position_number?: number | null;
+  panel_id?: string | null;
+  breaker_amps?: number | null;
+  created_at?: string | null;
+  updated_at?: string | null;
+}
+
+// ============================================================================
 // FEEDER TYPES (NEC Article 215)
 // ============================================================================
 

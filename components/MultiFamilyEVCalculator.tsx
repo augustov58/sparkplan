@@ -6,7 +6,7 @@
  * Forum-validated feature addressing the complexity contractors are turning away.
  */
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useCallback } from 'react';
 import {
   Building2,
   Car,
@@ -21,7 +21,9 @@ import {
   Loader,
   Plus,
   Trash2,
-  List
+  List,
+  ArrowRight,
+  Layers
 } from 'lucide-react';
 import {
   calculateMultiFamilyEV,
@@ -32,6 +34,16 @@ import {
   type CommonAreaCategory
 } from '../services/calculations/multiFamilyEV';
 import { exportMultiFamilyEVAnalysis } from '../services/pdfExport/multiFamilyEVPDF';
+import {
+  generateMultiFamilyProject,
+  type ScenarioKey
+} from '../services/autogeneration/multiFamilyProjectGenerator';
+import {
+  populateProject,
+  projectHasPanels,
+  clearProjectElectricalData,
+  type PopulationProgress
+} from '../services/autogeneration/projectPopulationOrchestrator';
 
 interface MultiFamilyEVCalculatorProps {
   projectId?: string;
@@ -124,8 +136,8 @@ export const MultiFamilyEVCalculator: React.FC<MultiFamilyEVCalculatorProps> = (
   const [buildingName, setBuildingName] = useState('');
   const [dwellingUnits, setDwellingUnits] = useState(20);
   const [avgUnitSqFt, setAvgUnitSqFt] = useState(900);
-  const [voltage, setVoltage] = useState<120 | 208 | 240 | 277 | 480>(208);
-  const [phase, setPhase] = useState<1 | 3>(3);
+  const [voltage, setVoltage] = useState<120 | 208 | 240 | 277 | 480>(240);
+  const [phase, setPhase] = useState<1 | 3>(1);
   const [existingServiceAmps, setExistingServiceAmps] = useState(800);
 
   // Apply building preset when selected
@@ -175,6 +187,15 @@ export const MultiFamilyEVCalculator: React.FC<MultiFamilyEVCalculatorProps> = (
   // PDF export state
   const [isExporting, setIsExporting] = useState(false);
 
+  // Apply to Project state
+  const [isApplying, setIsApplying] = useState(false);
+  const [applyProgress, setApplyProgress] = useState<PopulationProgress | null>(null);
+  const [applyError, setApplyError] = useState<string | null>(null);
+  const [applySuccess, setApplySuccess] = useState(false);
+  const [selectedScenario, setSelectedScenario] = useState<ScenarioKey>('noEVEMS');
+  const [showApplyConfirm, setShowApplyConfirm] = useState(false);
+  const [existingPanelsWarning, setExistingPanelsWarning] = useState(false);
+
   // Calculate results
   const result = useMemo<MultiFamilyEVResult | null>(() => {
     try {
@@ -215,6 +236,70 @@ export const MultiFamilyEVCalculator: React.FC<MultiFamilyEVCalculatorProps> = (
     hasElectricHeat, hasElectricCooking, commonAreaLoadVA,
     useItemizedCommonArea, commonAreaItems,
     hasTransformer, transformerKVA, useEVEMS
+  ]);
+
+  // Apply to Project handler (must be after result useMemo)
+  const handleApplyToProject = useCallback(async () => {
+    if (!projectId || !result) return;
+
+    setIsApplying(true);
+    setApplyError(null);
+    setApplySuccess(false);
+
+    try {
+      // Check for existing panels
+      const hasPanels = await projectHasPanels(projectId);
+      if (hasPanels && !existingPanelsWarning) {
+        setExistingPanelsWarning(true);
+        setIsApplying(false);
+        return;
+      }
+
+      // Generate project entities
+      const generated = generateMultiFamilyProject(result, {
+        scenario: selectedScenario,
+        projectId,
+        voltage,
+        phase,
+        dwellingUnits,
+        avgUnitSqFt,
+        buildingName: buildingName || undefined,
+        evAmpsPerCharger,
+        evChargerLevel,
+        commonAreaLoadVA: useItemizedCommonArea
+          ? (result.buildingLoad.breakdown
+              .filter(b => b.category.startsWith('Common Area'))
+              .reduce((sum, b) => sum + b.demandVA, 0))
+          : commonAreaLoadVA,
+        commonAreaItems: useItemizedCommonArea && commonAreaItems.length > 0
+          ? commonAreaItems : undefined,
+        hasElectricCooking,
+        hasElectricHeat,
+      });
+
+      // Populate database
+      const populationResult = await populateProject(generated, (progress) => {
+        setApplyProgress(progress);
+      });
+
+      if (populationResult.success) {
+        setApplySuccess(true);
+        setShowApplyConfirm(false);
+        setExistingPanelsWarning(false);
+      } else {
+        setApplyError(populationResult.error || 'Unknown error');
+      }
+    } catch (err) {
+      setApplyError(err instanceof Error ? err.message : 'Failed to apply to project');
+    } finally {
+      setIsApplying(false);
+      setApplyProgress(null);
+    }
+  }, [
+    projectId, result, selectedScenario, voltage, phase, dwellingUnits,
+    avgUnitSqFt, buildingName, evAmpsPerCharger, evChargerLevel,
+    commonAreaLoadVA, useItemizedCommonArea, hasElectricCooking, hasElectricHeat,
+    existingPanelsWarning
   ]);
 
   // Quick check for header summary
@@ -1136,6 +1221,151 @@ export const MultiFamilyEVCalculator: React.FC<MultiFamilyEVCalculatorProps> = (
                   </div>
                 </div>
               </div>
+
+              {/* Apply to Project */}
+              {projectId && (
+                <div className="bg-indigo-50 border border-indigo-200 rounded-lg p-4">
+                  <h4 className="font-semibold text-gray-900 mb-3 text-sm flex items-center gap-2">
+                    <Layers className="w-4 h-4 text-indigo-600" />
+                    Apply to Project
+                  </h4>
+
+                  {applySuccess ? (
+                    <div className="bg-green-50 border border-green-200 rounded-lg p-3">
+                      <div className="flex items-center gap-2 text-green-700 text-sm font-medium">
+                        <CheckCircle className="w-4 h-4" />
+                        Project populated successfully!
+                      </div>
+                      <p className="text-xs text-green-600 mt-1">
+                        MDP, meter stack, panels, circuits, and feeders have been created.
+                        View them in the One-Line Diagram.
+                      </p>
+                    </div>
+                  ) : (
+                    <>
+                      <p className="text-xs text-gray-600 mb-3">
+                        Generate a complete project design from this analysis — MDP, meter stack, unit panels, EV panel, house panel, circuits, and feeders.
+                      </p>
+
+                      {/* Scenario Selection */}
+                      <div className="space-y-2 mb-3">
+                        <label className="text-xs font-medium text-gray-700">Select Scenario:</label>
+                        {(['noEVEMS', 'withEVEMS', 'withUpgrade'] as const).map((key) => {
+                          const s = result.scenarios[key];
+                          return (
+                            <label
+                              key={key}
+                              className={`flex items-center gap-3 p-2 rounded border cursor-pointer transition-colors ${
+                                selectedScenario === key
+                                  ? 'border-indigo-400 bg-indigo-100'
+                                  : 'border-gray-200 bg-white hover:bg-gray-50'
+                              }`}
+                            >
+                              <input
+                                type="radio"
+                                name="applyScenario"
+                                value={key}
+                                checked={selectedScenario === key}
+                                onChange={() => setSelectedScenario(key)}
+                                className="text-indigo-600"
+                              />
+                              <div className="flex-1 min-w-0">
+                                <div className="text-sm font-medium text-gray-900">{s.name}</div>
+                                <div className="text-xs text-gray-500">
+                                  {s.maxChargers} chargers
+                                  {key === 'withUpgrade' && s.recommendedServiceAmps && ` (${s.recommendedServiceAmps}A service)`}
+                                </div>
+                              </div>
+                            </label>
+                          );
+                        })}
+                      </div>
+
+                      {/* Existing Panels Warning */}
+                      {existingPanelsWarning && (
+                        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 mb-3">
+                          <div className="flex items-center gap-2 text-yellow-700 text-sm font-medium">
+                            <AlertTriangle className="w-4 h-4" />
+                            This project already has panels
+                          </div>
+                          <p className="text-xs text-yellow-600 mt-1">
+                            Existing panels, circuits, feeders, meters, and meter stacks will be removed and replaced with the generated multi-family design.
+                          </p>
+                          <div className="flex gap-2 mt-2">
+                            <button
+                              onClick={async () => {
+                                if (!projectId) return;
+                                setIsApplying(true);
+                                setApplyProgress({ step: 'Clearing existing data...', current: 0, total: 1 });
+                                const clearResult = await clearProjectElectricalData(projectId);
+                                if (!clearResult.success) {
+                                  setApplyError(clearResult.error || 'Failed to clear existing data');
+                                  setIsApplying(false);
+                                  return;
+                                }
+                                setExistingPanelsWarning(false);
+                                setIsApplying(false);
+                                handleApplyToProject();
+                              }}
+                              className="px-3 py-1 text-xs bg-red-600 text-white rounded hover:bg-red-700"
+                            >
+                              Clear & Replace
+                            </button>
+                            <button
+                              onClick={() => setExistingPanelsWarning(false)}
+                              className="px-3 py-1 text-xs bg-gray-200 text-gray-700 rounded hover:bg-gray-300"
+                            >
+                              Cancel
+                            </button>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Error */}
+                      {applyError && (
+                        <div className="bg-red-50 border border-red-200 rounded-lg p-3 mb-3">
+                          <div className="text-red-700 text-xs">{applyError}</div>
+                        </div>
+                      )}
+
+                      {/* Progress */}
+                      {isApplying && applyProgress && (
+                        <div className="mb-3">
+                          <div className="flex items-center gap-2 text-sm text-indigo-700">
+                            <Loader className="w-4 h-4 animate-spin" />
+                            {applyProgress.step}
+                          </div>
+                          <div className="w-full bg-gray-200 rounded-full h-1.5 mt-2">
+                            <div
+                              className="bg-indigo-600 h-1.5 rounded-full transition-all"
+                              style={{ width: `${(applyProgress.current / applyProgress.total) * 100}%` }}
+                            />
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Apply Button */}
+                      <button
+                        onClick={handleApplyToProject}
+                        disabled={isApplying}
+                        className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                      >
+                        {isApplying ? (
+                          <>
+                            <Loader className="w-4 h-4 animate-spin" />
+                            Generating...
+                          </>
+                        ) : (
+                          <>
+                            <ArrowRight className="w-4 h-4" />
+                            Apply to Project
+                          </>
+                        )}
+                      </button>
+                    </>
+                  )}
+                </div>
+              )}
 
               {/* Transformer Check */}
               {result.transformerCheck && (

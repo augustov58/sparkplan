@@ -92,7 +92,7 @@ export const panelSchema = z.object({
     .optional()
     .nullable(),
 
-  fed_from_type: z.enum(['service', 'panel', 'transformer'])
+  fed_from_type: z.enum(['service', 'panel', 'transformer', 'meter_stack'])
     .optional()
     .nullable(),
 

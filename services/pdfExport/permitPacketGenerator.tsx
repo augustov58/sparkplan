@@ -12,6 +12,8 @@ import type { ArcFlashResult } from '../calculations/arcFlash';
 import type { MultiFamilyEVResult } from '../calculations/multiFamilyEV';
 
 type GroundingDetail = Database['public']['Tables']['grounding_details']['Row'];
+type MeterStack = Database['public']['Tables']['meter_stacks']['Row'];
+type MeterDB = Database['public']['Tables']['meters']['Row'];
 import {
   CoverPage,
   EquipmentSchedule,
@@ -27,6 +29,7 @@ import { ShortCircuitCalculationDocument } from './ShortCircuitDocuments';
 import { ArcFlashDocument } from './ArcFlashDocuments';
 import { GroundingPlanDocument } from './GroundingPlanDocuments';
 import { MultiFamilyEVDocument } from './MultiFamilyEVDocuments';
+import { MeterStackScheduleDocument } from './MeterStackSchedulePDF';
 
 export interface PermitPacketData {
   projectId: string;
@@ -64,6 +67,9 @@ export interface PermitPacketData {
     result: ArcFlashResult;
   };
   groundingSystem?: GroundingDetail; // Grounding electrode system
+  // Multi-Family: Meter Stack Schedule (NEC 408)
+  meterStacks?: MeterStack[];
+  meters?: MeterDB[];
   // Multi-Family EV Analysis (NEC 220.84 + 220.57)
   multiFamilyEVAnalysis?: {
     result: MultiFamilyEVResult;
@@ -208,6 +214,17 @@ export const generatePermitPacket = async (data: PermitPacketData): Promise<void
             grounding={data.groundingSystem}
             serviceAmperage={sortedPanels.find(p => p.is_main)?.bus_rating || data.serviceVoltage}
             conductorMaterial="Cu"
+          />
+        )}
+
+        {/* Meter Stack Schedule (Multi-Family - NEC 408) */}
+        {data.meterStacks && data.meterStacks.length > 0 && data.meters && (
+          <MeterStackScheduleDocument
+            projectName={data.projectName}
+            projectAddress={data.projectAddress}
+            meterStacks={data.meterStacks}
+            meters={data.meters}
+            panels={data.panels}
           />
         )}
 
