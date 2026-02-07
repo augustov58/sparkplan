@@ -270,6 +270,20 @@ export interface MultiFamilyEVInput {
    * Utility company name (for documentation)
    */
   utilityCompany?: string;
+
+  /**
+   * Pre-calculated building load from DwellingLoadCalculator (NEC 220.84).
+   * When provided with existingLoadMethod='calculated', this replaces the
+   * internal simplified calculation with the detailed result from the
+   * DwellingLoadCalculator (which uses actual per-unit appliance configs).
+   */
+  preCalculatedBuildingLoad?: {
+    totalDemandVA: number;
+    totalConnectedVA: number;
+    demandFactor: number;
+    serviceAmps: number;
+    breakdown: { category: string; description: string; connectedVA: number; demandVA: number; demandFactor: number; necReference: string }[];
+  };
 }
 
 /**
@@ -965,11 +979,44 @@ export function calculateMultiFamilyEV(input: MultiFamilyEVInput): MultiFamilyEV
   let totalConnectedVA: number;
   let buildingDemandFactor: number;
 
-  // Check if using measured data (NEC 220.87(A)) or calculation (NEC 220.87(B))
+  // Check if using measured data (NEC 220.87(A)), pre-calculated (DwellingLoadCalc), or internal calc
   const useMeasuredData = (existingLoadMethod === 'utility_bill' || existingLoadMethod === 'load_study')
     && measuredPeakDemandKW !== undefined && measuredPeakDemandKW > 0;
+  const usePreCalculated = existingLoadMethod === 'calculated'
+    && input.preCalculatedBuildingLoad !== undefined;
 
-  if (useMeasuredData) {
+  if (usePreCalculated) {
+    // =========================================================================
+    // PATH C: PRE-CALCULATED from DwellingLoadCalculator (NEC 220.84)
+    // =========================================================================
+    // The DwellingLoadCalculator has already performed the NEC 220.84
+    // calculation using detailed per-unit appliance configurations. Use that
+    // result directly instead of the simplified internal calculation.
+    // =========================================================================
+
+    const preCalc = input.preCalculatedBuildingLoad!;
+
+    // Import breakdown items from the DwellingLoadCalculator result
+    for (const item of preCalc.breakdown) {
+      breakdown.push({
+        category: item.category,
+        description: item.description,
+        connectedVA: item.connectedVA,
+        demandVA: item.demandVA,
+        demandFactor: item.demandFactor,
+        necReference: item.necReference,
+      });
+    }
+
+    totalConnectedVA = preCalc.totalConnectedVA;
+    buildingDemandVA = preCalc.totalDemandVA;
+    buildingDemandFactor = preCalc.demandFactor;
+
+    recommendations.push(
+      'Building load imported from Dwelling Load Calculator (NEC 220.84 with detailed appliance data).'
+    );
+
+  } else if (useMeasuredData) {
     // =========================================================================
     // PATH A: MEASURED DATA (NEC 220.87(A))
     // =========================================================================

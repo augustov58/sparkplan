@@ -173,6 +173,44 @@ export const DwellingLoadCalculator: React.FC<DwellingLoadCalculatorProps> = ({
     }
   }, [isSingleFamily, residentialSettings, appliances, unitTemplates, housePanelLoad]);
 
+  // Persist multi-family load result to project settings so MF EV Calculator can read it
+  useEffect(() => {
+    if (isSingleFamily || !loadResult) return;
+    const totalUnits = unitTemplates.reduce((sum, t) => sum + t.unitCount, 0);
+    const avgSqFt = totalUnits > 0
+      ? Math.round(unitTemplates.reduce((sum, t) => sum + t.squareFootage * t.unitCount, 0) / totalUnits)
+      : 1000;
+    const hasElectricCooking = appliances.range?.enabled === true && appliances.range.type === 'electric';
+    const hasElectricHeat = appliances.hvac?.enabled === true &&
+      (appliances.hvac.type === 'heat_pump' || appliances.hvac.type === 'electric_heat');
+
+    const timer = setTimeout(() => {
+      updateProject({
+        ...project,
+        settings: {
+          ...project.settings,
+          residential: {
+            ...project.settings.residential,
+            multiFamilyLoadResult: {
+              totalDemandVA: loadResult.totalDemandVA,
+              totalConnectedVA: loadResult.totalConnectedVA,
+              demandFactor: loadResult.demandFactor,
+              serviceAmps: loadResult.serviceAmps,
+              recommendedServiceSize: loadResult.recommendedServiceSize,
+              breakdown: loadResult.breakdown,
+              dwellingUnits: totalUnits,
+              avgUnitSqFt: avgSqFt,
+              commonAreaLoadVA: housePanelLoad,
+              hasElectricCooking,
+              hasElectricHeat,
+            },
+          } as any,
+        },
+      });
+    }, 600);
+    return () => clearTimeout(timer);
+  }, [loadResult, isSingleFamily]);
+
   // Toggle section
   const toggleSection = (section: string) => {
     const newExpanded = new Set(expandedSections);

@@ -245,7 +245,7 @@ export const Calculators: React.FC<CalculatorsProps> = ({ projectId }) => {
           {activeTab === 'service-upgrade' && <ServiceUpgradeWizard projectId={projectId} />}
           {activeTab === 'circuit-sharing' && <CircuitSharingCalculator />}
           <div style={{ display: activeTab === 'multi-family-ev' ? 'block' : 'none' }}>
-            <MultiFamilyEVCalculator projectId={projectId} />
+            <MultiFamilyEVCalculator projectId={projectId} project={project} />
           </div>
           {activeTab === 'change-impact' && <ChangeImpactAnalyzer projectId={projectId} />}
           {activeTab === 'ev-panel-builder' && project && <EVPanelTemplates project={project} />}
