@@ -72,21 +72,30 @@ const DRYER_DEMAND_TABLE = [
 /**
  * NEC Table 220.84 - Multi-Family Dwelling Demand Factors
  */
-const MULTI_FAMILY_DEMAND_TABLE = [
-  { units: 3, factor: 0.45 },    // 3 units: 45%
-  { units: 4, factor: 0.44 },
-  { units: 5, factor: 0.43 },
-  { units: 6, factor: 0.42 },
-  { units: 7, factor: 0.41 },
-  { units: 8, factor: 0.40 },
-  { units: 9, factor: 0.39 },
-  { units: 10, factor: 0.38 },
-  { units: 15, factor: 0.37 },
-  { units: 20, factor: 0.35 },
-  { units: 25, factor: 0.34 },
-  { units: 30, factor: 0.33 },
-  { units: 40, factor: 0.32 },
-  { units: Infinity, factor: 0.32 },
+const MULTI_FAMILY_DEMAND_TABLE: { units: number; factor: number }[] = [
+  { units: 5, factor: 0.45 },     // 3-5 units: 45%
+  { units: 7, factor: 0.44 },     // 6-7 units: 44%
+  { units: 10, factor: 0.43 },    // 8-10 units: 43%
+  { units: 11, factor: 0.42 },    // 11 units: 42%
+  { units: 13, factor: 0.41 },    // 12-13 units: 41%
+  { units: 15, factor: 0.40 },    // 14-15 units: 40%
+  { units: 17, factor: 0.39 },    // 16-17 units: 39%
+  { units: 20, factor: 0.38 },    // 18-20 units: 38%
+  { units: 21, factor: 0.37 },    // 21 units: 37%
+  { units: 23, factor: 0.36 },    // 22-23 units: 36%
+  { units: 25, factor: 0.35 },    // 24-25 units: 35%
+  { units: 27, factor: 0.34 },    // 26-27 units: 34%
+  { units: 30, factor: 0.33 },    // 28-30 units: 33%
+  { units: 31, factor: 0.32 },    // 31 units: 32%
+  { units: 33, factor: 0.31 },    // 32-33 units: 31%
+  { units: 36, factor: 0.30 },    // 34-36 units: 30%
+  { units: 38, factor: 0.29 },    // 37-38 units: 29%
+  { units: 42, factor: 0.28 },    // 39-42 units: 28%
+  { units: 45, factor: 0.27 },    // 43-45 units: 27%
+  { units: 50, factor: 0.26 },    // 46-50 units: 26%
+  { units: 55, factor: 0.25 },    // 51-55 units: 25%
+  { units: 61, factor: 0.24 },    // 56-61 units: 24%
+  { units: Infinity, factor: 0.23 }, // 62+ units: 23%
 ];
 
 // ============================================================================
@@ -181,7 +190,7 @@ function getMultiFamilyDemandFactor(unitCount: number): number {
       return entry.factor;
     }
   }
-  return 0.32; // 40+ units
+  return 0.23; // 62+ units
 }
 
 /**
@@ -704,6 +713,11 @@ export function calculateSingleFamilyLoad(input: SingleFamilyInput): Residential
  * NEC 220.84 - Multi-Family Dwellings Optional Calculation
  * Only for buildings with 3+ dwelling units where each unit has:
  * - Electric cooking equipment or space heating (or both)
+ *
+ * IMPORTANT: NEC 220.84 uses CONNECTED loads at nameplate rating.
+ * Do NOT apply individual reductions from 220.55 (range), 220.42 (lighting
+ * tiers), or 220.54 (dryer). The single Table 220.84 demand factor replaces
+ * all of those. This matches the methodology in multiFamilyEV.ts.
  */
 export function calculateMultiFamilyLoad(input: MultiFamilyInput): ResidentialLoadResult {
   const { unitTemplates, housePanelLoad = 0, serviceVoltage = 240 } = input;
@@ -712,19 +726,18 @@ export function calculateMultiFamilyLoad(input: MultiFamilyInput): ResidentialLo
   const necReferences: string[] = ['NEC 220.84 - Multi-Family Optional Method'];
   const warnings: string[] = [];
 
-  // Calculate total units
   const totalUnits = unitTemplates.reduce((sum, t) => sum + t.unitCount, 0);
-  
+
   if (totalUnits < 3) {
     warnings.push('NEC 220.84 requires minimum 3 dwelling units. Use standard method (220.82) for each unit.');
   }
 
-  // Step 1: Calculate per-unit loads
-  let totalConnected = 0;
-  let totalDemandBeforeDF = 0;
-
+  // =========================================================================
+  // Step 1: Per-unit panel sizing (still uses 220.82 for individual panels)
+  // Each dwelling unit panel is sized per the standard method — only the
+  // BUILDING SERVICE total uses the 220.84 optional method.
+  // =========================================================================
   for (const template of unitTemplates) {
-    // Calculate this unit type's load using single-family method
     const unitLoad = calculateSingleFamilyLoad({
       squareFootage: template.squareFootage,
       smallApplianceCircuits: 2,
@@ -732,41 +745,139 @@ export function calculateMultiFamilyLoad(input: MultiFamilyInput): ResidentialLo
       appliances: template.appliances,
       serviceVoltage
     });
-
-    const unitTotalConnected = unitLoad.totalConnectedVA * template.unitCount;
-    const unitTotalDemand = unitLoad.totalDemandVA * template.unitCount;
-
-    breakdown.push({
-      category: `Unit Type: ${template.name}`,
-      description: `${template.unitCount} units × ${(unitLoad.totalDemandVA / 1000).toFixed(1)} kVA each`,
-      connectedVA: unitTotalConnected,
-      demandVA: unitTotalDemand,
-      demandFactor: unitLoad.demandFactor,
-      necReference: 'NEC 220.84(A)'
-    });
-
-    totalConnected += unitTotalConnected;
-    totalDemandBeforeDF += unitTotalDemand;
-
-    // Store calculated values back to template
     template.calculatedLoadVA = unitLoad.totalDemandVA;
     template.panelSize = recommendServiceSize(unitLoad.serviceAmps);
   }
 
-  // Step 2: Apply multi-family demand factor
+  // =========================================================================
+  // Step 2: Building service load using NEC 220.84 Optional Method
+  //
+  // All unit loads are taken at NAMEPLATE (connected) values. The single
+  // Table 220.84 demand factor is applied once to the total. This is the
+  // same methodology used by the MF EV Calculator (multiFamilyEV.ts).
+  // =========================================================================
+
+  // 2a. General lighting (3 VA/sq ft per NEC 220.12 — no tiered 220.42 reduction)
+  let totalLightingVA = 0;
+  for (const template of unitTemplates) {
+    totalLightingVA += template.squareFootage * LIGHTING_LOAD_VA_PER_SQFT * template.unitCount;
+  }
+  breakdown.push({
+    category: 'General Lighting',
+    description: `${totalUnits} units @ 3 VA/sq ft`,
+    connectedVA: totalLightingVA,
+    demandVA: totalLightingVA,
+    demandFactor: 1.0,
+    necReference: 'NEC Table 220.12'
+  });
+
+  // 2b. Small appliance circuits (2 per unit @ 1,500 VA each)
+  const totalSmallApplianceVA = totalUnits * 2 * SMALL_APPLIANCE_VA_PER_CIRCUIT;
+  breakdown.push({
+    category: 'Small Appliance Circuits',
+    description: `${totalUnits} units × 2 circuits × 1,500 VA`,
+    connectedVA: totalSmallApplianceVA,
+    demandVA: totalSmallApplianceVA,
+    demandFactor: 1.0,
+    necReference: 'NEC 220.52(A)'
+  });
+
+  // 2c. Laundry circuits (1 per unit @ 1,500 VA)
+  const totalLaundryVA = totalUnits * LAUNDRY_CIRCUIT_VA;
+  breakdown.push({
+    category: 'Laundry Circuits',
+    description: `${totalUnits} units × 1,500 VA`,
+    connectedVA: totalLaundryVA,
+    demandVA: totalLaundryVA,
+    demandFactor: 1.0,
+    necReference: 'NEC 220.52(B)'
+  });
+
+  // 2d. Appliance loads at NAMEPLATE (no 220.55 / 220.54 reductions)
+  // Per NEC 220.84(C)(3): cooking equipment at nameplate, not per Table 220.55
+  // Per NEC 220.84(C)(4): electric heat at 65%
+  // Per NEC 220.60: non-coincident heating/cooling — use the larger
+  let totalApplianceVA = 0;
+  for (const template of unitTemplates) {
+    const app = template.appliances;
+    let unitApplianceVA = 0;
+
+    // Range at nameplate per 220.84(C)(3) — NOT reduced per 220.55
+    if (app.range?.enabled && app.range.type === 'electric') {
+      unitApplianceVA += app.range.kw * 1000;
+    }
+
+    // Dryer at nameplate (min 5 kW per NEC 220.54) — NOT demand-factored
+    if (app.dryer?.enabled && app.dryer.type === 'electric') {
+      unitApplianceVA += Math.max(app.dryer.kw * 1000, 5000);
+    }
+
+    // Water heater at nameplate
+    if (app.waterHeater?.enabled && app.waterHeater.type === 'electric') {
+      unitApplianceVA += app.waterHeater.kw * 1000;
+    }
+
+    // Kitchen appliances at nameplate
+    if (app.dishwasher?.enabled) unitApplianceVA += app.dishwasher.kw * 1000;
+    if (app.disposal?.enabled) unitApplianceVA += app.disposal.kw * 1000;
+    if (app.microwave?.enabled) unitApplianceVA += app.microwave.kw * 1000;
+
+    // HVAC: non-coincident per NEC 220.60 (use larger of heating / cooling)
+    // Electric heat at 65% per NEC 220.84(C)(4)
+    if (app.hvac?.enabled) {
+      const coolingVA = (app.hvac.coolingKw || 0) * 1000;
+      const isElectricHeat = app.hvac.type === 'heat_pump' || app.hvac.type === 'electric_heat';
+      const heatingVA = isElectricHeat ? (app.hvac.heatingKw || 0) * 1000 * 0.65 : 0;
+      unitApplianceVA += Math.max(coolingVA, heatingVA); // Non-coincident
+    }
+
+    // EV charger at nameplate
+    if (app.evCharger?.enabled) unitApplianceVA += app.evCharger.kw * 1000;
+
+    // Pool / hot tub / sauna
+    if (app.poolPump?.enabled) unitApplianceVA += hpToVA(app.poolPump.hp);
+    if (app.poolHeater?.enabled) unitApplianceVA += app.poolHeater.kw * 1000;
+    if (app.hotTub?.enabled) unitApplianceVA += app.hotTub.kw * 1000;
+    if (app.sauna?.enabled) unitApplianceVA += app.sauna.kw * 1000;
+    if (app.wellPump?.enabled) unitApplianceVA += hpToVA(app.wellPump.hp);
+
+    // Other / custom appliances
+    if (app.otherAppliances) {
+      for (const other of app.otherAppliances) {
+        unitApplianceVA += other.kw * 1000;
+      }
+    }
+
+    totalApplianceVA += unitApplianceVA * template.unitCount;
+  }
+
+  if (totalApplianceVA > 0) {
+    breakdown.push({
+      category: 'Appliance Loads (Nameplate)',
+      description: 'Range, dryer, water heater, HVAC, etc. at nameplate per 220.84',
+      connectedVA: totalApplianceVA,
+      demandVA: totalApplianceVA,
+      demandFactor: 1.0,
+      necReference: 'NEC 220.84(C)'
+    });
+  }
+
+  // 2e. Total unit loads — apply single NEC 220.84 demand factor
+  const unitLoadsSubtotal = totalLightingVA + totalSmallApplianceVA + totalLaundryVA + totalApplianceVA;
   const demandFactor = getMultiFamilyDemandFactor(totalUnits);
-  const totalDemandWithDF = totalDemandBeforeDF * demandFactor;
+  const totalDemandWithDF = unitLoadsSubtotal * demandFactor;
 
   breakdown.push({
     category: 'Multi-Family Demand Factor',
     description: `${totalUnits} units @ ${(demandFactor * 100).toFixed(0)}%`,
-    connectedVA: totalDemandBeforeDF,
+    connectedVA: unitLoadsSubtotal,
     demandVA: totalDemandWithDF,
     demandFactor: demandFactor,
     necReference: 'NEC Table 220.84'
   });
 
-  // Step 3: Add house panel loads (common areas) at 100%
+  // 2f. House panel loads (common areas) at 100% — added AFTER demand factor
+  let totalConnected = unitLoadsSubtotal;
   if (housePanelLoad > 0) {
     breakdown.push({
       category: 'House/Common Loads',
@@ -781,11 +892,13 @@ export function calculateMultiFamilyLoad(input: MultiFamilyInput): ResidentialLo
 
   const finalDemand = totalDemandWithDF + housePanelLoad;
 
-  // Calculate service
+  // =========================================================================
+  // Step 3: Service sizing and conductors
+  // =========================================================================
   const serviceAmps = finalDemand / serviceVoltage;
   const recommendedSize = recommendServiceSize(serviceAmps);
 
-  // Calculate Neutral Load (NEC 220.61, 220.84)
+  // Neutral load (NEC 220.61)
   const neutralLoad = calculateNeutralLoad(breakdown, serviceVoltage);
   if (neutralLoad.reductionPercent > 0) {
     necReferences.push('NEC 220.61(B) - Neutral Load Reduction');
@@ -795,7 +908,7 @@ export function calculateMultiFamilyLoad(input: MultiFamilyInput): ResidentialLo
     );
   }
 
-  // Recommend Conductor Sizes (Copper assumed)
+  // Conductor sizing (Copper assumed)
   const serviceConductorSize = recommendServiceConductorSize(serviceAmps, 'Cu');
   const neutralConductorSize = recommendServiceConductorSize(neutralLoad.neutralAmps, 'Cu');
   const gecSize = recommendGecSize(serviceConductorSize, 'Cu');
@@ -806,7 +919,7 @@ export function calculateMultiFamilyLoad(input: MultiFamilyInput): ResidentialLo
   return {
     totalConnectedVA: Math.round(totalConnected),
     totalDemandVA: Math.round(finalDemand),
-    demandFactor: finalDemand / totalConnected,
+    demandFactor: totalConnected > 0 ? finalDemand / totalConnected : 1,
     serviceAmps: Math.round(serviceAmps),
     recommendedServiceSize: recommendedSize,
     neutralLoadVA: neutralLoad.neutralVA,
