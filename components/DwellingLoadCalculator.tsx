@@ -163,7 +163,7 @@ export const DwellingLoadCalculator: React.FC<DwellingLoadCalculatorProps> = ({
         });
       } else {
         return calculateMultiFamilyLoad({
-          unitTemplates,
+          unitTemplates: unitTemplates.map(t => ({ ...t, appliances })),
           housePanelLoad
         });
       }
