@@ -91,7 +91,7 @@ export const EV_PANEL_TEMPLATE_4X_LEVEL2: EVPanelTemplate = {
       evChargerAmps: 48
     },
     {
-      circuitNumber: 3,
+      circuitNumber: 5,
       breakerAmps: 60,
       poles: 2,
       voltage: 240,
@@ -103,7 +103,7 @@ export const EV_PANEL_TEMPLATE_4X_LEVEL2: EVPanelTemplate = {
       evChargerAmps: 48
     },
     {
-      circuitNumber: 5,
+      circuitNumber: 9,
       breakerAmps: 60,
       poles: 2,
       voltage: 240,
@@ -115,7 +115,7 @@ export const EV_PANEL_TEMPLATE_4X_LEVEL2: EVPanelTemplate = {
       evChargerAmps: 48
     },
     {
-      circuitNumber: 7,
+      circuitNumber: 13,
       breakerAmps: 60,
       poles: 2,
       voltage: 240,
@@ -177,7 +177,7 @@ export const EV_PANEL_TEMPLATE_8X_LEVEL2_EVEMS: EVPanelTemplate = {
       evChargerAmps: 48
     },
     {
-      circuitNumber: 3,
+      circuitNumber: 5,
       breakerAmps: 60,
       poles: 2,
       voltage: 240,
@@ -189,7 +189,7 @@ export const EV_PANEL_TEMPLATE_8X_LEVEL2_EVEMS: EVPanelTemplate = {
       evChargerAmps: 48
     },
     {
-      circuitNumber: 5,
+      circuitNumber: 9,
       breakerAmps: 60,
       poles: 2,
       voltage: 240,
@@ -201,7 +201,7 @@ export const EV_PANEL_TEMPLATE_8X_LEVEL2_EVEMS: EVPanelTemplate = {
       evChargerAmps: 48
     },
     {
-      circuitNumber: 7,
+      circuitNumber: 13,
       breakerAmps: 60,
       poles: 2,
       voltage: 240,
@@ -213,7 +213,7 @@ export const EV_PANEL_TEMPLATE_8X_LEVEL2_EVEMS: EVPanelTemplate = {
       evChargerAmps: 48
     },
     {
-      circuitNumber: 9,
+      circuitNumber: 17,
       breakerAmps: 60,
       poles: 2,
       voltage: 240,
@@ -225,7 +225,7 @@ export const EV_PANEL_TEMPLATE_8X_LEVEL2_EVEMS: EVPanelTemplate = {
       evChargerAmps: 48
     },
     {
-      circuitNumber: 11,
+      circuitNumber: 21,
       breakerAmps: 60,
       poles: 2,
       voltage: 240,
@@ -237,7 +237,7 @@ export const EV_PANEL_TEMPLATE_8X_LEVEL2_EVEMS: EVPanelTemplate = {
       evChargerAmps: 48
     },
     {
-      circuitNumber: 13,
+      circuitNumber: 25,
       breakerAmps: 60,
       poles: 2,
       voltage: 240,
@@ -249,7 +249,7 @@ export const EV_PANEL_TEMPLATE_8X_LEVEL2_EVEMS: EVPanelTemplate = {
       evChargerAmps: 48
     },
     {
-      circuitNumber: 15,
+      circuitNumber: 29,
       breakerAmps: 60,
       poles: 2,
       voltage: 240,
@@ -261,7 +261,7 @@ export const EV_PANEL_TEMPLATE_8X_LEVEL2_EVEMS: EVPanelTemplate = {
       evChargerAmps: 48
     },
     {
-      circuitNumber: 17,
+      circuitNumber: 33,
       breakerAmps: 20,
       poles: 2,
       voltage: 240,
@@ -326,7 +326,7 @@ export const EV_PANEL_TEMPLATE_2X_DC_FAST: EVPanelTemplate = {
       evChargerAmps: 180
     },
     {
-      circuitNumber: 2,
+      circuitNumber: 7,
       breakerAmps: 225,
       poles: 3,
       voltage: 480,
@@ -338,7 +338,7 @@ export const EV_PANEL_TEMPLATE_2X_DC_FAST: EVPanelTemplate = {
       evChargerAmps: 180
     },
     {
-      circuitNumber: 3,
+      circuitNumber: 13,
       breakerAmps: 30,
       poles: 3,
       voltage: 480,
@@ -525,11 +525,14 @@ export function generateCustomEVPanel(input: CustomEVPanelInput): ApplyTemplateO
   let circuitNumber = 1;
 
   // Add EV charger circuits
+  // Multi-pole slot formula: 2-pole at slot N occupies N and N+2.
+  // Increment by (poles * 2) to avoid overlapping slots.
+  const chargerPoles = phase === 1 ? 2 : 3;
   for (let i = 1; i <= numberOfChargers; i++) {
     circuits.push({
       circuitNumber: circuitNumber,
       breakerAmps: breakerSize,
-      poles: phase === 1 ? 2 : 3,
+      poles: chargerPoles,
       voltage: voltage,
       description: `EV Charger #${i} - ${chargerType}${useEVEMS ? ' (EVEMS managed)' : ''}`,
       conductorSize: conductorSize,
@@ -538,7 +541,7 @@ export function generateCustomEVPanel(input: CustomEVPanelInput): ApplyTemplateO
       isEvCharger: true,
       evChargerAmps: chargerAmps
     });
-    circuitNumber += 2;  // Skip odd numbers for proper panel layout
+    circuitNumber += chargerPoles * 2;  // 2-pole = +4, 3-pole = +6
   }
 
   // Add EVEMS controller circuit if enabled
@@ -554,7 +557,7 @@ export function generateCustomEVPanel(input: CustomEVPanelInput): ApplyTemplateO
       loadVA: 500,
       isEvCharger: false
     });
-    circuitNumber += 2;
+    circuitNumber += 4;  // 2-pole occupies 2 slots
   }
 
   // Add spare circuit if requested
@@ -570,7 +573,7 @@ export function generateCustomEVPanel(input: CustomEVPanelInput): ApplyTemplateO
       loadVA: 0,
       isEvCharger: false
     });
-    circuitNumber += 2;
+    circuitNumber += 4;  // 2-pole occupies 2 slots
   }
 
   // Add lighting circuit if requested
