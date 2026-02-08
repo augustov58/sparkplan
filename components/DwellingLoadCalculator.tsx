@@ -133,8 +133,15 @@ export const DwellingLoadCalculator: React.FC<DwellingLoadCalculatorProps> = ({
   );
   const [housePanelLoad, setHousePanelLoad] = useState(0);
 
-  // Sync appliances to project when they change
+  // Sync appliances to project when they change (with value comparison to avoid infinite loop)
   useEffect(() => {
+    const stored = project.settings?.residential;
+    const storedAppliances = JSON.stringify(stored?.appliances);
+    const currentAppliances = JSON.stringify(appliances);
+    const storedTemplates = JSON.stringify(stored?.unitTemplates);
+    const currentTemplates = JSON.stringify(!isSingleFamily ? unitTemplates : undefined);
+    if (storedAppliances === currentAppliances && storedTemplates === currentTemplates) return;
+
     const timer = setTimeout(() => {
       updateProject({
         ...project,
@@ -174,6 +181,7 @@ export const DwellingLoadCalculator: React.FC<DwellingLoadCalculatorProps> = ({
   }, [isSingleFamily, residentialSettings, appliances, unitTemplates, housePanelLoad]);
 
   // Persist multi-family load result to project settings so MF EV Calculator can read it
+  // Uses value comparison to avoid infinite re-render loop (updateProject changes project → loadResult recomputes → useEffect fires)
   useEffect(() => {
     if (isSingleFamily || !loadResult) return;
     const totalUnits = unitTemplates.reduce((sum, t) => sum + t.unitCount, 0);
@@ -183,6 +191,16 @@ export const DwellingLoadCalculator: React.FC<DwellingLoadCalculatorProps> = ({
     const hasElectricCooking = appliances.range?.enabled === true && appliances.range.type === 'electric';
     const hasElectricHeat = appliances.hvac?.enabled === true &&
       (appliances.hvac.type === 'heat_pump' || appliances.hvac.type === 'electric_heat');
+
+    // Compare key values to skip update if nothing changed
+    const stored = project.settings?.residential?.multiFamilyLoadResult;
+    if (stored &&
+        stored.totalDemandVA === loadResult.totalDemandVA &&
+        stored.serviceAmps === loadResult.serviceAmps &&
+        stored.dwellingUnits === totalUnits &&
+        stored.commonAreaLoadVA === housePanelLoad) {
+      return;
+    }
 
     const timer = setTimeout(() => {
       updateProject({

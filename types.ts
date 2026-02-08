@@ -95,7 +95,7 @@ export interface ResidentialSettings {
   
   // Service
   recommendedServiceAmps?: number;      // Calculated recommendation
-  selectedServiceAmps?: 100 | 150 | 200 | 400;
+  selectedServiceAmps?: number;
 }
 
 export enum ProjectStatus {

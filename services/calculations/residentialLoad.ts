@@ -119,7 +119,7 @@ export interface ResidentialLoadResult {
 
   // Service sizing
   serviceAmps: number;
-  recommendedServiceSize: 100 | 150 | 200 | 400;
+  recommendedServiceSize: number;
 
   // Neutral conductor sizing (NEC 220.61)
   neutralLoadVA: number;
@@ -212,13 +212,24 @@ function hpToVA(hp: number): number {
 }
 
 /**
- * Recommend service size based on calculated amps
+ * Standard service entrance equipment sizes (commercially available)
+ * Per NEC 230.79 and standard manufacturer offerings
  */
-function recommendServiceSize(amps: number): 100 | 150 | 200 | 400 {
-  if (amps <= 80) return 100;      // 80% rule: 100A * 0.8 = 80A max continuous
-  if (amps <= 120) return 150;     // 150A * 0.8 = 120A
-  if (amps <= 160) return 200;     // 200A * 0.8 = 160A
-  return 400;
+const STANDARD_SERVICE_SIZES = [
+  100, 125, 150, 200, 225, 400, 600, 800, 1000, 1200, 1600, 2000, 2500, 3000, 4000
+];
+
+/**
+ * Recommend service size based on calculated amps.
+ * Returns the smallest standard service size that can handle the load
+ * at 80% continuous rating (NEC 215.3, 230.42).
+ */
+function recommendServiceSize(amps: number): number {
+  // Find smallest standard size where 80% of the rating >= calculated amps
+  for (const size of STANDARD_SERVICE_SIZES) {
+    if (size * 0.8 >= amps) return size;
+  }
+  return STANDARD_SERVICE_SIZES[STANDARD_SERVICE_SIZES.length - 1]!; // 4000A max
 }
 
 /**
