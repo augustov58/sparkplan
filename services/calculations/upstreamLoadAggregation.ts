@@ -19,6 +19,7 @@
 
 import type { Database } from '@/lib/database.types';
 import { getLightingDemandFactor } from '@/data/nec/table-220-42';
+import { getMultiFamilyDemandFactor } from './multiFamilyEV';
 
 type Panel = Database['public']['Tables']['panels']['Row'];
 type Transformer = Database['public']['Tables']['transformers']['Row'];
@@ -26,6 +27,11 @@ type Circuit = Database['public']['Tables']['circuits']['Row'];
 
 // Occupancy type from project settings
 type OccupancyType = 'dwelling' | 'commercial' | 'industrial';
+
+/** Context for NEC 220.84 Optional Calculation — Multi-Family Dwellings (3+ units) */
+export interface MultiFamilyContext {
+  dwellingUnits: number;
+}
 
 /**
  * Collected loads by type across hierarchy (connected VA, not demand)
@@ -597,7 +603,8 @@ export function calculateAggregatedLoad(
   panels: Panel[],
   circuits: Circuit[],
   transformers: Transformer[],
-  occupancyType: OccupancyType = 'commercial'
+  occupancyType: OccupancyType = 'commercial',
+  multiFamilyContext?: MultiFamilyContext
 ): AggregatedLoad {
   const panel = panels.find(p => p.id === panelId);
   if (!panel) {
@@ -624,7 +631,33 @@ export function calculateAggregatedLoad(
     loads.ranges.reduce((a, b) => a + b, 0) +
     loads.other;
   
-  // PHASE 2: Apply demand factors to system-wide totals
+  // NEC 220.84 Optional Method — replaces standard NEC 220 demand factors for multi-family
+  if (multiFamilyContext && multiFamilyContext.dwellingUnits >= 3) {
+    const demandFactor = getMultiFamilyDemandFactor(multiFamilyContext.dwellingUnits);
+    const totalDemandVA = Math.round(totalConnectedVA * demandFactor);
+
+    return {
+      panelId,
+      panelName: panel.name,
+      occupancyType,
+      totalConnectedVA,
+      totalDemandVA,
+      overallDemandFactor: demandFactor,
+      demandBreakdown: [{
+        loadType: `Multi-Family Dwelling (${multiFamilyContext.dwellingUnits} units)`,
+        connectedVA: totalConnectedVA,
+        demandVA: totalDemandVA,
+        demandFactor,
+        necReference: `NEC 220.84 Table (${multiFamilyContext.dwellingUnits} units @ ${(demandFactor * 100).toFixed(0)}%)`,
+      }],
+      sourceBreakdown,
+      downstreamPanelCount: panelCount,
+      transformerCount,
+      necReferences: ['NEC 220.84 (Optional Calculation — Multifamily Dwelling)'],
+    };
+  }
+
+  // PHASE 2: Apply standard NEC 220 demand factors to system-wide totals
   const { demandBreakdown, totalDemandVA, necReferences } = applyDemandFactors(loads, occupancyType);
   
   return {

@@ -504,7 +504,7 @@ export interface MultiFamilyEVResult {
 /**
  * Get NEC 220.84 demand factor based on number of dwelling units
  */
-function getMultiFamilyDemandFactor(unitCount: number): number {
+export function getMultiFamilyDemandFactor(unitCount: number): number {
   if (unitCount < 3) {
     // NEC 220.84 requires minimum 3 units for optional calculation
     return 1.0;

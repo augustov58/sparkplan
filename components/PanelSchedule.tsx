@@ -19,7 +19,7 @@ import {
   getLoadTypeColor,
   type CircuitLoad 
 } from '../services/calculations/demandFactor';
-import { calculateAggregatedLoad } from '../services/calculations/upstreamLoadAggregation';
+import { calculateAggregatedLoad, type MultiFamilyContext } from '../services/calculations/upstreamLoadAggregation';
 import type { LoadTypeCode } from '../types';
 
 // Load type options for dropdown
@@ -97,6 +97,19 @@ export const PanelSchedule: React.FC<PanelScheduleProps> = ({ project }) => {
     return transformers.filter(t => t.fed_from_panel_id === selectedPanelId);
   }, [selectedPanelId, transformers]);
 
+  // NEC 220.84: Multi-family MDP gets blanket demand factor instead of per-load-type factors
+  const multiFamilyCtx: MultiFamilyContext | undefined = useMemo(() => {
+    if (
+      selectedPanel?.is_main &&
+      project.settings?.occupancyType === 'dwelling' &&
+      project.settings?.residential?.dwellingType === 'multi_family' &&
+      (project.settings?.residential?.totalUnits || 0) >= 3
+    ) {
+      return { dwellingUnits: project.settings!.residential!.totalUnits! };
+    }
+    return undefined;
+  }, [selectedPanel, project.settings?.occupancyType, project.settings?.residential]);
+
   // Create "virtual feeder circuits" for downstream equipment
   // These represent the feeder breakers in this panel that feed downstream equipment
   const feederCircuits = useMemo(() => {
@@ -117,8 +130,8 @@ export const PanelSchedule: React.FC<PanelScheduleProps> = ({ project }) => {
     // Add downstream panels as feeder circuits
     downstreamPanels.forEach(panel => {
       // Calculate the demand load for this downstream panel
-      const panelLoad = calculateAggregatedLoad(panel.id, panels, circuits, transformers, occupancy);
-      
+      const panelLoad = calculateAggregatedLoad(panel.id, panels, circuits, transformers, occupancy, multiFamilyCtx);
+
       feeders.push({
         id: `feeder-panel-${panel.id}`,
         isFeeder: true,
@@ -138,7 +151,7 @@ export const PanelSchedule: React.FC<PanelScheduleProps> = ({ project }) => {
       const xfmrPanels = panels.filter(p => p.fed_from_transformer_id === xfmr.id);
       let totalLoad = 0;
       xfmrPanels.forEach(p => {
-        const pLoad = calculateAggregatedLoad(p.id, panels, circuits, transformers, occupancy);
+        const pLoad = calculateAggregatedLoad(p.id, panels, circuits, transformers, occupancy, multiFamilyCtx);
         totalLoad += pLoad.totalDemandVA;
       });
       // If no panels, use transformer kVA rating
@@ -160,7 +173,7 @@ export const PanelSchedule: React.FC<PanelScheduleProps> = ({ project }) => {
     });
 
     return feeders;
-  }, [downstreamPanels, downstreamTransformers, panels, circuits, transformers, selectedPanel, project.settings?.occupancyType]);
+  }, [downstreamPanels, downstreamTransformers, panels, circuits, transformers, selectedPanel, project.settings?.occupancyType, multiFamilyCtx]);
 
   // Split feeder circuits into breaker-fed (assigned to specific slot) and lug-fed (feed-thru lug)
   const { breakerFedPanels, lugFedPanels } = useMemo(() => {
@@ -245,8 +258,8 @@ export const PanelSchedule: React.FC<PanelScheduleProps> = ({ project }) => {
   const aggregatedLoad = useMemo(() => {
     if (!selectedPanel) return null;
     const occupancy = project.settings?.occupancyType || 'commercial';
-    return calculateAggregatedLoad(selectedPanel.id, panels, circuits, transformers, occupancy);
-  }, [selectedPanel, panels, circuits, transformers, project.settings?.occupancyType]);
+    return calculateAggregatedLoad(selectedPanel.id, panels, circuits, transformers, occupancy, multiFamilyCtx);
+  }, [selectedPanel, panels, circuits, transformers, project.settings?.occupancyType, multiFamilyCtx]);
 
   // Generate slots based on panel type (industry standard)
   // MDP/Main Distribution Panels: typically 24-30 poles
