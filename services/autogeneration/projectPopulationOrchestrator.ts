@@ -18,7 +18,7 @@
 
 import { supabase } from '@/lib/supabase';
 import type { Database } from '@/lib/database.types';
-import type { GeneratedProject } from './multiFamilyProjectGenerator';
+import type { GeneratedProject, EVInfrastructureProject } from './multiFamilyProjectGenerator';
 
 type Panel = Database['public']['Tables']['panels']['Row'];
 type MeterStack = Database['public']['Tables']['meter_stacks']['Row'];
@@ -348,4 +348,201 @@ export async function projectHasPanels(projectId: string): Promise<boolean> {
     .eq('project_id', projectId);
 
   return (count || 0) > 0;
+}
+
+export interface EVPopulationResult {
+  success: boolean;
+  error?: string;
+  evPanelId?: string;
+  evMeterId?: string;
+  evFeederId?: string;
+  circuitCount?: number;
+}
+
+/**
+ * Add EV infrastructure to an existing project.
+ * Finds the MDP and meter stack, then creates only the EV panel, circuits, meter, and feeder.
+ */
+export async function addEVInfrastructure(
+  projectId: string,
+  evInfra: EVInfrastructureProject,
+  onProgress?: (progress: PopulationProgress) => void
+): Promise<EVPopulationResult> {
+  const totalSteps = 5;
+  let step = 0;
+
+  const report = (stepName: string) => {
+    step++;
+    onProgress?.({ step: stepName, current: step, total: totalSteps });
+  };
+
+  try {
+    // ================================================================
+    // Step 1: Find existing MDP
+    // ================================================================
+    report('Finding Main Distribution Panel...');
+
+    const { data: mdp, error: mdpError } = await supabase
+      .from('panels')
+      .select('id')
+      .eq('project_id', projectId)
+      .eq('is_main', true)
+      .single();
+
+    if (mdpError || !mdp) {
+      throw new Error(
+        'No Main Distribution Panel found. Generate the building project from the Dwelling Load Calculator first.'
+      );
+    }
+
+    // ================================================================
+    // Step 2: Find existing Meter Stack
+    // ================================================================
+    report('Finding Meter Stack...');
+
+    const { data: meterStack, error: msError } = await supabase
+      .from('meter_stacks')
+      .select('id, num_meter_positions')
+      .eq('project_id', projectId)
+      .single();
+
+    if (msError || !meterStack) {
+      throw new Error(
+        'No Meter Stack found. Generate the building project from the Dwelling Load Calculator first.'
+      );
+    }
+
+    // ================================================================
+    // Step 3: Check for existing EV panel and remove it if present
+    // ================================================================
+    report('Preparing EV infrastructure...');
+
+    // Find and remove any existing EV panel + its circuits/feeders
+    const { data: existingEVPanels } = await supabase
+      .from('panels')
+      .select('id')
+      .eq('project_id', projectId)
+      .ilike('name', '%ev%');
+
+    if (existingEVPanels && existingEVPanels.length > 0) {
+      const evPanelIds = existingEVPanels.map(p => p.id);
+
+      // Delete circuits in EV panels
+      for (const epId of evPanelIds) {
+        await supabase.from('circuits').delete().eq('panel_id', epId);
+      }
+      // Delete feeders to EV panels
+      for (const epId of evPanelIds) {
+        await supabase.from('feeders').delete().eq('destination_panel_id', epId);
+      }
+      // Delete EV meters
+      for (const epId of evPanelIds) {
+        await supabase.from('meters').delete().eq('panel_id', epId);
+      }
+      // Delete the EV panels themselves
+      for (const epId of evPanelIds) {
+        await supabase.from('panels').delete().eq('id', epId);
+      }
+    }
+
+    // ================================================================
+    // Step 4: Create EV Panel + Circuits + Meter
+    // ================================================================
+    report('Creating EV panel and circuits...');
+
+    // Create EV panel
+    const evPanelData = { ...evInfra.evPanel, fed_from: mdp.id };
+    const { data: evPanel, error: epError } = await supabase
+      .from('panels')
+      .insert(evPanelData)
+      .select()
+      .single();
+
+    if (epError || !evPanel) {
+      throw new Error(`Failed to create EV panel: ${epError?.message || 'Unknown error'}`);
+    }
+
+    // Create EV circuits
+    let circuitCount = 0;
+    if (evInfra.evCircuits.length > 0) {
+      const circuitInserts = evInfra.evCircuits.map(c => ({
+        ...c,
+        project_id: projectId,
+        panel_id: evPanel.id,
+      }));
+      const { error: ecError } = await supabase.from('circuits').insert(circuitInserts);
+      if (ecError) {
+        console.warn('Failed to create EV circuits:', ecError.message);
+      } else {
+        circuitCount = circuitInserts.length;
+      }
+    }
+
+    // Determine next available meter position
+    const { count: existingMeterCount } = await supabase
+      .from('meters')
+      .select('id', { count: 'exact', head: true })
+      .eq('meter_stack_id', meterStack.id);
+
+    const meterPosition = (existingMeterCount || 0) + 1;
+
+    // Create EV meter
+    let evMeterId: string | undefined;
+    const { data: evMeter, error: mError } = await supabase
+      .from('meters')
+      .insert({
+        project_id: projectId,
+        meter_stack_id: meterStack.id,
+        name: evInfra.evMeter.name,
+        meter_type: 'ev',
+        position_number: meterPosition,
+        panel_id: evPanel.id,
+      })
+      .select()
+      .single();
+
+    if (mError) {
+      console.warn('Failed to create EV meter:', mError.message);
+    } else {
+      evMeterId = evMeter?.id;
+    }
+
+    // ================================================================
+    // Step 5: Create Feeder (MDP → EV Panel)
+    // ================================================================
+    report('Creating EV feeder...');
+
+    let evFeederId: string | undefined;
+    const { data: feeder, error: fError } = await supabase
+      .from('feeders')
+      .insert({
+        project_id: projectId,
+        name: evInfra.evFeeder.name,
+        source_panel_id: mdp.id,
+        destination_panel_id: evPanel.id,
+        distance_ft: evInfra.evFeeder.distance_ft,
+        conductor_material: 'Cu',
+      })
+      .select()
+      .single();
+
+    if (fError) {
+      console.warn('Failed to create EV feeder:', fError.message);
+    } else {
+      evFeederId = feeder?.id;
+    }
+
+    return {
+      success: true,
+      evPanelId: evPanel.id,
+      evMeterId,
+      evFeederId,
+      circuitCount,
+    };
+  } catch (err) {
+    return {
+      success: false,
+      error: err instanceof Error ? err.message : 'Failed to add EV infrastructure',
+    };
+  }
 }
