@@ -34,6 +34,17 @@ type FeederInsert = Database['public']['Tables']['feeders']['Insert'];
 
 export type ScenarioKey = 'noEVEMS' | 'withEVEMS' | 'withUpgrade';
 
+/** Appliance wattages for unit panel circuit generation (from DwellingLoadCalculator) */
+export interface UnitApplianceConfig {
+  rangeKW?: number;
+  dryerKW?: number;
+  waterHeaterKW?: number;
+  coolingKW?: number;
+  heatingKW?: number;
+  dishwasherKW?: number;
+  disposalKW?: number;
+}
+
 export interface GenerationOptions {
   /** Which scenario to apply */
   scenario: ScenarioKey;
@@ -61,6 +72,9 @@ export interface GenerationOptions {
   /** Whether building has electric cooking/heat (affects unit panel sizing) */
   hasElectricCooking: boolean;
   hasElectricHeat: boolean;
+
+  /** Actual appliance wattages from DwellingLoadCalculator settings */
+  applianceConfig?: UnitApplianceConfig;
 }
 
 /**
@@ -153,7 +167,7 @@ export function generateMultiFamilyProject(
   // ---- Unit Panels ----
   const { panels: unitPanels, circuits: unitCircuits } = generateUnitPanels(
     projectId, dwellingUnits, options.avgUnitSqFt, voltage, phase,
-    options.hasElectricCooking, options.hasElectricHeat
+    options.hasElectricCooking, options.hasElectricHeat, options.applianceConfig
   );
 
   // ---- Meters ----
@@ -207,6 +221,7 @@ export interface BasicGenerationOptions {
   commonAreaLoadVA: number;
   hasElectricCooking: boolean;
   hasElectricHeat: boolean;
+  applianceConfig?: UnitApplianceConfig;
 }
 
 /**
@@ -254,7 +269,7 @@ export function generateBasicMultiFamilyProject(
   // ---- Unit Panels ----
   const { panels: unitPanels, circuits: unitCircuits } = generateUnitPanels(
     projectId, dwellingUnits, avgUnitSqFt, voltage, phase,
-    hasElectricCooking, hasElectricHeat
+    hasElectricCooking, hasElectricHeat, options.applianceConfig
   );
 
   // ---- Meters (no EV meter) ----
@@ -669,7 +684,8 @@ function generateUnitPanels(
   voltage: number,
   phase: number,
   hasElectricCooking: boolean,
-  hasElectricHeat: boolean
+  hasElectricHeat: boolean,
+  applianceConfig?: UnitApplianceConfig
 ): {
   panels: Omit<PanelInsert, 'id'>[];
   circuits: Map<number, Omit<CircuitInsert, 'id' | 'panel_id' | 'project_id'>[]>;
@@ -685,7 +701,7 @@ function generateUnitPanels(
   for (let i = 0; i < panelsToCreate; i++) {
     const unitNumber = i + 101; // Start at Unit 101
     const { panel, circuits } = generateSingleUnitPanel(
-      projectId, unitNumber, avgSqFt, voltage, phase, hasElectricCooking, hasElectricHeat
+      projectId, unitNumber, avgSqFt, voltage, phase, hasElectricCooking, hasElectricHeat, applianceConfig
     );
     panels.push(panel);
     allCircuits.set(i, circuits);
@@ -709,137 +725,175 @@ function generateSingleUnitPanel(
   voltage: number,
   phase: number,
   hasElectricCooking: boolean,
-  hasElectricHeat: boolean
+  hasElectricHeat: boolean,
+  applianceConfig?: UnitApplianceConfig
 ): { panel: Omit<PanelInsert, 'id'>; circuits: Omit<CircuitInsert, 'id' | 'panel_id' | 'project_id'>[] } {
   const circuits: Omit<CircuitInsert, 'id' | 'panel_id' | 'project_id'>[] = [];
-  let circuitNumber = 1;
+
+  // Slot allocator: alternates between left (odd) and right (even) columns
+  let leftSlot = 1;
+  let rightSlot = 2;
+  let useLeft = true;
+  function nextSlot(poles: number): number {
+    const slot = useLeft ? leftSlot : rightSlot;
+    const increment = poles === 3 ? 6 : poles === 2 ? 4 : 2;
+    if (useLeft) leftSlot += increment; else rightSlot += increment;
+    useLeft = !useLeft;
+    return slot;
+  }
 
   // NEC 210.11(C)(1) - Small Appliance Branch Circuits (min 2 required)
   circuits.push({
-    circuit_number: circuitNumber,
+    circuit_number: nextSlot(1),
     description: 'Kitchen Small Appliance #1',
     breaker_amps: 20,
     pole: 1,
     load_watts: 1500,
     conductor_size: '12 AWG Cu',
   });
-  circuitNumber += 2;
 
   circuits.push({
-    circuit_number: circuitNumber,
+    circuit_number: nextSlot(1),
     description: 'Kitchen Small Appliance #2',
     breaker_amps: 20,
     pole: 1,
     load_watts: 1500,
     conductor_size: '12 AWG Cu',
   });
-  circuitNumber += 2;
 
   // NEC 210.11(C)(2) - Laundry Circuit
   circuits.push({
-    circuit_number: circuitNumber,
+    circuit_number: nextSlot(1),
     description: 'Laundry',
     breaker_amps: 20,
     pole: 1,
     load_watts: 1500,
     conductor_size: '12 AWG Cu',
   });
-  circuitNumber += 2;
 
   // NEC 210.11(C)(3) - Bathroom Circuit
   circuits.push({
-    circuit_number: circuitNumber,
+    circuit_number: nextSlot(1),
     description: 'Bathroom(s)',
     breaker_amps: 20,
     pole: 1,
     load_watts: 1500,
     conductor_size: '12 AWG Cu',
   });
-  circuitNumber += 2;
 
   // General Lighting (NEC 220.12: 3 VA/sq ft)
   const lightingVA = sqFt * 3;
   const lightingCircuits = Math.max(1, Math.ceil(lightingVA / 1800)); // ~15A per circuit
   for (let j = 0; j < lightingCircuits; j++) {
     circuits.push({
-      circuit_number: circuitNumber,
+      circuit_number: nextSlot(1),
       description: j === 0 ? 'General Lighting' : `General Lighting #${j + 1}`,
       breaker_amps: 15,
       pole: 1,
       load_watts: Math.round(lightingVA / lightingCircuits),
       conductor_size: '14 AWG Cu',
     });
-    circuitNumber += 2;
   }
 
   // Electric Range/Oven (if applicable)
   if (hasElectricCooking) {
+    const rangeWatts = applianceConfig?.rangeKW ? applianceConfig.rangeKW * 1000 : 8000;
+    const rangeBreaker = roundUpToStandardSize(
+      Math.ceil((rangeWatts / voltage) * 1.25), STANDARD_BREAKER_SIZES
+    );
     circuits.push({
-      circuit_number: circuitNumber,
+      circuit_number: nextSlot(2),
       description: 'Range/Oven',
-      breaker_amps: 40,
+      breaker_amps: rangeBreaker,
       pole: 2,
-      load_watts: 8000,
-      conductor_size: '8 AWG Cu',
+      load_watts: rangeWatts,
+      conductor_size: conductorForBreaker(rangeBreaker),
     });
-    circuitNumber += 2;
+  }
+
+  // Electric Dryer (if applicable)
+  if (applianceConfig?.dryerKW) {
+    const dryerWatts = applianceConfig.dryerKW * 1000;
+    const dryerBreaker = roundUpToStandardSize(
+      Math.ceil((dryerWatts / voltage) * 1.25), STANDARD_BREAKER_SIZES
+    );
+    circuits.push({
+      circuit_number: nextSlot(2),
+      description: 'Clothes Dryer',
+      breaker_amps: dryerBreaker,
+      pole: 2,
+      load_watts: dryerWatts,
+      conductor_size: conductorForBreaker(dryerBreaker),
+    });
   }
 
   // Electric Heat (if applicable)
   if (hasElectricHeat) {
+    const heatWatts = applianceConfig?.heatingKW ? applianceConfig.heatingKW * 1000 : 5000;
+    const heatBreaker = roundUpToStandardSize(
+      Math.ceil((heatWatts / voltage) * 1.25), STANDARD_BREAKER_SIZES
+    );
     circuits.push({
-      circuit_number: circuitNumber,
+      circuit_number: nextSlot(2),
       description: 'Electric Heat / Heat Pump',
-      breaker_amps: 30,
+      breaker_amps: heatBreaker,
       pole: 2,
-      load_watts: 5000,
-      conductor_size: '10 AWG Cu',
+      load_watts: heatWatts,
+      conductor_size: conductorForBreaker(heatBreaker),
     });
-    circuitNumber += 2;
   }
 
   // A/C condensing unit
+  const acWatts = applianceConfig?.coolingKW ? applianceConfig.coolingKW * 1000 : 3500;
+  const acBreaker = roundUpToStandardSize(
+    Math.ceil((acWatts / voltage) * 1.25), STANDARD_BREAKER_SIZES
+  );
   circuits.push({
-    circuit_number: circuitNumber,
+    circuit_number: nextSlot(2),
     description: 'A/C Condensing Unit',
-    breaker_amps: 25,
+    breaker_amps: acBreaker,
     pole: 2,
-    load_watts: 3500,
-    conductor_size: '10 AWG Cu',
+    load_watts: acWatts,
+    conductor_size: conductorForBreaker(acBreaker),
   });
-  circuitNumber += 2;
 
   // Water Heater
+  const whWatts = applianceConfig?.waterHeaterKW ? applianceConfig.waterHeaterKW * 1000 : 4500;
+  const whBreaker = roundUpToStandardSize(
+    Math.ceil((whWatts / voltage) * 1.25), STANDARD_BREAKER_SIZES
+  );
   circuits.push({
-    circuit_number: circuitNumber,
+    circuit_number: nextSlot(2),
     description: 'Water Heater',
-    breaker_amps: 30,
+    breaker_amps: whBreaker,
     pole: 2,
-    load_watts: 4500,
-    conductor_size: '10 AWG Cu',
+    load_watts: whWatts,
+    conductor_size: conductorForBreaker(whBreaker),
   });
-  circuitNumber += 2;
 
-  // Dishwasher
-  circuits.push({
-    circuit_number: circuitNumber,
-    description: 'Dishwasher',
-    breaker_amps: 20,
-    pole: 1,
-    load_watts: 1200,
-    conductor_size: '12 AWG Cu',
-  });
-  circuitNumber += 2;
+  // Dishwasher (if enabled)
+  if (applianceConfig?.dishwasherKW) {
+    circuits.push({
+      circuit_number: nextSlot(1),
+      description: 'Dishwasher',
+      breaker_amps: 20,
+      pole: 1,
+      load_watts: applianceConfig.dishwasherKW * 1000,
+      conductor_size: '12 AWG Cu',
+    });
+  }
 
-  // Disposal
-  circuits.push({
-    circuit_number: circuitNumber,
-    description: 'Disposal',
-    breaker_amps: 20,
-    pole: 1,
-    load_watts: 600,
-    conductor_size: '12 AWG Cu',
-  });
+  // Disposal (if enabled)
+  if (applianceConfig?.disposalKW) {
+    circuits.push({
+      circuit_number: nextSlot(1),
+      description: 'Disposal',
+      breaker_amps: 20,
+      pole: 1,
+      load_watts: applianceConfig.disposalKW * 1000,
+      conductor_size: '12 AWG Cu',
+    });
+  }
 
   // Size unit panel - dwelling unit panels are typically 100A or 125A
   const totalLoad = circuits.reduce((sum, c) => sum + c.load_watts, 0);

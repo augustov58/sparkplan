@@ -526,11 +526,16 @@ export function generateCustomEVPanel(input: CustomEVPanelInput): ApplyTemplateO
 
   // Add EV charger circuits
   // Multi-pole slot formula: 2-pole at slot N occupies N and N+2.
-  // Increment by (poles * 2) to avoid overlapping slots.
+  // Alternate between left (odd) and right (even) columns to fill panel evenly.
   const chargerPoles = phase === 1 ? 2 : 3;
+  const slotIncrement = chargerPoles * 2; // 2-pole = +4, 3-pole = +6
+  let leftSlot = 1;
+  let rightSlot = 2;
   for (let i = 1; i <= numberOfChargers; i++) {
+    const useLeft = i % 2 === 1; // Odd chargers on left, even on right
+    const slot = useLeft ? leftSlot : rightSlot;
     circuits.push({
-      circuitNumber: circuitNumber,
+      circuitNumber: slot,
       breakerAmps: breakerSize,
       poles: chargerPoles,
       voltage: voltage,
@@ -541,8 +546,14 @@ export function generateCustomEVPanel(input: CustomEVPanelInput): ApplyTemplateO
       isEvCharger: true,
       evChargerAmps: chargerAmps
     });
-    circuitNumber += chargerPoles * 2;  // 2-pole = +4, 3-pole = +6
+    if (useLeft) {
+      leftSlot += slotIncrement;
+    } else {
+      rightSlot += slotIncrement;
+    }
   }
+  // Set circuitNumber to the next available slot for auxiliary circuits
+  circuitNumber = Math.max(leftSlot, rightSlot);
 
   // Add EVEMS controller circuit if enabled
   if (useEVEMS) {
