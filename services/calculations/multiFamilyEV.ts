@@ -237,6 +237,9 @@ export interface MultiFamilyEVInput {
   /** Whether to use EVEMS load management */
   useEVEMS?: boolean;
 
+  /** Capacity reserve in VA (for EV panel auxiliary loads: spare, lighting, EVEMS controller) */
+  capacityReserveVA?: number;
+
   /** EVEMS scheduling mode */
   evemsMode?: 'power_sharing' | 'scheduled' | 'dynamic';
 
@@ -504,7 +507,7 @@ export interface MultiFamilyEVResult {
 /**
  * Get NEC 220.84 demand factor based on number of dwelling units
  */
-function getMultiFamilyDemandFactor(unitCount: number): number {
+export function getMultiFamilyDemandFactor(unitCount: number): number {
   if (unitCount < 3) {
     // NEC 220.84 requires minimum 3 units for optional calculation
     return 1.0;
@@ -1224,7 +1227,8 @@ export function calculateMultiFamilyEV(input: MultiFamilyEVInput): MultiFamilyEV
   const totalDemandVA = buildingDemandVA + evDemandVA;
   const totalDemandAmps = calculateAmps(totalDemandVA, voltage, phase);
 
-  const availableCapacityVA = existingCapacityVA - buildingDemandVA;
+  const capacityReserveVA = input.capacityReserveVA || 0;
+  const availableCapacityVA = existingCapacityVA - buildingDemandVA - capacityReserveVA;
   const availableCapacityAmps = calculateAmps(availableCapacityVA, voltage, phase);
 
   const utilizationPercent = (totalDemandVA / existingCapacityVA) * 100;

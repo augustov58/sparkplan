@@ -311,7 +311,8 @@ const NecAssistant = () => {
             panels,
             circuits,
             feeders,
-            transformers
+            transformers,
+            currentProject.settings?.residential
           )
         : null;
 

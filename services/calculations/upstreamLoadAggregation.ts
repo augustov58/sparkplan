@@ -19,6 +19,7 @@
 
 import type { Database } from '@/lib/database.types';
 import { getLightingDemandFactor } from '@/data/nec/table-220-42';
+import { getMultiFamilyDemandFactor } from './multiFamilyEV';
 
 type Panel = Database['public']['Tables']['panels']['Row'];
 type Transformer = Database['public']['Tables']['transformers']['Row'];
@@ -26,6 +27,15 @@ type Circuit = Database['public']['Tables']['circuits']['Row'];
 
 // Occupancy type from project settings
 type OccupancyType = 'dwelling' | 'commercial' | 'industrial';
+
+/** Context for NEC 220.84 Optional Calculation — Multi-Family Dwellings (3+ units) */
+export interface MultiFamilyContext {
+  dwellingUnits: number;
+  /** EV panel load (VA) — excluded from 220.84 base, added at EVEMS-managed value */
+  evLoadVA?: number;
+  /** House/common area panel load (VA) — excluded from 220.84 base, added at connected value */
+  housePanelLoadVA?: number;
+}
 
 /**
  * Collected loads by type across hierarchy (connected VA, not demand)
@@ -597,7 +607,8 @@ export function calculateAggregatedLoad(
   panels: Panel[],
   circuits: Circuit[],
   transformers: Transformer[],
-  occupancyType: OccupancyType = 'commercial'
+  occupancyType: OccupancyType = 'commercial',
+  multiFamilyContext?: MultiFamilyContext
 ): AggregatedLoad {
   const panel = panels.find(p => p.id === panelId);
   if (!panel) {
@@ -624,7 +635,65 @@ export function calculateAggregatedLoad(
     loads.ranges.reduce((a, b) => a + b, 0) +
     loads.other;
   
-  // PHASE 2: Apply demand factors to system-wide totals
+  // NEC 220.84 Optional Method — replaces standard NEC 220 demand factors for multi-family
+  if (multiFamilyContext && multiFamilyContext.dwellingUnits >= 3) {
+    const demandFactor = getMultiFamilyDemandFactor(multiFamilyContext.dwellingUnits);
+
+    // NEC 220.84 covers dwelling unit loads only — EV and house/common area loads
+    // are excluded from the demand factor base and added separately at full value
+    const evLoadVA = multiFamilyContext.evLoadVA || 0;
+    const housePanelLoadVA = multiFamilyContext.housePanelLoadVA || 0;
+    const nonDwellingVA = evLoadVA + housePanelLoadVA;
+    const dwellingConnectedVA = totalConnectedVA - nonDwellingVA;
+    const dwellingDemandVA = Math.round(dwellingConnectedVA * demandFactor);
+    const totalDemandVA = dwellingDemandVA + nonDwellingVA;
+
+    const demandBreakdown: DemandCalculation[] = [{
+      loadType: `Multi-Family Dwelling (${multiFamilyContext.dwellingUnits} units)`,
+      connectedVA: dwellingConnectedVA,
+      demandVA: dwellingDemandVA,
+      demandFactor,
+      necReference: `NEC 220.84 Table (${multiFamilyContext.dwellingUnits} units @ ${(demandFactor * 100).toFixed(0)}%)`,
+    }];
+    const necRefs = ['NEC 220.84 (Optional Calculation — Multifamily Dwelling)'];
+
+    if (housePanelLoadVA > 0) {
+      demandBreakdown.push({
+        loadType: 'House Panel / Common Areas',
+        connectedVA: housePanelLoadVA,
+        demandVA: housePanelLoadVA,
+        demandFactor: 1.0,
+        necReference: 'NEC 220.84 (Common area loads — excluded from dwelling demand)',
+      });
+    }
+
+    if (evLoadVA > 0) {
+      demandBreakdown.push({
+        loadType: 'EV Charging (EVEMS managed)',
+        connectedVA: evLoadVA,
+        demandVA: evLoadVA,
+        demandFactor: 1.0,
+        necReference: 'NEC 625.42 (EVEMS — excluded from 220.84)',
+      });
+      necRefs.push('NEC 625.42 (EVEMS Load)');
+    }
+
+    return {
+      panelId,
+      panelName: panel.name,
+      occupancyType,
+      totalConnectedVA,
+      totalDemandVA,
+      overallDemandFactor: totalConnectedVA > 0 ? totalDemandVA / totalConnectedVA : 0,
+      demandBreakdown,
+      sourceBreakdown,
+      downstreamPanelCount: panelCount,
+      transformerCount,
+      necReferences: necRefs,
+    };
+  }
+
+  // PHASE 2: Apply standard NEC 220 demand factors to system-wide totals
   const { demandBreakdown, totalDemandVA, necReferences } = applyDemandFactors(loads, occupancyType);
   
   return {

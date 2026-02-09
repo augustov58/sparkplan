@@ -19,7 +19,7 @@ import {
   getLoadTypeColor,
   type CircuitLoad 
 } from '../services/calculations/demandFactor';
-import { calculateAggregatedLoad } from '../services/calculations/upstreamLoadAggregation';
+import { calculateAggregatedLoad, type MultiFamilyContext } from '../services/calculations/upstreamLoadAggregation';
 import type { LoadTypeCode } from '../types';
 
 // Load type options for dropdown
@@ -97,6 +97,46 @@ export const PanelSchedule: React.FC<PanelScheduleProps> = ({ project }) => {
     return transformers.filter(t => t.fed_from_panel_id === selectedPanelId);
   }, [selectedPanelId, transformers]);
 
+  // NEC 220.84: Multi-family MDP gets blanket demand factor instead of per-load-type factors
+  // EV panel load is excluded from 220.84 base and added separately (NEC 625.42)
+  const multiFamilyCtx: MultiFamilyContext | undefined = useMemo(() => {
+    if (
+      selectedPanel?.is_main &&
+      project.settings?.occupancyType === 'dwelling' &&
+      project.settings?.residential?.dwellingType === 'multi_family' &&
+      (project.settings?.residential?.totalUnits || 0) >= 3
+    ) {
+      // Identify non-dwelling loads to exclude from 220.84 base
+      const occupancy = project.settings?.occupancyType || 'commercial';
+      const downstreamFromMDP = panels.filter(
+        p => p.fed_from_type === 'panel' && p.fed_from === selectedPanel.id
+      );
+
+      // EV panels (NEC 625.42 — added at EVEMS-managed value)
+      const evLoadVA = downstreamFromMDP
+        .filter(p => p.name.toLowerCase().includes('ev'))
+        .reduce((sum, p) => {
+          const load = calculateAggregatedLoad(p.id, panels, circuits, transformers, occupancy);
+          return sum + load.totalConnectedVA;
+        }, 0);
+
+      // House/common area panels (not dwelling unit loads)
+      const housePanelLoadVA = downstreamFromMDP
+        .filter(p => p.name.toLowerCase().includes('house'))
+        .reduce((sum, p) => {
+          const load = calculateAggregatedLoad(p.id, panels, circuits, transformers, occupancy);
+          return sum + load.totalConnectedVA;
+        }, 0);
+
+      return {
+        dwellingUnits: project.settings!.residential!.totalUnits!,
+        evLoadVA: evLoadVA > 0 ? evLoadVA : undefined,
+        housePanelLoadVA: housePanelLoadVA > 0 ? housePanelLoadVA : undefined,
+      };
+    }
+    return undefined;
+  }, [selectedPanel, panels, circuits, transformers, project.settings?.occupancyType, project.settings?.residential]);
+
   // Create "virtual feeder circuits" for downstream equipment
   // These represent the feeder breakers in this panel that feed downstream equipment
   const feederCircuits = useMemo(() => {
@@ -115,10 +155,12 @@ export const PanelSchedule: React.FC<PanelScheduleProps> = ({ project }) => {
     const occupancy = project.settings?.occupancyType || 'commercial';
 
     // Add downstream panels as feeder circuits
+    // NOTE: Do NOT pass multiFamilyCtx here — NEC 220.84 is a blanket factor for
+    // the MDP aggregate, not for individual feeder sizing. Each feeder uses standard
+    // NEC 220 demand factors for its own panel load.
     downstreamPanels.forEach(panel => {
-      // Calculate the demand load for this downstream panel
       const panelLoad = calculateAggregatedLoad(panel.id, panels, circuits, transformers, occupancy);
-      
+
       feeders.push({
         id: `feeder-panel-${panel.id}`,
         isFeeder: true,
@@ -245,8 +287,8 @@ export const PanelSchedule: React.FC<PanelScheduleProps> = ({ project }) => {
   const aggregatedLoad = useMemo(() => {
     if (!selectedPanel) return null;
     const occupancy = project.settings?.occupancyType || 'commercial';
-    return calculateAggregatedLoad(selectedPanel.id, panels, circuits, transformers, occupancy);
-  }, [selectedPanel, panels, circuits, transformers, project.settings?.occupancyType]);
+    return calculateAggregatedLoad(selectedPanel.id, panels, circuits, transformers, occupancy, multiFamilyCtx);
+  }, [selectedPanel, panels, circuits, transformers, project.settings?.occupancyType, multiFamilyCtx]);
 
   // Generate slots based on panel type (industry standard)
   // MDP/Main Distribution Panels: typically 24-30 poles
@@ -1566,17 +1608,27 @@ export const PanelSchedule: React.FC<PanelScheduleProps> = ({ project }) => {
                       </span>
                     </div>
                     <div className="bg-purple-100 rounded p-3 border border-purple-300">
-                      <span className="text-[10px] uppercase text-purple-700 block font-semibold">TOTAL WITH FEEDERS</span>
+                      <span className="text-[10px] uppercase text-purple-700 block font-semibold">
+                        {aggregatedLoad && aggregatedLoad.downstreamPanelCount > 0 ? 'DEMAND WITH FEEDERS' : 'TOTAL WITH FEEDERS'}
+                      </span>
                       <span className="text-xl font-bold text-purple-900">
-                        {((demandResult as any).totalWithFeeders_kVA || demandResult.totalDemandLoad_kVA).toFixed(1)} KVA
+                        {aggregatedLoad && aggregatedLoad.downstreamPanelCount > 0
+                          ? (aggregatedLoad.totalDemandVA / 1000).toFixed(1)
+                          : ((demandResult as any).totalWithFeeders_kVA || demandResult.totalDemandLoad_kVA).toFixed(1)
+                        } KVA
                       </span>
                     </div>
                   </>
                 )}
-                
+
                 <div className="bg-blue-50 rounded p-3">
                   <span className="text-[10px] uppercase text-gray-500 block">Demand Amps</span>
-                  <span className="text-xl font-bold text-blue-600">{demandResult.demandAmps.toFixed(1)} A</span>
+                  <span className="text-xl font-bold text-blue-600">
+                    {aggregatedLoad && aggregatedLoad.downstreamPanelCount > 0
+                      ? (aggregatedLoad.totalDemandVA / (selectedPanel!.voltage * (selectedPanel!.phase === 3 ? Math.sqrt(3) : 1))).toFixed(1)
+                      : demandResult.demandAmps.toFixed(1)
+                    } A
+                  </span>
                 </div>
                 <div className={`rounded p-3 ${demandResult.percentImbalance > 10 ? 'bg-red-50' : 'bg-green-50'}`}>
                   <span className="text-[10px] uppercase text-gray-500 block">Phase Imbalance</span>

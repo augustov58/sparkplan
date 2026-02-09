@@ -422,6 +422,7 @@ export interface CustomEVPanelConfig {
   numberOfChargers: number;
   useEVEMS: boolean;
   simultaneousChargers?: number;  // Required if useEVEMS is true
+  evemsLoadVAPerCharger?: number; // If provided, overrides simultaneousChargers formula for per-circuit load
   includeSpare: boolean;
   includeLighting: boolean;
   panelName?: string;
@@ -442,6 +443,7 @@ export function generateCustomEVPanel(input: CustomEVPanelInput): ApplyTemplateO
     numberOfChargers,
     useEVEMS,
     simultaneousChargers,
+    evemsLoadVAPerCharger,
     includeSpare,
     includeLighting,
     panelName
@@ -524,25 +526,44 @@ export function generateCustomEVPanel(input: CustomEVPanelInput): ApplyTemplateO
   const circuits: Omit<Circuit, 'id' | 'created_at' | 'project_id' | 'panel_id'>[] = [];
   let circuitNumber = 1;
 
+  // NEC 625.42: When EVEMS is active, each circuit's demand load is proportional
+  // to the managed setpoint. Breaker/conductor remain at full nameplate for protection.
+  const circuitLoadVA = (useEVEMS && evemsLoadVAPerCharger)
+    ? evemsLoadVAPerCharger
+    : (useEVEMS && simultaneousChargers)
+      ? Math.round(loadVA * simultaneousChargers / numberOfChargers)
+      : loadVA;
+
   // Add EV charger circuits
   // Multi-pole slot formula: 2-pole at slot N occupies N and N+2.
-  // Increment by (poles * 2) to avoid overlapping slots.
+  // Alternate between left (odd) and right (even) columns to fill panel evenly.
   const chargerPoles = phase === 1 ? 2 : 3;
+  const slotIncrement = chargerPoles * 2; // 2-pole = +4, 3-pole = +6
+  let leftSlot = 1;
+  let rightSlot = 2;
   for (let i = 1; i <= numberOfChargers; i++) {
+    const useLeft = i % 2 === 1; // Odd chargers on left, even on right
+    const slot = useLeft ? leftSlot : rightSlot;
     circuits.push({
-      circuitNumber: circuitNumber,
+      circuitNumber: slot,
       breakerAmps: breakerSize,
       poles: chargerPoles,
       voltage: voltage,
       description: `EV Charger #${i} - ${chargerType}${useEVEMS ? ' (EVEMS managed)' : ''}`,
       conductorSize: conductorSize,
       conductorType: 'THHN',
-      loadVA: loadVA,
+      loadVA: circuitLoadVA,
       isEvCharger: true,
       evChargerAmps: chargerAmps
     });
-    circuitNumber += chargerPoles * 2;  // 2-pole = +4, 3-pole = +6
+    if (useLeft) {
+      leftSlot += slotIncrement;
+    } else {
+      rightSlot += slotIncrement;
+    }
   }
+  // Set circuitNumber to the next available slot for auxiliary circuits
+  circuitNumber = Math.max(leftSlot, rightSlot);
 
   // Add EVEMS controller circuit if enabled
   if (useEVEMS) {

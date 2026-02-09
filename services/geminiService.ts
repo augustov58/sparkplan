@@ -12,6 +12,14 @@ You are a Senior Electrical Engineer and Master Electrician specializing in the 
 Your goal is to assist users in designing safe, compliant electrical systems.
 Always reference specific NEC articles (using the 2023 edition unless specified otherwise).
 Be concise, technical, and professional.
+
+MULTI-FAMILY DWELLING KNOWLEDGE:
+- NEC 220.84 Optional Calculation applies to multi-family (3+ units) with individual cooking + heating/AC
+- It replaces standard NEC 220 demand factors with a single blanket demand factor based on unit count
+- Meter stacks (CT cabinets) are used for multi-family metering — each unit gets a meter position
+- Panel hierarchy: Utility → Meter Stack (CT Cabinet) → MDP → Unit Panels + House Panel + EV Panel
+- House panel serves common area loads (hallway lighting, exterior, fire alarm, elevator, etc.)
+- NEC 220.57 per-EVSE load = max(7,200 VA, nameplate). NEC 625.42 allows EVEMS to reduce service sizing.
 `;
 
 /**
@@ -30,7 +38,7 @@ async function callGeminiProxy(prompt: string, systemInstruction?: string): Prom
       body: {
         prompt,
         systemInstruction: systemInstruction || NEC_SYSTEM_INSTRUCTION,
-        model: 'gemini-2.0-flash-exp'
+        model: 'gemini-2.5-flash'
       }
     });
 
@@ -258,6 +266,13 @@ This is a follow-up message in an ongoing conversation. The user may be:
 - Changing parameters from an earlier scenario
 ` : ''}
 
+MULTI-FAMILY DWELLING KNOWLEDGE:
+- NEC 220.84 Optional Calculation applies to multi-family buildings (3+ dwelling units)
+- It replaces standard NEC 220 demand factors with a single blanket demand factor based on unit count
+- Panel hierarchy: Utility → Meter Stack (CT Cabinet) → MDP → Unit Panels + House Panel + EV Panel
+- House panel serves common area loads (hallway lighting, exterior, fire alarm, elevator, etc.)
+- NEC 220.57 per-EVSE load = max(7,200 VA, nameplate). NEC 625.42 allows EVEMS to reduce service sizing.
+
 RESPONSE GUIDELINES:
 - Always reference specific NEC articles (2023 edition unless specified)
 - Be concise, technical, and professional
@@ -348,7 +363,7 @@ async function callGeminiProxyWithTools(
       body: {
         prompt,
         systemInstruction,
-        model: 'gemini-2.0-flash-exp',
+        model: 'gemini-2.5-flash',
         tools,
       }
     });
@@ -390,7 +405,7 @@ async function callGeminiProxyWithToolResult(
       body: {
         prompt: originalPrompt,
         systemInstruction,
-        model: 'gemini-2.0-flash-exp',
+        model: 'gemini-2.5-flash',
         toolResult: {
           toolName,
           result: toolResult,
@@ -543,6 +558,17 @@ WHEN NOT TO USE TOOLS:
 
 PROJECT CONTEXT:
 ${formatContextForAI(projectContext)}
+
+MULTI-FAMILY DWELLING KNOWLEDGE:
+- NEC 220.84 Optional Calculation applies to multi-family buildings (3+ dwelling units)
+- It replaces ALL standard NEC 220 demand factors with a single blanket demand factor based on unit count
+- The demand factor decreases as unit count increases (e.g., 3 units → 45%, 12 units → 41%, 40+ units → 28%)
+- Panel hierarchy for multi-family: Utility → Meter Stack (CT Cabinet) → MDP → Unit Panels + House Panel + EV Panel
+- Meter stacks (CT cabinets) provide individual metering for each dwelling unit
+- House panel serves common area loads (hallway lighting, exterior lighting, fire alarm, elevator, laundry, etc.)
+- NEC 220.57: Per-EVSE load = max(7,200 VA, nameplate rating). This is NOT a demand factor.
+- NEC 625.42: EVEMS (EV Energy Management System) allows sizing service to setpoint, not full connected load
+- EV panels in multi-family are dedicated panels for shared/assigned EV charging stations
 
 RESPONSE GUIDELINES:
 - After using a tool, explain the results in plain language

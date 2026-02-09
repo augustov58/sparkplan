@@ -52,7 +52,8 @@ import { usePanels } from '../hooks/usePanels';
 import { useCircuits } from '../hooks/useCircuits';
 import {
   generateBasicMultiFamilyProject,
-  type BasicGenerationOptions
+  type BasicGenerationOptions,
+  type UnitApplianceConfig
 } from '../services/autogeneration/multiFamilyProjectGenerator';
 import {
   populateProject,
@@ -131,7 +132,9 @@ export const DwellingLoadCalculator: React.FC<DwellingLoadCalculatorProps> = ({
   const [unitTemplates, setUnitTemplates] = useState<DwellingUnitTemplate[]>(
     residentialSettings?.unitTemplates || [{ ...DEFAULT_UNIT_TEMPLATE, id: crypto.randomUUID() }]
   );
-  const [housePanelLoad, setHousePanelLoad] = useState(0);
+  const [housePanelLoad, setHousePanelLoad] = useState(
+    () => (project.settings?.residential as any)?.multiFamilyLoadResult?.commonAreaLoadVA || 0
+  );
 
   // Sync appliances to project when they change (with value comparison to avoid infinite loop)
   useEffect(() => {
@@ -470,13 +473,21 @@ export const DwellingLoadCalculator: React.FC<DwellingLoadCalculatorProps> = ({
     setMfProgress(null);
 
     try {
-      // Determine appliance flags from unit templates
-      const hasElectricCooking = unitTemplates.some(t =>
-        t.appliances?.range?.enabled && t.appliances.range.type === 'electric'
-      );
-      const hasElectricHeat = unitTemplates.some(t =>
-        t.appliances?.hvac?.enabled && t.appliances.hvac.type === 'heat_pump'
-      );
+      // Use shared appliances state (applies to ALL unit types)
+      const hasElectricCooking = appliances.range?.enabled === true && appliances.range.type === 'electric';
+      const hasElectricHeat = appliances.hvac?.enabled === true &&
+        (appliances.hvac.type === 'heat_pump' || appliances.hvac.type === 'electric_heat');
+
+      // Build appliance config with actual wattages from DLC settings
+      const applianceConfig: UnitApplianceConfig = {
+        rangeKW: hasElectricCooking ? appliances.range!.kw : undefined,
+        dryerKW: appliances.dryer?.enabled && appliances.dryer.type === 'electric' ? appliances.dryer.kw : undefined,
+        waterHeaterKW: appliances.waterHeater?.enabled ? appliances.waterHeater.kw : undefined,
+        coolingKW: appliances.hvac?.enabled ? appliances.hvac.coolingKw : undefined,
+        heatingKW: hasElectricHeat ? appliances.hvac!.heatingKw : undefined,
+        dishwasherKW: appliances.dishwasher?.enabled ? appliances.dishwasher.kw : undefined,
+        disposalKW: appliances.disposal?.enabled ? appliances.disposal.kw : undefined,
+      };
 
       // Calculate total dwelling units
       const totalUnits = unitTemplates.reduce((sum, t) => sum + t.unitCount, 0);
@@ -492,10 +503,11 @@ export const DwellingLoadCalculator: React.FC<DwellingLoadCalculatorProps> = ({
         dwellingUnits: totalUnits,
         avgUnitSqFt: avgSqFt,
         buildingName: project.name,
-        serviceAmps: loadResult.serviceAmps,
+        serviceAmps: loadResult.recommendedServiceSize,
         commonAreaLoadVA: housePanelLoad,
         hasElectricCooking,
         hasElectricHeat,
+        applianceConfig,
       };
 
       const generated = generateBasicMultiFamilyProject(options);
