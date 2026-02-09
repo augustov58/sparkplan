@@ -173,8 +173,8 @@ export function generateMultiFamilyProject(
   // ---- Meters ----
   const meters = generateMeters(dwellingUnits);
 
-  // ---- Feeders ----
-  const feeders = generateFeeders(dwellingUnits);
+  // ---- Feeders: skip auto-creation (panels already linked via fed_from) ----
+  const feeders: GeneratedProject['feeders'] = [];
 
   // ---- Summary ----
   const totalCircuits = houseCircuits.length + evCircuits.length +
@@ -286,18 +286,10 @@ export function generateBasicMultiFamilyProject(
     });
   }
 
-  // ---- Feeders (no EV feeder) ----
+  // ---- Feeders: skip auto-creation (panels already linked via fed_from) ----
+  // Stub feeders have no conductor sizing and show as errored in FeederManager.
+  // Users can create feeders manually with proper specs when needed.
   const feeders: GeneratedProject['feeders'] = [];
-  feeders.push({ name: 'MDP to House Panel', sourceRef: 'mdp', destRef: 'house', distance_ft: 25 });
-  const feedersToCreate = Math.min(dwellingUnits, 20);
-  for (let i = 0; i < feedersToCreate; i++) {
-    feeders.push({
-      name: `MDP to Unit ${i + 101}`,
-      sourceRef: 'mdp',
-      destRef: { unitIndex: i },
-      distance_ft: 50 + i * 10,
-    });
-  }
 
   // ---- Summary ----
   const totalCircuits = houseCircuits.length +
