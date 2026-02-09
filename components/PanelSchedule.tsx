@@ -98,6 +98,7 @@ export const PanelSchedule: React.FC<PanelScheduleProps> = ({ project }) => {
   }, [selectedPanelId, transformers]);
 
   // NEC 220.84: Multi-family MDP gets blanket demand factor instead of per-load-type factors
+  // EV panel load is excluded from 220.84 base and added separately (NEC 625.42)
   const multiFamilyCtx: MultiFamilyContext | undefined = useMemo(() => {
     if (
       selectedPanel?.is_main &&
@@ -105,10 +106,23 @@ export const PanelSchedule: React.FC<PanelScheduleProps> = ({ project }) => {
       project.settings?.residential?.dwellingType === 'multi_family' &&
       (project.settings?.residential?.totalUnits || 0) >= 3
     ) {
-      return { dwellingUnits: project.settings!.residential!.totalUnits! };
+      // Find EV panel load to exclude from 220.84 base
+      const occupancy = project.settings?.occupancyType || 'commercial';
+      const evLoadVA = panels
+        .filter(p => p.fed_from_type === 'panel' && p.fed_from === selectedPanel.id
+          && p.name.toLowerCase().includes('ev'))
+        .reduce((sum, evPanel) => {
+          const load = calculateAggregatedLoad(evPanel.id, panels, circuits, transformers, occupancy);
+          return sum + load.totalConnectedVA;
+        }, 0);
+
+      return {
+        dwellingUnits: project.settings!.residential!.totalUnits!,
+        evLoadVA: evLoadVA > 0 ? evLoadVA : undefined,
+      };
     }
     return undefined;
-  }, [selectedPanel, project.settings?.occupancyType, project.settings?.residential]);
+  }, [selectedPanel, panels, circuits, transformers, project.settings?.occupancyType, project.settings?.residential]);
 
   // Create "virtual feeder circuits" for downstream equipment
   // These represent the feeder breakers in this panel that feed downstream equipment
@@ -1581,17 +1595,27 @@ export const PanelSchedule: React.FC<PanelScheduleProps> = ({ project }) => {
                       </span>
                     </div>
                     <div className="bg-purple-100 rounded p-3 border border-purple-300">
-                      <span className="text-[10px] uppercase text-purple-700 block font-semibold">TOTAL WITH FEEDERS</span>
+                      <span className="text-[10px] uppercase text-purple-700 block font-semibold">
+                        {aggregatedLoad && aggregatedLoad.downstreamPanelCount > 0 ? 'DEMAND WITH FEEDERS' : 'TOTAL WITH FEEDERS'}
+                      </span>
                       <span className="text-xl font-bold text-purple-900">
-                        {((demandResult as any).totalWithFeeders_kVA || demandResult.totalDemandLoad_kVA).toFixed(1)} KVA
+                        {aggregatedLoad && aggregatedLoad.downstreamPanelCount > 0
+                          ? (aggregatedLoad.totalDemandVA / 1000).toFixed(1)
+                          : ((demandResult as any).totalWithFeeders_kVA || demandResult.totalDemandLoad_kVA).toFixed(1)
+                        } KVA
                       </span>
                     </div>
                   </>
                 )}
-                
+
                 <div className="bg-blue-50 rounded p-3">
                   <span className="text-[10px] uppercase text-gray-500 block">Demand Amps</span>
-                  <span className="text-xl font-bold text-blue-600">{demandResult.demandAmps.toFixed(1)} A</span>
+                  <span className="text-xl font-bold text-blue-600">
+                    {aggregatedLoad && aggregatedLoad.downstreamPanelCount > 0
+                      ? (aggregatedLoad.totalDemandVA / (selectedPanel!.voltage * (selectedPanel!.phase === 3 ? Math.sqrt(3) : 1))).toFixed(1)
+                      : demandResult.demandAmps.toFixed(1)
+                    } A
+                  </span>
                 </div>
                 <div className={`rounded p-3 ${demandResult.percentImbalance > 10 ? 'bg-red-50' : 'bg-green-50'}`}>
                   <span className="text-[10px] uppercase text-gray-500 block">Phase Imbalance</span>
