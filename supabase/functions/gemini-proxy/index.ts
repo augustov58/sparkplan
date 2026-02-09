@@ -79,7 +79,7 @@ serve(async (req) => {
     }
 
     // Parse request body
-    const { prompt, systemInstruction, model = 'gemini-2.0-flash-exp', pdfData, imageData, tools, toolResult }: GeminiRequest = await req.json()
+    const { prompt, systemInstruction, model = 'gemini-2.5-flash', pdfData, imageData, tools, toolResult }: GeminiRequest = await req.json()
 
     if (!prompt) {
       throw new Error('Prompt is required')

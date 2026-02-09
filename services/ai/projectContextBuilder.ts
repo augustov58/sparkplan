@@ -43,7 +43,7 @@ interface PanelSummary {
   totalLoadVA: number;
   location?: string;
   fedFrom?: string; // Name of panel/transformer/service that feeds this panel
-  fedFromType?: 'service' | 'panel' | 'transformer';
+  fedFromType?: 'service' | 'panel' | 'transformer' | 'meter_stack';
   downstreamPanels?: string[]; // Names of panels fed from this panel
   downstreamTransformers?: string[]; // Names of transformers fed from this panel
 }
@@ -91,7 +91,21 @@ export function buildProjectContext(
   panels: Panel[],
   circuits: Circuit[],
   feeders: Feeder[],
-  transformers: Transformer[]
+  transformers: Transformer[],
+  residentialSettings?: {
+    dwellingType?: 'single_family' | 'multi_family';
+    totalUnits?: number;
+    multiFamilyLoadResult?: {
+      totalDemandVA: number;
+      totalConnectedVA: number;
+      demandFactor: number;
+      recommendedServiceSize: number;
+    };
+    mfEvInputs?: {
+      evChargerCount?: number;
+      useEVEMS?: boolean;
+    };
+  }
 ): ProjectContext {
   // Build panel summaries with hierarchy information
   const panelSummaries: PanelSummary[] = panels.map(panel => {
@@ -102,6 +116,8 @@ export function buildProjectContext(
     let fedFrom: string | undefined;
     if (panel.fed_from_type === 'service') {
       fedFrom = 'Service Entrance';
+    } else if (panel.fed_from_type === 'meter_stack') {
+      fedFrom = 'Meter Stack (CT Cabinet)';
     } else if (panel.fed_from_type === 'panel' && panel.fed_from) {
       const parentPanel = panels.find(p => p.id === panel.fed_from);
       fedFrom = parentPanel?.name;
@@ -260,6 +276,30 @@ export function buildProjectContext(
     });
   }
   
+  // Multi-family context
+  let multiFamilyText = '';
+  if (residentialSettings?.dwellingType === 'multi_family' && residentialSettings.totalUnits) {
+    const mfLoad = residentialSettings.multiFamilyLoadResult;
+    const mfEv = residentialSettings.mfEvInputs;
+    multiFamilyText = `\nMulti-Family Dwelling: ${residentialSettings.totalUnits} units`;
+    if (mfLoad) {
+      multiFamilyText += `\nNEC 220.84 Demand Factor: ${(mfLoad.demandFactor * 100).toFixed(0)}%`;
+      multiFamilyText += ` (Connected: ${Math.round(mfLoad.totalConnectedVA / 1000)} kVA → Demand: ${Math.round(mfLoad.totalDemandVA / 1000)} kVA)`;
+      multiFamilyText += `\nRecommended Service: ${mfLoad.recommendedServiceSize}A`;
+    }
+    if (mfEv?.evChargerCount) {
+      multiFamilyText += `\nEV Chargers: ${mfEv.evChargerCount}${mfEv.useEVEMS ? ' (EVEMS managed per NEC 625.42)' : ' (direct connection)'}`;
+    }
+    // Count unit panels
+    const unitPanelCount = panels.filter(p => p.name.toLowerCase().includes('unit')).length;
+    if (unitPanelCount > 0) multiFamilyText += `\nUnit Panels: ${unitPanelCount}`;
+    const hasHousePanel = panels.some(p => p.name.toLowerCase().includes('house'));
+    if (hasHousePanel) multiFamilyText += `\nHouse/Common Area Panel: Yes`;
+    const hasEvPanel = panels.some(p => p.name.toLowerCase().includes('ev'));
+    if (hasEvPanel) multiFamilyText += `\nEV Sub-Panel: Yes`;
+    multiFamilyText += `\nMeter Stack (CT Cabinet): Yes`;
+  }
+
   const summary = `
 PROJECT: ${projectName}
 Type: ${projectType}
@@ -270,7 +310,7 @@ Total Circuits: ${circuits.length}
 Total Connected Load: ${Math.round(totalConnectedVA / 1000)} kVA
 Estimated Demand Load: ${Math.round(totalDemandVA / 1000)} kVA
 ${feeders.length > 0 ? `Feeders: ${feeders.length}` : ''}
-${transformers.length > 0 ? `Transformers: ${transformers.length}` : ''}${hierarchyText}
+${transformers.length > 0 ? `Transformers: ${transformers.length}` : ''}${multiFamilyText}${hierarchyText}
   `.trim();
 
   return {
