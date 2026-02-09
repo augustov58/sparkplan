@@ -148,6 +148,7 @@ export const MultiFamilyEVCalculator: React.FC<MultiFamilyEVCalculatorProps> = (
     evChargerLevel?: 'Level1' | 'Level2';
     evAmpsPerCharger?: number;
     useEVEMS?: boolean;
+    capacityReserveVA?: number;
     existingServiceAmps?: number;
     selectedScenario?: ScenarioKey;
     voltage?: number;
@@ -200,6 +201,9 @@ export const MultiFamilyEVCalculator: React.FC<MultiFamilyEVCalculatorProps> = (
   // EVEMS toggle
   const [useEVEMS, setUseEVEMS] = useState(storedEvInputs?.useEVEMS || false);
 
+  // Capacity reserve for EV panel auxiliary loads (spare, lighting, EVEMS controller)
+  const [capacityReserveVA, setCapacityReserveVA] = useState(storedEvInputs?.capacityReserveVA || 0);
+
   // NEC 220.87 - Existing Load Determination Method
   const [existingLoadMethod, setExistingLoadMethod] = useState<'calculated' | 'utility_bill' | 'load_study'>('calculated');
   const [measuredPeakDemandKW, setMeasuredPeakDemandKW] = useState(0);
@@ -220,6 +224,23 @@ export const MultiFamilyEVCalculator: React.FC<MultiFamilyEVCalculatorProps> = (
     }
   }, [storedMFLoad]);
 
+  // Restore persisted EV inputs when project data loads (useState misses async project)
+  const evInputsRestoredRef = React.useRef(false);
+  useEffect(() => {
+    if (storedEvInputs && !evInputsRestoredRef.current) {
+      evInputsRestoredRef.current = true;
+      if (storedEvInputs.evChargerCount != null) setEvChargerCount(storedEvInputs.evChargerCount);
+      if (storedEvInputs.evChargerLevel) setEvChargerLevel(storedEvInputs.evChargerLevel);
+      if (storedEvInputs.evAmpsPerCharger != null) setEvAmpsPerCharger(storedEvInputs.evAmpsPerCharger);
+      if (storedEvInputs.useEVEMS != null) setUseEVEMS(storedEvInputs.useEVEMS);
+      if (storedEvInputs.capacityReserveVA != null) setCapacityReserveVA(storedEvInputs.capacityReserveVA);
+      if (storedEvInputs.existingServiceAmps != null) setExistingServiceAmps(storedEvInputs.existingServiceAmps);
+      if (storedEvInputs.selectedScenario) setSelectedScenario(storedEvInputs.selectedScenario);
+      if (storedEvInputs.voltage != null) setVoltage(storedEvInputs.voltage as any);
+      if (storedEvInputs.phase != null) setPhase(storedEvInputs.phase as any);
+    }
+  }, [storedEvInputs]);
+
   // Quick check mode
   const [mode, setMode] = useState<'quick' | 'detailed'>('detailed');
 
@@ -233,10 +254,13 @@ export const MultiFamilyEVCalculator: React.FC<MultiFamilyEVCalculatorProps> = (
   const [applySuccess, setApplySuccess] = useState(false);
   const [selectedScenario, setSelectedScenario] = useState<ScenarioKey>(storedEvInputs?.selectedScenario || 'noEVEMS');
 
-  // Persist MF EV inputs to project settings (debounced)
+  // Persist MF EV inputs to project settings (debounced, skip until restore completes)
   useEffect(() => {
     if (!project || !updateProject) return;
-    const current = { evChargerCount, evChargerLevel, evAmpsPerCharger, useEVEMS, existingServiceAmps, selectedScenario, voltage, phase };
+    // Don't persist defaults before stored values have been restored
+    if (!evInputsRestoredRef.current && (project.settings?.residential as any)?.mfEvInputs) return;
+
+    const current = { evChargerCount, evChargerLevel, evAmpsPerCharger, useEVEMS, capacityReserveVA, existingServiceAmps, selectedScenario, voltage, phase };
     const stored = (project.settings?.residential as any)?.mfEvInputs;
     if (JSON.stringify(current) === JSON.stringify(stored)) return;
 
@@ -253,7 +277,7 @@ export const MultiFamilyEVCalculator: React.FC<MultiFamilyEVCalculatorProps> = (
       });
     }, 500);
     return () => clearTimeout(timer);
-  }, [evChargerCount, evChargerLevel, evAmpsPerCharger, useEVEMS, existingServiceAmps, selectedScenario, voltage, phase]);
+  }, [evChargerCount, evChargerLevel, evAmpsPerCharger, useEVEMS, capacityReserveVA, existingServiceAmps, selectedScenario, voltage, phase]);
 
   // Calculate results
   const result = useMemo<MultiFamilyEVResult | null>(() => {
@@ -288,6 +312,7 @@ export const MultiFamilyEVCalculator: React.FC<MultiFamilyEVCalculatorProps> = (
         commonAreaLoads: useItemizedCommonArea && commonAreaItems.length > 0 ? commonAreaItems : undefined,
         transformer: hasTransformer ? { kvaRating: transformerKVA } : undefined,
         useEVEMS,
+        capacityReserveVA: capacityReserveVA > 0 ? capacityReserveVA : undefined,
         // NEC 220.87 - Existing Load Determination Method
         existingLoadMethod,
         measuredPeakDemandKW: existingLoadMethod !== 'calculated' && measuredPeakDemandKW > 0 ? measuredPeakDemandKW : undefined,
@@ -306,7 +331,7 @@ export const MultiFamilyEVCalculator: React.FC<MultiFamilyEVCalculatorProps> = (
     evChargerCount, evChargerLevel, evAmpsPerCharger,
     hasElectricHeat, hasElectricCooking, commonAreaLoadVA,
     useItemizedCommonArea, commonAreaItems,
-    hasTransformer, transformerKVA, useEVEMS,
+    hasTransformer, transformerKVA, useEVEMS, capacityReserveVA,
     existingLoadMethod, measuredPeakDemandKW, storedMFLoad
   ]);
 
@@ -819,6 +844,24 @@ export const MultiFamilyEVCalculator: React.FC<MultiFamilyEVCalculatorProps> = (
                 EVEMS can increase charger capacity by sharing available power
               </p>
             </div>
+
+            {/* Capacity Reserve */}
+            <div className="pt-3 border-t border-blue-200">
+              <label className="block text-xs font-semibold text-gray-500 uppercase mb-1">
+                Capacity Reserve (VA)
+              </label>
+              <input
+                type="number"
+                min={0}
+                step={500}
+                value={capacityReserveVA}
+                onChange={e => setCapacityReserveVA(Number(e.target.value))}
+                className="w-full border-gray-200 rounded text-sm py-2 focus:border-electric-500 focus:ring-electric-500"
+              />
+              <p className="text-xs text-gray-500 mt-1">
+                Reserve for EV panel auxiliary loads (spare circuits, lighting, EVEMS controller)
+              </p>
+            </div>
           </div>
 
           {mode === 'detailed' && (
@@ -1183,36 +1226,63 @@ export const MultiFamilyEVCalculator: React.FC<MultiFamilyEVCalculatorProps> = (
                 </div>
               </div>
 
-              {/* Service Utilization Gauge */}
-              <div className="bg-white border border-gray-200 rounded-lg p-4">
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-sm font-semibold text-gray-700">Service Utilization</span>
-                  <span className={`text-2xl font-bold ${
-                    result.serviceAnalysis.utilizationPercent > 100 ? 'text-red-700' :
-                    result.serviceAnalysis.utilizationPercent > 90 ? 'text-orange-700' :
-                    result.serviceAnalysis.utilizationPercent > 80 ? 'text-yellow-700' :
-                    'text-green-700'
-                  }`}>
-                    {result.serviceAnalysis.utilizationPercent}%
-                  </span>
-                </div>
-                <div className="w-full bg-gray-200 rounded-full h-4">
-                  <div
-                    className={`h-4 rounded-full transition-all ${
-                      result.serviceAnalysis.utilizationPercent > 100 ? 'bg-red-600' :
-                      result.serviceAnalysis.utilizationPercent > 90 ? 'bg-orange-500' :
-                      result.serviceAnalysis.utilizationPercent > 80 ? 'bg-yellow-500' :
-                      'bg-green-500'
-                    }`}
-                    style={{ width: `${Math.min(result.serviceAnalysis.utilizationPercent, 100)}%` }}
-                  />
-                </div>
-                <div className="grid grid-cols-3 gap-2 mt-3 text-xs text-gray-600">
-                  <div>Building: {result.buildingLoad.buildingLoadAmps}A</div>
-                  <div>EV: {result.evLoad.loadAmps}A</div>
-                  <div>Total: {result.serviceAnalysis.totalDemandAmps}A / {result.serviceAnalysis.existingCapacityAmps}A</div>
-                </div>
-              </div>
+              {/* Service Utilization Gauge — reflects selected scenario */}
+              {(() => {
+                const scenario = result.scenarios[selectedScenario];
+                const buildingVA = result.buildingLoad.totalDemandVA;
+                const chargerCount = Math.min(evChargerCount, scenario.maxChargers);
+                // Compute EV demand for the selected scenario
+                const evVA = scenario.powerPerCharger_kW
+                  ? Math.round(scenario.powerPerCharger_kW * 1000 * chargerCount)
+                  : result.evLoad.demandVA;
+                // Use upgrade service if that scenario, else existing
+                const serviceVA = selectedScenario === 'withUpgrade' && scenario.recommendedServiceAmps
+                  ? scenario.recommendedServiceAmps * (result.serviceAnalysis.existingCapacityVA / result.serviceAnalysis.existingCapacityAmps)
+                  : result.serviceAnalysis.existingCapacityVA;
+                const totalVA = buildingVA + evVA;
+                const util = Math.round((totalVA / serviceVA) * 1000) / 10;
+                const serviceAmps = selectedScenario === 'withUpgrade' && scenario.recommendedServiceAmps
+                  ? scenario.recommendedServiceAmps
+                  : result.serviceAnalysis.existingCapacityAmps;
+                const evAmps = Math.round(evVA / (result.serviceAnalysis.existingCapacityVA / result.serviceAnalysis.existingCapacityAmps));
+                const totalAmps = Math.round(totalVA / (result.serviceAnalysis.existingCapacityVA / result.serviceAnalysis.existingCapacityAmps));
+                const scenarioLabel = selectedScenario === 'noEVEMS' ? 'Direct' :
+                  selectedScenario === 'withEVEMS' ? 'EVEMS' : 'Upgrade';
+
+                return (
+                  <div className="bg-white border border-gray-200 rounded-lg p-4">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-sm font-semibold text-gray-700">
+                        Service Utilization <span className="text-xs font-normal text-gray-500">({scenarioLabel})</span>
+                      </span>
+                      <span className={`text-2xl font-bold ${
+                        util > 100 ? 'text-red-700' :
+                        util > 90 ? 'text-orange-700' :
+                        util > 80 ? 'text-yellow-700' :
+                        'text-green-700'
+                      }`}>
+                        {util}%
+                      </span>
+                    </div>
+                    <div className="w-full bg-gray-200 rounded-full h-4">
+                      <div
+                        className={`h-4 rounded-full transition-all ${
+                          util > 100 ? 'bg-red-600' :
+                          util > 90 ? 'bg-orange-500' :
+                          util > 80 ? 'bg-yellow-500' :
+                          'bg-green-500'
+                        }`}
+                        style={{ width: `${Math.min(util, 100)}%` }}
+                      />
+                    </div>
+                    <div className="grid grid-cols-3 gap-2 mt-3 text-xs text-gray-600">
+                      <div>Building: {result.buildingLoad.buildingLoadAmps}A</div>
+                      <div>EV: {evAmps}A</div>
+                      <div>Total: {totalAmps}A / {serviceAmps}A</div>
+                    </div>
+                  </div>
+                );
+              })()}
 
               {/* Scenario Comparison */}
               <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
