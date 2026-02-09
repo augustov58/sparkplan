@@ -220,6 +220,19 @@ export const MultiFamilyEVCalculator: React.FC<MultiFamilyEVCalculatorProps> = (
     }
   }, [storedMFLoad]);
 
+  // Quick check mode
+  const [mode, setMode] = useState<'quick' | 'detailed'>('detailed');
+
+  // PDF export state
+  const [isExporting, setIsExporting] = useState(false);
+
+  // Apply to Project state
+  const [isApplying, setIsApplying] = useState(false);
+  const [applyProgress, setApplyProgress] = useState<PopulationProgress | null>(null);
+  const [applyError, setApplyError] = useState<string | null>(null);
+  const [applySuccess, setApplySuccess] = useState(false);
+  const [selectedScenario, setSelectedScenario] = useState<ScenarioKey>(storedEvInputs?.selectedScenario || 'noEVEMS');
+
   // Persist MF EV inputs to project settings (debounced)
   useEffect(() => {
     if (!project || !updateProject) return;
@@ -241,19 +254,6 @@ export const MultiFamilyEVCalculator: React.FC<MultiFamilyEVCalculatorProps> = (
     }, 500);
     return () => clearTimeout(timer);
   }, [evChargerCount, evChargerLevel, evAmpsPerCharger, useEVEMS, existingServiceAmps, selectedScenario, voltage, phase]);
-
-  // Quick check mode
-  const [mode, setMode] = useState<'quick' | 'detailed'>('detailed');
-
-  // PDF export state
-  const [isExporting, setIsExporting] = useState(false);
-
-  // Apply to Project state
-  const [isApplying, setIsApplying] = useState(false);
-  const [applyProgress, setApplyProgress] = useState<PopulationProgress | null>(null);
-  const [applyError, setApplyError] = useState<string | null>(null);
-  const [applySuccess, setApplySuccess] = useState(false);
-  const [selectedScenario, setSelectedScenario] = useState<ScenarioKey>(storedEvInputs?.selectedScenario || 'noEVEMS');
 
   // Calculate results
   const result = useMemo<MultiFamilyEVResult | null>(() => {
