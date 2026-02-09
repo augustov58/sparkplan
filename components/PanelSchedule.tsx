@@ -106,19 +106,32 @@ export const PanelSchedule: React.FC<PanelScheduleProps> = ({ project }) => {
       project.settings?.residential?.dwellingType === 'multi_family' &&
       (project.settings?.residential?.totalUnits || 0) >= 3
     ) {
-      // Find EV panel load to exclude from 220.84 base
+      // Identify non-dwelling loads to exclude from 220.84 base
       const occupancy = project.settings?.occupancyType || 'commercial';
-      const evLoadVA = panels
-        .filter(p => p.fed_from_type === 'panel' && p.fed_from === selectedPanel.id
-          && p.name.toLowerCase().includes('ev'))
-        .reduce((sum, evPanel) => {
-          const load = calculateAggregatedLoad(evPanel.id, panels, circuits, transformers, occupancy);
+      const downstreamFromMDP = panels.filter(
+        p => p.fed_from_type === 'panel' && p.fed_from === selectedPanel.id
+      );
+
+      // EV panels (NEC 625.42 — added at EVEMS-managed value)
+      const evLoadVA = downstreamFromMDP
+        .filter(p => p.name.toLowerCase().includes('ev'))
+        .reduce((sum, p) => {
+          const load = calculateAggregatedLoad(p.id, panels, circuits, transformers, occupancy);
+          return sum + load.totalConnectedVA;
+        }, 0);
+
+      // House/common area panels (not dwelling unit loads)
+      const housePanelLoadVA = downstreamFromMDP
+        .filter(p => p.name.toLowerCase().includes('house'))
+        .reduce((sum, p) => {
+          const load = calculateAggregatedLoad(p.id, panels, circuits, transformers, occupancy);
           return sum + load.totalConnectedVA;
         }, 0);
 
       return {
         dwellingUnits: project.settings!.residential!.totalUnits!,
         evLoadVA: evLoadVA > 0 ? evLoadVA : undefined,
+        housePanelLoadVA: housePanelLoadVA > 0 ? housePanelLoadVA : undefined,
       };
     }
     return undefined;

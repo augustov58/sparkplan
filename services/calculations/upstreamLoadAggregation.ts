@@ -31,8 +31,10 @@ type OccupancyType = 'dwelling' | 'commercial' | 'industrial';
 /** Context for NEC 220.84 Optional Calculation — Multi-Family Dwellings (3+ units) */
 export interface MultiFamilyContext {
   dwellingUnits: number;
-  /** EV panel load (VA) to exclude from 220.84 base — added at full EVEMS-managed value */
+  /** EV panel load (VA) — excluded from 220.84 base, added at EVEMS-managed value */
   evLoadVA?: number;
+  /** House/common area panel load (VA) — excluded from 220.84 base, added at connected value */
+  housePanelLoadVA?: number;
 }
 
 /**
@@ -637,12 +639,14 @@ export function calculateAggregatedLoad(
   if (multiFamilyContext && multiFamilyContext.dwellingUnits >= 3) {
     const demandFactor = getMultiFamilyDemandFactor(multiFamilyContext.dwellingUnits);
 
-    // NEC 220.84 covers dwelling unit loads only — EV infrastructure is excluded from
-    // the demand factor base and added separately at its EVEMS-managed value
+    // NEC 220.84 covers dwelling unit loads only — EV and house/common area loads
+    // are excluded from the demand factor base and added separately at full value
     const evLoadVA = multiFamilyContext.evLoadVA || 0;
-    const dwellingConnectedVA = totalConnectedVA - evLoadVA;
+    const housePanelLoadVA = multiFamilyContext.housePanelLoadVA || 0;
+    const nonDwellingVA = evLoadVA + housePanelLoadVA;
+    const dwellingConnectedVA = totalConnectedVA - nonDwellingVA;
     const dwellingDemandVA = Math.round(dwellingConnectedVA * demandFactor);
-    const totalDemandVA = dwellingDemandVA + evLoadVA;
+    const totalDemandVA = dwellingDemandVA + nonDwellingVA;
 
     const demandBreakdown: DemandCalculation[] = [{
       loadType: `Multi-Family Dwelling (${multiFamilyContext.dwellingUnits} units)`,
@@ -652,6 +656,16 @@ export function calculateAggregatedLoad(
       necReference: `NEC 220.84 Table (${multiFamilyContext.dwellingUnits} units @ ${(demandFactor * 100).toFixed(0)}%)`,
     }];
     const necRefs = ['NEC 220.84 (Optional Calculation — Multifamily Dwelling)'];
+
+    if (housePanelLoadVA > 0) {
+      demandBreakdown.push({
+        loadType: 'House Panel / Common Areas',
+        connectedVA: housePanelLoadVA,
+        demandVA: housePanelLoadVA,
+        demandFactor: 1.0,
+        necReference: 'NEC 220.84 (Common area loads — excluded from dwelling demand)',
+      });
+    }
 
     if (evLoadVA > 0) {
       demandBreakdown.push({
