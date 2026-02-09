@@ -1229,23 +1229,26 @@ export const MultiFamilyEVCalculator: React.FC<MultiFamilyEVCalculatorProps> = (
               {/* Service Utilization Gauge — reflects selected scenario */}
               {(() => {
                 const scenario = result.scenarios[selectedScenario];
-                const buildingVA = result.buildingLoad.totalDemandVA;
+                const buildingAmps = result.buildingLoad.buildingLoadAmps;
                 const chargerCount = Math.min(evChargerCount, scenario.maxChargers);
-                // Compute EV demand for the selected scenario
-                const evVA = scenario.powerPerCharger_kW
-                  ? Math.round(scenario.powerPerCharger_kW * 1000 * chargerCount)
-                  : result.evLoad.demandVA;
-                // Use upgrade service if that scenario, else existing
-                const serviceVA = selectedScenario === 'withUpgrade' && scenario.recommendedServiceAmps
-                  ? scenario.recommendedServiceAmps * (result.serviceAnalysis.existingCapacityVA / result.serviceAnalysis.existingCapacityAmps)
-                  : result.serviceAnalysis.existingCapacityVA;
-                const totalVA = buildingVA + evVA;
-                const util = Math.round((totalVA / serviceVA) * 1000) / 10;
+
+                // VA-per-amp factor (e.g., 240 for 240V/1φ) with fallback
+                const vaPerAmp = result.serviceAnalysis.existingCapacityAmps > 0
+                  ? result.serviceAnalysis.existingCapacityVA / result.serviceAnalysis.existingCapacityAmps
+                  : voltage;
+
+                // Compute EV amps for the selected scenario
+                const evAmps = (scenario.powerPerCharger_kW != null && vaPerAmp > 0)
+                  ? Math.round((scenario.powerPerCharger_kW * 1000 * chargerCount) / vaPerAmp)
+                  : result.evLoad.loadAmps;
+
+                // Service capacity: use upgraded size if that scenario, else existing
                 const serviceAmps = selectedScenario === 'withUpgrade' && scenario.recommendedServiceAmps
                   ? scenario.recommendedServiceAmps
                   : result.serviceAnalysis.existingCapacityAmps;
-                const evAmps = Math.round(evVA / (result.serviceAnalysis.existingCapacityVA / result.serviceAnalysis.existingCapacityAmps));
-                const totalAmps = Math.round(totalVA / (result.serviceAnalysis.existingCapacityVA / result.serviceAnalysis.existingCapacityAmps));
+
+                const totalAmps = buildingAmps + evAmps;
+                const util = serviceAmps > 0 ? Math.round((totalAmps / serviceAmps) * 1000) / 10 : 0;
                 const scenarioLabel = selectedScenario === 'noEVEMS' ? 'Direct' :
                   selectedScenario === 'withEVEMS' ? 'EVEMS' : 'Upgrade';
 
