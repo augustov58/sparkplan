@@ -44,6 +44,7 @@ import {
 interface MultiFamilyEVCalculatorProps {
   projectId?: string;
   project?: { settings: any; [key: string]: any };
+  updateProject?: (p: any) => void;
 }
 
 // Building type presets for smart defaults
@@ -125,7 +126,7 @@ const BUILDING_PRESETS: Record<BuildingPresetType, BuildingPreset> = {
   },
 };
 
-export const MultiFamilyEVCalculator: React.FC<MultiFamilyEVCalculatorProps> = ({ projectId, project }) => {
+export const MultiFamilyEVCalculator: React.FC<MultiFamilyEVCalculatorProps> = ({ projectId, project, updateProject }) => {
   // Read pre-calculated building load from DwellingLoadCalculator (stored in project settings)
   const storedMFLoad = project?.settings?.residential?.multiFamilyLoadResult as {
     totalDemandVA: number;
@@ -141,6 +142,18 @@ export const MultiFamilyEVCalculator: React.FC<MultiFamilyEVCalculatorProps> = (
     hasElectricHeat: boolean;
   } | undefined;
 
+  // Restore persisted MF EV inputs (if any)
+  const storedEvInputs = (project?.settings?.residential as any)?.mfEvInputs as {
+    evChargerCount?: number;
+    evChargerLevel?: 'Level1' | 'Level2';
+    evAmpsPerCharger?: number;
+    useEVEMS?: boolean;
+    existingServiceAmps?: number;
+    selectedScenario?: ScenarioKey;
+    voltage?: number;
+    phase?: number;
+  } | undefined;
+
   // Building preset type
   const [buildingPreset, setBuildingPreset] = useState<BuildingPresetType>('custom');
 
@@ -148,9 +161,9 @@ export const MultiFamilyEVCalculator: React.FC<MultiFamilyEVCalculatorProps> = (
   const [buildingName, setBuildingName] = useState('');
   const [dwellingUnits, setDwellingUnits] = useState(20);
   const [avgUnitSqFt, setAvgUnitSqFt] = useState(900);
-  const [voltage, setVoltage] = useState<120 | 208 | 240 | 277 | 480>(240);
-  const [phase, setPhase] = useState<1 | 3>(1);
-  const [existingServiceAmps, setExistingServiceAmps] = useState(800);
+  const [voltage, setVoltage] = useState<120 | 208 | 240 | 277 | 480>(storedEvInputs?.voltage as any || 240);
+  const [phase, setPhase] = useState<1 | 3>(storedEvInputs?.phase as any || 1);
+  const [existingServiceAmps, setExistingServiceAmps] = useState(storedEvInputs?.existingServiceAmps || 800);
 
   // Apply building preset when selected
   const applyBuildingPreset = (preset: BuildingPresetType) => {
@@ -167,9 +180,9 @@ export const MultiFamilyEVCalculator: React.FC<MultiFamilyEVCalculatorProps> = (
   };
 
   // EV charger configuration
-  const [evChargerCount, setEvChargerCount] = useState(20);
-  const [evChargerLevel, setEvChargerLevel] = useState<'Level1' | 'Level2'>('Level2');
-  const [evAmpsPerCharger, setEvAmpsPerCharger] = useState(48);
+  const [evChargerCount, setEvChargerCount] = useState(storedEvInputs?.evChargerCount || 20);
+  const [evChargerLevel, setEvChargerLevel] = useState<'Level1' | 'Level2'>(storedEvInputs?.evChargerLevel || 'Level2');
+  const [evAmpsPerCharger, setEvAmpsPerCharger] = useState(storedEvInputs?.evAmpsPerCharger || 48);
 
   // Building details
   const [hasElectricHeat, setHasElectricHeat] = useState(false);
@@ -185,7 +198,7 @@ export const MultiFamilyEVCalculator: React.FC<MultiFamilyEVCalculatorProps> = (
   const [transformerKVA, setTransformerKVA] = useState(500);
 
   // EVEMS toggle
-  const [useEVEMS, setUseEVEMS] = useState(false);
+  const [useEVEMS, setUseEVEMS] = useState(storedEvInputs?.useEVEMS || false);
 
   // NEC 220.87 - Existing Load Determination Method
   const [existingLoadMethod, setExistingLoadMethod] = useState<'calculated' | 'utility_bill' | 'load_study'>('calculated');
@@ -207,6 +220,28 @@ export const MultiFamilyEVCalculator: React.FC<MultiFamilyEVCalculatorProps> = (
     }
   }, [storedMFLoad]);
 
+  // Persist MF EV inputs to project settings (debounced)
+  useEffect(() => {
+    if (!project || !updateProject) return;
+    const current = { evChargerCount, evChargerLevel, evAmpsPerCharger, useEVEMS, existingServiceAmps, selectedScenario, voltage, phase };
+    const stored = (project.settings?.residential as any)?.mfEvInputs;
+    if (JSON.stringify(current) === JSON.stringify(stored)) return;
+
+    const timer = setTimeout(() => {
+      updateProject({
+        ...project,
+        settings: {
+          ...project.settings,
+          residential: {
+            ...project.settings?.residential,
+            mfEvInputs: current,
+          } as any,
+        },
+      });
+    }, 500);
+    return () => clearTimeout(timer);
+  }, [evChargerCount, evChargerLevel, evAmpsPerCharger, useEVEMS, existingServiceAmps, selectedScenario, voltage, phase]);
+
   // Quick check mode
   const [mode, setMode] = useState<'quick' | 'detailed'>('detailed');
 
@@ -218,7 +253,7 @@ export const MultiFamilyEVCalculator: React.FC<MultiFamilyEVCalculatorProps> = (
   const [applyProgress, setApplyProgress] = useState<PopulationProgress | null>(null);
   const [applyError, setApplyError] = useState<string | null>(null);
   const [applySuccess, setApplySuccess] = useState(false);
-  const [selectedScenario, setSelectedScenario] = useState<ScenarioKey>('noEVEMS');
+  const [selectedScenario, setSelectedScenario] = useState<ScenarioKey>(storedEvInputs?.selectedScenario || 'noEVEMS');
 
   // Calculate results
   const result = useMemo<MultiFamilyEVResult | null>(() => {

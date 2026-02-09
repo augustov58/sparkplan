@@ -59,7 +59,7 @@ const VALID_TABS = new Set<string>([
 ]);
 
 export const Calculators: React.FC<CalculatorsProps> = ({ projectId }) => {
-  const { getProjectById } = useProjects();
+  const { getProjectById, updateProject } = useProjects();
   const project = projectId ? getProjectById(projectId) : undefined;
   const [searchParams] = useSearchParams();
 
@@ -245,7 +245,7 @@ export const Calculators: React.FC<CalculatorsProps> = ({ projectId }) => {
           {activeTab === 'service-upgrade' && <ServiceUpgradeWizard projectId={projectId} />}
           {activeTab === 'circuit-sharing' && <CircuitSharingCalculator />}
           <div style={{ display: activeTab === 'multi-family-ev' ? 'block' : 'none' }}>
-            <MultiFamilyEVCalculator projectId={projectId} project={project} />
+            <MultiFamilyEVCalculator projectId={projectId} project={project} updateProject={updateProject} />
           </div>
           {activeTab === 'change-impact' && <ChangeImpactAnalyzer projectId={projectId} />}
           {activeTab === 'ev-panel-builder' && project && <EVPanelTemplates project={project} />}

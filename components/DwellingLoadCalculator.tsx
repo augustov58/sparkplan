@@ -132,7 +132,9 @@ export const DwellingLoadCalculator: React.FC<DwellingLoadCalculatorProps> = ({
   const [unitTemplates, setUnitTemplates] = useState<DwellingUnitTemplate[]>(
     residentialSettings?.unitTemplates || [{ ...DEFAULT_UNIT_TEMPLATE, id: crypto.randomUUID() }]
   );
-  const [housePanelLoad, setHousePanelLoad] = useState(0);
+  const [housePanelLoad, setHousePanelLoad] = useState(
+    () => (project.settings?.residential as any)?.multiFamilyLoadResult?.commonAreaLoadVA || 0
+  );
 
   // Sync appliances to project when they change (with value comparison to avoid infinite loop)
   useEffect(() => {
@@ -501,7 +503,7 @@ export const DwellingLoadCalculator: React.FC<DwellingLoadCalculatorProps> = ({
         dwellingUnits: totalUnits,
         avgUnitSqFt: avgSqFt,
         buildingName: project.name,
-        serviceAmps: loadResult.serviceAmps,
+        serviceAmps: loadResult.recommendedServiceSize,
         commonAreaLoadVA: housePanelLoad,
         hasElectricCooking,
         hasElectricHeat,

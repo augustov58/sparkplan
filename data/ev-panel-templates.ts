@@ -422,6 +422,7 @@ export interface CustomEVPanelConfig {
   numberOfChargers: number;
   useEVEMS: boolean;
   simultaneousChargers?: number;  // Required if useEVEMS is true
+  evemsLoadVAPerCharger?: number; // If provided, overrides simultaneousChargers formula for per-circuit load
   includeSpare: boolean;
   includeLighting: boolean;
   panelName?: string;
@@ -442,6 +443,7 @@ export function generateCustomEVPanel(input: CustomEVPanelInput): ApplyTemplateO
     numberOfChargers,
     useEVEMS,
     simultaneousChargers,
+    evemsLoadVAPerCharger,
     includeSpare,
     includeLighting,
     panelName
@@ -526,9 +528,11 @@ export function generateCustomEVPanel(input: CustomEVPanelInput): ApplyTemplateO
 
   // NEC 625.42: When EVEMS is active, each circuit's demand load is proportional
   // to the managed setpoint. Breaker/conductor remain at full nameplate for protection.
-  const circuitLoadVA = (useEVEMS && simultaneousChargers)
-    ? Math.round(loadVA * simultaneousChargers / numberOfChargers)
-    : loadVA;
+  const circuitLoadVA = (useEVEMS && evemsLoadVAPerCharger)
+    ? evemsLoadVAPerCharger
+    : (useEVEMS && simultaneousChargers)
+      ? Math.round(loadVA * simultaneousChargers / numberOfChargers)
+      : loadVA;
 
   // Add EV charger circuits
   // Multi-pole slot formula: 2-pole at slot N occupies N and N+2.

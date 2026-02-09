@@ -640,11 +640,18 @@ function generateEVPanel(
     chargerType = 'DC Fast Charge (150kW)';
   }
 
+  // NEC 625.42: Use scenario's computed per-charger power (accounts for building load + house panel)
+  // Fall back to 50% simultaneous if no scenario power available
+  const evemsLoadVAPerCharger = (useEVEMS && scenario.powerPerCharger_kW)
+    ? Math.round(scenario.powerPerCharger_kW * 1000)
+    : undefined;
+
   const config: CustomEVPanelConfig = {
     chargerType,
     numberOfChargers: chargerCount,
     useEVEMS,
     simultaneousChargers: useEVEMS ? Math.ceil(chargerCount * 0.5) : undefined,
+    evemsLoadVAPerCharger,
     includeSpare: true,
     includeLighting: true,
     panelName: 'EV Sub-Panel',
