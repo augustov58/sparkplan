@@ -128,9 +128,11 @@ export const PanelSchedule: React.FC<PanelScheduleProps> = ({ project }) => {
     const occupancy = project.settings?.occupancyType || 'commercial';
 
     // Add downstream panels as feeder circuits
+    // NOTE: Do NOT pass multiFamilyCtx here — NEC 220.84 is a blanket factor for
+    // the MDP aggregate, not for individual feeder sizing. Each feeder uses standard
+    // NEC 220 demand factors for its own panel load.
     downstreamPanels.forEach(panel => {
-      // Calculate the demand load for this downstream panel
-      const panelLoad = calculateAggregatedLoad(panel.id, panels, circuits, transformers, occupancy, multiFamilyCtx);
+      const panelLoad = calculateAggregatedLoad(panel.id, panels, circuits, transformers, occupancy);
 
       feeders.push({
         id: `feeder-panel-${panel.id}`,
@@ -151,7 +153,7 @@ export const PanelSchedule: React.FC<PanelScheduleProps> = ({ project }) => {
       const xfmrPanels = panels.filter(p => p.fed_from_transformer_id === xfmr.id);
       let totalLoad = 0;
       xfmrPanels.forEach(p => {
-        const pLoad = calculateAggregatedLoad(p.id, panels, circuits, transformers, occupancy, multiFamilyCtx);
+        const pLoad = calculateAggregatedLoad(p.id, panels, circuits, transformers, occupancy);
         totalLoad += pLoad.totalDemandVA;
       });
       // If no panels, use transformer kVA rating
@@ -173,7 +175,7 @@ export const PanelSchedule: React.FC<PanelScheduleProps> = ({ project }) => {
     });
 
     return feeders;
-  }, [downstreamPanels, downstreamTransformers, panels, circuits, transformers, selectedPanel, project.settings?.occupancyType, multiFamilyCtx]);
+  }, [downstreamPanels, downstreamTransformers, panels, circuits, transformers, selectedPanel, project.settings?.occupancyType]);
 
   // Split feeder circuits into breaker-fed (assigned to specific slot) and lug-fed (feed-thru lug)
   const { breakerFedPanels, lugFedPanels } = useMemo(() => {
