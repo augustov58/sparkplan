@@ -33,7 +33,7 @@ export const LandingPage: React.FC = () => {
           <div className="bg-electric-500 w-8 h-8 rounded flex items-center justify-center">
             <Bolt className="text-white w-5 h-5 fill-current" />
           </div>
-          <span className="font-bold text-xl tracking-tight text-gray-900">NEC Compliance</span>
+          <span className="font-bold text-xl tracking-tight text-gray-900">SparkPlan</span>
         </div>
 
         {/* Desktop Links */}
@@ -79,7 +79,7 @@ export const LandingPage: React.FC = () => {
       {/* 2. Hero Section */}
       <section className="pt-32 pb-20 px-6 lg:px-12 max-w-7xl mx-auto text-center">
         <h1 className="text-5xl md:text-6xl font-bold tracking-tight text-gray-900 mb-6">
-          NEC Compliance. <br className="hidden md:block"/>
+          SparkPlan. <br className="hidden md:block"/>
           <span className="text-gray-400">Simplified. Automated.</span>
         </h1>
         <p className="text-xl text-gray-600 max-w-2xl mx-auto mb-10 leading-relaxed">
@@ -270,7 +270,7 @@ export const LandingPage: React.FC = () => {
                 <div className="bg-electric-500 w-6 h-6 rounded flex items-center justify-center">
                   <Bolt className="text-white w-4 h-4 fill-current" />
                 </div>
-                <span className="font-bold text-lg tracking-tight text-gray-900">NEC Compliance</span>
+                <span className="font-bold text-lg tracking-tight text-gray-900">SparkPlan</span>
              </div>
              <p className="text-sm text-gray-500">The modern standard for electrical code compliance.</p>
           </div>
@@ -303,7 +303,7 @@ export const LandingPage: React.FC = () => {
         </div>
         
         <div className="max-w-7xl mx-auto mt-12 pt-8 border-t border-gray-200 text-center md:text-left flex flex-col md:flex-row justify-between text-sm text-gray-400">
-          <p>© {new Date().getFullYear()} NEC Compliance Inc. All rights reserved.</p>
+          <p>© {new Date().getFullYear()} SparkPlan Inc. All rights reserved.</p>
           <div className="flex gap-6 justify-center md:justify-end mt-4 md:mt-0">
              <a href="#" className="hover:text-gray-600">Privacy Policy</a>
              <a href="#" className="hover:text-gray-600">Terms of Service</a>
