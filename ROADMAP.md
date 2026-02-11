@@ -1,4 +1,4 @@
-# NEC Pro Compliance - Roadmap
+# SparkPlan - Roadmap
 
 ## Current Phase: 2.5 (Multi-Family EV) - COMPLETE
 

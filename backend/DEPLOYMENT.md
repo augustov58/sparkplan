@@ -1,6 +1,6 @@
 # Python Backend Deployment Guide
 
-This guide covers deploying the NEC Pro Compliance AI backend to Railway or Render.
+This guide covers deploying the SparkPlan AI backend to Railway or Render.
 
 ## Prerequisites
 
@@ -39,7 +39,7 @@ LOG_LEVEL=INFO
 
 **GOOGLE_API_KEY**: Google AI Studio → Get API Key → https://aistudio.google.com/app/apikey
 
-**ALLOWED_ORIGINS**: JSON array of allowed frontend URLs (e.g., `["https://nec-pro-compliance.vercel.app"]`)
+**ALLOWED_ORIGINS**: JSON array of allowed frontend URLs (e.g., `["https://sparkplan.vercel.app"]`)
 
 ---
 
@@ -88,7 +88,7 @@ In Railway Dashboard → Variables:
 ### Step 6: Verify Deployment
 ```bash
 curl https://your-app.railway.app/health
-# Should return: {"status":"healthy","message":"NEC Pro AI Backend is running"}
+# Should return: {"status":"healthy","message":"SparkPlan AI Backend is running"}
 ```
 
 ---
@@ -102,7 +102,7 @@ curl https://your-app.railway.app/health
 4. Select the `NEC-Compliance` repository
 
 ### Step 2: Configure Service
-**Name**: `nec-pro-backend`
+**Name**: `sparkplan-backend`
 
 **Branch**: `feature/agentic-pm-system`
 
@@ -131,12 +131,12 @@ In Render Dashboard → Environment:
 ### Step 4: Deploy
 - Click "Create Web Service"
 - Render will build and deploy automatically
-- Get your deployment URL: `https://nec-pro-backend.onrender.com`
+- Get your deployment URL: `https://sparkplan-backend.onrender.com`
 
 ### Step 5: Verify Deployment
 ```bash
-curl https://nec-pro-backend.onrender.com/health
-# Should return: {"status":"healthy","message":"NEC Pro AI Backend is running"}
+curl https://sparkplan-backend.onrender.com/health
+# Should return: {"status":"healthy","message":"SparkPlan AI Backend is running"}
 ```
 
 ---

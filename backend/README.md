@@ -1,4 +1,4 @@
-# NEC Pro Compliance - Python AI Backend
+# SparkPlan - Python AI Backend
 
 Pydantic AI-powered agent orchestration backend for electrical project management.
 

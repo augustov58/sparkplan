@@ -1,5 +1,5 @@
 # LLM Handoff Prompt
-## NEC Pro Compliance Codebase
+## SparkPlan Codebase
 
 **Purpose**: This document provides the optimal reading path for an LLM taking over this codebase.
 **Time Required**: 3-4 hours of focused reading
@@ -33,7 +33,7 @@
 
 **Time**: 4-6 hours, prone to calculation errors
 
-**With NEC Pro Compliance**:
+**With SparkPlan**:
 1. Create project → Set service parameters (480V, 3-phase)
 2. Use project template → "Office Building" auto-generates panels
 3. Add circuits → Software auto-calculates loads, sizes conductors, checks voltage drop
@@ -304,7 +304,7 @@ useLoads(projectId)        // Manages load entries
 - Errors in calculations cause inspection failures
 - Manual panel schedules in Excel are tedious
 
-**How He Uses NEC Pro Compliance**:
+**How He Uses SparkPlan**:
 1. Creates new project: "Johnson Residence, 3500 sq ft"
 2. Uses "Residential Home" template → Auto-generates 200A service, MDP, circuits
 3. Customizes circuits for specific needs (add EV charger, pool equipment)
@@ -319,7 +319,7 @@ useLoads(projectId)        // Manages load entries
 - Voltage drop calculations for long feeders
 - Short circuit analysis for equipment ratings
 
-**How She Uses NEC Pro Compliance**:
+**How She Uses SparkPlan**:
 1. Creates project: "Office Complex, 480V 3-phase service"
 2. Adds MDP (800A bus rating)
 3. Adds transformer (480V → 208V, 75kVA) fed from MDP

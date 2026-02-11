@@ -1,6 +1,6 @@
 # Changelog
 
-All notable changes to NEC Pro Compliance.
+All notable changes to SparkPlan.
 
 ---
 

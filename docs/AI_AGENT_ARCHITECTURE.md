@@ -2,7 +2,7 @@
 
 ## Executive Summary
 
-Your NEC Pro Compliance app uses a **two-tier AI architecture**:
+Your SparkPlan app uses a **two-tier AI architecture**:
 - **Python Backend** (Pydantic AI + FastAPI): 4 specialized AI agents with guaranteed structured outputs
 - **React Frontend**: Real-time UI that displays agent suggestions for user approval/rejection
 

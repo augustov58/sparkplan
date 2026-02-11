@@ -1,6 +1,6 @@
 # AI Agent Features - User Guide
 
-This guide explains how to use the three AI-powered features in NEC Pro Compliance: Change Impact Analyzer, RFI Drafter, and Photo Analyzer.
+This guide explains how to use the three AI-powered features in SparkPlan: Change Impact Analyzer, RFI Drafter, and Photo Analyzer.
 
 ---
 

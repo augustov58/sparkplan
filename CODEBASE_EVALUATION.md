@@ -1,7 +1,7 @@
 # Codebase Evaluation Report
 
 **Date:** December 16, 2025
-**Project:** NEC Compliance (NEC Pro)
+**Project:** NEC Compliance (SparkPlan)
 
 ## Executive Summary
 

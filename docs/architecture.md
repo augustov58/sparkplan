@@ -1,5 +1,5 @@
 # Software Architecture Documentation
-## NEC Pro Compliance Application
+## SparkPlan Application
 
 **Last Updated**: 2026-01-15
 **Version**: 1.0
@@ -22,7 +22,7 @@
 
 ## Overview
 
-NEC Pro Compliance is a **database-first SaaS application** built on Supabase PostgreSQL with real-time synchronization. The architecture prioritizes:
+SparkPlan is a **database-first SaaS application** built on Supabase PostgreSQL with real-time synchronization. The architecture prioritizes:
 
 1. **Data persistence** - All state lives in Supabase, not React
 2. **Real-time collaboration** - Changes sync across browser tabs via WebSocket subscriptions
@@ -276,7 +276,7 @@ useEffect(() => {
 
 ### Multi-Tab Synchronization
 
-**Scenario**: User has NEC Pro open in 2 browser tabs
+**Scenario**: User has SparkPlan open in 2 browser tabs
 
 **Flow**:
 1. **Tab 1**: User creates panel

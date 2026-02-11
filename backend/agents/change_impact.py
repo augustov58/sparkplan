@@ -4,7 +4,7 @@ Change Impact Analyzer Agent
 Analyzes the cascading impacts when users modify their electrical system.
 Example: "Add 3x 50A EV chargers" → Analyzes service capacity, feeders, panels, voltage drop, cost, timeline.
 
-This is the KILLER FEATURE that differentiates NEC Pro from competitors.
+This is the KILLER FEATURE that differentiates SparkPlan from competitors.
 """
 
 from pydantic_ai import Agent, RunContext

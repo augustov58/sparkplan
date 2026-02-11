@@ -8,7 +8,7 @@
 
 ## Problem Statement
 
-The NEC Pro Compliance software was allowing users to create dangerous and electrically invalid panel connections:
+The SparkPlan software was allowing users to create dangerous and electrically invalid panel connections:
 
 - **208V 3φ panel directly connected to 480V 3φ panel** (voltage mismatch without transformer)
 - **Single-phase panel fed from three-phase panel** (invalid phase conversion)

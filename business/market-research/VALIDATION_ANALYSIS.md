@@ -1,4 +1,4 @@
-# NEC Pro Compliance - Validation Analysis
+# SparkPlan - Validation Analysis
 
 **Created:** January 15, 2026
 **Last Updated:** February 9, 2026

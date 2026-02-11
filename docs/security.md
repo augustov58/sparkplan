@@ -1,5 +1,5 @@
 # Security Architecture
-## NEC Pro Compliance Application
+## SparkPlan Application
 
 **Last Updated**: 2025-12-03
 **Security Status**: ✅ **PRODUCTION-READY** (All critical security measures implemented)
@@ -650,7 +650,7 @@ const userInput = '<script>alert("XSS")</script>';
 ```typescript
 // Example: Vercel serverless function
 export default function handler(req, res) {
-  res.setHeader('Access-Control-Allow-Origin', 'https://nec-pro.app');
+  res.setHeader('Access-Control-Allow-Origin', 'https://sparkplan.io');
   res.setHeader('Access-Control-Allow-Methods', 'POST');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
 

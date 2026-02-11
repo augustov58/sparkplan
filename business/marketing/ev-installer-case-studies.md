@@ -1,6 +1,6 @@
 # EV Installer Case Studies: Real Scenarios, Better Solutions
 
-**Purpose:** Demonstrate how NEC Pro solves actual problems EV installers face daily
+**Purpose:** Demonstrate how SparkPlan solves actual problems EV installers face daily
 **Based on:** Research of contractor workflows, pain points, and NEC requirements
 
 ---
@@ -24,12 +24,12 @@ Sarah calls three EV installers she found on Google:
 **Installer B (Traditional Method):**
 "Let me schedule a site visit. I have openings next Tuesday."
 
-**Installer C (Using NEC Pro):**
+**Installer C (Using SparkPlan):**
 "Let me ask you a few quick questions..."
 
 ---
 
-### Installer C's Workflow (With NEC Pro)
+### Installer C's Workflow (With SparkPlan)
 
 **9:15 AM - Phone Call (5 minutes)**
 
@@ -41,13 +41,13 @@ Sarah calls three EV installers she found on Google:
 
 **Sarah:** "Gas furnace and water heater. Electric oven and dryer."
 
-**Installer C:** *Opens NEC Pro on phone, enters:*
+**Installer C:** *Opens SparkPlan on phone, enters:*
 - Service: 200A, 240V, 1-phase
 - Square footage: 2,400
 - Major appliances: Electric oven, electric dryer, gas HVAC
 - New load: Tesla Wall Connector (48A)
 
-**NEC Pro Result (15 seconds):**
+**SparkPlan Result (15 seconds):**
 ```
 ✅ No service upgrade needed
 Service capacity: 78% with EV charger
@@ -65,7 +65,7 @@ Estimated installation: $1,200-$1,500
 
 ### 9:20 AM - Quote Sent
 
-Installer C uses NEC Pro's Permit Packet Generator:
+Installer C uses SparkPlan's Permit Packet Generator:
 1. Click "Generate Permit Packet"
 2. Review auto-filled load calculation and circuit details
 3. Export PDF (includes one-line diagram, panel schedule, load calc)
@@ -95,7 +95,7 @@ Installer C uses NEC Pro's Permit Packet Generator:
 
 ### Results Comparison
 
-| Metric | Installer A (Traditional) | Installer B (Traditional) | Installer C (NEC Pro) |
+| Metric | Installer A (Traditional) | Installer B (Traditional) | Installer C (SparkPlan) |
 |--------|---------------------------|---------------------------|----------------------|
 | **Response time** | 5 days | Never quoted | 5 minutes |
 | **Time invested** | 3 hours | 1 hour (wasted) | 10 minutes |
@@ -147,11 +147,11 @@ Contractor visits home, sees 150A panel, estimates:
 
 ---
 
-### Better Approach: Using NEC Pro
+### Better Approach: Using SparkPlan
 
-**Monday - Initial Consultation (With NEC Pro)**
+**Monday - Initial Consultation (With SparkPlan)**
 
-**Contractor opens NEC Pro Service Upgrade Calculator:**
+**Contractor opens SparkPlan Service Upgrade Calculator:**
 
 **Inputs:**
 - Existing service: 150A, 240V, 1-phase
@@ -163,7 +163,7 @@ Contractor visits home, sees 150A panel, estimates:
   - Central A/C: 7 kW
   - Electric dryer: 5.5 kW
 
-**NEC Pro applies demand factors per NEC 220:**
+**SparkPlan applies demand factors per NEC 220:**
 - General lighting: (1,800 × 3) + 4,500 = 9,900 VA
 - Appliances with demand factor: First 10 kVA @ 100%, rest @ 40%
 - Total existing load: 128A
@@ -172,7 +172,7 @@ Contractor visits home, sees 150A panel, estimates:
 - Ford Charge Station Pro: 80A (continuous)
 - Must calculate at 125%: 80 × 1.25 = 100A
 
-**NEC Pro Result:**
+**SparkPlan Result:**
 ```
 ❌ Service upgrade required
 Current load: 128A (85% of 150A)
@@ -197,7 +197,7 @@ Which works better for your budget?"
 
 ### Results Comparison
 
-| Metric | Traditional Method | NEC Pro Method |
+| Metric | Traditional Method | SparkPlan Method |
 |--------|-------------------|----------------|
 | **Upfront honesty** | ❌ Underestimated | ✅ Accurate quote |
 | **Customer surprise** | ❌ Mid-job $3,500 change order | ✅ Options presented upfront |
@@ -206,7 +206,7 @@ Which works better for your budget?"
 
 **Time Saved:**
 - Traditional: 3 hours site visit + load calculation + return trip for upgrade discussion
-- NEC Pro: 30 minutes consultation, decision made on-site
+- SparkPlan: 30 minutes consultation, decision made on-site
 
 ---
 
@@ -233,11 +233,11 @@ Which works better for your budget?"
 
 ---
 
-### Better Approach: Circuit Sharing (With NEC Pro)
+### Better Approach: Circuit Sharing (With SparkPlan)
 
-**Contractor B uses NEC Pro + Circuit Sharing Calculator:**
+**Contractor B uses SparkPlan + Circuit Sharing Calculator:**
 
-**NEC Pro Analysis:**
+**SparkPlan Analysis:**
 ```
 Existing service: 100A
 Current usage: 82A (82%)
@@ -265,7 +265,7 @@ How often do you run your dryer at night while charging your car?"
 
 ### Results Comparison
 
-| Metric | Panel Upgrade (Contractor A) | Circuit Sharing (Contractor B + NEC Pro) |
+| Metric | Panel Upgrade (Contractor A) | Circuit Sharing (Contractor B + SparkPlan) |
 |--------|------------------------------|------------------------------------------|
 | **Cost to customer** | $5,400 | $1,850 |
 | **Installation time** | 2-3 days | 4 hours |
@@ -274,7 +274,7 @@ How often do you run your dryer at night while charging your car?"
 | **Customer satisfaction** | Lost sale | ✅ Happy customer |
 | **Contractor profit** | $0 | $850 profit |
 
-**NEC Pro Advantage:**
+**SparkPlan Advantage:**
 - Circuit Sharing Calculator showed the solution automatically
 - Contractor differentiated from competitors (no one else offered this option)
 - Won job that Contractor A lost
@@ -339,11 +339,11 @@ How often do you run your dryer at night while charging your car?"
 
 ---
 
-### NEC Pro Method: 10 Minutes
+### SparkPlan Method: 10 Minutes
 
 **Tuesday 2:00 PM - Contractor B Timeline:**
 
-1. **Open existing project in NEC Pro** (30 seconds)
+1. **Open existing project in SparkPlan** (30 seconds)
    - Already has customer's panel data from initial quote
 
 2. **Add EV charger circuit** (2 minutes)
@@ -384,16 +384,16 @@ How often do you run your dryer at night while charging your car?"
 - Time on paperwork: 5.25 hours
 - **Lost revenue opportunity:** $656.25
 
-**Contractor B (NEC Pro Method):**
+**Contractor B (SparkPlan Method):**
 - Time on paperwork: 10 minutes
 - **Time reclaimed:** 5 hours, 5 minutes
 - **Additional revenue:** $631.25 (worked on other jobs)
 
 **Annual Impact (50 EV charger jobs/year):**
 - Traditional method: 262.5 hours on paperwork = **$32,812 lost opportunity**
-- NEC Pro method: 8.3 hours on paperwork = **$31,775 reclaimed**
+- SparkPlan method: 8.3 hours on paperwork = **$31,775 reclaimed**
 
-**ROI on NEC Pro:**
+**ROI on SparkPlan:**
 - Cost: $49/month × 12 = $588/year
 - Value: $31,775 reclaimed revenue
 - **ROI: 54:1**
@@ -425,7 +425,7 @@ How often do you run your dryer at night while charging your car?"
 
 ### Better Solution: EVEMS (Electric Vehicle Energy Management System)
 
-**Contractor uses NEC Pro EVEMS Calculator:**
+**Contractor uses SparkPlan EVEMS Calculator:**
 
 **Inputs:**
 - Existing service: 400A, 208V, 3-phase
@@ -433,7 +433,7 @@ How often do you run your dryer at night while charging your car?"
 - Available capacity for EVEMS: 80A (400A - 320A)
 - Desired chargers: 12 × 40A Level 2 chargers
 
-**NEC Pro EVEMS Analysis (per NEC 625.42):**
+**SparkPlan EVEMS Analysis (per NEC 625.42):**
 
 ```
 WITHOUT Load Management:
@@ -501,20 +501,20 @@ WITH EVEMS Load Management:
 
 ---
 
-### NEC Pro Advantage
+### SparkPlan Advantage
 
-**Without NEC Pro:**
+**Without SparkPlan:**
 - Contractor calculates 480A needed, quotes $60k upgrade
 - Loses job (too expensive)
 - Revenue: $0
 
-**With NEC Pro EVEMS Calculator:**
+**With SparkPlan EVEMS Calculator:**
 - Contractor finds EVEMS solution automatically
 - Differentiates from competitors (no one else offered this)
 - Revenue: $18,000 installation + $2,400/year maintenance contract = **$20,400 first year**
 
-**NEC Pro ROI for this single job:**
-- NEC Pro cost: $49/month = $588/year
+**SparkPlan ROI for this single job:**
+- SparkPlan cost: $49/month = $588/year
 - Revenue from EVEMS solution: $20,400
 - **ROI: 35:1** (from one job)
 
@@ -522,7 +522,7 @@ WITH EVEMS Load Management:
 
 ## Summary: Value Delivered Across Case Studies
 
-| Case Study | Customer Problem | Traditional Outcome | NEC Pro Outcome | Revenue Impact |
+| Case Study | Customer Problem | Traditional Outcome | SparkPlan Outcome | Revenue Impact |
 |------------|------------------|---------------------|-----------------|----------------|
 | **#1: Phone Quote Race** | 3 contractors competing | Lost to faster competitor | Won job in 5 minutes | +$1,350 |
 | **#2: Service Upgrade Surprise** | Mid-job discovery of needed upgrade | Angry customer, negative review | Honest quote upfront, circuit sharing option | +$2,400 |
@@ -531,7 +531,7 @@ WITH EVEMS Load Management:
 | **#5: Apartment EVEMS** | $60k service upgrade unaffordable | Lost job | $18k EVEMS solution | +$20,400 |
 | **Total Annual Impact** | - | **$0-32,000 lost** | **$57,775+ gained** | **+$57,775** |
 
-**NEC Pro Annual Cost:** $588/year (Pro tier)
+**SparkPlan Annual Cost:** $588/year (Pro tier)
 **Annual Value:** $57,775+ in additional revenue
 **ROI: 98:1**
 

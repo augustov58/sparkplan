@@ -258,9 +258,9 @@ Level 3: Organic Dentists (super niche, YOU'RE THE ONLY ONE)
 
 ---
 
-## Application to NEC Pro Compliance
+## Application to SparkPlan
 
-This video reinforces several strategic decisions in the NEC Pro Compliance project:
+This video reinforces several strategic decisions in the SparkPlan project:
 
 1. **Niche Focus**: Targeting electrical contractors (not all construction) = smaller but captive market
 2. **Breakage Found**: Manual NEC compliance calculations waste time and risk code violations = real money lost

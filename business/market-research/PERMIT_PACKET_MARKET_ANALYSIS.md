@@ -648,9 +648,9 @@ From the seeded jurisdiction requirements for Miami, Miami-Dade County, FL:
 
 ### Competitive Positioning Statement:
 
-> **"For residential electricians and small contractors who need professional permit documents fast, NEC Pro Compliance is the only cloud-based electrical design tool that generates NEC-compliant load calculations, panel schedules, and jurisdiction checklists in minutes - without expensive engineering drawings or complex desktop software."**
+> **"For residential electricians and small contractors who need professional permit documents fast, SparkPlan is the only cloud-based electrical design tool that generates NEC-compliant load calculations, panel schedules, and jurisdiction checklists in minutes - without expensive engineering drawings or complex desktop software."**
 
-**Unlike** ETAP and SKM (industrial-focused, $10,000/year), **NEC Pro is** built for field electricians doing residential and small commercial work, priced at $49/month with AI-powered validation.
+**Unlike** ETAP and SKM (industrial-focused, $10,000/year), **SparkPlan is** built for field electricians doing residential and small commercial work, priced at $49/month with AI-powered validation.
 
 ---
 
@@ -798,6 +798,6 @@ The **Jurisdiction Requirements + Permit Packet Generator** feature solves a mas
 
 The residential electrical software market is **completely ignored** by big players (ETAP, SKM, EasyPower) because their business models and technical debt prevent them from going down-market. This creates a **once-in-a-decade opportunity** to own a $50M+/year market with minimal competition.
 
-**The jurisdiction feature was the final piece** - it transformed NEC Pro from "another electrical calculator" into a **complete permit package solution** that electricians can submit directly to building departments without engineering drawings.
+**The jurisdiction feature was the final piece** - it transformed SparkPlan from "another electrical calculator" into a **complete permit package solution** that electricians can submit directly to building departments without engineering drawings.
 
 Time to go to market. 🔥

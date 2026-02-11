@@ -245,7 +245,7 @@
 
 ### EV-Specific Tools (Different Problem)
 
-| Tool | Focus | Overlap with NEC Pro? |
+| Tool | Focus | Overlap with SparkPlan? |
 |------|-------|-----------------------|
 | ChargeLab | Charger network management | No — operations |
 | Ampcontrol | Fleet management/simulation | No — grid planning |

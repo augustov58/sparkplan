@@ -1,14 +1,14 @@
 # Agent Consultation Reports
 
 **Date:** December 1, 2025
-**Project:** NEC Pro Compliance
+**Project:** SparkPlan
 **Purpose:** Evaluate current state and plan next development phase
 
 ---
 
 ## Summary
 
-Two specialized agents were consulted to determine the most impactful next steps for the NEC Pro Compliance application:
+Two specialized agents were consulted to determine the most impactful next steps for the SparkPlan application:
 
 1. **electrical-engineering-advisor**: Evaluated the application from a practitioner's perspective (PE/journeyman electrician/contractor)
 2. **software-engineering-planner**: Created detailed implementation plans for the top 3 priority features
@@ -40,7 +40,7 @@ Two specialized agents were consulted to determine the most impactful next steps
 
 ## Evaluation Request:
 
-> You are reviewing the NEC Pro Compliance software application for electrical contractors and engineers. Here's what has been implemented so far:
+> You are reviewing the SparkPlan software application for electrical contractors and engineers. Here's what has been implemented so far:
 >
 > **Currently Implemented Features:**
 > - Database & Infrastructure (Supabase, authentication, real-time sync)
@@ -422,7 +422,7 @@ You're on the right track. Build feeders, EGC, and PDF export, and you'll have a
 
 ## Planning Request:
 
-> You are a software engineering planner working on the NEC Pro Compliance application (React + TypeScript + Supabase). The electrical engineering advisor has identified the top 3 features needed for professional adoption:
+> You are a software engineering planner working on the SparkPlan application (React + TypeScript + Supabase). The electrical engineering advisor has identified the top 3 features needed for professional adoption:
 >
 > 1. Feeder Sizing Calculator (NEC Article 215) - 16-20 hours
 > 2. Equipment Grounding Conductor Sizing (NEC Table 250.122) - 8-10 hours

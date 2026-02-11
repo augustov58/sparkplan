@@ -1,5 +1,5 @@
 # Database Architecture
-## NEC Pro Compliance Application
+## SparkPlan Application
 
 **Last Updated**: 2025-12-03
 **Database**: Supabase PostgreSQL 15

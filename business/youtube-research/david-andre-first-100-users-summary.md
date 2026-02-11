@@ -421,7 +421,7 @@ Once you master micro influencers:
 
 ---
 
-## Application to NEC Pro Compliance
+## Application to SparkPlan
 
 ### Target Avatar
 **Primary**: EV charging installers, solar integrators, electrical contractors doing commercial/multi-family projects
@@ -477,7 +477,7 @@ Once you master micro influencers:
   - "Voltage drop calculator for long runs"
   - "Arc flash calculator for low voltage"
 - **Comparison pages**:
-  - "ETAP vs SKM vs EasyPower vs NEC Pro Compliance"
+  - "ETAP vs SKM vs EasyPower vs SparkPlan"
   - "Best electrical design software for small contractors"
 - **Use Claude** for writing assistance (not GPT)
 

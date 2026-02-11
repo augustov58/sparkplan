@@ -44,7 +44,7 @@ Screenshot of Service Upgrade Calculator showing:
 | Customer calls 3 other installers while you're calculating | Customer thinks you don't know what you're doing | Customer angry, threatens 1-star review |
 
 ### Transition Statement
-**"There's a better way. NEC Pro gives you the answer before you hang up the phone."**
+**"There's a better way. SparkPlan gives you the answer before you hang up the phone."**
 
 ---
 
@@ -56,14 +56,14 @@ Screenshot of Service Upgrade Calculator showing:
 ### 4 Outcome-Focused Benefits
 
 #### 1. Quote Jobs in 60 Seconds ⚡
-**Before NEC Pro:**
+**Before SparkPlan:**
 - Drive to customer's house (30 min)
 - Check panel label (10 min)
 - Manually calculate load (90 min)
 - Research conductor sizing (30 min)
 - Total: **2.5 hours**
 
-**With NEC Pro:**
+**With SparkPlan:**
 - Ask customer 3 questions over the phone
 - Enter into Service Upgrade Calculator
 - Get instant answer with panel schedule
@@ -80,7 +80,7 @@ Screenshot of Service Upgrade Calculator showing:
 - Competitor quotes over the phone Monday afternoon
 - Customer books competitor **before you even show up**
 
-**With NEC Pro:**
+**With SparkPlan:**
 - Customer calls Monday morning
 - You quote over the phone in 5 minutes
 - Email quote with professional permit packet
@@ -98,7 +98,7 @@ Screenshot of Service Upgrade Calculator showing:
 - Tell customer it's now $6,200
 - Customer refuses, threatens to sue
 
-**With NEC Pro:**
+**With SparkPlan:**
 - Service Upgrade Calculator flags upgrade needed
 - Quote includes service upgrade upfront
 - No surprises on installation day
@@ -276,7 +276,7 @@ Screenshot of Service Upgrade Calculator showing:
 > *25 EV charger installs/month*
 
 **Testimonial 2: Change Order Reduction**
-> "Before NEC Pro, I had 2-3 change orders per month from undersized services. Now? Zero. The Service Upgrade Calculator catches everything upfront."
+> "Before SparkPlan, I had 2-3 change orders per month from undersized services. Now? Zero. The Service Upgrade Calculator catches everything upfront."
 >
 > **— Jennifer Lee, Green Energy Installs (Austin, TX)**
 > *15 EV charger installs/month*
@@ -292,7 +292,7 @@ Screenshot of Service Upgrade Calculator showing:
 ## ❓ FAQ Section
 
 ### "Does this work for commercial EV charging installations?"
-**Yes.** NEC Pro supports both residential (Level 2) and commercial (DC Fast Charging) installations. The Business tier ($149/mo) includes arc flash analysis required for commercial projects over 400A.
+**Yes.** SparkPlan supports both residential (Level 2) and commercial (DC Fast Charging) installations. The Business tier ($149/mo) includes arc flash analysis required for commercial projects over 400A.
 
 ### "What if my customer has a unique service configuration?"
 **No problem.** The Service Upgrade Calculator supports:
@@ -303,7 +303,7 @@ Screenshot of Service Upgrade Calculator showing:
 - Existing solar + battery storage systems
 
 ### "Do I need to be an electrical engineer to use this?"
-**No.** NEC Pro is built for electricians and contractors, not engineers. If you can read a panel label, you can use the Service Upgrade Calculator. We provide load templates for common equipment (Tesla Wall Connector, ChargePoint, etc.).
+**No.** SparkPlan is built for electricians and contractors, not engineers. If you can read a panel label, you can use the Service Upgrade Calculator. We provide load templates for common equipment (Tesla Wall Connector, ChargePoint, etc.).
 
 ### "What jurisdictions are supported?"
 **Currently:** California (San Diego, Los Angeles, San Francisco), Texas (Houston, Dallas, Austin), Florida (Miami, Tampa, Orlando)
@@ -395,10 +395,10 @@ No credit card required. 3 free permits to try it out. Upgrade anytime.
 ## 🔍 SEO Metadata
 
 ### Title Tag
-"EV Charger Service Upgrade Calculator | Quote Jobs in 60 Seconds | NEC Pro"
+"EV Charger Service Upgrade Calculator | Quote Jobs in 60 Seconds | SparkPlan"
 
 ### Meta Description
-"Stop guessing if customers need a service upgrade. NEC Pro's Service Upgrade Calculator gives you NEC 220.87 compliant answers in 60 seconds. Try free - no credit card required."
+"Stop guessing if customers need a service upgrade. SparkPlan's Service Upgrade Calculator gives you NEC 220.87 compliant answers in 60 seconds. Try free - no credit card required."
 
 ### Target Keywords
 - Primary: "EV charger service upgrade calculator"
@@ -435,7 +435,7 @@ No credit card required. 3 free permits to try it out. Upgrade anytime.
 ## 📧 Follow-Up Email Sequence (Post-Signup)
 
 ### Email 1: Welcome (Immediate)
-**Subject:** "Your NEC Pro account is ready - try Service Upgrade Calculator"
+**Subject:** "Your SparkPlan account is ready - try Service Upgrade Calculator"
 
 **Body:**
 - Quick start guide (3 steps)

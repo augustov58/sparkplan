@@ -217,7 +217,7 @@ Miss one loop, and the others become ineffective.
 
 ---
 
-## Application to NEC Pro Compliance
+## Application to SparkPlan
 
 ### Loop 1: Balance Analysis
 
@@ -243,7 +243,7 @@ Miss one loop, and the others become ineffective.
 - **Opportunity**: Increase to daily feature shipping
 
 **Dog-fooding Opportunity**:
-- Use NEC Pro for our own project electrical planning
+- Use SparkPlan for our own project electrical planning
 - Document our own pain points
 
 **Foundation Model Risk**:

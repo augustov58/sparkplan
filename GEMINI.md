@@ -1,10 +1,10 @@
 # GEMINI.md: AI Assistant Context
 
-This document provides essential context about the NEC Pro Compliance project for AI assistants.
+This document provides essential context about the SparkPlan project for AI assistants.
 
 ## Project Overview
 
-**NEC Pro Compliance** is a database-first, real-time, single-page SaaS application designed for electrical engineers and electricians to manage and validate electrical system designs against the National Electrical Code (NEC).
+**SparkPlan** is a database-first, real-time, single-page SaaS application designed for electrical engineers and electricians to manage and validate electrical system designs against the National Electrical Code (NEC).
 
 The application is built with a modern web stack, prioritizing data integrity, real-time collaboration, and a reactive user experience.
 

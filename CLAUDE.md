@@ -2,7 +2,7 @@
 
 ## Project Overview
 
-**NEC Pro Compliance**: SaaS dashboard for electrical contractors. Modern alternative to ETAP/SKM ($15-50k/yr). React + TypeScript + Supabase + Gemini AI.
+**SparkPlan**: SaaS dashboard for electrical contractors. Modern alternative to ETAP/SKM ($15-50k/yr). React + TypeScript + Supabase + Gemini AI.
 
 **Roadmap**: See [ROADMAP.md](./ROADMAP.md) for current phase and feature list.
 

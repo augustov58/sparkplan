@@ -43,7 +43,7 @@
 - **70% less code:** Framework handles orchestration, retries, memory
 - **Better AI capabilities:** Multi-turn reasoning, dependency injection
 
-### Key Benefits for NEC Pro Compliance
+### Key Benefits for SparkPlan
 
 | Feature | TypeScript | Pydantic AI | Impact |
 |---------|-----------|-------------|--------|

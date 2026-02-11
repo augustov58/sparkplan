@@ -222,15 +222,15 @@ For physical products: Turn off the order form for a day. If people aren't pound
 
 ---
 
-## Application to NEC Pro Compliance
+## Application to SparkPlan
 
 ### Current PMF Assessment
 
-| Checklist Item | NEC Pro Status | Action Required |
+| Checklist Item | SparkPlan Status | Action Required |
 |----------------|----------------|-----------------|
 | **1. Results 100% of time** | Partially met - calculations work, but need validation with real contractors | Get 20-50 beta users, track if they successfully complete permit packets |
 | **2. Market big enough** | YES - Electrical contractors, EV installers, solar integrators = massive market | Continue targeting EV niche for initial focus |
-| **3. Problem big enough** | YES - Desktop tools cost $15-50K/yr, permit delays cost thousands | Validate: Would users "freak out" if NEC Pro went offline? |
+| **3. Problem big enough** | YES - Desktop tools cost $15-50K/yr, permit delays cost thousands | Validate: Would users "freak out" if SparkPlan went offline? |
 | **4. Value in 2 minutes** | NEEDS WORK - Onboarding could be faster | Build "instant value" demo - input service size, get panel schedule in 30 seconds |
 | **5. Telling friends** | NOT YET - No distribution mechanism | Add: Share permit packet feature, affiliate program, contractor community |
 
@@ -253,10 +253,10 @@ Value in under 60 seconds
 - Use visual guides, not text
 - Auto-fill example data
 - Show value BEFORE asking for project details
-- Consider: "See what NEC Pro can do" demo mode
+- Consider: "See what SparkPlan can do" demo mode
 
 #### 4. Add Distribution Mechanisms
-- **Permit Packet Sharing**: "Generated with NEC Pro" footer on PDFs
+- **Permit Packet Sharing**: "Generated with SparkPlan" footer on PDFs
 - **Contractor Referral Program**: Discount for referrals
 - **AHJ Integration**: Partner with jurisdictions to recommend tool
 
@@ -266,9 +266,9 @@ Per Becker's advice: Don't try to serve everyone. Current best niche:
 - Specific pain point: Load calculations for EVEMS
 - Measurable result: Permits approved first time
 
-### The NEC Pro "Freak Out" Test
+### The SparkPlan "Freak Out" Test
 
-Ask: If we turned off NEC Pro for a contractor mid-project, would they:
+Ask: If we turned off SparkPlan for a contractor mid-project, would they:
 - [ ] Not notice for days (BAD - no PMF)
 - [ ] Be mildly annoyed (OKAY - getting there)
 - [ ] Immediately call support panicking (GOOD - PMF achieved)
@@ -292,4 +292,4 @@ Only after achieving all 5 should you consider mass marketing. This explains why
 ---
 
 *Summary created: January 15, 2026*
-*For: NEC Pro Compliance project strategic planning*
+*For: SparkPlan project strategic planning*

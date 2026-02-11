@@ -148,7 +148,7 @@ function App() {
 **URL examples**:
 ```
 Development:  http://localhost:3000/#/project/abc123/circuits
-Production:   https://nec-pro.app/#/project/abc123/circuits
+Production:   https://sparkplan.io/#/project/abc123/circuits
 ```
 
 **Navigation using React Router**:
@@ -161,7 +161,7 @@ navigate('/project/abc123/circuits');  // Becomes /#/project/abc123/circuits
 
 **External links** (from email, Slack, etc.):
 ```html
-<a href="https://nec-pro.app/#/project/abc123/circuits">View circuits</a>
+<a href="https://sparkplan.io/#/project/abc123/circuits">View circuits</a>
 ```
 
 ---

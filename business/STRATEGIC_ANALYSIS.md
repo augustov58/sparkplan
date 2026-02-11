@@ -1,4 +1,4 @@
-# NEC Pro Compliance - Strategic Analysis
+# SparkPlan - Strategic Analysis
 
 **Last Updated:** February 9, 2026
 **Review Cadence:** Monthly (see [Document Maintenance](#document-maintenance))
@@ -12,7 +12,7 @@
 
 Multi-family EV charging is the highest-pain, highest-willingness-to-pay niche in the electrical contracting market. Contractors are turning down $10,000-$50,000 jobs because they cannot produce the NEC 220.84 calculations inspectors require. Engineering firms charge $2-10K per project. No affordable software exists to bridge this gap.
 
-**NEC Pro Compliance** automates these calculations at $49-149/mo — a 40x+ ROI on the first project.
+**SparkPlan** automates these calculations at $49-149/mo — a 40x+ ROI on the first project.
 
 ### What We Know vs What We Assume
 
@@ -239,7 +239,7 @@ Two paths for determining existing building demand:
 
 ### Price Anchoring
 
-| Alternative | Cost | NEC Pro Savings |
+| Alternative | Cost | SparkPlan Savings |
 |-------------|------|----------------|
 | Engineering firm (per project) | $2,000-$10,000 | 40x+ ROI on first project |
 | PE stamp (per project) | $150-$1,500 | 3-30x savings per project |

@@ -1,6 +1,6 @@
 # Architecture Decision Records (ADRs)
 
-This directory contains Architecture Decision Records for the NEC Pro Compliance application. ADRs document significant architectural decisions made during development, including context, alternatives considered, and consequences.
+This directory contains Architecture Decision Records for the SparkPlan application. ADRs document significant architectural decisions made during development, including context, alternatives considered, and consequences.
 
 ---
 

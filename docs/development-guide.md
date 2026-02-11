@@ -1,5 +1,5 @@
 # Development Guide
-## NEC Pro Compliance Application
+## SparkPlan Application
 
 **Last Updated**: 2026-01-15
 **For**: Developers, LLMs continuing development

@@ -9,7 +9,7 @@
 
 ## Executive Summary
 
-This specification outlines the enhancement of the NEC Pro Compliance AI chatbot from a stateless Q&A system to an intelligent, context-aware copilot with conversation memory, agentic actions, and RAG-powered NEC knowledge retrieval.
+This specification outlines the enhancement of the SparkPlan AI chatbot from a stateless Q&A system to an intelligent, context-aware copilot with conversation memory, agentic actions, and RAG-powered NEC knowledge retrieval.
 
 ---
 

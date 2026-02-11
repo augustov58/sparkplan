@@ -1,4 +1,4 @@
-# NEC Pro Compliance
+# SparkPlan
 
 **Professional electrical compliance platform with AI-powered project management**
 
