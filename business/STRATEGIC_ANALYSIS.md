@@ -360,6 +360,7 @@ California has the strictest EV-ready mandates (100% of MF parking by 2026) and 
 | SaaS Growth Strategy | [saas-growth-strategy.md](saas-growth-strategy.md) | Bootstrapping principles, scaling framework |
 | Marketing Materials | [marketing/](marketing/) | Landing pages, case study templates, ad copy |
 | YouTube Research | [youtube-research/](youtube-research/) | SaaS strategy summaries (Becker, Andre) |
+| Distribution Playbook | [DISTRIBUTION_PLAYBOOK.md](DISTRIBUTION_PLAYBOOK.md) | Channel strategy, execution sequence, tracking |
 | Product Roadmap | [../ROADMAP.md](../ROADMAP.md) | Development phases and feature tracking |
 
 ---
