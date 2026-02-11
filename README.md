@@ -205,7 +205,7 @@ npm test
 - **[CLAUDE.md](/CLAUDE.md)** - Complete development guide for AI assistants
 - **[AI Agent Architecture](/docs/AI_AGENT_ARCHITECTURE.md)** - Dual AI system explained
 - **[Backend Deployment](/backend/DEPLOYMENT.md)** - Railway deployment guide
-- **[Strategic Analysis](/STRATEGIC_ANALYSIS.md)** - Market positioning & roadmap
+- **[Strategic Analysis](/business/STRATEGIC_ANALYSIS.md)** - Market positioning & roadmap
 
 ---
 
