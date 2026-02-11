@@ -51,7 +51,7 @@ export function Login({ onSuccess }: LoginProps) {
               <div className="w-10 h-10 bg-electric rounded-lg flex items-center justify-center">
                 <span className="text-2xl">⚡</span>
               </div>
-              <span className="text-2xl font-bold text-slate-800">NEC Pro</span>
+              <span className="text-2xl font-bold text-slate-800">SparkPlan</span>
             </div>
             <h2 className="text-xl text-slate-600">Sign in to your account</h2>
           </div>

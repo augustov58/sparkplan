@@ -148,7 +148,7 @@ export const toastMessages = {
   auth: {
     signedIn: 'Welcome back!',
     signedOut: 'Signed out successfully',
-    signUp: 'Account created! Welcome to NEC Pro',
+    signUp: 'Account created! Welcome to SparkPlan',
     error: 'Authentication failed',
   },
 

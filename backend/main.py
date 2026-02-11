@@ -12,7 +12,7 @@ logger = logging.getLogger(__name__)
 
 # Create FastAPI app
 app = FastAPI(
-    title="NEC Pro Compliance - AI Agent API",
+    title="SparkPlan - AI Agent API",
     description="Pydantic AI-powered agent orchestration for electrical project management",
     version="1.0.0"
 )
@@ -32,7 +32,7 @@ async def root():
     """Health check endpoint"""
     return {
         "status": "online",
-        "service": "NEC Pro Compliance AI Agent API",
+        "service": "SparkPlan AI Agent API",
         "environment": settings.environment
     }
 

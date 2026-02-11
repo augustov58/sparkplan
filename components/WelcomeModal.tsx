@@ -18,13 +18,13 @@ export const WelcomeModal: React.FC<WelcomeModalProps> = ({ onClose, onCreatePro
 
   const steps = [
     {
-      title: 'Welcome to NEC Pro Compliance',
+      title: 'Welcome to SparkPlan',
       icon: <Zap className="w-12 h-12 text-electric-500" />,
       description: 'Your professional electrical design and compliance platform powered by AI.',
       content: (
         <div className="space-y-4">
           <p className="text-gray-600">
-            NEC Pro helps electrical contractors and engineers design safe, compliant electrical systems with:
+            SparkPlan helps electrical contractors and engineers design safe, compliant electrical systems with:
           </p>
           <ul className="space-y-3">
             <li className="flex items-start gap-3">
@@ -226,7 +226,7 @@ export const WelcomeModal: React.FC<WelcomeModalProps> = ({ onClose, onCreatePro
             <div className="w-10 h-10 bg-electric-500 rounded flex items-center justify-center">
               <Zap className="text-white w-6 h-6 fill-current" />
             </div>
-            <h2 className="text-lg font-bold text-gray-900">NEC PRO</h2>
+            <h2 className="text-lg font-bold text-gray-900">SPARKPLAN</h2>
           </div>
           <button
             onClick={onClose}

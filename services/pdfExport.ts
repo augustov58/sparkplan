@@ -150,7 +150,7 @@ ${result.notes.map(note => `• ${note}`).join('\n')}
 ` : ''}
 
 ═══════════════════════════════════════════════════════════════════════
-Report generated with NEC Pro Compliance
+Report generated with SparkPlan
 Generated: ${new Date().toLocaleString()}
 ═══════════════════════════════════════════════════════════════════════
 `.trim();
