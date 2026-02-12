@@ -30,13 +30,13 @@ export interface Subscription {
   updated_at: string;
 }
 
-// Plan limits
-export const PLAN_LIMITS: Record<SubscriptionPlan, { permits: number; projects: number }> = {
-  free: { permits: 0, projects: 3 },  // Free tier: no permits, explore only
-  starter: { permits: 10, projects: 10 },
-  pro: { permits: Infinity, projects: Infinity },
-  business: { permits: Infinity, projects: Infinity },
-  enterprise: { permits: Infinity, projects: Infinity },
+// Plan limits (permits unlimited for all paid tiers — limit by projects, not generations)
+export const PLAN_LIMITS: Record<SubscriptionPlan, { projects: number }> = {
+  free: { projects: 3 },
+  starter: { projects: 10 },
+  pro: { projects: Infinity },
+  business: { projects: Infinity },
+  enterprise: { projects: Infinity },
 };
 
 // Plan features (for display - short list)
@@ -48,7 +48,7 @@ export const PLAN_FEATURES: Record<SubscriptionPlan, string[]> = {
     '3 projects max',
   ],
   starter: [
-    '10 permits/month',
+    'Unlimited permits per project',
     '10 projects',
     'All residential calculators',
     'Panel schedules & diagrams',
@@ -56,18 +56,20 @@ export const PLAN_FEATURES: Record<SubscriptionPlan, string[]> = {
     'Jurisdiction Wizard',
   ],
   pro: [
-    'Unlimited permits & projects',
+    'Unlimited projects',
     'Everything in Starter',
-    'AI Inspector Mode',
     'Service Upgrade Wizard',
     'EVEMS Calculator',
-    'Priority support',
+    'EV Panel Templates',
+    'Priority email support',
   ],
   business: [
     'Everything in Pro',
+    'AI Copilot Chatbot',
+    'AI Inspector Mode',
+    'AI Pre-Inspection Checklist',
     'Project Management Suite',
-    'Arc Flash Calculator',
-    'Advanced Short Circuit',
+    'Arc Flash & Advanced SC',
     'Team collaboration (5 users)',
   ],
   enterprise: [
@@ -111,19 +113,22 @@ export const FEATURE_ACCESS: Record<string, SubscriptionPlan[]> = {
   'jurisdiction-wizard': ['starter', 'pro', 'business', 'enterprise'],
 
   // ═══════════════════════════════════════════════════════════════
-  // PRO TIER ($49) - Primary target: EV installers
+  // PRO TIER ($49) - EV installers & unlimited projects
   // ═══════════════════════════════════════════════════════════════
-  'ai-inspector': ['pro', 'business', 'enterprise'],
   'service-upgrade-wizard': ['pro', 'business', 'enterprise'],
   'evems-calculator': ['pro', 'business', 'enterprise'],
   'ev-panel-templates': ['pro', 'business', 'enterprise'],
-  'unlimited-permits': ['pro', 'business', 'enterprise'],
   'unlimited-projects': ['pro', 'business', 'enterprise'],
-  'pre-inspection-check': ['pro', 'business', 'enterprise'],
 
   // ═══════════════════════════════════════════════════════════════
-  // BUSINESS TIER ($149) - Teams & commercial
+  // BUSINESS TIER ($149) - AI suite, teams & commercial
   // ═══════════════════════════════════════════════════════════════
+  // AI features (consolidated here — highest-cost backend features)
+  'ai-copilot': ['business', 'enterprise'],
+  'ai-inspector': ['business', 'enterprise'],
+  'pre-inspection-check': ['business', 'enterprise'],
+  'change-impact': ['business', 'enterprise'],
+
   // Project Management Suite
   'rfi-tracking': ['business', 'enterprise'],
   'site-visits': ['business', 'enterprise'],
@@ -153,8 +158,8 @@ export const FEATURE_COMPARISON: { category: string; features: { name: string; f
   {
     category: 'Core Limits',
     features: [
-      { name: 'Permits per month', free: '0', starter: '10', pro: 'Unlimited', business: 'Unlimited' },
       { name: 'Projects', free: '3', starter: '10', pro: 'Unlimited', business: 'Unlimited' },
+      { name: 'Permit Generation', free: false, starter: 'Unlimited', pro: 'Unlimited', business: 'Unlimited' },
     ]
   },
   {
@@ -188,8 +193,15 @@ export const FEATURE_COMPARISON: { category: string; features: { name: string; f
     features: [
       { name: 'Permit Packet Generator', free: false, starter: true, pro: true, business: true },
       { name: 'Jurisdiction Wizard', free: false, starter: true, pro: true, business: true },
-      { name: 'AI Inspector Mode', free: false, starter: false, pro: true, business: true },
-      { name: 'Pre-Inspection Checklist', free: false, starter: false, pro: true, business: true },
+    ]
+  },
+  {
+    category: 'AI Suite',
+    features: [
+      { name: 'AI Copilot Chatbot', free: false, starter: false, pro: false, business: true },
+      { name: 'AI Inspector Mode', free: false, starter: false, pro: false, business: true },
+      { name: 'AI Pre-Inspection Checklist', free: false, starter: false, pro: false, business: true },
+      { name: 'Change Impact Analyzer', free: false, starter: false, pro: false, business: true },
     ]
   },
   {
@@ -207,7 +219,7 @@ export const FEATURE_COMPARISON: { category: string; features: { name: string; f
       { name: 'Team Members', free: '1', starter: '1', pro: '1', business: '5' },
       { name: 'Custom Report Branding', free: false, starter: false, pro: false, business: true },
       { name: 'Team Collaboration', free: false, starter: false, pro: false, business: 'Coming Soon' },
-      { name: 'Support', free: 'Community', starter: 'Email', pro: 'Priority Email', business: 'Phone + Email' },
+      { name: 'Support', free: 'Community', starter: 'Email', pro: 'Priority Email', business: 'Priority Chat + Email' },
     ]
   },
 ];
@@ -230,8 +242,10 @@ export interface UseSubscriptionReturn {
   isTrial: boolean;
   isTrialExpired: boolean;
   daysUntilTrialEnd: number | null;
+  /** @deprecated Permits are now unlimited per project. Always returns Infinity. */
   permitsRemaining: number;
   projectsRemaining: number;
+  /** @deprecated Permits are now unlimited per project. Always returns true. */
   canCreatePermit: boolean;
   canCreateProject: boolean;
   hasFeature: (feature: string) => boolean;
@@ -351,16 +365,15 @@ export function useSubscription(): UseSubscriptionReturn {
 
   const isActive = (subscription?.status === 'active' || subscription?.status === 'trialing') && !isTrialExpired;
 
-  // Calculate remaining permits and projects based on effective plan
+  // Calculate remaining projects based on effective plan
   const limits = PLAN_LIMITS[effectivePlan];
-  const permitsRemaining = limits.permits === Infinity
-    ? Infinity
-    : Math.max(0, limits.permits - (subscription?.permits_used_this_month || 0));
   const projectsRemaining = limits.projects === Infinity
     ? Infinity
     : Math.max(0, limits.projects - (subscription?.projects_count || 0));
 
-  const canCreatePermit = permitsRemaining > 0;
+  // Permits are now unlimited for all paid tiers (limit by projects, not generations)
+  const permitsRemaining = Infinity;
+  const canCreatePermit = true;
   const canCreateProject = projectsRemaining > 0;
 
   // Check if user has a specific feature (using effective plan)

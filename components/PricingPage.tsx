@@ -19,8 +19,8 @@ const PLAN_PRICING: Record<SubscriptionPlan, { price: number; interval: string }
 const PLAN_DESCRIPTIONS: Record<SubscriptionPlan, string> = {
   free: 'Try NEC compliance tools with no commitment.',
   starter: 'For solo electricians starting with permits.',
-  pro: 'Unlimited permits with AI-powered tools.',
-  business: 'For teams needing commercial features.',
+  pro: 'Unlimited projects with EV tools.',
+  business: 'AI suite, PM tools, and team features.',
   enterprise: 'Custom solutions for large organizations.',
 };
 
@@ -94,7 +94,7 @@ export const PricingPage: React.FC = () => {
     if (plan === 'enterprise') {
       return (
         <a
-          href="mailto:sales@neccompliance.com?subject=Enterprise%20Plan%20Inquiry"
+          href="mailto:sales@sparkplan.io?subject=Enterprise%20Plan%20Inquiry"
           className="w-full block text-center bg-white text-gray-900 hover:bg-gray-100 py-2.5 rounded-sm font-semibold transition-colors"
         >
           Contact Sales
@@ -293,15 +293,15 @@ export const PricingPage: React.FC = () => {
               {/* Limits */}
               <div className="text-sm text-gray-600 mb-4 pb-4 border-b border-gray-100">
                 <div className="flex justify-between">
-                  <span>Permits/month:</span>
-                  <span className="font-medium">
-                    {limits.permits === Infinity ? 'Unlimited' : limits.permits}
-                  </span>
-                </div>
-                <div className="flex justify-between mt-1">
                   <span>Projects:</span>
                   <span className="font-medium">
                     {limits.projects === Infinity ? 'Unlimited' : limits.projects}
+                  </span>
+                </div>
+                <div className="flex justify-between mt-1">
+                  <span>Permits:</span>
+                  <span className="font-medium">
+                    {plan === 'free' ? 'None' : 'Unlimited'}
                   </span>
                 </div>
               </div>
@@ -330,7 +330,7 @@ export const PricingPage: React.FC = () => {
           Get unlimited seats, SSO/SAML, dedicated support, and custom integrations.
         </p>
         <a
-          href="mailto:sales@neccompliance.com?subject=Enterprise%20Plan%20Inquiry"
+          href="mailto:sales@sparkplan.io?subject=Enterprise%20Plan%20Inquiry"
           className="inline-block bg-electric-400 hover:bg-electric-500 text-gray-900 px-6 py-2.5 rounded-sm font-semibold transition-colors"
         >
           Contact Sales
@@ -421,15 +421,15 @@ export const PricingPage: React.FC = () => {
             </p>
           </div>
           <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
-            <h4 className="font-semibold text-gray-900 mb-2">What counts as a "permit"?</h4>
+            <h4 className="font-semibold text-gray-900 mb-2">Are permit generations limited?</h4>
             <p className="text-sm text-gray-600">
-              A permit is counted when you generate a permit packet PDF. Drafts and calculations don't count toward your limit.
+              No! All paid plans include unlimited permit generations. Regenerate as many times as you need — we don't penalize iteration.
             </p>
           </div>
           <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
             <h4 className="font-semibold text-gray-900 mb-2">Do you offer annual billing?</h4>
             <p className="text-sm text-gray-600">
-              Yes! Contact us for annual pricing with 20% discount. Email sales@neccompliance.com.
+              Yes! Contact us for annual pricing with 20% discount. Email sales@sparkplan.io.
             </p>
           </div>
         </div>

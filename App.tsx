@@ -29,6 +29,7 @@ const CalendarView = lazy(() => import('./components/CalendarView').then(m => ({
 const AgentActivityLog = lazy(() => import('./components/AgentActivityLog').then(m => ({ default: m.AgentActivityLog })));
 const UtilityInterconnectionForm = lazy(() => import('./components/UtilityInterconnectionForm').then(m => ({ default: m.UtilityInterconnectionForm })));
 const PricingPage = lazy(() => import('./components/PricingPage').then(m => ({ default: m.PricingPage })));
+const AdminPanel = lazy(() => import('./components/AdminPanel').then(m => ({ default: m.AdminPanel })));
 // EVPanelTemplates moved to Calculators component
 import { Project, ProjectStatus, ProjectType } from './types';
 import { askNecAssistantWithTools } from './services/geminiService';
@@ -49,6 +50,7 @@ import { ProtectedRoute } from './components/Auth/ProtectedRoute';
 import { useProjects } from './hooks/useProjects';
 import { ErrorBoundary, FeatureErrorBoundary } from './components/ErrorBoundary';
 import { FeatureGate } from './components/FeatureGate';
+import { useSubscription } from './hooks/useSubscription';
 import { TemplateSelector } from './components/TemplateSelector';
 import type { ProjectTemplate } from './data/project-templates';
 import { Toaster } from 'react-hot-toast';
@@ -276,6 +278,7 @@ interface Message {
 }
 
 const NecAssistant = () => {
+    const { hasFeature } = useSubscription();
     const [isOpen, setIsOpen] = useState(false);
     const [isEnlarged, setIsEnlarged] = useState(false);
     const [query, setQuery] = useState('');
@@ -284,21 +287,21 @@ const NecAssistant = () => {
     const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
     const messagesEndRef = React.useRef<HTMLDivElement>(null);
     const location = useLocation();
-    
+
     // Detect project context from URL
     const projectMatch = location.pathname.match(/\/project\/([^/]+)/);
     const projectId = projectMatch ? projectMatch[1] : undefined;
-    
+
     // Fetch project data if in project context
     const { panels } = usePanels(projectId);
     const { circuits } = useCircuits(projectId);
     const { feeders } = useFeeders(projectId);
     const { transformers } = useTransformers(projectId);
-    
+
     // Get project info from projects list (if available)
     const { projects } = useProjects();
     const currentProject = projectId ? projects.find(p => p.id === projectId) : undefined;
-    
+
     // Build context if in project
     const hasContext = projectId && currentProject && panels.length > 0;
     const projectContext = hasContext && currentProject
@@ -320,6 +323,9 @@ const NecAssistant = () => {
     useEffect(() => {
         messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
     }, [history, loading]);
+
+    // AI Copilot is gated to Business tier (must be after all hooks)
+    if (!hasFeature('ai-copilot')) return null;
 
     // Format timestamp
     const formatTime = (date: Date) => {
@@ -861,6 +867,21 @@ function AppContent() {
                 <PricingPage />
               </Suspense>
             </Layout>
+          </ProtectedRoute>
+        } />
+
+        {/* Admin panel - restricted to admin email */}
+        <Route path="/admin" element={
+          <ProtectedRoute>
+            {user?.email === 'augustovalbuena@gmail.com' ? (
+              <Layout title="Admin Panel" onSignOut={handleSignOut}>
+                <Suspense fallback={<LoadingSpinner />}>
+                  <AdminPanel />
+                </Suspense>
+              </Layout>
+            ) : (
+              <Navigate to="/" replace />
+            )}
           </ProtectedRoute>
         } />
 
