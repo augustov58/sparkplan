@@ -118,6 +118,9 @@ export const FEATURE_ACCESS: Record<string, SubscriptionPlan[]> = {
   'service-upgrade-wizard': ['pro', 'business', 'enterprise'],
   'evems-calculator': ['pro', 'business', 'enterprise'],
   'ev-panel-templates': ['pro', 'business', 'enterprise'],
+  'ev-charging-calc': ['pro', 'business', 'enterprise'],
+  'circuit-sharing-calc': ['pro', 'business', 'enterprise'],
+  'multi-family-ev': ['pro', 'business', 'enterprise'],
   'unlimited-projects': ['pro', 'business', 'enterprise'],
 
   // ═══════════════════════════════════════════════════════════════

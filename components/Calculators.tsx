@@ -1,7 +1,9 @@
 
 import React, { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { Calculator, ArrowRight, CheckCircle, XCircle, AlertTriangle, Zap, Car, Sun, Shield, Save, X, Plus, Trash2, TrendingUp, Sparkles, Info, Menu, Building2 } from 'lucide-react';
+import { Calculator, ArrowRight, CheckCircle, XCircle, AlertTriangle, Zap, Car, Sun, Shield, Save, X, Plus, Trash2, TrendingUp, Sparkles, Info, Menu, Building2, Lock } from 'lucide-react';
+import { useSubscription } from '../hooks/useSubscription';
+import { FeatureGate } from './FeatureGate';
 import { calculateVoltageDropAC, compareVoltageDropMethods, VoltageDropResult } from '../services/calculations';
 import { ConductorSizingTool } from './ConductorSizingTool';
 import { ProjectSettings } from '../types';
@@ -87,24 +89,27 @@ export const Calculators: React.FC<CalculatorsProps> = ({ projectId }) => {
 
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
 
+  const { hasFeature } = useSubscription();
+
   // Calculator options for mobile dropdown - grouped
-  const calculatorOptions = [
+  // feature?: string maps to FEATURE_ACCESS keys; omitted = free/ungated
+  const calculatorOptions: { value: string; label: string; group: string; feature?: string }[] = [
     // General Calculators
     { value: 'voltage-drop', label: 'Voltage Drop (NEC 210.19)', group: 'general' },
     { value: 'conductor-sizing', label: 'Conductor Sizing (NEC 310 + 250.122)', group: 'general' },
     { value: 'conduit-fill', label: 'Conduit Fill (Chapter 9)', group: 'general' },
-    { value: 'short-circuit', label: 'Short Circuit (NEC 110.9)', group: 'general' },
-    { value: 'arc-flash', label: 'Arc Flash (NFPA 70E)', group: 'general' },
+    { value: 'short-circuit', label: 'Short Circuit (NEC 110.9)', group: 'general', feature: 'short-circuit-basic' },
+    { value: 'arc-flash', label: 'Arc Flash (NFPA 70E)', group: 'general', feature: 'arc-flash' },
     { value: 'solar-pv', label: 'Solar PV (NEC 690)', group: 'general' },
-    { value: 'service-upgrade', label: 'Service Upgrade (NEC 230.42)', group: 'general' },
+    { value: 'service-upgrade', label: 'Service Upgrade (NEC 230.42)', group: 'general', feature: 'service-upgrade-wizard' },
     // EV Calculators
-    { value: 'multi-family-ev', label: '⚡ Multi-Family EV (NEC 220.84)', group: 'ev' },
-    { value: 'ev-charging', label: '⚡ EV Charging (NEC 625)', group: 'ev' },
-    { value: 'evems', label: '⚡ EVEMS Load Mgmt (NEC 625.42)', group: 'ev' },
-    { value: 'ev-panel-builder', label: '⚡ EV Panel Builder', group: 'ev' },
-    { value: 'circuit-sharing', label: '⚡ Circuit Sharing (NEC 625)', group: 'ev' },
+    { value: 'multi-family-ev', label: 'Multi-Family EV (NEC 220.84)', group: 'ev', feature: 'multi-family-ev' },
+    { value: 'ev-charging', label: 'EV Charging (NEC 625)', group: 'ev', feature: 'ev-charging-calc' },
+    { value: 'evems', label: 'EVEMS Load Mgmt (NEC 625.42)', group: 'ev', feature: 'evems-calculator' },
+    { value: 'ev-panel-builder', label: 'EV Panel Builder', group: 'ev', feature: 'ev-panel-templates' },
+    { value: 'circuit-sharing', label: 'Circuit Sharing (NEC 625)', group: 'ev', feature: 'circuit-sharing-calc' },
     // AI
-    { value: 'change-impact', label: '✨ Change Impact Analyzer (AI)', group: 'ai' },
+    { value: 'change-impact', label: 'Change Impact Analyzer (AI)', group: 'ai', feature: 'change-impact' },
   ];
 
   const handleMobileCalculatorChange = (value: string) => {
@@ -128,7 +133,9 @@ export const Calculators: React.FC<CalculatorsProps> = ({ projectId }) => {
           className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-electric-500 focus:border-electric-500"
         >
           {calculatorOptions.map(opt => (
-            <option key={opt.value} value={opt.value}>{opt.label}</option>
+            <option key={opt.value} value={opt.value}>
+              {opt.feature && !hasFeature(opt.feature) ? `🔒 ${opt.label}` : opt.label}
+            </option>
           ))}
         </select>
       </div>
@@ -160,13 +167,19 @@ export const Calculators: React.FC<CalculatorsProps> = ({ projectId }) => {
             onClick={() => setActiveTab('short-circuit')}
             className={`w-full text-left px-3 py-2.5 text-sm font-medium border-l-4 transition-colors ${activeTab === 'short-circuit' ? 'border-electric-500 bg-electric-50 text-gray-900' : 'border-transparent text-gray-500 hover:bg-gray-50 hover:text-gray-700'}`}
           >
-            Short Circuit (NEC 110.9)
+            <span className="flex items-center justify-between">
+              Short Circuit (NEC 110.9)
+              {!hasFeature('short-circuit-basic') && <Lock className="w-3.5 h-3.5 text-gray-400 flex-shrink-0" />}
+            </span>
           </button>
           <button
             onClick={() => setActiveTab('arc-flash')}
             className={`w-full text-left px-3 py-2.5 text-sm font-medium border-l-4 transition-colors ${activeTab === 'arc-flash' ? 'border-electric-500 bg-electric-50 text-gray-900' : 'border-transparent text-gray-500 hover:bg-gray-50 hover:text-gray-700'}`}
           >
-            <span className="flex items-center gap-2"><Shield className="w-4 h-4" /> Arc Flash (NFPA 70E)</span>
+            <span className="flex items-center justify-between">
+              <span className="flex items-center gap-2"><Shield className="w-4 h-4" /> Arc Flash (NFPA 70E)</span>
+              {!hasFeature('arc-flash') && <Lock className="w-3.5 h-3.5 text-gray-400 flex-shrink-0" />}
+            </span>
           </button>
           <button
             onClick={() => setActiveTab('solar-pv')}
@@ -178,7 +191,10 @@ export const Calculators: React.FC<CalculatorsProps> = ({ projectId }) => {
             onClick={() => setActiveTab('service-upgrade')}
             className={`w-full text-left px-3 py-2.5 text-sm font-medium border-l-4 transition-colors ${activeTab === 'service-upgrade' ? 'border-electric-500 bg-electric-50 text-gray-900' : 'border-transparent text-gray-500 hover:bg-gray-50 hover:text-gray-700'}`}
           >
-            <span className="flex items-center gap-2"><TrendingUp className="w-4 h-4" /> Service Upgrade (NEC 230.42)</span>
+            <span className="flex items-center justify-between">
+              <span className="flex items-center gap-2"><TrendingUp className="w-4 h-4" /> Service Upgrade (NEC 230.42)</span>
+              {!hasFeature('service-upgrade-wizard') && <Lock className="w-3.5 h-3.5 text-gray-400 flex-shrink-0" />}
+            </span>
           </button>
 
           {/* EV Calculators Section */}
@@ -190,31 +206,46 @@ export const Calculators: React.FC<CalculatorsProps> = ({ projectId }) => {
               onClick={() => setActiveTab('multi-family-ev')}
               className={`w-full text-left px-3 py-2.5 text-sm font-medium border-l-4 transition-colors ${activeTab === 'multi-family-ev' ? 'border-green-500 bg-green-50 text-gray-900' : 'border-transparent text-gray-500 hover:bg-gray-50 hover:text-gray-700'}`}
             >
-              <span className="flex items-center gap-2"><Building2 className="w-4 h-4" /> Multi-Family EV (NEC 220.84)</span>
+              <span className="flex items-center justify-between">
+                <span className="flex items-center gap-2"><Building2 className="w-4 h-4" /> Multi-Family EV (NEC 220.84)</span>
+                {!hasFeature('multi-family-ev') && <Lock className="w-3.5 h-3.5 text-gray-400 flex-shrink-0" />}
+              </span>
             </button>
             <button
               onClick={() => setActiveTab('ev-charging')}
               className={`w-full text-left px-3 py-2.5 text-sm font-medium border-l-4 transition-colors ${activeTab === 'ev-charging' ? 'border-green-500 bg-green-50 text-gray-900' : 'border-transparent text-gray-500 hover:bg-gray-50 hover:text-gray-700'}`}
             >
-              <span className="flex items-center gap-2"><Car className="w-4 h-4" /> EV Charging (NEC 625)</span>
+              <span className="flex items-center justify-between">
+                <span className="flex items-center gap-2"><Car className="w-4 h-4" /> EV Charging (NEC 625)</span>
+                {!hasFeature('ev-charging-calc') && <Lock className="w-3.5 h-3.5 text-gray-400 flex-shrink-0" />}
+              </span>
             </button>
             <button
               onClick={() => setActiveTab('evems')}
               className={`w-full text-left px-3 py-2.5 text-sm font-medium border-l-4 transition-colors ${activeTab === 'evems' ? 'border-green-500 bg-green-50 text-gray-900' : 'border-transparent text-gray-500 hover:bg-gray-50 hover:text-gray-700'}`}
             >
-              <span className="flex items-center gap-2"><Zap className="w-4 h-4" /> EVEMS Load Mgmt (NEC 625.42)</span>
+              <span className="flex items-center justify-between">
+                <span className="flex items-center gap-2"><Zap className="w-4 h-4" /> EVEMS Load Mgmt (NEC 625.42)</span>
+                {!hasFeature('evems-calculator') && <Lock className="w-3.5 h-3.5 text-gray-400 flex-shrink-0" />}
+              </span>
             </button>
             <button
               onClick={() => setActiveTab('ev-panel-builder')}
               className={`w-full text-left px-3 py-2.5 text-sm font-medium border-l-4 transition-colors ${activeTab === 'ev-panel-builder' ? 'border-green-500 bg-green-50 text-gray-900' : 'border-transparent text-gray-500 hover:bg-gray-50 hover:text-gray-700'}`}
             >
-              <span className="flex items-center gap-2"><Zap className="w-4 h-4" /> EV Panel Builder</span>
+              <span className="flex items-center justify-between">
+                <span className="flex items-center gap-2"><Zap className="w-4 h-4" /> EV Panel Builder</span>
+                {!hasFeature('ev-panel-templates') && <Lock className="w-3.5 h-3.5 text-gray-400 flex-shrink-0" />}
+              </span>
             </button>
             <button
               onClick={() => setActiveTab('circuit-sharing')}
               className={`w-full text-left px-3 py-2.5 text-sm font-medium border-l-4 transition-colors ${activeTab === 'circuit-sharing' ? 'border-green-500 bg-green-50 text-gray-900' : 'border-transparent text-gray-500 hover:bg-gray-50 hover:text-gray-700'}`}
             >
-              <span className="flex items-center gap-2"><Zap className="w-4 h-4" /> Circuit Sharing (NEC 625)</span>
+              <span className="flex items-center justify-between">
+                <span className="flex items-center gap-2"><Zap className="w-4 h-4" /> Circuit Sharing (NEC 625)</span>
+                {!hasFeature('circuit-sharing-calc') && <Lock className="w-3.5 h-3.5 text-gray-400 flex-shrink-0" />}
+              </span>
             </button>
           </div>
 
@@ -227,36 +258,81 @@ export const Calculators: React.FC<CalculatorsProps> = ({ projectId }) => {
               onClick={() => setActiveTab('change-impact')}
               className={`w-full text-left px-3 py-2.5 text-sm font-medium border-l-4 transition-colors ${activeTab === 'change-impact' ? 'border-purple-500 bg-purple-50 text-gray-900' : 'border-transparent text-gray-500 hover:bg-gray-50 hover:text-gray-700'}`}
             >
-              <span className="flex items-center gap-2"><Sparkles className="w-4 h-4" /> Change Impact Analyzer</span>
+              <span className="flex items-center justify-between">
+                <span className="flex items-center gap-2"><Sparkles className="w-4 h-4" /> Change Impact Analyzer</span>
+                {!hasFeature('change-impact') && <Lock className="w-3.5 h-3.5 text-gray-400 flex-shrink-0" />}
+              </span>
             </button>
           </div>
         </div>
 
         {/* Calculator Content Area */}
         <div className="bg-white border border-gray-100 rounded-lg card-padding shadow-sm min-h-[600px]">
+          {/* Free-tier calculators — no gate */}
           {activeTab === 'voltage-drop' && <VoltageDropCalculator />}
           {activeTab === 'conductor-sizing' && <ConductorSizingTool projectSettings={defaultSettings} />}
           {activeTab === 'conduit-fill' && <ConduitFillCalculator />}
-          {activeTab === 'short-circuit' && <ShortCircuitCalculator projectId={projectId} />}
-          {activeTab === 'ev-charging' && <EVChargingCalculator />}
           {activeTab === 'solar-pv' && <SolarPVCalculator />}
-          {activeTab === 'arc-flash' && <ArcFlashCalculator />}
-          {activeTab === 'evems' && <EVEMSLoadManagement />}
-          {activeTab === 'service-upgrade' && <ServiceUpgradeWizard projectId={projectId} />}
-          {activeTab === 'circuit-sharing' && <CircuitSharingCalculator />}
+
+          {/* Starter-tier */}
+          {activeTab === 'short-circuit' && (
+            <FeatureGate feature="short-circuit-basic">
+              <ShortCircuitCalculator projectId={projectId} />
+            </FeatureGate>
+          )}
+
+          {/* Pro-tier */}
+          {activeTab === 'ev-charging' && (
+            <FeatureGate feature="ev-charging-calc">
+              <EVChargingCalculator />
+            </FeatureGate>
+          )}
+          {activeTab === 'evems' && (
+            <FeatureGate feature="evems-calculator">
+              <EVEMSLoadManagement />
+            </FeatureGate>
+          )}
+          {activeTab === 'service-upgrade' && (
+            <FeatureGate feature="service-upgrade-wizard">
+              <ServiceUpgradeWizard projectId={projectId} />
+            </FeatureGate>
+          )}
+          {activeTab === 'circuit-sharing' && (
+            <FeatureGate feature="circuit-sharing-calc">
+              <CircuitSharingCalculator />
+            </FeatureGate>
+          )}
           <div style={{ display: activeTab === 'multi-family-ev' ? 'block' : 'none' }}>
-            <MultiFamilyEVCalculator projectId={projectId} project={project} updateProject={updateProject} />
+            <FeatureGate feature="multi-family-ev">
+              <MultiFamilyEVCalculator projectId={projectId} project={project} updateProject={updateProject} />
+            </FeatureGate>
           </div>
-          {activeTab === 'change-impact' && <ChangeImpactAnalyzer projectId={projectId} />}
-          {activeTab === 'ev-panel-builder' && project && <EVPanelTemplates project={project} />}
-          {activeTab === 'ev-panel-builder' && !project && (
-            <div className="flex flex-col items-center justify-center h-64 text-center">
-              <AlertTriangle className="w-12 h-12 text-yellow-500 mb-4" />
-              <h3 className="text-lg font-semibold text-gray-900 mb-2">Project Required</h3>
-              <p className="text-sm text-gray-600">
-                EV Panel Builder requires an active project. Please navigate to a project to use this tool.
-              </p>
-            </div>
+          {activeTab === 'ev-panel-builder' && (
+            <FeatureGate feature="ev-panel-templates">
+              {project ? (
+                <EVPanelTemplates project={project} />
+              ) : (
+                <div className="flex flex-col items-center justify-center h-64 text-center">
+                  <AlertTriangle className="w-12 h-12 text-yellow-500 mb-4" />
+                  <h3 className="text-lg font-semibold text-gray-900 mb-2">Project Required</h3>
+                  <p className="text-sm text-gray-600">
+                    EV Panel Builder requires an active project. Please navigate to a project to use this tool.
+                  </p>
+                </div>
+              )}
+            </FeatureGate>
+          )}
+
+          {/* Business-tier */}
+          {activeTab === 'arc-flash' && (
+            <FeatureGate feature="arc-flash">
+              <ArcFlashCalculator />
+            </FeatureGate>
+          )}
+          {activeTab === 'change-impact' && (
+            <FeatureGate feature="change-impact">
+              <ChangeImpactAnalyzer projectId={projectId} />
+            </FeatureGate>
           )}
         </div>
       </div>
