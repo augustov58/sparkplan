@@ -82,7 +82,6 @@ const ProjectWrapper = ({ projects, updateProject, deleteProject, onSignOut }: {
 
     return (
         <Layout title={project.name} showBack onSignOut={onSignOut} projectType={project.type}>
-            <div key={location.pathname}>
             <Routes>
                 <Route path="/" element={
                     <FeatureErrorBoundary>
@@ -262,7 +261,6 @@ const ProjectWrapper = ({ projects, updateProject, deleteProject, onSignOut }: {
                     </FeatureErrorBoundary>
                 } />
             </Routes>
-            </div>
         </Layout>
     );
 };

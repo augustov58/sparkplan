@@ -347,7 +347,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, title, showBack, onSig
         </header>
         <div className="p-4 md:p-8 max-w-[1600px] mx-auto">
           {/* Content Panel - white paper with subtle border */}
-          <div className="bg-white border border-gray-200 rounded-lg p-6 shadow-sm">
+          <div className="bg-white border border-gray-200 rounded-lg p-3 sm:p-4 md:p-6 shadow-sm">
             {children}
           </div>
         </div>

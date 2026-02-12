@@ -14,6 +14,7 @@ import {
 } from '../services/calculations/commercialLoad';
 import { calculateFeederSizing } from '../services/calculations/feederSizing';
 import type { FeederCalculationInput, FeederCalculationResult } from '../types';
+import { usePersistedState } from '../hooks/usePersistedState';
 
 interface CommercialLoadCalculatorProps {
   projectId?: string;
@@ -34,17 +35,19 @@ export const CommercialLoadCalculator: React.FC<CommercialLoadCalculatorProps> =
   projectId,
   onResultCalculated,
 }) => {
+  const pk = `commercial-load-calc-${projectId ?? 'global'}`;
+
   // Building Information
-  const [occupancyType, setOccupancyType] = useState<OccupancyType>('office_buildings');
-  const [totalFloorArea, setTotalFloorArea] = useState<number>(10000);
+  const [occupancyType, setOccupancyType] = usePersistedState<OccupancyType>(`${pk}-occupancy`, 'office_buildings');
+  const [totalFloorArea, setTotalFloorArea] = usePersistedState<number>(`${pk}-floorArea`, 10000);
 
   // Receptacles
-  const [generalReceptacleCount, setGeneralReceptacleCount] = useState<number>(50);
-  const [showWindowLighting_linearFeet, setShowWindowLighting_linearFeet] = useState<number>(0);
-  const [signOutlets, setSignOutlets] = useState<number>(0);
+  const [generalReceptacleCount, setGeneralReceptacleCount] = usePersistedState<number>(`${pk}-receptacles`, 50);
+  const [showWindowLighting_linearFeet, setShowWindowLighting_linearFeet] = usePersistedState<number>(`${pk}-windowLighting`, 0);
+  const [signOutlets, setSignOutlets] = usePersistedState<number>(`${pk}-signOutlets`, 0);
 
   // HVAC Loads
-  const [hvacLoads, setHvacLoads] = useState<HVACLoad[]>([
+  const [hvacLoads, setHvacLoads] = usePersistedState<HVACLoad[]>(`${pk}-hvac`, [
     {
       description: 'Rooftop Unit #1',
       nameplateFLA: 42,
@@ -55,24 +58,24 @@ export const CommercialLoadCalculator: React.FC<CommercialLoadCalculatorProps> =
   ]);
 
   // Motor Loads
-  const [motorLoads, setMotorLoads] = useState<MotorLoad[]>([]);
+  const [motorLoads, setMotorLoads] = usePersistedState<MotorLoad[]>(`${pk}-motors`, []);
 
   // Kitchen Equipment
-  const [kitchenEquipment, setKitchenEquipment] = useState<KitchenEquipment[]>([]);
-  const [showKitchenSection, setShowKitchenSection] = useState<boolean>(false);
+  const [kitchenEquipment, setKitchenEquipment] = usePersistedState<KitchenEquipment[]>(`${pk}-kitchen`, []);
+  const [showKitchenSection, setShowKitchenSection] = usePersistedState<boolean>(`${pk}-showKitchen`, false);
 
   // Special Loads
-  const [specialLoads, setSpecialLoads] = useState<SpecialLoad[]>([]);
+  const [specialLoads, setSpecialLoads] = usePersistedState<SpecialLoad[]>(`${pk}-specialLoads`, []);
 
   // Feeders
-  const [feeders, setFeeders] = useState<FeederInput[]>([]);
+  const [feeders, setFeeders] = usePersistedState<FeederInput[]>(`${pk}-feeders`, []);
   const [feederResults, setFeederResults] = useState<Record<string, FeederCalculationResult>>({});
 
   // Service Parameters
-  const [serviceVoltage, setServiceVoltage] = useState<120 | 208 | 240 | 277 | 480>(208);
-  const [servicePhase, setServicePhase] = useState<1 | 3>(3);
+  const [serviceVoltage, setServiceVoltage] = usePersistedState<120 | 208 | 240 | 277 | 480>(`${pk}-voltage`, 208);
+  const [servicePhase, setServicePhase] = usePersistedState<1 | 3>(`${pk}-phase`, 3);
 
-  // Calculation Result
+  // Calculation Result (derived, no need to persist)
   const [result, setResult] = useState<CommercialLoadResult | null>(null);
 
   // Auto-show kitchen section for restaurants
@@ -374,7 +377,7 @@ export const CommercialLoadCalculator: React.FC<CommercialLoadCalculatorProps> =
               </div>
 
               {/* Service Parameters */}
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div className="form-group">
                   <label className="block text-sm font-medium text-gray-700 mb-1.5">
                     Phase
@@ -495,7 +498,7 @@ export const CommercialLoadCalculator: React.FC<CommercialLoadCalculatorProps> =
                     </button>
                   </div>
 
-                  <div className="grid grid-cols-2 gap-2">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                     <div>
                       <label className="block text-xs text-gray-600 mb-1">FLA (Amps)</label>
                       <input
@@ -582,7 +585,7 @@ export const CommercialLoadCalculator: React.FC<CommercialLoadCalculatorProps> =
                     </button>
                   </div>
 
-                  <div className="grid grid-cols-2 gap-2">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                     <div>
                       <label className="block text-xs text-gray-600 mb-1">HP</label>
                       <input
@@ -736,7 +739,7 @@ export const CommercialLoadCalculator: React.FC<CommercialLoadCalculatorProps> =
                     </button>
                   </div>
 
-                  <div className="grid grid-cols-2 gap-2">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                     <div>
                       <label className="block text-xs text-gray-600 mb-1">Load (VA)</label>
                       <input
@@ -804,7 +807,7 @@ export const CommercialLoadCalculator: React.FC<CommercialLoadCalculatorProps> =
                     </button>
                   </div>
 
-                  <div className="grid grid-cols-3 gap-2">
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
                     <div>
                       <label className="block text-xs text-gray-600 mb-1">Load (VA)</label>
                       <input
@@ -841,7 +844,7 @@ export const CommercialLoadCalculator: React.FC<CommercialLoadCalculatorProps> =
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-3 gap-2">
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
                     <div>
                       <label className="block text-xs text-gray-600 mb-1">Voltage</label>
                       <input

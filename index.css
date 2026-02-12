@@ -184,3 +184,29 @@ button:active:not(:disabled) {
 .calc-note-success {
   border-left-color: #10b981;
 }
+
+/* Shared form utilities */
+.input-std {
+  width: 100%;
+  border: 1px solid #e5e7eb;
+  border-radius: 0.5rem;
+  padding: 0.5rem 0.75rem;
+  font-size: 0.875rem;
+  line-height: 1.25rem;
+  color: #1f2937;
+  background-color: #ffffff;
+  outline: none;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+.input-std:focus {
+  border-color: #FFCC00;
+  box-shadow: 0 0 0 2px rgba(255, 204, 0, 0.25);
+}
+
+.label-xs {
+  display: block;
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: #6b7280;
+  margin-bottom: 0.25rem;
+}

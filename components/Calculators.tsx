@@ -1,6 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
+import { usePersistedState } from '../hooks/usePersistedState';
 import { Calculator, ArrowRight, CheckCircle, XCircle, AlertTriangle, Zap, Car, Sun, Shield, Save, X, Plus, Trash2, TrendingUp, Sparkles, Info, Menu, Building2, Lock } from 'lucide-react';
 import { useSubscription } from '../hooks/useSubscription';
 import { FeatureGate } from './FeatureGate';
@@ -65,10 +66,16 @@ export const Calculators: React.FC<CalculatorsProps> = ({ projectId }) => {
   const project = projectId ? getProjectById(projectId) : undefined;
   const [searchParams] = useSearchParams();
 
+  const [persistedTab, setPersistedTab] = usePersistedState<TabKey>(`calc-activeTab-${projectId ?? 'global'}`, 'voltage-drop');
   const [activeTab, setActiveTab] = useState<TabKey>(() => {
     const tab = searchParams.get('tab');
-    return tab && VALID_TABS.has(tab) ? tab as TabKey : 'voltage-drop';
+    return tab && VALID_TABS.has(tab) ? tab as TabKey : persistedTab;
   });
+
+  // Sync active tab to persisted state
+  useEffect(() => {
+    setPersistedTab(activeTab);
+  }, [activeTab]);
 
   // Respond to query param changes (e.g. navigation from DwellingLoadCalculator)
   useEffect(() => {
@@ -267,7 +274,7 @@ export const Calculators: React.FC<CalculatorsProps> = ({ projectId }) => {
         </div>
 
         {/* Calculator Content Area */}
-        <div className="bg-white border border-gray-100 rounded-lg card-padding shadow-sm min-h-[600px]">
+        <div className="bg-white border border-gray-100 rounded-lg card-padding shadow-sm min-h-0 md:min-h-[600px]">
           {/* Free-tier calculators — no gate */}
           {activeTab === 'voltage-drop' && <VoltageDropCalculator />}
           {activeTab === 'conductor-sizing' && <ConductorSizingTool projectSettings={defaultSettings} />}
@@ -366,10 +373,10 @@ const VoltageDropCalculator: React.FC = () => {
 
   return (
     <div className="space-y-4">
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
         <div className="space-y-3">
            <h3 className="font-semibold text-gray-900 text-base">Input Parameters</h3>
-           <div className="grid grid-cols-2 gap-3">
+           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
              <div>
                <label className="label-xs">Voltage (V)</label>
                <input type="number" value={voltage} onChange={e => setVoltage(Number(e.target.value))} className="input-std" />
@@ -618,12 +625,12 @@ const ConduitFillCalculator: React.FC = () => {
   const isCompliant = fillPercent <= maxFillPercent;
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
       {/* Left Column - Configuration */}
       <div className="space-y-4">
         <div>
           <h3 className="font-semibold text-gray-900 mb-3 text-base">Raceway Configuration</h3>
-          <div className="grid grid-cols-2 gap-3 mb-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
             <div>
               <label className="label-xs">Conduit Type</label>
               <select
@@ -698,7 +705,7 @@ const ConduitFillCalculator: React.FC = () => {
                     </button>
                   )}
                 </div>
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
                     <label className="label-xs">Wire Size</label>
                     <select
@@ -973,7 +980,7 @@ const ShortCircuitCalculator: React.FC<ShortCircuitCalculatorProps> = ({ project
         </button>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
         {/* Input Section */}
         <div className="space-y-3">
           <h3 className="font-semibold text-gray-900 text-base">
@@ -982,7 +989,7 @@ const ShortCircuitCalculator: React.FC<ShortCircuitCalculatorProps> = ({ project
 
           {mode === 'service' ? (
             <>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="label-xs">Service Amps</label>
                   <input
@@ -1024,7 +1031,7 @@ const ShortCircuitCalculator: React.FC<ShortCircuitCalculatorProps> = ({ project
                   <strong>Auto mode:</strong> Leave kVA blank to estimate based on service size<br/>
                   <strong>Manual mode:</strong> Enter kVA when transformer is known from utility specs
                 </p>
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
                     <label className="label-xs">Transformer kVA</label>
                     <input
@@ -1056,7 +1063,7 @@ const ShortCircuitCalculator: React.FC<ShortCircuitCalculatorProps> = ({ project
                 <p className="text-xs text-gray-500 mb-3">
                   Parameters from utility transformer to service panel
                 </p>
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
                     <label className="label-xs">Conductor Length (ft)</label>
                     <input
@@ -1152,7 +1159,7 @@ const ShortCircuitCalculator: React.FC<ShortCircuitCalculatorProps> = ({ project
                   </p>
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
                     <label className="label-xs">Feeder Length (ft)</label>
                     <input
@@ -1458,14 +1465,14 @@ const EVChargingCalculator: React.FC = () => {
 
   return (
     <div className="space-y-4">
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
         {/* Input Section */}
         <div className="space-y-3">
           <h3 className="font-semibold text-gray-900 flex items-center gap-2 text-base">
             <Car className="w-4 h-4 text-electric-500" /> Charger Configuration
           </h3>
 
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
               <label className="block text-xs font-semibold text-gray-500 uppercase mb-1">Charger Level</label>
               <select
@@ -1578,7 +1585,7 @@ const EVChargingCalculator: React.FC = () => {
           {/* Charging Time Estimator */}
           <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 mt-4">
             <h4 className="font-medium text-gray-800 mb-3">Charging Time Estimator</h4>
-            <div className="grid grid-cols-3 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               <div>
                 <label className="block text-xs text-gray-500 mb-1">Battery (kWh)</label>
                 <input
@@ -1738,7 +1745,7 @@ const SolarPVCalculator: React.FC = () => {
 
   return (
     <div className="space-y-4">
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
         {/* Input Section */}
         <div className="space-y-3">
           <h3 className="font-semibold text-gray-900 flex items-center gap-2 text-base">
@@ -1748,7 +1755,7 @@ const SolarPVCalculator: React.FC = () => {
           {/* Panel Selection */}
           <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
             <h4 className="font-semibold text-yellow-800 mb-2 text-sm">PV Panel Selection</h4>
-            <div className="grid grid-cols-2 gap-2">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
               <div className="col-span-2">
                 <label className="block text-xs text-gray-500 mb-1">Panel Type</label>
                 <select
@@ -1793,7 +1800,7 @@ const SolarPVCalculator: React.FC = () => {
           </div>
 
           {/* Inverter Configuration */}
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className="block text-xs font-semibold text-gray-500 uppercase mb-1">Inverter Type</label>
               <select
@@ -1840,7 +1847,7 @@ const SolarPVCalculator: React.FC = () => {
           </div>
 
           {/* Installation */}
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className="block text-xs font-semibold text-gray-500 uppercase mb-1">Mount Type</label>
               <select
@@ -2020,12 +2027,12 @@ const ArcFlashCalculator: React.FC = () => {
 
   return (
     <div className="space-y-4">
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
         <div className="space-y-3">
           <h3 className="font-semibold text-gray-900 flex items-center gap-2 text-base">
             <Shield className="w-4 h-4 text-electric-500" /> System Parameters
           </h3>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
               <label className="block text-xs font-semibold text-gray-500 uppercase mb-1">Short Circuit Current (kA)</label>
               <input type="number" value={shortCircuitCurrent} onChange={e => setShortCircuitCurrent(Number(e.target.value))} min="0.1" max="200" step="0.1" className="w-full border-gray-200 rounded text-sm py-2 px-3 focus:border-electric-500 focus:ring-electric-500" />
