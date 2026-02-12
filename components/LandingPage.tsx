@@ -296,7 +296,7 @@ export const LandingPage: React.FC = () => {
           <div>
              <h4 className="font-bold text-gray-900 mb-4">Contact</h4>
              <ul className="space-y-2 text-sm text-gray-500">
-               <li>support@sparkplan.io</li>
+               <li>support@sparkplan.app</li>
                <li>+1 (555) 987-6543</li>
              </ul>
           </div>

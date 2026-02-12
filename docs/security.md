@@ -650,7 +650,7 @@ const userInput = '<script>alert("XSS")</script>';
 ```typescript
 // Example: Vercel serverless function
 export default function handler(req, res) {
-  res.setHeader('Access-Control-Allow-Origin', 'https://sparkplan.io');
+  res.setHeader('Access-Control-Allow-Origin', 'https://sparkplan.app');
   res.setHeader('Access-Control-Allow-Methods', 'POST');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
 

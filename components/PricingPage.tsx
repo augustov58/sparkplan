@@ -94,7 +94,7 @@ export const PricingPage: React.FC = () => {
     if (plan === 'enterprise') {
       return (
         <a
-          href="mailto:sales@sparkplan.io?subject=Enterprise%20Plan%20Inquiry"
+          href="mailto:sales@sparkplan.app?subject=Enterprise%20Plan%20Inquiry"
           className="w-full block text-center bg-white text-gray-900 hover:bg-gray-100 py-2.5 rounded-sm font-semibold transition-colors"
         >
           Contact Sales
@@ -330,7 +330,7 @@ export const PricingPage: React.FC = () => {
           Get unlimited seats, SSO/SAML, dedicated support, and custom integrations.
         </p>
         <a
-          href="mailto:sales@sparkplan.io?subject=Enterprise%20Plan%20Inquiry"
+          href="mailto:sales@sparkplan.app?subject=Enterprise%20Plan%20Inquiry"
           className="inline-block bg-electric-400 hover:bg-electric-500 text-gray-900 px-6 py-2.5 rounded-sm font-semibold transition-colors"
         >
           Contact Sales
@@ -429,7 +429,7 @@ export const PricingPage: React.FC = () => {
           <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
             <h4 className="font-semibold text-gray-900 mb-2">Do you offer annual billing?</h4>
             <p className="text-sm text-gray-600">
-              Yes! Contact us for annual pricing with 20% discount. Email sales@sparkplan.io.
+              Yes! Contact us for annual pricing with 20% discount. Email sales@sparkplan.app.
             </p>
           </div>
         </div>
