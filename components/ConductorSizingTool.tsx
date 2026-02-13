@@ -303,6 +303,26 @@ export const ConductorSizingTool: React.FC<ConductorSizingToolProps> = ({ projec
                 </div>
               </div>
 
+              {/* NEC 240.4(D) Small Conductor OCPD Limits */}
+              <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
+                <div className="text-sm font-bold text-gray-900 mb-2">NEC 240.4(D) — Max OCPD for Small Conductors</div>
+                <div className="grid grid-cols-3 gap-3 text-sm">
+                  {[
+                    { size: '14 AWG', max: '15A', active: result.conductorSize === '14 AWG' },
+                    { size: '12 AWG', max: '20A', active: result.conductorSize === '12 AWG' },
+                    { size: '10 AWG', max: '30A', active: result.conductorSize === '10 AWG' },
+                  ].map(({ size, max, active }) => (
+                    <div
+                      key={size}
+                      className={`text-center py-2 px-3 rounded border ${active ? 'bg-electric-50 border-electric-400 font-bold' : 'bg-white border-gray-200'}`}
+                    >
+                      <div className="text-xs text-gray-500">{size}</div>
+                      <div className={active ? 'text-electric-700' : 'text-gray-700'}>{max}</div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
               {/* Ampacity Comparison Table */}
               <AmpacityComparisonTable
                 conductorSize={result.conductorSize}
