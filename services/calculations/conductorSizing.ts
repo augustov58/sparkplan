@@ -318,14 +318,14 @@ export function sizeConductor(
     necReferences.push('NEC 240.4(D) - Small Conductor Protection');
 
     // Find next larger conductor that can handle the OCPD
+    // Must exceed current conductor's ampacity to actually get the next size up
     let nextBaseAmpacity = baseAmpacityNeeded;
-    // Increase required ampacity to meet OCPD limit
     if (finalConductor.size === '14 AWG') {
-      // Need at least 12 AWG
-      nextBaseAmpacity = Math.max(baseAmpacityNeeded, 20 / combinedDerating);
+      // 14 AWG Cu@75°C = 20A; need >20A to land on 12 AWG
+      nextBaseAmpacity = Math.max(baseAmpacityNeeded, 20 / combinedDerating + 0.1);
     } else if (finalConductor.size === '12 AWG') {
-      // Need at least 10 AWG
-      nextBaseAmpacity = Math.max(baseAmpacityNeeded, 30 / combinedDerating);
+      // 12 AWG Cu@75°C = 25A; need >25A to land on 10 AWG
+      nextBaseAmpacity = Math.max(baseAmpacityNeeded, 25 / combinedDerating + 0.1);
     }
 
     const upsizedConductor = findConductorByAmpacity(

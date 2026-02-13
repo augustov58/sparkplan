@@ -170,6 +170,25 @@ describe('Conductor Sizing (NEC Article 310)', () => {
     expect(manyCondResult.bundlingAdjustment).toBeLessThan(1.0);
     expect(fewCondResult.bundlingAdjustment).toBe(1.0);
   });
+
+  it('should upsize from 14 AWG to 12 AWG per NEC 240.4(D) for 16A load', () => {
+    // 16A non-continuous, Cu, 75°C, standard conditions
+    // 14 AWG has 20A ampacity but is limited to 15A OCPD per 240.4(D)
+    // Must upsize to 12 AWG (20A OCPD allowed)
+    const result = sizeConductor(16, settings, 30, 3, false);
+    expect(result.conductorSize).toBe('12 AWG');
+  });
+
+  it('should upsize from 12 AWG to 10 AWG per NEC 240.4(D) for 21A load', () => {
+    // 21A non-continuous needs >20A OCPD, 12 AWG limited to 20A
+    const result = sizeConductor(21, settings, 30, 3, false);
+    expect(result.conductorSize).toBe('10 AWG');
+  });
+
+  it('should keep 14 AWG for loads within 15A OCPD limit', () => {
+    const result = sizeConductor(15, settings, 30, 3, false);
+    expect(result.conductorSize).toBe('14 AWG');
+  });
 });
 
 describe('Breaker Sizing (NEC Article 240)', () => {
