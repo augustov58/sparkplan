@@ -18,6 +18,7 @@ export const ConductorSizingTool: React.FC<ConductorSizingToolProps> = ({ projec
   const [ambientTempC, setAmbientTempC] = useState(30);
   const [numConductors, setNumConductors] = useState(3);
   const [isContinuous, setIsContinuous] = useState(true);
+  const [terminalsRated75C, setTerminalsRated75C] = useState(false);
   const [useQuickMode, setUseQuickMode] = useState(false);
   const [quickScenario, setQuickScenario] = useState<'indoor_standard' | 'outdoor_hot' | 'attic' | 'underground' | 'high_density_conduit'>('indoor_standard');
 
@@ -28,7 +29,7 @@ export const ConductorSizingTool: React.FC<ConductorSizingToolProps> = ({ projec
     if (useQuickMode) {
       result = quickSizeConductor(loadAmps, projectSettings, quickScenario);
     } else {
-      result = sizeConductor(loadAmps, projectSettings, ambientTempC, numConductors, isContinuous);
+      result = sizeConductor(loadAmps, projectSettings, ambientTempC, numConductors, isContinuous, undefined, terminalsRated75C);
     }
   } catch (e) {
     error = e instanceof Error ? e.message : 'Unknown error';
@@ -153,6 +154,19 @@ export const ConductorSizingTool: React.FC<ConductorSizingToolProps> = ({ projec
                   <span className="text-sm text-gray-700">Continuous Load (≥3 hours)</span>
                 </label>
                 <p className="text-xs text-gray-500 mt-1 ml-6">125% multiplier per NEC 210.19(A)(1)</p>
+              </div>
+
+              <div>
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={terminalsRated75C}
+                    onChange={e => setTerminalsRated75C(e.target.checked)}
+                    className="rounded border-gray-300 text-electric-500 focus:ring-electric-500"
+                  />
+                  <span className="text-sm text-gray-700">Terminals listed for 75°C</span>
+                </label>
+                <p className="text-xs text-gray-500 mt-1 ml-6">NEC 110.14(C)(1)(a)(2): Use 75°C column for ≤100A circuits</p>
               </div>
             </div>
           )}
@@ -293,6 +307,7 @@ export const ConductorSizingTool: React.FC<ConductorSizingToolProps> = ({ projec
               <AmpacityComparisonTable
                 conductorSize={result.conductorSize}
                 loadAmps={loadAmps}
+                terminalsRated75C={terminalsRated75C}
               />
 
               {/* NEC References */}
@@ -323,18 +338,21 @@ export const ConductorSizingTool: React.FC<ConductorSizingToolProps> = ({ projec
 interface AmpacityComparisonTableProps {
   conductorSize: string;
   loadAmps: number;
+  terminalsRated75C?: boolean;
 }
 
-const AmpacityComparisonTable: React.FC<AmpacityComparisonTableProps> = ({ conductorSize, loadAmps }) => {
-  // Get ampacity data for both materials
+const AmpacityComparisonTable: React.FC<AmpacityComparisonTableProps> = ({ conductorSize, loadAmps, terminalsRated75C = false }) => {
   const cuData = TABLE_310_16.find(e => e.size === conductorSize && e.material === 'Cu');
   const alData = TABLE_310_16.find(e => e.size === conductorSize && e.material === 'Al');
 
-  // Determine which temperature column to use per NEC 110.14(C)
-  // For circuits ≤100A or conductors #14-#1 AWG: Use 60°C column (unless equipment listed for 75°C)
-  // For circuits >100A or conductors larger than #1 AWG: Use 75°C column
-  const conductorSizeIndex = ['14 AWG', '12 AWG', '10 AWG', '8 AWG', '6 AWG', '4 AWG', '3 AWG', '2 AWG', '1 AWG'].indexOf(conductorSize);
-  const isSmallConductor = conductorSizeIndex !== -1;  const recommendedTemp = (loadAmps <= 100 && isSmallConductor) ? 60 : 75;
+  // NEC 110.14(C): termination column
+  // ≤100A + small conductor: 60°C default, 75°C if terminals listed for it
+  // >100A or larger than #1: always 75°C
+  const smallConductorSizes = ['14 AWG', '12 AWG', '10 AWG', '8 AWG', '6 AWG', '4 AWG', '3 AWG', '2 AWG', '1 AWG'];
+  const isSmallConductor = smallConductorSizes.includes(conductorSize);
+  const recommendedTemp = (loadAmps <= 100 && isSmallConductor)
+    ? (terminalsRated75C ? 75 : 60)
+    : 75;
 
   return (
     <div className="bg-white border border-gray-200 rounded-lg p-6">
@@ -345,7 +363,9 @@ const AmpacityComparisonTable: React.FC<AmpacityComparisonTableProps> = ({ condu
           <p className="text-xs text-gray-600">
             <strong>NEC 110.14(C):</strong> {recommendedTemp === 60
               ? 'For circuits ≤100A, use 60°C column for terminations (unless equipment is listed for 75°C)'
-              : 'For circuits >100A or conductors larger than #1 AWG, use 75°C column for terminations'}
+              : (loadAmps <= 100 && isSmallConductor && terminalsRated75C)
+                ? 'Terminals listed for 75°C per NEC 110.14(C)(1)(a)(2) — using 75°C column'
+                : 'For circuits >100A or conductors larger than #1 AWG, use 75°C column for terminations'}
           </p>
         </div>
       </div>

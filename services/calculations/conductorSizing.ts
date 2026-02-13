@@ -162,6 +162,8 @@ function getTypicalConductorForOcpd(ocpdRating: number, material: 'Cu' | 'Al'): 
  * @param numConductors - Number of current-carrying conductors in raceway (default 3 for 3-phase)
  * @param isContinuous - Whether load is continuous (>3 hours)
  * @param ocpdRating - Optional OCPD rating for EGC sizing (if not provided, uses requiredAmpacity)
+ * @param terminalsRated75C - True if equipment terminals are listed for 75°C per NEC 110.14(C)(1)(a)(2).
+ *   When true, allows 75°C column for circuits ≤100A with small conductors instead of 60°C.
  * @returns Conductor sizing result with all corrections including EGC
  *
  * @example
@@ -175,7 +177,8 @@ export function sizeConductor(
   ambientTempC: number = 30,
   numConductors: number = 3,
   isContinuous: boolean = true,
-  ocpdRating?: number
+  ocpdRating?: number,
+  terminalsRated75C: boolean = false
 ): ConductorSizingResult {
   const necReferences: string[] = ['NEC 310.16 - Conductor Ampacity'];
   const warnings: string[] = [];
@@ -242,62 +245,73 @@ export function sizeConductor(
   }
 
   // CHECK NEC 110.14(C) - TERMINATION TEMPERATURE RATING LIMITS
-  // For circuits ≤100A with conductors #14-#1 AWG: Use 60°C column for terminations
-  // For circuits >100A: Use 75°C column for terminations
+  // (a) ≤100A with conductors #14–#1: default 60°C; 75°C if equipment listed for it
+  // (b) >100A or conductors larger than #1: default 75°C
   const requiredOCPD = ocpdRating ?? Math.ceil(requiredAmpacity);
   let finalConductor = conductor;
   let finalBaseAmpacity = baseAmpacity;
   let finalAdjustedAmpacity = adjustedAmpacity;
 
-  // List of "small conductors" per NEC 110.14(C)(1)(a)
   const smallConductorSizes = ['14 AWG', '12 AWG', '10 AWG', '8 AWG', '6 AWG', '4 AWG', '3 AWG', '2 AWG', '1 AWG'];
   const isSmallConductor = smallConductorSizes.includes(conductor.size);
 
-  // NEC 110.14(C): Termination temperature limits
-  if (requiredAmpacity <= 100 && isSmallConductor && settings.temperatureRating > 60) {
-    // For circuits ≤100A with small conductors, check 60°C termination rating
-    const ampacityAt60C = conductor.temp60C;
-    const adjustedAmpacityAt60C = ampacityAt60C * combinedDerating;
+  // Determine effective termination temperature
+  let terminationTemp: 60 | 75;
+  if (requiredAmpacity <= 100 && isSmallConductor) {
+    // NEC 110.14(C)(1)(a): default 60°C, or 75°C if terminals are listed for it
+    terminationTemp = terminalsRated75C ? 75 : 60;
+  } else {
+    // NEC 110.14(C)(1)(b): >100A or conductor > #1 AWG → 75°C
+    terminationTemp = 75;
+  }
 
-    if (adjustedAmpacityAt60C < requiredAmpacity) {
-      // Conductor doesn't meet requirements at 60°C termination - need to upsize
+  // Only need to check if insulation rating exceeds terminationTemp
+  if (settings.temperatureRating > terminationTemp) {
+    const ampacityAtTermTemp = conductor[`temp${terminationTemp}C` as 'temp60C' | 'temp75C'] as number;
+    const adjustedAmpacityAtTermTemp = ampacityAtTermTemp * combinedDerating;
+
+    if (adjustedAmpacityAtTermTemp < requiredAmpacity) {
+      // Conductor insufficient at termination temp — upsize
+      const necRef = terminationTemp === 60
+        ? 'NEC 110.14(C)(1)(a) - 60°C termination for ≤100A circuits'
+        : 'NEC 110.14(C)(1)(b) - 75°C termination for >100A circuits';
+      necReferences.push(necRef);
       warnings.push(
-        `⚠️ NEC 110.14(C)(1)(a): Circuits ≤100A require 60°C termination rating. ` +
-        `${conductor.size} at 60°C = ${ampacityAt60C}A (adjusted: ${adjustedAmpacityAt60C.toFixed(1)}A) is insufficient for ${requiredAmpacity.toFixed(1)}A. Upsizing conductor.`
+        `⚠️ NEC 110.14(C): ${terminationTemp}°C termination required. ` +
+        `${conductor.size} at ${terminationTemp}°C = ${ampacityAtTermTemp}A ` +
+        `(adjusted: ${adjustedAmpacityAtTermTemp.toFixed(1)}A) is insufficient for ${requiredAmpacity.toFixed(1)}A. Upsizing conductor.`
       );
-      necReferences.push('NEC 110.14(C)(1) - Termination Temperature Rating');
 
-      // Find conductor that meets requirement at 60°C
-      const requiredAt60C = requiredAmpacity / combinedDerating;
+      const requiredAtTermTemp = requiredAmpacity / combinedDerating;
       const upsizedConductor = findConductorByAmpacity(
-        requiredAt60C,
+        requiredAtTermTemp,
         settings.conductorMaterial,
-        60 // Use 60°C column
+        terminationTemp
       );
 
       if (upsizedConductor) {
         finalConductor = upsizedConductor;
-        // Still use the higher temp rating for the base ampacity (for derating calculations)
         finalBaseAmpacity = upsizedConductor[`temp${settings.temperatureRating}C` as 'temp60C' | 'temp75C' | 'temp90C'];
         finalAdjustedAmpacity = finalBaseAmpacity * combinedDerating;
+        const upsizedAmpAtTerm = upsizedConductor[`temp${terminationTemp}C` as 'temp60C' | 'temp75C'] as number;
         warnings.push(
-          `✓ Upsized to ${upsizedConductor.size} to meet 60°C termination requirement (${upsizedConductor.temp60C}A @ 60°C).`
+          `✓ Upsized to ${upsizedConductor.size} to meet ${terminationTemp}°C termination requirement (${upsizedAmpAtTerm}A @ ${terminationTemp}°C).`
         );
       }
     } else {
-      // Conductor is sized based on higher temp but limited by 60°C termination
-      necReferences.push('NEC 110.14(C)(1)(a) - 60°C termination for ≤100A circuits');
+      // Sufficient — info only
+      const necRef = terminationTemp === 60
+        ? 'NEC 110.14(C)(1)(a) - 60°C termination for ≤100A circuits'
+        : 'NEC 110.14(C)(1)(b) - 75°C termination for >100A circuits';
+      necReferences.push(necRef);
       warnings.push(
-        `ℹ️ NEC 110.14(C): Circuit ≤100A requires 60°C termination. ` +
-        `${conductor.size} rated ${ampacityAt60C}A @ 60°C, sufficient for ${requiredAmpacity.toFixed(1)}A.`
+        `ℹ️ NEC 110.14(C): Circuit ${terminationTemp === 60 ? '≤100A requires 60°C' : '>100A uses 75°C'} termination. ` +
+        `${conductor.size} rated ${ampacityAtTermTemp}A @ ${terminationTemp}°C, sufficient for ${requiredAmpacity.toFixed(1)}A.`
       );
     }
-  } else if (requiredAmpacity > 100 && settings.temperatureRating > 75) {
-    // For circuits >100A, 75°C termination rating applies
-    necReferences.push('NEC 110.14(C)(1)(b) - 75°C termination for >100A circuits');
-    warnings.push(
-      `ℹ️ NEC 110.14(C): Circuit >100A uses 75°C termination rating.`
-    );
+  } else if (terminalsRated75C && requiredAmpacity <= 100 && isSmallConductor) {
+    // Insulation is already 75°C and terminals are 75°C rated — just note it
+    necReferences.push('NEC 110.14(C)(1)(a)(2) - 75°C termination (equipment listed)');
   }
 
   // CHECK NEC 240.4(D) - OVERCURRENT PROTECTION FOR SMALL CONDUCTORS

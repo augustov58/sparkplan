@@ -353,6 +353,37 @@ describe('Equipment Grounding Conductor (EGC) Sizing - NEC 250.122', () => {
     });
   });
 
+  describe('NEC 110.14(C) Termination Temperature', () => {
+    const baseSettings: ProjectSettings = {
+      serviceVoltage: 240,
+      servicePhase: 1,
+      occupancyType: 'dwelling',
+      conductorMaterial: 'Cu',
+      temperatureRating: 90
+    };
+
+    it('should check 60°C column by default for ≤100A circuits', () => {
+      // 90°C insulation, 40A continuous → 50A required
+      const result = sizeConductor(40, baseSettings, 30, 3, true);
+      expect(result.warnings.some(w => w.includes('110.14(C)'))).toBe(true);
+    });
+
+    it('should allow 75°C column when terminalsRated75C is true for ≤100A', () => {
+      const withoutTerminals = sizeConductor(40, baseSettings, 30, 3, true, undefined, false);
+      const withTerminals = sizeConductor(40, baseSettings, 30, 3, true, undefined, true);
+      // Without terminals: warns about 60°C. With terminals: no 60°C warning.
+      expect(withoutTerminals.warnings.some(w => w.includes('60°C'))).toBe(true);
+      expect(withTerminals.warnings.some(w => w.includes('60°C'))).toBe(false);
+    });
+
+    it('should always use 75°C for >100A regardless of terminals checkbox', () => {
+      const result = sizeConductor(100, baseSettings, 30, 3, true, undefined, false);
+      // >100A → 75°C termination, not 60°C
+      expect(result.warnings.some(w => w.includes('75°C termination'))).toBe(true);
+      expect(result.warnings.some(w => w.includes('60°C'))).toBe(false);
+    });
+  });
+
   describe('EGC Calculation Function', () => {
     it('should calculate EGC with detailed info', () => {
       const result = calculateEgcSize(100, '3', 'Cu', false);
