@@ -13,7 +13,7 @@ import { AmpacityEntry } from '../../types/nec-types';
 export const TABLE_310_16: AmpacityEntry[] = [
   // Copper conductors
   { size: '14 AWG', material: 'Cu', temp60C: 20, temp75C: 20, temp90C: 25 },
-  { size: '12 AWG', material: 'Cu', temp60C: 25, temp75C: 25, temp90C: 30 },
+  { size: '12 AWG', material: 'Cu', temp60C: 20, temp75C: 25, temp90C: 30 },
   { size: '10 AWG', material: 'Cu', temp60C: 30, temp75C: 35, temp90C: 40 },
   { size: '8 AWG', material: 'Cu', temp60C: 40, temp75C: 50, temp90C: 55 },
   { size: '6 AWG', material: 'Cu', temp60C: 55, temp75C: 65, temp90C: 75 },
