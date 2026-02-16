@@ -1195,26 +1195,26 @@ export const DwellingLoadCalculator: React.FC<DwellingLoadCalculatorProps> = ({
                 </h3>
               </div>
               <div className="p-5 space-y-3">
-                <div className="flex justify-between items-center">
-                  <span className="text-[#666]">Connected Load</span>
-                  <span className="text-xl font-bold text-[#1a1a1a]">{(loadResult.totalConnectedVA / 1000).toFixed(1)} kVA</span>
+                <div className="flex justify-between items-center py-1">
+                  <span className="text-[#888] text-sm">Connected Load</span>
+                  <span className="text-lg font-semibold text-[#2d3b2d]">{(loadResult.totalConnectedVA / 1000).toFixed(1)} kVA</span>
                 </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-[#666]">Demand Load</span>
-                  <span className="text-xl font-bold text-[#1a1a1a]">{(loadResult.totalDemandVA / 1000).toFixed(1)} kVA</span>
+                <div className="flex justify-between items-center py-1">
+                  <span className="text-[#888] text-sm">Demand Load</span>
+                  <span className="text-lg font-semibold text-[#2d3b2d]">{(loadResult.totalDemandVA / 1000).toFixed(1)} kVA</span>
                 </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-[#666]">Demand Factor</span>
-                  <span className="text-lg text-[#1a1a1a]">{(loadResult.demandFactor * 100).toFixed(1)}%</span>
+                <div className="flex justify-between items-center py-1">
+                  <span className="text-[#888] text-sm">Demand Factor</span>
+                  <span className="text-lg text-[#2d3b2d]">{(loadResult.demandFactor * 100).toFixed(1)}%</span>
                 </div>
                 <div className="pt-3 mt-3 border-t border-[#e8e6e3]">
-                  <div className="flex justify-between items-center">
-                    <span className="text-[#666]">Service Current</span>
-                    <span className="text-xl font-bold text-[#2d3b2d]">{loadResult.serviceAmps}A</span>
+                  <div className="flex justify-between items-center py-1">
+                    <span className="text-[#888] text-sm">Service Current</span>
+                    <span className="text-xl font-bold text-[#c9a227]">{loadResult.serviceAmps}A</span>
                   </div>
-                  <div className="flex justify-between items-center mt-2">
-                    <span className="text-[#666]">Recommended Service</span>
-                    <span className="text-2xl font-bold text-[#2d3b2d]">{loadResult.recommendedServiceSize}A</span>
+                  <div className="flex justify-between items-center py-1">
+                    <span className="text-[#888] text-sm">Recommended Service</span>
+                    <span className="text-2xl font-bold text-[#c9a227]">{loadResult.recommendedServiceSize}A</span>
                   </div>
                 </div>
               </div>
