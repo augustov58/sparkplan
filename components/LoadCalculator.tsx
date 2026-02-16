@@ -224,7 +224,7 @@ export const LoadCalculator: React.FC<LoadCalculatorProps> = ({ project, updateP
 
             <button
               type="submit"
-              className="w-full bg-gray-900 text-white hover:bg-black transition-colors py-2.5 rounded-md text-sm font-medium"
+              className="w-full bg-[#2d3b2d] text-white hover:bg-[#3d4f3d] transition-colors py-2.5 rounded-md text-sm font-medium"
             >
               Add Load Entry
             </button>

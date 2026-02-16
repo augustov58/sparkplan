@@ -136,7 +136,7 @@ export const PricingPage: React.FC = () => {
           disabled={isLoading}
           className={`w-full py-2.5 rounded-sm font-semibold transition-colors flex items-center justify-center gap-2 ${
             plan === 'pro'
-              ? 'bg-[#2d3b2d] hover:bg-[#2d3b2d] text-gray-900'
+              ? 'bg-[#2d3b2d] hover:bg-[#2d3b2d] text-white'
               : 'bg-white text-gray-900 hover:bg-gray-100'
           }`}
         >
@@ -266,7 +266,7 @@ export const PricingPage: React.FC = () => {
               }`}
             >
               {isPopular && (
-                <div className="absolute top-0 right-0 bg-[#2d3b2d] text-gray-900 text-xs font-bold px-2 py-1 rounded-bl-lg rounded-tr-lg">
+                <div className="absolute top-0 right-0 bg-[#2d3b2d] text-white text-xs font-bold px-2 py-1 rounded-bl-lg rounded-tr-lg">
                   POPULAR
                 </div>
               )}
@@ -331,7 +331,7 @@ export const PricingPage: React.FC = () => {
         </p>
         <a
           href="mailto:sales@sparkplan.app?subject=Enterprise%20Plan%20Inquiry"
-          className="inline-block bg-[#2d3b2d] hover:bg-[#2d3b2d] text-gray-900 px-6 py-2.5 rounded-sm font-semibold transition-colors"
+          className="inline-block bg-[#2d3b2d] hover:bg-[#2d3b2d] text-white px-6 py-2.5 rounded-sm font-semibold transition-colors"
         >
           Contact Sales
         </a>

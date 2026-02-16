@@ -96,7 +96,7 @@ export const ComplianceReport: React.FC<ReportProps> = ({ project }) => {
                         <p className="text-gray-400">Master Electrician License #48291</p>
                     </div>
                 </div>
-                <button className="bg-black text-white px-6 py-3 rounded hover:bg-gray-800 transition-colors flex items-center gap-2">
+                <button className="bg-[#2d3b2d] text-white px-6 py-3 rounded hover:bg-[#3d4f3d] transition-colors flex items-center gap-2">
                     <FileText className="w-4 h-4" /> Download PDF Report
                 </button>
             </div>

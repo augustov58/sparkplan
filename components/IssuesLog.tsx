@@ -66,7 +66,7 @@ export const IssuesLog: React.FC<IssuesLogProps> = ({ project }) => {
          </div>
          <button
            onClick={() => setIsAdding(!isAdding)}
-           className="bg-gray-900 text-white px-4 py-2 rounded text-sm font-medium flex items-center gap-2 hover:bg-black"
+           className="bg-[#2d3b2d] text-white px-4 py-2 rounded text-sm font-medium flex items-center gap-2 hover:bg-black"
          >
            <Plus className="w-4 h-4" /> Log Violation
          </button>
@@ -132,7 +132,7 @@ export const IssuesLog: React.FC<IssuesLogProps> = ({ project }) => {
                 <button 
                   key={f}
                   onClick={() => setFilter(f)}
-                  className={`px-3 py-1.5 rounded text-xs font-medium transition-colors ${filter === f ? 'bg-gray-900 text-white' : 'text-gray-500 hover:bg-gray-100'}`}
+                  className={`px-3 py-1.5 rounded text-xs font-medium transition-colors ${filter === f ? 'bg-[#2d3b2d] text-white' : 'text-gray-500 hover:bg-gray-100'}`}
                 >
                     {f}
                 </button>

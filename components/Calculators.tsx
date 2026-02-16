@@ -1297,7 +1297,7 @@ const ShortCircuitCalculator: React.FC<ShortCircuitCalculatorProps> = ({ project
               <div className="mt-4">
                 <button
                   onClick={() => setShowSaveModal(true)}
-                  className="w-full bg-gray-900 hover:bg-black text-white px-4 py-3 rounded-lg text-sm font-medium flex items-center justify-center gap-2 transition-colors"
+                  className="w-full bg-[#2d3b2d] hover:bg-[#3d4f3d] text-white px-4 py-3 rounded-lg text-sm font-medium flex items-center justify-center gap-2 transition-colors"
                 >
                   <Save className="w-4 h-4" />
                   Save to Project
@@ -1380,7 +1380,7 @@ const ShortCircuitCalculator: React.FC<ShortCircuitCalculatorProps> = ({ project
               <button
                 onClick={handleSave}
                 disabled={saving}
-                className="bg-gray-900 hover:bg-black text-white px-4 py-2 rounded-md text-sm font-medium disabled:opacity-50"
+                className="bg-[#2d3b2d] hover:bg-[#3d4f3d] text-white px-4 py-2 rounded-md text-sm font-medium disabled:opacity-50"
               >
                 {saving ? 'Saving...' : 'Save Calculation'}
               </button>

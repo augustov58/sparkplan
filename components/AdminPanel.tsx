@@ -151,7 +151,7 @@ export const AdminPanel: React.FC = () => {
         </div>
         <button
           onClick={() => setShowAddForm(!showAddForm)}
-          className="bg-[#2d3b2d] hover:bg-[#2d3b2d] text-gray-900 px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-2 transition-colors"
+          className="bg-[#2d3b2d] hover:bg-[#2d3b2d] text-white px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-2 transition-colors"
         >
           <UserPlus className="w-4 h-4" />
           Add User
