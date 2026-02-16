@@ -1109,7 +1109,7 @@ export const PanelSchedule: React.FC<PanelScheduleProps> = ({ project }) => {
               <div className="flex gap-1">
                 <button
                   onClick={saveEdit}
-                  className="flex items-center gap-1 px-3 py-1.5 bg-[#2d3b2d] text-black rounded text-xs font-medium hover:bg-[#2d3b2d]"
+                  className="flex items-center gap-1 px-3 py-1.5 bg-[#2d3b2d] text-white rounded text-xs font-medium hover:bg-[#2d3b2d]"
                 >
                   <Save className="w-3 h-3" /> Save
                 </button>
@@ -1136,7 +1136,7 @@ export const PanelSchedule: React.FC<PanelScheduleProps> = ({ project }) => {
             {panels.length > 1 && (
               <button
                 onClick={handleExportAllPanels}
-                className="flex items-center gap-1 px-3 py-1.5 bg-[#2d3b2d] text-black rounded text-xs font-medium hover:bg-[#2d3b2d]"
+                className="flex items-center gap-1 px-3 py-1.5 bg-[#2d3b2d] text-white rounded text-xs font-medium hover:bg-[#2d3b2d]"
               >
                 <Download className="w-3 h-3" /> All Panels
               </button>
@@ -1156,7 +1156,7 @@ export const PanelSchedule: React.FC<PanelScheduleProps> = ({ project }) => {
                 <th colSpan={3} className="p-1.5 text-center font-semibold bg-gray-700">LOAD/PHASE (KVA)</th>
                 <th className="p-1.5 w-10 text-center font-semibold border-l border-gray-600">TRIP</th>
                 <th className="p-1.5 w-10 text-center font-semibold">POLES</th>
-                <th className="p-1.5 w-8 text-center font-semibold bg-[#2d3b2d] text-black border-x border-gray-600">Φ</th>
+                <th className="p-1.5 w-8 text-center font-semibold bg-[#2d3b2d] text-white border-x border-gray-600">Φ</th>
                 <th className="p-1.5 w-10 text-center font-semibold">POLES</th>
                 <th className="p-1.5 w-10 text-center font-semibold border-r border-gray-600">TRIP</th>
                 <th colSpan={3} className="p-1.5 text-center font-semibold bg-gray-700">LOAD/PHASE (KVA)</th>

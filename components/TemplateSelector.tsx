@@ -269,7 +269,7 @@ export const TemplateSelector: React.FC<TemplateSelectorProps> = ({
           </button>
           <button
             onClick={handleSelectTemplate}
-            className="px-6 py-2 rounded-md font-medium bg-[#2d3b2d] text-black hover:bg-[#2d3b2d] transition-colors"
+            className="px-6 py-2 rounded-md font-medium bg-[#2d3b2d] text-white hover:bg-[#2d3b2d] transition-colors"
           >
             {selectedSampleTemplate || selectedTemplateId ? 'Use This Template' : 'Start Blank Project'}
           </button>

@@ -188,7 +188,7 @@ export const EVEMSLoadManagement: React.FC = () => {
               <h4 className="font-semibold text-gray-900 text-sm">EV Chargers</h4>
               <button
                 onClick={addCharger}
-                className="text-xs bg-[#2d3b2d] text-black px-3 py-1.5 rounded font-medium hover:bg-[#3d4f3d] transition-colors flex items-center gap-1"
+                className="text-xs bg-[#2d3b2d] text-white px-3 py-1.5 rounded font-medium hover:bg-[#3d4f3d] transition-colors flex items-center gap-1"
               >
                 <Plus className="w-3 h-3" />
                 Add Charger

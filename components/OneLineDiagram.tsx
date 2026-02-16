@@ -2278,7 +2278,7 @@ export const OneLineDiagram: React.FC<OneLineDiagramProps> = ({ project, updateP
               <button
                 onClick={() => handleExportDiagram('pdf')}
                 disabled={exporting || panels.length === 0}
-                className="bg-[#2d3b2d] hover:bg-[#3d4f3d] disabled:bg-gray-300 text-black px-3 py-1 rounded text-xs font-medium flex items-center gap-1 transition-colors shadow-sm"
+                className="bg-[#2d3b2d] hover:bg-[#3d4f3d] disabled:bg-gray-300 text-white px-3 py-1 rounded text-xs font-medium flex items-center gap-1 transition-colors shadow-sm"
                 title="Export as PDF (Print)"
               >
                 <Download className="w-3 h-3" />
@@ -2521,7 +2521,7 @@ export const OneLineDiagram: React.FC<OneLineDiagramProps> = ({ project, updateP
               <RefreshCcw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
               {description ? 'Regenerate Analysis' : 'Analyze Topology'}
             </button>
-            <button className="flex items-center gap-2 px-4 py-2 bg-[#2d3b2d] rounded-md text-sm font-medium hover:bg-[#2d3b2d] text-black">
+            <button className="flex items-center gap-2 px-4 py-2 bg-[#2d3b2d] rounded-md text-sm font-medium hover:bg-[#2d3b2d] text-white">
               <Download className="w-4 h-4" />
               Export DWG/PDF
             </button>
@@ -2696,7 +2696,7 @@ export const OneLineDiagram: React.FC<OneLineDiagramProps> = ({ project, updateP
 
                <button
                   onClick={addPanel}
-                  className="w-full bg-[#2d3b2d] text-black text-sm font-medium py-2 rounded hover:bg-[#2d3b2d] transition-colors"
+                  className="w-full bg-[#2d3b2d] text-white text-sm font-medium py-2 rounded hover:bg-[#2d3b2d] transition-colors"
                >
                  Add Panel
                </button>
@@ -3219,7 +3219,7 @@ export const OneLineDiagram: React.FC<OneLineDiagramProps> = ({ project, updateP
               <button
                 onClick={() => handleExportDiagram('pdf')}
                 disabled={exporting || panels.length === 0}
-                className="bg-[#2d3b2d] hover:bg-[#3d4f3d] disabled:bg-gray-300 text-black px-3 py-1 rounded text-xs font-medium flex items-center gap-1 transition-colors shadow-sm"
+                className="bg-[#2d3b2d] hover:bg-[#3d4f3d] disabled:bg-gray-300 text-white px-3 py-1 rounded text-xs font-medium flex items-center gap-1 transition-colors shadow-sm"
                 title="Export as PDF (Print)"
               >
                 <Download className="w-3 h-3" />

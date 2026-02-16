@@ -585,7 +585,7 @@ export const SiteVisitManager: React.FC<SiteVisitManagerProps> = ({ project }) =
               </button>
               <button
                 onClick={handleCreate}
-                className="bg-[#2d3b2d] text-black px-6 py-2 rounded text-sm font-bold hover:bg-[#2d3b2d] transition-colors"
+                className="bg-[#2d3b2d] text-white px-6 py-2 rounded text-sm font-bold hover:bg-[#2d3b2d] transition-colors"
               >
                 Save Visit
               </button>

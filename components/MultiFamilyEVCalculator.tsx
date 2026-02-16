@@ -496,7 +496,7 @@ export const MultiFamilyEVCalculator: React.FC<MultiFamilyEVCalculatorProps> = (
           onClick={() => setMode('detailed')}
           className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
             mode === 'detailed'
-              ? 'bg-[#2d3b2d] text-black'
+              ? 'bg-[#2d3b2d] text-white'
               : 'bg-white text-gray-700 hover:bg-gray-100'
           }`}
         >
@@ -506,7 +506,7 @@ export const MultiFamilyEVCalculator: React.FC<MultiFamilyEVCalculatorProps> = (
           onClick={() => setMode('quick')}
           className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
             mode === 'quick'
-              ? 'bg-[#2d3b2d] text-black'
+              ? 'bg-[#2d3b2d] text-white'
               : 'bg-white text-gray-700 hover:bg-gray-100'
           }`}
         >
@@ -1183,7 +1183,7 @@ export const MultiFamilyEVCalculator: React.FC<MultiFamilyEVCalculatorProps> = (
               <button
                 onClick={handleExportPDF}
                 disabled={isExporting}
-                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-[#2d3b2d] text-black rounded hover:bg-[#3d4f3d] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-[#2d3b2d] text-white rounded hover:bg-[#3d4f3d] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {isExporting ? (
                   <>

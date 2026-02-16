@@ -81,12 +81,26 @@
 }
 
 /* ===== BASE STYLES ===== */
+* {
+  font-family: inherit;
+}
+
 body {
   font-family: var(--font-sans);
   background-color: var(--color-paper);
   color: var(--color-ink);
   font-size: 14px;
   line-height: 1.5;
+}
+
+/* Ensure all interactive elements use the body font */
+button, input, select, textarea, option {
+  font-family: var(--font-sans);
+}
+
+/* Labels should be consistent */
+label {
+  font-family: var(--font-sans);
 }
 
 /* ===== HARVEY TYPOGRAPHY ===== */

@@ -112,7 +112,7 @@ export const IssuesLog: React.FC<IssuesLogProps> = ({ project }) => {
             </div>
             <div className="flex justify-end gap-2">
                 <button onClick={() => setIsAdding(false)} className="px-3 py-1 text-sm text-gray-500">Cancel</button>
-                <button onClick={handleAdd} className="bg-[#2d3b2d] text-black px-4 py-1.5 rounded text-sm font-bold">Save Issue</button>
+                <button onClick={handleAdd} className="bg-[#2d3b2d] text-white px-4 py-1.5 rounded text-sm font-bold">Save Issue</button>
             </div>
          </div>
        )}

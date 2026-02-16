@@ -684,7 +684,7 @@ const ConduitFillCalculator: React.FC = () => {
             <h3 className="font-semibold text-[#1a1a1a] text-base">Conductors</h3>
             <button
               onClick={addWireGroup}
-              className="flex items-center gap-1.5 text-xs bg-[#2d3b2d] text-black px-3 py-2 rounded font-semibold hover:bg-[#3d4f3d] transition-all shadow-sm hover:shadow-md"
+              className="flex items-center gap-1.5 text-xs bg-[#2d3b2d] text-white px-3 py-2 rounded font-semibold hover:bg-[#3d4f3d] transition-all shadow-sm hover:shadow-md"
             >
               <Plus className="w-3.5 h-3.5" />
               Add Group

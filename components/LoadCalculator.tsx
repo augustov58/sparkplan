@@ -327,7 +327,7 @@ export const LoadCalculator: React.FC<LoadCalculatorProps> = ({ project, updateP
                   <button
                     onClick={handleExportPDF}
                     disabled={isExporting}
-                    className="w-full bg-[#2d3b2d] hover:bg-[#3d4f3d] text-black px-4 py-2.5 rounded-md text-sm font-medium transition-colors flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="w-full bg-[#2d3b2d] hover:bg-[#3d4f3d] text-white px-4 py-2.5 rounded-md text-sm font-medium transition-colors flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     <Download className="w-4 h-4" />
                     {isExporting ? 'Exporting...' : 'Export Report (TXT)'}
@@ -354,7 +354,7 @@ export const LoadCalculator: React.FC<LoadCalculatorProps> = ({ project, updateP
                  <button 
                   onClick={runAiValidation}
                   disabled={isValidating || loads.length === 0}
-                  className="bg-[#2d3b2d] hover:bg-[#2d3b2d] text-black px-4 py-2 rounded text-sm font-medium w-full transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="bg-[#2d3b2d] hover:bg-[#2d3b2d] text-white px-4 py-2 rounded text-sm font-medium w-full transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                  >
                    {isValidating ? 'Analyzing...' : 'Validate Compliance'}
                  </button>

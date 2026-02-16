@@ -263,7 +263,7 @@ export const GroundingBonding: React.FC<GroundingProps> = ({ project }) => {
           <button 
             onClick={handleValidate}
             disabled={validating}
-            className="bg-[#2d3b2d] hover:bg-[#2d3b2d] disabled:opacity-50 text-black px-4 py-2 rounded-md text-sm font-medium flex items-center gap-2 transition-colors"
+            className="bg-[#2d3b2d] hover:bg-[#2d3b2d] disabled:opacity-50 text-white px-4 py-2 rounded-md text-sm font-medium flex items-center gap-2 transition-colors"
           >
             <ShieldCheck className={`w-4 h-4 ${validating ? 'animate-pulse' : ''}`} />
             {validating ? 'Validating...' : 'Verify NEC 250'}

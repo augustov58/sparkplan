@@ -160,7 +160,7 @@ export const RFIManager: React.FC<RFIManagerProps> = ({ project }) => {
                 onClick={() => setCreationMode('manual')}
                 className={`px-3 py-1 text-xs font-medium rounded transition-colors ${
                   creationMode === 'manual'
-                    ? 'bg-[#2d3b2d] text-black'
+                    ? 'bg-[#2d3b2d] text-white'
                     : 'bg-gray-200 text-gray-600 hover:bg-gray-300'
                 }`}
               >
@@ -170,7 +170,7 @@ export const RFIManager: React.FC<RFIManagerProps> = ({ project }) => {
                 onClick={() => setCreationMode('pdf')}
                 className={`px-3 py-1 text-xs font-medium rounded transition-colors flex items-center gap-1 ${
                   creationMode === 'pdf'
-                    ? 'bg-[#2d3b2d] text-black'
+                    ? 'bg-[#2d3b2d] text-white'
                     : 'bg-gray-200 text-gray-600 hover:bg-gray-300'
                 }`}
               >
@@ -411,7 +411,7 @@ export const RFIManager: React.FC<RFIManagerProps> = ({ project }) => {
               </button>
               <button
                 onClick={handleCreate}
-                className="bg-[#2d3b2d] text-black px-6 py-2 rounded text-sm font-bold hover:bg-[#2d3b2d] transition-colors"
+                className="bg-[#2d3b2d] text-white px-6 py-2 rounded text-sm font-bold hover:bg-[#2d3b2d] transition-colors"
               >
                 Create RFI
               </button>

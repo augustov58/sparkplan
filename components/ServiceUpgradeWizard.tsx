@@ -230,7 +230,7 @@ export const ServiceUpgradeWizard: React.FC<ServiceUpgradeWizardProps> = ({ proj
           onClick={() => setMode('quick')}
           className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
             mode === 'quick'
-              ? 'bg-[#2d3b2d] text-black'
+              ? 'bg-[#2d3b2d] text-white'
               : 'bg-white text-gray-700 hover:bg-gray-100'
           }`}
         >

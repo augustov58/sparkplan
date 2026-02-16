@@ -407,7 +407,7 @@ Analyze the attached PDF document now.`,
         {file && !extracting && progress !== 'Extraction complete!' && (
           <button
             onClick={handleExtract}
-            className="w-full bg-[#2d3b2d] text-black px-6 py-3 rounded-lg text-sm font-bold hover:bg-[#2d3b2d] transition-colors flex items-center justify-center gap-2"
+            className="w-full bg-[#2d3b2d] text-white px-6 py-3 rounded-lg text-sm font-bold hover:bg-[#2d3b2d] transition-colors flex items-center justify-center gap-2"
           >
             <FileText className="w-4 h-4" />
             Extract RFI Data with AI
