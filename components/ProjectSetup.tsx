@@ -176,7 +176,7 @@ export const ProjectSetup: React.FC<ProjectSetupProps> = ({ project, updateProje
   const isResidential = localProject.type === ProjectType.RESIDENTIAL;
 
   return (
-    <div className="space-y-8 animate-in fade-in duration-500 max-w-6xl">
+    <div className="space-y-8 animate-in fade-in duration-500 w-full">
       <div className="flex justify-between items-center">
         <div>
           <h2 className="text-2xl font-light text-[#1a1a1a]">Project Configuration</h2>

@@ -125,7 +125,7 @@ export const Calculators: React.FC<CalculatorsProps> = ({ projectId }) => {
   };
 
   return (
-    <div className="animate-in fade-in duration-500 max-w-6xl">
+    <div className="animate-in fade-in duration-500 w-full">
       <div className="section-spacing">
         <h2 className="text-xl font-semibold text-[#1a1a1a]">Engineering Tools</h2>
         <p className="text-[#888] mt-0.5 text-sm">Deterministic calculators for NEC compliance (Not AI).</p>
