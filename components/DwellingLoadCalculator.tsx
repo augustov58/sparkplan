@@ -1187,7 +1187,7 @@ export const DwellingLoadCalculator: React.FC<DwellingLoadCalculatorProps> = ({
         <div className="space-y-6">
           {/* Service Summary */}
           {loadResult && (
-            <div className="bg-gradient-to-br from-[#f0f5f0]0 to-[#2d3b2d] text-white rounded-lg p-6 shadow-lg">
+            <div className="bg-gradient-to-br from-[#3d4f3d] to-[#2d3b2d] text-white rounded-lg p-6 shadow-lg">
               <h3 className="text-lg font-medium mb-4 flex items-center gap-2">
                 <Zap className="w-5 h-5" />
                 Service Calculation
@@ -1221,36 +1221,36 @@ export const DwellingLoadCalculator: React.FC<DwellingLoadCalculatorProps> = ({
 
           {/* Conductor Sizing */}
           {loadResult && (
-            <div className="bg-gradient-to-br from-blue-600 to-blue-700 text-white rounded-lg p-6 shadow-lg">
+            <div className="bg-gradient-to-br from-[#243024] to-[#1a231a] text-white rounded-lg p-6 shadow-lg">
               <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
                 <Cable className="w-5 h-5" />
                 Recommended Conductor Sizes
               </h3>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div className="bg-blue-500/20 rounded-lg p-4 border border-blue-400/30">
-                  <div className="text-xs text-blue-100 mb-1">Service Conductors</div>
+                <div className="bg-[#3d6b3d]/20 rounded-lg p-4 border border-[#3d6b3d]/30">
+                  <div className="text-xs text-[#c1d7c1] mb-1">Service Conductors</div>
                   <div className="text-2xl font-bold">{loadResult.serviceConductorSize} Cu</div>
-                  <div className="text-xs text-blue-200 mt-2">Ungrounded (hot)</div>
-                  <div className="text-xs text-blue-200">Per NEC Table 310.12</div>
+                  <div className="text-xs text-[#94b894] mt-2">Ungrounded (hot)</div>
+                  <div className="text-xs text-[#94b894]">Per NEC Table 310.12</div>
                 </div>
-                <div className="bg-blue-500/20 rounded-lg p-4 border border-blue-400/30">
-                  <div className="text-xs text-blue-100 mb-1">Neutral Conductor</div>
+                <div className="bg-[#3d6b3d]/20 rounded-lg p-4 border border-[#3d6b3d]/30">
+                  <div className="text-xs text-[#c1d7c1] mb-1">Neutral Conductor</div>
                   <div className="text-2xl font-bold">{loadResult.neutralConductorSize} Cu</div>
-                  <div className="text-xs text-blue-200 mt-2">{loadResult.neutralAmps}A demand</div>
-                  <div className="text-xs text-blue-200">
+                  <div className="text-xs text-[#94b894] mt-2">{loadResult.neutralAmps}A demand</div>
+                  <div className="text-xs text-[#94b894]">
                     {loadResult.neutralReduction > 0
                       ? `(${loadResult.neutralReduction}% reduction applied)`
                       : 'No reduction'}
                   </div>
                 </div>
-                <div className="bg-blue-500/20 rounded-lg p-4 border border-blue-400/30">
-                  <div className="text-xs text-blue-100 mb-1">Grounding Electrode</div>
+                <div className="bg-[#3d6b3d]/20 rounded-lg p-4 border border-[#3d6b3d]/30">
+                  <div className="text-xs text-[#c1d7c1] mb-1">Grounding Electrode</div>
                   <div className="text-2xl font-bold">{loadResult.gecSize} Cu</div>
-                  <div className="text-xs text-blue-200 mt-2">GEC to electrode</div>
-                  <div className="text-xs text-blue-200">Per NEC 250.66</div>
+                  <div className="text-xs text-[#94b894] mt-2">GEC to electrode</div>
+                  <div className="text-xs text-[#94b894]">Per NEC 250.66</div>
                 </div>
               </div>
-              <div className="mt-4 text-xs text-blue-100 bg-blue-900/20 rounded-md p-3">
+              <div className="mt-4 text-xs text-[#c1d7c1] bg-[#111711]/30 rounded-md p-3">
                 <p className="flex items-start gap-2">
                   <AlertTriangle className="w-4 h-4 mt-0.5 flex-shrink-0" />
                   <span>Conductor sizes assume copper (Cu), 75°C terminations, and standard installation conditions.
