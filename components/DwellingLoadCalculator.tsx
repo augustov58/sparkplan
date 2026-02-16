@@ -1189,8 +1189,8 @@ export const DwellingLoadCalculator: React.FC<DwellingLoadCalculatorProps> = ({
           {loadResult && (
             <div className="bg-white rounded-xl border border-[#e8e6e3] shadow-lg overflow-hidden">
               <div className="bg-gradient-to-r from-[#2d3b2d] to-[#3d4f3d] px-6 py-3">
-                <h3 className="text-base font-semibold text-white flex items-center gap-2">
-                  <Zap className="w-5 h-5" />
+                <h3 className="text-base font-semibold flex items-center gap-2" style={{ color: 'white' }}>
+                  <Zap className="w-5 h-5 text-white" />
                   Service Calculation
                 </h3>
               </div>
@@ -1225,8 +1225,8 @@ export const DwellingLoadCalculator: React.FC<DwellingLoadCalculatorProps> = ({
           {loadResult && (
             <div className="bg-white rounded-xl border border-[#e8e6e3] shadow-lg overflow-hidden">
               <div className="bg-gradient-to-r from-[#2d3b2d] to-[#3d4f3d] px-6 py-3">
-                <h3 className="text-base font-semibold text-white flex items-center gap-2">
-                  <Cable className="w-5 h-5" />
+                <h3 className="text-base font-semibold flex items-center gap-2" style={{ color: 'white' }}>
+                  <Cable className="w-5 h-5 text-white" />
                   Recommended Conductor Sizes
                 </h3>
               </div>
