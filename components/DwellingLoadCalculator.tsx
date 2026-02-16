@@ -1188,11 +1188,9 @@ export const DwellingLoadCalculator: React.FC<DwellingLoadCalculatorProps> = ({
           {/* Service Summary */}
           {loadResult && (
             <div className="bg-white rounded-xl border border-[#e8e6e3] shadow-lg overflow-hidden">
-              <div className="bg-gradient-to-r from-[#2d3b2d] to-[#3d4f3d] px-6 py-3">
-                <h3 className="text-base font-semibold flex items-center gap-2" style={{ color: 'white' }}>
-                  <Zap className="w-5 h-5 text-white" />
-                  Service Calculation
-                </h3>
+              <div className="bg-gradient-to-r from-[#2d3b2d] to-[#3d4f3d] px-6 py-3 flex items-center gap-2">
+                <Zap className="w-5 h-5 text-white" />
+                <span className="text-base font-semibold text-white">Service Calculation</span>
               </div>
               <div className="p-5 space-y-3">
                 <div className="flex justify-between items-center py-1">
@@ -1224,11 +1222,9 @@ export const DwellingLoadCalculator: React.FC<DwellingLoadCalculatorProps> = ({
           {/* Conductor Sizing */}
           {loadResult && (
             <div className="bg-white rounded-xl border border-[#e8e6e3] shadow-lg overflow-hidden">
-              <div className="bg-gradient-to-r from-[#2d3b2d] to-[#3d4f3d] px-6 py-3">
-                <h3 className="text-base font-semibold flex items-center gap-2" style={{ color: 'white' }}>
-                  <Cable className="w-5 h-5 text-white" />
-                  Recommended Conductor Sizes
-                </h3>
+              <div className="bg-gradient-to-r from-[#2d3b2d] to-[#3d4f3d] px-6 py-3 flex items-center gap-2">
+                <Cable className="w-5 h-5 text-white" />
+                <span className="text-base font-semibold text-white">Recommended Conductor Sizes</span>
               </div>
               <div className="p-5">
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
