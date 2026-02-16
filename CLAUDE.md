@@ -19,6 +19,20 @@ npm test             # Run tests
 
 ---
 
+## Verification Protocol
+
+Before marking any task complete, run these checks in order:
+
+1. **`npm run build`** — Must exit 0 with no errors
+2. **`npm test`** — All tests must pass. Zero failures allowed.
+3. **If a test fails** — Fix the code (not the test), re-run. Do not mark complete with failing tests.
+4. **If you modified a calculation service** — Verify the test file covers your changes. Add tests for new code paths.
+5. **If you added a new route or component** — Verify it's included in the build output (check for the chunk in build log).
+
+**Verify incrementally**: Run build/tests after each significant change, not just at the end. Runtime bugs (DB constraint violations, null crashes, type errors) are cheaper to catch in the step that introduced them.
+
+---
+
 ## Critical NEC Rules
 
 ### NEC 220.87 - Service Upgrade Sizing
@@ -96,6 +110,8 @@ export function getEgcSize(ocpdRating: number, material: 'Cu' | 'Al'): string { 
 ```
 Table lookups always have a **fallback** (return largest size if input exceeds table).
 
+**NEC table data is safety-critical.** Before modifying any values in `/data/nec/`, cross-check against the actual NEC code book or a verified reference. A single wrong ampacity value (e.g., 25A vs 20A for 12 AWG Cu@60°C) cascades into incorrect conductor sizing for every user. When adding or editing table lookup functions, verify the result is actually a different entry — `>=` comparisons can return the same row you're trying to upsize from.
+
 ### Demand Factors Are Non-Cascading
 Demand factors apply **once per load type to system-wide totals**, never chained through panel hierarchy. Wrong: apply 35% per panel. Right: collect all lighting VA across hierarchy, apply NEC 220.42 tiers once.
 
@@ -112,6 +128,12 @@ Use suffixes in variable names for clarity: `_VA`, `_kVA`, `_kW`, `_pct`, `_ft`.
 ---
 
 ## Development Patterns
+
+### Scope Confirmation
+Before implementing non-trivial features, briefly restate: (1) what you understand the request to be, (2) which files will change, (3) the specific user-facing behavior. This prevents wasted work from misunderstood intent (e.g., "assign transformers to slots" ≠ "add a transformer edit form").
+
+### Renaming / Rebranding
+When renaming across the codebase, grep for ALL variations: exact match, partial, different casings, with/without spaces, abbreviations. After replacing, grep again to verify **zero** remaining references. Check landing pages, meta tags, page titles, and user-facing strings explicitly.
 
 ### Adding Calculations
 1. Types → `types.ts`
@@ -214,3 +236,5 @@ See [`.env.example`](./.env.example) and [`backend/.env.example`](./backend/.env
 ## Session Log Maintenance
 
 `/docs/SESSION_LOG.md` tracks recent work for handoff continuity. **Keep only the last 2 sessions.** At the start of each new session, archive older entries by deleting them — the git history preserves everything.
+
+When updating any documentation file, always update "Last Updated" dates to the current date. Never leave stale dates from previous months.
