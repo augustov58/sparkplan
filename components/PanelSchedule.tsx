@@ -771,14 +771,14 @@ export const PanelSchedule: React.FC<PanelScheduleProps> = ({ project }) => {
                 type="text"
                 value={editForm.description || ''}
                 onChange={e => setEditForm({...editForm, description: e.target.value})}
-                className="w-full text-xs border border-electric-300 rounded px-1 py-0.5"
+                className="w-full text-xs border border-[#94b894] rounded px-1 py-0.5"
               />
             </td>
             <td className="p-1 border-r border-gray-100">
               <select
                 value={editForm.loadType || 'O'}
                 onChange={e => setEditForm({...editForm, loadType: e.target.value as LoadTypeCode})}
-                className="w-full text-xs border border-electric-300 rounded px-0.5 py-0.5"
+                className="w-full text-xs border border-[#94b894] rounded px-0.5 py-0.5"
               >
                 {LOAD_TYPES.map(lt => (
                   <option key={lt.code} value={lt.code}>{lt.code}</option>
@@ -791,7 +791,7 @@ export const PanelSchedule: React.FC<PanelScheduleProps> = ({ project }) => {
                 step="any"
                 value={editForm.loadWatts || ''}
                 onChange={e => setEditForm({...editForm, loadWatts: parseFloat(e.target.value) || 0})}
-                className="w-full text-xs border border-electric-300 rounded px-1 py-0.5 text-center"
+                className="w-full text-xs border border-[#94b894] rounded px-1 py-0.5 text-center"
                 placeholder="Watts"
               />
             </td>
@@ -805,12 +805,12 @@ export const PanelSchedule: React.FC<PanelScheduleProps> = ({ project }) => {
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-1">
                 {leftCkt.pole > 1 && (
-                  <span className="text-[10px] font-bold text-electric-600">{leftCkt.pole}P</span>
+                  <span className="text-[10px] font-bold text-[#2d3b2d]">{leftCkt.pole}P</span>
                 )}
                 <span className="truncate max-w-[120px]">{leftCkt.description}</span>
               </div>
               <div className="flex gap-0.5 opacity-0 group-hover:opacity-100">
-                <button onClick={() => startEdit(leftCkt)} className="hover:text-electric-500">
+                <button onClick={() => startEdit(leftCkt)} className="hover:text-[#2d3b2d]">
                   <Edit2 className="w-3 h-3 text-gray-400" />
                 </button>
                 <button onClick={() => handleDeleteCircuit(leftCkt)} className="hover:text-red-500">
@@ -919,7 +919,7 @@ export const PanelSchedule: React.FC<PanelScheduleProps> = ({ project }) => {
                 step="any"
                 value={editForm.loadWatts || ''}
                 onChange={e => setEditForm({...editForm, loadWatts: parseFloat(e.target.value) || 0})}
-                className="w-full text-xs border border-electric-300 rounded px-1 py-0.5 text-center"
+                className="w-full text-xs border border-[#94b894] rounded px-1 py-0.5 text-center"
                 placeholder="Watts"
               />
             </td>
@@ -927,7 +927,7 @@ export const PanelSchedule: React.FC<PanelScheduleProps> = ({ project }) => {
               <select
                 value={editForm.loadType || 'O'}
                 onChange={e => setEditForm({...editForm, loadType: e.target.value as LoadTypeCode})}
-                className="w-full text-xs border border-electric-300 rounded px-0.5 py-0.5"
+                className="w-full text-xs border border-[#94b894] rounded px-0.5 py-0.5"
               >
                 {LOAD_TYPES.map(lt => (
                   <option key={lt.code} value={lt.code}>{lt.code}</option>
@@ -939,7 +939,7 @@ export const PanelSchedule: React.FC<PanelScheduleProps> = ({ project }) => {
                 type="text"
                 value={editForm.description || ''}
                 onChange={e => setEditForm({...editForm, description: e.target.value})}
-                className="w-full text-xs border border-electric-300 rounded px-1 py-0.5"
+                className="w-full text-xs border border-[#94b894] rounded px-1 py-0.5"
               />
             </td>
           </>
@@ -963,7 +963,7 @@ export const PanelSchedule: React.FC<PanelScheduleProps> = ({ project }) => {
           <td className="p-1 border-l border-gray-100 text-xs text-right group">
             <div className="flex items-center justify-between">
               <div className="flex gap-0.5 opacity-0 group-hover:opacity-100">
-                <button onClick={() => startEdit(rightCkt)} className="hover:text-electric-500">
+                <button onClick={() => startEdit(rightCkt)} className="hover:text-[#2d3b2d]">
                   <Edit2 className="w-3 h-3 text-gray-400" />
                 </button>
                 <button onClick={() => handleDeleteCircuit(rightCkt)} className="hover:text-red-500">
@@ -973,7 +973,7 @@ export const PanelSchedule: React.FC<PanelScheduleProps> = ({ project }) => {
               <div className="flex items-center gap-1">
                 <span className="truncate max-w-[120px]">{rightCkt.description}</span>
                 {rightCkt.pole > 1 && (
-                  <span className="text-[10px] font-bold text-electric-600">{rightCkt.pole}P</span>
+                  <span className="text-[10px] font-bold text-[#2d3b2d]">{rightCkt.pole}P</span>
                 )}
               </div>
             </div>
@@ -991,7 +991,7 @@ export const PanelSchedule: React.FC<PanelScheduleProps> = ({ project }) => {
               type="number"
               value={editForm.circuitNumber || ''}
               onChange={e => setEditForm({...editForm, circuitNumber: Number(e.target.value)})}
-              className="w-full text-xs border border-electric-300 rounded px-1 py-0.5 text-center"
+              className="w-full text-xs border border-[#94b894] rounded px-1 py-0.5 text-center"
               min="1"
             />
           ) : leftNum}
@@ -1009,7 +1009,7 @@ export const PanelSchedule: React.FC<PanelScheduleProps> = ({ project }) => {
         </td>
 
         {/* Center Phase indicator */}
-        <td className="p-1 w-8 text-center text-xs font-bold bg-electric-50 text-electric-700 border-x border-gray-300">
+        <td className="p-1 w-8 text-center text-xs font-bold bg-[#f0f5f0] text-[#2d3b2d] border-x border-gray-300">
           {phase}
         </td>
 
@@ -1031,7 +1031,7 @@ export const PanelSchedule: React.FC<PanelScheduleProps> = ({ project }) => {
               type="number"
               value={editForm.circuitNumber || ''}
               onChange={e => setEditForm({...editForm, circuitNumber: Number(e.target.value)})}
-              className="w-full text-xs border border-electric-300 rounded px-1 py-0.5 text-center"
+              className="w-full text-xs border border-[#94b894] rounded px-1 py-0.5 text-center"
               min="1"
             />
           ) : rightNum}
@@ -1063,7 +1063,7 @@ export const PanelSchedule: React.FC<PanelScheduleProps> = ({ project }) => {
             onClick={() => setSelectedPanelId(panel.id)}
             className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${
               selectedPanelId === panel.id
-                ? 'border-electric-500 text-electric-600'
+                ? 'border-[#2d3b2d] text-[#2d3b2d]'
                 : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
             }`}
           >
@@ -1109,7 +1109,7 @@ export const PanelSchedule: React.FC<PanelScheduleProps> = ({ project }) => {
               <div className="flex gap-1">
                 <button
                   onClick={saveEdit}
-                  className="flex items-center gap-1 px-3 py-1.5 bg-electric-400 text-black rounded text-xs font-medium hover:bg-electric-500"
+                  className="flex items-center gap-1 px-3 py-1.5 bg-[#2d3b2d] text-black rounded text-xs font-medium hover:bg-[#2d3b2d]"
                 >
                   <Save className="w-3 h-3" /> Save
                 </button>
@@ -1136,7 +1136,7 @@ export const PanelSchedule: React.FC<PanelScheduleProps> = ({ project }) => {
             {panels.length > 1 && (
               <button
                 onClick={handleExportAllPanels}
-                className="flex items-center gap-1 px-3 py-1.5 bg-electric-400 text-black rounded text-xs font-medium hover:bg-electric-500"
+                className="flex items-center gap-1 px-3 py-1.5 bg-[#2d3b2d] text-black rounded text-xs font-medium hover:bg-[#2d3b2d]"
               >
                 <Download className="w-3 h-3" /> All Panels
               </button>
@@ -1156,7 +1156,7 @@ export const PanelSchedule: React.FC<PanelScheduleProps> = ({ project }) => {
                 <th colSpan={3} className="p-1.5 text-center font-semibold bg-gray-700">LOAD/PHASE (KVA)</th>
                 <th className="p-1.5 w-10 text-center font-semibold border-l border-gray-600">TRIP</th>
                 <th className="p-1.5 w-10 text-center font-semibold">POLES</th>
-                <th className="p-1.5 w-8 text-center font-semibold bg-electric-600 text-black border-x border-gray-600">Φ</th>
+                <th className="p-1.5 w-8 text-center font-semibold bg-[#2d3b2d] text-black border-x border-gray-600">Φ</th>
                 <th className="p-1.5 w-10 text-center font-semibold">POLES</th>
                 <th className="p-1.5 w-10 text-center font-semibold border-r border-gray-600">TRIP</th>
                 <th colSpan={3} className="p-1.5 text-center font-semibold bg-gray-700">LOAD/PHASE (KVA)</th>
@@ -1173,7 +1173,7 @@ export const PanelSchedule: React.FC<PanelScheduleProps> = ({ project }) => {
                 <th className="p-1 text-center border-r border-gray-600">{selectedPanel.phase === 3 ? 'C' : ''}</th>
                 <th className="p-1"></th>
                 <th className="p-1"></th>
-                <th className="p-1 bg-electric-600"></th>
+                <th className="p-1 bg-[#2d3b2d]"></th>
                 <th className="p-1"></th>
                 <th className="p-1"></th>
                 <th className="p-1 text-center border-l border-gray-600">{selectedPanel.phase === 3 ? 'C' : ''}</th>
@@ -1188,7 +1188,7 @@ export const PanelSchedule: React.FC<PanelScheduleProps> = ({ project }) => {
               {Array.from({ length: Math.ceil(totalSlots / 2) }).map((_, i) => renderRow(i + 1))}
 
               {/* Add Circuit Row - Inline */}
-              <tr className="bg-electric-50 border-t-2 border-electric-300 hover:bg-electric-100">
+              <tr className="bg-[#f0f5f0] border-t-2 border-[#94b894] hover:bg-[#e8f5e8]">
                 {/* Left Side - Add Circuit */}
                 {addingCircuit === 'left' ? (
                   <>
@@ -1272,7 +1272,7 @@ export const PanelSchedule: React.FC<PanelScheduleProps> = ({ project }) => {
                     <td colSpan={2} className="p-2 text-center">
                       <button
                         onClick={() => startAddCircuit('left')}
-                        className="text-xs text-electric-600 hover:text-electric-700 font-medium flex items-center justify-center gap-1 w-full"
+                        className="text-xs text-[#2d3b2d] hover:text-[#2d3b2d] font-medium flex items-center justify-center gap-1 w-full"
                       >
                         <Plus className="w-3 h-3" /> Add Circuit
                       </button>
@@ -1282,7 +1282,7 @@ export const PanelSchedule: React.FC<PanelScheduleProps> = ({ project }) => {
                 )}
 
                 {/* Center Phase Column */}
-                <td className="p-1 bg-electric-600"></td>
+                <td className="p-1 bg-[#2d3b2d]"></td>
 
                 {/* Right Side - Add Circuit */}
                 {addingCircuit === 'right' ? (
@@ -1367,7 +1367,7 @@ export const PanelSchedule: React.FC<PanelScheduleProps> = ({ project }) => {
                     <td colSpan={2} className="p-2 text-center">
                       <button
                         onClick={() => startAddCircuit('right')}
-                        className="text-xs text-electric-600 hover:text-electric-700 font-medium flex items-center justify-center gap-1 w-full"
+                        className="text-xs text-[#2d3b2d] hover:text-[#2d3b2d] font-medium flex items-center justify-center gap-1 w-full"
                       >
                         <Plus className="w-3 h-3" /> Add Circuit
                       </button>
@@ -1378,7 +1378,7 @@ export const PanelSchedule: React.FC<PanelScheduleProps> = ({ project }) => {
 
               {/* Save/Cancel Row - shown when adding circuit */}
               {addingCircuit && (
-                <tr className="bg-electric-100 border-b border-electric-300">
+                <tr className="bg-[#e8f5e8] border-b border-[#94b894]">
                   <td colSpan={17} className="p-2 text-center">
                     <div className="flex justify-center gap-2">
                       <button
@@ -1463,7 +1463,7 @@ export const PanelSchedule: React.FC<PanelScheduleProps> = ({ project }) => {
                         </span>
                       </td>
                       {/* Center bus bar section */}
-                      <td className="p-1 bg-electric-500 text-electric-100 text-center text-[10px] font-mono">
+                      <td className="p-1 bg-[#2d3b2d] text-[#e8f5e8] text-center text-[10px] font-mono">
                         LUG
                       </td>
                       <td className="p-1 text-center">
@@ -1575,7 +1575,7 @@ export const PanelSchedule: React.FC<PanelScheduleProps> = ({ project }) => {
                   <td className="p-2 text-center font-mono">{demandResult.totalConnectedLoad_kVA.toFixed(2)}</td>
                   <td className="p-2 text-center">—</td>
                   <td className="p-2 text-center">—</td>
-                  <td className="p-2 text-center font-mono text-electric-600">{demandResult.totalDemandLoad_kVA.toFixed(2)}</td>
+                  <td className="p-2 text-center font-mono text-[#2d3b2d]">{demandResult.totalDemandLoad_kVA.toFixed(2)}</td>
                 </tr>
               </tfoot>
             </table>
@@ -1594,9 +1594,9 @@ export const PanelSchedule: React.FC<PanelScheduleProps> = ({ project }) => {
                   <span className="text-[10px] uppercase text-gray-500 block">Direct Circuits Load</span>
                   <span className="text-xl font-bold text-gray-900">{demandResult.totalConnectedLoad_kVA.toFixed(1)} KVA</span>
                 </div>
-                <div className="bg-electric-50 rounded p-3">
+                <div className="bg-[#f0f5f0] rounded p-3">
                   <span className="text-[10px] uppercase text-gray-500 block">Direct Demand Load</span>
-                  <span className="text-xl font-bold text-electric-600">{demandResult.totalDemandLoad_kVA.toFixed(1)} KVA</span>
+                  <span className="text-xl font-bold text-[#2d3b2d]">{demandResult.totalDemandLoad_kVA.toFixed(1)} KVA</span>
                 </div>
                 
                 {/* Feeder Circuits (if any) */}
@@ -1642,33 +1642,33 @@ export const PanelSchedule: React.FC<PanelScheduleProps> = ({ project }) => {
 
             {/* Upstream Load Aggregation (when panel has downstream loads) */}
             {aggregatedLoad && aggregatedLoad.downstreamPanelCount > 0 && (
-              <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
+              <div className="bg-[#f0f5f0] border border-[#3d6b3d]/30 rounded-lg p-4">
                 <h4 className="font-semibold text-sm text-amber-800 mb-3 flex items-center gap-2">
                   <ArrowDown className="w-4 h-4" /> AGGREGATED LOAD (NEC 220.40)
                 </h4>
-                <p className="text-xs text-amber-700 mb-3">
+                <p className="text-xs text-[#2d3b2d] mb-3">
                   This panel feeds {aggregatedLoad.downstreamPanelCount} downstream panel{aggregatedLoad.downstreamPanelCount > 1 ? 's' : ''}.
                   Demand factors applied to system-wide totals ({aggregatedLoad.occupancyType} occupancy).
                 </p>
                 <div className="grid grid-cols-2 gap-3">
                   <div className="bg-white/50 rounded p-2">
-                    <span className="text-[10px] uppercase text-amber-600 block">Total Connected</span>
+                    <span className="text-[10px] uppercase text-[#3d6b3d] block">Total Connected</span>
                     <span className="text-base font-bold text-gray-900">{(aggregatedLoad.totalConnectedVA / 1000).toFixed(1)} kVA</span>
                   </div>
-                  <div className="bg-amber-100 rounded p-2">
-                    <span className="text-[10px] uppercase text-amber-700 block">Total Demand</span>
+                  <div className="bg-[#e8f5e8] rounded p-2">
+                    <span className="text-[10px] uppercase text-[#2d3b2d] block">Total Demand</span>
                     <span className="text-base font-bold text-amber-900">{(aggregatedLoad.totalDemandVA / 1000).toFixed(1)} kVA</span>
                   </div>
                   <div className="bg-white/50 rounded p-2 col-span-2">
-                    <span className="text-[10px] uppercase text-amber-600 block">Overall Demand Factor</span>
+                    <span className="text-[10px] uppercase text-[#3d6b3d] block">Overall Demand Factor</span>
                     <span className="text-base font-bold text-green-700">{(aggregatedLoad.overallDemandFactor * 100).toFixed(1)}%</span>
                   </div>
                 </div>
 
                 {/* Demand Breakdown by Load Type */}
                 {aggregatedLoad.demandBreakdown.length > 0 && (
-                  <div className="mt-3 pt-3 border-t border-amber-200">
-                    <span className="text-[10px] uppercase text-amber-600 block mb-2">Demand by Load Type (NEC Factors Applied)</span>
+                  <div className="mt-3 pt-3 border-t border-[#3d6b3d]/30">
+                    <span className="text-[10px] uppercase text-[#3d6b3d] block mb-2">Demand by Load Type (NEC Factors Applied)</span>
                     <div className="space-y-1">
                       {aggregatedLoad.demandBreakdown.map((item, i) => (
                         <div key={i} className="flex justify-between items-center text-xs">
@@ -1686,8 +1686,8 @@ export const PanelSchedule: React.FC<PanelScheduleProps> = ({ project }) => {
 
                 {/* Source Breakdown */}
                 {aggregatedLoad.sourceBreakdown.length > 1 && (
-                  <div className="mt-3 pt-3 border-t border-amber-200">
-                    <span className="text-[10px] uppercase text-amber-600 block mb-2">Sources (Connected VA)</span>
+                  <div className="mt-3 pt-3 border-t border-[#3d6b3d]/30">
+                    <span className="text-[10px] uppercase text-[#3d6b3d] block mb-2">Sources (Connected VA)</span>
                     <ul className="text-xs text-amber-800 space-y-1">
                       {aggregatedLoad.sourceBreakdown.map((item, i) => (
                         <li key={i} className="flex justify-between">

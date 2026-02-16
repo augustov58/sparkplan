@@ -19,7 +19,7 @@ export const WelcomeModal: React.FC<WelcomeModalProps> = ({ onClose, onCreatePro
   const steps = [
     {
       title: 'Welcome to SparkPlan',
-      icon: <Zap className="w-12 h-12 text-electric-500" />,
+      icon: <Zap className="w-12 h-12 text-[#2d3b2d]" />,
       description: 'Your professional electrical design and compliance platform powered by AI.',
       content: (
         <div className="space-y-4">
@@ -57,7 +57,7 @@ export const WelcomeModal: React.FC<WelcomeModalProps> = ({ onClose, onCreatePro
     },
     {
       title: 'Professional Features',
-      icon: <Calculator className="w-12 h-12 text-electric-500" />,
+      icon: <Calculator className="w-12 h-12 text-[#2d3b2d]" />,
       description: 'Everything you need for electrical design and compliance.',
       content: (
         <div className="space-y-4">
@@ -105,7 +105,7 @@ export const WelcomeModal: React.FC<WelcomeModalProps> = ({ onClose, onCreatePro
     },
     {
       title: 'Ready to Get Started?',
-      icon: <Rocket className="w-12 h-12 text-electric-500" />,
+      icon: <Rocket className="w-12 h-12 text-[#2d3b2d]" />,
       description: 'Create your first project and start designing compliant electrical systems.',
       content: (
         <div className="space-y-4">
@@ -117,8 +117,8 @@ export const WelcomeModal: React.FC<WelcomeModalProps> = ({ onClose, onCreatePro
               onClick={() => setSelectedTemplate('residential')}
               className={`text-left border-2 rounded-lg p-4 transition-all ${
                 selectedTemplate === 'residential'
-                  ? 'border-electric-500 bg-electric-50'
-                  : 'border-gray-200 bg-gray-50 hover:border-electric-300'
+                  ? 'border-[#2d3b2d] bg-[#f0f5f0]'
+                  : 'border-gray-200 bg-gray-50 hover:border-[#94b894]'
               }`}
             >
               <div className="flex items-start gap-3">
@@ -128,7 +128,7 @@ export const WelcomeModal: React.FC<WelcomeModalProps> = ({ onClose, onCreatePro
                   <p className="text-xs text-gray-600 mt-1">2,400 sq ft single-family with typical loads</p>
                 </div>
                 {selectedTemplate === 'residential' && (
-                  <CheckCircle className="w-5 h-5 text-electric-600 flex-shrink-0" />
+                  <CheckCircle className="w-5 h-5 text-[#2d3b2d] flex-shrink-0" />
                 )}
               </div>
             </button>
@@ -137,8 +137,8 @@ export const WelcomeModal: React.FC<WelcomeModalProps> = ({ onClose, onCreatePro
               onClick={() => setSelectedTemplate('commercial')}
               className={`text-left border-2 rounded-lg p-4 transition-all ${
                 selectedTemplate === 'commercial'
-                  ? 'border-electric-500 bg-electric-50'
-                  : 'border-gray-200 bg-gray-50 hover:border-electric-300'
+                  ? 'border-[#2d3b2d] bg-[#f0f5f0]'
+                  : 'border-gray-200 bg-gray-50 hover:border-[#94b894]'
               }`}
             >
               <div className="flex items-start gap-3">
@@ -148,7 +148,7 @@ export const WelcomeModal: React.FC<WelcomeModalProps> = ({ onClose, onCreatePro
                   <p className="text-xs text-gray-600 mt-1">5,000 sq ft office with HVAC</p>
                 </div>
                 {selectedTemplate === 'commercial' && (
-                  <CheckCircle className="w-5 h-5 text-electric-600 flex-shrink-0" />
+                  <CheckCircle className="w-5 h-5 text-[#2d3b2d] flex-shrink-0" />
                 )}
               </div>
             </button>
@@ -157,8 +157,8 @@ export const WelcomeModal: React.FC<WelcomeModalProps> = ({ onClose, onCreatePro
               onClick={() => setSelectedTemplate('industrial')}
               className={`text-left border-2 rounded-lg p-4 transition-all ${
                 selectedTemplate === 'industrial'
-                  ? 'border-electric-500 bg-electric-50'
-                  : 'border-gray-200 bg-gray-50 hover:border-electric-300'
+                  ? 'border-[#2d3b2d] bg-[#f0f5f0]'
+                  : 'border-gray-200 bg-gray-50 hover:border-[#94b894]'
               }`}
             >
               <div className="flex items-start gap-3">
@@ -168,7 +168,7 @@ export const WelcomeModal: React.FC<WelcomeModalProps> = ({ onClose, onCreatePro
                   <p className="text-xs text-gray-600 mt-1">10,000 sq ft with machinery</p>
                 </div>
                 {selectedTemplate === 'industrial' && (
-                  <CheckCircle className="w-5 h-5 text-electric-600 flex-shrink-0" />
+                  <CheckCircle className="w-5 h-5 text-[#2d3b2d] flex-shrink-0" />
                 )}
               </div>
             </button>
@@ -177,8 +177,8 @@ export const WelcomeModal: React.FC<WelcomeModalProps> = ({ onClose, onCreatePro
               onClick={() => setSelectedTemplate('ev-charging')}
               className={`text-left border-2 rounded-lg p-4 transition-all ${
                 selectedTemplate === 'ev-charging'
-                  ? 'border-electric-500 bg-electric-50'
-                  : 'border-gray-200 bg-gray-50 hover:border-electric-300'
+                  ? 'border-[#2d3b2d] bg-[#f0f5f0]'
+                  : 'border-gray-200 bg-gray-50 hover:border-[#94b894]'
               }`}
             >
               <div className="flex items-start gap-3">
@@ -188,7 +188,7 @@ export const WelcomeModal: React.FC<WelcomeModalProps> = ({ onClose, onCreatePro
                   <p className="text-xs text-gray-600 mt-1">Residential with Level 2 charger</p>
                 </div>
                 {selectedTemplate === 'ev-charging' && (
-                  <CheckCircle className="w-5 h-5 text-electric-600 flex-shrink-0" />
+                  <CheckCircle className="w-5 h-5 text-[#2d3b2d] flex-shrink-0" />
                 )}
               </div>
             </button>
@@ -223,7 +223,7 @@ export const WelcomeModal: React.FC<WelcomeModalProps> = ({ onClose, onCreatePro
         {/* Header */}
         <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-electric-500 rounded flex items-center justify-center">
+            <div className="w-10 h-10 bg-[#2d3b2d] rounded flex items-center justify-center">
               <Zap className="text-white w-6 h-6 fill-current" />
             </div>
             <h2 className="text-lg font-bold text-gray-900">SPARKPLAN</h2>
@@ -246,9 +246,9 @@ export const WelcomeModal: React.FC<WelcomeModalProps> = ({ onClose, onCreatePro
                 key={index}
                 className={`h-2 rounded-full transition-all ${
                   index === currentStep
-                    ? 'w-8 bg-electric-500'
+                    ? 'w-8 bg-[#2d3b2d]'
                     : index < currentStep
-                    ? 'w-2 bg-electric-300'
+                    ? 'w-2 bg-[#94b894]'
                     : 'w-2 bg-gray-200'
                 }`}
               />
@@ -290,7 +290,7 @@ export const WelcomeModal: React.FC<WelcomeModalProps> = ({ onClose, onCreatePro
           {currentStep < steps.length - 1 ? (
             <button
               onClick={() => setCurrentStep(currentStep + 1)}
-              className="px-4 py-2 bg-electric-500 hover:bg-electric-600 text-white text-sm font-medium rounded-lg transition-colors"
+              className="px-4 py-2 bg-[#2d3b2d] hover:bg-[#3d4f3d] text-white text-sm font-medium rounded-lg transition-colors"
             >
               Next
             </button>
@@ -300,7 +300,7 @@ export const WelcomeModal: React.FC<WelcomeModalProps> = ({ onClose, onCreatePro
                 onClose();
                 onCreateProject(selectedTemplate);
               }}
-              className="px-6 py-2 bg-electric-500 hover:bg-electric-600 text-white text-sm font-semibold rounded-lg transition-colors flex items-center gap-2"
+              className="px-6 py-2 bg-[#2d3b2d] hover:bg-[#3d4f3d] text-white text-sm font-semibold rounded-lg transition-colors flex items-center gap-2"
             >
               <Rocket className="w-4 h-4" />
               Create Project from Template

@@ -611,20 +611,20 @@ export const FeederManager: React.FC<FeederManagerProps> = ({
     <div className="space-y-6">
       {/* Stale Feeders Warning Banner */}
       {staleFeeders.length > 0 && showStaleWarning && (
-        <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
+        <div className="bg-[#f0f5f0] border border-[#3d6b3d]/30 rounded-lg p-4">
           <div className="flex items-start justify-between">
             <div className="flex items-start gap-3">
-              <AlertTriangle className="w-5 h-5 text-amber-600 mt-0.5" />
+              <AlertTriangle className="w-5 h-5 text-[#3d6b3d] mt-0.5" />
               <div>
                 <h4 className="font-semibold text-amber-800">
                   {staleFeeders.length} Feeder{staleFeeders.length > 1 ? 's' : ''} Need Recalculation
                 </h4>
-                <p className="text-sm text-amber-700 mt-1">
+                <p className="text-sm text-[#2d3b2d] mt-1">
                   Panel loads have changed since these feeders were calculated. Click the refresh button to update.
                 </p>
                 <ul className="mt-2 space-y-1">
                   {staleFeeders.map(sf => (
-                    <li key={sf.feederId} className="text-sm text-amber-700 flex items-center gap-2">
+                    <li key={sf.feederId} className="text-sm text-[#2d3b2d] flex items-center gap-2">
                       <span className="font-medium">{sf.feederName}:</span>
                       <span>
                         {sf.cachedConnectedVA.toLocaleString()} VA → {sf.currentConnectedVA.toLocaleString()} VA
@@ -635,7 +635,7 @@ export const FeederManager: React.FC<FeederManagerProps> = ({
                           const feeder = feeders.find(f => f.id === sf.feederId);
                           if (feeder) handleRecalculateFeeder(feeder);
                         }}
-                        className="p-1 text-amber-700 hover:text-amber-900 hover:bg-amber-100 rounded"
+                        className="p-1 text-[#2d3b2d] hover:text-amber-900 hover:bg-[#e8f5e8] rounded"
                         title="Recalculate feeder"
                       >
                         <RefreshCw className="w-4 h-4" />
@@ -647,7 +647,7 @@ export const FeederManager: React.FC<FeederManagerProps> = ({
             </div>
             <button
               onClick={() => setShowStaleWarning(false)}
-              className="text-amber-600 hover:text-amber-800"
+              className="text-[#3d6b3d] hover:text-amber-800"
             >
               <X className="w-4 h-4" />
             </button>
@@ -659,7 +659,7 @@ export const FeederManager: React.FC<FeederManagerProps> = ({
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
         <div>
           <h3 className="text-xl font-bold text-gray-900 flex items-center gap-2">
-            <Cable className="w-5 h-5 text-electric-500" />
+            <Cable className="w-5 h-5 text-[#2d3b2d]" />
             Feeder Sizing (NEC Article 215)
           </h3>
           <p className="text-sm text-gray-500 mt-1">
@@ -667,7 +667,7 @@ export const FeederManager: React.FC<FeederManagerProps> = ({
           </p>
           {/* Debug info for voltage drop export */}
           {feeders.length > 0 && !hasVoltageDropData(feeders) && (
-            <p className="text-xs text-amber-600 mt-2 flex items-center gap-1">
+            <p className="text-xs text-[#3d6b3d] mt-2 flex items-center gap-1">
               <Info className="w-3 h-3" />
               Voltage drop export requires at least one feeder with length and calculated load.
               {' '}({feeders.filter(f => f.distance_ft && f.distance_ft > 0).length} of {feeders.length} have length,
@@ -701,7 +701,7 @@ export const FeederManager: React.FC<FeederManagerProps> = ({
             {/* Add Feeder Button */}
             <button
               onClick={() => setShowCreateForm(true)}
-              className="flex items-center gap-2 px-4 py-2 bg-electric-500 text-white rounded-lg hover:bg-electric-600 transition-colors text-sm font-medium"
+              className="flex items-center gap-2 px-4 py-2 bg-[#2d3b2d] text-white rounded-lg hover:bg-[#3d4f3d] transition-colors text-sm font-medium"
             >
               <Plus className="w-4 h-4" />
               Add Feeder
@@ -728,7 +728,7 @@ export const FeederManager: React.FC<FeederManagerProps> = ({
                 value={formData.name || ''}
                 onChange={e => setFormData({ ...formData, name: e.target.value })}
                 placeholder="e.g., MDP to Panel 2"
-                className="w-full border-gray-200 rounded-md focus:border-electric-500 focus:ring-electric-500 text-sm py-2"
+                className="w-full border-gray-200 rounded-md focus:border-[#2d3b2d] focus:ring-[#2d3b2d]/20 text-sm py-2"
               />
             </div>
 
@@ -746,7 +746,7 @@ export const FeederManager: React.FC<FeederManagerProps> = ({
                   }}
                   className={`flex-1 py-2 px-4 rounded-md text-sm font-medium transition-colors ${
                     sourceType === 'panel'
-                      ? 'bg-electric-500 text-white'
+                      ? 'bg-[#2d3b2d] text-white'
                       : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
                   }`}
                 >
@@ -760,7 +760,7 @@ export const FeederManager: React.FC<FeederManagerProps> = ({
                   }}
                   className={`flex-1 py-2 px-4 rounded-md text-sm font-medium transition-colors ${
                     sourceType === 'transformer'
-                      ? 'bg-electric-500 text-white'
+                      ? 'bg-[#2d3b2d] text-white'
                       : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
                   }`}
                 >
@@ -778,7 +778,7 @@ export const FeederManager: React.FC<FeederManagerProps> = ({
                 <select
                   value={formData.source_panel_id || ''}
                   onChange={e => setFormData({ ...formData, source_panel_id: e.target.value || null })}
-                  className="w-full border-gray-200 rounded-md focus:border-electric-500 focus:ring-electric-500 text-sm py-2"
+                  className="w-full border-gray-200 rounded-md focus:border-[#2d3b2d] focus:ring-[#2d3b2d]/20 text-sm py-2"
                 >
                   <option value="">Select Source Panel</option>
                   {panels.map(panel => (
@@ -791,7 +791,7 @@ export const FeederManager: React.FC<FeederManagerProps> = ({
                 <select
                   value={formData.source_transformer_id || ''}
                   onChange={e => setFormData({ ...formData, source_transformer_id: e.target.value || null })}
-                  className="w-full border-gray-200 rounded-md focus:border-electric-500 focus:ring-electric-500 text-sm py-2"
+                  className="w-full border-gray-200 rounded-md focus:border-[#2d3b2d] focus:ring-[#2d3b2d]/20 text-sm py-2"
                 >
                   <option value="">Select Source Transformer</option>
                   {transformers.map(xfmr => (
@@ -816,7 +816,7 @@ export const FeederManager: React.FC<FeederManagerProps> = ({
                   }}
                   className={`flex-1 py-2 px-4 rounded-md text-sm font-medium transition-colors ${
                     destinationType === 'panel'
-                      ? 'bg-electric-500 text-white'
+                      ? 'bg-[#2d3b2d] text-white'
                       : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
                   }`}
                 >
@@ -829,7 +829,7 @@ export const FeederManager: React.FC<FeederManagerProps> = ({
                   }}
                   className={`flex-1 py-2 px-4 rounded-md text-sm font-medium transition-colors ${
                     destinationType === 'transformer'
-                      ? 'bg-electric-500 text-white'
+                      ? 'bg-[#2d3b2d] text-white'
                       : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
                   }`}
                 >
@@ -848,7 +848,7 @@ export const FeederManager: React.FC<FeederManagerProps> = ({
                   <select
                     value={formData.destination_panel_id || ''}
                     onChange={e => setFormData({ ...formData, destination_panel_id: e.target.value || null })}
-                    className={`w-full rounded-md focus:border-electric-500 focus:ring-electric-500 text-sm py-2 ${
+                    className={`w-full rounded-md focus:border-[#2d3b2d] focus:ring-[#2d3b2d]/20 text-sm py-2 ${
                       connectivityError ? 'border-red-300 bg-red-50' : 'border-gray-200'
                     }`}
                     disabled={!formData.source_panel_id && !formData.source_transformer_id}
@@ -875,7 +875,7 @@ export const FeederManager: React.FC<FeederManagerProps> = ({
                   </select>
                   {/* Connectivity helper text */}
                   {(formData.source_panel_id || formData.source_transformer_id) && validDestinations.length === 0 && (
-                    <p className="text-xs text-amber-600 mt-1 flex items-center gap-1">
+                    <p className="text-xs text-[#3d6b3d] mt-1 flex items-center gap-1">
                       <Info className="w-3 h-3" />
                       {formData.source_transformer_id
                         ? 'No panels are fed from this transformer. Check that panels have this transformer set as their source.'
@@ -887,7 +887,7 @@ export const FeederManager: React.FC<FeederManagerProps> = ({
                 <select
                   value={formData.destination_transformer_id || ''}
                   onChange={e => setFormData({ ...formData, destination_transformer_id: e.target.value || null })}
-                  className="w-full border-gray-200 rounded-md focus:border-electric-500 focus:ring-electric-500 text-sm py-2"
+                  className="w-full border-gray-200 rounded-md focus:border-[#2d3b2d] focus:ring-[#2d3b2d]/20 text-sm py-2"
                 >
                   <option value="">Select Destination Transformer</option>
                   {transformers.map(xfmr => (
@@ -921,7 +921,7 @@ export const FeederManager: React.FC<FeederManagerProps> = ({
                   onClick={() => setSizingBasis('load')}
                   className={`flex-1 py-2 px-4 rounded-md text-sm font-medium transition-colors ${
                     sizingBasis === 'load'
-                      ? 'bg-electric-500 text-white'
+                      ? 'bg-[#2d3b2d] text-white'
                       : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
                   }`}
                 >
@@ -931,7 +931,7 @@ export const FeederManager: React.FC<FeederManagerProps> = ({
                   onClick={() => setSizingBasis('capacity')}
                   className={`flex-1 py-2 px-4 rounded-md text-sm font-medium transition-colors ${
                     sizingBasis === 'capacity'
-                      ? 'bg-electric-500 text-white'
+                      ? 'bg-[#2d3b2d] text-white'
                       : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
                   }`}
                 >
@@ -955,7 +955,7 @@ export const FeederManager: React.FC<FeederManagerProps> = ({
                 type="number"
                 value={formData.distance_ft || 100}
                 onChange={e => setFormData({ ...formData, distance_ft: Number(e.target.value) })}
-                className="w-full border-gray-200 rounded-md focus:border-electric-500 focus:ring-electric-500 text-sm py-2"
+                className="w-full border-gray-200 rounded-md focus:border-[#2d3b2d] focus:ring-[#2d3b2d]/20 text-sm py-2"
               />
             </div>
 
@@ -967,7 +967,7 @@ export const FeederManager: React.FC<FeederManagerProps> = ({
               <select
                 value={formData.conductor_material || 'Cu'}
                 onChange={e => setFormData({ ...formData, conductor_material: e.target.value as 'Cu' | 'Al' })}
-                className="w-full border-gray-200 rounded-md focus:border-electric-500 focus:ring-electric-500 text-sm py-2"
+                className="w-full border-gray-200 rounded-md focus:border-[#2d3b2d] focus:ring-[#2d3b2d]/20 text-sm py-2"
               >
                 <option value="Cu">Copper (Cu)</option>
                 <option value="Al">Aluminum (Al)</option>
@@ -983,7 +983,7 @@ export const FeederManager: React.FC<FeederManagerProps> = ({
                 type="number"
                 value={formData.ambient_temperature_c || 30}
                 onChange={e => setFormData({ ...formData, ambient_temperature_c: Number(e.target.value) })}
-                className="w-full border-gray-200 rounded-md focus:border-electric-500 focus:ring-electric-500 text-sm py-2"
+                className="w-full border-gray-200 rounded-md focus:border-[#2d3b2d] focus:ring-[#2d3b2d]/20 text-sm py-2"
               />
             </div>
 
@@ -996,7 +996,7 @@ export const FeederManager: React.FC<FeederManagerProps> = ({
                 type="number"
                 value={formData.num_current_carrying || 4}
                 onChange={e => setFormData({ ...formData, num_current_carrying: Number(e.target.value) })}
-                className="w-full border-gray-200 rounded-md focus:border-electric-500 focus:ring-electric-500 text-sm py-2"
+                className="w-full border-gray-200 rounded-md focus:border-[#2d3b2d] focus:ring-[#2d3b2d]/20 text-sm py-2"
               />
               <p className="text-xs text-gray-500 mt-1">
                 Affects bundling adjustment (NEC 310.15(C)(1))
@@ -1008,7 +1008,7 @@ export const FeederManager: React.FC<FeederManagerProps> = ({
               <button
                 type="button"
                 onClick={() => setShowAdvancedOptions(!showAdvancedOptions)}
-                className="flex items-center gap-2 text-sm text-electric-600 hover:text-electric-700 font-medium"
+                className="flex items-center gap-2 text-sm text-[#2d3b2d] hover:text-[#2d3b2d] font-medium"
               >
                 {showAdvancedOptions ? '▼' : '▶'} Advanced Calculation Options
               </button>
@@ -1025,7 +1025,7 @@ export const FeederManager: React.FC<FeederManagerProps> = ({
                   <select
                     value={temperatureRating}
                     onChange={e => setTemperatureRating(Number(e.target.value) as 60 | 75 | 90)}
-                    className="w-full border-gray-200 rounded-md focus:border-electric-500 focus:ring-electric-500 text-sm py-2"
+                    className="w-full border-gray-200 rounded-md focus:border-[#2d3b2d] focus:ring-[#2d3b2d]/20 text-sm py-2"
                   >
                     <option value={60}>60°C (THHN, TW)</option>
                     <option value={75}>75°C (THWN, XHHW)</option>
@@ -1121,7 +1121,7 @@ export const FeederManager: React.FC<FeederManagerProps> = ({
                 (!formData.destination_panel_id && !formData.destination_transformer_id) ||
                 !!connectivityError
               }
-              className="flex items-center gap-2 px-4 py-2 bg-electric-500 text-white rounded-lg hover:bg-electric-600 transition-colors text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+              className="flex items-center gap-2 px-4 py-2 bg-[#2d3b2d] text-white rounded-lg hover:bg-[#3d4f3d] transition-colors text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
               title={connectivityError ? 'Cannot save: panels are not properly connected' : undefined}
             >
               <Save className="w-4 h-4" />
@@ -1220,15 +1220,15 @@ const FeederCard: React.FC<FeederCardProps> = ({
 
   return (
     <div className={`bg-white border rounded-lg p-3 ${
-      isEditing ? 'border-electric-500 border-2' :
-      staleStatus.isStale ? 'border-amber-300 border-2' :
+      isEditing ? 'border-[#2d3b2d] border-2' :
+      staleStatus.isStale ? 'border-[#3d6b3d]/40 border-2' :
       'border-gray-200'
     }`}>
       {/* Stale Warning Badge - Compact */}
       {staleStatus.isStale && (
-        <div className="flex items-center justify-between bg-amber-50 border border-amber-200 rounded px-2 py-1.5 mb-2 text-xs">
+        <div className="flex items-center justify-between bg-[#f0f5f0] border border-[#3d6b3d]/30 rounded px-2 py-1.5 mb-2 text-xs">
           <div className="flex items-center gap-1.5">
-            <AlertTriangle className="w-3.5 h-3.5 text-amber-600" />
+            <AlertTriangle className="w-3.5 h-3.5 text-[#3d6b3d]" />
             <span className="text-amber-800">
               Load: {staleStatus.cachedConnectedVA.toLocaleString()} → {staleStatus.currentConnectedVA.toLocaleString()} VA
               ({staleStatus.loadDifferencePercent > 0 ? '+' : ''}{staleStatus.loadDifferencePercent}%)
@@ -1236,7 +1236,7 @@ const FeederCard: React.FC<FeederCardProps> = ({
           </div>
           <button
             onClick={() => onRecalculate(feeder)}
-            className="flex items-center gap-1 px-2 py-0.5 bg-amber-100 text-amber-800 rounded hover:bg-amber-200 transition-colors font-medium"
+            className="flex items-center gap-1 px-2 py-0.5 bg-[#e8f5e8] text-amber-800 rounded hover:bg-[#e8f5e8] transition-colors font-medium"
           >
             <RefreshCw className="w-3 h-3" />
             Recalc
@@ -1254,7 +1254,7 @@ const FeederCard: React.FC<FeederCardProps> = ({
             {sourceLabel} → {destLabel}
           </span>
           {staleStatus.isStale && (
-            <span className="text-xs bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded-full shrink-0">
+            <span className="text-xs bg-[#e8f5e8] text-[#2d3b2d] px-1.5 py-0.5 rounded-full shrink-0">
               Outdated
             </span>
           )}
@@ -1262,14 +1262,14 @@ const FeederCard: React.FC<FeederCardProps> = ({
         <div className="flex gap-1 shrink-0">
           <button
             onClick={() => onRecalculate(feeder)}
-            className="p-1.5 text-gray-400 hover:text-electric-600 hover:bg-electric-50 rounded transition-colors"
+            className="p-1.5 text-gray-400 hover:text-[#2d3b2d] hover:bg-[#f0f5f0] rounded transition-colors"
             title="Recalculate"
           >
             <RefreshCw className="w-3.5 h-3.5" />
           </button>
           <button
             onClick={() => onEdit(feeder)}
-            className="p-1.5 text-gray-400 hover:text-electric-600 hover:bg-electric-50 rounded transition-colors"
+            className="p-1.5 text-gray-400 hover:text-[#2d3b2d] hover:bg-[#f0f5f0] rounded transition-colors"
             title="Edit"
           >
             <Edit2 className="w-3.5 h-3.5" />

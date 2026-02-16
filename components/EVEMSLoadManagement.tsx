@@ -95,7 +95,7 @@ export const EVEMSLoadManagement: React.FC = () => {
         {/* Input Section */}
         <div className="space-y-6">
           <h3 className="font-bold text-gray-900 flex items-center gap-2">
-            <Zap className="w-5 h-5 text-electric-500" /> System Information
+            <Zap className="w-5 h-5 text-[#2d3b2d]" /> System Information
           </h3>
 
           {/* Service Information */}
@@ -113,7 +113,7 @@ export const EVEMSLoadManagement: React.FC = () => {
                   min="100"
                   max="2000"
                   step="25"
-                  className="w-full border-gray-200 rounded text-sm py-2 px-3 focus:border-electric-500 focus:ring-electric-500"
+                  className="w-full border-gray-200 rounded text-sm py-2 px-3 focus:border-[#2d3b2d] focus:ring-[#2d3b2d]/20"
                 />
               </div>
               <div>
@@ -123,7 +123,7 @@ export const EVEMSLoadManagement: React.FC = () => {
                 <select
                   value={serviceVoltage}
                   onChange={e => setServiceVoltage(Number(e.target.value))}
-                  className="w-full border-gray-200 rounded text-sm py-2 focus:border-electric-500 focus:ring-electric-500"
+                  className="w-full border-gray-200 rounded text-sm py-2 focus:border-[#2d3b2d] focus:ring-[#2d3b2d]/20"
                 >
                   <option value="120">120V</option>
                   <option value="208">208V</option>
@@ -139,7 +139,7 @@ export const EVEMSLoadManagement: React.FC = () => {
                 <select
                   value={servicePhase}
                   onChange={e => setServicePhase(Number(e.target.value) as 1 | 3)}
-                  className="w-full border-gray-200 rounded text-sm py-2 focus:border-electric-500 focus:ring-electric-500"
+                  className="w-full border-gray-200 rounded text-sm py-2 focus:border-[#2d3b2d] focus:ring-[#2d3b2d]/20"
                 >
                   <option value="1">Single-Phase</option>
                   <option value="3">Three-Phase</option>
@@ -162,7 +162,7 @@ export const EVEMSLoadManagement: React.FC = () => {
                   onChange={e => setExistingLoad_kVA(Number(e.target.value))}
                   min="0"
                   step="0.1"
-                  className="w-full border-gray-200 rounded text-sm py-2 px-3 focus:border-electric-500 focus:ring-electric-500"
+                  className="w-full border-gray-200 rounded text-sm py-2 px-3 focus:border-[#2d3b2d] focus:ring-[#2d3b2d]/20"
                 />
               </div>
               <div>
@@ -175,7 +175,7 @@ export const EVEMSLoadManagement: React.FC = () => {
                   onChange={e => setExistingDemand_kVA(Number(e.target.value))}
                   min="0"
                   step="0.1"
-                  className="w-full border-gray-200 rounded text-sm py-2 px-3 focus:border-electric-500 focus:ring-electric-500"
+                  className="w-full border-gray-200 rounded text-sm py-2 px-3 focus:border-[#2d3b2d] focus:ring-[#2d3b2d]/20"
                 />
                 <p className="text-xs text-gray-400 mt-1">After demand factors</p>
               </div>
@@ -188,7 +188,7 @@ export const EVEMSLoadManagement: React.FC = () => {
               <h4 className="font-semibold text-gray-900 text-sm">EV Chargers</h4>
               <button
                 onClick={addCharger}
-                className="text-xs bg-electric-500 text-black px-3 py-1.5 rounded font-medium hover:bg-electric-600 transition-colors flex items-center gap-1"
+                className="text-xs bg-[#2d3b2d] text-black px-3 py-1.5 rounded font-medium hover:bg-[#3d4f3d] transition-colors flex items-center gap-1"
               >
                 <Plus className="w-3 h-3" />
                 Add Charger
@@ -227,7 +227,7 @@ export const EVEMSLoadManagement: React.FC = () => {
                           chargerAmps: specs.maxAmps,
                         });
                       }}
-                      className="w-full border-gray-200 rounded text-sm py-2 focus:border-electric-500 focus:ring-electric-500"
+                      className="w-full border-gray-200 rounded text-sm py-2 focus:border-[#2d3b2d] focus:ring-[#2d3b2d]/20"
                     >
                       <option value="Level1">Level 1</option>
                       <option value="Level2">Level 2</option>
@@ -242,7 +242,7 @@ export const EVEMSLoadManagement: React.FC = () => {
                     <select
                       value={charger.chargerAmps}
                       onChange={e => updateCharger(charger.id, { chargerAmps: Number(e.target.value) })}
-                      className="w-full border-gray-200 rounded text-sm py-2 focus:border-electric-500 focus:ring-electric-500"
+                      className="w-full border-gray-200 rounded text-sm py-2 focus:border-[#2d3b2d] focus:ring-[#2d3b2d]/20"
                     >
                       {EV_CHARGER_SPECS[charger.level].map(spec => (
                         <option key={spec.maxAmps} value={spec.maxAmps}>
@@ -260,7 +260,7 @@ export const EVEMSLoadManagement: React.FC = () => {
                       type="number"
                       value={charger.voltage}
                       onChange={e => updateCharger(charger.id, { voltage: Number(e.target.value) })}
-                      className="w-full border-gray-200 rounded text-sm py-2 px-3 focus:border-electric-500 focus:ring-electric-500"
+                      className="w-full border-gray-200 rounded text-sm py-2 px-3 focus:border-[#2d3b2d] focus:ring-[#2d3b2d]/20"
                     />
                   </div>
                   
@@ -274,7 +274,7 @@ export const EVEMSLoadManagement: React.FC = () => {
                       onChange={e => updateCharger(charger.id, { quantity: Number(e.target.value) })}
                       min="1"
                       max="100"
-                      className="w-full border-gray-200 rounded text-sm py-2 px-3 focus:border-electric-500 focus:ring-electric-500"
+                      className="w-full border-gray-200 rounded text-sm py-2 px-3 focus:border-[#2d3b2d] focus:ring-[#2d3b2d]/20"
                     />
                   </div>
                 </div>
@@ -290,7 +290,7 @@ export const EVEMSLoadManagement: React.FC = () => {
                 id="useEVEMS"
                 checked={useEVEMS}
                 onChange={e => setUseEVEMS(e.target.checked)}
-                className="rounded border-gray-300 text-electric-500 focus:ring-electric-500"
+                className="rounded border-gray-300 text-[#2d3b2d] focus:ring-[#2d3b2d]/20"
               />
               <label htmlFor="useEVEMS" className="font-semibold text-gray-900 text-sm">
                 Use EVEMS (EV Energy Management System)
@@ -305,7 +305,7 @@ export const EVEMSLoadManagement: React.FC = () => {
                 <select
                   value={evemsMode}
                   onChange={e => setEvemsMode(e.target.value as typeof evemsMode)}
-                  className="w-full border-gray-200 rounded text-sm py-2 focus:border-electric-500 focus:ring-electric-500"
+                  className="w-full border-gray-200 rounded text-sm py-2 focus:border-[#2d3b2d] focus:ring-[#2d3b2d]/20"
                 >
                   <option value="first_come_first_served">First-Come-First-Served</option>
                   <option value="priority_based">Priority-Based</option>
@@ -390,17 +390,17 @@ export const EVEMSLoadManagement: React.FC = () => {
 
               {/* EVEMS Recommendations */}
               {result.evemsRecommendations.evemsRequired && (
-                <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+                <div className="bg-[#fff8e6] border border-[#c9a227]/40 rounded-lg p-4">
                   <div className="flex items-center gap-2 mb-2">
-                    <AlertTriangle className="w-5 h-5 text-yellow-700" />
-                    <span className="font-semibold text-yellow-900">EVEMS Recommended</span>
+                    <AlertTriangle className="w-5 h-5 text-[#9a7b00]" />
+                    <span className="font-semibold text-[#5a4500]">EVEMS Recommended</span>
                   </div>
-                  <p className="text-sm text-yellow-800 mb-2">
+                  <p className="text-sm text-[#7a6200] mb-2">
                     Service capacity exceeded. EVEMS can reduce required capacity by up to{' '}
                     {result.evemsRecommendations.evemsBenefit_kVA.toFixed(1)} kVA.
                   </p>
                   {result.evemsRecommendations.schedulingStrategy && (
-                    <p className="text-xs text-yellow-700 mt-2">
+                    <p className="text-xs text-[#9a7b00] mt-2">
                       <strong>Strategy:</strong> {result.evemsRecommendations.schedulingStrategy}
                     </p>
                   )}

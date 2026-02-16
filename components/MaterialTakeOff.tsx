@@ -349,7 +349,7 @@ export const MaterialTakeOff: React.FC<MaterialTakeOffProps> = ({ project }) => 
           </button>
           <button
             onClick={printList}
-            className="flex items-center gap-2 px-4 py-2 bg-electric-400 text-black rounded-md text-sm font-medium hover:bg-electric-500"
+            className="flex items-center gap-2 px-4 py-2 bg-[#2d3b2d] text-black rounded-md text-sm font-medium hover:bg-[#2d3b2d]"
           >
             <FileText className="w-4 h-4" />
             Print List
@@ -422,8 +422,8 @@ export const MaterialTakeOff: React.FC<MaterialTakeOffProps> = ({ project }) => 
 
         <div className="bg-white border border-gray-200 rounded-lg p-4">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-yellow-100 rounded-full flex items-center justify-center">
-              <DollarSign className="w-5 h-5 text-yellow-600" />
+            <div className="w-10 h-10 bg-[#fdf6dc] rounded-full flex items-center justify-center">
+              <DollarSign className="w-5 h-5 text-[#c9a227]" />
             </div>
             <div>
               <p className="text-xs text-gray-500 uppercase font-semibold">Ready for</p>

@@ -192,7 +192,7 @@ export const PanelPhotoImporter: React.FC<PanelPhotoImporterProps> = ({
   const getConfidenceColor = () => {
     switch (confidence) {
       case 'high': return 'text-green-600 bg-green-50';
-      case 'medium': return 'text-yellow-600 bg-yellow-50';
+      case 'medium': return 'text-[#c9a227] bg-[#fff8e6]';
       case 'low': return 'text-red-600 bg-red-50';
     }
   };
@@ -206,7 +206,7 @@ export const PanelPhotoImporter: React.FC<PanelPhotoImporterProps> = ({
             key={i}
             className={`w-2 h-2 rounded-full ${
               i <= filled
-                ? confidence === 'high' ? 'bg-green-500' : confidence === 'medium' ? 'bg-yellow-500' : 'bg-red-500'
+                ? confidence === 'high' ? 'bg-green-500' : confidence === 'medium' ? 'bg-[#fff8e6]0' : 'bg-red-500'
                 : 'bg-gray-300'
             }`}
           />
@@ -248,7 +248,7 @@ export const PanelPhotoImporter: React.FC<PanelPhotoImporterProps> = ({
           {step === 'upload' && (
             <div
               className={`border-2 border-dashed rounded-lg p-12 text-center transition-colors ${
-                isDragging ? 'border-electric-500 bg-electric-50' : 'border-gray-300 hover:border-gray-400'
+                isDragging ? 'border-[#2d3b2d] bg-[#f0f5f0]' : 'border-gray-300 hover:border-gray-400'
               }`}
               onDrop={handleDrop}
               onDragOver={handleDragOver}
@@ -270,7 +270,7 @@ export const PanelPhotoImporter: React.FC<PanelPhotoImporterProps> = ({
               />
               <button
                 onClick={() => fileInputRef.current?.click()}
-                className="px-6 py-2 bg-electric-600 text-white rounded-lg hover:bg-electric-700 transition-colors"
+                className="px-6 py-2 bg-[#2d3b2d] text-white rounded-lg hover:bg-[#243024] transition-colors"
               >
                 Choose Photo
               </button>
@@ -283,7 +283,7 @@ export const PanelPhotoImporter: React.FC<PanelPhotoImporterProps> = ({
           {/* Analyzing Step */}
           {step === 'analyzing' && (
             <div className="text-center py-12">
-              <Loader2 className="w-12 h-12 mx-auto text-electric-600 animate-spin mb-4" />
+              <Loader2 className="w-12 h-12 mx-auto text-[#2d3b2d] animate-spin mb-4" />
               <h3 className="text-lg font-medium text-gray-900 mb-2">
                 Analyzing Panel Photo...
               </h3>
@@ -318,7 +318,7 @@ export const PanelPhotoImporter: React.FC<PanelPhotoImporterProps> = ({
                   )}
                   <button
                     onClick={resetToUpload}
-                    className="mt-3 text-sm text-electric-600 hover:text-electric-700"
+                    className="mt-3 text-sm text-[#2d3b2d] hover:text-[#2d3b2d]"
                   >
                     Upload different photo
                   </button>
@@ -340,12 +340,12 @@ export const PanelPhotoImporter: React.FC<PanelPhotoImporterProps> = ({
 
                 {/* Warnings */}
                 {warnings.length > 0 && (
-                  <div className="mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
-                    <div className="flex items-center gap-2 text-yellow-700 font-medium mb-1">
+                  <div className="mb-4 p-3 bg-[#fff8e6] border border-[#c9a227]/40 rounded-lg">
+                    <div className="flex items-center gap-2 text-[#9a7b00] font-medium mb-1">
                       <AlertTriangle className="w-4 h-4" />
                       Warnings
                     </div>
-                    <ul className="text-sm text-yellow-700 list-disc list-inside">
+                    <ul className="text-sm text-[#9a7b00] list-disc list-inside">
                       {warnings.map((w, i) => (
                         <li key={i}>{w}</li>
                       ))}
@@ -383,7 +383,7 @@ export const PanelPhotoImporter: React.FC<PanelPhotoImporterProps> = ({
                                 max={maxCircuits}
                                 value={circuit.circuit_number}
                                 onChange={(e) => updateCircuit(index, 'circuit_number', parseInt(e.target.value) || 1)}
-                                className="w-14 px-2 py-1 border border-gray-300 rounded text-center focus:ring-1 focus:ring-electric-500 focus:border-electric-500"
+                                className="w-14 px-2 py-1 border border-gray-300 rounded text-center focus:ring-1 focus:ring-[#2d3b2d]/20 focus:border-[#2d3b2d]"
                               />
                             </td>
                             <td className="px-3 py-2">
@@ -392,14 +392,14 @@ export const PanelPhotoImporter: React.FC<PanelPhotoImporterProps> = ({
                                 value={circuit.description || ''}
                                 onChange={(e) => updateCircuit(index, 'description', e.target.value || null)}
                                 placeholder="Circuit description"
-                                className="w-full px-2 py-1 border border-gray-300 rounded focus:ring-1 focus:ring-electric-500 focus:border-electric-500"
+                                className="w-full px-2 py-1 border border-gray-300 rounded focus:ring-1 focus:ring-[#2d3b2d]/20 focus:border-[#2d3b2d]"
                               />
                             </td>
                             <td className="px-3 py-2">
                               <select
                                 value={circuit.breaker_amps || 20}
                                 onChange={(e) => updateCircuit(index, 'breaker_amps', parseInt(e.target.value))}
-                                className="w-full px-2 py-1 border border-gray-300 rounded focus:ring-1 focus:ring-electric-500 focus:border-electric-500"
+                                className="w-full px-2 py-1 border border-gray-300 rounded focus:ring-1 focus:ring-[#2d3b2d]/20 focus:border-[#2d3b2d]"
                               >
                                 {STANDARD_BREAKER_SIZES.map(size => (
                                   <option key={size} value={size}>{size}A</option>
@@ -410,7 +410,7 @@ export const PanelPhotoImporter: React.FC<PanelPhotoImporterProps> = ({
                               <select
                                 value={circuit.load_type || 'O'}
                                 onChange={(e) => updateCircuit(index, 'load_type', e.target.value)}
-                                className="w-full px-2 py-1 border border-gray-300 rounded focus:ring-1 focus:ring-electric-500 focus:border-electric-500"
+                                className="w-full px-2 py-1 border border-gray-300 rounded focus:ring-1 focus:ring-[#2d3b2d]/20 focus:border-[#2d3b2d]"
                               >
                                 {LOAD_TYPE_OPTIONS.map(opt => (
                                   <option key={opt.value} value={opt.value}>{opt.label}</option>
@@ -421,7 +421,7 @@ export const PanelPhotoImporter: React.FC<PanelPhotoImporterProps> = ({
                               <select
                                 value={circuit.pole}
                                 onChange={(e) => updateCircuit(index, 'pole', parseInt(e.target.value))}
-                                className="w-full px-2 py-1 border border-gray-300 rounded focus:ring-1 focus:ring-electric-500 focus:border-electric-500"
+                                className="w-full px-2 py-1 border border-gray-300 rounded focus:ring-1 focus:ring-[#2d3b2d]/20 focus:border-[#2d3b2d]"
                               >
                                 <option value={1}>1P</option>
                                 <option value={2}>2P</option>
@@ -447,7 +447,7 @@ export const PanelPhotoImporter: React.FC<PanelPhotoImporterProps> = ({
                   <div className="border-t border-gray-200 p-2 bg-gray-50">
                     <button
                       onClick={addCircuit}
-                      className="w-full flex items-center justify-center gap-2 py-2 text-sm text-gray-600 hover:text-electric-600 hover:bg-electric-50 rounded transition-colors"
+                      className="w-full flex items-center justify-center gap-2 py-2 text-sm text-gray-600 hover:text-[#2d3b2d] hover:bg-[#f0f5f0] rounded transition-colors"
                     >
                       <Plus className="w-4 h-4" />
                       Add Circuit
@@ -457,7 +457,7 @@ export const PanelPhotoImporter: React.FC<PanelPhotoImporterProps> = ({
 
                 {/* Existing Circuits Warning */}
                 {existingCircuitCount > 0 && (
-                  <div className="mt-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg flex items-center gap-2 text-yellow-700">
+                  <div className="mt-4 p-3 bg-[#fff8e6] border border-[#c9a227]/40 rounded-lg flex items-center gap-2 text-[#9a7b00]">
                     <AlertTriangle className="w-5 h-5 flex-shrink-0" />
                     <span>
                       This will replace <strong>{existingCircuitCount}</strong> existing circuit{existingCircuitCount !== 1 ? 's' : ''} in this panel
@@ -481,7 +481,7 @@ export const PanelPhotoImporter: React.FC<PanelPhotoImporterProps> = ({
             <button
               onClick={handleImport}
               disabled={circuits.length === 0 || importing}
-              className="px-6 py-2 bg-electric-600 text-white rounded-lg hover:bg-electric-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-2"
+              className="px-6 py-2 bg-[#2d3b2d] text-white rounded-lg hover:bg-[#243024] disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-2"
             >
               {importing && <Loader2 className="w-4 h-4 animate-spin" />}
               Import {circuits.length} Circuit{circuits.length !== 1 ? 's' : ''}

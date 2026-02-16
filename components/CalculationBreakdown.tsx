@@ -55,7 +55,7 @@ export const CalculationBreakdown: React.FC<CalculationBreakdownProps> = ({
               key={idx}
               className={`p-4 rounded-lg border ${
                 item.highlight
-                  ? 'bg-electric-50 border-electric-200'
+                  ? 'bg-[#f0f5f0] border-[#2d3b2d]/30'
                   : 'bg-gray-50 border-gray-200'
               }`}
             >

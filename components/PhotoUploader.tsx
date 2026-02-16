@@ -114,8 +114,8 @@ export const PhotoUploader: React.FC<PhotoUploaderProps> = ({
           onDrop={handleDrop}
           className={`border-2 border-dashed rounded-lg p-4 transition-colors ${
             isDragging
-              ? 'border-electric-500 bg-electric-100'
-              : 'border-gray-300 hover:border-electric-400 hover:bg-electric-50'
+              ? 'border-[#2d3b2d] bg-[#e8f5e8]'
+              : 'border-gray-300 hover:border-[#2d3b2d] hover:bg-[#f0f5f0]'
           }`}
         >
           <div className="flex flex-col items-center gap-2">

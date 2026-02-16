@@ -86,7 +86,7 @@ export const AICopilotSidebar: React.FC = () => {
   const getPriorityColor = (priority: number) => {
     if (priority >= 80) return 'text-red-600 bg-red-50 border-red-200';
     if (priority >= 60) return 'text-orange-600 bg-orange-50 border-orange-200';
-    if (priority >= 40) return 'text-yellow-600 bg-yellow-50 border-yellow-200';
+    if (priority >= 40) return 'text-[#c9a227] bg-[#fff8e6] border-[#c9a227]/40';
     return 'text-blue-600 bg-blue-50 border-blue-200';
   };
 
@@ -115,7 +115,7 @@ export const AICopilotSidebar: React.FC = () => {
     return (
       <button
         onClick={() => setIsOpen(true)}
-        className="fixed right-4 bottom-24 bg-electric-500 text-white p-3 rounded-full shadow-lg hover:bg-electric-600 transition-colors z-50"
+        className="fixed right-4 bottom-24 bg-[#2d3b2d] text-white p-3 rounded-full shadow-lg hover:bg-[#3d4f3d] transition-colors z-50"
         aria-label="Open AI Copilot"
         title="AI Copilot - View AI suggestions"
       >
@@ -142,10 +142,10 @@ export const AICopilotSidebar: React.FC = () => {
       {/* Header */}
       <div className="p-4 border-b border-gray-200 flex items-center justify-between bg-gray-50">
         <div className="flex items-center gap-2">
-          <Sparkles className="w-5 h-5 text-electric-500" />
+          <Sparkles className="w-5 h-5 text-[#2d3b2d]" />
           <h2 className="font-semibold text-gray-900">AI Copilot</h2>
           {actions.length > 0 && (
-            <span className="bg-electric-500 text-white text-xs font-medium px-2 py-1 rounded-full">
+            <span className="bg-[#2d3b2d] text-white text-xs font-medium px-2 py-1 rounded-full">
               {actions.length}
             </span>
           )}
@@ -162,7 +162,7 @@ export const AICopilotSidebar: React.FC = () => {
       <div className="flex-1 overflow-y-auto p-4 space-y-3">
         {loading ? (
           <div className="text-center py-8 text-gray-400">
-            <Sparkles className="w-8 h-8 mx-auto mb-2 animate-pulse text-electric-500" />
+            <Sparkles className="w-8 h-8 mx-auto mb-2 animate-pulse text-[#2d3b2d]" />
             <p className="text-sm">Loading AI suggestions...</p>
           </div>
         ) : actions.length === 0 ? (
@@ -205,7 +205,7 @@ const RFIDraftView: React.FC<RFIDraftViewProps> = ({ draft }) => {
     switch (priority) {
       case 'Urgent': return 'bg-red-100 text-red-800 border-red-300';
       case 'High': return 'bg-orange-100 text-orange-800 border-orange-300';
-      case 'Medium': return 'bg-yellow-100 text-yellow-800 border-yellow-300';
+      case 'Medium': return 'bg-[#fdf6dc] text-[#7a6200] border-[#c9a227]/50';
       case 'Low': return 'bg-green-100 text-green-800 border-green-300';
       default: return 'bg-gray-100 text-gray-800 border-gray-300';
     }
@@ -292,7 +292,7 @@ const PhotoAnalysisView: React.FC<PhotoAnalysisViewProps> = ({ analysis }) => {
   const getConditionColor = (condition: string) => {
     switch (condition) {
       case 'Good': return 'text-green-700 bg-green-50';
-      case 'Fair': return 'text-yellow-700 bg-yellow-50';
+      case 'Fair': return 'text-[#9a7b00] bg-[#fff8e6]';
       case 'Poor': return 'text-red-700 bg-red-50';
       default: return 'text-gray-700 bg-gray-50';
     }
@@ -455,7 +455,7 @@ const InspectionPredictionView: React.FC<InspectionPredictionViewProps> = ({ pre
     switch (riskLevel) {
       case 'Critical': return 'bg-red-100 text-red-800 border-red-300';
       case 'High': return 'bg-orange-100 text-orange-800 border-orange-300';
-      case 'Medium': return 'bg-yellow-100 text-yellow-800 border-yellow-300';
+      case 'Medium': return 'bg-[#fdf6dc] text-[#7a6200] border-[#c9a227]/50';
       case 'Low': return 'bg-green-100 text-green-800 border-green-300';
       default: return 'bg-gray-100 text-gray-800 border-gray-300';
     }
@@ -464,7 +464,7 @@ const InspectionPredictionView: React.FC<InspectionPredictionViewProps> = ({ pre
   const getLikelihoodColor = (likelihood: number) => {
     if (likelihood >= 0.7) return 'bg-red-500';
     if (likelihood >= 0.4) return 'bg-orange-500';
-    if (likelihood >= 0.2) return 'bg-yellow-500';
+    if (likelihood >= 0.2) return 'bg-[#fff8e6]0';
     return 'bg-green-500';
   };
 
@@ -647,7 +647,7 @@ const ActionCard: React.FC<ActionCardProps> = ({
             <span className="text-xs text-gray-500">Confidence:</span>
             <div className="flex-1 bg-gray-200 rounded-full h-1.5">
               <div
-                className="bg-electric-500 h-1.5 rounded-full transition-all"
+                className="bg-[#2d3b2d] h-1.5 rounded-full transition-all"
                 style={{ width: `${action.confidence_score * 100}%` }}
               />
             </div>
@@ -754,7 +754,7 @@ const ActionCard: React.FC<ActionCardProps> = ({
           <div className="flex gap-2 pt-2">
             <button
               onClick={(e) => { e.stopPropagation(); onApprove(); }}
-              className="flex-1 bg-electric-500 text-white px-3 py-2 rounded text-sm font-medium hover:bg-electric-600 transition-colors flex items-center justify-center gap-1 shadow-sm"
+              className="flex-1 bg-[#2d3b2d] text-white px-3 py-2 rounded text-sm font-medium hover:bg-[#3d4f3d] transition-colors flex items-center justify-center gap-1 shadow-sm"
             >
               <Check className="w-4 h-4" />
               Approve

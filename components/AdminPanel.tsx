@@ -146,12 +146,12 @@ export const AdminPanel: React.FC = () => {
     <div className="max-w-5xl mx-auto">
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 mb-6">
         <div className="flex items-center gap-3">
-          <Shield className="w-6 h-6 text-electric-500" />
+          <Shield className="w-6 h-6 text-[#2d3b2d]" />
           <h1 className="text-2xl font-bold text-gray-900">Admin Panel</h1>
         </div>
         <button
           onClick={() => setShowAddForm(!showAddForm)}
-          className="bg-electric-400 hover:bg-electric-500 text-gray-900 px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-2 transition-colors"
+          className="bg-[#2d3b2d] hover:bg-[#2d3b2d] text-gray-900 px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-2 transition-colors"
         >
           <UserPlus className="w-4 h-4" />
           Add User
@@ -160,7 +160,7 @@ export const AdminPanel: React.FC = () => {
 
       {/* Add User Form */}
       {showAddForm && (
-        <div className="bg-white border border-electric-200 rounded-lg p-6 mb-6">
+        <div className="bg-white border border-[#2d3b2d]/30 rounded-lg p-6 mb-6">
           <h2 className="font-semibold text-gray-900 mb-4">Create New User</h2>
           <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
             <input
@@ -168,14 +168,14 @@ export const AdminPanel: React.FC = () => {
               value={newEmail}
               onChange={e => setNewEmail(e.target.value)}
               placeholder="Email"
-              className="border border-gray-200 rounded-lg px-3 py-2 text-sm focus:border-electric-500 focus:ring-2 focus:ring-electric-500/20 outline-none"
+              className="border border-gray-200 rounded-lg px-3 py-2 text-sm focus:border-[#2d3b2d] focus:ring-2 focus:ring-[#2d3b2d]/20/20 outline-none"
             />
             <input
               type="text"
               value={newPassword}
               onChange={e => setNewPassword(e.target.value)}
               placeholder="Password"
-              className="border border-gray-200 rounded-lg px-3 py-2 text-sm focus:border-electric-500 focus:ring-2 focus:ring-electric-500/20 outline-none"
+              className="border border-gray-200 rounded-lg px-3 py-2 text-sm focus:border-[#2d3b2d] focus:ring-2 focus:ring-[#2d3b2d]/20/20 outline-none"
             />
             <select
               value={newPlan}
@@ -206,7 +206,7 @@ export const AdminPanel: React.FC = () => {
             onChange={e => setSearchEmail(e.target.value)}
             onKeyDown={e => e.key === 'Enter' && handleSearch()}
             placeholder="Filter by email..."
-            className="flex-1 border border-gray-200 rounded-lg px-4 py-2 text-sm focus:border-electric-500 focus:ring-2 focus:ring-electric-500/20 outline-none"
+            className="flex-1 border border-gray-200 rounded-lg px-4 py-2 text-sm focus:border-[#2d3b2d] focus:ring-2 focus:ring-[#2d3b2d]/20/20 outline-none"
           />
           <button
             onClick={handleSearch}
@@ -256,7 +256,7 @@ export const AdminPanel: React.FC = () => {
                   <td className="p-3">
                     <span className="capitalize font-medium">{user.plan || 'none'}</span>
                     {user.trial_end && (
-                      <span className="ml-1 text-xs text-amber-600">
+                      <span className="ml-1 text-xs text-[#3d6b3d]">
                         (trial ends {new Date(user.trial_end).toLocaleDateString()})
                       </span>
                     )}
@@ -264,7 +264,7 @@ export const AdminPanel: React.FC = () => {
                   <td className="p-3">
                     <span className={`text-xs px-2 py-0.5 rounded-full ${
                       user.status === 'active' ? 'bg-green-100 text-green-700' :
-                      user.status === 'trialing' ? 'bg-amber-100 text-amber-700' :
+                      user.status === 'trialing' ? 'bg-[#e8f5e8] text-[#2d3b2d]' :
                       'bg-gray-100 text-gray-600'
                     }`}>
                       {user.status || 'none'}

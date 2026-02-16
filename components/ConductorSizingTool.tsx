@@ -39,26 +39,26 @@ export const ConductorSizingTool: React.FC<ConductorSizingToolProps> = ({ projec
   return (
     <div className="space-y-6 animate-in fade-in duration-500">
       <div>
-        <h2 className="text-2xl font-light text-gray-900 flex items-center gap-2">
-          <Cable className="w-6 h-6 text-electric-500" />
+        <h2 className="text-2xl font-light text-[#1a1a1a] flex items-center gap-2">
+          <Cable className="w-6 h-6 text-[#2d3b2d]" />
           Conductor Sizing Tool
         </h2>
-        <p className="text-gray-500 mt-1">NEC Article 310 compliant with temperature and bundling corrections</p>
+        <p className="text-[#888] mt-1">NEC Article 310 compliant with temperature and bundling corrections</p>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
         {/* Input Section */}
-        <div className="bg-white border border-gray-100 rounded-lg p-6 shadow-sm">
-          <h3 className="font-bold text-gray-900 mb-4">Parameters</h3>
+        <div className="bg-white border border-[#e8e6e3] rounded-lg p-6 shadow-sm">
+          <h3 className="font-bold text-[#1a1a1a] mb-4">Parameters</h3>
 
           {/* Quick Mode Toggle */}
-          <div className="mb-6 pb-4 border-b border-gray-200">
+          <div className="mb-6 pb-4 border-b border-[#e8e6e3]">
             <label className="flex items-center gap-2 cursor-pointer">
               <input
                 type="checkbox"
                 checked={useQuickMode}
                 onChange={e => setUseQuickMode(e.target.checked)}
-                className="rounded border-gray-300 text-electric-500 focus:ring-electric-500"
+                className="rounded border-gray-300 text-[#2d3b2d] focus:ring-[#2d3b2d]/20"
               />
               <span className="text-sm text-gray-700 font-medium">Quick Mode (Common Scenarios)</span>
             </label>
@@ -68,13 +68,13 @@ export const ConductorSizingTool: React.FC<ConductorSizingToolProps> = ({ projec
             /* Quick Mode - Scenario Selection */
             <div className="space-y-4">
               <div>
-                <label className="block text-xs font-semibold text-gray-500 mb-1 uppercase tracking-wider">
+                <label className="block text-xs font-semibold text-[#888] mb-1 uppercase tracking-wider">
                   Installation Scenario
                 </label>
                 <select
                   value={quickScenario}
                   onChange={e => setQuickScenario(e.target.value as any)}
-                  className="w-full border-gray-200 rounded-md focus:border-electric-500 focus:ring-electric-500 text-sm py-2"
+                  className="w-full border-[#e8e6e3] rounded-md focus:border-[#2d3b2d] focus:ring-[#2d3b2d]/20 text-sm py-2"
                 >
                   <option value="indoor_standard">Indoor Standard (30°C, 3 conductors)</option>
                   <option value="outdoor_hot">Outdoor Hot (40°C, 3 conductors)</option>
@@ -85,14 +85,14 @@ export const ConductorSizingTool: React.FC<ConductorSizingToolProps> = ({ projec
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-gray-500 mb-1 uppercase tracking-wider">
+                <label className="block text-xs font-semibold text-[#888] mb-1 uppercase tracking-wider">
                   Load Current (A)
                 </label>
                 <input
                   type="number"
                   value={loadAmps}
                   onChange={e => setLoadAmps(Number(e.target.value))}
-                  className="w-full border-gray-200 rounded-md focus:border-electric-500 focus:ring-electric-500 text-sm py-2"
+                  className="w-full border-[#e8e6e3] rounded-md focus:border-[#2d3b2d] focus:ring-[#2d3b2d]/20 text-sm py-2"
                   min="1"
                 />
               </div>
@@ -101,46 +101,46 @@ export const ConductorSizingTool: React.FC<ConductorSizingToolProps> = ({ projec
             /* Advanced Mode - Full Control */
             <div className="space-y-4">
               <div>
-                <label className="block text-xs font-semibold text-gray-500 mb-1 uppercase tracking-wider">
+                <label className="block text-xs font-semibold text-[#888] mb-1 uppercase tracking-wider">
                   Load Current (A)
                 </label>
                 <input
                   type="number"
                   value={loadAmps}
                   onChange={e => setLoadAmps(Number(e.target.value))}
-                  className="w-full border-gray-200 rounded-md focus:border-electric-500 focus:ring-electric-500 text-sm py-2"
+                  className="w-full border-[#e8e6e3] rounded-md focus:border-[#2d3b2d] focus:ring-[#2d3b2d]/20 text-sm py-2"
                   min="1"
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-gray-500 mb-1 uppercase tracking-wider">
+                <label className="block text-xs font-semibold text-[#888] mb-1 uppercase tracking-wider">
                   Ambient Temperature (°C)
                 </label>
                 <input
                   type="number"
                   value={ambientTempC}
                   onChange={e => setAmbientTempC(Number(e.target.value))}
-                  className="w-full border-gray-200 rounded-md focus:border-electric-500 focus:ring-electric-500 text-sm py-2"
+                  className="w-full border-[#e8e6e3] rounded-md focus:border-[#2d3b2d] focus:ring-[#2d3b2d]/20 text-sm py-2"
                   min="10"
                   max="80"
                 />
-                <p className="text-xs text-gray-500 mt-1">NEC 310.15(B)(1): 10°C - 80°C</p>
+                <p className="text-xs text-[#888] mt-1">NEC 310.15(B)(1): 10°C - 80°C</p>
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-gray-500 mb-1 uppercase tracking-wider">
+                <label className="block text-xs font-semibold text-[#888] mb-1 uppercase tracking-wider">
                   Current-Carrying Conductors
                 </label>
                 <input
                   type="number"
                   value={numConductors}
                   onChange={e => setNumConductors(Number(e.target.value))}
-                  className="w-full border-gray-200 rounded-md focus:border-electric-500 focus:ring-electric-500 text-sm py-2"
+                  className="w-full border-[#e8e6e3] rounded-md focus:border-[#2d3b2d] focus:ring-[#2d3b2d]/20 text-sm py-2"
                   min="1"
                   max="50"
                 />
-                <p className="text-xs text-gray-500 mt-1">NEC 310.15(C)(1): Bundle adjustment</p>
+                <p className="text-xs text-[#888] mt-1">NEC 310.15(C)(1): Bundle adjustment</p>
               </div>
 
               <div>
@@ -149,11 +149,11 @@ export const ConductorSizingTool: React.FC<ConductorSizingToolProps> = ({ projec
                     type="checkbox"
                     checked={isContinuous}
                     onChange={e => setIsContinuous(e.target.checked)}
-                    className="rounded border-gray-300 text-electric-500 focus:ring-electric-500"
+                    className="rounded border-gray-300 text-[#2d3b2d] focus:ring-[#2d3b2d]/20"
                   />
                   <span className="text-sm text-gray-700">Continuous Load (≥3 hours)</span>
                 </label>
-                <p className="text-xs text-gray-500 mt-1 ml-6">125% multiplier per NEC 210.19(A)(1)</p>
+                <p className="text-xs text-[#888] mt-1 ml-6">125% multiplier per NEC 210.19(A)(1)</p>
               </div>
 
               <div>
@@ -162,18 +162,18 @@ export const ConductorSizingTool: React.FC<ConductorSizingToolProps> = ({ projec
                     type="checkbox"
                     checked={terminalsRated75C}
                     onChange={e => setTerminalsRated75C(e.target.checked)}
-                    className="rounded border-gray-300 text-electric-500 focus:ring-electric-500"
+                    className="rounded border-gray-300 text-[#2d3b2d] focus:ring-[#2d3b2d]/20"
                   />
                   <span className="text-sm text-gray-700">Terminals listed for 75°C</span>
                 </label>
-                <p className="text-xs text-gray-500 mt-1 ml-6">NEC 110.14(C)(1)(a)(2): Use 75°C column for ≤100A circuits</p>
+                <p className="text-xs text-[#888] mt-1 ml-6">NEC 110.14(C)(1)(a)(2): Use 75°C column for ≤100A circuits</p>
               </div>
             </div>
           )}
 
           {/* Project Settings Display */}
-          <div className="mt-6 pt-4 border-t border-gray-200">
-            <div className="text-xs text-gray-500 space-y-1">
+          <div className="mt-6 pt-4 border-t border-[#e8e6e3]">
+            <div className="text-xs text-[#888] space-y-1">
               <div><strong>Material:</strong> {projectSettings.conductorMaterial === 'Cu' ? 'Copper' : 'Aluminum'}</div>
               <div><strong>Insulation:</strong> {projectSettings.temperatureRating}°C</div>
             </div>
@@ -195,10 +195,10 @@ export const ConductorSizingTool: React.FC<ConductorSizingToolProps> = ({ projec
           ) : result ? (
             <>
               {/* Main Result Card */}
-              <div className="bg-electric-50 border border-electric-200 rounded-lg p-8">
+              <div className="bg-[#f0f5f0] border border-[#2d3b2d]/30 rounded-lg p-8">
                 <div className="text-center mb-6">
-                  <div className="text-sm text-electric-700 uppercase tracking-wide mb-2">Required Conductor Size</div>
-                  <div className="text-5xl font-bold text-gray-900 mb-4">{result.conductorSize}</div>
+                  <div className="text-sm text-[#2d3b2d] uppercase tracking-wide mb-2">Required Conductor Size</div>
+                  <div className="text-5xl font-bold text-[#1a1a1a] mb-4">{result.conductorSize}</div>
 
                   <div className="flex justify-center">
                     <div className="flex items-center gap-2 text-green-700 bg-green-100 px-6 py-2 rounded-full text-sm font-bold">
@@ -209,13 +209,13 @@ export const ConductorSizingTool: React.FC<ConductorSizingToolProps> = ({ projec
                 </div>
 
                 <div className="grid grid-cols-2 gap-4 text-sm mb-4">
-                  <div className="bg-white rounded p-3 border border-electric-100">
-                    <div className="text-xs text-gray-500 mb-1">Base Ampacity</div>
-                    <div className="text-xl font-bold text-gray-900">{result.baseAmpacity} A</div>
+                  <div className="bg-white rounded p-3 border border-[#e8f5e8]">
+                    <div className="text-xs text-[#888] mb-1">Base Ampacity</div>
+                    <div className="text-xl font-bold text-[#1a1a1a]">{result.baseAmpacity} A</div>
                   </div>
-                  <div className="bg-white rounded p-3 border border-electric-100">
-                    <div className="text-xs text-gray-500 mb-1">Adjusted Ampacity</div>
-                    <div className="text-xl font-bold text-gray-900">{result.adjustedAmpacity} A</div>
+                  <div className="bg-white rounded p-3 border border-[#e8f5e8]">
+                    <div className="text-xs text-[#888] mb-1">Adjusted Ampacity</div>
+                    <div className="text-xl font-bold text-[#1a1a1a]">{result.adjustedAmpacity} A</div>
                   </div>
                 </div>
 
@@ -258,40 +258,40 @@ export const ConductorSizingTool: React.FC<ConductorSizingToolProps> = ({ projec
               )}
 
               {/* Calculation Breakdown */}
-              <div className="bg-white border border-gray-200 rounded-lg p-6">
-                <h4 className="font-bold text-gray-900 mb-4">Calculation Breakdown</h4>
+              <div className="bg-white border border-[#e8e6e3] rounded-lg p-6">
+                <h4 className="font-bold text-[#1a1a1a] mb-4">Calculation Breakdown</h4>
 
                 <div className="space-y-3 text-sm">
-                  <div className="flex justify-between py-2 border-b border-gray-100">
-                    <span className="text-gray-600">Load Current</span>
-                    <span className="font-mono font-semibold text-gray-900">{loadAmps} A</span>
+                  <div className="flex justify-between py-2 border-b border-[#e8e6e3]">
+                    <span className="text-[#666]">Load Current</span>
+                    <span className="font-mono font-semibold text-[#1a1a1a]">{loadAmps} A</span>
                   </div>
 
                   {result.continuousLoadFactor > 1 && (
-                    <div className="flex justify-between py-2 border-b border-gray-100">
-                      <span className="text-gray-600">Continuous Factor (125%)</span>
-                      <span className="font-mono font-semibold text-gray-900">{result.continuousLoadFactor}×</span>
+                    <div className="flex justify-between py-2 border-b border-[#e8e6e3]">
+                      <span className="text-[#666]">Continuous Factor (125%)</span>
+                      <span className="font-mono font-semibold text-[#1a1a1a]">{result.continuousLoadFactor}×</span>
                     </div>
                   )}
 
-                  <div className="flex justify-between py-2 border-b border-gray-100">
-                    <span className="text-gray-600">Required Ampacity</span>
-                    <span className="font-mono font-semibold text-gray-900">{result.requiredAmpacity} A</span>
+                  <div className="flex justify-between py-2 border-b border-[#e8e6e3]">
+                    <span className="text-[#666]">Required Ampacity</span>
+                    <span className="font-mono font-semibold text-[#1a1a1a]">{result.requiredAmpacity} A</span>
                   </div>
 
-                  <div className="flex justify-between py-2 border-b border-gray-100">
-                    <span className="text-gray-600">Temperature Correction</span>
-                    <span className="font-mono font-semibold text-gray-900">{(result.baseTempCorrection * 100).toFixed(0)}%</span>
+                  <div className="flex justify-between py-2 border-b border-[#e8e6e3]">
+                    <span className="text-[#666]">Temperature Correction</span>
+                    <span className="font-mono font-semibold text-[#1a1a1a]">{(result.baseTempCorrection * 100).toFixed(0)}%</span>
                   </div>
 
-                  <div className="flex justify-between py-2 border-b border-gray-100">
-                    <span className="text-gray-600">Bundling Adjustment</span>
-                    <span className="font-mono font-semibold text-gray-900">{(result.bundlingAdjustment * 100).toFixed(0)}%</span>
+                  <div className="flex justify-between py-2 border-b border-[#e8e6e3]">
+                    <span className="text-[#666]">Bundling Adjustment</span>
+                    <span className="font-mono font-semibold text-[#1a1a1a]">{(result.bundlingAdjustment * 100).toFixed(0)}%</span>
                   </div>
 
                   <div className="flex justify-between py-2 pt-3 border-t-2 border-gray-300">
-                    <span className="text-gray-900 font-bold">Selected Conductor</span>
-                    <span className="font-mono font-bold text-electric-600 text-lg">{result.conductorSize}</span>
+                    <span className="text-[#1a1a1a] font-bold">Selected Conductor</span>
+                    <span className="font-mono font-bold text-[#2d3b2d] text-lg">{result.conductorSize}</span>
                   </div>
 
                   <div className="flex justify-between py-2 bg-green-50 -mx-6 px-6 -mb-3">
@@ -304,8 +304,8 @@ export const ConductorSizingTool: React.FC<ConductorSizingToolProps> = ({ projec
               </div>
 
               {/* NEC 240.4(D) Small Conductor OCPD Limits */}
-              <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
-                <div className="text-sm font-bold text-gray-900 mb-2">NEC 240.4(D) — Max OCPD for Small Conductors</div>
+              <div className="bg-gray-50 border border-[#e8e6e3] rounded-lg p-4">
+                <div className="text-sm font-bold text-[#1a1a1a] mb-2">NEC 240.4(D) — Max OCPD for Small Conductors</div>
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-sm">
                   {[
                     { size: '14 AWG', max: '15A', active: result.conductorSize === '14 AWG' },
@@ -314,10 +314,10 @@ export const ConductorSizingTool: React.FC<ConductorSizingToolProps> = ({ projec
                   ].map(({ size, max, active }) => (
                     <div
                       key={size}
-                      className={`text-center py-2 px-3 rounded border ${active ? 'bg-electric-50 border-electric-400 font-bold' : 'bg-white border-gray-200'}`}
+                      className={`text-center py-2 px-3 rounded border ${active ? 'bg-[#f0f5f0] border-[#2d3b2d] font-bold' : 'bg-white border-[#e8e6e3]'}`}
                     >
-                      <div className="text-xs text-gray-500">{size}</div>
-                      <div className={active ? 'text-electric-700' : 'text-gray-700'}>{max}</div>
+                      <div className="text-xs text-[#888]">{size}</div>
+                      <div className={active ? 'text-[#2d3b2d]' : 'text-gray-700'}>{max}</div>
                     </div>
                   ))}
                 </div>
@@ -375,12 +375,12 @@ const AmpacityComparisonTable: React.FC<AmpacityComparisonTableProps> = ({ condu
     : 75;
 
   return (
-    <div className="bg-white border border-gray-200 rounded-lg p-6">
+    <div className="bg-white border border-[#e8e6e3] rounded-lg p-6">
       <div className="flex items-start gap-2 mb-4">
         <Info className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" />
         <div>
-          <h4 className="font-bold text-gray-900 mb-1">Ampacity Comparison (NEC Table 310.16)</h4>
-          <p className="text-xs text-gray-600">
+          <h4 className="font-bold text-[#1a1a1a] mb-1">Ampacity Comparison (NEC Table 310.16)</h4>
+          <p className="text-xs text-[#666]">
             <strong>NEC 110.14(C):</strong> {recommendedTemp === 60
               ? 'For circuits ≤100A, use 60°C column for terminations (unless equipment is listed for 75°C)'
               : (loadAmps <= 100 && isSmallConductor && terminalsRated75C)
@@ -396,29 +396,29 @@ const AmpacityComparisonTable: React.FC<AmpacityComparisonTableProps> = ({ condu
             <tr className="border-b-2 border-gray-300">
               <th className="text-left py-2 px-3 font-bold text-gray-700">Material</th>
               <th className="text-center py-2 px-3 font-bold text-gray-700">60°C</th>
-              <th className="text-center py-2 px-3 font-bold text-gray-700 bg-electric-50">75°C</th>
+              <th className="text-center py-2 px-3 font-bold text-gray-700 bg-[#f0f5f0]">75°C</th>
               <th className="text-center py-2 px-3 font-bold text-gray-700">90°C</th>
             </tr>
           </thead>
           <tbody>
             {/* Copper Row */}
             {cuData && (
-              <tr className="border-b border-gray-200">
-                <td className="py-3 px-3 font-semibold text-gray-900">
+              <tr className="border-b border-[#e8e6e3]">
+                <td className="py-3 px-3 font-semibold text-[#1a1a1a]">
                   Copper (Cu)
-                  <div className="text-xs text-gray-500 font-normal">THW, THWN</div>
+                  <div className="text-xs text-[#888] font-normal">THW, THWN</div>
                 </td>
-                <td className={`text-center py-3 px-3 font-mono text-lg ${recommendedTemp === 60 ? 'bg-yellow-100 font-bold text-yellow-900 border-2 border-yellow-400' : 'text-gray-600'}`}>
+                <td className={`text-center py-3 px-3 font-mono text-lg ${recommendedTemp === 60 ? 'bg-[#c9a227]100 font-bold text-[#5a4500] border-2 border-[#c9a227]' : 'text-[#666]'}`}>
                   {cuData.temp60C}A
-                  {recommendedTemp === 60 && <div className="text-xs font-bold text-yellow-700">USE THIS</div>}
+                  {recommendedTemp === 60 && <div className="text-xs font-bold text-[#9a7b00]">USE THIS</div>}
                 </td>
-                <td className={`text-center py-3 px-3 font-mono text-lg ${recommendedTemp === 75 ? 'bg-electric-100 font-bold text-electric-900 border-2 border-electric-400' : 'text-gray-900 bg-electric-50'}`}>
+                <td className={`text-center py-3 px-3 font-mono text-lg ${recommendedTemp === 75 ? 'bg-[#e8f5e8] font-bold text-[#111711] border-2 border-[#2d3b2d]' : 'text-[#1a1a1a] bg-[#f0f5f0]'}`}>
                   {cuData.temp75C}A
-                  {recommendedTemp === 75 && <div className="text-xs font-bold text-electric-700">USE THIS</div>}
+                  {recommendedTemp === 75 && <div className="text-xs font-bold text-[#2d3b2d]">USE THIS</div>}
                 </td>
-                <td className="text-center py-3 px-3 font-mono text-lg text-gray-600">
+                <td className="text-center py-3 px-3 font-mono text-lg text-[#666]">
                   {cuData.temp90C}A
-                  <div className="text-xs text-gray-500">Derating only</div>
+                  <div className="text-xs text-[#888]">Derating only</div>
                 </td>
               </tr>
             )}
@@ -426,21 +426,21 @@ const AmpacityComparisonTable: React.FC<AmpacityComparisonTableProps> = ({ condu
             {/* Aluminum Row */}
             {alData && (
               <tr>
-                <td className="py-3 px-3 font-semibold text-gray-900">
+                <td className="py-3 px-3 font-semibold text-[#1a1a1a]">
                   Aluminum (Al)
-                  <div className="text-xs text-gray-500 font-normal">THW, THWN</div>
+                  <div className="text-xs text-[#888] font-normal">THW, THWN</div>
                 </td>
-                <td className={`text-center py-3 px-3 font-mono text-lg ${recommendedTemp === 60 ? 'bg-yellow-100 font-bold text-yellow-900 border-2 border-yellow-400' : 'text-gray-600'}`}>
+                <td className={`text-center py-3 px-3 font-mono text-lg ${recommendedTemp === 60 ? 'bg-[#c9a227]100 font-bold text-[#5a4500] border-2 border-[#c9a227]' : 'text-[#666]'}`}>
                   {alData.temp60C}A
-                  {recommendedTemp === 60 && <div className="text-xs font-bold text-yellow-700">USE THIS</div>}
+                  {recommendedTemp === 60 && <div className="text-xs font-bold text-[#9a7b00]">USE THIS</div>}
                 </td>
-                <td className={`text-center py-3 px-3 font-mono text-lg ${recommendedTemp === 75 ? 'bg-electric-100 font-bold text-electric-900 border-2 border-electric-400' : 'text-gray-900 bg-electric-50'}`}>
+                <td className={`text-center py-3 px-3 font-mono text-lg ${recommendedTemp === 75 ? 'bg-[#e8f5e8] font-bold text-[#111711] border-2 border-[#2d3b2d]' : 'text-[#1a1a1a] bg-[#f0f5f0]'}`}>
                   {alData.temp75C}A
-                  {recommendedTemp === 75 && <div className="text-xs font-bold text-electric-700">USE THIS</div>}
+                  {recommendedTemp === 75 && <div className="text-xs font-bold text-[#2d3b2d]">USE THIS</div>}
                 </td>
-                <td className="text-center py-3 px-3 font-mono text-lg text-gray-600">
+                <td className="text-center py-3 px-3 font-mono text-lg text-[#666]">
                   {alData.temp90C}A
-                  <div className="text-xs text-gray-500">Derating only</div>
+                  <div className="text-xs text-[#888]">Derating only</div>
                 </td>
               </tr>
             )}

@@ -132,7 +132,7 @@ export const EVPanelTemplates: React.FC<EVPanelTemplatesProps> = ({ project }) =
       {/* Header */}
       <div className="bg-white border border-gray-200 rounded-lg p-6">
         <div className="flex items-center gap-3 mb-2">
-          <Zap className="w-7 h-7 text-electric-500" />
+          <Zap className="w-7 h-7 text-[#2d3b2d]" />
           <h1 className="text-2xl font-bold text-gray-900">
             Custom EV Panel Builder
           </h1>
@@ -157,8 +157,8 @@ export const EVPanelTemplates: React.FC<EVPanelTemplatesProps> = ({ project }) =
                   onClick={() => setChargerType(type)}
                   className={`p-4 border-2 rounded-lg cursor-pointer transition-all ${
                     chargerType === type
-                      ? 'border-electric-500 bg-electric-50'
-                      : 'border-gray-200 hover:border-electric-300'
+                      ? 'border-[#2d3b2d] bg-[#f0f5f0]'
+                      : 'border-gray-200 hover:border-[#94b894]'
                   }`}
                 >
                   <div className="flex items-center justify-between">
@@ -171,7 +171,7 @@ export const EVPanelTemplates: React.FC<EVPanelTemplatesProps> = ({ project }) =
                       </div>
                     </div>
                     {chargerType === type && (
-                      <Check className="w-5 h-5 text-electric-500" />
+                      <Check className="w-5 h-5 text-[#2d3b2d]" />
                     )}
                   </div>
                 </div>
@@ -190,7 +190,7 @@ export const EVPanelTemplates: React.FC<EVPanelTemplatesProps> = ({ project }) =
               max="20"
               value={numberOfChargers}
               onChange={(e) => setNumberOfChargers(Math.max(1, Math.min(20, parseInt(e.target.value) || 1)))}
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg text-lg font-medium focus:ring-2 focus:ring-electric-500 focus:border-electric-500"
+              className="w-full px-4 py-3 border border-gray-300 rounded-lg text-lg font-medium focus:ring-2 focus:ring-[#2d3b2d]/20 focus:border-[#2d3b2d]"
             />
             <p className="text-xs text-gray-500 mt-2">
               Enter 1-20 chargers (typical: 4-8 for commercial)
@@ -205,7 +205,7 @@ export const EVPanelTemplates: React.FC<EVPanelTemplatesProps> = ({ project }) =
                   type="checkbox"
                   checked={useEVEMS}
                   onChange={(e) => setUseEVEMS(e.target.checked)}
-                  className="mt-1 w-5 h-5 text-electric-500 border-gray-300 rounded focus:ring-electric-500"
+                  className="mt-1 w-5 h-5 text-[#2d3b2d] border-gray-300 rounded focus:ring-[#2d3b2d]/20"
                 />
                 <div className="flex-1">
                   <label className="block text-sm font-semibold text-gray-900">
@@ -228,7 +228,7 @@ export const EVPanelTemplates: React.FC<EVPanelTemplatesProps> = ({ project }) =
                     max={numberOfChargers}
                     value={simultaneousChargers}
                     onChange={(e) => setSimultaneousChargers(Math.max(1, Math.min(numberOfChargers, parseInt(e.target.value) || 1)))}
-                    className="w-full px-3 py-2 border border-gray-300 rounded focus:ring-2 focus:ring-electric-500 focus:border-electric-500"
+                    className="w-full px-3 py-2 border border-gray-300 rounded focus:ring-2 focus:ring-[#2d3b2d]/20 focus:border-[#2d3b2d]"
                   />
                   <p className="text-xs text-gray-500 mt-1">
                     Typical: 75% of total chargers ({Math.floor(numberOfChargers * 0.75)} for {numberOfChargers} chargers)
@@ -250,7 +250,7 @@ export const EVPanelTemplates: React.FC<EVPanelTemplatesProps> = ({ project }) =
                   type="checkbox"
                   checked={includeSpare}
                   onChange={(e) => setIncludeSpare(e.target.checked)}
-                  className="w-4 h-4 text-electric-500 border-gray-300 rounded focus:ring-electric-500"
+                  className="w-4 h-4 text-[#2d3b2d] border-gray-300 rounded focus:ring-[#2d3b2d]/20"
                 />
                 <label className="text-sm text-gray-700">
                   Include Spare Circuit (20A)
@@ -262,7 +262,7 @@ export const EVPanelTemplates: React.FC<EVPanelTemplatesProps> = ({ project }) =
                   type="checkbox"
                   checked={includeLighting}
                   onChange={(e) => setIncludeLighting(e.target.checked)}
-                  className="w-4 h-4 text-electric-500 border-gray-300 rounded focus:ring-electric-500"
+                  className="w-4 h-4 text-[#2d3b2d] border-gray-300 rounded focus:ring-[#2d3b2d]/20"
                 />
                 <label className="text-sm text-gray-700">
                   Include Lighting Circuit (20A)
@@ -281,7 +281,7 @@ export const EVPanelTemplates: React.FC<EVPanelTemplatesProps> = ({ project }) =
               value={customPanelName}
               onChange={(e) => setCustomPanelName(e.target.value)}
               placeholder={`${numberOfChargers}× ${chargerType}${useEVEMS ? ' with EVEMS' : ''} Panel`}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-electric-500 focus:border-electric-500"
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#2d3b2d]/20 focus:border-[#2d3b2d]"
             />
           </div>
         </div>
@@ -291,7 +291,7 @@ export const EVPanelTemplates: React.FC<EVPanelTemplatesProps> = ({ project }) =
           {/* Panel Specifications */}
           <div className="bg-white border border-gray-200 rounded-lg p-6">
             <div className="flex items-center gap-2 mb-4">
-              <Calculator className="w-5 h-5 text-electric-500" />
+              <Calculator className="w-5 h-5 text-[#2d3b2d]" />
               <h3 className="font-bold text-gray-900">Panel Specifications</h3>
             </div>
 
@@ -343,7 +343,7 @@ export const EVPanelTemplates: React.FC<EVPanelTemplatesProps> = ({ project }) =
                       (panelSpecs.totalLoad / panelSpecs.panelRating) > 0.8
                         ? 'bg-red-500'
                         : (panelSpecs.totalLoad / panelSpecs.panelRating) > 0.6
-                        ? 'bg-yellow-500'
+                        ? 'bg-[#fff8e6]0'
                         : 'bg-green-500'
                     }`}
                     style={{ width: `${Math.min(100, (panelSpecs.totalLoad / panelSpecs.panelRating) * 100)}%` }}
@@ -356,7 +356,7 @@ export const EVPanelTemplates: React.FC<EVPanelTemplatesProps> = ({ project }) =
           {/* What Will Be Created */}
           <div className="bg-gray-50 border border-gray-200 rounded-lg p-6">
             <h3 className="font-semibold text-gray-900 mb-3 flex items-center gap-2">
-              <Sparkles className="w-4 h-4 text-electric-500" />
+              <Sparkles className="w-4 h-4 text-[#2d3b2d]" />
               This will create:
             </h3>
             <ul className="text-sm text-gray-700 space-y-2">
@@ -421,7 +421,7 @@ export const EVPanelTemplates: React.FC<EVPanelTemplatesProps> = ({ project }) =
                 ? 'bg-gray-400 text-white cursor-not-allowed'
                 : applyStatus === 'success'
                 ? 'bg-green-500 text-white'
-                : 'bg-electric-500 text-white hover:bg-electric-600'
+                : 'bg-[#2d3b2d] text-white hover:bg-[#3d4f3d]'
             }`}
           >
             {applyStatus === 'applying' ? (

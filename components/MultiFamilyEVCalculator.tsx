@@ -426,7 +426,7 @@ export const MultiFamilyEVCalculator: React.FC<MultiFamilyEVCalculatorProps> = (
       {/* Header */}
       <div>
         <h3 className="text-xl font-bold text-gray-900 flex items-center gap-2">
-          <Building2 className="w-6 h-6 text-electric-500" />
+          <Building2 className="w-6 h-6 text-[#2d3b2d]" />
           Multi-Family EV Readiness Calculator
         </h3>
         <p className="text-sm text-gray-500 mt-1">
@@ -439,7 +439,7 @@ export const MultiFamilyEVCalculator: React.FC<MultiFamilyEVCalculatorProps> = (
         <div className={`border-2 rounded-lg p-4 ${
           quickCheck.canSupport
             ? 'bg-green-50 border-green-300'
-            : 'bg-yellow-50 border-yellow-300'
+            : 'bg-[#fff8e6] border-[#c9a227]/50'
         }`}>
           <div className="flex items-center justify-between flex-wrap gap-4">
             <div className="flex items-center gap-3">
@@ -450,12 +450,12 @@ export const MultiFamilyEVCalculator: React.FC<MultiFamilyEVCalculatorProps> = (
                 ) : result.scenarios.withEVEMS.maxChargers >= evChargerCount ? (
                   <CheckCircle className="w-6 h-6 text-blue-600" />
                 ) : (
-                  <AlertTriangle className="w-6 h-6 text-yellow-600" />
+                  <AlertTriangle className="w-6 h-6 text-[#c9a227]" />
                 )
               ) : quickCheck.canSupport ? (
                 <CheckCircle className="w-6 h-6 text-green-600" />
               ) : (
-                <AlertTriangle className="w-6 h-6 text-yellow-600" />
+                <AlertTriangle className="w-6 h-6 text-[#c9a227]" />
               )}
               <div>
                 <div className="font-semibold text-gray-900">
@@ -496,7 +496,7 @@ export const MultiFamilyEVCalculator: React.FC<MultiFamilyEVCalculatorProps> = (
           onClick={() => setMode('detailed')}
           className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
             mode === 'detailed'
-              ? 'bg-electric-500 text-black'
+              ? 'bg-[#2d3b2d] text-black'
               : 'bg-white text-gray-700 hover:bg-gray-100'
           }`}
         >
@@ -506,7 +506,7 @@ export const MultiFamilyEVCalculator: React.FC<MultiFamilyEVCalculatorProps> = (
           onClick={() => setMode('quick')}
           className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
             mode === 'quick'
-              ? 'bg-electric-500 text-black'
+              ? 'bg-[#2d3b2d] text-black'
               : 'bg-white text-gray-700 hover:bg-gray-100'
           }`}
         >
@@ -525,20 +525,20 @@ export const MultiFamilyEVCalculator: React.FC<MultiFamilyEVCalculatorProps> = (
           {!hasStoredData && (
             <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 space-y-4">
               <h4 className="font-semibold text-gray-900 text-sm flex items-center gap-2">
-                <Building2 className="w-4 h-4 text-electric-500" />
+                <Building2 className="w-4 h-4 text-[#2d3b2d]" />
                 Building Profile
               </h4>
 
               {/* Building Type Preset Selector */}
               {existingLoadMethod === 'calculated' && (
-                <div className="bg-electric-50 border border-electric-200 rounded-lg p-3">
-                  <label className="block text-xs font-semibold text-electric-700 uppercase mb-2">
+                <div className="bg-[#f0f5f0] border border-[#2d3b2d]/30 rounded-lg p-3">
+                  <label className="block text-xs font-semibold text-[#2d3b2d] uppercase mb-2">
                     Don&apos;t Know All Details? Select Building Type
                   </label>
                   <select
                     value={buildingPreset}
                     onChange={e => applyBuildingPreset(e.target.value as BuildingPresetType)}
-                    className="w-full border-electric-300 rounded text-sm py-2 focus:border-electric-500 focus:ring-electric-500"
+                    className="w-full border-[#94b894] rounded text-sm py-2 focus:border-[#2d3b2d] focus:ring-[#2d3b2d]/20"
                   >
                     {Object.entries(BUILDING_PRESETS).map(([key, preset]) => (
                       <option key={key} value={key}>
@@ -547,7 +547,7 @@ export const MultiFamilyEVCalculator: React.FC<MultiFamilyEVCalculatorProps> = (
                     ))}
                   </select>
                   {buildingPreset !== 'custom' && (
-                    <p className="text-xs text-electric-600 mt-2">
+                    <p className="text-xs text-[#2d3b2d] mt-2">
                       Defaults applied: {BUILDING_PRESETS[buildingPreset].avgSqFt} sq ft avg, {(BUILDING_PRESETS[buildingPreset].commonAreaVA / 1000).toFixed(0)} kVA common area
                     </p>
                   )}
@@ -564,7 +564,7 @@ export const MultiFamilyEVCalculator: React.FC<MultiFamilyEVCalculatorProps> = (
                     value={buildingName}
                     onChange={e => setBuildingName(e.target.value)}
                     placeholder="e.g., Sunset Apartments"
-                    className="w-full border-gray-200 rounded text-sm py-2 px-3 focus:border-electric-500 focus:ring-electric-500"
+                    className="w-full border-gray-200 rounded text-sm py-2 px-3 focus:border-[#2d3b2d] focus:ring-[#2d3b2d]/20"
                   />
                 </div>
 
@@ -578,13 +578,13 @@ export const MultiFamilyEVCalculator: React.FC<MultiFamilyEVCalculatorProps> = (
                     onChange={e => setDwellingUnits(Number(e.target.value))}
                     min="3"
                     max="500"
-                    className="w-full border-gray-200 rounded text-sm py-2 px-3 focus:border-electric-500 focus:ring-electric-500"
+                    className="w-full border-gray-200 rounded text-sm py-2 px-3 focus:border-[#2d3b2d] focus:ring-[#2d3b2d]/20"
                   />
                 </div>
 
                 <div>
                   <label className="block text-xs font-semibold text-gray-500 uppercase mb-1">
-                    Avg. Unit Sq Ft {buildingPreset !== 'custom' && <span className="text-electric-500">(preset)</span>}
+                    Avg. Unit Sq Ft {buildingPreset !== 'custom' && <span className="text-[#2d3b2d]">(preset)</span>}
                   </label>
                   <input
                     type="number"
@@ -596,7 +596,7 @@ export const MultiFamilyEVCalculator: React.FC<MultiFamilyEVCalculatorProps> = (
                     min="400"
                     max="3000"
                     step="50"
-                    className="w-full border-gray-200 rounded text-sm py-2 px-3 focus:border-electric-500 focus:ring-electric-500"
+                    className="w-full border-gray-200 rounded text-sm py-2 px-3 focus:border-[#2d3b2d] focus:ring-[#2d3b2d]/20"
                   />
                 </div>
               </div>
@@ -606,7 +606,7 @@ export const MultiFamilyEVCalculator: React.FC<MultiFamilyEVCalculatorProps> = (
           {/* Service Details */}
           <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 space-y-4">
             <h4 className="font-semibold text-gray-900 text-sm flex items-center gap-2">
-              <Zap className="w-4 h-4 text-electric-500" />
+              <Zap className="w-4 h-4 text-[#2d3b2d]" />
               Existing Service
             </h4>
 
@@ -618,7 +618,7 @@ export const MultiFamilyEVCalculator: React.FC<MultiFamilyEVCalculatorProps> = (
                 <select
                   value={existingServiceAmps}
                   onChange={e => setExistingServiceAmps(Number(e.target.value))}
-                  className="w-full border-gray-200 rounded text-sm py-2 focus:border-electric-500 focus:ring-electric-500"
+                  className="w-full border-gray-200 rounded text-sm py-2 focus:border-[#2d3b2d] focus:ring-[#2d3b2d]/20"
                 >
                   <option value="200">200A</option>
                   <option value="400">400A</option>
@@ -641,7 +641,7 @@ export const MultiFamilyEVCalculator: React.FC<MultiFamilyEVCalculatorProps> = (
                 <select
                   value={voltage}
                   onChange={e => setVoltage(Number(e.target.value) as 120 | 208 | 240 | 277 | 480)}
-                  className="w-full border-gray-200 rounded text-sm py-2 focus:border-electric-500 focus:ring-electric-500"
+                  className="w-full border-gray-200 rounded text-sm py-2 focus:border-[#2d3b2d] focus:ring-[#2d3b2d]/20"
                 >
                   <option value="208">208V</option>
                   <option value="240">240V</option>
@@ -656,7 +656,7 @@ export const MultiFamilyEVCalculator: React.FC<MultiFamilyEVCalculatorProps> = (
                 <select
                   value={phase}
                   onChange={e => setPhase(Number(e.target.value) as 1 | 3)}
-                  className="w-full border-gray-200 rounded text-sm py-2 focus:border-electric-500 focus:ring-electric-500"
+                  className="w-full border-gray-200 rounded text-sm py-2 focus:border-[#2d3b2d] focus:ring-[#2d3b2d]/20"
                 >
                   <option value="1">1-Phase</option>
                   <option value="3">3-Phase</option>
@@ -697,11 +697,11 @@ export const MultiFamilyEVCalculator: React.FC<MultiFamilyEVCalculatorProps> = (
                 </div>
               )}
               {existingLoadMethod === 'calculated' && !storedMFLoad && (
-                <div className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded p-2.5">
+                <div className="text-xs text-[#2d3b2d] bg-[#f0f5f0] border border-[#3d6b3d]/30 rounded p-2.5">
                   <AlertTriangle className="w-3 h-3 inline mr-1" />
                   No building load configured. Go to the <strong>Dwelling Load Calculator</strong> (Load Calculation tab) and set up unit types and appliances.
                   The NEC 220.84 calculation will be imported here automatically.
-                  <div className="mt-1.5 text-amber-600">
+                  <div className="mt-1.5 text-[#3d6b3d]">
                     Using simplified estimates until then.
                   </div>
                 </div>
@@ -780,7 +780,7 @@ export const MultiFamilyEVCalculator: React.FC<MultiFamilyEVCalculatorProps> = (
                   onChange={e => setEvChargerCount(Number(e.target.value))}
                   min="1"
                   max="500"
-                  className="w-full border-gray-200 rounded text-sm py-2 px-3 focus:border-electric-500 focus:ring-electric-500"
+                  className="w-full border-gray-200 rounded text-sm py-2 px-3 focus:border-[#2d3b2d] focus:ring-[#2d3b2d]/20"
                 />
               </div>
 
@@ -791,7 +791,7 @@ export const MultiFamilyEVCalculator: React.FC<MultiFamilyEVCalculatorProps> = (
                 <select
                   value={evChargerLevel}
                   onChange={e => setEvChargerLevel(e.target.value as 'Level1' | 'Level2')}
-                  className="w-full border-gray-200 rounded text-sm py-2 focus:border-electric-500 focus:ring-electric-500"
+                  className="w-full border-gray-200 rounded text-sm py-2 focus:border-[#2d3b2d] focus:ring-[#2d3b2d]/20"
                 >
                   <option value="Level1">Level 1 (120V)</option>
                   <option value="Level2">Level 2 (208/240V)</option>
@@ -805,7 +805,7 @@ export const MultiFamilyEVCalculator: React.FC<MultiFamilyEVCalculatorProps> = (
                 <select
                   value={evAmpsPerCharger}
                   onChange={e => setEvAmpsPerCharger(Number(e.target.value))}
-                  className="w-full border-gray-200 rounded text-sm py-2 focus:border-electric-500 focus:ring-electric-500"
+                  className="w-full border-gray-200 rounded text-sm py-2 focus:border-[#2d3b2d] focus:ring-[#2d3b2d]/20"
                 >
                   {evChargerLevel === 'Level1' ? (
                     <>
@@ -834,7 +834,7 @@ export const MultiFamilyEVCalculator: React.FC<MultiFamilyEVCalculatorProps> = (
                   id="useEVEMS"
                   checked={useEVEMS}
                   onChange={e => setUseEVEMS(e.target.checked)}
-                  className="rounded border-gray-300 text-electric-500 focus:ring-electric-500"
+                  className="rounded border-gray-300 text-[#2d3b2d] focus:ring-[#2d3b2d]/20"
                 />
                 <label htmlFor="useEVEMS" className="font-semibold text-gray-900 text-sm cursor-pointer">
                   Include EVEMS Analysis (NEC 625.42)
@@ -856,7 +856,7 @@ export const MultiFamilyEVCalculator: React.FC<MultiFamilyEVCalculatorProps> = (
                 step={500}
                 value={capacityReserveVA}
                 onChange={e => setCapacityReserveVA(Number(e.target.value))}
-                className="w-full border-gray-200 rounded text-sm py-2 focus:border-electric-500 focus:ring-electric-500"
+                className="w-full border-gray-200 rounded text-sm py-2 focus:border-[#2d3b2d] focus:ring-[#2d3b2d]/20"
               />
               <p className="text-xs text-gray-500 mt-1">
                 Reserve for EV panel auxiliary loads (spare circuits, lighting, EVEMS controller)
@@ -880,7 +880,7 @@ export const MultiFamilyEVCalculator: React.FC<MultiFamilyEVCalculatorProps> = (
                         type="checkbox"
                         checked={hasElectricHeat}
                         onChange={e => setHasElectricHeat(e.target.checked)}
-                        className="rounded border-gray-300 text-electric-500 focus:ring-electric-500"
+                        className="rounded border-gray-300 text-[#2d3b2d] focus:ring-[#2d3b2d]/20"
                       />
                       <span className="text-sm text-gray-700">Electric Heat (65% demand factor)</span>
                     </label>
@@ -890,7 +890,7 @@ export const MultiFamilyEVCalculator: React.FC<MultiFamilyEVCalculatorProps> = (
                         type="checkbox"
                         checked={hasElectricCooking}
                         onChange={e => setHasElectricCooking(e.target.checked)}
-                        className="rounded border-gray-300 text-electric-500 focus:ring-electric-500"
+                        className="rounded border-gray-300 text-[#2d3b2d] focus:ring-[#2d3b2d]/20"
                       />
                       <span className="text-sm text-gray-700">Electric Cooking (12 kW/unit nameplate)</span>
                     </label>
@@ -906,7 +906,7 @@ export const MultiFamilyEVCalculator: React.FC<MultiFamilyEVCalculatorProps> = (
                             type="checkbox"
                             checked={useItemizedCommonArea}
                             onChange={e => setUseItemizedCommonArea(e.target.checked)}
-                            className="rounded border-gray-300 text-electric-500 focus:ring-electric-500"
+                            className="rounded border-gray-300 text-[#2d3b2d] focus:ring-[#2d3b2d]/20"
                           />
                           <span className="text-xs text-gray-600">Itemize with NEC demand factors</span>
                         </label>
@@ -921,7 +921,7 @@ export const MultiFamilyEVCalculator: React.FC<MultiFamilyEVCalculatorProps> = (
                             onChange={e => setCommonAreaLoadVA(Number(e.target.value))}
                             min="0"
                             step="1000"
-                            className="w-full border-gray-200 rounded text-sm py-2 px-3 focus:border-electric-500 focus:ring-electric-500"
+                            className="w-full border-gray-200 rounded text-sm py-2 px-3 focus:border-[#2d3b2d] focus:ring-[#2d3b2d]/20"
                           />
                           <p className="text-xs text-gray-500 mt-1">
                             Quick entry: Total VA for lighting, elevators, pool, gym, etc.
@@ -1069,7 +1069,7 @@ export const MultiFamilyEVCalculator: React.FC<MultiFamilyEVCalculatorProps> = (
                                 }
                               ]);
                             }}
-                            className="w-full py-2 border-2 border-dashed border-gray-300 rounded-lg text-gray-500 hover:border-electric-500 hover:text-electric-600 text-xs font-medium flex items-center justify-center gap-1"
+                            className="w-full py-2 border-2 border-dashed border-gray-300 rounded-lg text-gray-500 hover:border-[#2d3b2d] hover:text-[#2d3b2d] text-xs font-medium flex items-center justify-center gap-1"
                           >
                             <Plus className="w-4 h-4" />
                             Add Common Area Load
@@ -1087,7 +1087,7 @@ export const MultiFamilyEVCalculator: React.FC<MultiFamilyEVCalculatorProps> = (
                                   { category: 'receptacles', description: 'Common area outlets', inputType: 'va', value: 5000, quantity: 1 },
                                 ]);
                               }}
-                              className="text-xs text-electric-600 hover:text-electric-700 underline"
+                              className="text-xs text-[#2d3b2d] hover:text-[#2d3b2d] underline"
                             >
                               Low-Rise
                             </button>
@@ -1102,7 +1102,7 @@ export const MultiFamilyEVCalculator: React.FC<MultiFamilyEVCalculatorProps> = (
                                   { category: 'receptacles', description: 'Common area outlets', inputType: 'va', value: 10000, quantity: 1 },
                                 ]);
                               }}
-                              className="text-xs text-electric-600 hover:text-electric-700 underline"
+                              className="text-xs text-[#2d3b2d] hover:text-[#2d3b2d] underline"
                             >
                               Mid-Rise
                             </button>
@@ -1120,7 +1120,7 @@ export const MultiFamilyEVCalculator: React.FC<MultiFamilyEVCalculatorProps> = (
                                   { category: 'receptacles', description: 'Common area outlets', inputType: 'va', value: 15000, quantity: 1 },
                                 ]);
                               }}
-                              className="text-xs text-electric-600 hover:text-electric-700 underline"
+                              className="text-xs text-[#2d3b2d] hover:text-[#2d3b2d] underline"
                             >
                               High-Rise
                             </button>
@@ -1140,7 +1140,7 @@ export const MultiFamilyEVCalculator: React.FC<MultiFamilyEVCalculatorProps> = (
                     id="hasTransformer"
                     checked={hasTransformer}
                     onChange={e => setHasTransformer(e.target.checked)}
-                    className="rounded border-gray-300 text-electric-500 focus:ring-electric-500"
+                    className="rounded border-gray-300 text-[#2d3b2d] focus:ring-[#2d3b2d]/20"
                   />
                   <label htmlFor="hasTransformer" className="font-semibold text-gray-900 text-sm cursor-pointer flex items-center gap-2">
                     <Battery className="w-4 h-4 text-gray-600" />
@@ -1156,7 +1156,7 @@ export const MultiFamilyEVCalculator: React.FC<MultiFamilyEVCalculatorProps> = (
                     <select
                       value={transformerKVA}
                       onChange={e => setTransformerKVA(Number(e.target.value))}
-                      className="w-full border-gray-200 rounded text-sm py-2 focus:border-electric-500 focus:ring-electric-500"
+                      className="w-full border-gray-200 rounded text-sm py-2 focus:border-[#2d3b2d] focus:ring-[#2d3b2d]/20"
                     >
                       <option value="150">150 kVA</option>
                       <option value="225">225 kVA</option>
@@ -1183,7 +1183,7 @@ export const MultiFamilyEVCalculator: React.FC<MultiFamilyEVCalculatorProps> = (
               <button
                 onClick={handleExportPDF}
                 disabled={isExporting}
-                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-electric-500 text-black rounded hover:bg-electric-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-[#2d3b2d] text-black rounded hover:bg-[#3d4f3d] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {isExporting ? (
                   <>
@@ -1261,7 +1261,7 @@ export const MultiFamilyEVCalculator: React.FC<MultiFamilyEVCalculatorProps> = (
                       <span className={`text-2xl font-bold ${
                         util > 100 ? 'text-red-700' :
                         util > 90 ? 'text-orange-700' :
-                        util > 80 ? 'text-yellow-700' :
+                        util > 80 ? 'text-[#9a7b00]' :
                         'text-green-700'
                       }`}>
                         {util}%
@@ -1272,7 +1272,7 @@ export const MultiFamilyEVCalculator: React.FC<MultiFamilyEVCalculatorProps> = (
                         className={`h-4 rounded-full transition-all ${
                           util > 100 ? 'bg-red-600' :
                           util > 90 ? 'bg-orange-500' :
-                          util > 80 ? 'bg-yellow-500' :
+                          util > 80 ? 'bg-[#fff8e6]0' :
                           'bg-green-500'
                         }`}
                         style={{ width: `${Math.min(util, 100)}%` }}
@@ -1481,7 +1481,7 @@ export const MultiFamilyEVCalculator: React.FC<MultiFamilyEVCalculatorProps> = (
               {result.transformerCheck && (
                 <div className={`border rounded-lg p-4 ${
                   result.transformerCheck.status === 'red' ? 'bg-red-50 border-red-200' :
-                  result.transformerCheck.status === 'yellow' ? 'bg-yellow-50 border-yellow-200' :
+                  result.transformerCheck.status === 'yellow' ? 'bg-[#fff8e6] border-[#c9a227]/40' :
                   'bg-green-50 border-green-200'
                 }`}>
                   <h4 className="font-semibold text-gray-900 mb-2 text-sm flex items-center gap-2">
@@ -1497,14 +1497,14 @@ export const MultiFamilyEVCalculator: React.FC<MultiFamilyEVCalculatorProps> = (
                       <div className="text-xs text-gray-600">Utilization</div>
                       <div className={`font-bold ${
                         result.transformerCheck.status === 'red' ? 'text-red-700' :
-                        result.transformerCheck.status === 'yellow' ? 'text-yellow-700' :
+                        result.transformerCheck.status === 'yellow' ? 'text-[#9a7b00]' :
                         'text-green-700'
                       }`}>{result.transformerCheck.utilizationPercent}%</div>
                     </div>
                   </div>
                   <p className={`text-xs mt-2 ${
                     result.transformerCheck.status === 'red' ? 'text-red-700' :
-                    result.transformerCheck.status === 'yellow' ? 'text-yellow-700' :
+                    result.transformerCheck.status === 'yellow' ? 'text-[#9a7b00]' :
                     'text-green-700'
                   }`}>
                     {result.transformerCheck.recommendation}
@@ -1515,7 +1515,7 @@ export const MultiFamilyEVCalculator: React.FC<MultiFamilyEVCalculatorProps> = (
               {/* Phase Balance (3-phase only) */}
               {result.phaseBalance && (
                 <div className={`border rounded-lg p-4 ${
-                  result.phaseBalance.isAcceptable ? 'bg-green-50 border-green-200' : 'bg-yellow-50 border-yellow-200'
+                  result.phaseBalance.isAcceptable ? 'bg-green-50 border-green-200' : 'bg-[#fff8e6] border-[#c9a227]/40'
                 }`}>
                   <h4 className="font-semibold text-gray-900 mb-2 text-sm flex items-center gap-2">
                     <Zap className="w-4 h-4" />
@@ -1539,7 +1539,7 @@ export const MultiFamilyEVCalculator: React.FC<MultiFamilyEVCalculatorProps> = (
                     </div>
                   </div>
                   <div className={`text-xs mt-2 flex items-center gap-1 ${
-                    result.phaseBalance.isAcceptable ? 'text-green-700' : 'text-yellow-700'
+                    result.phaseBalance.isAcceptable ? 'text-green-700' : 'text-[#9a7b00]'
                   }`}>
                     {result.phaseBalance.isAcceptable ? (
                       <CheckCircle className="w-3 h-3" />
@@ -1553,13 +1553,13 @@ export const MultiFamilyEVCalculator: React.FC<MultiFamilyEVCalculatorProps> = (
 
               {/* Compliance & Warnings */}
               <div className={`border rounded-lg p-4 ${
-                result.compliance.isCompliant ? 'bg-green-50 border-green-200' : 'bg-yellow-50 border-yellow-200'
+                result.compliance.isCompliant ? 'bg-green-50 border-green-200' : 'bg-[#fff8e6] border-[#c9a227]/40'
               }`}>
                 <div className="flex items-center gap-2 mb-3">
                   {result.compliance.isCompliant ? (
                     <CheckCircle className="w-5 h-5 text-green-600" />
                   ) : (
-                    <AlertTriangle className="w-5 h-5 text-yellow-600" />
+                    <AlertTriangle className="w-5 h-5 text-[#c9a227]" />
                   )}
                   <span className="font-semibold text-gray-900 text-sm">
                     {result.compliance.isCompliant ? 'NEC Compliant Design' : 'Action Required'}
@@ -1624,7 +1624,7 @@ export const MultiFamilyEVCalculator: React.FC<MultiFamilyEVCalculatorProps> = (
                     ))}
                     <div className="flex items-center justify-between pt-2 border-t-2 border-gray-300 font-bold">
                       <span>Total Building Demand</span>
-                      <span className="text-electric-600">
+                      <span className="text-[#2d3b2d]">
                         {(result.buildingLoad.buildingDemandVA / 1000).toFixed(1)} kVA ({result.buildingLoad.buildingLoadAmps}A)
                       </span>
                     </div>

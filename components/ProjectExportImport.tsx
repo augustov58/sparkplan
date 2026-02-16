@@ -102,7 +102,7 @@ export const ProjectExportImport: React.FC<ProjectExportImportProps> = ({
           <div className="flex items-start justify-between gap-4">
             <div className="flex-1">
               <div className="flex items-center gap-2 mb-1">
-                <Download className="w-4 h-4 text-electric-500" />
+                <Download className="w-4 h-4 text-[#2d3b2d]" />
                 <h4 className="font-semibold text-sm text-gray-900">Export Project</h4>
               </div>
               <p className="text-xs text-gray-600">
@@ -128,7 +128,7 @@ export const ProjectExportImport: React.FC<ProjectExportImportProps> = ({
           <div className="flex items-start justify-between gap-4">
             <div className="flex-1">
               <div className="flex items-center gap-2 mb-1">
-                <Upload className="w-4 h-4 text-electric-500" />
+                <Upload className="w-4 h-4 text-[#2d3b2d]" />
                 <h4 className="font-semibold text-sm text-gray-900">Import Project</h4>
               </div>
               <p className="text-xs text-gray-600">

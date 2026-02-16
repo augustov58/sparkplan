@@ -98,7 +98,7 @@ export const JurisdictionSearchWizard: React.FC<JurisdictionSearchWizardProps> =
       {/* Header */}
       <div>
         <h3 className="text-xl font-bold text-gray-900 flex items-center gap-2">
-          <MapPin className="w-6 h-6 text-electric-500" />
+          <MapPin className="w-6 h-6 text-[#2d3b2d]" />
           Jurisdiction Requirements Wizard
         </h3>
         <p className="text-sm text-gray-500 mt-1">
@@ -109,7 +109,7 @@ export const JurisdictionSearchWizard: React.FC<JurisdictionSearchWizardProps> =
       {/* Loading State */}
       {loading && (
         <div className="text-center py-8">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-electric-500 mx-auto"></div>
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#2d3b2d] mx-auto"></div>
           <p className="text-sm text-gray-500 mt-2">Loading jurisdictions...</p>
         </div>
       )}
@@ -132,7 +132,7 @@ export const JurisdictionSearchWizard: React.FC<JurisdictionSearchWizardProps> =
                   placeholder="Search city, county, or state..."
                   value={searchQuery}
                   onChange={e => setSearchQuery(e.target.value)}
-                  className="w-full border border-gray-200 rounded px-3 py-2 pl-9 focus:border-electric-500 focus:ring-electric-500"
+                  className="w-full border border-gray-200 rounded px-3 py-2 pl-9 focus:border-[#2d3b2d] focus:ring-[#2d3b2d]/20"
                 />
                 <MapPin className="absolute left-3 top-2.5 w-4 h-4 text-gray-400" />
               </div>
@@ -154,7 +154,7 @@ export const JurisdictionSearchWizard: React.FC<JurisdictionSearchWizardProps> =
                       onClick={() => handleSelectJurisdiction(jurisdiction)}
                       className={`w-full text-left px-4 py-3 hover:bg-gray-50 transition-colors ${
                         selectedJurisdiction?.id === jurisdiction.id
-                          ? 'bg-electric-50 border-l-4 border-electric-500'
+                          ? 'bg-[#f0f5f0] border-l-4 border-[#2d3b2d]'
                           : ''
                       }`}
                     >
@@ -223,17 +223,17 @@ export const JurisdictionSearchWizard: React.FC<JurisdictionSearchWizardProps> =
             {selectedJurisdiction ? (
               <>
                 {/* Jurisdiction Header */}
-                <div className="bg-electric-50 border border-electric-200 rounded-lg p-4">
-                  <h4 className="font-bold text-electric-900 flex items-center gap-2">
+                <div className="bg-[#f0f5f0] border border-[#2d3b2d]/30 rounded-lg p-4">
+                  <h4 className="font-bold text-[#111711] flex items-center gap-2">
                     <MapPin className="w-4 h-4" />
                     {selectedJurisdiction.jurisdiction_name}
                   </h4>
                   {selectedJurisdiction.ahj_name && (
-                    <p className="text-sm text-electric-700 mt-1">
+                    <p className="text-sm text-[#2d3b2d] mt-1">
                       Authority: {selectedJurisdiction.ahj_name}
                     </p>
                   )}
-                  <div className="flex items-center gap-3 mt-2 text-xs text-electric-600">
+                  <div className="flex items-center gap-3 mt-2 text-xs text-[#2d3b2d]">
                     <span>NEC {selectedJurisdiction.nec_edition}</span>
                     {selectedJurisdiction.estimated_review_days && (
                       <>
@@ -269,14 +269,14 @@ export const JurisdictionSearchWizard: React.FC<JurisdictionSearchWizardProps> =
                 {/* Required Calculations Checklist */}
                 <div className="space-y-2">
                   <h5 className="font-semibold text-gray-900 flex items-center gap-2">
-                    <Calculator className="w-4 h-4 text-electric-500" />
+                    <Calculator className="w-4 h-4 text-[#2d3b2d]" />
                     Required Calculations ({selectedJurisdiction.required_calculations.length})
                   </h5>
                   <div className="space-y-1">
                     {selectedJurisdiction.required_calculations.map(calc => (
                       <div key={calc} className="flex items-start gap-2 p-2 border border-gray-200 rounded bg-white text-sm">
-                        <div className="w-4 h-4 rounded border-2 border-electric-500 flex items-center justify-center mt-0.5 flex-shrink-0">
-                          <Calculator className="w-3 h-3 text-electric-600" />
+                        <div className="w-4 h-4 rounded border-2 border-[#2d3b2d] flex items-center justify-center mt-0.5 flex-shrink-0">
+                          <Calculator className="w-3 h-3 text-[#2d3b2d]" />
                         </div>
                         <div className="flex-1">
                           <div className="font-medium text-gray-900">
@@ -290,12 +290,12 @@ export const JurisdictionSearchWizard: React.FC<JurisdictionSearchWizardProps> =
 
                 {/* Special Notes */}
                 {selectedJurisdiction.notes && (
-                  <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
+                  <div className="bg-[#fff8e6] border border-[#c9a227]/40 rounded-lg p-3">
                     <div className="flex items-start gap-2">
-                      <AlertCircle className="w-4 h-4 text-yellow-600 mt-0.5 flex-shrink-0" />
+                      <AlertCircle className="w-4 h-4 text-[#c9a227] mt-0.5 flex-shrink-0" />
                       <div>
-                        <div className="font-semibold text-sm text-yellow-900">Special Notes</div>
-                        <div className="text-xs text-yellow-800 mt-1">{selectedJurisdiction.notes}</div>
+                        <div className="font-semibold text-sm text-[#5a4500]">Special Notes</div>
+                        <div className="text-xs text-[#7a6200] mt-1">{selectedJurisdiction.notes}</div>
                       </div>
                     </div>
                   </div>
@@ -317,7 +317,7 @@ export const JurisdictionSearchWizard: React.FC<JurisdictionSearchWizardProps> =
                         href={selectedJurisdiction.source_url}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="text-sm text-electric-600 hover:text-electric-700 underline inline-flex items-center gap-1"
+                        className="text-sm text-[#2d3b2d] hover:text-[#2d3b2d] underline inline-flex items-center gap-1"
                       >
                         View Official Requirements →
                       </a>
@@ -337,7 +337,7 @@ export const JurisdictionSearchWizard: React.FC<JurisdictionSearchWizardProps> =
                       href={selectedJurisdiction.ahj_website}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="text-sm text-electric-600 hover:text-electric-700 underline"
+                      className="text-sm text-[#2d3b2d] hover:text-[#2d3b2d] underline"
                     >
                       Visit {selectedJurisdiction.ahj_name || 'AHJ'} Website →
                     </a>

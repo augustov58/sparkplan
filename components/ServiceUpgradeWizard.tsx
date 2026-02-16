@@ -216,7 +216,7 @@ export const ServiceUpgradeWizard: React.FC<ServiceUpgradeWizardProps> = ({ proj
       {/* Header */}
       <div>
         <h3 className="text-xl font-bold text-gray-900 flex items-center gap-2">
-          <TrendingUp className="w-6 h-6 text-electric-500" />
+          <TrendingUp className="w-6 h-6 text-[#2d3b2d]" />
           Service Upgrade Wizard
         </h3>
         <p className="text-sm text-gray-500 mt-1">
@@ -230,7 +230,7 @@ export const ServiceUpgradeWizard: React.FC<ServiceUpgradeWizardProps> = ({ proj
           onClick={() => setMode('quick')}
           className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
             mode === 'quick'
-              ? 'bg-electric-500 text-black'
+              ? 'bg-[#2d3b2d] text-black'
               : 'bg-white text-gray-700 hover:bg-gray-100'
           }`}
         >
@@ -252,7 +252,7 @@ export const ServiceUpgradeWizard: React.FC<ServiceUpgradeWizardProps> = ({ proj
                 id="useProjectData"
                 checked={useProjectData}
                 onChange={e => setUseProjectData(e.target.checked)}
-                className="rounded border-gray-300 text-electric-500 focus:ring-electric-500"
+                className="rounded border-gray-300 text-[#2d3b2d] focus:ring-[#2d3b2d]/20"
               />
               <label htmlFor="useProjectData" className="text-xs text-gray-700 cursor-pointer">
                 Use project data
@@ -308,10 +308,10 @@ export const ServiceUpgradeWizard: React.FC<ServiceUpgradeWizardProps> = ({ proj
 
       {/* No Data - Prompt to use Dwelling Calculator OR Manual Entry */}
       {!useProjectData && !usingDwellingData && projectId && (
-        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 flex items-start gap-2">
-          <Info className="w-4 h-4 text-yellow-600 mt-0.5 flex-shrink-0" />
+        <div className="bg-[#fff8e6] border border-[#c9a227]/40 rounded-lg p-3 flex items-start gap-2">
+          <Info className="w-4 h-4 text-[#c9a227] mt-0.5 flex-shrink-0" />
           <div className="text-sm flex-1">
-            <span className="font-semibold text-yellow-900">
+            <span className="font-semibold text-[#5a4500]">
               {existingLoadMethod === ExistingLoadDeterminationMethod.CALCULATED
                 ? 'Quick Check Mode - Manual Entry'
                 : existingLoadMethod === ExistingLoadDeterminationMethod.UTILITY_BILL
@@ -320,7 +320,7 @@ export const ServiceUpgradeWizard: React.FC<ServiceUpgradeWizardProps> = ({ proj
                 ? '30-Day Load Study - Enter Peak Demand'
                 : 'Manual Entry Mode'}
             </span>
-            <p className="text-xs text-yellow-700 mt-1">
+            <p className="text-xs text-[#9a7b00] mt-1">
               {existingLoadMethod === ExistingLoadDeterminationMethod.CALCULATED ? (
                 <>For more accurate results, use the Dwelling Load Calculator to input your square footage and appliances.</>
               ) : existingLoadMethod === ExistingLoadDeterminationMethod.UTILITY_BILL ? (
@@ -335,7 +335,7 @@ export const ServiceUpgradeWizard: React.FC<ServiceUpgradeWizardProps> = ({ proj
               <div className="mt-2">
                 <a
                   href={`/project/${projectId}/dwelling-calculator`}
-                  className="text-xs text-yellow-700 hover:text-yellow-800 underline font-medium"
+                  className="text-xs text-[#9a7b00] hover:text-[#7a6200] underline font-medium"
                 >
                   Configure in Dwelling Load Calculator →
                 </a>
@@ -352,7 +352,7 @@ export const ServiceUpgradeWizard: React.FC<ServiceUpgradeWizardProps> = ({ proj
           {/* Current Service Section */}
           <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 space-y-4">
             <h4 className="font-semibold text-gray-900 text-sm flex items-center gap-2">
-              <Zap className="w-4 h-4 text-electric-500" />
+              <Zap className="w-4 h-4 text-[#2d3b2d]" />
               Current Service
             </h4>
 
@@ -364,7 +364,7 @@ export const ServiceUpgradeWizard: React.FC<ServiceUpgradeWizardProps> = ({ proj
                 <select
                   value={currentServiceAmps}
                   onChange={e => setCurrentServiceAmps(Number(e.target.value))}
-                  className="w-full border-gray-200 rounded text-sm py-2 px-3 focus:border-electric-500 focus:ring-electric-500"
+                  className="w-full border-gray-200 rounded text-sm py-2 px-3 focus:border-[#2d3b2d] focus:ring-[#2d3b2d]/20"
                 >
                   <option value="100">100A</option>
                   <option value="125">125A</option>
@@ -389,7 +389,7 @@ export const ServiceUpgradeWizard: React.FC<ServiceUpgradeWizardProps> = ({ proj
                   min="0"
                   max={currentServiceAmps}
                   step="1"
-                  className="w-full border-gray-200 rounded text-sm py-2 px-3 focus:border-electric-500 focus:ring-electric-500"
+                  className="w-full border-gray-200 rounded text-sm py-2 px-3 focus:border-[#2d3b2d] focus:ring-[#2d3b2d]/20"
                 />
               </div>
             </div>
@@ -407,7 +407,7 @@ export const ServiceUpgradeWizard: React.FC<ServiceUpgradeWizardProps> = ({ proj
                     name="existingLoadMethod"
                     checked={existingLoadMethod === ExistingLoadDeterminationMethod.UTILITY_BILL}
                     onChange={() => setExistingLoadMethod(ExistingLoadDeterminationMethod.UTILITY_BILL)}
-                    className="mt-0.5 text-electric-500 focus:ring-electric-500"
+                    className="mt-0.5 text-[#2d3b2d] focus:ring-[#2d3b2d]/20"
                   />
                   <span className="text-xs">
                     <span className="font-semibold text-gray-900">12-Month Utility Billing</span>
@@ -420,7 +420,7 @@ export const ServiceUpgradeWizard: React.FC<ServiceUpgradeWizardProps> = ({ proj
                     name="existingLoadMethod"
                     checked={existingLoadMethod === ExistingLoadDeterminationMethod.LOAD_STUDY}
                     onChange={() => setExistingLoadMethod(ExistingLoadDeterminationMethod.LOAD_STUDY)}
-                    className="mt-0.5 text-electric-500 focus:ring-electric-500"
+                    className="mt-0.5 text-[#2d3b2d] focus:ring-[#2d3b2d]/20"
                   />
                   <span className="text-xs">
                     <span className="font-semibold text-gray-900">30-Day Load Study</span>
@@ -433,7 +433,7 @@ export const ServiceUpgradeWizard: React.FC<ServiceUpgradeWizardProps> = ({ proj
                     name="existingLoadMethod"
                     checked={existingLoadMethod === ExistingLoadDeterminationMethod.CALCULATED}
                     onChange={() => setExistingLoadMethod(ExistingLoadDeterminationMethod.CALCULATED)}
-                    className="mt-0.5 text-electric-500 focus:ring-electric-500"
+                    className="mt-0.5 text-[#2d3b2d] focus:ring-[#2d3b2d]/20"
                   />
                   <span className="text-xs">
                     <span className="font-semibold text-gray-900">Calculated from Panel Schedule</span>
@@ -446,7 +446,7 @@ export const ServiceUpgradeWizard: React.FC<ServiceUpgradeWizardProps> = ({ proj
                     name="existingLoadMethod"
                     checked={existingLoadMethod === ExistingLoadDeterminationMethod.MANUAL}
                     onChange={() => setExistingLoadMethod(ExistingLoadDeterminationMethod.MANUAL)}
-                    className="mt-0.5 text-electric-500 focus:ring-electric-500"
+                    className="mt-0.5 text-[#2d3b2d] focus:ring-[#2d3b2d]/20"
                   />
                   <span className="text-xs">
                     <span className="font-semibold text-gray-900">Manual Entry</span>
@@ -476,7 +476,7 @@ export const ServiceUpgradeWizard: React.FC<ServiceUpgradeWizardProps> = ({ proj
           {/* Proposed Load Section */}
           <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 space-y-4">
             <h4 className="font-semibold text-gray-900 text-sm flex items-center gap-2">
-              <Plus className="w-4 h-4 text-electric-500" />
+              <Plus className="w-4 h-4 text-[#2d3b2d]" />
               Proposed New Load
             </h4>
 
@@ -488,7 +488,7 @@ export const ServiceUpgradeWizard: React.FC<ServiceUpgradeWizardProps> = ({ proj
               <select
                 value={selectedTemplate}
                 onChange={e => addLoadFromTemplate(e.target.value)}
-                className="w-full border-gray-200 rounded text-sm py-2 px-3 focus:border-electric-500 focus:ring-electric-500"
+                className="w-full border-gray-200 rounded text-sm py-2 px-3 focus:border-[#2d3b2d] focus:ring-[#2d3b2d]/20"
               >
                 <option value="">-- Select Load --</option>
                 <optgroup label="EV Chargers">
@@ -525,13 +525,13 @@ export const ServiceUpgradeWizard: React.FC<ServiceUpgradeWizardProps> = ({ proj
                 onChange={e => setProposedLoadAmps(Number(e.target.value))}
                 min="0"
                 step="1"
-                className="w-full border-gray-200 rounded text-sm py-2 px-3 focus:border-electric-500 focus:ring-electric-500"
+                className="w-full border-gray-200 rounded text-sm py-2 px-3 focus:border-[#2d3b2d] focus:ring-[#2d3b2d]/20"
                 placeholder="Enter amps"
               />
             </div>
 
             {proposedLoadAmps > 0 && (
-              <div className="bg-white border border-electric-200 rounded-lg p-3">
+              <div className="bg-white border border-[#2d3b2d]/30 rounded-lg p-3">
                 <div className="flex items-center justify-between">
                   <div>
                     <div className="text-sm font-medium text-gray-900">
@@ -638,20 +638,20 @@ export const ServiceUpgradeWizard: React.FC<ServiceUpgradeWizardProps> = ({ proj
                 result.status === 'CRITICAL'
                   ? 'bg-red-50 border-red-300'
                   : result.status === 'HIGH'
-                    ? 'bg-yellow-50 border-yellow-300'
+                    ? 'bg-[#fff8e6] border-[#c9a227]/50'
                     : 'bg-green-50 border-green-300'
               }`}>
                 <div className="flex items-center gap-3 mb-3">
                   {result.status === 'CRITICAL' ? (
                     <AlertTriangle className="w-6 h-6 text-red-700" />
                   ) : result.status === 'HIGH' ? (
-                    <Info className="w-6 h-6 text-yellow-700" />
+                    <Info className="w-6 h-6 text-[#9a7b00]" />
                   ) : (
                     <CheckCircle className="w-6 h-6 text-green-700" />
                   )}
                   <span className={`font-bold text-lg ${
                     result.status === 'CRITICAL' ? 'text-red-900' :
-                    result.status === 'HIGH' ? 'text-yellow-900' :
+                    result.status === 'HIGH' ? 'text-[#5a4500]' :
                     'text-green-900'
                   }`}>
                     {result.status === 'CRITICAL'
@@ -665,7 +665,7 @@ export const ServiceUpgradeWizard: React.FC<ServiceUpgradeWizardProps> = ({ proj
 
                 <p className={`text-sm ${
                   result.status === 'CRITICAL' ? 'text-red-800' :
-                  result.status === 'HIGH' ? 'text-yellow-800' :
+                  result.status === 'HIGH' ? 'text-[#7a6200]' :
                   'text-green-800'
                 }`}>
                   {result.recommendation}
@@ -700,11 +700,11 @@ export const ServiceUpgradeWizard: React.FC<ServiceUpgradeWizardProps> = ({ proj
                 )}
 
                 {result.status === 'HIGH' && (
-                  <div className="mt-4 pt-4 border-t border-yellow-200">
-                    <div className="text-sm text-yellow-900 font-semibold mb-2">
+                  <div className="mt-4 pt-4 border-t border-[#c9a227]/40">
+                    <div className="text-sm text-[#5a4500] font-semibold mb-2">
                       Recommendations:
                     </div>
-                    <ul className="text-xs text-yellow-800 space-y-1 list-disc list-inside">
+                    <ul className="text-xs text-[#7a6200] space-y-1 list-disc list-inside">
                       <li>Service can handle load but has limited future capacity</li>
                       <li>Consider service upgrade now to avoid future issues</li>
                       <li>Monitor total load to stay below {currentServiceAmps}A continuous</li>
@@ -724,7 +724,7 @@ export const ServiceUpgradeWizard: React.FC<ServiceUpgradeWizardProps> = ({ proj
                   return (
                     <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
                       <div className="flex items-start gap-3">
-                        <Zap className="w-5 h-5 text-electric-600 flex-shrink-0 mt-0.5" />
+                        <Zap className="w-5 h-5 text-[#2d3b2d] flex-shrink-0 mt-0.5" />
                         <div className="flex-1">
                           <h4 className="font-semibold text-gray-900 mb-1 text-sm">
                             Consider Circuit Sharing
@@ -784,7 +784,7 @@ export const ServiceUpgradeWizard: React.FC<ServiceUpgradeWizardProps> = ({ proj
                     <span>Load Breakdown (NEC 220.82)</span>
                     <a
                       href={`/project/${projectId}/dwelling-calculator`}
-                      className="text-xs text-electric-600 hover:text-electric-700 underline"
+                      className="text-xs text-[#2d3b2d] hover:text-[#2d3b2d] underline"
                     >
                       View Details
                     </a>
@@ -803,7 +803,7 @@ export const ServiceUpgradeWizard: React.FC<ServiceUpgradeWizardProps> = ({ proj
                     ))}
                     <div className="flex items-center justify-between pt-2 border-t-2 border-gray-300 font-bold">
                       <span>Total Load</span>
-                      <span className="text-electric-600">
+                      <span className="text-[#2d3b2d]">
                         {(dwellingLoadResult.totalDemandVA / 1000).toFixed(1)} kVA
                         <span className="ml-1">
                           ({Math.round(dwellingLoadResult.serviceAmps)}A)

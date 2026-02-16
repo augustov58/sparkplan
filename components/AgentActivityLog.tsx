@@ -131,7 +131,7 @@ export const AgentActivityLog: React.FC<AgentActivityLogProps> = ({ project }) =
   if (loading) {
     return (
       <div className="flex items-center justify-center py-12">
-        <RefreshCw className="w-8 h-8 text-electric-500 animate-spin" />
+        <RefreshCw className="w-8 h-8 text-[#2d3b2d] animate-spin" />
         <span className="ml-3 text-gray-600">Loading activity logs...</span>
       </div>
     );
@@ -152,7 +152,7 @@ export const AgentActivityLog: React.FC<AgentActivityLogProps> = ({ project }) =
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
-            <Activity className="w-7 h-7 text-electric-500" />
+            <Activity className="w-7 h-7 text-[#2d3b2d]" />
             AI Agent Activity Log
           </h2>
           <p className="text-sm text-gray-600 mt-1">
@@ -161,7 +161,7 @@ export const AgentActivityLog: React.FC<AgentActivityLogProps> = ({ project }) =
         </div>
         <button
           onClick={refresh}
-          className="flex items-center gap-2 px-4 py-2 bg-electric-500 text-white rounded-lg hover:bg-electric-600 transition-colors"
+          className="flex items-center gap-2 px-4 py-2 bg-[#2d3b2d] text-white rounded-lg hover:bg-[#3d4f3d] transition-colors"
         >
           <RefreshCw className="w-4 h-4" />
           Refresh
@@ -181,7 +181,7 @@ export const AgentActivityLog: React.FC<AgentActivityLogProps> = ({ project }) =
             <select
               value={filterAgent}
               onChange={(e) => setFilterAgent(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-electric-500 focus:border-electric-500 text-sm"
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#2d3b2d]/20 focus:border-[#2d3b2d] text-sm"
             >
               <option value="all">All Agents</option>
               {uniqueAgents.map(agent => (
@@ -196,7 +196,7 @@ export const AgentActivityLog: React.FC<AgentActivityLogProps> = ({ project }) =
             <select
               value={filterEvent}
               onChange={(e) => setFilterEvent(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-electric-500 focus:border-electric-500 text-sm"
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#2d3b2d]/20 focus:border-[#2d3b2d] text-sm"
             >
               <option value="all">All Events</option>
               {uniqueEvents.map(event => (
@@ -236,7 +236,7 @@ export const AgentActivityLog: React.FC<AgentActivityLogProps> = ({ project }) =
                 <div className="flex items-start justify-between gap-4">
                   <div className="flex items-start gap-3 flex-1 min-w-0">
                     {/* Agent Icon */}
-                    <div className="flex-shrink-0 w-10 h-10 rounded-full bg-electric-100 flex items-center justify-center text-electric-600">
+                    <div className="flex-shrink-0 w-10 h-10 rounded-full bg-[#e8f5e8] flex items-center justify-center text-[#2d3b2d]">
                       {getAgentIcon(log.agent_name)}
                     </div>
 

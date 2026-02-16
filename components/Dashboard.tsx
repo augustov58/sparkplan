@@ -124,7 +124,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ projects, createNewProject
         return 'bg-orange-100 text-orange-700 border-orange-200';
       case 'Warning':
       case 'Medium':
-        return 'bg-yellow-100 text-yellow-700 border-yellow-200';
+        return 'bg-[#fdf6dc] text-[#9a7b00] border-[#c9a227]/40';
       case 'Low':
       case 'Info':
         return 'bg-blue-100 text-blue-700 border-blue-200';

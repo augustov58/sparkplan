@@ -131,7 +131,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ project }) => {
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
-            <Calendar className="w-6 h-6 text-electric-500" />
+            <Calendar className="w-6 h-6 text-[#2d3b2d]" />
             {project ? `${project.name} - Calendar` : 'All Projects Calendar'}
           </h2>
           <p className="text-sm text-gray-500 mt-1">
@@ -356,7 +356,7 @@ const EventCard: React.FC<EventCardProps> = ({
                 {showProject && event.projects && (
                   <>
                     <span className="text-xs text-gray-400">•</span>
-                    <p className="text-xs font-medium text-electric-600">{event.projects.name}</p>
+                    <p className="text-xs font-medium text-[#2d3b2d]">{event.projects.name}</p>
                   </>
                 )}
               </div>

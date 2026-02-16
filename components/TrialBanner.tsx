@@ -23,16 +23,16 @@ export const TrialBanner: React.FC<TrialBannerProps> = ({ onDismiss, compact = f
   // Trial expired state
   if (isTrialExpired) {
     return (
-      <div className="bg-gradient-to-r from-amber-50 to-orange-50 border-b border-amber-200">
+      <div className="bg-gradient-to-r from-[#f0f5f0] to-[#e8f5e8] border-b border-[#3d6b3d]/30">
         <div className="max-w-7xl mx-auto px-4 py-3">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <div className="p-1.5 bg-amber-100 rounded-full">
-                <AlertTriangle className="w-4 h-4 text-amber-600" />
+              <div className="p-1.5 bg-[#e8f5e8] rounded-full">
+                <AlertTriangle className="w-4 h-4 text-[#3d6b3d]" />
               </div>
               <div>
                 <span className="text-amber-800 font-medium">Your free trial has ended.</span>
-                <span className="text-amber-700 ml-2">
+                <span className="text-[#2d3b2d] ml-2">
                   Upgrade now to continue using Pro features.
                 </span>
               </div>
@@ -40,14 +40,14 @@ export const TrialBanner: React.FC<TrialBannerProps> = ({ onDismiss, compact = f
             <div className="flex items-center gap-2">
               <button
                 onClick={() => navigate('/pricing')}
-                className="bg-amber-500 hover:bg-amber-600 text-white font-medium px-4 py-1.5 rounded-lg text-sm transition-colors"
+                className="bg-[#f0f5f0]0 hover:bg-[#2d3b2d] text-white font-medium px-4 py-1.5 rounded-lg text-sm transition-colors"
               >
                 View Plans
               </button>
               {onDismiss && (
                 <button
                   onClick={onDismiss}
-                  className="text-amber-500 hover:text-amber-700 p-1"
+                  className="text-amber-500 hover:text-[#2d3b2d] p-1"
                   aria-label="Dismiss"
                 >
                   <X className="w-4 h-4" />
@@ -73,8 +73,8 @@ export const TrialBanner: React.FC<TrialBannerProps> = ({ onDismiss, compact = f
           isUrgent
             ? 'bg-red-100 text-red-700 hover:bg-red-200'
             : isWarning
-            ? 'bg-amber-100 text-amber-700 hover:bg-amber-200'
-            : 'bg-electric-100 text-electric-700 hover:bg-electric-200'
+            ? 'bg-[#e8f5e8] text-[#2d3b2d] hover:bg-[#e8f5e8]'
+            : 'bg-[#e8f5e8] text-[#2d3b2d] hover:bg-[#d1e7d1]'
         }`}
       >
         <Clock className="w-3.5 h-3.5" />
@@ -87,10 +87,10 @@ export const TrialBanner: React.FC<TrialBannerProps> = ({ onDismiss, compact = f
   return (
     <div className={`border-b ${
       isUrgent
-        ? 'bg-gradient-to-r from-red-50 to-orange-50 border-red-200'
+        ? 'bg-gradient-to-r from-red-50 to-[#e8f5e8] border-red-200'
         : isWarning
-        ? 'bg-gradient-to-r from-amber-50 to-yellow-50 border-amber-200'
-        : 'bg-gradient-to-r from-electric-50 to-blue-50 border-electric-200'
+        ? 'bg-gradient-to-r from-[#f0f5f0] to-[#fff8e6] border-[#3d6b3d]/30'
+        : 'bg-gradient-to-r from-[#f0f5f0] to-blue-50 border-[#2d3b2d]/30'
     }`}>
       <div className="max-w-7xl mx-auto px-4 py-3">
         <div className="flex items-center justify-between">
@@ -99,15 +99,15 @@ export const TrialBanner: React.FC<TrialBannerProps> = ({ onDismiss, compact = f
               isUrgent
                 ? 'bg-red-100'
                 : isWarning
-                ? 'bg-amber-100'
-                : 'bg-electric-100'
+                ? 'bg-[#e8f5e8]'
+                : 'bg-[#e8f5e8]'
             }`}>
               <Sparkles className={`w-4 h-4 ${
                 isUrgent
                   ? 'text-red-600'
                   : isWarning
-                  ? 'text-amber-600'
-                  : 'text-electric-600'
+                  ? 'text-[#3d6b3d]'
+                  : 'text-[#2d3b2d]'
               }`} />
             </div>
             <div>
@@ -116,7 +116,7 @@ export const TrialBanner: React.FC<TrialBannerProps> = ({ onDismiss, compact = f
                   ? 'text-red-800'
                   : isWarning
                   ? 'text-amber-800'
-                  : 'text-electric-800'
+                  : 'text-[#1a231a]'
               }`}>
                 {daysUntilTrialEnd === 1 ? 'Last day' : `${daysUntilTrialEnd} days left`} of your {plan.charAt(0).toUpperCase() + plan.slice(1)} trial!
               </span>
@@ -124,8 +124,8 @@ export const TrialBanner: React.FC<TrialBannerProps> = ({ onDismiss, compact = f
                 isUrgent
                   ? 'text-red-700'
                   : isWarning
-                  ? 'text-amber-700'
-                  : 'text-electric-700'
+                  ? 'text-[#2d3b2d]'
+                  : 'text-[#2d3b2d]'
               }`}>
                 {isUrgent
                   ? 'Upgrade now to keep your Pro features.'
@@ -140,8 +140,8 @@ export const TrialBanner: React.FC<TrialBannerProps> = ({ onDismiss, compact = f
                 isUrgent
                   ? 'bg-red-500 hover:bg-red-600 text-white'
                   : isWarning
-                  ? 'bg-amber-500 hover:bg-amber-600 text-white'
-                  : 'bg-electric-500 hover:bg-electric-600 text-white'
+                  ? 'bg-[#f0f5f0]0 hover:bg-[#2d3b2d] text-white'
+                  : 'bg-[#2d3b2d] hover:bg-[#3d4f3d] text-white'
               }`}
             >
               Upgrade Now
@@ -153,8 +153,8 @@ export const TrialBanner: React.FC<TrialBannerProps> = ({ onDismiss, compact = f
                   isUrgent
                     ? 'text-red-500 hover:text-red-700'
                     : isWarning
-                    ? 'text-amber-500 hover:text-amber-700'
-                    : 'text-electric-500 hover:text-electric-700'
+                    ? 'text-amber-500 hover:text-[#2d3b2d]'
+                    : 'text-[#2d3b2d] hover:text-[#2d3b2d]'
                 }`}
                 aria-label="Dismiss"
               >
@@ -214,13 +214,13 @@ export const PromoCodeInput: React.FC<PromoCodeInputProps> = ({ className = '' }
           value={code}
           onChange={(e) => setCode(e.target.value.toUpperCase())}
           placeholder="Enter promo code"
-          className="flex-1 border border-gray-300 rounded-lg px-4 py-2 text-sm focus:border-electric-500 focus:ring-2 focus:ring-electric-500/20 outline-none uppercase"
+          className="flex-1 border border-gray-300 rounded-lg px-4 py-2 text-sm focus:border-[#2d3b2d] focus:ring-2 focus:ring-[#2d3b2d]/20/20 outline-none uppercase"
           disabled={loading}
         />
         <button
           type="submit"
           disabled={!code.trim() || loading}
-          className="bg-electric-500 hover:bg-electric-600 disabled:bg-gray-300 disabled:cursor-not-allowed text-white font-medium px-4 py-2 rounded-lg text-sm transition-colors"
+          className="bg-[#2d3b2d] hover:bg-[#3d4f3d] disabled:bg-gray-300 disabled:cursor-not-allowed text-white font-medium px-4 py-2 rounded-lg text-sm transition-colors"
         >
           {loading ? 'Applying...' : 'Apply'}
         </button>

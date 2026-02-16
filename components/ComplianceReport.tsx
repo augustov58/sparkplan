@@ -32,7 +32,7 @@ export const ComplianceReport: React.FC<ReportProps> = ({ project }) => {
                 <div className="text-right">
                     <p className="font-bold text-gray-900">{project.name}</p>
                     <p className="text-gray-500">{project.address}</p>
-                    <p className="text-electric-600 font-mono mt-2">{new Date().toLocaleDateString()}</p>
+                    <p className="text-[#2d3b2d] font-mono mt-2">{new Date().toLocaleDateString()}</p>
                 </div>
             </div>
 
@@ -67,7 +67,7 @@ export const ComplianceReport: React.FC<ReportProps> = ({ project }) => {
                             <CheckCircle2 className="w-4 h-4" /> Ready for Inspection
                         </div>
                     ) : (
-                        <div className="bg-yellow-50 text-yellow-800 px-4 py-2 rounded text-sm font-medium flex items-center gap-2">
+                        <div className="bg-[#fff8e6] text-[#7a6200] px-4 py-2 rounded text-sm font-medium flex items-center gap-2">
                             <AlertTriangle className="w-4 h-4" /> Action Required
                         </div>
                     )}

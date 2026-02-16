@@ -112,7 +112,7 @@ export const IssuesLog: React.FC<IssuesLogProps> = ({ project }) => {
             </div>
             <div className="flex justify-end gap-2">
                 <button onClick={() => setIsAdding(false)} className="px-3 py-1 text-sm text-gray-500">Cancel</button>
-                <button onClick={handleAdd} className="bg-electric-500 text-black px-4 py-1.5 rounded text-sm font-bold">Save Issue</button>
+                <button onClick={handleAdd} className="bg-[#2d3b2d] text-black px-4 py-1.5 rounded text-sm font-bold">Save Issue</button>
             </div>
          </div>
        )}
@@ -164,7 +164,7 @@ export const IssuesLog: React.FC<IssuesLogProps> = ({ project }) => {
                       <div className="flex items-center gap-2 mb-1">
                           <span className={`text-xs font-bold uppercase px-2 py-0.5 rounded-full ${
                               issue.severity === 'Critical' ? 'bg-red-100 text-red-700' :
-                              issue.severity === 'Warning' ? 'bg-yellow-100 text-yellow-700' : 'bg-blue-50 text-blue-600'
+                              issue.severity === 'Warning' ? 'bg-[#fdf6dc] text-[#9a7b00]' : 'bg-blue-50 text-blue-600'
                           }`}>
                               {issue.severity}
                           </span>

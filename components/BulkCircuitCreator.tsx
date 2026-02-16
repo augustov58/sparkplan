@@ -202,7 +202,7 @@ export const BulkCircuitCreator: React.FC<BulkCircuitCreatorProps> = ({
         </div>
 
         {/* Common Settings Panel */}
-        <div className="bg-electric-50 p-4 border-b border-electric-200">
+        <div className="bg-[#f0f5f0] p-4 border-b border-[#2d3b2d]/30">
           <h3 className="font-semibold text-gray-900 mb-3 flex items-center gap-2">
             <Check className="w-4 h-4" />
             Apply Common Settings to All Circuits
@@ -246,7 +246,7 @@ export const BulkCircuitCreator: React.FC<BulkCircuitCreatorProps> = ({
                 <option value={3} disabled={!is3PoleAllowed}>3P {!is3PoleAllowed && '(3Φ only)'}</option>
               </select>
               {!is3PoleAllowed && (
-                <span className="text-xs text-amber-600" title="Single-phase panel">1Φ Panel</span>
+                <span className="text-xs text-[#3d6b3d]" title="Single-phase panel">1Φ Panel</span>
               )}
             </label>
 
@@ -304,7 +304,7 @@ export const BulkCircuitCreator: React.FC<BulkCircuitCreatorProps> = ({
           </div>
           <button
             onClick={applyCommonSettings}
-            className="mt-3 px-4 py-2 bg-electric-400 text-black rounded font-medium hover:bg-electric-500 text-sm"
+            className="mt-3 px-4 py-2 bg-[#2d3b2d] text-black rounded font-medium hover:bg-[#2d3b2d] text-sm"
           >
             Apply to All Circuits
           </button>
@@ -398,7 +398,7 @@ export const BulkCircuitCreator: React.FC<BulkCircuitCreatorProps> = ({
                       <div className="flex gap-1">
                         <button
                           onClick={() => duplicateCircuit(circuit)}
-                          className="p-1 text-gray-600 hover:text-electric-600"
+                          className="p-1 text-gray-600 hover:text-[#2d3b2d]"
                           title="Duplicate"
                         >
                           <Copy className="w-4 h-4" />
@@ -442,7 +442,7 @@ export const BulkCircuitCreator: React.FC<BulkCircuitCreatorProps> = ({
             </button>
             <button
               onClick={handleCreate}
-              className="px-6 py-2 bg-electric-400 text-black rounded-md font-medium hover:bg-electric-500 transition-colors flex items-center gap-2"
+              className="px-6 py-2 bg-[#2d3b2d] text-black rounded-md font-medium hover:bg-[#2d3b2d] transition-colors flex items-center gap-2"
             >
               <Check className="w-4 h-4" />
               Create {circuits.length} Circuit{circuits.length !== 1 ? 's' : ''}

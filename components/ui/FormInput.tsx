@@ -55,15 +55,15 @@ export const TextInput: React.FC<TextInputProps> = ({
   return (
     <div className={fullWidth ? 'w-full' : ''}>
       {label && (
-        <label className="block text-sm font-medium text-gray-700 mb-1">
+        <label className="block text-sm font-medium text-[#1a1a1a] mb-1">
           {label}
-          {required && <span className="text-red-500 ml-1">*</span>}
+          {required && <span className="text-[#c44] ml-1">*</span>}
         </label>
       )}
 
       <div className="relative">
         {icon && (
-          <div className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
+          <div className="absolute left-3 top-1/2 -translate-y-1/2 text-[#888]">
             {icon}
           </div>
         )}
@@ -75,12 +75,12 @@ export const TextInput: React.FC<TextInputProps> = ({
             pr-10 py-2 text-sm
             transition-colors
             focus:outline-none focus:ring-2
-            disabled:bg-gray-50 disabled:text-gray-500 disabled:cursor-not-allowed
+            disabled:bg-[#faf9f7] disabled:text-[#888] disabled:cursor-not-allowed
             ${hasError
-              ? 'border-red-300 focus:border-red-500 focus:ring-red-200'
+              ? 'border-[#c44]/50 focus:border-[#c44] focus:ring-[#c44]/20'
               : hasSuccess
-              ? 'border-green-300 focus:border-green-500 focus:ring-green-200'
-              : 'border-gray-300 focus:border-electric-500 focus:ring-electric-200'
+              ? 'border-[#3d6b3d]/50 focus:border-[#3d6b3d] focus:ring-[#3d6b3d]/20'
+              : 'border-[#e8e6e3] focus:border-[#2d3b2d] focus:ring-[#2d3b2d]/20'
             }
             ${className}
           `}
@@ -137,9 +137,9 @@ export const TextArea: React.FC<TextAreaProps> = ({
   return (
     <div className={fullWidth ? 'w-full' : ''}>
       {label && (
-        <label className="block text-sm font-medium text-gray-700 mb-1">
+        <label className="block text-sm font-medium text-[#1a1a1a] mb-1">
           {label}
-          {required && <span className="text-red-500 ml-1">*</span>}
+          {required && <span className="text-[#c44] ml-1">*</span>}
         </label>
       )}
 
@@ -148,12 +148,12 @@ export const TextArea: React.FC<TextAreaProps> = ({
           block w-full rounded-lg border px-3 py-2 text-sm
           transition-colors
           focus:outline-none focus:ring-2
-          disabled:bg-gray-50 disabled:text-gray-500 disabled:cursor-not-allowed
+          disabled:bg-[#faf9f7] disabled:text-[#888] disabled:cursor-not-allowed
           ${hasError
-            ? 'border-red-300 focus:border-red-500 focus:ring-red-200'
+            ? 'border-[#c44]/50 focus:border-[#c44] focus:ring-[#c44]/20'
             : hasSuccess
-            ? 'border-green-300 focus:border-green-500 focus:ring-green-200'
-            : 'border-gray-300 focus:border-electric-500 focus:ring-electric-200'
+            ? 'border-[#3d6b3d]/50 focus:border-[#3d6b3d] focus:ring-[#3d6b3d]/20'
+            : 'border-[#e8e6e3] focus:border-[#2d3b2d] focus:ring-[#2d3b2d]/20'
           }
           ${className}
         `}
@@ -203,9 +203,9 @@ export const Select: React.FC<SelectProps> = ({
   return (
     <div className={fullWidth ? 'w-full' : ''}>
       {label && (
-        <label className="block text-sm font-medium text-gray-700 mb-1">
+        <label className="block text-sm font-medium text-[#1a1a1a] mb-1">
           {label}
-          {required && <span className="text-red-500 ml-1">*</span>}
+          {required && <span className="text-[#c44] ml-1">*</span>}
         </label>
       )}
 
@@ -214,12 +214,12 @@ export const Select: React.FC<SelectProps> = ({
           block w-full rounded-lg border px-3 py-2 text-sm
           transition-colors
           focus:outline-none focus:ring-2
-          disabled:bg-gray-50 disabled:text-gray-500 disabled:cursor-not-allowed
+          disabled:bg-[#faf9f7] disabled:text-[#888] disabled:cursor-not-allowed
           ${hasError
-            ? 'border-red-300 focus:border-red-500 focus:ring-red-200'
+            ? 'border-[#c44]/50 focus:border-[#c44] focus:ring-[#c44]/20'
             : hasSuccess
-            ? 'border-green-300 focus:border-green-500 focus:ring-green-200'
-            : 'border-gray-300 focus:border-electric-500 focus:ring-electric-200'
+            ? 'border-[#3d6b3d]/50 focus:border-[#3d6b3d] focus:ring-[#3d6b3d]/20'
+            : 'border-[#e8e6e3] focus:border-[#2d3b2d] focus:ring-[#2d3b2d]/20'
           }
           ${className}
         `}
@@ -268,8 +268,8 @@ export const Checkbox: React.FC<CheckboxProps> = ({
       <input
         type="checkbox"
         className={`
-          mt-1 w-4 h-4 rounded border-gray-300
-          text-electric-500 focus:ring-electric-500
+          mt-1 w-4 h-4 rounded border-[#e8e6e3]
+          text-[#2d3b2d] focus:ring-[#2d3b2d]
           transition-colors
           disabled:cursor-not-allowed disabled:opacity-50
           ${className}
@@ -277,11 +277,11 @@ export const Checkbox: React.FC<CheckboxProps> = ({
         {...props}
       />
       <div className="flex-1">
-        <label className="text-sm font-medium text-gray-700 cursor-pointer">
+        <label className="text-sm font-medium text-[#1a1a1a] cursor-pointer">
           {label}
         </label>
         {description && (
-          <p className="text-xs text-gray-500 mt-0.5">{description}</p>
+          <p className="text-xs text-[#888] mt-0.5">{description}</p>
         )}
       </div>
     </div>

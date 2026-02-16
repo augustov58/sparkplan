@@ -197,10 +197,10 @@ export const PreInspection: React.FC<InspectionProps> = ({ project }) => {
                          <span className={`block text-sm font-medium ${item.status === 'Pass' ? 'text-gray-500 line-through' : 'text-gray-900'}`}>
                            {item.requirement}
                          </span>
-                         <span className="text-xs text-electric-600 bg-electric-50 px-2 py-0.5 rounded-full mt-1 inline-block">{item.category}</span>
+                         <span className="text-xs text-[#2d3b2d] bg-[#f0f5f0] px-2 py-0.5 rounded-full mt-1 inline-block">{item.category}</span>
                      </div>
                      <div className="col-span-2 text-center">
-                         <button className="text-gray-400 hover:text-electric-600 transition-colors">
+                         <button className="text-gray-400 hover:text-[#2d3b2d] transition-colors">
                             <Camera className="w-5 h-5 mx-auto" />
                          </button>
                      </div>

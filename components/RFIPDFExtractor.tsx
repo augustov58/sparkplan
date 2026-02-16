@@ -297,7 +297,7 @@ Analyze the attached PDF document now.`,
     <div className="bg-white border border-gray-200 rounded-lg p-6">
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-2">
-          <FileText className="w-5 h-5 text-electric-500" />
+          <FileText className="w-5 h-5 text-[#2d3b2d]" />
           <h3 className="font-medium text-gray-900">Extract RFI from PDF</h3>
         </div>
         <button
@@ -320,8 +320,8 @@ Analyze the attached PDF document now.`,
               onDrop={handleDrop}
               className={`border-2 border-dashed rounded-lg p-8 transition-colors ${
                 isDragging
-                  ? 'border-electric-500 bg-electric-100'
-                  : 'border-gray-300 hover:border-electric-400 hover:bg-electric-50'
+                  ? 'border-[#2d3b2d] bg-[#e8f5e8]'
+                  : 'border-gray-300 hover:border-[#2d3b2d] hover:bg-[#f0f5f0]'
               }`}
             >
               <div className="flex flex-col items-center gap-3">
@@ -347,7 +347,7 @@ Analyze the attached PDF document now.`,
           <div className="bg-gray-50 rounded-lg p-4">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
-                <FileText className="w-8 h-8 text-electric-500" />
+                <FileText className="w-8 h-8 text-[#2d3b2d]" />
                 <div>
                   <p className="text-sm font-medium text-gray-900">{file.name}</p>
                   <p className="text-xs text-gray-500">
@@ -407,7 +407,7 @@ Analyze the attached PDF document now.`,
         {file && !extracting && progress !== 'Extraction complete!' && (
           <button
             onClick={handleExtract}
-            className="w-full bg-electric-500 text-black px-6 py-3 rounded-lg text-sm font-bold hover:bg-electric-400 transition-colors flex items-center justify-center gap-2"
+            className="w-full bg-[#2d3b2d] text-black px-6 py-3 rounded-lg text-sm font-bold hover:bg-[#2d3b2d] transition-colors flex items-center justify-center gap-2"
           >
             <FileText className="w-4 h-4" />
             Extract RFI Data with AI

@@ -240,7 +240,7 @@ export const GroundingBonding: React.FC<GroundingProps> = ({ project }) => {
   if (loading) {
     return (
       <div className="flex items-center justify-center h-96">
-        <Loader2 className="w-8 h-8 text-electric-500 animate-spin" />
+        <Loader2 className="w-8 h-8 text-[#2d3b2d] animate-spin" />
         <span className="ml-2 text-gray-500">Loading grounding data...</span>
       </div>
     );
@@ -254,7 +254,7 @@ export const GroundingBonding: React.FC<GroundingProps> = ({ project }) => {
           <h2 className="text-2xl font-light text-gray-900">Grounding & Bonding (NEC 250)</h2>
           <p className="text-gray-500 mt-1">Configure grounding electrode system and bonding jumpers.</p>
           {mainPanel && (
-            <p className="text-sm text-electric-600 mt-1">
+            <p className="text-sm text-[#2d3b2d] mt-1">
               Service: {mainPanel.main_breaker_amps}A {mainPanel.voltage}V {mainPanel.phase}Φ
             </p>
           )}
@@ -263,7 +263,7 @@ export const GroundingBonding: React.FC<GroundingProps> = ({ project }) => {
           <button 
             onClick={handleValidate}
             disabled={validating}
-            className="bg-electric-400 hover:bg-electric-500 disabled:opacity-50 text-black px-4 py-2 rounded-md text-sm font-medium flex items-center gap-2 transition-colors"
+            className="bg-[#2d3b2d] hover:bg-[#2d3b2d] disabled:opacity-50 text-black px-4 py-2 rounded-md text-sm font-medium flex items-center gap-2 transition-colors"
           >
             <ShieldCheck className={`w-4 h-4 ${validating ? 'animate-pulse' : ''}`} />
             {validating ? 'Validating...' : 'Verify NEC 250'}
@@ -273,12 +273,12 @@ export const GroundingBonding: React.FC<GroundingProps> = ({ project }) => {
 
       {/* Compliance Status Banner */}
       {!complianceStatus.isCompliant && (
-        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+        <div className="bg-[#fff8e6] border border-[#c9a227]/40 rounded-lg p-4">
           <div className="flex items-start gap-3">
-            <AlertTriangle className="w-5 h-5 text-yellow-600 flex-shrink-0 mt-0.5" />
+            <AlertTriangle className="w-5 h-5 text-[#c9a227] flex-shrink-0 mt-0.5" />
             <div>
-              <h4 className="font-semibold text-yellow-800">Compliance Issues Detected</h4>
-              <ul className="mt-1 text-sm text-yellow-700 list-disc list-inside">
+              <h4 className="font-semibold text-[#7a6200]">Compliance Issues Detected</h4>
+              <ul className="mt-1 text-sm text-[#9a7b00] list-disc list-inside">
                 {complianceStatus.issues.map((issue, i) => (
                   <li key={i}>{issue}</li>
                 ))}
@@ -301,7 +301,7 @@ export const GroundingBonding: React.FC<GroundingProps> = ({ project }) => {
           onClick={() => setActiveTab('electrodes')}
           className={`px-6 py-3 text-sm font-medium border-b-2 transition-colors ${
             activeTab === 'electrodes' 
-              ? 'border-electric-500 text-gray-900' 
+              ? 'border-[#2d3b2d] text-gray-900' 
               : 'border-transparent text-gray-500 hover:text-gray-700'
           }`}
         >
@@ -312,7 +312,7 @@ export const GroundingBonding: React.FC<GroundingProps> = ({ project }) => {
           onClick={() => setActiveTab('bonding')}
           className={`px-6 py-3 text-sm font-medium border-b-2 transition-colors ${
             activeTab === 'bonding' 
-              ? 'border-electric-500 text-gray-900' 
+              ? 'border-[#2d3b2d] text-gray-900' 
               : 'border-transparent text-gray-500 hover:text-gray-700'
           }`}
         >
@@ -323,7 +323,7 @@ export const GroundingBonding: React.FC<GroundingProps> = ({ project }) => {
           onClick={() => setActiveTab('sizing')}
           className={`px-6 py-3 text-sm font-medium border-b-2 transition-colors ${
             activeTab === 'sizing' 
-              ? 'border-electric-500 text-gray-900' 
+              ? 'border-[#2d3b2d] text-gray-900' 
               : 'border-transparent text-gray-500 hover:text-gray-700'
           }`}
         >
@@ -338,7 +338,7 @@ export const GroundingBonding: React.FC<GroundingProps> = ({ project }) => {
         {activeTab === 'electrodes' && (
           <div className="p-6">
             <h3 className="text-lg font-medium text-gray-900 mb-4 flex items-center gap-2">
-              <Zap className="w-5 h-5 text-electric-600" />
+              <Zap className="w-5 h-5 text-[#2d3b2d]" />
               Grounding Electrode System (NEC 250.50)
             </h3>
             <p className="text-sm text-gray-500 mb-4">
@@ -353,7 +353,7 @@ export const GroundingBonding: React.FC<GroundingProps> = ({ project }) => {
                     key={electrode.name} 
                     className={`flex items-start gap-3 p-4 border rounded-lg cursor-pointer transition-all ${
                       isSelected 
-                        ? 'border-electric-400 bg-electric-50' 
+                        ? 'border-[#2d3b2d] bg-[#f0f5f0]' 
                         : 'border-gray-200 hover:bg-gray-50'
                     }`}
                   >
@@ -361,7 +361,7 @@ export const GroundingBonding: React.FC<GroundingProps> = ({ project }) => {
                       type="checkbox" 
                       checked={isSelected}
                       onChange={() => toggleElectrode(electrode.name)}
-                      className="mt-1 rounded border-gray-300 text-electric-600 focus:ring-electric-500"
+                      className="mt-1 rounded border-gray-300 text-[#2d3b2d] focus:ring-[#2d3b2d]/20"
                     />
                     <div className="flex-1">
                       <div className="flex items-center gap-2">
@@ -373,7 +373,7 @@ export const GroundingBonding: React.FC<GroundingProps> = ({ project }) => {
                         )}
                       </div>
                       <div className="text-xs text-gray-500 mt-1">
-                        <span className="font-mono text-electric-600">{electrode.necRef}</span> • {electrode.note}
+                        <span className="font-mono text-[#2d3b2d]">{electrode.necRef}</span> • {electrode.note}
                       </div>
                     </div>
                   </label>
@@ -390,7 +390,7 @@ export const GroundingBonding: React.FC<GroundingProps> = ({ project }) => {
                 <select 
                   value={currentGecSize}
                   onChange={(e) => setGecSize(e.target.value)}
-                  className="flex-1 border-gray-200 rounded-md text-sm focus:border-electric-500 focus:ring-electric-500"
+                  className="flex-1 border-gray-200 rounded-md text-sm focus:border-[#2d3b2d] focus:ring-[#2d3b2d]/20"
                 >
                   <option value="8 AWG">8 AWG Copper</option>
                   <option value="6 AWG">6 AWG Copper</option>
@@ -419,7 +419,7 @@ export const GroundingBonding: React.FC<GroundingProps> = ({ project }) => {
         {activeTab === 'bonding' && (
           <div className="p-6">
             <h3 className="text-lg font-medium text-gray-900 mb-4 flex items-center gap-2">
-              <CheckSquare className="w-5 h-5 text-electric-600" />
+              <CheckSquare className="w-5 h-5 text-[#2d3b2d]" />
               Bonding Requirements (NEC 250.104)
             </h3>
             <p className="text-sm text-gray-500 mb-4">
@@ -434,7 +434,7 @@ export const GroundingBonding: React.FC<GroundingProps> = ({ project }) => {
                     key={target.name} 
                     className={`flex items-start gap-3 p-4 border rounded-lg cursor-pointer transition-all ${
                       isSelected 
-                        ? 'border-electric-400 bg-electric-50' 
+                        ? 'border-[#2d3b2d] bg-[#f0f5f0]' 
                         : 'border-gray-200 hover:bg-gray-50'
                     }`}
                   >
@@ -442,7 +442,7 @@ export const GroundingBonding: React.FC<GroundingProps> = ({ project }) => {
                       type="checkbox" 
                       checked={isSelected}
                       onChange={() => toggleBonding(target.name)}
-                      className="mt-1 rounded border-gray-300 text-electric-600 focus:ring-electric-500"
+                      className="mt-1 rounded border-gray-300 text-[#2d3b2d] focus:ring-[#2d3b2d]/20"
                     />
                     <div className="flex-1">
                       <div className="flex items-center gap-2">
@@ -454,7 +454,7 @@ export const GroundingBonding: React.FC<GroundingProps> = ({ project }) => {
                         )}
                       </div>
                       <div className="text-xs text-gray-500 mt-1">
-                        <span className="font-mono text-electric-600">{target.necRef}</span> • {target.note}
+                        <span className="font-mono text-[#2d3b2d]">{target.necRef}</span> • {target.note}
                       </div>
                     </div>
                   </label>
@@ -472,7 +472,7 @@ export const GroundingBonding: React.FC<GroundingProps> = ({ project }) => {
                 rows={4}
                 value={currentNotes}
                 onChange={(e) => setNotes(e.target.value)}
-                className="w-full border-gray-200 rounded-md text-sm p-3 focus:border-electric-500 focus:ring-electric-500"
+                className="w-full border-gray-200 rounded-md text-sm p-3 focus:border-[#2d3b2d] focus:ring-[#2d3b2d]/20"
                 placeholder="E.g., Two ground rods spaced 6ft apart, intersystem bonding terminal at meter base..."
               />
             </div>
@@ -485,7 +485,7 @@ export const GroundingBonding: React.FC<GroundingProps> = ({ project }) => {
             {/* GEC Table */}
             <div>
               <h3 className="text-lg font-medium text-gray-900 mb-4 flex items-center gap-2">
-                <Calculator className="w-5 h-5 text-electric-600" />
+                <Calculator className="w-5 h-5 text-[#2d3b2d]" />
                 NEC Table 250.66 - Grounding Electrode Conductor (GEC)
               </h3>
               <div className="overflow-x-auto">
@@ -513,7 +513,7 @@ export const GroundingBonding: React.FC<GroundingProps> = ({ project }) => {
             {/* EGC Table */}
             <div>
               <h3 className="text-lg font-medium text-gray-900 mb-4 flex items-center gap-2">
-                <Calculator className="w-5 h-5 text-electric-600" />
+                <Calculator className="w-5 h-5 text-[#2d3b2d]" />
                 NEC Table 250.122 - Equipment Grounding Conductor (EGC)
               </h3>
               <div className="overflow-x-auto">
@@ -542,7 +542,7 @@ export const GroundingBonding: React.FC<GroundingProps> = ({ project }) => {
             </div>
 
             {/* Quick Calculator */}
-            <div className="bg-electric-50 border border-electric-200 rounded-lg p-4">
+            <div className="bg-[#f0f5f0] border border-[#2d3b2d]/30 rounded-lg p-4">
               <h4 className="font-semibold text-gray-900 mb-3">Quick Reference for This Project</h4>
               <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
                 <div className="bg-white rounded p-3">
@@ -551,15 +551,15 @@ export const GroundingBonding: React.FC<GroundingProps> = ({ project }) => {
                 </div>
                 <div className="bg-white rounded p-3">
                   <span className="text-xs text-gray-500 block">Recommended GEC</span>
-                  <span className="text-lg font-bold text-electric-600">{recommendedGec}</span>
+                  <span className="text-lg font-bold text-[#2d3b2d]">{recommendedGec}</span>
                 </div>
                 <div className="bg-white rounded p-3">
                   <span className="text-xs text-gray-500 block">Main EGC</span>
-                  <span className="text-lg font-bold text-electric-600">{getEgcSize(serviceAmps)}</span>
+                  <span className="text-lg font-bold text-[#2d3b2d]">{getEgcSize(serviceAmps)}</span>
                 </div>
                 <div className="bg-white rounded p-3">
                   <span className="text-xs text-gray-500 block">Selected GEC</span>
-                  <span className={`text-lg font-bold ${currentGecSize === recommendedGec ? 'text-green-600' : 'text-yellow-600'}`}>
+                  <span className={`text-lg font-bold ${currentGecSize === recommendedGec ? 'text-green-600' : 'text-[#c9a227]'}`}>
                     {currentGecSize}
                   </span>
                 </div>
@@ -571,9 +571,9 @@ export const GroundingBonding: React.FC<GroundingProps> = ({ project }) => {
 
       {/* AI Analysis Results */}
       {aiAnalysis && (
-        <div className="bg-electric-50 border border-electric-200 rounded-lg p-6 animate-in slide-in-from-bottom-2">
+        <div className="bg-[#f0f5f0] border border-[#2d3b2d]/30 rounded-lg p-6 animate-in slide-in-from-bottom-2">
           <h4 className="font-bold text-gray-900 mb-3 flex items-center gap-2">
-            <ShieldCheck className="w-5 h-5 text-electric-600" /> AI Compliance Analysis
+            <ShieldCheck className="w-5 h-5 text-[#2d3b2d]" /> AI Compliance Analysis
           </h4>
           <div className="prose prose-sm prose-gray max-w-none text-gray-700 whitespace-pre-wrap">
             {aiAnalysis}
@@ -608,7 +608,7 @@ export const GroundingBonding: React.FC<GroundingProps> = ({ project }) => {
           <div>
             <span className="text-gray-500 block mb-1">GEC Size</span>
             <span className="text-lg font-bold text-gray-900">{currentGecSize}</span>
-            <span className={`block text-xs ${complianceStatus.isCompliant ? 'text-green-600' : 'text-yellow-600'}`}>
+            <span className={`block text-xs ${complianceStatus.isCompliant ? 'text-green-600' : 'text-[#c9a227]'}`}>
               {complianceStatus.isCompliant ? '✓ Compliant' : '⚠ Issues detected'}
             </span>
           </div>

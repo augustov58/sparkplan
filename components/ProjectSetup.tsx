@@ -176,11 +176,11 @@ export const ProjectSetup: React.FC<ProjectSetupProps> = ({ project, updateProje
   const isResidential = localProject.type === ProjectType.RESIDENTIAL;
 
   return (
-    <div className="space-y-8 animate-in fade-in duration-500 max-w-5xl">
+    <div className="space-y-8 animate-in fade-in duration-500 max-w-6xl">
       <div className="flex justify-between items-center">
         <div>
-          <h2 className="text-2xl font-light text-gray-900">Project Configuration</h2>
-          <p className="text-gray-500 mt-1">Define site parameters and electrical characteristics. Changes save automatically.</p>
+          <h2 className="text-2xl font-light text-[#1a1a1a]">Project Configuration</h2>
+          <p className="text-[#888] mt-1">Define site parameters and electrical characteristics. Changes save automatically.</p>
         </div>
         {deleteProject && (
           <button
@@ -195,36 +195,36 @@ export const ProjectSetup: React.FC<ProjectSetupProps> = ({ project, updateProje
       <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
         
         {/* General Info */}
-        <div className="bg-white border border-gray-100 rounded-lg p-6 shadow-sm">
-          <h3 className="text-lg font-medium text-gray-900 mb-6 flex items-center gap-2">
-            <Building className="w-5 h-5 text-gray-400" /> General Information
+        <div className="bg-white border border-[#e8e6e3] rounded-lg p-6 shadow-sm">
+          <h3 className="text-lg font-medium text-[#1a1a1a] mb-6 flex items-center gap-2">
+            <Building className="w-5 h-5 text-[#888]" /> General Information
           </h3>
           <div className="space-y-4">
             <div>
-              <label className="block text-xs font-semibold text-gray-500 uppercase mb-1">Project Name</label>
+              <label className="block text-xs font-semibold text-[#888] uppercase mb-1">Project Name</label>
               <input
                 type="text"
                 value={localProject.name}
                 onChange={e => handleMetaChange('name', e.target.value)}
-                className="w-full border-gray-200 rounded-md text-sm focus:border-electric-500 focus:ring-electric-500"
+                className="w-full border-[#e8e6e3] rounded-md text-sm focus:border-[#2d3b2d] focus:ring-[#2d3b2d]/20"
               />
             </div>
             <div>
-              <label className="block text-xs font-semibold text-gray-500 uppercase mb-1">Address</label>
+              <label className="block text-xs font-semibold text-[#888] uppercase mb-1">Address</label>
               <input
                 type="text"
                 value={localProject.address}
                 onChange={e => handleMetaChange('address', e.target.value)}
-                className="w-full border-gray-200 rounded-md text-sm focus:border-electric-500 focus:ring-electric-500"
+                className="w-full border-[#e8e6e3] rounded-md text-sm focus:border-[#2d3b2d] focus:ring-[#2d3b2d]/20"
               />
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                <div>
-                <label className="block text-xs font-semibold text-gray-500 uppercase mb-1">Building Type</label>
+                <label className="block text-xs font-semibold text-[#888] uppercase mb-1">Building Type</label>
                 <select
                   value={localProject.type}
                   onChange={e => handleMetaChange('type', e.target.value)}
-                  className="w-full border-gray-200 rounded-md text-sm"
+                  className="w-full border-[#e8e6e3] rounded-md text-sm"
                 >
                   <option value={ProjectType.RESIDENTIAL}>Residential</option>
                   <option value={ProjectType.COMMERCIAL}>Commercial</option>
@@ -232,11 +232,11 @@ export const ProjectSetup: React.FC<ProjectSetupProps> = ({ project, updateProje
                 </select>
                </div>
                <div>
-                <label className="block text-xs font-semibold text-gray-500 uppercase mb-1">NEC Edition</label>
+                <label className="block text-xs font-semibold text-[#888] uppercase mb-1">NEC Edition</label>
                 <select
                   value={localProject.necEdition}
                   onChange={e => handleMetaChange('necEdition', e.target.value)}
-                  className="w-full border-gray-200 rounded-md text-sm"
+                  className="w-full border-[#e8e6e3] rounded-md text-sm"
                 >
                   <option value="2023">2023 Edition</option>
                   <option value="2020">2020 Edition</option>
@@ -245,22 +245,22 @@ export const ProjectSetup: React.FC<ProjectSetupProps> = ({ project, updateProje
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                <div>
-                  <label className="block text-xs font-semibold text-gray-500 uppercase mb-1">Permit Number</label>
+                  <label className="block text-xs font-semibold text-[#888] uppercase mb-1">Permit Number</label>
                   <input
                     type="text"
                     value={localProject.settings.permitNumber || ''}
                     onChange={e => handleSettingChange('permitNumber', e.target.value)}
-                    className="w-full border-gray-200 rounded-md text-sm"
+                    className="w-full border-[#e8e6e3] rounded-md text-sm"
                     placeholder="Optional"
                   />
                </div>
                <div>
-                  <label className="block text-xs font-semibold text-gray-500 uppercase mb-1">Utility Provider</label>
+                  <label className="block text-xs font-semibold text-[#888] uppercase mb-1">Utility Provider</label>
                   <input
                     type="text"
                     value={localProject.settings.utilityProvider || ''}
                     onChange={e => handleSettingChange('utilityProvider', e.target.value)}
-                    className="w-full border-gray-200 rounded-md text-sm"
+                    className="w-full border-[#e8e6e3] rounded-md text-sm"
                     placeholder="e.g. PG&E"
                   />
                </div>
@@ -269,27 +269,27 @@ export const ProjectSetup: React.FC<ProjectSetupProps> = ({ project, updateProje
         </div>
 
         {/* Electrical Characteristics */}
-        <div className="bg-white border border-gray-100 rounded-lg p-6 shadow-sm">
-          <h3 className="text-lg font-medium text-gray-900 mb-6 flex items-center gap-2">
-            <Zap className="w-5 h-5 text-electric-500" /> System Characteristics
+        <div className="bg-white border border-[#e8e6e3] rounded-lg p-6 shadow-sm">
+          <h3 className="text-lg font-medium text-[#1a1a1a] mb-6 flex items-center gap-2">
+            <Zap className="w-5 h-5 text-[#2d3b2d]" /> System Characteristics
           </h3>
           
-          <div className="p-4 bg-yellow-50 border border-yellow-100 rounded-md mb-6 flex gap-3">
-             <AlertTriangle className="w-5 h-5 text-yellow-600 flex-shrink-0" />
-             <p className="text-xs text-yellow-800 leading-relaxed">
+          <div className="p-4 bg-[#fff8e6] border border-[#c9a227]/30 rounded-md mb-6 flex gap-3">
+             <AlertTriangle className="w-5 h-5 text-[#c9a227] flex-shrink-0" />
+             <p className="text-xs text-[#7a6200] leading-relaxed">
                Changing system voltage or phase will affect all load calculations and panel schedules. Ensure downstream equipment is rated for the selected voltage.
              </p>
           </div>
 
           <div className="space-y-4">
             <div>
-              <label className="block text-xs font-semibold text-gray-500 uppercase mb-1">Electrical System Type</label>
+              <label className="block text-xs font-semibold text-[#888] uppercase mb-1">Electrical System Type</label>
               {isResidential ? (
                 // Locked for residential - always 120/240V single-phase
                 <div className="flex items-center gap-2">
-                  <div className="flex-1 px-3 py-2 bg-gray-50 border border-gray-200 rounded-md text-sm font-mono text-gray-700">
+                  <div className="flex-1 px-3 py-2 bg-gray-50 border border-[#e8e6e3] rounded-md text-sm font-mono text-[#666]">
                     <span className="flex items-center gap-2">
-                      <Lock className="w-3 h-3 text-gray-400" />
+                      <Lock className="w-3 h-3 text-[#888]" />
                       120/240V Single-Phase
                     </span>
                   </div>
@@ -305,40 +305,40 @@ export const ProjectSetup: React.FC<ProjectSetupProps> = ({ project, updateProje
                     return '120/240-1'; // Default
                   })()}
                   onChange={e => handleSystemTypeChange(e.target.value)}
-                  className="w-full border-gray-200 rounded-md text-sm font-mono"
+                  className="w-full border-[#e8e6e3] rounded-md text-sm font-mono"
                 >
                   <option value="120/240-1">120/240V Single-Phase (Residential)</option>
                   <option value="120/208-3">120/208V Three-Phase (Commercial)</option>
                   <option value="277/480-3">277/480V Three-Phase (Industrial)</option>
                 </select>
               )}
-              <p className="text-xs text-gray-500 mt-1">
+              <p className="text-xs text-[#888] mt-1">
                 {isResidential 
                   ? 'Residential projects are limited to 120/240V single-phase per NEC' 
                   : 'Common electrical system configurations per NEC standards'}
               </p>
             </div>
 
-            <div className="pt-4 border-t border-gray-50">
-               <h4 className="text-sm font-medium text-gray-900 mb-3">Conductor Defaults</h4>
+            <div className="pt-4 border-t border-[#f0eeeb]">
+               <h4 className="text-sm font-medium text-[#1a1a1a] mb-3">Conductor Defaults</h4>
                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                  <div>
-                    <label className="block text-xs font-semibold text-gray-500 uppercase mb-1">Material</label>
+                    <label className="block text-xs font-semibold text-[#888] uppercase mb-1">Material</label>
                     <select
                       value={localProject.settings.conductorMaterial}
                       onChange={e => handleSettingChange('conductorMaterial', e.target.value)}
-                      className="w-full border-gray-200 rounded-md text-sm"
+                      className="w-full border-[#e8e6e3] rounded-md text-sm"
                     >
                       <option value="Cu">Copper (Cu)</option>
                       <option value="Al">Aluminum (Al)</option>
                     </select>
                  </div>
                  <div>
-                    <label className="block text-xs font-semibold text-gray-500 uppercase mb-1">Temp Rating</label>
+                    <label className="block text-xs font-semibold text-[#888] uppercase mb-1">Temp Rating</label>
                     <select
                       value={localProject.settings.temperatureRating}
                       onChange={e => handleSettingChange('temperatureRating', Number(e.target.value))}
-                      className="w-full border-gray-200 rounded-md text-sm"
+                      className="w-full border-[#e8e6e3] rounded-md text-sm"
                     >
                       <option value={60}>60°C</option>
                       <option value={75}>75°C (Standard)</option>
@@ -352,24 +352,24 @@ export const ProjectSetup: React.FC<ProjectSetupProps> = ({ project, updateProje
 
         {/* Residential Settings - Only shown for Residential projects */}
         {isResidential && (
-          <div className="md:col-span-2 bg-gradient-to-br from-amber-50 to-orange-50 border border-amber-200 rounded-lg p-6 shadow-sm">
-            <h3 className="text-lg font-medium text-gray-900 mb-6 flex items-center gap-2">
-              <Home className="w-5 h-5 text-amber-600" /> Residential Settings
+          <div className="md:col-span-2 bg-gradient-to-br from-[#f0f5f0] to-[#e8f5e8] border border-[#3d6b3d]/30 rounded-lg p-6 shadow-sm">
+            <h3 className="text-lg font-medium text-[#1a1a1a] mb-6 flex items-center gap-2">
+              <Home className="w-5 h-5 text-[#3d6b3d]" /> Residential Settings
             </h3>
             
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
               {/* Dwelling Type */}
               <div>
-                <label className="block text-xs font-semibold text-gray-500 uppercase mb-1">Dwelling Type</label>
+                <label className="block text-xs font-semibold text-[#888] uppercase mb-1">Dwelling Type</label>
                 <select
                   value={localProject.settings.residential?.dwellingType || DwellingType.SINGLE_FAMILY}
                   onChange={e => handleResidentialChange('dwellingType', e.target.value)}
-                  className="w-full border-amber-200 rounded-md text-sm bg-white focus:border-amber-500 focus:ring-amber-500"
+                  className="w-full border-[#3d6b3d]/30 rounded-md text-sm bg-white focus:border-[#3d6b3d] focus:ring-[#3d6b3d]/20"
                 >
                   <option value={DwellingType.SINGLE_FAMILY}>Single-Family (NEC 220.82)</option>
                   <option value={DwellingType.MULTI_FAMILY}>Multi-Family (NEC 220.84)</option>
                 </select>
-                <p className="text-xs text-gray-500 mt-1">
+                <p className="text-xs text-[#888] mt-1">
                   Determines calculation method
                 </p>
               </div>
@@ -377,16 +377,16 @@ export const ProjectSetup: React.FC<ProjectSetupProps> = ({ project, updateProje
               {/* Square Footage - Single Family */}
               {localProject.settings.residential?.dwellingType !== DwellingType.MULTI_FAMILY && (
                 <div>
-                  <label className="block text-xs font-semibold text-gray-500 uppercase mb-1">Heated Square Footage</label>
+                  <label className="block text-xs font-semibold text-[#888] uppercase mb-1">Heated Square Footage</label>
                   <input
                     type="number"
                     value={localProject.settings.residential?.squareFootage || ''}
                     onChange={e => handleResidentialChange('squareFootage', Number(e.target.value))}
-                    className="w-full border-amber-200 rounded-md text-sm bg-white focus:border-amber-500 focus:ring-amber-500"
+                    className="w-full border-[#3d6b3d]/30 rounded-md text-sm bg-white focus:border-[#3d6b3d] focus:ring-[#3d6b3d]/20"
                     placeholder="e.g. 2500"
                     min={0}
                   />
-                  <p className="text-xs text-gray-500 mt-1">
+                  <p className="text-xs text-[#888] mt-1">
                     Used for general lighting load (3 VA/sq ft)
                   </p>
                 </div>
@@ -395,16 +395,16 @@ export const ProjectSetup: React.FC<ProjectSetupProps> = ({ project, updateProje
               {/* Total Units - Multi Family */}
               {localProject.settings.residential?.dwellingType === DwellingType.MULTI_FAMILY && (
                 <div>
-                  <label className="block text-xs font-semibold text-gray-500 uppercase mb-1">Total Dwelling Units</label>
+                  <label className="block text-xs font-semibold text-[#888] uppercase mb-1">Total Dwelling Units</label>
                   <input
                     type="number"
                     value={localProject.settings.residential?.totalUnits || ''}
                     onChange={e => handleResidentialChange('totalUnits', Number(e.target.value))}
-                    className="w-full border-amber-200 rounded-md text-sm bg-white focus:border-amber-500 focus:ring-amber-500"
+                    className="w-full border-[#3d6b3d]/30 rounded-md text-sm bg-white focus:border-[#3d6b3d] focus:ring-[#3d6b3d]/20"
                     placeholder="e.g. 12"
                     min={1}
                   />
-                  <p className="text-xs text-gray-500 mt-1">
+                  <p className="text-xs text-[#888] mt-1">
                     Number of apartments/units
                   </p>
                 </div>
@@ -412,11 +412,11 @@ export const ProjectSetup: React.FC<ProjectSetupProps> = ({ project, updateProje
 
               {/* Service Size Selector */}
               <div>
-                <label className="block text-xs font-semibold text-gray-500 uppercase mb-1">Service Size</label>
+                <label className="block text-xs font-semibold text-[#888] uppercase mb-1">Service Size</label>
                 <select
                   value={localProject.settings.residential?.selectedServiceAmps || ''}
                   onChange={e => handleResidentialChange('selectedServiceAmps', e.target.value ? Number(e.target.value) : undefined)}
-                  className="w-full border-amber-200 rounded-md text-sm bg-white focus:border-amber-500 focus:ring-amber-500"
+                  className="w-full border-[#3d6b3d]/30 rounded-md text-sm bg-white focus:border-[#3d6b3d] focus:ring-[#3d6b3d]/20"
                 >
                   <option value="">Auto-Calculate</option>
                   <option value="100">100A</option>
@@ -424,44 +424,44 @@ export const ProjectSetup: React.FC<ProjectSetupProps> = ({ project, updateProje
                   <option value="200">200A</option>
                   <option value="400">400A (Multi-Family)</option>
                 </select>
-                <p className="text-xs text-gray-500 mt-1">
+                <p className="text-xs text-[#888] mt-1">
                   Override calculated service
                 </p>
               </div>
             </div>
 
             {/* Required Circuits Section */}
-            <div className="mt-6 pt-6 border-t border-amber-200">
-              <h4 className="text-sm font-medium text-gray-900 mb-4 flex items-center gap-2">
-                <Users className="w-4 h-4 text-amber-600" /> Required Branch Circuits (NEC 210.11)
+            <div className="mt-6 pt-6 border-t border-[#3d6b3d]/30">
+              <h4 className="text-sm font-medium text-[#1a1a1a] mb-4 flex items-center gap-2">
+                <Users className="w-4 h-4 text-[#3d6b3d]" /> Required Branch Circuits (NEC 210.11)
               </h4>
               <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
                 <div>
-                  <label className="block text-xs font-semibold text-gray-500 uppercase mb-1">
+                  <label className="block text-xs font-semibold text-[#888] uppercase mb-1">
                     Small Appliance Circuits
                   </label>
                   <input
                     type="number"
                     value={localProject.settings.residential?.smallApplianceCircuits ?? 2}
                     onChange={e => handleResidentialChange('smallApplianceCircuits', Math.max(2, Number(e.target.value)))}
-                    className="w-full border-amber-200 rounded-md text-sm bg-white"
+                    className="w-full border-[#3d6b3d]/30 rounded-md text-sm bg-white"
                     min={2}
                   />
-                  <p className="text-xs text-gray-500 mt-1">Min: 2 required</p>
+                  <p className="text-xs text-[#888] mt-1">Min: 2 required</p>
                 </div>
                 
                 <div>
-                  <label className="block text-xs font-semibold text-gray-500 uppercase mb-1">
+                  <label className="block text-xs font-semibold text-[#888] uppercase mb-1">
                     Bathroom Circuits
                   </label>
                   <input
                     type="number"
                     value={localProject.settings.residential?.bathroomCircuits ?? 1}
                     onChange={e => handleResidentialChange('bathroomCircuits', Math.max(1, Number(e.target.value)))}
-                    className="w-full border-amber-200 rounded-md text-sm bg-white"
+                    className="w-full border-[#3d6b3d]/30 rounded-md text-sm bg-white"
                     min={1}
                   />
-                  <p className="text-xs text-gray-500 mt-1">Min: 1 required</p>
+                  <p className="text-xs text-[#888] mt-1">Min: 1 required</p>
                 </div>
                 
                 <div className="flex items-center gap-2">
@@ -470,10 +470,10 @@ export const ProjectSetup: React.FC<ProjectSetupProps> = ({ project, updateProje
                     id="laundryCircuit"
                     checked={localProject.settings.residential?.laundryCircuit ?? true}
                     onChange={e => handleResidentialChange('laundryCircuit', e.target.checked)}
-                    className="rounded border-amber-300 text-amber-600 focus:ring-amber-500"
+                    className="rounded border-[#3d6b3d]/40 text-[#3d6b3d] focus:ring-[#3d6b3d]/20"
                   />
-                  <label htmlFor="laundryCircuit" className="text-sm text-gray-700">
-                    Laundry Circuit <span className="text-xs text-gray-500">(required)</span>
+                  <label htmlFor="laundryCircuit" className="text-sm text-[#666]">
+                    Laundry Circuit <span className="text-xs text-[#888]">(required)</span>
                   </label>
                 </div>
                 
@@ -483,9 +483,9 @@ export const ProjectSetup: React.FC<ProjectSetupProps> = ({ project, updateProje
                     id="garageCircuit"
                     checked={localProject.settings.residential?.garageCircuit ?? false}
                     onChange={e => handleResidentialChange('garageCircuit', e.target.checked)}
-                    className="rounded border-amber-300 text-amber-600 focus:ring-amber-500"
+                    className="rounded border-[#3d6b3d]/40 text-[#3d6b3d] focus:ring-[#3d6b3d]/20"
                   />
-                  <label htmlFor="garageCircuit" className="text-sm text-gray-700">
+                  <label htmlFor="garageCircuit" className="text-sm text-[#666]">
                     Garage/Accessory Building
                   </label>
                 </div>
@@ -493,7 +493,7 @@ export const ProjectSetup: React.FC<ProjectSetupProps> = ({ project, updateProje
             </div>
 
             {/* Tip for Residential */}
-            <div className="mt-6 p-4 bg-amber-100/50 border border-amber-200 rounded-md">
+            <div className="mt-6 p-4 bg-[#e8f5e8]/50 border border-[#3d6b3d]/30 rounded-md">
               <p className="text-xs text-amber-800">
                 <strong>💡 Next Step:</strong> Use the <strong>Dwelling Calculator</strong> tab to add appliances and calculate 
                 your total service load per NEC {localProject.settings.residential?.dwellingType === DwellingType.MULTI_FAMILY ? '220.84' : '220.82'}.

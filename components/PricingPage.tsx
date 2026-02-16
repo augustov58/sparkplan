@@ -27,20 +27,20 @@ const PLAN_DESCRIPTIONS: Record<SubscriptionPlan, string> = {
 // Helper component for feature comparison table cells
 const FeatureCell: React.FC<{ value: boolean | string; highlight?: boolean }> = ({ value, highlight }) => {
   if (value === true) {
-    return <Check className={`w-5 h-5 mx-auto ${highlight ? 'text-electric-600' : 'text-green-500'}`} />;
+    return <Check className={`w-5 h-5 mx-auto ${highlight ? 'text-[#2d3b2d]' : 'text-green-500'}`} />;
   }
   if (value === false) {
     return <X className="w-5 h-5 mx-auto text-gray-300" />;
   }
   if (value === 'Coming Soon') {
     return (
-      <span className="inline-flex items-center gap-1 text-xs text-amber-600 font-medium">
+      <span className="inline-flex items-center gap-1 text-xs text-[#3d6b3d] font-medium">
         <Clock className="w-3 h-3" /> Soon
       </span>
     );
   }
   // String value (like "10", "Unlimited", "Community", etc.)
-  return <span className={`text-sm font-medium ${highlight ? 'text-electric-700' : 'text-gray-700'}`}>{value}</span>;
+  return <span className={`text-sm font-medium ${highlight ? 'text-[#2d3b2d]' : 'text-gray-700'}`}>{value}</span>;
 };
 
 export const PricingPage: React.FC = () => {
@@ -136,7 +136,7 @@ export const PricingPage: React.FC = () => {
           disabled={isLoading}
           className={`w-full py-2.5 rounded-sm font-semibold transition-colors flex items-center justify-center gap-2 ${
             plan === 'pro'
-              ? 'bg-electric-400 hover:bg-electric-500 text-gray-900'
+              ? 'bg-[#2d3b2d] hover:bg-[#2d3b2d] text-gray-900'
               : 'bg-white text-gray-900 hover:bg-gray-100'
           }`}
         >
@@ -181,7 +181,7 @@ export const PricingPage: React.FC = () => {
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
-        <Loader2 className="w-8 h-8 animate-spin text-electric-500" />
+        <Loader2 className="w-8 h-8 animate-spin text-[#2d3b2d]" />
       </div>
     );
   }
@@ -201,13 +201,13 @@ export const PricingPage: React.FC = () => {
         <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 mb-8">
           <div className="flex items-center justify-between flex-wrap gap-4">
             <div className="flex items-center gap-3">
-              <Crown className="w-5 h-5 text-electric-500" />
+              <Crown className="w-5 h-5 text-[#2d3b2d]" />
               <div>
                 <span className="font-semibold text-gray-900">
                   Current Plan: {currentPlan.charAt(0).toUpperCase() + currentPlan.slice(1)}
                 </span>
                 {isTrial && daysUntilTrialEnd !== null && (
-                  <span className="ml-2 text-sm text-amber-600">
+                  <span className="ml-2 text-sm text-[#3d6b3d]">
                     ({daysUntilTrialEnd} days left in trial)
                   </span>
                 )}
@@ -222,7 +222,7 @@ export const PricingPage: React.FC = () => {
               <button
                 onClick={handleManageSubscription}
                 disabled={portalLoading}
-                className="text-sm text-electric-600 hover:text-electric-700 font-medium flex items-center gap-1"
+                className="text-sm text-[#2d3b2d] hover:text-[#2d3b2d] font-medium flex items-center gap-1"
               >
                 {portalLoading ? (
                   <Loader2 className="w-4 h-4 animate-spin" />
@@ -259,14 +259,14 @@ export const PricingPage: React.FC = () => {
               key={plan}
               className={`bg-white p-6 rounded-lg border-2 relative flex flex-col ${
                 isPopular
-                  ? 'border-electric-500 shadow-sm'
+                  ? 'border-[#2d3b2d] shadow-sm'
                   : isCurrent
                   ? 'border-gray-400'
                   : 'border-gray-200'
               }`}
             >
               {isPopular && (
-                <div className="absolute top-0 right-0 bg-electric-500 text-gray-900 text-xs font-bold px-2 py-1 rounded-bl-lg rounded-tr-lg">
+                <div className="absolute top-0 right-0 bg-[#2d3b2d] text-gray-900 text-xs font-bold px-2 py-1 rounded-bl-lg rounded-tr-lg">
                   POPULAR
                 </div>
               )}
@@ -310,7 +310,7 @@ export const PricingPage: React.FC = () => {
               <ul className="space-y-2 mb-6 flex-1 text-sm">
                 {features.map((feature) => (
                   <li key={feature} className="flex items-start gap-2 text-gray-700">
-                    <Check className="w-4 h-4 text-electric-500 flex-shrink-0 mt-0.5" />
+                    <Check className="w-4 h-4 text-[#2d3b2d] flex-shrink-0 mt-0.5" />
                     {feature}
                   </li>
                 ))}
@@ -331,17 +331,17 @@ export const PricingPage: React.FC = () => {
         </p>
         <a
           href="mailto:sales@sparkplan.app?subject=Enterprise%20Plan%20Inquiry"
-          className="inline-block bg-electric-400 hover:bg-electric-500 text-gray-900 px-6 py-2.5 rounded-sm font-semibold transition-colors"
+          className="inline-block bg-[#2d3b2d] hover:bg-[#2d3b2d] text-gray-900 px-6 py-2.5 rounded-sm font-semibold transition-colors"
         >
           Contact Sales
         </a>
       </div>
 
       {/* Promo Code Section */}
-      <div className="mt-8 bg-gradient-to-r from-electric-50 to-blue-50 border border-electric-200 rounded-lg p-6">
+      <div className="mt-8 bg-gradient-to-r from-[#f0f5f0] to-blue-50 border border-[#2d3b2d]/30 rounded-lg p-6">
         <div className="flex items-start gap-4">
-          <div className="p-2 bg-electric-100 rounded-full">
-            <Gift className="w-5 h-5 text-electric-600" />
+          <div className="p-2 bg-[#e8f5e8] rounded-full">
+            <Gift className="w-5 h-5 text-[#2d3b2d]" />
           </div>
           <div className="flex-1">
             <h3 className="text-lg font-semibold text-gray-900 mb-1">Have a promo code?</h3>
@@ -363,7 +363,7 @@ export const PricingPage: React.FC = () => {
             <div className="p-4 font-semibold text-gray-700 text-sm">Feature</div>
             <div className="p-4 font-semibold text-gray-700 text-sm text-center">Free</div>
             <div className="p-4 font-semibold text-gray-700 text-sm text-center">Starter<br/><span className="font-normal text-gray-500">$29/mo</span></div>
-            <div className="p-4 font-semibold text-electric-600 text-sm text-center bg-electric-50">Pro<br/><span className="font-normal text-electric-500">$49/mo</span></div>
+            <div className="p-4 font-semibold text-[#2d3b2d] text-sm text-center bg-[#f0f5f0]">Pro<br/><span className="font-normal text-[#2d3b2d]">$49/mo</span></div>
             <div className="p-4 font-semibold text-gray-700 text-sm text-center">Business<br/><span className="font-normal text-gray-500">$149/mo</span></div>
           </div>
 
@@ -392,7 +392,7 @@ export const PricingPage: React.FC = () => {
                   <div className="p-3 text-center">
                     <FeatureCell value={feature.starter} />
                   </div>
-                  <div className="p-3 text-center bg-electric-50/30">
+                  <div className="p-3 text-center bg-[#f0f5f0]/30">
                     <FeatureCell value={feature.pro} highlight />
                   </div>
                   <div className="p-3 text-center">

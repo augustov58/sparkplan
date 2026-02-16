@@ -81,7 +81,7 @@ export const UtilityInterconnectionForm: React.FC<UtilityInterconnectionFormProp
       {/* Header */}
       <div className="bg-white border border-gray-200 rounded-lg p-6">
         <div className="flex items-center gap-3 mb-2">
-          <FileText className="w-7 h-7 text-electric-500" />
+          <FileText className="w-7 h-7 text-[#2d3b2d]" />
           <h1 className="text-2xl font-bold text-gray-900">
             Utility Interconnection Application
           </h1>
@@ -105,7 +105,7 @@ export const UtilityInterconnectionForm: React.FC<UtilityInterconnectionFormProp
                 <div
                   className={`w-10 h-10 rounded-full flex items-center justify-center font-bold ${
                     currentStep === step.num
-                      ? 'bg-electric-500 text-white'
+                      ? 'bg-[#2d3b2d] text-white'
                       : currentStep > step.num
                       ? 'bg-green-500 text-white'
                       : 'bg-gray-200 text-gray-600'
@@ -148,12 +148,12 @@ export const UtilityInterconnectionForm: React.FC<UtilityInterconnectionFormProp
                   onClick={() => handleUtilityChange(utility)}
                   className={`p-6 border-2 rounded-lg text-left transition-all ${
                     formData.utilityProvider === utility
-                      ? 'border-electric-500 bg-electric-50'
-                      : 'border-gray-200 hover:border-electric-300'
+                      ? 'border-[#2d3b2d] bg-[#f0f5f0]'
+                      : 'border-gray-200 hover:border-[#94b894]'
                   }`}
                 >
                   <div className="flex items-center gap-2 mb-3">
-                    <Building2 className="w-5 h-5 text-electric-500" />
+                    <Building2 className="w-5 h-5 text-[#2d3b2d]" />
                     <h3 className="font-bold text-gray-900">{utility}</h3>
                   </div>
                   <p className="text-xs text-gray-600 mb-2">
@@ -236,7 +236,7 @@ export const UtilityInterconnectionForm: React.FC<UtilityInterconnectionFormProp
                     ...formData,
                     applicant: { ...formData.applicant!, contactName: e.target.value }
                   })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-electric-500 focus:border-electric-500"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#2d3b2d]/20 focus:border-[#2d3b2d]"
                   placeholder="John Doe"
                 />
               </div>
@@ -253,7 +253,7 @@ export const UtilityInterconnectionForm: React.FC<UtilityInterconnectionFormProp
                     ...formData,
                     applicant: { ...formData.applicant!, companyName: e.target.value }
                   })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-electric-500 focus:border-electric-500"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#2d3b2d]/20 focus:border-[#2d3b2d]"
                   placeholder="ABC Electric Company"
                 />
               </div>
@@ -270,7 +270,7 @@ export const UtilityInterconnectionForm: React.FC<UtilityInterconnectionFormProp
                     ...formData,
                     applicant: { ...formData.applicant!, phone: e.target.value }
                   })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-electric-500 focus:border-electric-500"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#2d3b2d]/20 focus:border-[#2d3b2d]"
                   placeholder="(555) 123-4567"
                 />
               </div>
@@ -287,7 +287,7 @@ export const UtilityInterconnectionForm: React.FC<UtilityInterconnectionFormProp
                     ...formData,
                     applicant: { ...formData.applicant!, email: e.target.value }
                   })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-electric-500 focus:border-electric-500"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#2d3b2d]/20 focus:border-[#2d3b2d]"
                   placeholder="john@example.com"
                 />
               </div>
@@ -304,7 +304,7 @@ export const UtilityInterconnectionForm: React.FC<UtilityInterconnectionFormProp
                     ...formData,
                     applicant: { ...formData.applicant!, siteAddress: e.target.value }
                   })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-electric-500 focus:border-electric-500"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#2d3b2d]/20 focus:border-[#2d3b2d]"
                   placeholder="123 Main Street"
                 />
               </div>
@@ -321,7 +321,7 @@ export const UtilityInterconnectionForm: React.FC<UtilityInterconnectionFormProp
                     ...formData,
                     applicant: { ...formData.applicant!, city: e.target.value }
                   })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-electric-500 focus:border-electric-500"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#2d3b2d]/20 focus:border-[#2d3b2d]"
                   placeholder="San Francisco"
                 />
               </div>
@@ -338,7 +338,7 @@ export const UtilityInterconnectionForm: React.FC<UtilityInterconnectionFormProp
                     ...formData,
                     applicant: { ...formData.applicant!, zip: e.target.value }
                   })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-electric-500 focus:border-electric-500"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#2d3b2d]/20 focus:border-[#2d3b2d]"
                   placeholder="94102"
                 />
               </div>
@@ -356,7 +356,7 @@ export const UtilityInterconnectionForm: React.FC<UtilityInterconnectionFormProp
                       ...formData,
                       applicant: { ...formData.applicant!, parcelNumber: e.target.value }
                     })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-electric-500 focus:border-electric-500"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#2d3b2d]/20 focus:border-[#2d3b2d]"
                     placeholder="123-456-789"
                   />
                 </div>
@@ -375,7 +375,7 @@ export const UtilityInterconnectionForm: React.FC<UtilityInterconnectionFormProp
                       ...formData,
                       applicant: { ...formData.applicant!, utilityAccountNumber: e.target.value }
                     })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-electric-500 focus:border-electric-500"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#2d3b2d]/20 focus:border-[#2d3b2d]"
                     placeholder="1234567890"
                   />
                 </div>
@@ -394,7 +394,7 @@ export const UtilityInterconnectionForm: React.FC<UtilityInterconnectionFormProp
                       ...formData,
                       applicant: { ...formData.applicant!, contractorLicense: e.target.value }
                     })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-electric-500 focus:border-electric-500"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#2d3b2d]/20 focus:border-[#2d3b2d]"
                     placeholder="C-10 #123456"
                   />
                 </div>
@@ -447,7 +447,7 @@ export const UtilityInterconnectionForm: React.FC<UtilityInterconnectionFormProp
                     ...formData,
                     system: { ...formData.system!, systemSizeKw: parseFloat(e.target.value) }
                   })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-electric-500 focus:border-electric-500"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#2d3b2d]/20 focus:border-[#2d3b2d]"
                 />
               </div>
 
@@ -461,7 +461,7 @@ export const UtilityInterconnectionForm: React.FC<UtilityInterconnectionFormProp
                     ...formData,
                     system: { ...formData.system!, willExportPower: e.target.value === 'yes' }
                   })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-electric-500 focus:border-electric-500"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#2d3b2d]/20 focus:border-[#2d3b2d]"
                 >
                   <option value="no">No (Charging Only)</option>
                   <option value="yes">Yes (Net Metering/V2G)</option>
@@ -480,7 +480,7 @@ export const UtilityInterconnectionForm: React.FC<UtilityInterconnectionFormProp
                     ...formData,
                     system: { ...formData.system!, equipmentManufacturer: e.target.value }
                   })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-electric-500 focus:border-electric-500"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#2d3b2d]/20 focus:border-[#2d3b2d]"
                   placeholder="Tesla, ChargePoint, etc."
                 />
               </div>
@@ -496,7 +496,7 @@ export const UtilityInterconnectionForm: React.FC<UtilityInterconnectionFormProp
                     ...formData,
                     system: { ...formData.system!, equipmentModel: e.target.value }
                   })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-electric-500 focus:border-electric-500"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#2d3b2d]/20 focus:border-[#2d3b2d]"
                   placeholder="Model number"
                 />
               </div>
@@ -551,9 +551,9 @@ export const UtilityInterconnectionForm: React.FC<UtilityInterconnectionFormProp
             </div>
 
             {/* Estimated Fees */}
-            <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
-              <h4 className="font-medium text-yellow-900 mb-2">Estimated Application Fees</h4>
-              <div className="text-sm text-yellow-800 space-y-1">
+            <div className="bg-[#fff8e6] border border-[#c9a227]/40 rounded-lg p-4">
+              <h4 className="font-medium text-[#5a4500] mb-2">Estimated Application Fees</h4>
+              <div className="text-sm text-[#7a6200] space-y-1">
                 <div className="flex justify-between">
                   <span>Application Fee:</span>
                   <span className="font-medium">${fees.applicationFee}</span>
@@ -562,7 +562,7 @@ export const UtilityInterconnectionForm: React.FC<UtilityInterconnectionFormProp
                   <span>Engineering Study Deposit:</span>
                   <span className="font-medium">${fees.studyFee}</span>
                 </div>
-                <div className="flex justify-between border-t border-yellow-300 pt-2 mt-2">
+                <div className="flex justify-between border-t border-[#c9a227]/50 pt-2 mt-2">
                   <span className="font-bold">Total Estimated:</span>
                   <span className="font-bold">${fees.totalFee}</span>
                 </div>
@@ -596,7 +596,7 @@ export const UtilityInterconnectionForm: React.FC<UtilityInterconnectionFormProp
                   setErrors(validation.errors);
                 }
               }}
-              className="w-full bg-electric-500 text-white py-3 rounded-lg font-medium hover:bg-electric-600 transition-colors flex items-center justify-center gap-2"
+              className="w-full bg-[#2d3b2d] text-white py-3 rounded-lg font-medium hover:bg-[#3d4f3d] transition-colors flex items-center justify-center gap-2"
             >
               <Download className="w-5 h-5" />
               Export Application as PDF
@@ -636,7 +636,7 @@ export const UtilityInterconnectionForm: React.FC<UtilityInterconnectionFormProp
             className={`px-6 py-2 rounded-lg font-medium transition-colors ${
               currentStep === 4
                 ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
-                : 'bg-electric-500 text-white hover:bg-electric-600'
+                : 'bg-[#2d3b2d] text-white hover:bg-[#3d4f3d]'
             }`}
           >
             {currentStep === 4 ? 'Completed' : 'Next'}
@@ -649,16 +649,16 @@ export const UtilityInterconnectionForm: React.FC<UtilityInterconnectionFormProp
         <p className="font-medium mb-2">Sources:</p>
         <ul className="space-y-1">
           <li>
-            • <a href="https://www.cpuc.ca.gov/Rule21/" target="_blank" rel="noopener noreferrer" className="text-electric-600 hover:underline">Electric Rule 21: Generating Facility Interconnections</a>
+            • <a href="https://www.cpuc.ca.gov/Rule21/" target="_blank" rel="noopener noreferrer" className="text-[#2d3b2d] hover:underline">Electric Rule 21: Generating Facility Interconnections</a>
           </li>
           <li>
-            • <a href="https://www.pge.com/tariffs/assets/pdf/tariffbook/ELEC_FORMS_79-1174-03.pdf" target="_blank" rel="noopener noreferrer" className="text-electric-600 hover:underline">PG&E Rule 21 Generator Interconnection Application (Form 79-1174-03)</a>
+            • <a href="https://www.pge.com/tariffs/assets/pdf/tariffbook/ELEC_FORMS_79-1174-03.pdf" target="_blank" rel="noopener noreferrer" className="text-[#2d3b2d] hover:underline">PG&E Rule 21 Generator Interconnection Application (Form 79-1174-03)</a>
           </li>
           <li>
-            • <a href="https://www.sce.com/clean-energy-efficiency/solar-generating-your-own-power/solar-power-basics/grid-interconnections" target="_blank" rel="noopener noreferrer" className="text-electric-600 hover:underline">SCE Generator Interconnection Processes</a>
+            • <a href="https://www.sce.com/clean-energy-efficiency/solar-generating-your-own-power/solar-power-basics/grid-interconnections" target="_blank" rel="noopener noreferrer" className="text-[#2d3b2d] hover:underline">SCE Generator Interconnection Processes</a>
           </li>
           <li>
-            • <a href="https://www.sdge.com/more-information/customer-generation/electric-rule-21" target="_blank" rel="noopener noreferrer" className="text-electric-600 hover:underline">SDG&E Electric Rule 21</a>
+            • <a href="https://www.sdge.com/more-information/customer-generation/electric-rule-21" target="_blank" rel="noopener noreferrer" className="text-[#2d3b2d] hover:underline">SDG&E Electric Rule 21</a>
           </li>
         </ul>
       </div>

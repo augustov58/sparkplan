@@ -89,7 +89,7 @@ export const CircuitSharingCalculator: React.FC<CircuitSharingCalculatorProps> =
       {/* Header */}
       <div>
         <h3 className="text-xl font-bold text-gray-900 flex items-center gap-2">
-          <Plug className="w-6 h-6 text-electric-500" />
+          <Plug className="w-6 h-6 text-[#2d3b2d]" />
           Circuit Sharing Calculator
         </h3>
         <p className="text-sm text-gray-500 mt-1">
@@ -134,7 +134,7 @@ export const CircuitSharingCalculator: React.FC<CircuitSharingCalculatorProps> =
               <select
                 value={serviceRating}
                 onChange={e => setServiceRating(Number(e.target.value))}
-                className="w-full px-3 py-2 bg-white border border-gray-300 text-gray-900 rounded-md focus:ring-electric-500 focus:border-electric-500"
+                className="w-full px-3 py-2 bg-white border border-gray-300 text-gray-900 rounded-md focus:ring-[#2d3b2d]/20 focus:border-[#2d3b2d]"
               >
                 <option value={100}>100A</option>
                 <option value={125}>125A</option>
@@ -154,7 +154,7 @@ export const CircuitSharingCalculator: React.FC<CircuitSharingCalculatorProps> =
                   max={100}
                   value={currentUtilization}
                   onChange={e => setCurrentUtilization(Number(e.target.value))}
-                  className="flex-1 accent-electric-500"
+                  className="flex-1 accent-[#f0f5f0]0"
                 />
                 <span className={`text-lg font-bold min-w-[50px] text-right ${
                   currentUtilization > 90 ? 'text-red-600' :
@@ -181,7 +181,7 @@ export const CircuitSharingCalculator: React.FC<CircuitSharingCalculatorProps> =
               <select
                 value={proposedEVChargerAmps}
                 onChange={e => setProposedEVChargerAmps(Number(e.target.value))}
-                className="w-full px-3 py-2 bg-white border border-gray-300 text-gray-900 rounded-md focus:ring-electric-500 focus:border-electric-500"
+                className="w-full px-3 py-2 bg-white border border-gray-300 text-gray-900 rounded-md focus:ring-[#2d3b2d]/20 focus:border-[#2d3b2d]"
               >
                 <option value={24}>24A (Tesla Mobile Connector)</option>
                 <option value={32}>32A (Level 2 Standard)</option>
@@ -198,7 +198,7 @@ export const CircuitSharingCalculator: React.FC<CircuitSharingCalculatorProps> =
               <select
                 value={evChargingSchedule}
                 onChange={e => setEvChargingSchedule(e.target.value as typeof evChargingSchedule)}
-                className="w-full px-3 py-2 bg-white border border-gray-300 text-gray-900 rounded-md focus:ring-electric-500 focus:border-electric-500"
+                className="w-full px-3 py-2 bg-white border border-gray-300 text-gray-900 rounded-md focus:ring-[#2d3b2d]/20 focus:border-[#2d3b2d]"
               >
                 <option value="overnight">Overnight (11pm-7am) - Recommended</option>
                 <option value="daytime">Daytime (9am-5pm)</option>
@@ -221,14 +221,14 @@ export const CircuitSharingCalculator: React.FC<CircuitSharingCalculatorProps> =
                 onClick={() => handleShareWithChange(device)}
                 className={`p-4 rounded-lg border-2 transition-all text-left ${
                   shareWith === device
-                    ? 'border-electric-500 bg-electric-50 ring-2 ring-electric-500/30'
+                    ? 'border-[#2d3b2d] bg-[#f0f5f0] ring-2 ring-[#f0f5f0]0/30'
                     : 'border-gray-200 hover:border-gray-300 hover:bg-gray-100'
                 } ${device === 'range' ? 'opacity-60' : ''}`}
               >
-                <div className={`mb-2 ${shareWith === device ? 'text-electric-500' : 'text-gray-400'}`}>
+                <div className={`mb-2 ${shareWith === device ? 'text-[#2d3b2d]' : 'text-gray-400'}`}>
                   {getDeviceIcon(device)}
                 </div>
-                <div className={`font-medium text-sm ${shareWith === device ? 'text-electric-600' : 'text-gray-900'}`}>
+                <div className={`font-medium text-sm ${shareWith === device ? 'text-[#2d3b2d]' : 'text-gray-900'}`}>
                   {getDeviceDisplayName(device)}
                 </div>
                 <div className="text-xs text-gray-500 mt-1">
@@ -254,7 +254,7 @@ export const CircuitSharingCalculator: React.FC<CircuitSharingCalculatorProps> =
             <select
               value={dryerUsagePattern}
               onChange={e => setDryerUsagePattern(e.target.value as typeof dryerUsagePattern)}
-              className="w-full px-3 py-2 bg-white border border-gray-300 text-gray-900 rounded-md focus:ring-electric-500 focus:border-electric-500"
+              className="w-full px-3 py-2 bg-white border border-gray-300 text-gray-900 rounded-md focus:ring-[#2d3b2d]/20 focus:border-[#2d3b2d]"
             >
               <option value="daytime">Daytime (9am-6pm)</option>
               <option value="evening">Evening (6pm-11pm)</option>
@@ -269,7 +269,7 @@ export const CircuitSharingCalculator: React.FC<CircuitSharingCalculatorProps> =
             <select
               value={existingCircuitAmps}
               onChange={e => setExistingCircuitAmps(Number(e.target.value))}
-              className="w-full px-3 py-2 bg-white border border-gray-300 text-gray-900 rounded-md focus:ring-electric-500 focus:border-electric-500"
+              className="w-full px-3 py-2 bg-white border border-gray-300 text-gray-900 rounded-md focus:ring-[#2d3b2d]/20 focus:border-[#2d3b2d]"
             >
               <option value={30}>30A (Standard dryer/water heater)</option>
               <option value={40}>40A (Large dryer/HVAC)</option>
@@ -306,7 +306,7 @@ export const CircuitSharingCalculator: React.FC<CircuitSharingCalculatorProps> =
                         <p className="text-sm text-gray-500">Recommended device</p>
                       </div>
                       <div className="text-right">
-                        <div className="text-2xl font-bold text-electric-600">
+                        <div className="text-2xl font-bold text-[#2d3b2d]">
                           ${result.deviceCost.min}-${result.deviceCost.max}
                         </div>
                         <div className="text-xs text-gray-500">Device cost</div>
@@ -434,15 +434,15 @@ export const CircuitSharingCalculator: React.FC<CircuitSharingCalculatorProps> =
 
           {/* Warnings */}
           {result.warnings.length > 0 && (
-            <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
-              <h5 className="font-semibold text-yellow-700 mb-2 flex items-center gap-2">
+            <div className="bg-[#fff8e6] border border-[#c9a227]/40 rounded-lg p-4">
+              <h5 className="font-semibold text-[#9a7b00] mb-2 flex items-center gap-2">
                 <AlertTriangle className="w-4 h-4" />
                 Considerations
               </h5>
-              <ul className="text-sm text-yellow-600 space-y-1">
+              <ul className="text-sm text-[#c9a227] space-y-1">
                 {result.warnings.map((warning, i) => (
                   <li key={i} className="flex items-start gap-2">
-                    <span className="text-yellow-500">•</span>
+                    <span className="text-[#c9a227]">•</span>
                     {warning}
                   </li>
                 ))}

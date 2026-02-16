@@ -66,7 +66,7 @@ interface InspectorModeProps {
 const SeverityBadge: React.FC<{ severity: IssueSeverity }> = ({ severity }) => {
   const styles = {
     critical: 'bg-red-100 text-red-700 border-red-200',
-    warning: 'bg-amber-100 text-amber-700 border-amber-200',
+    warning: 'bg-[#e8f5e8] text-[#2d3b2d] border-[#3d6b3d]/30',
     info: 'bg-blue-100 text-blue-700 border-blue-200',
   };
   
@@ -168,7 +168,7 @@ const IssueCard: React.FC<IssueCardProps> = ({ issue, onExplain, explaining }) =
       issue.severity === 'critical' 
         ? 'border-red-200 bg-red-50/50' 
         : issue.severity === 'warning'
-        ? 'border-amber-200 bg-amber-50/50'
+        ? 'border-[#3d6b3d]/30 bg-[#f0f5f0]/50'
         : 'border-blue-200 bg-blue-50/50'
     }`}>
       <button
@@ -386,7 +386,7 @@ export const InspectorMode: React.FC<InspectorModeProps> = ({
           <button
             onClick={runAudit}
             disabled={loading || dataLoading}
-            className="inline-flex items-center gap-2 px-5 py-2.5 bg-electric-500 hover:bg-electric-600 text-white rounded-lg font-medium transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+            className="inline-flex items-center gap-2 px-5 py-2.5 bg-[#2d3b2d] hover:bg-[#3d4f3d] text-white rounded-lg font-medium transition-all disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {loading ? (
               <>
@@ -480,14 +480,14 @@ export const InspectorMode: React.FC<InspectorModeProps> = ({
                 </div>
               </div>
               
-              <div className="bg-amber-50 border border-amber-100 rounded-xl p-6">
+              <div className="bg-[#f0f5f0] border border-amber-100 rounded-xl p-6">
                 <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-lg bg-amber-100 flex items-center justify-center">
-                    <AlertTriangle className="w-5 h-5 text-amber-600" />
+                  <div className="w-10 h-10 rounded-lg bg-[#e8f5e8] flex items-center justify-center">
+                    <AlertTriangle className="w-5 h-5 text-[#3d6b3d]" />
                   </div>
                   <div>
-                    <p className="text-3xl font-bold text-amber-700">{result.summary.warnings}</p>
-                    <p className="text-sm text-amber-600">Warnings</p>
+                    <p className="text-3xl font-bold text-[#2d3b2d]">{result.summary.warnings}</p>
+                    <p className="text-sm text-[#3d6b3d]">Warnings</p>
                   </div>
                 </div>
               </div>

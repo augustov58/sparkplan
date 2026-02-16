@@ -242,7 +242,7 @@ export const SiteVisitManager: React.FC<SiteVisitManagerProps> = ({ project }) =
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'Scheduled': return 'bg-blue-50 text-blue-700';
-      case 'In Progress': return 'bg-yellow-50 text-yellow-700';
+      case 'In Progress': return 'bg-[#fff8e6] text-[#9a7b00]';
       case 'Completed': return 'bg-green-50 text-green-700';
       case 'Cancelled': return 'bg-gray-100 text-gray-600';
       default: return 'bg-gray-100 text-gray-600';
@@ -252,7 +252,7 @@ export const SiteVisitManager: React.FC<SiteVisitManagerProps> = ({ project }) =
   const getStatusIcon = (status: string) => {
     switch (status) {
       case 'Scheduled': return <Calendar className="w-4 h-4 text-blue-500" />;
-      case 'In Progress': return <Clock className="w-4 h-4 text-yellow-500" />;
+      case 'In Progress': return <Clock className="w-4 h-4 text-[#c9a227]" />;
       case 'Completed': return <CheckCircle className="w-4 h-4 text-green-500" />;
       case 'Cancelled': return <AlertTriangle className="w-4 h-4 text-gray-500" />;
       default: return <MapPin className="w-4 h-4 text-gray-500" />;
@@ -463,9 +463,9 @@ export const SiteVisitManager: React.FC<SiteVisitManagerProps> = ({ project }) =
                 </div>
                 <div className="space-y-1">
                   {newVisit.action_items.map((action, i) => (
-                    <div key={i} className="bg-yellow-50 text-yellow-700 px-3 py-2 rounded text-sm flex items-center justify-between">
+                    <div key={i} className="bg-[#fff8e6] text-[#9a7b00] px-3 py-2 rounded text-sm flex items-center justify-between">
                       <span>{action}</span>
-                      <button onClick={() => removeAction(i)} className="text-yellow-600 hover:text-yellow-800">×</button>
+                      <button onClick={() => removeAction(i)} className="text-[#c9a227] hover:text-[#7a6200]">×</button>
                     </div>
                   ))}
                 </div>
@@ -485,7 +485,7 @@ export const SiteVisitManager: React.FC<SiteVisitManagerProps> = ({ project }) =
                     <div className="flex items-start justify-between gap-4">
                       <div>
                         <div className="flex items-center gap-2 mb-1">
-                          <Sparkles className="w-4 h-4 text-electric-600" />
+                          <Sparkles className="w-4 h-4 text-[#2d3b2d]" />
                           <h4 className="text-sm font-medium text-gray-900">AI Photo Analysis Available</h4>
                         </div>
                         <p className="text-xs text-gray-700">
@@ -546,7 +546,7 @@ export const SiteVisitManager: React.FC<SiteVisitManagerProps> = ({ project }) =
                           }
                         }}
                         disabled={analyzingPhotos}
-                        className="flex items-center gap-2 px-4 py-2 bg-electric-500 hover:bg-electric-600 text-white rounded text-xs font-medium transition-all disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
+                        className="flex items-center gap-2 px-4 py-2 bg-[#2d3b2d] hover:bg-[#3d4f3d] text-white rounded text-xs font-medium transition-all disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
                       >
                         {analyzingPhotos ? (
                           <>
@@ -585,7 +585,7 @@ export const SiteVisitManager: React.FC<SiteVisitManagerProps> = ({ project }) =
               </button>
               <button
                 onClick={handleCreate}
-                className="bg-electric-500 text-black px-6 py-2 rounded text-sm font-bold hover:bg-electric-400 transition-colors"
+                className="bg-[#2d3b2d] text-black px-6 py-2 rounded text-sm font-bold hover:bg-[#2d3b2d] transition-colors"
               >
                 Save Visit
               </button>
@@ -648,7 +648,7 @@ export const SiteVisitManager: React.FC<SiteVisitManagerProps> = ({ project }) =
                 : visit.status === 'Scheduled'
                 ? 'border-l-4 border-l-blue-500 border-y-gray-100 border-r-gray-100'
                 : visit.status === 'In Progress'
-                ? 'border-l-4 border-l-yellow-500 border-y-gray-100 border-r-gray-100'
+                ? 'border-l-4 border-l-[#fff8e6]0 border-y-gray-100 border-r-gray-100'
                 : 'border-gray-100'
             }`}
           >
@@ -763,12 +763,12 @@ export const SiteVisitManager: React.FC<SiteVisitManagerProps> = ({ project }) =
             {/* Action Items */}
             {visit.action_items && visit.action_items.length > 0 && (
               <div className="mb-3">
-                <p className="text-xs font-medium text-yellow-600 mb-1 flex items-center gap-1">
+                <p className="text-xs font-medium text-[#c9a227] mb-1 flex items-center gap-1">
                   <ClipboardList className="w-3 h-3" /> ACTION ITEMS:
                 </p>
                 <ul className="space-y-1">
                   {visit.action_items.map((action, i) => (
-                    <li key={i} className="bg-yellow-50 text-yellow-700 px-3 py-1 rounded text-xs">
+                    <li key={i} className="bg-[#fff8e6] text-[#9a7b00] px-3 py-1 rounded text-xs">
                       • {action}
                     </li>
                   ))}

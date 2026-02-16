@@ -120,7 +120,7 @@ export const RFIManager: React.FC<RFIManagerProps> = ({ project }) => {
 
   const getStatusIcon = (status: string) => {
     switch (status) {
-      case 'Pending': return <Clock className="w-4 h-4 text-yellow-500" />;
+      case 'Pending': return <Clock className="w-4 h-4 text-[#c9a227]" />;
       case 'Answered': return <MessageSquare className="w-4 h-4 text-blue-500" />;
       case 'Closed': return <CheckCircle className="w-4 h-4 text-green-500" />;
       default: return <AlertCircle className="w-4 h-4 text-gray-500" />;
@@ -160,7 +160,7 @@ export const RFIManager: React.FC<RFIManagerProps> = ({ project }) => {
                 onClick={() => setCreationMode('manual')}
                 className={`px-3 py-1 text-xs font-medium rounded transition-colors ${
                   creationMode === 'manual'
-                    ? 'bg-electric-500 text-black'
+                    ? 'bg-[#2d3b2d] text-black'
                     : 'bg-gray-200 text-gray-600 hover:bg-gray-300'
                 }`}
               >
@@ -170,7 +170,7 @@ export const RFIManager: React.FC<RFIManagerProps> = ({ project }) => {
                 onClick={() => setCreationMode('pdf')}
                 className={`px-3 py-1 text-xs font-medium rounded transition-colors flex items-center gap-1 ${
                   creationMode === 'pdf'
-                    ? 'bg-electric-500 text-black'
+                    ? 'bg-[#2d3b2d] text-black'
                     : 'bg-gray-200 text-gray-600 hover:bg-gray-300'
                 }`}
               >
@@ -213,7 +213,7 @@ export const RFIManager: React.FC<RFIManagerProps> = ({ project }) => {
               {/* AI Drafting Form */}
               <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 mb-4">
                 <div className="flex items-start gap-2">
-                  <Sparkles className="w-5 h-5 text-electric-600 flex-shrink-0 mt-0.5" />
+                  <Sparkles className="w-5 h-5 text-[#2d3b2d] flex-shrink-0 mt-0.5" />
                   <div>
                     <h4 className="text-sm font-medium text-gray-900">AI RFI Drafter</h4>
                     <p className="text-xs text-gray-700 mt-1">
@@ -289,7 +289,7 @@ export const RFIManager: React.FC<RFIManagerProps> = ({ project }) => {
                     }
                   }}
                   disabled={aiDrafting || !aiTopic.trim()}
-                  className="flex-1 bg-electric-500 hover:bg-electric-600 text-white px-4 py-2 rounded text-sm font-medium flex items-center justify-center gap-2 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="flex-1 bg-[#2d3b2d] hover:bg-[#3d4f3d] text-white px-4 py-2 rounded text-sm font-medium flex items-center justify-center gap-2 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {aiDrafting ? (
                     <>
@@ -411,7 +411,7 @@ export const RFIManager: React.FC<RFIManagerProps> = ({ project }) => {
               </button>
               <button
                 onClick={handleCreate}
-                className="bg-electric-500 text-black px-6 py-2 rounded text-sm font-bold hover:bg-electric-400 transition-colors"
+                className="bg-[#2d3b2d] text-black px-6 py-2 rounded text-sm font-bold hover:bg-[#2d3b2d] transition-colors"
               >
                 Create RFI
               </button>
@@ -473,7 +473,7 @@ export const RFIManager: React.FC<RFIManagerProps> = ({ project }) => {
               rfi.status === 'Closed'
                 ? 'border-gray-100 opacity-60'
                 : rfi.status === 'Pending'
-                ? 'border-l-4 border-l-yellow-500 border-y-gray-100 border-r-gray-100'
+                ? 'border-l-4 border-l-[#fff8e6]0 border-y-gray-100 border-r-gray-100'
                 : 'border-l-4 border-l-blue-500 border-y-gray-100 border-r-gray-100'
             }`}
           >
@@ -486,7 +486,7 @@ export const RFIManager: React.FC<RFIManagerProps> = ({ project }) => {
                   {rfi.priority}
                 </span>
                 <span className={`text-xs font-medium px-2 py-0.5 rounded ${
-                  rfi.status === 'Pending' ? 'bg-yellow-50 text-yellow-700' :
+                  rfi.status === 'Pending' ? 'bg-[#fff8e6] text-[#9a7b00]' :
                   rfi.status === 'Answered' ? 'bg-blue-50 text-blue-700' :
                   'bg-green-50 text-green-700'
                 }`}>

@@ -140,8 +140,8 @@ export const FeatureGate: React.FC<FeatureGateProps> = ({
   return (
     <div className="relative min-h-[300px] bg-gray-50 border border-gray-200 rounded-lg">
       <div className="absolute inset-0 flex flex-col items-center justify-center p-8 text-center">
-        <div className="w-16 h-16 bg-electric-100 rounded-full flex items-center justify-center mb-4">
-          <Sparkles className="w-8 h-8 text-electric-600" />
+        <div className="w-16 h-16 bg-[#e8f5e8] rounded-full flex items-center justify-center mb-4">
+          <Sparkles className="w-8 h-8 text-[#2d3b2d]" />
         </div>
 
         <h3 className="text-xl font-bold text-gray-900 mb-2">
@@ -155,7 +155,7 @@ export const FeatureGate: React.FC<FeatureGateProps> = ({
         <div className="flex flex-col sm:flex-row gap-3">
           <button
             onClick={() => navigate('/pricing')}
-            className="inline-flex items-center gap-2 bg-electric-500 hover:bg-electric-600 text-white font-semibold px-6 py-2.5 rounded-lg transition-colors"
+            className="inline-flex items-center gap-2 bg-[#2d3b2d] hover:bg-[#3d4f3d] text-white font-semibold px-6 py-2.5 rounded-lg transition-colors"
           >
             View Plans
             <ArrowRight className="w-4 h-4" />
@@ -216,10 +216,10 @@ export const UpgradeBanner: React.FC<UpgradeBannerProps> = ({ feature, onDismiss
   const planName = getPlanDisplayName(requiredPlan);
 
   return (
-    <div className="bg-gradient-to-r from-electric-50 to-blue-50 border border-electric-200 rounded-lg p-4 mb-4">
+    <div className="bg-gradient-to-r from-[#f0f5f0] to-blue-50 border border-[#2d3b2d]/30 rounded-lg p-4 mb-4">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <Sparkles className="w-5 h-5 text-electric-600" />
+          <Sparkles className="w-5 h-5 text-[#2d3b2d]" />
           <span className="text-sm text-gray-700">
             Unlock this feature with <span className="font-semibold">{planName}</span> plan
           </span>
@@ -227,7 +227,7 @@ export const UpgradeBanner: React.FC<UpgradeBannerProps> = ({ feature, onDismiss
         <div className="flex items-center gap-2">
           <button
             onClick={() => navigate('/pricing')}
-            className="text-sm font-medium text-electric-600 hover:text-electric-700"
+            className="text-sm font-medium text-[#2d3b2d] hover:text-[#2d3b2d]"
           >
             Upgrade
           </button>

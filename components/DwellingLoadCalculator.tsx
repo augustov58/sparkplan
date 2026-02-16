@@ -548,7 +548,7 @@ export const DwellingLoadCalculator: React.FC<DwellingLoadCalculatorProps> = ({
 
     return (
       <div className={`border rounded-lg p-4 transition-all ${
-        isEnabled ? 'border-electric-500 bg-electric-50/50' : 'border-gray-200 bg-white'
+        isEnabled ? 'border-[#2d3b2d] bg-[#f0f5f0]/50' : 'border-gray-200 bg-white'
       }`}>
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-2">
@@ -558,7 +558,7 @@ export const DwellingLoadCalculator: React.FC<DwellingLoadCalculatorProps> = ({
           <button
             onClick={() => toggleAppliance(key)}
             className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-              isEnabled ? 'bg-electric-500' : 'bg-gray-200'
+              isEnabled ? 'bg-[#2d3b2d]' : 'bg-gray-200'
             }`}
           >
             <span
@@ -583,7 +583,7 @@ export const DwellingLoadCalculator: React.FC<DwellingLoadCalculatorProps> = ({
       <div className="flex justify-between items-start">
         <div>
           <h2 className="text-2xl font-light text-gray-900 flex items-center gap-2">
-            <Home className="w-6 h-6 text-amber-600" />
+            <Home className="w-6 h-6 text-[#3d6b3d]" />
             Dwelling Load Calculator
           </h2>
           <p className="text-gray-500 mt-1">
@@ -625,7 +625,7 @@ export const DwellingLoadCalculator: React.FC<DwellingLoadCalculatorProps> = ({
           <button
             onClick={handleGeneratePanelSchedule}
             disabled={isGenerating || !loadResult}
-            className="px-4 py-2 bg-electric-500 text-white rounded-md hover:bg-electric-600 transition-colors flex items-center gap-2 disabled:opacity-50"
+            className="px-4 py-2 bg-[#2d3b2d] text-white rounded-md hover:bg-[#3d4f3d] transition-colors flex items-center gap-2 disabled:opacity-50"
           >
             <Calculator className="w-4 h-4" />
             {mainPanelCircuits.length > 0 ? 'Regenerate Schedule' : 'Generate Panel Schedule'}
@@ -649,7 +649,7 @@ export const DwellingLoadCalculator: React.FC<DwellingLoadCalculatorProps> = ({
 
               {/* Existing panels warning */}
               {existingPanelsWarning && (
-                <div className="mt-3 p-2.5 bg-amber-50 border border-amber-300 rounded-md">
+                <div className="mt-3 p-2.5 bg-[#f0f5f0] border border-[#3d6b3d]/40 rounded-md">
                   <p className="text-xs font-medium text-amber-800">
                     <AlertTriangle className="w-3.5 h-3.5 inline mr-1" />
                     This project already has panels. Generating will clear all existing panels, circuits, feeders, meters, and meter stacks.
@@ -657,13 +657,13 @@ export const DwellingLoadCalculator: React.FC<DwellingLoadCalculatorProps> = ({
                   <div className="flex items-center gap-2 mt-2">
                     <button
                       onClick={handleClearAndGenerateMF}
-                      className="inline-flex items-center gap-1 px-2.5 py-1 bg-amber-600 text-white text-xs font-medium rounded hover:bg-amber-700 transition-colors"
+                      className="inline-flex items-center gap-1 px-2.5 py-1 bg-[#2d3b2d] text-white text-xs font-medium rounded hover:bg-[#243024] transition-colors"
                     >
                       Clear & Replace
                     </button>
                     <button
                       onClick={() => setExistingPanelsWarning(false)}
-                      className="text-xs text-amber-700 hover:text-amber-900"
+                      className="text-xs text-[#2d3b2d] hover:text-amber-900"
                     >
                       Cancel
                     </button>
@@ -746,17 +746,17 @@ export const DwellingLoadCalculator: React.FC<DwellingLoadCalculatorProps> = ({
         <div className="lg:col-span-2 space-y-6">
           {/* Single Family: Square Footage Info */}
           {isSingleFamily && (
-            <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
+            <div className="bg-[#f0f5f0] border border-[#3d6b3d]/30 rounded-lg p-4">
               <div className="flex items-center gap-4">
                 <div className="flex-1">
                   <p className="text-sm font-medium text-amber-800">
                     General Lighting Load: {((residentialSettings?.squareFootage || 2000) * 3).toLocaleString()} VA
                   </p>
-                  <p className="text-xs text-amber-600">
+                  <p className="text-xs text-[#3d6b3d]">
                     {residentialSettings?.squareFootage?.toLocaleString() || '2,000'} sq ft × 3 VA/sq ft (NEC Table 220.12)
                   </p>
                 </div>
-                <p className="text-xs text-amber-700">
+                <p className="text-xs text-[#2d3b2d]">
                   Edit square footage in Project Setup
                 </p>
               </div>
@@ -790,7 +790,7 @@ export const DwellingLoadCalculator: React.FC<DwellingLoadCalculatorProps> = ({
                   <h3 className="font-medium text-gray-900">Dwelling Unit Types</h3>
                   <button
                     onClick={addUnitTemplate}
-                    className="text-sm text-electric-600 hover:text-electric-700 flex items-center gap-1"
+                    className="text-sm text-[#2d3b2d] hover:text-[#2d3b2d] flex items-center gap-1"
                   >
                     <Plus className="w-4 h-4" /> Add Unit Type
                   </button>
@@ -868,7 +868,7 @@ export const DwellingLoadCalculator: React.FC<DwellingLoadCalculatorProps> = ({
               </div>
 
               {/* Note about appliances */}
-              <div className="bg-amber-50 border border-amber-200 rounded-lg p-3">
+              <div className="bg-[#f0f5f0] border border-[#3d6b3d]/30 rounded-lg p-3">
                 <p className="text-xs text-amber-800">
                   <strong>💡 Appliances below apply to ALL unit types.</strong> Configure typical unit appliances (range, A/C, water heater) in the Appliances section below. The calculator assumes each dwelling unit has the same equipment.
                 </p>
@@ -883,7 +883,7 @@ export const DwellingLoadCalculator: React.FC<DwellingLoadCalculatorProps> = ({
               className="w-full px-4 py-3 flex items-center justify-between bg-gray-50 hover:bg-gray-100 transition-colors"
             >
               <h3 className="font-medium text-gray-900 flex items-center gap-2">
-                <Zap className="w-5 h-5 text-electric-500" />
+                <Zap className="w-5 h-5 text-[#2d3b2d]" />
                 Appliances & Equipment
               </h3>
               {expandedSections.has('appliances') ? (
@@ -1146,7 +1146,7 @@ export const DwellingLoadCalculator: React.FC<DwellingLoadCalculatorProps> = ({
                     <h4 className="text-sm font-medium text-gray-700">Other Fixed Appliances</h4>
                     <button
                       onClick={addOtherAppliance}
-                      className="text-sm text-electric-600 hover:text-electric-700 flex items-center gap-1"
+                      className="text-sm text-[#2d3b2d] hover:text-[#2d3b2d] flex items-center gap-1"
                     >
                       <Plus className="w-4 h-4" /> Add Appliance
                     </button>
@@ -1187,31 +1187,31 @@ export const DwellingLoadCalculator: React.FC<DwellingLoadCalculatorProps> = ({
         <div className="space-y-6">
           {/* Service Summary */}
           {loadResult && (
-            <div className="bg-gradient-to-br from-electric-500 to-electric-600 text-white rounded-lg p-6 shadow-lg">
+            <div className="bg-gradient-to-br from-[#f0f5f0]0 to-[#2d3b2d] text-white rounded-lg p-6 shadow-lg">
               <h3 className="text-lg font-medium mb-4 flex items-center gap-2">
                 <Zap className="w-5 h-5" />
                 Service Calculation
               </h3>
               <div className="space-y-3">
                 <div className="flex justify-between items-center">
-                  <span className="text-electric-100">Connected Load</span>
+                  <span className="text-[#e8f5e8]">Connected Load</span>
                   <span className="text-xl font-bold">{(loadResult.totalConnectedVA / 1000).toFixed(1)} kVA</span>
                 </div>
                 <div className="flex justify-between items-center">
-                  <span className="text-electric-100">Demand Load</span>
+                  <span className="text-[#e8f5e8]">Demand Load</span>
                   <span className="text-xl font-bold">{(loadResult.totalDemandVA / 1000).toFixed(1)} kVA</span>
                 </div>
                 <div className="flex justify-between items-center">
-                  <span className="text-electric-100">Demand Factor</span>
+                  <span className="text-[#e8f5e8]">Demand Factor</span>
                   <span className="text-lg">{(loadResult.demandFactor * 100).toFixed(1)}%</span>
                 </div>
-                <div className="pt-3 mt-3 border-t border-electric-400">
+                <div className="pt-3 mt-3 border-t border-[#2d3b2d]">
                   <div className="flex justify-between items-center">
-                    <span className="text-electric-100">Service Current</span>
+                    <span className="text-[#e8f5e8]">Service Current</span>
                     <span className="text-xl font-bold">{loadResult.serviceAmps}A</span>
                   </div>
                   <div className="flex justify-between items-center mt-2">
-                    <span className="text-electric-100">Recommended Service</span>
+                    <span className="text-[#e8f5e8]">Recommended Service</span>
                     <span className="text-2xl font-bold">{loadResult.recommendedServiceSize}A</span>
                   </div>
                 </div>
@@ -1262,12 +1262,12 @@ export const DwellingLoadCalculator: React.FC<DwellingLoadCalculatorProps> = ({
 
           {/* Warnings */}
           {loadResult?.warnings && loadResult.warnings.length > 0 && (
-            <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
-              <h4 className="font-medium text-yellow-800 flex items-center gap-2 mb-2">
+            <div className="bg-[#fff8e6] border border-[#c9a227]/40 rounded-lg p-4">
+              <h4 className="font-medium text-[#7a6200] flex items-center gap-2 mb-2">
                 <AlertTriangle className="w-4 h-4" />
                 Warnings
               </h4>
-              <ul className="text-sm text-yellow-700 space-y-1">
+              <ul className="text-sm text-[#9a7b00] space-y-1">
                 {loadResult.warnings.map((w, i) => (
                   <li key={i}>• {w}</li>
                 ))}
@@ -1327,7 +1327,7 @@ export const DwellingLoadCalculator: React.FC<DwellingLoadCalculatorProps> = ({
                       <tr className="border-t-2 border-gray-300 font-bold">
                         <td className="pt-3">TOTAL</td>
                         <td className="pt-3 text-right">{(loadResult.totalConnectedVA / 1000).toFixed(2)} kVA</td>
-                        <td className="pt-3 text-right text-electric-600">{(loadResult.totalDemandVA / 1000).toFixed(2)} kVA</td>
+                        <td className="pt-3 text-right text-[#2d3b2d]">{(loadResult.totalDemandVA / 1000).toFixed(2)} kVA</td>
                         <td className="pt-3 text-right">{(loadResult.demandFactor * 100).toFixed(1)}%</td>
                       </tr>
                     </tfoot>
@@ -1411,7 +1411,7 @@ export const DwellingLoadCalculator: React.FC<DwellingLoadCalculatorProps> = ({
                 </button>
                 <button
                   onClick={handleApplyToPanelSchedule}
-                  className="px-4 py-2 bg-electric-500 text-white rounded-md hover:bg-electric-600 transition-colors flex items-center gap-2"
+                  className="px-4 py-2 bg-[#2d3b2d] text-white rounded-md hover:bg-[#3d4f3d] transition-colors flex items-center gap-2"
                 >
                   <Download className="w-4 h-4" />
                   Apply to Panel Schedule

@@ -2278,7 +2278,7 @@ export const OneLineDiagram: React.FC<OneLineDiagramProps> = ({ project, updateP
               <button
                 onClick={() => handleExportDiagram('pdf')}
                 disabled={exporting || panels.length === 0}
-                className="bg-electric-500 hover:bg-electric-600 disabled:bg-gray-300 text-black px-3 py-1 rounded text-xs font-medium flex items-center gap-1 transition-colors shadow-sm"
+                className="bg-[#2d3b2d] hover:bg-[#3d4f3d] disabled:bg-gray-300 text-black px-3 py-1 rounded text-xs font-medium flex items-center gap-1 transition-colors shadow-sm"
                 title="Export as PDF (Print)"
               >
                 <Download className="w-3 h-3" />
@@ -2521,7 +2521,7 @@ export const OneLineDiagram: React.FC<OneLineDiagramProps> = ({ project, updateP
               <RefreshCcw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
               {description ? 'Regenerate Analysis' : 'Analyze Topology'}
             </button>
-            <button className="flex items-center gap-2 px-4 py-2 bg-electric-400 rounded-md text-sm font-medium hover:bg-electric-500 text-black">
+            <button className="flex items-center gap-2 px-4 py-2 bg-[#2d3b2d] rounded-md text-sm font-medium hover:bg-[#2d3b2d] text-black">
               <Download className="w-4 h-4" />
               Export DWG/PDF
             </button>
@@ -2535,7 +2535,7 @@ export const OneLineDiagram: React.FC<OneLineDiagramProps> = ({ project, updateP
            {/* Add Panel */}
            <div className="bg-white border border-gray-100 rounded-lg p-6 shadow-sm">
              <h3 className="font-medium text-gray-900 mb-4 flex items-center gap-2">
-               <Grid className="w-4 h-4 text-electric-500" /> Add Panel/Bus
+               <Grid className="w-4 h-4 text-[#2d3b2d]" /> Add Panel/Bus
              </h3>
              <div className="space-y-3">
                <div>
@@ -2545,7 +2545,7 @@ export const OneLineDiagram: React.FC<OneLineDiagramProps> = ({ project, updateP
                     value={newPanel.name}
                     onChange={e => setNewPanel({...newPanel, name: e.target.value})}
                     placeholder="e.g. LP - Lighting Panel"
-                    className="w-full border-gray-200 rounded text-sm py-2 focus:border-electric-500 focus:ring-electric-500"
+                    className="w-full border-gray-200 rounded text-sm py-2 focus:border-[#2d3b2d] focus:ring-[#2d3b2d]/20"
                  />
                </div>
                <div className="grid grid-cols-2 gap-3">
@@ -2611,7 +2611,7 @@ export const OneLineDiagram: React.FC<OneLineDiagramProps> = ({ project, updateP
                    id="isMainPanel"
                    checked={newPanel.isMain}
                    onChange={e => setNewPanel({...newPanel, isMain: e.target.checked})}
-                   className="rounded border-gray-300 text-electric-500 focus:ring-electric-500"
+                   className="rounded border-gray-300 text-[#2d3b2d] focus:ring-[#2d3b2d]/20"
                  />
                  <label htmlFor="isMainPanel" className="ml-2 text-sm text-gray-700 cursor-pointer">
                    This is the Main Distribution Panel (MDP)
@@ -2696,7 +2696,7 @@ export const OneLineDiagram: React.FC<OneLineDiagramProps> = ({ project, updateP
 
                <button
                   onClick={addPanel}
-                  className="w-full bg-electric-400 text-black text-sm font-medium py-2 rounded hover:bg-electric-500 transition-colors"
+                  className="w-full bg-[#2d3b2d] text-black text-sm font-medium py-2 rounded hover:bg-[#2d3b2d] transition-colors"
                >
                  Add Panel
                </button>
@@ -3121,7 +3121,7 @@ export const OneLineDiagram: React.FC<OneLineDiagramProps> = ({ project, updateP
                            placeholder="Location (optional)"
                          />
                          {panel.is_main && isResidentialProject && (
-                           <div className="text-xs text-amber-600 bg-amber-50 p-2 rounded">
+                           <div className="text-xs text-[#3d6b3d] bg-[#f0f5f0] p-2 rounded">
                              ⚠️ Residential: Voltage/Phase locked to 240V/1Φ
                            </div>
                          )}
@@ -3169,11 +3169,11 @@ export const OneLineDiagram: React.FC<OneLineDiagramProps> = ({ project, updateP
                        <div className="flex justify-between items-center">
                          <div>
                            <div className="flex items-center gap-2">
-                              <Zap className={`w-4 h-4 ${panel.is_main ? 'text-red-500' : 'text-electric-500'}`} />
+                              <Zap className={`w-4 h-4 ${panel.is_main ? 'text-red-500' : 'text-[#2d3b2d]'}`} />
                               <span className="text-sm font-medium text-gray-900">{panel.name}</span>
                               {panel.is_main && <span className="text-xs bg-red-100 text-red-600 px-1.5 py-0.5 rounded font-bold">MAIN</span>}
                               {panel.is_main && mainPanelCount > 1 && (
-                                <span className="text-xs bg-yellow-100 text-yellow-700 px-1.5 py-0.5 rounded font-bold">DUPLICATE</span>
+                                <span className="text-xs bg-[#fdf6dc] text-[#9a7b00] px-1.5 py-0.5 rounded font-bold">DUPLICATE</span>
                               )}
                            </div>
                            <div className="text-xs text-gray-500 ml-6">
@@ -3219,7 +3219,7 @@ export const OneLineDiagram: React.FC<OneLineDiagramProps> = ({ project, updateP
               <button
                 onClick={() => handleExportDiagram('pdf')}
                 disabled={exporting || panels.length === 0}
-                className="bg-electric-500 hover:bg-electric-600 disabled:bg-gray-300 text-black px-3 py-1 rounded text-xs font-medium flex items-center gap-1 transition-colors shadow-sm"
+                className="bg-[#2d3b2d] hover:bg-[#3d4f3d] disabled:bg-gray-300 text-black px-3 py-1 rounded text-xs font-medium flex items-center gap-1 transition-colors shadow-sm"
                 title="Export as PDF (Print)"
               >
                 <Download className="w-3 h-3" />

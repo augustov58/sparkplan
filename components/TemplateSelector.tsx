@@ -98,7 +98,7 @@ export const TemplateSelector: React.FC<TemplateSelectorProps> = ({
               }}
               className={`px-6 py-3 font-medium text-sm transition-colors border-b-2 ${
                 selectedType === type
-                  ? 'border-electric-500 text-electric-600'
+                  ? 'border-[#2d3b2d] text-[#2d3b2d]'
                   : 'border-transparent text-gray-600 hover:text-gray-900'
               }`}
             >
@@ -113,7 +113,7 @@ export const TemplateSelector: React.FC<TemplateSelectorProps> = ({
           {visibleSampleTemplates.length > 0 && (
             <div className="mb-6">
               <h3 className="text-sm font-semibold text-gray-900 mb-3 flex items-center gap-2">
-                <Zap className="w-4 h-4 text-electric-500" />
+                <Zap className="w-4 h-4 text-[#2d3b2d]" />
                 Quick Start Templates
               </h3>
               <p className="text-xs text-gray-600 mb-4">
@@ -131,14 +131,14 @@ export const TemplateSelector: React.FC<TemplateSelectorProps> = ({
                       }}
                       className={`p-6 border-2 rounded-lg text-left transition-all hover:shadow-lg ${
                         selectedSampleTemplate === template.type
-                          ? 'border-electric-500 bg-electric-50'
+                          ? 'border-[#2d3b2d] bg-[#f0f5f0]'
                           : 'border-gray-200 hover:border-gray-300'
                       }`}
                     >
                       <div className="flex items-start justify-between mb-3">
                         <div className="text-4xl">{template.icon}</div>
                         {selectedSampleTemplate === template.type && (
-                          <Check className="w-6 h-6 text-electric-600" />
+                          <Check className="w-6 h-6 text-[#2d3b2d]" />
                         )}
                       </div>
                       <h4 className="font-semibold text-lg text-gray-900 mb-2">
@@ -175,14 +175,14 @@ export const TemplateSelector: React.FC<TemplateSelectorProps> = ({
                 }}
                 className={`p-6 border-2 rounded-lg text-left transition-all hover:shadow-lg ${
                   selectedTemplateId === null && selectedSampleTemplate === null
-                    ? 'border-electric-500 bg-electric-50'
+                    ? 'border-[#2d3b2d] bg-[#f0f5f0]'
                     : 'border-gray-200 hover:border-gray-300'
                 }`}
               >
               <div className="flex items-start justify-between mb-3">
                 <div className="text-4xl">⚡</div>
                 {selectedTemplateId === null && selectedSampleTemplate === null && (
-                  <Check className="w-6 h-6 text-electric-600" />
+                  <Check className="w-6 h-6 text-[#2d3b2d]" />
                 )}
               </div>
               <h3 className="font-semibold text-lg text-gray-900 mb-2">
@@ -207,14 +207,14 @@ export const TemplateSelector: React.FC<TemplateSelectorProps> = ({
                 }}
                 className={`p-6 border-2 rounded-lg text-left transition-all hover:shadow-lg ${
                   selectedTemplateId === template.id
-                    ? 'border-electric-500 bg-electric-50'
+                    ? 'border-[#2d3b2d] bg-[#f0f5f0]'
                     : 'border-gray-200 hover:border-gray-300'
                 }`}
               >
                 <div className="flex items-start justify-between mb-3">
                   <div className="text-4xl">{template.icon}</div>
                   {selectedTemplateId === template.id && (
-                    <Check className="w-6 h-6 text-electric-600" />
+                    <Check className="w-6 h-6 text-[#2d3b2d]" />
                   )}
                 </div>
 
@@ -269,7 +269,7 @@ export const TemplateSelector: React.FC<TemplateSelectorProps> = ({
           </button>
           <button
             onClick={handleSelectTemplate}
-            className="px-6 py-2 rounded-md font-medium bg-electric-400 text-black hover:bg-electric-500 transition-colors"
+            className="px-6 py-2 rounded-md font-medium bg-[#2d3b2d] text-black hover:bg-[#2d3b2d] transition-colors"
           >
             {selectedSampleTemplate || selectedTemplateId ? 'Use This Template' : 'Start Blank Project'}
           </button>

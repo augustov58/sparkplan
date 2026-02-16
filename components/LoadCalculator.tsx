@@ -116,7 +116,7 @@ export const LoadCalculator: React.FC<LoadCalculatorProps> = ({ project, updateP
         <div className="lg:col-span-2 space-y-6">
           <form onSubmit={handleSubmit(onSubmit)} className="bg-white border border-gray-100 rounded-lg p-6 shadow-sm hover:shadow-md transition-shadow">
             <h3 className="text-lg font-medium text-gray-900 mb-4 flex items-center gap-2">
-              <Plus className="w-5 h-5 text-electric-500" />
+              <Plus className="w-5 h-5 text-[#2d3b2d]" />
               Add Electrical Load
             </h3>
 
@@ -128,7 +128,7 @@ export const LoadCalculator: React.FC<LoadCalculatorProps> = ({ project, updateP
                 <input
                   type="text"
                   {...register('description')}
-                  className={`w-full border rounded-md focus:border-electric-500 focus:ring-electric-500 text-sm py-2 ${
+                  className={`w-full border rounded-md focus:border-[#2d3b2d] focus:ring-[#2d3b2d]/20 text-sm py-2 ${
                     errors.description ? 'border-red-300' : 'border-gray-200'
                   }`}
                   placeholder="e.g. Living Room Lights"
@@ -147,7 +147,7 @@ export const LoadCalculator: React.FC<LoadCalculatorProps> = ({ project, updateP
                 <input
                   type="number"
                   {...register('watts', { valueAsNumber: true })}
-                  className={`w-full border rounded-md focus:border-electric-500 focus:ring-electric-500 text-sm py-2 ${
+                  className={`w-full border rounded-md focus:border-[#2d3b2d] focus:ring-[#2d3b2d]/20 text-sm py-2 ${
                     errors.watts ? 'border-red-300' : 'border-gray-200'
                   }`}
                   placeholder="e.g. 1500"
@@ -166,7 +166,7 @@ export const LoadCalculator: React.FC<LoadCalculatorProps> = ({ project, updateP
                 <input
                   type="number"
                   {...register('quantity', { valueAsNumber: true })}
-                  className={`w-full border rounded-md focus:border-electric-500 focus:ring-electric-500 text-sm py-2 ${
+                  className={`w-full border rounded-md focus:border-[#2d3b2d] focus:ring-[#2d3b2d]/20 text-sm py-2 ${
                     errors.quantity ? 'border-red-300' : 'border-gray-200'
                   }`}
                   placeholder="1"
@@ -190,7 +190,7 @@ export const LoadCalculator: React.FC<LoadCalculatorProps> = ({ project, updateP
                       setValue('continuous', getContinuousLoadDefault(type));
                     }
                   })}
-                  className={`w-full border rounded-md focus:border-electric-500 focus:ring-electric-500 text-sm py-2 ${
+                  className={`w-full border rounded-md focus:border-[#2d3b2d] focus:ring-[#2d3b2d]/20 text-sm py-2 ${
                     errors.loadType ? 'border-red-300' : 'border-gray-200'
                   }`}
                 >
@@ -215,7 +215,7 @@ export const LoadCalculator: React.FC<LoadCalculatorProps> = ({ project, updateP
                    <input
                     type="checkbox"
                     {...register('continuous')}
-                    className="rounded border-gray-300 text-electric-500 focus:ring-electric-500"
+                    className="rounded border-gray-300 text-[#2d3b2d] focus:ring-[#2d3b2d]/20"
                    />
                    <span className="text-sm text-gray-600">Continuous Load (125%)</span>
                  </label>
@@ -248,7 +248,7 @@ export const LoadCalculator: React.FC<LoadCalculatorProps> = ({ project, updateP
               <tbody className="divide-y divide-gray-50">
                 {loads.map(load => (
                   <tr key={load.id} className="hover:bg-gray-50/50 group">
-                    <td className="px-6 py-3 text-gray-900">{load.description} {load.continuous && <span className="text-electric-500 text-xs ml-2">●</span>}</td>
+                    <td className="px-6 py-3 text-gray-900">{load.description} {load.continuous && <span className="text-[#2d3b2d] text-xs ml-2">●</span>}</td>
                     <td className="px-6 py-3 text-gray-500 capitalize">{load.type}</td>
                     <td className="px-6 py-3 text-right font-mono text-gray-700">{load.watts.toLocaleString()}</td>
                     <td className="px-6 py-3 text-right text-gray-500">{load.phase}</td>
@@ -273,8 +273,8 @@ export const LoadCalculator: React.FC<LoadCalculatorProps> = ({ project, updateP
 
         {/* Right Column: Calculations & AI */}
         <div className="space-y-6">
-          <div className="bg-electric-50 border border-electric-100 rounded-lg p-6">
-            <h3 className="text-sm font-bold text-electric-700 uppercase tracking-wider mb-4">Service Calculation</h3>
+          <div className="bg-[#f0f5f0] border border-[#e8f5e8] rounded-lg p-6">
+            <h3 className="text-sm font-bold text-[#2d3b2d] uppercase tracking-wider mb-4">Service Calculation</h3>
             <div className="space-y-4">
               {/* Connected Load */}
               <div className="flex justify-between items-center">
@@ -284,16 +284,16 @@ export const LoadCalculator: React.FC<LoadCalculatorProps> = ({ project, updateP
 
               {/* Continuous Load Breakdown */}
               {continuousWatts > 0 && (
-                <div className="bg-yellow-50 border border-yellow-200 rounded p-3 text-xs space-y-1">
-                  <div className="flex justify-between text-yellow-800">
+                <div className="bg-[#fff8e6] border border-[#c9a227]/40 rounded p-3 text-xs space-y-1">
+                  <div className="flex justify-between text-[#7a6200]">
                     <span>Continuous Load:</span>
                     <span className="font-mono">{continuousWatts.toLocaleString()} VA</span>
                   </div>
-                  <div className="flex justify-between text-yellow-900 font-semibold">
+                  <div className="flex justify-between text-[#5a4500] font-semibold">
                     <span>× 125% (NEC 210.19):</span>
                     <span className="font-mono">{continuousWattsAdjusted.toLocaleString()} VA</span>
                   </div>
-                  <div className="flex justify-between text-yellow-800">
+                  <div className="flex justify-between text-[#7a6200]">
                     <span>Non-Continuous:</span>
                     <span className="font-mono">{nonContinuousWatts.toLocaleString()} VA</span>
                   </div>
@@ -301,7 +301,7 @@ export const LoadCalculator: React.FC<LoadCalculatorProps> = ({ project, updateP
               )}
 
               {/* Total Demand Load */}
-              <div className="flex justify-between items-center border-t border-electric-200 pt-3">
+              <div className="flex justify-between items-center border-t border-[#2d3b2d]/30 pt-3">
                 <span className="text-gray-700 text-sm font-semibold">Total Demand Load</span>
                 <span className="font-mono text-xl font-bold text-gray-900">{(totalDemandWatts / 1000).toFixed(2)} kVA</span>
               </div>
@@ -316,18 +316,18 @@ export const LoadCalculator: React.FC<LoadCalculatorProps> = ({ project, updateP
               </div>
 
               {/* Recommended Service Size */}
-              <div className="pt-4 border-t border-electric-200/50">
-                <span className="text-xs text-electric-700 block mb-1">Recommended Service Size</span>
+              <div className="pt-4 border-t border-[#2d3b2d]/30/50">
+                <span className="text-xs text-[#2d3b2d] block mb-1">Recommended Service Size</span>
                 <span className="text-2xl font-bold text-gray-900">{totalAmps > 200 ? '400A' : totalAmps > 100 ? '200A' : '100A'}</span>
               </div>
 
               {/* Export PDF Button */}
               {project.settings?.occupancyType && loads.length > 0 && (
-                <div className="pt-4 border-t border-electric-200/50">
+                <div className="pt-4 border-t border-[#2d3b2d]/30/50">
                   <button
                     onClick={handleExportPDF}
                     disabled={isExporting}
-                    className="w-full bg-electric-500 hover:bg-electric-600 text-black px-4 py-2.5 rounded-md text-sm font-medium transition-colors flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="w-full bg-[#2d3b2d] hover:bg-[#3d4f3d] text-black px-4 py-2.5 rounded-md text-sm font-medium transition-colors flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     <Download className="w-4 h-4" />
                     {isExporting ? 'Exporting...' : 'Export Report (TXT)'}
@@ -343,7 +343,7 @@ export const LoadCalculator: React.FC<LoadCalculatorProps> = ({ project, updateP
           <div className="bg-white border border-gray-100 rounded-lg p-6 shadow-sm">
             <div className="flex items-center justify-between mb-4">
               <h3 className="font-medium text-gray-900 flex items-center gap-2">
-                <Cpu className="w-4 h-4 text-electric-500" />
+                <Cpu className="w-4 h-4 text-[#2d3b2d]" />
                 AI Validation (NEC 220)
               </h3>
             </div>
@@ -354,7 +354,7 @@ export const LoadCalculator: React.FC<LoadCalculatorProps> = ({ project, updateP
                  <button 
                   onClick={runAiValidation}
                   disabled={isValidating || loads.length === 0}
-                  className="bg-electric-400 hover:bg-electric-500 text-black px-4 py-2 rounded text-sm font-medium w-full transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="bg-[#2d3b2d] hover:bg-[#2d3b2d] text-black px-4 py-2 rounded text-sm font-medium w-full transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                  >
                    {isValidating ? 'Analyzing...' : 'Validate Compliance'}
                  </button>
@@ -364,7 +364,7 @@ export const LoadCalculator: React.FC<LoadCalculatorProps> = ({ project, updateP
                 <div className="whitespace-pre-wrap font-mono">{validationResult}</div>
                 <button 
                   onClick={() => setValidationResult(null)}
-                  className="mt-4 text-xs text-electric-600 hover:text-electric-700 underline"
+                  className="mt-4 text-xs text-[#2d3b2d] hover:text-[#2d3b2d] underline"
                 >
                   Clear Analysis
                 </button>

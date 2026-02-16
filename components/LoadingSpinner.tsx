@@ -58,7 +58,7 @@ export const LoadingSpinner: React.FC<LoadingSpinnerProps> = ({
 }) => {
   const spinner = (
     <div className={`flex flex-col items-center justify-center gap-3 ${center ? 'min-h-[200px]' : ''}`}>
-      <Loader2 className={`${sizeClasses[size]} text-electric-500 animate-spin`} />
+      <Loader2 className={`${sizeClasses[size]} text-[#2d3b2d] animate-spin`} />
       {text && (
         <p className={`${textSizeClasses[size]} text-gray-600 font-medium`}>
           {text}
@@ -136,7 +136,7 @@ export const EmptyState: React.FC<EmptyStateProps> = ({
       {action && (
         <button
           onClick={action.onClick}
-          className="bg-electric-500 hover:bg-electric-600 text-white font-medium py-2 px-4 rounded-lg transition-colors"
+          className="bg-[#2d3b2d] hover:bg-[#3d4f3d] text-white font-medium py-2 px-4 rounded-lg transition-colors"
         >
           {action.label}
         </button>

@@ -176,7 +176,7 @@ export const PermitPacketGenerator: React.FC<PermitPacketGeneratorProps> = ({ pr
       {/* Header */}
       <div>
         <h2 className="text-2xl font-light text-gray-900 flex items-center gap-2">
-          <FileText className="w-6 h-6 text-electric-500" />
+          <FileText className="w-6 h-6 text-[#2d3b2d]" />
           Permit Packet Generator
         </h2>
         <p className="text-gray-500 mt-1">
@@ -262,7 +262,7 @@ export const PermitPacketGenerator: React.FC<PermitPacketGeneratorProps> = ({ pr
                 value="full"
                 checked={packetType === 'full'}
                 onChange={() => setPacketType('full')}
-                className="text-electric-500 focus:ring-electric-500"
+                className="text-[#2d3b2d] focus:ring-[#2d3b2d]/20"
               />
               <div>
                 <span className="font-medium">Full Packet</span>
@@ -276,7 +276,7 @@ export const PermitPacketGenerator: React.FC<PermitPacketGeneratorProps> = ({ pr
                 value="lightweight"
                 checked={packetType === 'lightweight'}
                 onChange={() => setPacketType('lightweight')}
-                className="text-electric-500 focus:ring-electric-500"
+                className="text-[#2d3b2d] focus:ring-[#2d3b2d]/20"
               />
               <div>
                 <span className="font-medium">Lightweight</span>
@@ -298,7 +298,7 @@ export const PermitPacketGenerator: React.FC<PermitPacketGeneratorProps> = ({ pr
               value={preparedBy}
               onChange={(e) => setPreparedBy(e.target.value)}
               placeholder="Contractor/Engineer name"
-              className="w-full border border-gray-200 rounded px-3 py-2 text-sm focus:border-electric-500 focus:ring-2 focus:ring-electric-500/20 outline-none"
+              className="w-full border border-gray-200 rounded px-3 py-2 text-sm focus:border-[#2d3b2d] focus:ring-2 focus:ring-[#2d3b2d]/20/20 outline-none"
             />
           </div>
           <div>
@@ -311,7 +311,7 @@ export const PermitPacketGenerator: React.FC<PermitPacketGeneratorProps> = ({ pr
               value={contractorLicense}
               onChange={(e) => setContractorLicense(e.target.value)}
               placeholder="e.g., C-10 #123456"
-              className="w-full border border-gray-200 rounded px-3 py-2 text-sm focus:border-electric-500 focus:ring-2 focus:ring-electric-500/20 outline-none"
+              className="w-full border border-gray-200 rounded px-3 py-2 text-sm focus:border-[#2d3b2d] focus:ring-2 focus:ring-[#2d3b2d]/20/20 outline-none"
             />
             <p className="text-xs text-gray-500 mt-1">Required by most jurisdictions</p>
           </div>
@@ -328,7 +328,7 @@ export const PermitPacketGenerator: React.FC<PermitPacketGeneratorProps> = ({ pr
               value={permitNumber}
               onChange={(e) => setPermitNumber(e.target.value)}
               placeholder="e.g., PER-2024-001234"
-              className="w-full border border-gray-200 rounded px-3 py-2 text-sm focus:border-electric-500 focus:ring-2 focus:ring-electric-500/20 outline-none"
+              className="w-full border border-gray-200 rounded px-3 py-2 text-sm focus:border-[#2d3b2d] focus:ring-2 focus:ring-[#2d3b2d]/20/20 outline-none"
             />
           </div>
         </div>
@@ -344,7 +344,7 @@ export const PermitPacketGenerator: React.FC<PermitPacketGeneratorProps> = ({ pr
             onChange={(e) => setScopeOfWork(e.target.value)}
             placeholder="e.g., Replace existing 100A overhead service with 200A underground service, relocate meter to exterior wall, install new 200A main panel"
             rows={3}
-            className="w-full border border-gray-200 rounded px-3 py-2 text-sm focus:border-electric-500 focus:ring-2 focus:ring-electric-500/20 outline-none"
+            className="w-full border border-gray-200 rounded px-3 py-2 text-sm focus:border-[#2d3b2d] focus:ring-2 focus:ring-[#2d3b2d]/20/20 outline-none"
           />
           <p className="text-xs text-gray-500 mt-1">Brief description of work to be performed</p>
         </div>
@@ -361,7 +361,7 @@ export const PermitPacketGenerator: React.FC<PermitPacketGeneratorProps> = ({ pr
                 id="serviceType"
                 value={serviceType}
                 onChange={(e) => setServiceType(e.target.value as 'overhead' | 'underground')}
-                className="w-full border border-gray-200 rounded px-3 py-2 text-sm focus:border-electric-500 focus:ring-2 focus:ring-electric-500/20 outline-none"
+                className="w-full border border-gray-200 rounded px-3 py-2 text-sm focus:border-[#2d3b2d] focus:ring-2 focus:ring-[#2d3b2d]/20/20 outline-none"
               >
                 <option value="overhead">Overhead</option>
                 <option value="underground">Underground</option>
@@ -377,7 +377,7 @@ export const PermitPacketGenerator: React.FC<PermitPacketGeneratorProps> = ({ pr
                 value={meterLocation}
                 onChange={(e) => setMeterLocation(e.target.value)}
                 placeholder="e.g., Exterior wall, north side"
-                className="w-full border border-gray-200 rounded px-3 py-2 text-sm focus:border-electric-500 focus:ring-2 focus:ring-electric-500/20 outline-none"
+                className="w-full border border-gray-200 rounded px-3 py-2 text-sm focus:border-[#2d3b2d] focus:ring-2 focus:ring-[#2d3b2d]/20/20 outline-none"
               />
             </div>
             <div>
@@ -390,7 +390,7 @@ export const PermitPacketGenerator: React.FC<PermitPacketGeneratorProps> = ({ pr
                 value={serviceConductorRouting}
                 onChange={(e) => setServiceConductorRouting(e.target.value)}
                 placeholder="e.g., PVC conduit, buried 24in"
-                className="w-full border border-gray-200 rounded px-3 py-2 text-sm focus:border-electric-500 focus:ring-2 focus:ring-electric-500/20 outline-none"
+                className="w-full border border-gray-200 rounded px-3 py-2 text-sm focus:border-[#2d3b2d] focus:ring-2 focus:ring-[#2d3b2d]/20/20 outline-none"
               />
             </div>
           </div>
@@ -401,7 +401,7 @@ export const PermitPacketGenerator: React.FC<PermitPacketGeneratorProps> = ({ pr
       <div className="bg-white border border-gray-200 rounded-lg p-6 space-y-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <Building2 className="w-5 h-5 text-electric-500" />
+            <Building2 className="w-5 h-5 text-[#2d3b2d]" />
             <div>
               <h3 className="font-bold text-gray-900">Multi-Family EV Analysis</h3>
               <p className="text-sm text-gray-500">NEC 220.84 + 220.57 + 625.42 compliance</p>
@@ -414,7 +414,7 @@ export const PermitPacketGenerator: React.FC<PermitPacketGeneratorProps> = ({ pr
               onChange={(e) => setIncludeMultiFamilyEV(e.target.checked)}
               className="sr-only peer"
             />
-            <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-electric-500/20 rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-electric-500"></div>
+            <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-[#2d3b2d]/20/20 rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[#2d3b2d]"></div>
             <span className="ml-2 text-sm font-medium text-gray-700">Include</span>
           </label>
         </div>
@@ -439,7 +439,7 @@ export const PermitPacketGenerator: React.FC<PermitPacketGeneratorProps> = ({ pr
                   value={mfEvBuildingName}
                   onChange={(e) => setMfEvBuildingName(e.target.value)}
                   placeholder="e.g., Parkside Apartments"
-                  className="w-full border border-gray-200 rounded px-3 py-2 text-sm focus:border-electric-500 focus:ring-2 focus:ring-electric-500/20 outline-none"
+                  className="w-full border border-gray-200 rounded px-3 py-2 text-sm focus:border-[#2d3b2d] focus:ring-2 focus:ring-[#2d3b2d]/20/20 outline-none"
                 />
               </div>
               <div>
@@ -453,7 +453,7 @@ export const PermitPacketGenerator: React.FC<PermitPacketGeneratorProps> = ({ pr
                   max="500"
                   value={mfEvDwellingUnits}
                   onChange={(e) => setMfEvDwellingUnits(parseInt(e.target.value) || 20)}
-                  className="w-full border border-gray-200 rounded px-3 py-2 text-sm focus:border-electric-500 focus:ring-2 focus:ring-electric-500/20 outline-none"
+                  className="w-full border border-gray-200 rounded px-3 py-2 text-sm focus:border-[#2d3b2d] focus:ring-2 focus:ring-[#2d3b2d]/20/20 outline-none"
                 />
                 <p className="text-xs text-gray-500 mt-1">Min 3 units for NEC 220.84</p>
               </div>
@@ -468,7 +468,7 @@ export const PermitPacketGenerator: React.FC<PermitPacketGeneratorProps> = ({ pr
                   id="mfEvChargersPerUnit"
                   value={mfEvChargersPerUnit}
                   onChange={(e) => setMfEvChargersPerUnit(parseInt(e.target.value))}
-                  className="w-full border border-gray-200 rounded px-3 py-2 text-sm focus:border-electric-500 focus:ring-2 focus:ring-electric-500/20 outline-none"
+                  className="w-full border border-gray-200 rounded px-3 py-2 text-sm focus:border-[#2d3b2d] focus:ring-2 focus:ring-[#2d3b2d]/20/20 outline-none"
                 >
                   <option value="1">1 charger per unit</option>
                   <option value="2">2 chargers per unit</option>
@@ -482,7 +482,7 @@ export const PermitPacketGenerator: React.FC<PermitPacketGeneratorProps> = ({ pr
                   id="mfEvChargerLevel"
                   value={mfEvChargerLevel}
                   onChange={(e) => setMfEvChargerLevel(e.target.value as 'level1' | 'level2')}
-                  className="w-full border border-gray-200 rounded px-3 py-2 text-sm focus:border-electric-500 focus:ring-2 focus:ring-electric-500/20 outline-none"
+                  className="w-full border border-gray-200 rounded px-3 py-2 text-sm focus:border-[#2d3b2d] focus:ring-2 focus:ring-[#2d3b2d]/20/20 outline-none"
                 >
                   <option value="level2">Level 2 (40A, 240V) - Recommended</option>
                   <option value="level1">Level 1 (12A, 120V)</option>
@@ -565,10 +565,10 @@ export const PermitPacketGenerator: React.FC<PermitPacketGeneratorProps> = ({ pr
 
       {/* Validation Warnings */}
       {!canGenerate && !dataLoading && (
-        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+        <div className="bg-[#fff8e6] border border-[#c9a227]/40 rounded-lg p-4">
           <div className="flex gap-3">
-            <AlertCircle className="w-5 h-5 text-yellow-600 flex-shrink-0" />
-            <div className="text-sm text-yellow-900">
+            <AlertCircle className="w-5 h-5 text-[#c9a227] flex-shrink-0" />
+            <div className="text-sm text-[#5a4500]">
               <p className="font-medium mb-1">Cannot generate permit packet</p>
               <ul className="list-disc list-inside space-y-1">
                 {panels.length === 0 && <li>At least one panel is required</li>}

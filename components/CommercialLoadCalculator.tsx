@@ -1098,12 +1098,12 @@ export const CommercialLoadCalculator: React.FC<CommercialLoadCalculatorProps> =
 
               {/* Warnings */}
               {result.warnings.length > 0 && (
-                <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+                <div className="bg-[#fff8e6] border border-[#c9a227]/40 rounded-lg p-4">
                   <div className="flex items-start gap-3">
-                    <AlertCircle className="w-5 h-5 text-yellow-600 mt-0.5 flex-shrink-0" />
+                    <AlertCircle className="w-5 h-5 text-[#c9a227] mt-0.5 flex-shrink-0" />
                     <div className="space-y-2">
                       {result.warnings.map((warning, index) => (
-                        <p key={index} className="text-sm text-yellow-800">
+                        <p key={index} className="text-sm text-[#7a6200]">
                           {warning}
                         </p>
                       ))}

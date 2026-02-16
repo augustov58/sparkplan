@@ -256,7 +256,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, title, showBack, onSig
                     navigate('/');
                     setIsMobileMenuOpen(false);
                   }}
-                  className="flex items-center gap-2 text-xs text-gray-400 hover:text-gray-600 transition-colors"
+                  className="flex items-center gap-2 text-xs text-[#888] hover:text-[#666] transition-colors"
                 >
                   <ArrowLeft className="w-3 h-3" /> Back to Dashboard
                 </button>

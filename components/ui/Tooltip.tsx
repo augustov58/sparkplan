@@ -26,7 +26,7 @@ const iconSizeClasses = {
 };
 
 const variantClasses = {
-  help: 'text-gray-400 hover:text-electric-600',
+  help: 'text-gray-400 hover:text-[#2d3b2d]',
   info: 'text-blue-400 hover:text-blue-600',
   warning: 'text-orange-400 hover:text-orange-600'
 };
@@ -181,7 +181,7 @@ export const NecReference: React.FC<NecReferenceProps> = ({
           href={link}
           target="_blank"
           rel="noopener noreferrer"
-          className="text-xs text-electric-600 hover:text-electric-700 hover:underline"
+          className="text-xs text-[#2d3b2d] hover:text-electric-700 hover:underline"
         >
           View
         </a>
