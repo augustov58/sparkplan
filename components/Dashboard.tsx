@@ -248,8 +248,8 @@ export const Dashboard: React.FC<DashboardProps> = ({ projects, createNewProject
                 <div className="flex justify-between items-start mb-4">
                   <div>
                     <div className="flex gap-2 mb-1">
-                        <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider bg-gray-50 px-2 py-0.5 rounded">{project.type}</span>
-                        <span className="text-[10px] font-bold text-electric-700 uppercase tracking-wider bg-electric-50 px-2 py-0.5 rounded">NEC {project.necEdition}</span>
+                        <span className="text-xs font-bold text-gray-400 uppercase tracking-wider bg-gray-50 px-2 py-0.5 rounded">{project.type}</span>
+                        <span className="text-xs font-bold text-electric-700 uppercase tracking-wider bg-electric-50 px-2 py-0.5 rounded">NEC {project.necEdition}</span>
                     </div>
                     <h3 className="text-lg font-medium text-gray-900 mt-2 group-hover:text-electric-600 transition-colors">{project.name}</h3>
                     <p className="text-sm text-gray-500 mt-1">{project.address}</p>
@@ -280,14 +280,14 @@ export const Dashboard: React.FC<DashboardProps> = ({ projects, createNewProject
                   <div className="flex gap-4 pt-4 border-t border-gray-50">
                     <div className="text-center">
                        <span className="block text-lg font-bold text-gray-900">{project.loads.length}</span>
-                       <span className="text-[10px] text-gray-400 uppercase">Loads</span>
+                       <span className="text-xs text-gray-400 uppercase">Loads</span>
                     </div>
                     <div className={`text-center border-l border-gray-100 pl-4 ${criticalIssues > 0 ? 'text-red-600' : 'text-gray-900'}`}>
                        <span className="block text-lg font-bold flex items-center justify-center gap-1">
                           {openIssues}
                           {criticalIssues > 0 && <AlertTriangle className="w-3 h-3 text-red-500" />}
                        </span>
-                       <span className="text-[10px] text-gray-400 uppercase">Open Issues</span>
+                       <span className="text-xs text-gray-400 uppercase">Open Issues</span>
                     </div>
                     <div className="ml-auto flex items-center text-electric-600 text-sm font-medium group-hover:translate-x-1 transition-transform">
                       Open Project <ChevronRight className="w-4 h-4 ml-1" />
@@ -389,7 +389,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ projects, createNewProject
                         {getItemTypeLabel(item.type)}
                       </span>
                       <span className="text-xs text-gray-500">{item.project_name}</span>
-                      <span className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded ${getPriorityColor(item.priority)}`}>
+                      <span className={`text-xs font-bold uppercase px-2 py-0.5 rounded ${getPriorityColor(item.priority)}`}>
                         {item.priority}
                       </span>
                       {item.status && (

@@ -1077,7 +1077,7 @@ export const PanelSchedule: React.FC<PanelScheduleProps> = ({ project }) => {
 
       {/* Panel Header Info */}
       <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 p-4 bg-gray-50 border-b border-gray-200">
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 p-4 bg-gray-50 border-b border-gray-200">
           <div>
             <span className="text-[10px] uppercase text-gray-500 font-semibold">Main Breaker</span>
             <div className="text-sm font-bold">{selectedPanel.main_breaker_amps || 'MLO'} A</div>
@@ -1097,7 +1097,7 @@ export const PanelSchedule: React.FC<PanelScheduleProps> = ({ project }) => {
         </div>
 
         {/* Actions */}
-        <div className="flex justify-between items-center p-3 border-b border-gray-200">
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 p-3 border-b border-gray-200">
           <div className="flex items-center gap-4">
             <h2 className="text-lg font-bold text-gray-900">{selectedPanel.name}</h2>
             {selectedPanel.location && (
@@ -1145,6 +1145,7 @@ export const PanelSchedule: React.FC<PanelScheduleProps> = ({ project }) => {
         </div>
 
         {/* Panel Schedule Table */}
+        <div className="sm:hidden text-xs text-gray-400 text-center py-1">Swipe to see full schedule &rarr;</div>
         <div className="overflow-x-auto">
           <table className="w-full text-xs">
             <thead className="bg-gray-800 text-white">

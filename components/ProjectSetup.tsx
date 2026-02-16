@@ -218,7 +218,7 @@ export const ProjectSetup: React.FC<ProjectSetupProps> = ({ project, updateProje
                 className="w-full border-gray-200 rounded-md text-sm focus:border-electric-500 focus:ring-electric-500"
               />
             </div>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                <div>
                 <label className="block text-xs font-semibold text-gray-500 uppercase mb-1">Building Type</label>
                 <select
@@ -243,7 +243,7 @@ export const ProjectSetup: React.FC<ProjectSetupProps> = ({ project, updateProje
                 </select>
                </div>
             </div>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                <div>
                   <label className="block text-xs font-semibold text-gray-500 uppercase mb-1">Permit Number</label>
                   <input
@@ -321,7 +321,7 @@ export const ProjectSetup: React.FC<ProjectSetupProps> = ({ project, updateProje
 
             <div className="pt-4 border-t border-gray-50">
                <h4 className="text-sm font-medium text-gray-900 mb-3">Conductor Defaults</h4>
-               <div className="grid grid-cols-2 gap-4">
+               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                  <div>
                     <label className="block text-xs font-semibold text-gray-500 uppercase mb-1">Material</label>
                     <select
@@ -435,7 +435,7 @@ export const ProjectSetup: React.FC<ProjectSetupProps> = ({ project, updateProje
               <h4 className="text-sm font-medium text-gray-900 mb-4 flex items-center gap-2">
                 <Users className="w-4 h-4 text-amber-600" /> Required Branch Circuits (NEC 210.11)
               </h4>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
                 <div>
                   <label className="block text-xs font-semibold text-gray-500 uppercase mb-1">
                     Small Appliance Circuits

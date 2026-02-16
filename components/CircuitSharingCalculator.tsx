@@ -313,7 +313,7 @@ export const CircuitSharingCalculator: React.FC<CircuitSharingCalculatorProps> =
                       </div>
                     </div>
 
-                    <div className="grid grid-cols-3 gap-4 text-center pt-3 border-t border-gray-200">
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-center pt-3 border-t border-gray-200">
                       <div>
                         <div className="text-lg font-bold text-gray-900">
                           {result.circuitRequirements.circuitAmps}A
@@ -341,7 +341,7 @@ export const CircuitSharingCalculator: React.FC<CircuitSharingCalculatorProps> =
                       <DollarSign className="w-5 h-5 text-green-600" />
                       <span className="font-semibold text-green-700">Cost Savings</span>
                     </div>
-                    <div className="grid grid-cols-3 gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                       <div>
                         <div className="text-sm text-green-600">Circuit Sharing</div>
                         <div className="text-xl font-bold text-green-700">
@@ -391,7 +391,7 @@ export const CircuitSharingCalculator: React.FC<CircuitSharingCalculatorProps> =
                       <h5 className="font-semibold text-gray-900 mb-2">
                         Alternative: Service Upgrade
                       </h5>
-                      <div className="grid grid-cols-3 gap-4 text-sm">
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-sm">
                         <div>
                           <span className="text-gray-500">Upgrade to:</span>
                           <div className="font-bold text-gray-900">{result.upgradeAlternative.newServiceSize}A</div>
@@ -453,7 +453,7 @@ export const CircuitSharingCalculator: React.FC<CircuitSharingCalculatorProps> =
           {/* Circuit Requirements */}
           <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
             <h5 className="font-semibold text-gray-900 mb-3">Circuit Requirements</h5>
-            <div className="grid grid-cols-3 gap-4 text-sm">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-sm">
               <div>
                 <span className="text-gray-500">Circuit Size:</span>
                 <div className="font-bold text-gray-900">{result.circuitRequirements.circuitAmps}A</div>

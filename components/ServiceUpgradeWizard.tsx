@@ -625,7 +625,7 @@ export const ServiceUpgradeWizard: React.FC<ServiceUpgradeWizardProps> = ({ proj
                       style={{ width: `${Math.min(result.utilizationPercent, 100)}%` }}
                     />
                   </div>
-                  <div className="grid grid-cols-3 gap-2 mt-3 text-xs text-gray-600">
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 mt-3 text-xs text-gray-600">
                     <div>Current: {effectiveCurrentUsageAmps}A</div>
                     <div>Added: +{proposedLoadAmps}A</div>
                     <div>Total: {result.totalAmps}A</div>

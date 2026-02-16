@@ -162,7 +162,7 @@ export const IssuesLog: React.FC<IssuesLogProps> = ({ project }) => {
 
                   <div className="flex-1">
                       <div className="flex items-center gap-2 mb-1">
-                          <span className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded-full ${
+                          <span className={`text-xs font-bold uppercase px-2 py-0.5 rounded-full ${
                               issue.severity === 'Critical' ? 'bg-red-100 text-red-700' :
                               issue.severity === 'Warning' ? 'bg-yellow-100 text-yellow-700' : 'bg-blue-50 text-blue-600'
                           }`}>

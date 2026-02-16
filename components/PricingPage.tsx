@@ -356,7 +356,8 @@ export const PricingPage: React.FC = () => {
       {/* Feature Comparison Table */}
       <div className="mt-12">
         <h3 className="text-xl font-bold text-gray-900 mb-6 text-center">Complete Feature Comparison</h3>
-        <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
+        <div className="overflow-x-auto">
+        <div className="bg-white border border-gray-200 rounded-lg overflow-hidden min-w-[640px]">
           {/* Table Header */}
           <div className="grid grid-cols-5 bg-gray-50 border-b border-gray-200">
             <div className="p-4 font-semibold text-gray-700 text-sm">Feature</div>
@@ -401,6 +402,7 @@ export const PricingPage: React.FC = () => {
               ))}
             </div>
           ))}
+        </div>
         </div>
       </div>
 

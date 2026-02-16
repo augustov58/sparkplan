@@ -482,7 +482,7 @@ export const RFIManager: React.FC<RFIManagerProps> = ({ project }) => {
               <div className="flex items-center gap-2">
                 {getStatusIcon(rfi.status)}
                 <span className="font-mono font-bold text-sm text-gray-900">{rfi.rfi_number}</span>
-                <span className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded-full ${getPriorityColor(rfi.priority)}`}>
+                <span className={`text-xs font-bold uppercase px-2 py-0.5 rounded-full ${getPriorityColor(rfi.priority)}`}>
                   {rfi.priority}
                 </span>
                 <span className={`text-xs font-medium px-2 py-0.5 rounded ${

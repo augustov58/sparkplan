@@ -144,7 +144,7 @@ export const AdminPanel: React.FC = () => {
 
   return (
     <div className="max-w-5xl mx-auto">
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 mb-6">
         <div className="flex items-center gap-3">
           <Shield className="w-6 h-6 text-electric-500" />
           <h1 className="text-2xl font-bold text-gray-900">Admin Panel</h1>
@@ -199,7 +199,7 @@ export const AdminPanel: React.FC = () => {
 
       {/* Search */}
       <div className="bg-white border border-gray-200 rounded-lg p-6 mb-6">
-        <div className="flex gap-3">
+        <div className="flex flex-col sm:flex-row gap-3">
           <input
             type="text"
             value={searchEmail}
@@ -237,7 +237,7 @@ export const AdminPanel: React.FC = () => {
 
       {/* Users table */}
       {users.length > 0 && (
-        <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
+        <div className="bg-white border border-gray-200 rounded-lg overflow-x-auto">
           <table className="w-full text-sm">
             <thead className="bg-gray-50 border-b border-gray-200">
               <tr>

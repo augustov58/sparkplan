@@ -2274,7 +2274,7 @@ export const OneLineDiagram: React.FC<OneLineDiagramProps> = ({ project, updateP
             </div>
 
             {/* Export Buttons */}
-            <div className="absolute top-4 left-1/2 transform -translate-x-1/2 z-20 flex gap-2">
+            <div className="absolute top-12 sm:top-4 left-1/2 transform -translate-x-1/2 z-20 flex flex-wrap justify-center gap-2">
               <button
                 onClick={() => handleExportDiagram('pdf')}
                 disabled={exporting || panels.length === 0}
@@ -2318,7 +2318,7 @@ export const OneLineDiagram: React.FC<OneLineDiagramProps> = ({ project, updateP
             </div>
 
             <DiagramPanZoom className="w-full h-full flex-1">
-            <svg ref={diagramRef} className="w-full bg-white" viewBox={`${viewBoxMinX} 0 ${viewBoxWidth} ${viewBoxHeight}`} preserveAspectRatio="xMidYMid meet" style={{ minWidth: `${viewBoxWidth}px`, minHeight: `${viewBoxHeight}px` }}>
+            <svg ref={diagramRef} className="w-full bg-white" viewBox={`${viewBoxMinX} 0 ${viewBoxWidth} ${viewBoxHeight}`} preserveAspectRatio="xMidYMid meet">
                 <defs>
                     <marker id="arrow" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto" markerUnits="strokeWidth">
                         <path d="M0,0 L0,6 L9,3 z" fill="#9CA3AF" />
@@ -2508,13 +2508,13 @@ export const OneLineDiagram: React.FC<OneLineDiagramProps> = ({ project, updateP
     <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
       
       {/* Header */}
-      <div className="flex justify-between items-center">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
         <div>
           <h2 className="text-lg font-medium text-gray-900">Circuit Design & One-Line</h2>
           <p className="text-sm text-gray-500">Design branch circuits and generate system diagram.</p>
         </div>
-        <div className="flex gap-2">
-            <button 
+        <div className="flex flex-wrap gap-2">
+            <button
               onClick={handleGenerate}
               className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 rounded-md text-sm font-medium hover:bg-gray-50 text-gray-700"
             >
@@ -2531,7 +2531,7 @@ export const OneLineDiagram: React.FC<OneLineDiagramProps> = ({ project, updateP
       <div className="grid grid-cols-1 lg:grid-cols-[420px_1fr] gap-6">
 
         {/* Left Col: Panel & Circuit Editors */}
-        <div className="space-y-6 lg:max-h-[calc(100vh-12rem)] lg:overflow-y-auto lg:pr-2">
+        <div className="space-y-6 max-h-[50vh] overflow-y-auto lg:max-h-[calc(100vh-12rem)] lg:pr-2">
            {/* Add Panel */}
            <div className="bg-white border border-gray-100 rounded-lg p-6 shadow-sm">
              <h3 className="font-medium text-gray-900 mb-4 flex items-center gap-2">
@@ -2684,7 +2684,7 @@ export const OneLineDiagram: React.FC<OneLineDiagramProps> = ({ project, updateP
                            })()}
                          </optgroup>
                        </select>
-                       <p className="text-[10px] text-gray-400 mt-1">
+                       <p className="text-xs text-gray-400 mt-1">
                          {newPanel.fedFromCircuitNumber === null
                            ? 'Panel will connect via feed-thru lugs'
                            : `Panel will use breaker at slot ${newPanel.fedFromCircuitNumber}`}
@@ -2765,7 +2765,7 @@ export const OneLineDiagram: React.FC<OneLineDiagramProps> = ({ project, updateP
                        })()}
                      </optgroup>
                    </select>
-                   <p className="text-[10px] text-gray-400 mt-1">
+                   <p className="text-xs text-gray-400 mt-1">
                      {newTransformer.fedFromCircuitNumber === null
                        ? 'Transformer will connect via feed-thru lugs'
                        : `Transformer will use breaker at slot ${newTransformer.fedFromCircuitNumber}`}
@@ -2881,7 +2881,7 @@ export const OneLineDiagram: React.FC<OneLineDiagramProps> = ({ project, updateP
 
                            {/* Fed From Panel - KEY FEATURE */}
                            <div>
-                             <label className="text-[10px] text-gray-500 uppercase">Fed From Panel</label>
+                             <label className="text-xs text-gray-500 uppercase">Fed From Panel</label>
                              <select
                                value={editingTransformer.fedFromPanelId}
                                onChange={e => setEditingTransformer({ ...editingTransformer, fedFromPanelId: e.target.value, fedFromCircuitNumber: null })}
@@ -2899,7 +2899,7 @@ export const OneLineDiagram: React.FC<OneLineDiagramProps> = ({ project, updateP
                            {/* Circuit Number / Feed-Thru Lug Selection */}
                            {editingTransformer.fedFromPanelId && (
                              <div>
-                               <label className="text-[10px] text-gray-500 uppercase">Connection Type</label>
+                               <label className="text-xs text-gray-500 uppercase">Connection Type</label>
                                <select
                                  value={editingTransformer.fedFromCircuitNumber === null ? 'lug' : String(editingTransformer.fedFromCircuitNumber)}
                                  onChange={e => {
@@ -2924,7 +2924,7 @@ export const OneLineDiagram: React.FC<OneLineDiagramProps> = ({ project, updateP
                                    })()}
                                  </optgroup>
                                </select>
-                               <p className="text-[10px] text-gray-400 mt-1">
+                               <p className="text-xs text-gray-400 mt-1">
                                  {editingTransformer.fedFromCircuitNumber === null
                                    ? 'Via feed-thru lugs'
                                    : `Breaker at slot ${editingTransformer.fedFromCircuitNumber}`}
@@ -2934,7 +2934,7 @@ export const OneLineDiagram: React.FC<OneLineDiagramProps> = ({ project, updateP
 
                            <div className="grid grid-cols-2 gap-2">
                              <div>
-                               <label className="text-[10px] text-gray-500 uppercase">kVA Rating</label>
+                               <label className="text-xs text-gray-500 uppercase">kVA Rating</label>
                                <input
                                  type="number"
                                  value={editingTransformer.kvaRating}
@@ -2943,7 +2943,7 @@ export const OneLineDiagram: React.FC<OneLineDiagramProps> = ({ project, updateP
                                />
                              </div>
                              <div>
-                               <label className="text-[10px] text-gray-500 uppercase">Primary Breaker</label>
+                               <label className="text-xs text-gray-500 uppercase">Primary Breaker</label>
                                <input
                                  type="number"
                                  value={editingTransformer.primaryBreakerAmps}
@@ -2955,7 +2955,7 @@ export const OneLineDiagram: React.FC<OneLineDiagramProps> = ({ project, updateP
 
                            <div className="grid grid-cols-2 gap-2">
                              <div>
-                               <label className="text-[10px] text-gray-500 uppercase">Secondary Voltage</label>
+                               <label className="text-xs text-gray-500 uppercase">Secondary Voltage</label>
                                <select
                                  value={editingTransformer.secondaryVoltage}
                                  onChange={e => setEditingTransformer({ ...editingTransformer, secondaryVoltage: Number(e.target.value) })}
@@ -2969,7 +2969,7 @@ export const OneLineDiagram: React.FC<OneLineDiagramProps> = ({ project, updateP
                                </select>
                              </div>
                              <div>
-                               <label className="text-[10px] text-gray-500 uppercase">Secondary Phase</label>
+                               <label className="text-xs text-gray-500 uppercase">Secondary Phase</label>
                                <select
                                  value={editingTransformer.secondaryPhase}
                                  onChange={e => setEditingTransformer({ ...editingTransformer, secondaryPhase: Number(e.target.value) as 1 | 3 })}
@@ -3066,7 +3066,7 @@ export const OneLineDiagram: React.FC<OneLineDiagramProps> = ({ project, updateP
                          />
                          <div className="grid grid-cols-2 gap-2">
                            <div>
-                             <label className="text-[10px] text-gray-500 uppercase">Voltage</label>
+                             <label className="text-xs text-gray-500 uppercase">Voltage</label>
                              <select
                                value={editingPanel.voltage}
                                onChange={e => setEditingPanel({ ...editingPanel, voltage: Number(e.target.value) })}
@@ -3081,7 +3081,7 @@ export const OneLineDiagram: React.FC<OneLineDiagramProps> = ({ project, updateP
                              </select>
                            </div>
                            <div>
-                             <label className="text-[10px] text-gray-500 uppercase">Phase</label>
+                             <label className="text-xs text-gray-500 uppercase">Phase</label>
                              <select
                                value={editingPanel.phase}
                                onChange={e => setEditingPanel({ ...editingPanel, phase: Number(e.target.value) as 1 | 3 })}
@@ -3095,7 +3095,7 @@ export const OneLineDiagram: React.FC<OneLineDiagramProps> = ({ project, updateP
                          </div>
                          <div className="grid grid-cols-2 gap-2">
                            <div>
-                             <label className="text-[10px] text-gray-500 uppercase">Bus Rating</label>
+                             <label className="text-xs text-gray-500 uppercase">Bus Rating</label>
                              <input
                                type="number"
                                value={editingPanel.busRating}
@@ -3104,7 +3104,7 @@ export const OneLineDiagram: React.FC<OneLineDiagramProps> = ({ project, updateP
                              />
                            </div>
                            <div>
-                             <label className="text-[10px] text-gray-500 uppercase">Main Breaker</label>
+                             <label className="text-xs text-gray-500 uppercase">Main Breaker</label>
                              <input
                                type="number"
                                value={editingPanel.mainBreakerAmps}
@@ -3121,7 +3121,7 @@ export const OneLineDiagram: React.FC<OneLineDiagramProps> = ({ project, updateP
                            placeholder="Location (optional)"
                          />
                          {panel.is_main && isResidentialProject && (
-                           <div className="text-[10px] text-amber-600 bg-amber-50 p-2 rounded">
+                           <div className="text-xs text-amber-600 bg-amber-50 p-2 rounded">
                              ⚠️ Residential: Voltage/Phase locked to 240V/1Φ
                            </div>
                          )}
@@ -3171,9 +3171,9 @@ export const OneLineDiagram: React.FC<OneLineDiagramProps> = ({ project, updateP
                            <div className="flex items-center gap-2">
                               <Zap className={`w-4 h-4 ${panel.is_main ? 'text-red-500' : 'text-electric-500'}`} />
                               <span className="text-sm font-medium text-gray-900">{panel.name}</span>
-                              {panel.is_main && <span className="text-[10px] bg-red-100 text-red-600 px-1.5 py-0.5 rounded font-bold">MAIN</span>}
+                              {panel.is_main && <span className="text-xs bg-red-100 text-red-600 px-1.5 py-0.5 rounded font-bold">MAIN</span>}
                               {panel.is_main && mainPanelCount > 1 && (
-                                <span className="text-[10px] bg-yellow-100 text-yellow-700 px-1.5 py-0.5 rounded font-bold">DUPLICATE</span>
+                                <span className="text-xs bg-yellow-100 text-yellow-700 px-1.5 py-0.5 rounded font-bold">DUPLICATE</span>
                               )}
                            </div>
                            <div className="text-xs text-gray-500 ml-6">
@@ -3209,13 +3209,13 @@ export const OneLineDiagram: React.FC<OneLineDiagramProps> = ({ project, updateP
         </div>
 
         {/* Right Col: Diagram */}
-        <div className="bg-white border border-gray-100 rounded-lg h-[600px] lg:h-[calc(100vh-12rem)] lg:sticky lg:top-4 overflow-auto relative shadow-inner flex flex-col">
+        <div className="bg-white border border-gray-100 rounded-lg h-[70vh] sm:h-[600px] lg:h-[calc(100vh-12rem)] lg:sticky lg:top-4 overflow-hidden relative shadow-inner flex flex-col">
             <div className="absolute top-4 left-4 z-20 bg-white/90 backdrop-blur px-3 py-1 text-xs font-mono border border-gray-200 rounded">
                {project.serviceVoltage}V {project.servicePhase}Φ Service
             </div>
             
             {/* Export Buttons */}
-            <div className="absolute top-4 left-1/2 transform -translate-x-1/2 z-20 flex gap-2">
+            <div className="absolute top-12 sm:top-4 left-1/2 transform -translate-x-1/2 z-20 flex flex-wrap justify-center gap-2">
               <button
                 onClick={() => handleExportDiagram('pdf')}
                 disabled={exporting || panels.length === 0}
@@ -3259,7 +3259,7 @@ export const OneLineDiagram: React.FC<OneLineDiagramProps> = ({ project, updateP
             </div>
             
             <DiagramPanZoom className="w-full h-full flex-1">
-            <svg ref={diagramRef} className="w-full bg-white" viewBox={`${viewBoxMinX} 0 ${viewBoxWidth} ${viewBoxHeight}`} preserveAspectRatio="xMidYMid meet" style={{ minWidth: `${viewBoxWidth}px`, minHeight: `${viewBoxHeight}px` }}>
+            <svg ref={diagramRef} className="w-full bg-white" viewBox={`${viewBoxMinX} 0 ${viewBoxWidth} ${viewBoxHeight}`} preserveAspectRatio="xMidYMid meet">
                 <defs>
                     <marker id="arrow" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto" markerUnits="strokeWidth">
                         <path d="M0,0 L0,6 L9,3 z" fill="#9CA3AF" />

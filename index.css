@@ -105,6 +105,16 @@ input[type="number"],
   }
 }
 
+/* Diagram pan/zoom mobile hint */
+.animate-fade-out {
+  animation: fadeOut 3s ease-in-out forwards;
+}
+
+@keyframes fadeOut {
+  0%, 60% { opacity: 1; }
+  100% { opacity: 0; }
+}
+
 /* Color-coded load type indicators */
 .load-continuous {
   border-left: 4px solid #2563eb; /* Blue */

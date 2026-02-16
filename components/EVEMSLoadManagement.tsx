@@ -381,7 +381,7 @@ export const EVEMSLoadManagement: React.FC = () => {
                     style={{ width: `${Math.min(result.serviceUtilizationPercent, 100)}%` }}
                   />
                 </div>
-                <div className="grid grid-cols-3 gap-2 mt-3 text-xs text-gray-600">
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 mt-3 text-xs text-gray-600">
                   <div>Existing: {result.existingDemand_kVA.toFixed(1)} kVA</div>
                   <div>EV Load: {result.evDemandLoad_kVA.toFixed(1)} kVA</div>
                   <div>Total: {result.totalSystemDemand_kVA.toFixed(1)} kVA</div>
@@ -470,7 +470,7 @@ export const EVEMSLoadManagement: React.FC = () => {
                             {schedule.utilizationPercent.toFixed(1)}% utilized
                           </span>
                         </div>
-                        <div className="grid grid-cols-3 gap-2 text-xs text-gray-600">
+                        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 text-xs text-gray-600">
                           <div>EV: {schedule.evCharging_kVA.toFixed(1)} kVA</div>
                           <div>Other: {schedule.otherLoads_kVA.toFixed(1)} kVA</div>
                           <div>Available: {schedule.availableCapacity_kVA.toFixed(1)} kVA</div>

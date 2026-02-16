@@ -306,7 +306,7 @@ export const ConductorSizingTool: React.FC<ConductorSizingToolProps> = ({ projec
               {/* NEC 240.4(D) Small Conductor OCPD Limits */}
               <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
                 <div className="text-sm font-bold text-gray-900 mb-2">NEC 240.4(D) — Max OCPD for Small Conductors</div>
-                <div className="grid grid-cols-3 gap-3 text-sm">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-sm">
                   {[
                     { size: '14 AWG', max: '15A', active: result.conductorSize === '14 AWG' },
                     { size: '12 AWG', max: '20A', active: result.conductorSize === '12 AWG' },

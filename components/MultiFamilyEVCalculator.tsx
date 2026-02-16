@@ -610,7 +610,7 @@ export const MultiFamilyEVCalculator: React.FC<MultiFamilyEVCalculatorProps> = (
               Existing Service
             </h4>
 
-            <div className="grid grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <div>
                 <label className="block text-xs font-semibold text-gray-500 uppercase mb-1">
                   Service (A)
@@ -769,7 +769,7 @@ export const MultiFamilyEVCalculator: React.FC<MultiFamilyEVCalculatorProps> = (
               EV Charger Requirements
             </h4>
 
-            <div className="grid grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <div>
                 <label className="block text-xs font-semibold text-gray-500 uppercase mb-1">
                   # of Chargers
@@ -991,9 +991,9 @@ export const MultiFamilyEVCalculator: React.FC<MultiFamilyEVCalculatorProps> = (
                                   className="border-gray-200 rounded text-xs py-1 px-2"
                                 />
                               </div>
-                              <div className="grid grid-cols-3 gap-2">
+                              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                                 <div>
-                                  <label className="block text-[10px] text-gray-500 mb-0.5">
+                                  <label className="block text-xs text-gray-500 mb-0.5">
                                     {item.inputType === 'sqft' ? 'Sq Ft' :
                                      item.inputType === 'hp' ? 'HP' :
                                      item.inputType === 'tons' ? 'Tons' : 'VA'}
@@ -1011,7 +1011,7 @@ export const MultiFamilyEVCalculator: React.FC<MultiFamilyEVCalculatorProps> = (
                                   />
                                 </div>
                                 <div>
-                                  <label className="block text-[10px] text-gray-500 mb-0.5">Qty</label>
+                                  <label className="block text-xs text-gray-500 mb-0.5">Qty</label>
                                   <input
                                     type="number"
                                     value={item.quantity || 1}
@@ -1026,7 +1026,7 @@ export const MultiFamilyEVCalculator: React.FC<MultiFamilyEVCalculatorProps> = (
                                 </div>
                                 {item.inputType === 'sqft' && (
                                   <div>
-                                    <label className="block text-[10px] text-gray-500 mb-0.5">Space Type</label>
+                                    <label className="block text-xs text-gray-500 mb-0.5">Space Type</label>
                                     <select
                                       value={item.spaceType || 'corridor'}
                                       onChange={e => {
@@ -1034,7 +1034,7 @@ export const MultiFamilyEVCalculator: React.FC<MultiFamilyEVCalculatorProps> = (
                                         newItems[index] = { ...item, spaceType: e.target.value as any };
                                         setCommonAreaItems(newItems);
                                       }}
-                                      className="w-full border-gray-200 rounded text-[10px] py-1"
+                                      className="w-full border-gray-200 rounded text-xs py-1"
                                     >
                                       <option value="corridor">Corridor (0.5)</option>
                                       <option value="lobby">Lobby (2.0)</option>
@@ -1077,7 +1077,7 @@ export const MultiFamilyEVCalculator: React.FC<MultiFamilyEVCalculatorProps> = (
 
                           {/* Quick templates */}
                           <div className="flex flex-wrap gap-1">
-                            <span className="text-[10px] text-gray-500">Templates:</span>
+                            <span className="text-xs text-gray-500">Templates:</span>
                             <button
                               type="button"
                               onClick={() => {
@@ -1087,7 +1087,7 @@ export const MultiFamilyEVCalculator: React.FC<MultiFamilyEVCalculatorProps> = (
                                   { category: 'receptacles', description: 'Common area outlets', inputType: 'va', value: 5000, quantity: 1 },
                                 ]);
                               }}
-                              className="text-[10px] text-electric-600 hover:text-electric-700 underline"
+                              className="text-xs text-electric-600 hover:text-electric-700 underline"
                             >
                               Low-Rise
                             </button>
@@ -1102,7 +1102,7 @@ export const MultiFamilyEVCalculator: React.FC<MultiFamilyEVCalculatorProps> = (
                                   { category: 'receptacles', description: 'Common area outlets', inputType: 'va', value: 10000, quantity: 1 },
                                 ]);
                               }}
-                              className="text-[10px] text-electric-600 hover:text-electric-700 underline"
+                              className="text-xs text-electric-600 hover:text-electric-700 underline"
                             >
                               Mid-Rise
                             </button>
@@ -1120,7 +1120,7 @@ export const MultiFamilyEVCalculator: React.FC<MultiFamilyEVCalculatorProps> = (
                                   { category: 'receptacles', description: 'Common area outlets', inputType: 'va', value: 15000, quantity: 1 },
                                 ]);
                               }}
-                              className="text-[10px] text-electric-600 hover:text-electric-700 underline"
+                              className="text-xs text-electric-600 hover:text-electric-700 underline"
                             >
                               High-Rise
                             </button>
@@ -1521,7 +1521,7 @@ export const MultiFamilyEVCalculator: React.FC<MultiFamilyEVCalculatorProps> = (
                     <Zap className="w-4 h-4" />
                     3-Phase Load Balance
                   </h4>
-                  <div className="grid grid-cols-3 gap-2 text-center text-sm">
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 text-center text-sm">
                     <div>
                       <div className="text-xs text-gray-600">Phase A</div>
                       <div className="font-bold">{result.phaseBalance.phaseLoads.phaseA}A</div>

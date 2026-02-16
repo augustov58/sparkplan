@@ -1,6 +1,6 @@
 /**
  * Pan and Zoom Wrapper for SVG Diagrams
- * Provides mouse wheel zoom and drag pan functionality
+ * Provides mouse wheel zoom, drag pan, and touch gestures (pinch-to-zoom, single-finger pan, double-tap reset)
  */
 
 import React, { useState, useRef, useCallback, useEffect } from 'react';
@@ -28,6 +28,7 @@ export const DiagramPanZoom: React.FC<DiagramPanZoomProps> = ({
   zoomStep = 0.1
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
+  const contentRef = useRef<HTMLDivElement>(null);
   const [transform, setTransform] = useState<Transform>({
     scale: 1,
     translateX: 0,
@@ -35,24 +36,46 @@ export const DiagramPanZoom: React.FC<DiagramPanZoomProps> = ({
   });
   const [isPanning, setIsPanning] = useState(false);
   const [panStart, setPanStart] = useState({ x: 0, y: 0 });
+  const [showHint, setShowHint] = useState(false);
+
+  // Touch state refs (avoid re-renders during gestures)
+  const touchStateRef = useRef({
+    lastTouchEnd: 0,
+    initialPinchDistance: 0,
+    initialScale: 1,
+    isTouching: false,
+    touchStartPos: { x: 0, y: 0 },
+  });
+
+  // Show mobile hint on first load
+  useEffect(() => {
+    const isMobile = window.matchMedia('(max-width: 768px)').matches;
+    const hintShown = sessionStorage.getItem('diagram-hint-shown');
+    if (isMobile && !hintShown) {
+      setShowHint(true);
+      sessionStorage.setItem('diagram-hint-shown', '1');
+      const timer = setTimeout(() => setShowHint(false), 3000);
+      return () => clearTimeout(timer);
+    }
+  }, []);
 
   // Handle mouse wheel zoom
   const handleWheel = useCallback((e: WheelEvent) => {
     e.preventDefault();
-    
+
     const delta = e.deltaY > 0 ? -zoomStep : zoomStep;
     const newScale = Math.min(maxZoom, Math.max(minZoom, transform.scale + delta));
-    
+
     // Zoom towards cursor position
     if (containerRef.current) {
       const rect = containerRef.current.getBoundingClientRect();
       const cursorX = e.clientX - rect.left;
       const cursorY = e.clientY - rect.top;
-      
+
       const scaleDiff = newScale - transform.scale;
       const newTranslateX = transform.translateX - cursorX * scaleDiff / transform.scale;
       const newTranslateY = transform.translateY - cursorY * scaleDiff / transform.scale;
-      
+
       setTransform({
         scale: newScale,
         translateX: newTranslateX,
@@ -72,7 +95,86 @@ export const DiagramPanZoom: React.FC<DiagramPanZoomProps> = ({
     }
   }, [handleWheel]);
 
-  // Handle pan start
+  // --- Touch handlers ---
+  const getTouchDistance = (t1: React.Touch, t2: React.Touch) => {
+    const dx = t1.clientX - t2.clientX;
+    const dy = t1.clientY - t2.clientY;
+    return Math.sqrt(dx * dx + dy * dy);
+  };
+
+  const handleTouchStart = useCallback((e: React.TouchEvent) => {
+    const ts = touchStateRef.current;
+
+    if (e.touches.length === 2) {
+      // Pinch start
+      ts.initialPinchDistance = getTouchDistance(e.touches[0], e.touches[1]);
+      ts.initialScale = transform.scale;
+    } else if (e.touches.length === 1) {
+      // Check for double-tap
+      const now = Date.now();
+      if (now - ts.lastTouchEnd < 300) {
+        // Double-tap → reset view
+        e.preventDefault();
+        resetView();
+        return;
+      }
+
+      // Single-finger pan start
+      ts.isTouching = true;
+      ts.touchStartPos = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+      setIsPanning(true);
+      setPanStart({
+        x: e.touches[0].clientX - transform.translateX,
+        y: e.touches[0].clientY - transform.translateY
+      });
+    }
+  }, [transform]);
+
+  const handleTouchMove = useCallback((e: React.TouchEvent) => {
+    const ts = touchStateRef.current;
+
+    if (e.touches.length === 2) {
+      // Pinch zoom
+      e.preventDefault();
+      const currentDistance = getTouchDistance(e.touches[0], e.touches[1]);
+      const scaleRatio = currentDistance / ts.initialPinchDistance;
+      const newScale = Math.min(maxZoom, Math.max(minZoom, ts.initialScale * scaleRatio));
+
+      // Zoom towards pinch center
+      if (containerRef.current) {
+        const rect = containerRef.current.getBoundingClientRect();
+        const centerX = (e.touches[0].clientX + e.touches[1].clientX) / 2 - rect.left;
+        const centerY = (e.touches[0].clientY + e.touches[1].clientY) / 2 - rect.top;
+        const scaleDiff = newScale - transform.scale;
+
+        setTransform(prev => ({
+          scale: newScale,
+          translateX: prev.translateX - centerX * scaleDiff / prev.scale,
+          translateY: prev.translateY - centerY * scaleDiff / prev.scale
+        }));
+      } else {
+        setTransform(prev => ({ ...prev, scale: newScale }));
+      }
+    } else if (e.touches.length === 1 && ts.isTouching) {
+      // Single-finger pan
+      setTransform(prev => ({
+        ...prev,
+        translateX: e.touches[0].clientX - panStart.x,
+        translateY: e.touches[0].clientY - panStart.y
+      }));
+    }
+  }, [transform, panStart, minZoom, maxZoom]);
+
+  const handleTouchEnd = useCallback((e: React.TouchEvent) => {
+    const ts = touchStateRef.current;
+    ts.lastTouchEnd = Date.now();
+    if (e.touches.length === 0) {
+      ts.isTouching = false;
+      setIsPanning(false);
+    }
+  }, []);
+
+  // Handle pan start (mouse)
   const handleMouseDown = (e: React.MouseEvent) => {
     if (e.button === 0) { // Left mouse button
       setIsPanning(true);
@@ -80,7 +182,7 @@ export const DiagramPanZoom: React.FC<DiagramPanZoomProps> = ({
     }
   };
 
-  // Handle pan move
+  // Handle pan move (mouse)
   const handleMouseMove = (e: React.MouseEvent) => {
     if (isPanning) {
       setTransform(prev => ({
@@ -91,7 +193,7 @@ export const DiagramPanZoom: React.FC<DiagramPanZoomProps> = ({
     }
   };
 
-  // Handle pan end
+  // Handle pan end (mouse)
   const handleMouseUp = () => {
     setIsPanning(false);
   };
@@ -116,8 +218,33 @@ export const DiagramPanZoom: React.FC<DiagramPanZoomProps> = ({
   };
 
   const fitToScreen = () => {
-    // Reset to fit the container
-    setTransform({ scale: 1, translateX: 0, translateY: 0 });
+    if (!containerRef.current || !contentRef.current) {
+      resetView();
+      return;
+    }
+
+    const container = containerRef.current.getBoundingClientRect();
+    const content = contentRef.current.getBoundingClientRect();
+
+    // Measure unscaled content size
+    const contentWidth = content.width / transform.scale;
+    const contentHeight = content.height / transform.scale;
+
+    if (contentWidth === 0 || contentHeight === 0) {
+      resetView();
+      return;
+    }
+
+    const scaleX = container.width / contentWidth;
+    const scaleY = container.height / contentHeight;
+    const newScale = Math.min(scaleX, scaleY, maxZoom) * 0.95; // 5% padding
+    const fitScale = Math.max(minZoom, newScale);
+
+    // Center content
+    const newTranslateX = (container.width - contentWidth * fitScale) / 2;
+    const newTranslateY = (container.height - contentHeight * fitScale) / 2;
+
+    setTransform({ scale: fitScale, translateX: newTranslateX, translateY: newTranslateY });
   };
 
   return (
@@ -140,9 +267,9 @@ export const DiagramPanZoom: React.FC<DiagramPanZoomProps> = ({
         </button>
         <div className="h-px bg-gray-200 my-1" />
         <button
-          onClick={resetView}
+          onClick={fitToScreen}
           className="p-2 hover:bg-gray-100 rounded-md transition-colors"
-          title="Reset View"
+          title="Fit to Screen"
         >
           <Maximize2 className="w-4 h-4 text-gray-600" />
         </button>
@@ -160,6 +287,15 @@ export const DiagramPanZoom: React.FC<DiagramPanZoomProps> = ({
         </div>
       )}
 
+      {/* Mobile hint overlay */}
+      {showHint && (
+        <div className="absolute inset-0 z-20 flex items-center justify-center pointer-events-none">
+          <div className="bg-black/70 text-white text-sm px-4 py-2 rounded-lg animate-fade-out">
+            Pinch to zoom, drag to pan
+          </div>
+        </div>
+      )}
+
       {/* Diagram Container */}
       <div
         ref={containerRef}
@@ -168,9 +304,13 @@ export const DiagramPanZoom: React.FC<DiagramPanZoomProps> = ({
         onMouseMove={handleMouseMove}
         onMouseUp={handleMouseUp}
         onMouseLeave={handleMouseUp}
+        onTouchStart={handleTouchStart}
+        onTouchMove={handleTouchMove}
+        onTouchEnd={handleTouchEnd}
         style={{ touchAction: 'none' }}
       >
         <div
+          ref={contentRef}
           style={{
             transform: `translate(${transform.translateX}px, ${transform.translateY}px) scale(${transform.scale})`,
             transformOrigin: '0 0',
@@ -183,4 +323,3 @@ export const DiagramPanZoom: React.FC<DiagramPanZoomProps> = ({
     </div>
   );
 };
-

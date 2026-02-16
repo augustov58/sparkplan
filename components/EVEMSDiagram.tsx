@@ -52,8 +52,8 @@ export const EVEMSDiagram: React.FC<EVEMSDiagramProps> = ({
       
       <svg
         width="100%"
-        height={svgHeight}
         viewBox={`0 0 ${svgWidth} ${svgHeight}`}
+        preserveAspectRatio="xMidYMid meet"
         className="overflow-visible"
       >
         {/* Main Service Feed (Vertical Line) */}

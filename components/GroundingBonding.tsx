@@ -249,7 +249,7 @@ export const GroundingBonding: React.FC<GroundingProps> = ({ project }) => {
   return (
     <div className="space-y-6 animate-in fade-in duration-500">
       {/* Header */}
-      <div className="flex justify-between items-start">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
         <div>
           <h2 className="text-2xl font-light text-gray-900">Grounding & Bonding (NEC 250)</h2>
           <p className="text-gray-500 mt-1">Configure grounding electrode system and bonding jumpers.</p>
@@ -367,7 +367,7 @@ export const GroundingBonding: React.FC<GroundingProps> = ({ project }) => {
                       <div className="flex items-center gap-2">
                         <span className="font-medium text-gray-900">{electrode.name}</span>
                         {electrode.required && (
-                          <span className="text-[10px] px-1.5 py-0.5 bg-red-100 text-red-700 rounded font-semibold">
+                          <span className="text-xs px-1.5 py-0.5 bg-red-100 text-red-700 rounded font-semibold">
                             REQUIRED IF PRESENT
                           </span>
                         )}
@@ -448,7 +448,7 @@ export const GroundingBonding: React.FC<GroundingProps> = ({ project }) => {
                       <div className="flex items-center gap-2">
                         <span className="font-medium text-gray-900">{target.name}</span>
                         {target.required && (
-                          <span className="text-[10px] px-1.5 py-0.5 bg-red-100 text-red-700 rounded font-semibold">
+                          <span className="text-xs px-1.5 py-0.5 bg-red-100 text-red-700 rounded font-semibold">
                             REQUIRED
                           </span>
                         )}
@@ -544,7 +544,7 @@ export const GroundingBonding: React.FC<GroundingProps> = ({ project }) => {
             {/* Quick Calculator */}
             <div className="bg-electric-50 border border-electric-200 rounded-lg p-4">
               <h4 className="font-semibold text-gray-900 mb-3">Quick Reference for This Project</h4>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
                 <div className="bg-white rounded p-3">
                   <span className="text-xs text-gray-500 block">Service Size</span>
                   <span className="text-lg font-bold text-gray-900">{serviceAmps}A</span>

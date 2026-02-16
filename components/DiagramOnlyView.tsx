@@ -357,7 +357,7 @@ export const DiagramOnlyView: React.FC<DiagramOnlyViewProps> = ({ project }) => 
       {/* System Summary */}
       <div className="bg-white border border-gray-200 rounded-lg p-6">
         <h2 className="text-lg font-semibold text-gray-900 mb-4">System Summary</h2>
-        <div className="grid grid-cols-3 gap-4 text-sm">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-sm">
           <div>
             <p className="text-gray-600">Service</p>
             <p className="font-medium">{project.serviceVoltage}V, {project.servicePhase}Φ</p>

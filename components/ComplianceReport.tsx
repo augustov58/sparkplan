@@ -36,7 +36,7 @@ export const ComplianceReport: React.FC<ReportProps> = ({ project }) => {
                 </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-12 mb-12">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 md:gap-12 mb-12">
                 <div>
                     <h4 className="text-xs font-bold text-gray-400 uppercase mb-4">Code Adoption</h4>
                     <div className="space-y-2">

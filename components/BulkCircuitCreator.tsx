@@ -207,7 +207,7 @@ export const BulkCircuitCreator: React.FC<BulkCircuitCreatorProps> = ({
             <Check className="w-4 h-4" />
             Apply Common Settings to All Circuits
           </h3>
-          <div className="grid grid-cols-5 gap-3">
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
             <label className="flex items-center gap-2 text-sm">
               <input
                 type="checkbox"
@@ -246,7 +246,7 @@ export const BulkCircuitCreator: React.FC<BulkCircuitCreatorProps> = ({
                 <option value={3} disabled={!is3PoleAllowed}>3P {!is3PoleAllowed && '(3Φ only)'}</option>
               </select>
               {!is3PoleAllowed && (
-                <span className="text-[10px] text-amber-600" title="Single-phase panel">1Φ Panel</span>
+                <span className="text-xs text-amber-600" title="Single-phase panel">1Φ Panel</span>
               )}
             </label>
 

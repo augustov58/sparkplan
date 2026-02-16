@@ -69,7 +69,7 @@ export const ShortCircuitResults: React.FC = () => {
   return (
     <div className="animate-in fade-in duration-500 max-w-6xl space-y-6">
       {/* Header */}
-      <div className="flex justify-between items-start">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
         <div>
           <h2 className="text-2xl font-light text-gray-900">Short Circuit Analysis</h2>
           <p className="text-gray-500 mt-1">{project?.name || 'Project'}</p>

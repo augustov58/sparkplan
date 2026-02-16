@@ -714,7 +714,7 @@ export const SiteVisitManager: React.FC<SiteVisitManagerProps> = ({ project }) =
                 <p className="text-xs font-medium text-gray-500 mb-2 flex items-center gap-1">
                   <ImageIcon className="w-3 h-3" /> PHOTOS:
                 </p>
-                <div className="grid grid-cols-3 gap-2">
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                   {visit.photos.map((url, i) => (
                     <img
                       key={i}
