@@ -1,0 +1,313 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SparkPlan - Swiss Engineering + Color Coded</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['IBM Plex Sans', 'system-ui', 'sans-serif'],
+            mono: ['IBM Plex Mono', 'monospace'],
+          },
+        }
+      }
+    }
+  </script>
+  <style>
+    body { font-family: 'IBM Plex Sans', system-ui, sans-serif; }
+    .mono { font-family: 'IBM Plex Mono', monospace; }
+  </style>
+</head>
+<body class="bg-[#FAFAFA] min-h-screen">
+  <!-- Sidebar -->
+  <aside class="fixed left-0 top-0 h-screen w-64 bg-white border-r border-gray-200 flex flex-col">
+    <div class="p-6 border-b border-gray-200">
+      <div class="flex items-center gap-3">
+        <div class="w-10 h-10 bg-black flex items-center justify-center">
+          <svg class="w-6 h-6 text-yellow-400" fill="currentColor" viewBox="0 0 24 24">
+            <path d="M13 3L4 14h7l-2 7 9-11h-7l2-7z"/>
+          </svg>
+        </div>
+        <span class="text-lg font-bold tracking-tight">SPARKPLAN</span>
+      </div>
+    </div>
+    
+    <nav class="flex-1 p-4">
+      <p class="text-xs text-gray-400 uppercase tracking-wider mb-3 px-3 mono">Navigation</p>
+      <a href="#" class="flex items-center gap-3 px-3 py-2.5 bg-black text-white text-sm font-medium mb-1">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6z"/>
+        </svg>
+        Dashboard
+      </a>
+      <a href="#" class="flex items-center gap-3 px-3 py-2.5 text-gray-600 hover:bg-gray-100 text-sm font-medium mb-1 transition-colors">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/>
+        </svg>
+        Projects
+      </a>
+      <a href="#" class="flex items-center gap-3 px-3 py-2.5 text-gray-600 hover:bg-gray-100 text-sm font-medium mb-1 transition-colors">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+        </svg>
+        Calendar
+      </a>
+      <a href="#" class="flex items-center gap-3 px-3 py-2.5 text-gray-600 hover:bg-gray-100 text-sm font-medium mb-1 transition-colors">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+        </svg>
+        Reports
+      </a>
+      
+      <p class="text-xs text-gray-400 uppercase tracking-wider mb-3 px-3 mono mt-8">Tools</p>
+      <a href="#" class="flex items-center gap-3 px-3 py-2.5 text-gray-600 hover:bg-gray-100 text-sm font-medium mb-1 transition-colors">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z"/>
+        </svg>
+        Calculators
+      </a>
+      <a href="#" class="flex items-center gap-3 px-3 py-2.5 text-gray-600 hover:bg-gray-100 text-sm font-medium transition-colors">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"/>
+        </svg>
+        NEC Assistant
+      </a>
+    </nav>
+    
+    <div class="p-4 border-t border-gray-200">
+      <div class="flex items-center gap-3">
+        <div class="w-9 h-9 bg-black text-white flex items-center justify-center text-sm font-bold">AV</div>
+        <div>
+          <p class="text-sm font-semibold">Augusto</p>
+          <p class="text-xs text-gray-500">Professional</p>
+        </div>
+      </div>
+    </div>
+  </aside>
+
+  <!-- Main Content -->
+  <main class="ml-64">
+    <header class="h-16 bg-white border-b border-gray-200 flex items-center justify-between px-8 sticky top-0 z-10">
+      <div>
+        <h1 class="text-xl font-bold text-black">Dashboard</h1>
+      </div>
+      <button class="bg-black text-white px-5 py-2 text-sm font-semibold hover:bg-gray-800 transition-colors">
+        + New Project
+      </button>
+    </header>
+
+    <div class="p-8">
+      <!-- Welcome -->
+      <div class="mb-8">
+        <p class="text-sm text-gray-500 mono uppercase tracking-wider mb-1">Overview</p>
+        <h2 class="text-2xl font-bold text-black">Welcome back, Augusto</h2>
+      </div>
+
+      <!-- Color-coded Stats -->
+      <div class="grid grid-cols-4 gap-4 mb-8">
+        <div class="bg-blue-500 p-6 text-white">
+          <p class="text-xs text-white/70 uppercase tracking-wider mb-2 mono">Active Projects</p>
+          <p class="text-5xl font-bold mono">03</p>
+          <p class="text-sm text-white/80 mt-2">+2 this week</p>
+        </div>
+        <div class="bg-amber-500 p-6 text-white">
+          <p class="text-xs text-white/70 uppercase tracking-wider mb-2 mono">Open Issues</p>
+          <p class="text-5xl font-bold mono">07</p>
+          <p class="text-sm text-white/80 mt-2 font-semibold">2 critical</p>
+        </div>
+        <div class="bg-violet-500 p-6 text-white">
+          <p class="text-xs text-white/70 uppercase tracking-wider mb-2 mono">Pending RFIs</p>
+          <p class="text-5xl font-bold mono">04</p>
+          <p class="text-sm text-white/80 mt-2">Awaiting response</p>
+        </div>
+        <div class="bg-emerald-500 p-6 text-white">
+          <p class="text-xs text-white/70 uppercase tracking-wider mb-2 mono">Compliance</p>
+          <p class="text-5xl font-bold mono">94%</p>
+          <p class="text-sm text-white/80 mt-2 font-semibold">+3% this month</p>
+        </div>
+      </div>
+
+      <!-- Projects -->
+      <div class="bg-white border border-gray-200 mb-8">
+        <div class="border-b border-gray-200 px-6 py-4 flex items-center justify-between">
+          <p class="text-sm font-bold uppercase tracking-wider">Active Projects</p>
+        </div>
+        
+        <div class="divide-y divide-gray-100">
+          <!-- Project 1 -->
+          <div class="flex items-center gap-6 px-6 py-5 hover:bg-gray-50 cursor-pointer transition-colors">
+            <div class="w-1 h-14 bg-emerald-500"></div>
+            <div class="w-12 h-12 bg-emerald-100 flex items-center justify-center flex-shrink-0">
+              <svg class="w-6 h-6 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/>
+              </svg>
+            </div>
+            <div class="flex-1">
+              <div class="flex items-center gap-2 mb-1">
+                <span class="text-xs uppercase tracking-wider text-gray-500">Residential</span>
+                <span class="text-xs mono font-medium bg-yellow-100 text-yellow-800 px-2 py-0.5">NEC 2023</span>
+              </div>
+              <p class="font-semibold text-black">Smith Residence</p>
+              <p class="text-sm text-gray-500">1234 Oak Street, Miami FL</p>
+            </div>
+            <div class="flex items-center gap-8">
+              <div class="text-center">
+                <p class="text-3xl font-bold text-black mono">85%</p>
+                <p class="text-xs text-gray-500 uppercase">Compliance</p>
+              </div>
+              <div class="text-center">
+                <p class="text-xl font-bold text-black mono">12</p>
+                <p class="text-xs text-gray-500 uppercase">Loads</p>
+              </div>
+              <div class="text-center">
+                <p class="text-xl font-bold text-black mono">2</p>
+                <p class="text-xs text-gray-500 uppercase">Issues</p>
+              </div>
+              <span class="text-sm font-medium text-emerald-600 flex items-center gap-2">
+                <span class="w-2 h-2 bg-emerald-500 rounded-full"></span>
+                On Track
+              </span>
+            </div>
+          </div>
+
+          <!-- Project 2 -->
+          <div class="flex items-center gap-6 px-6 py-5 hover:bg-gray-50 cursor-pointer transition-colors">
+            <div class="w-1 h-14 bg-amber-500"></div>
+            <div class="w-12 h-12 bg-amber-100 flex items-center justify-center flex-shrink-0">
+              <svg class="w-6 h-6 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/>
+              </svg>
+            </div>
+            <div class="flex-1">
+              <div class="flex items-center gap-2 mb-1">
+                <span class="text-xs uppercase tracking-wider text-gray-500">Commercial</span>
+                <span class="text-xs mono font-medium bg-yellow-100 text-yellow-800 px-2 py-0.5">NEC 2023</span>
+              </div>
+              <p class="font-semibold text-black">Downtown Office</p>
+              <p class="text-sm text-gray-500">500 Business Ave, Tampa FL</p>
+            </div>
+            <div class="flex items-center gap-8">
+              <div class="text-center">
+                <p class="text-3xl font-bold text-black mono">62%</p>
+                <p class="text-xs text-gray-500 uppercase">Compliance</p>
+              </div>
+              <div class="text-center">
+                <p class="text-xl font-bold text-black mono">34</p>
+                <p class="text-xs text-gray-500 uppercase">Loads</p>
+              </div>
+              <div class="text-center">
+                <p class="text-xl font-bold text-red-600 mono">5</p>
+                <p class="text-xs text-gray-500 uppercase">Issues</p>
+              </div>
+              <span class="text-sm font-medium text-amber-600 flex items-center gap-2">
+                <span class="w-2 h-2 bg-amber-500 rounded-full"></span>
+                Attention
+              </span>
+            </div>
+          </div>
+
+          <!-- Project 3 -->
+          <div class="flex items-center gap-6 px-6 py-5 hover:bg-gray-50 cursor-pointer transition-colors">
+            <div class="w-1 h-14 bg-gray-300"></div>
+            <div class="w-12 h-12 bg-gray-100 flex items-center justify-center flex-shrink-0">
+              <svg class="w-6 h-6 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 14v3m4-3v3m4-3v3M3 21h18M3 10h18M3 7l9-4 9 4M4 10h16v11H4V10z"/>
+              </svg>
+            </div>
+            <div class="flex-1">
+              <div class="flex items-center gap-2 mb-1">
+                <span class="text-xs uppercase tracking-wider text-gray-500">Multi-Family</span>
+                <span class="text-xs mono font-medium bg-gray-100 text-gray-600 px-2 py-0.5">NEC 2020</span>
+              </div>
+              <p class="font-semibold text-black">Sunset Apartments</p>
+              <p class="text-sm text-gray-500">2100 Palm Drive, Orlando FL</p>
+            </div>
+            <div class="flex items-center gap-8">
+              <div class="text-center">
+                <p class="text-3xl font-bold text-black mono">28%</p>
+                <p class="text-xs text-gray-500 uppercase">Compliance</p>
+              </div>
+              <div class="text-center">
+                <p class="text-xl font-bold text-black mono">48</p>
+                <p class="text-xs text-gray-500 uppercase">Loads</p>
+              </div>
+              <div class="text-center">
+                <p class="text-xl font-bold text-black mono">0</p>
+                <p class="text-xs text-gray-500 uppercase">Issues</p>
+              </div>
+              <span class="text-sm font-medium text-gray-500 flex items-center gap-2">
+                <span class="w-2 h-2 bg-gray-400 rounded-full"></span>
+                In Progress
+              </span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Bottom Cards -->
+      <div class="grid grid-cols-3 gap-4">
+        <div class="bg-white border border-gray-200 p-6">
+          <p class="text-xs text-gray-500 uppercase tracking-wider mb-4 mono">Upcoming</p>
+          <div class="space-y-3">
+            <div class="flex items-center gap-4">
+              <div class="w-12 h-12 bg-blue-500 text-white flex flex-col items-center justify-center">
+                <p class="text-lg font-bold mono leading-none">18</p>
+                <p class="text-xs uppercase">Feb</p>
+              </div>
+              <div>
+                <p class="font-semibold">Site Inspection</p>
+                <p class="text-sm text-gray-500">Downtown Office • 2:00 PM</p>
+              </div>
+            </div>
+            <div class="flex items-center gap-4">
+              <div class="w-12 h-12 bg-gray-100 flex flex-col items-center justify-center">
+                <p class="text-lg font-bold mono leading-none">20</p>
+                <p class="text-xs uppercase text-gray-500">Feb</p>
+              </div>
+              <div>
+                <p class="font-semibold">RFI Review</p>
+                <p class="text-sm text-gray-500">Smith Residence • 10:00 AM</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="bg-white border border-gray-200 p-6">
+          <div class="flex items-center justify-between mb-4">
+            <p class="text-xs text-gray-500 uppercase tracking-wider mono">Critical</p>
+            <span class="bg-red-500 text-white text-xs font-bold px-2 py-0.5 mono">2</span>
+          </div>
+          <div class="space-y-2">
+            <div class="p-3 bg-red-50 border-l-4 border-red-500">
+              <p class="text-sm font-medium">Panel LP-1 overcurrent protection</p>
+              <p class="text-xs text-gray-500 mono">NEC 240.4</p>
+            </div>
+            <div class="p-3 bg-red-50 border-l-4 border-red-500">
+              <p class="text-sm font-medium">Service conductor sizing</p>
+              <p class="text-xs text-gray-500 mono">NEC 230.42</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="bg-black text-white p-6">
+          <p class="text-xs text-white/50 uppercase tracking-wider mb-2 mono">AI Assistant</p>
+          <p class="text-lg font-bold mb-4">NEC Code Help</p>
+          <button class="w-full bg-yellow-400 text-black py-3 text-sm font-bold hover:bg-yellow-300 transition-colors">
+            Ask a Question →
+          </button>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <!-- Design Label -->
+  <div class="fixed bottom-4 right-4 bg-black text-white px-4 py-2 font-bold text-sm">
+    Swiss + Color Coded
+  </div>
+</body>
+</html>

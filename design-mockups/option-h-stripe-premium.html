@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SparkPlan - Option H: Stripe-Inspired Premium</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Inter', 'system-ui', 'sans-serif'],
+          },
+        }
+      }
+    }
+  </script>
+  <style>
+    body { font-family: 'Inter', system-ui, sans-serif; }
+    .gradient-bg {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    }
+    .gradient-text {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+    .card-hover {
+      transition: all 0.2s ease;
+    }
+    .card-hover:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 12px 24px -8px rgba(0,0,0,0.15);
+    }
+  </style>
+</head>
+<body class="bg-gray-50 min-h-screen">
+  <!-- Top Nav - Floating -->
+  <nav class="fixed top-0 left-0 right-0 z-50 px-8 py-4">
+    <div class="max-w-7xl mx-auto flex items-center justify-between bg-white/80 backdrop-blur-lg rounded-2xl px-6 py-3 shadow-sm border border-gray-200/50">
+      <div class="flex items-center gap-8">
+        <div class="flex items-center gap-2">
+          <div class="w-8 h-8 gradient-bg rounded-lg flex items-center justify-center">
+            <svg class="w-5 h-5 text-white" fill="currentColor" viewBox="0 0 24 24">
+              <path d="M13 3L4 14h7l-2 7 9-11h-7l2-7z"/>
+            </svg>
+          </div>
+          <span class="font-semibold text-gray-900">SparkPlan</span>
+        </div>
+        <div class="flex items-center gap-1">
+          <a href="#" class="px-4 py-2 text-sm font-medium text-gray-900 bg-gray-100 rounded-lg">Dashboard</a>
+          <a href="#" class="px-4 py-2 text-sm font-medium text-gray-600 hover:text-gray-900 hover:bg-gray-50 rounded-lg transition-colors">Projects</a>
+          <a href="#" class="px-4 py-2 text-sm font-medium text-gray-600 hover:text-gray-900 hover:bg-gray-50 rounded-lg transition-colors">Calendar</a>
+          <a href="#" class="px-4 py-2 text-sm font-medium text-gray-600 hover:text-gray-900 hover:bg-gray-50 rounded-lg transition-colors">Reports</a>
+        </div>
+      </div>
+      <div class="flex items-center gap-3">
+        <button class="p-2 text-gray-500 hover:text-gray-700 transition-colors">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+          </svg>
+        </button>
+        <button class="gradient-bg text-white px-4 py-2 rounded-lg text-sm font-medium hover:opacity-90 transition-opacity">
+          New Project
+        </button>
+        <div class="w-8 h-8 bg-gradient-to-br from-violet-500 to-purple-600 rounded-full flex items-center justify-center text-white text-xs font-semibold">A</div>
+      </div>
+    </div>
+  </nav>
+
+  <main class="pt-24 px-8 pb-8">
+    <div class="max-w-7xl mx-auto">
+      <!-- Hero Section -->
+      <div class="mb-8">
+        <h1 class="text-4xl font-bold text-gray-900 mb-2">Welcome back, Augusto</h1>
+        <p class="text-lg text-gray-500">Here's your NEC compliance overview for today.</p>
+      </div>
+
+      <!-- Stats Cards -->
+      <div class="grid grid-cols-4 gap-6 mb-8">
+        <div class="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 card-hover cursor-pointer">
+          <div class="flex items-center justify-between mb-4">
+            <span class="text-sm font-medium text-gray-500">Active Projects</span>
+            <span class="w-10 h-10 bg-violet-50 rounded-xl flex items-center justify-center">
+              <svg class="w-5 h-5 text-violet-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/>
+              </svg>
+            </span>
+          </div>
+          <p class="text-3xl font-bold text-gray-900 mb-1">3</p>
+          <p class="text-sm text-green-600 font-medium">+2 this week</p>
+        </div>
+
+        <div class="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 card-hover cursor-pointer">
+          <div class="flex items-center justify-between mb-4">
+            <span class="text-sm font-medium text-gray-500">Open Issues</span>
+            <span class="w-10 h-10 bg-amber-50 rounded-xl flex items-center justify-center">
+              <svg class="w-5 h-5 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+              </svg>
+            </span>
+          </div>
+          <p class="text-3xl font-bold text-gray-900 mb-1">7</p>
+          <p class="text-sm text-amber-600 font-medium">2 critical</p>
+        </div>
+
+        <div class="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 card-hover cursor-pointer">
+          <div class="flex items-center justify-between mb-4">
+            <span class="text-sm font-medium text-gray-500">Pending RFIs</span>
+            <span class="w-10 h-10 bg-blue-50 rounded-xl flex items-center justify-center">
+              <svg class="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"/>
+              </svg>
+            </span>
+          </div>
+          <p class="text-3xl font-bold text-gray-900 mb-1">4</p>
+          <p class="text-sm text-gray-500">Awaiting response</p>
+        </div>
+
+        <div class="bg-gradient-to-br from-violet-500 to-purple-600 rounded-2xl p-6 shadow-sm card-hover cursor-pointer">
+          <div class="flex items-center justify-between mb-4">
+            <span class="text-sm font-medium text-white/80">Compliance Rate</span>
+            <span class="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center">
+              <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+              </svg>
+            </span>
+          </div>
+          <p class="text-3xl font-bold text-white mb-1">94%</p>
+          <p class="text-sm text-white/80 font-medium">+3% this month</p>
+        </div>
+      </div>
+
+      <!-- Projects Section -->
+      <div class="flex items-center justify-between mb-6">
+        <h2 class="text-xl font-semibold text-gray-900">Active Projects</h2>
+        <div class="flex items-center gap-2">
+          <button class="px-3 py-1.5 text-sm font-medium text-violet-600 bg-violet-50 rounded-lg">All</button>
+          <button class="px-3 py-1.5 text-sm font-medium text-gray-500 hover:bg-gray-100 rounded-lg transition-colors">Active</button>
+          <button class="px-3 py-1.5 text-sm font-medium text-gray-500 hover:bg-gray-100 rounded-lg transition-colors">Completed</button>
+        </div>
+      </div>
+
+      <div class="space-y-4">
+        <!-- Project Row 1 -->
+        <div class="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 card-hover cursor-pointer">
+          <div class="flex items-center gap-6">
+            <div class="w-14 h-14 bg-gradient-to-br from-emerald-400 to-green-500 rounded-2xl flex items-center justify-center flex-shrink-0">
+              <svg class="w-7 h-7 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/>
+              </svg>
+            </div>
+            <div class="flex-1">
+              <div class="flex items-center gap-2 mb-1">
+                <span class="text-xs font-medium text-gray-400 uppercase tracking-wide">Residential</span>
+                <span class="w-1 h-1 bg-gray-300 rounded-full"></span>
+                <span class="text-xs font-medium text-violet-600">NEC 2023</span>
+              </div>
+              <h3 class="text-lg font-semibold text-gray-900">Smith Residence</h3>
+              <p class="text-sm text-gray-500">1234 Oak Street, Miami FL</p>
+            </div>
+            <div class="flex items-center gap-8">
+              <div class="text-center">
+                <p class="text-2xl font-bold text-gray-900">85%</p>
+                <p class="text-xs text-gray-500">Compliant</p>
+              </div>
+              <div class="w-px h-10 bg-gray-200"></div>
+              <div class="text-center">
+                <p class="text-2xl font-bold text-gray-900">12</p>
+                <p class="text-xs text-gray-500">Loads</p>
+              </div>
+              <div class="text-center">
+                <p class="text-2xl font-bold text-gray-900">2</p>
+                <p class="text-xs text-gray-500">Issues</p>
+              </div>
+            </div>
+            <svg class="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+            </svg>
+          </div>
+        </div>
+
+        <!-- Project Row 2 -->
+        <div class="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 card-hover cursor-pointer">
+          <div class="flex items-center gap-6">
+            <div class="w-14 h-14 bg-gradient-to-br from-blue-400 to-indigo-500 rounded-2xl flex items-center justify-center flex-shrink-0">
+              <svg class="w-7 h-7 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/>
+              </svg>
+            </div>
+            <div class="flex-1">
+              <div class="flex items-center gap-2 mb-1">
+                <span class="text-xs font-medium text-gray-400 uppercase tracking-wide">Commercial</span>
+                <span class="w-1 h-1 bg-gray-300 rounded-full"></span>
+                <span class="text-xs font-medium text-violet-600">NEC 2023</span>
+                <span class="text-xs font-medium text-amber-600 bg-amber-50 px-2 py-0.5 rounded-full">5 issues</span>
+              </div>
+              <h3 class="text-lg font-semibold text-gray-900">Downtown Office</h3>
+              <p class="text-sm text-gray-500">500 Business Ave, Tampa FL</p>
+            </div>
+            <div class="flex items-center gap-8">
+              <div class="text-center">
+                <p class="text-2xl font-bold text-gray-900">62%</p>
+                <p class="text-xs text-gray-500">Compliant</p>
+              </div>
+              <div class="w-px h-10 bg-gray-200"></div>
+              <div class="text-center">
+                <p class="text-2xl font-bold text-gray-900">34</p>
+                <p class="text-xs text-gray-500">Loads</p>
+              </div>
+              <div class="text-center">
+                <p class="text-2xl font-bold text-amber-500">5</p>
+                <p class="text-xs text-gray-500">Issues</p>
+              </div>
+            </div>
+            <svg class="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+            </svg>
+          </div>
+        </div>
+
+        <!-- Project Row 3 -->
+        <div class="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 card-hover cursor-pointer">
+          <div class="flex items-center gap-6">
+            <div class="w-14 h-14 bg-gradient-to-br from-purple-400 to-violet-500 rounded-2xl flex items-center justify-center flex-shrink-0">
+              <svg class="w-7 h-7 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 14v3m4-3v3m4-3v3M3 21h18M3 10h18M3 7l9-4 9 4M4 10h16v11H4V10z"/>
+              </svg>
+            </div>
+            <div class="flex-1">
+              <div class="flex items-center gap-2 mb-1">
+                <span class="text-xs font-medium text-gray-400 uppercase tracking-wide">Multi-Family</span>
+                <span class="w-1 h-1 bg-gray-300 rounded-full"></span>
+                <span class="text-xs font-medium text-gray-500">NEC 2020</span>
+              </div>
+              <h3 class="text-lg font-semibold text-gray-900">Sunset Apartments</h3>
+              <p class="text-sm text-gray-500">2100 Palm Drive, Orlando FL</p>
+            </div>
+            <div class="flex items-center gap-8">
+              <div class="text-center">
+                <p class="text-2xl font-bold text-gray-900">28%</p>
+                <p class="text-xs text-gray-500">Compliant</p>
+              </div>
+              <div class="w-px h-10 bg-gray-200"></div>
+              <div class="text-center">
+                <p class="text-2xl font-bold text-gray-900">48</p>
+                <p class="text-xs text-gray-500">Loads</p>
+              </div>
+              <div class="text-center">
+                <p class="text-2xl font-bold text-gray-900">0</p>
+                <p class="text-xs text-gray-500">Issues</p>
+              </div>
+            </div>
+            <svg class="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+            </svg>
+          </div>
+        </div>
+      </div>
+
+      <!-- AI Assistant Banner -->
+      <div class="mt-8 bg-gradient-to-r from-violet-600 via-purple-600 to-indigo-600 rounded-2xl p-8 relative overflow-hidden">
+        <div class="absolute top-0 right-0 w-64 h-64 bg-white/10 rounded-full -translate-y-1/2 translate-x-1/3 blur-3xl"></div>
+        <div class="relative flex items-center justify-between">
+          <div>
+            <h3 class="text-2xl font-bold text-white mb-2">NEC Assistant</h3>
+            <p class="text-white/80 max-w-md">Get instant answers to your NEC code questions. Powered by AI trained on the complete National Electrical Code.</p>
+          </div>
+          <button class="bg-white text-violet-600 px-6 py-3 rounded-xl font-semibold hover:bg-gray-50 transition-colors">
+            Ask a Question →
+          </button>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <!-- Design Label -->
+  <div class="fixed bottom-4 right-4 gradient-bg text-white px-4 py-2 rounded-lg shadow-lg font-medium text-sm">
+    Option H: Stripe-Inspired Premium
+  </div>
+</body>
+</html>

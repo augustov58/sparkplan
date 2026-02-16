@@ -192,8 +192,8 @@ export const Dashboard: React.FC<DashboardProps> = ({ projects, createNewProject
       {/* Header */}
       <div className="flex justify-between items-end">
         <div>
-          <h2 className="text-2xl font-light text-gray-900">Welcome back, {getUserName()}</h2>
-          <p className="text-gray-500 mt-1">You have <span className="font-medium text-electric-600">{projects.length} active projects</span> requiring NEC compliance review.</p>
+          <h2 className="font-serif text-2xl font-medium text-[#1a1a1a]">Welcome back, {getUserName()}</h2>
+          <p className="text-[#666] mt-1">You have <span className="font-medium text-[#3d6b3d]">{projects.length} active projects</span> requiring NEC compliance review.</p>
         </div>
         <div className="flex items-center gap-3">
           <ProjectExportImportCompact
@@ -203,7 +203,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ projects, createNewProject
           />
           <button
             onClick={createNewProject}
-            className="bg-electric-400 hover:bg-electric-500 text-black px-6 py-3 rounded-md font-medium flex items-center gap-2 transition-colors shadow-sm"
+            className="bg-[#2d3b2d] hover:bg-[#3d4f3d] text-white px-6 py-3 rounded-md font-medium flex items-center gap-2 transition-colors shadow-sm"
           >
             <Plus className="w-5 h-5" />
             Create New NEC Project
@@ -232,9 +232,9 @@ export const Dashboard: React.FC<DashboardProps> = ({ projects, createNewProject
               <div
                 key={project.id}
                 onClick={() => navigate(`/project/${project.id}`)}
-                className="group bg-white border border-gray-100 hover:border-electric-400 rounded-lg p-6 cursor-pointer transition-all hover:shadow-lg relative overflow-hidden"
+                className="group bg-white border border-[#e8e6e3] hover:border-[#2d3b2d] rounded-xl p-6 cursor-pointer transition-all hover:shadow-lg relative overflow-hidden"
               >
-                <div className="absolute top-0 left-0 w-full h-1 bg-gray-100 group-hover:bg-electric-400 transition-colors"></div>
+                <div className="absolute top-0 left-0 w-full h-1 bg-[#e8e6e3] group-hover:bg-[#2d3b2d] transition-colors"></div>
 
                 {/* Delete button */}
                 <button
@@ -248,11 +248,11 @@ export const Dashboard: React.FC<DashboardProps> = ({ projects, createNewProject
                 <div className="flex justify-between items-start mb-4">
                   <div>
                     <div className="flex gap-2 mb-1">
-                        <span className="text-xs font-bold text-gray-400 uppercase tracking-wider bg-gray-50 px-2 py-0.5 rounded">{project.type}</span>
-                        <span className="text-xs font-bold text-electric-700 uppercase tracking-wider bg-electric-50 px-2 py-0.5 rounded">NEC {project.necEdition}</span>
+                        <span className="text-xs font-bold text-[#888] uppercase tracking-wider bg-[#f0eeeb] px-2 py-0.5 rounded">{project.type}</span>
+                        <span className="text-xs font-bold text-[#3d6b3d] uppercase tracking-wider bg-[#e8f5e8] px-2 py-0.5 rounded">NEC {project.necEdition}</span>
                     </div>
-                    <h3 className="text-lg font-medium text-gray-900 mt-2 group-hover:text-electric-600 transition-colors">{project.name}</h3>
-                    <p className="text-sm text-gray-500 mt-1">{project.address}</p>
+                    <h3 className="font-serif text-lg font-medium text-[#1a1a1a] mt-2 group-hover:text-[#2d3b2d] transition-colors">{project.name}</h3>
+                    <p className="text-sm text-[#666] mt-1">{project.address}</p>
                   </div>
                   <div className={`p-2 rounded-full ${
                     project.status === ProjectStatus.COMPLIANT ? 'bg-green-50 text-green-600' :
@@ -265,31 +265,31 @@ export const Dashboard: React.FC<DashboardProps> = ({ projects, createNewProject
 
                 <div className="space-y-4">
                   <div>
-                    <div className="flex justify-between text-xs text-gray-500 mb-1">
+                    <div className="flex justify-between text-xs text-[#666] mb-1">
                       <span>NEC Compliance Progress</span>
                       <span>{project.progress}%</span>
                     </div>
-                    <div className="w-full bg-gray-100 rounded-full h-1.5 overflow-hidden">
+                    <div className="w-full bg-[#e8e6e3] rounded-full h-1.5 overflow-hidden">
                       <div 
-                        className="bg-electric-500 h-full rounded-full transition-all duration-1000 ease-out" 
+                        className="bg-[#3d6b3d] h-full rounded-full transition-all duration-1000 ease-out" 
                         style={{ width: `${project.progress}%` }}
                       ></div>
                     </div>
                   </div>
 
-                  <div className="flex gap-4 pt-4 border-t border-gray-50">
+                  <div className="flex gap-4 pt-4 border-t border-[#f0eeeb]">
                     <div className="text-center">
-                       <span className="block text-lg font-bold text-gray-900">{project.loads.length}</span>
-                       <span className="text-xs text-gray-400 uppercase">Loads</span>
+                       <span className="block font-serif text-lg font-medium text-[#1a1a1a]">{project.loads.length}</span>
+                       <span className="text-xs text-[#888] uppercase">Loads</span>
                     </div>
-                    <div className={`text-center border-l border-gray-100 pl-4 ${criticalIssues > 0 ? 'text-red-600' : 'text-gray-900'}`}>
-                       <span className="block text-lg font-bold flex items-center justify-center gap-1">
+                    <div className={`text-center border-l border-[#e8e6e3] pl-4 ${criticalIssues > 0 ? 'text-[#c44]' : 'text-[#1a1a1a]'}`}>
+                       <span className="block font-serif text-lg font-medium flex items-center justify-center gap-1">
                           {openIssues}
-                          {criticalIssues > 0 && <AlertTriangle className="w-3 h-3 text-red-500" />}
+                          {criticalIssues > 0 && <AlertTriangle className="w-3 h-3 text-[#c44]" />}
                        </span>
-                       <span className="text-xs text-gray-400 uppercase">Open Issues</span>
+                       <span className="text-xs text-[#888] uppercase">Open Issues</span>
                     </div>
-                    <div className="ml-auto flex items-center text-electric-600 text-sm font-medium group-hover:translate-x-1 transition-transform">
+                    <div className="ml-auto flex items-center text-[#2d3b2d] text-sm font-medium group-hover:translate-x-1 transition-transform">
                       Open Project <ChevronRight className="w-4 h-4 ml-1" />
                     </div>
                   </div>
@@ -302,16 +302,16 @@ export const Dashboard: React.FC<DashboardProps> = ({ projects, createNewProject
 
       {/* Open Items Section (Below Project Cards) */}
       {!loadingOpenItems && openItems.length > 0 && (
-        <div className="bg-white border border-gray-100 rounded-lg p-6">
+        <div className="bg-white border border-[#e8e6e3] rounded-xl p-6">
           {/* Header with Filters */}
           <div className="flex flex-col gap-4 mb-6">
             <div className="flex items-center justify-between">
               <div>
-                <h3 className="text-lg font-medium text-gray-900 flex items-center gap-2">
-                  <Filter className="w-5 h-5 text-electric-500" />
+                <h3 className="font-serif text-lg font-medium text-[#1a1a1a] flex items-center gap-2">
+                  <Filter className="w-5 h-5 text-[#2d3b2d]" />
                   Open Items Across All Projects
                 </h3>
-                <p className="text-sm text-gray-500 mt-1">
+                <p className="text-sm text-[#666] mt-1">
                   {filteredAndSortedItems.length} of {openItems.length} {filteredAndSortedItems.length === 1 ? 'item' : 'items'} shown
                 </p>
               </div>
@@ -323,7 +323,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ projects, createNewProject
               <select
                 value={selectedProject}
                 onChange={(e) => setSelectedProject(e.target.value)}
-                className="px-3 py-2 border border-gray-200 rounded-md text-sm bg-white hover:border-electric-400 transition-colors focus:outline-none focus:ring-2 focus:ring-electric-400"
+                className="px-3 py-2 border border-[#e8e6e3] rounded-md text-sm bg-white hover:border-[#2d3b2d] transition-colors focus:outline-none focus:ring-2 focus:ring-[#2d3b2d]/20"
               >
                 <option value="all">All Projects</option>
                 {projects.map(project => (
@@ -335,7 +335,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ projects, createNewProject
               <select
                 value={selectedType}
                 onChange={(e) => setSelectedType(e.target.value)}
-                className="px-3 py-2 border border-gray-200 rounded-md text-sm bg-white hover:border-electric-400 transition-colors focus:outline-none focus:ring-2 focus:ring-electric-400"
+                className="px-3 py-2 border border-[#e8e6e3] rounded-md text-sm bg-white hover:border-[#2d3b2d] transition-colors focus:outline-none focus:ring-2 focus:ring-[#2d3b2d]/20"
               >
                 <option value="all">All Types</option>
                 <option value="rfi">RFIs</option>
@@ -348,7 +348,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ projects, createNewProject
               <select
                 value={sortBy}
                 onChange={(e) => setSortBy(e.target.value as 'date' | 'priority')}
-                className="px-3 py-2 border border-gray-200 rounded-md text-sm bg-white hover:border-electric-400 transition-colors focus:outline-none focus:ring-2 focus:ring-electric-400"
+                className="px-3 py-2 border border-[#e8e6e3] rounded-md text-sm bg-white hover:border-[#2d3b2d] transition-colors focus:outline-none focus:ring-2 focus:ring-[#2d3b2d]/20"
               >
                 <option value="priority">Sort by Priority</option>
                 <option value="date">Sort by Date</option>
@@ -362,7 +362,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ projects, createNewProject
                     setSelectedType('all');
                     setSortBy('priority');
                   }}
-                  className="px-3 py-2 text-sm text-gray-600 hover:text-electric-600 transition-colors"
+                  className="px-3 py-2 text-sm text-[#666] hover:text-[#2d3b2d] transition-colors"
                 >
                   Clear Filters
                 </button>
@@ -377,7 +377,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ projects, createNewProject
                 <div
                   key={`${item.type}-${item.id}`}
                   onClick={() => navigate(item.url)}
-                  className="group flex items-start gap-3 p-3 rounded-lg border border-gray-100 hover:border-electric-400 hover:bg-electric-50 cursor-pointer transition-all"
+                  className="group flex items-start gap-3 p-3 rounded-lg border border-[#e8e6e3] hover:border-[#2d3b2d] hover:bg-[#f0f5f0] cursor-pointer transition-all"
                 >
                   <div className={`p-2 rounded ${getPriorityColor(item.priority)}`}>
                     {getItemTypeIcon(item.type)}
@@ -385,35 +385,35 @@ export const Dashboard: React.FC<DashboardProps> = ({ projects, createNewProject
 
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-1">
-                      <span className="text-xs font-medium text-gray-600 bg-gray-100 px-2 py-0.5 rounded">
+                      <span className="text-xs font-medium text-[#666] bg-[#f0eeeb] px-2 py-0.5 rounded">
                         {getItemTypeLabel(item.type)}
                       </span>
-                      <span className="text-xs text-gray-500">{item.project_name}</span>
+                      <span className="text-xs text-[#888]">{item.project_name}</span>
                       <span className={`text-xs font-bold uppercase px-2 py-0.5 rounded ${getPriorityColor(item.priority)}`}>
                         {item.priority}
                       </span>
                       {item.status && (
-                        <span className="text-xs text-gray-400">{item.status}</span>
+                        <span className="text-xs text-[#888]">{item.status}</span>
                       )}
                     </div>
-                    <p className="font-medium text-sm text-gray-900 truncate group-hover:text-electric-700 transition-colors">
+                    <p className="font-medium text-sm text-[#1a1a1a] truncate group-hover:text-[#2d3b2d] transition-colors">
                       {item.title}
                     </p>
-                    <p className="text-xs text-gray-600 truncate mt-0.5">{item.description}</p>
+                    <p className="text-xs text-[#666] truncate mt-0.5">{item.description}</p>
                     {item.due_date && (
-                      <p className="text-xs text-gray-500 mt-1 flex items-center gap-1">
+                      <p className="text-xs text-[#888] mt-1 flex items-center gap-1">
                         <Clock className="w-3 h-3" />
                         Due: {new Date(item.due_date).toLocaleDateString()}
                       </p>
                     )}
                   </div>
 
-                  <ChevronRight className="w-4 h-4 text-gray-400 group-hover:text-electric-600 group-hover:translate-x-1 transition-all flex-shrink-0" />
+                  <ChevronRight className="w-4 h-4 text-[#888] group-hover:text-[#2d3b2d] group-hover:translate-x-1 transition-all flex-shrink-0" />
                 </div>
               ))}
             </div>
           ) : (
-            <div className="text-center py-8 text-gray-500">
+            <div className="text-center py-8 text-[#888]">
               <p>No items match the selected filters.</p>
             </div>
           )}

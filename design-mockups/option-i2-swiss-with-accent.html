@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SparkPlan - Swiss Engineering + Gold Accent</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['IBM Plex Sans', 'system-ui', 'sans-serif'],
+            mono: ['IBM Plex Mono', 'monospace'],
+          },
+          colors: {
+            gold: {
+              50: '#FFFEF5',
+              100: '#FFF9E0',
+              200: '#FFF3C4',
+              400: '#FFD93D',
+              500: '#FFD000',
+              600: '#E6BB00',
+            }
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    body { font-family: 'IBM Plex Sans', system-ui, sans-serif; }
+    .mono { font-family: 'IBM Plex Mono', monospace; }
+  </style>
+</head>
+<body class="bg-white min-h-screen">
+  <!-- Header -->
+  <header class="border-b-2 border-black">
+    <div class="max-w-screen-2xl mx-auto px-8 h-16 flex items-center justify-between">
+      <div class="flex items-center gap-12">
+        <div class="flex items-center gap-3">
+          <div class="w-9 h-9 bg-gold-500 flex items-center justify-center">
+            <svg class="w-5 h-5 text-black" fill="currentColor" viewBox="0 0 24 24">
+              <path d="M13 3L4 14h7l-2 7 9-11h-7l2-7z"/>
+            </svg>
+          </div>
+          <span class="text-lg font-bold tracking-tight">SPARKPLAN</span>
+        </div>
+        <nav class="flex items-center gap-1">
+          <a href="#" class="px-4 py-2 text-sm font-semibold text-black bg-gold-500">Dashboard</a>
+          <a href="#" class="px-4 py-2 text-sm font-medium text-gray-600 hover:text-black hover:bg-gray-100 transition-colors">Projects</a>
+          <a href="#" class="px-4 py-2 text-sm font-medium text-gray-600 hover:text-black hover:bg-gray-100 transition-colors">Calendar</a>
+          <a href="#" class="px-4 py-2 text-sm font-medium text-gray-600 hover:text-black hover:bg-gray-100 transition-colors">Reports</a>
+        </nav>
+      </div>
+      <div class="flex items-center gap-4">
+        <button class="bg-black text-white px-5 py-2 text-sm font-semibold hover:bg-gray-800 transition-colors">
+          + New Project
+        </button>
+        <div class="w-9 h-9 bg-black text-white flex items-center justify-center text-sm font-bold">AV</div>
+      </div>
+    </div>
+  </header>
+
+  <main class="max-w-screen-2xl mx-auto px-8 py-8">
+    <!-- Page Title -->
+    <div class="mb-8 flex items-end justify-between">
+      <div>
+        <p class="text-sm text-gray-500 mb-1 mono uppercase tracking-wider">Dashboard</p>
+        <h1 class="text-3xl font-bold text-black tracking-tight">Welcome back, Augusto</h1>
+      </div>
+      <p class="text-sm text-gray-500">Last updated: Today, 11:45 AM</p>
+    </div>
+
+    <!-- Stats Row with Gold Accent -->
+    <div class="grid grid-cols-4 gap-px bg-black mb-8">
+      <div class="bg-white p-6">
+        <p class="text-xs text-gray-500 uppercase tracking-wider mb-3 mono">Active Projects</p>
+        <p class="text-5xl font-bold text-black mono">03</p>
+        <div class="flex items-center gap-2 mt-3">
+          <span class="w-2 h-2 bg-gold-500"></span>
+          <span class="text-sm text-gray-600">+2 this week</span>
+        </div>
+      </div>
+      <div class="bg-white p-6">
+        <p class="text-xs text-gray-500 uppercase tracking-wider mb-3 mono">Open Issues</p>
+        <p class="text-5xl font-bold text-black mono">07</p>
+        <div class="flex items-center gap-2 mt-3">
+          <span class="w-2 h-2 bg-red-500"></span>
+          <span class="text-sm text-red-600 font-medium">2 critical</span>
+        </div>
+      </div>
+      <div class="bg-white p-6">
+        <p class="text-xs text-gray-500 uppercase tracking-wider mb-3 mono">Pending RFIs</p>
+        <p class="text-5xl font-bold text-black mono">04</p>
+        <div class="flex items-center gap-2 mt-3">
+          <span class="w-2 h-2 bg-blue-500"></span>
+          <span class="text-sm text-gray-600">Awaiting response</span>
+        </div>
+      </div>
+      <div class="bg-gold-500 p-6">
+        <p class="text-xs text-black/60 uppercase tracking-wider mb-3 mono">Compliance Rate</p>
+        <p class="text-5xl font-bold text-black mono">94%</p>
+        <div class="flex items-center gap-2 mt-3">
+          <span class="w-2 h-2 bg-black"></span>
+          <span class="text-sm text-black/80 font-medium">+3% this month</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Projects Section -->
+    <div class="border-2 border-black">
+      <div class="border-b-2 border-black px-6 py-4 flex items-center justify-between bg-gray-50">
+        <p class="text-sm font-bold uppercase tracking-wider">Active Projects</p>
+        <div class="flex items-center gap-1">
+          <button class="px-3 py-1.5 text-xs font-semibold uppercase tracking-wider bg-black text-white">Active</button>
+          <button class="px-3 py-1.5 text-xs font-medium uppercase tracking-wider text-gray-500 hover:bg-gray-200 transition-colors">All</button>
+          <button class="px-3 py-1.5 text-xs font-medium uppercase tracking-wider text-gray-500 hover:bg-gray-200 transition-colors">Completed</button>
+        </div>
+      </div>
+      
+      <!-- Table Header -->
+      <div class="grid grid-cols-12 gap-4 px-6 py-3 border-b border-gray-200 text-xs uppercase tracking-wider text-gray-500 mono bg-gray-50">
+        <div class="col-span-4">Project</div>
+        <div class="col-span-2">Type / Code</div>
+        <div class="col-span-2 text-right">Compliance</div>
+        <div class="col-span-1 text-right">Loads</div>
+        <div class="col-span-1 text-right">Issues</div>
+        <div class="col-span-2 text-right">Status</div>
+      </div>
+      
+      <!-- Row 1 -->
+      <div class="grid grid-cols-12 gap-4 px-6 py-5 border-b border-gray-100 hover:bg-gold-50 cursor-pointer transition-colors items-center group">
+        <div class="col-span-4">
+          <div class="flex items-center gap-3">
+            <div class="w-1 h-12 bg-gold-500 group-hover:w-2 transition-all"></div>
+            <div>
+              <p class="font-semibold text-black">Smith Residence</p>
+              <p class="text-sm text-gray-500">1234 Oak Street, Miami FL</p>
+            </div>
+          </div>
+        </div>
+        <div class="col-span-2">
+          <span class="text-xs uppercase tracking-wider text-gray-500">Residential</span>
+          <span class="text-xs uppercase tracking-wider text-black ml-2 mono bg-gold-100 px-2 py-0.5">NEC 2023</span>
+        </div>
+        <div class="col-span-2 text-right">
+          <span class="text-2xl font-bold text-black mono">85%</span>
+        </div>
+        <div class="col-span-1 text-right">
+          <span class="text-lg font-semibold text-black mono">12</span>
+        </div>
+        <div class="col-span-1 text-right">
+          <span class="text-lg font-semibold text-black mono">2</span>
+        </div>
+        <div class="col-span-2 text-right">
+          <span class="inline-flex items-center gap-2 text-sm font-medium text-green-700 bg-green-50 px-3 py-1">
+            <span class="w-2 h-2 bg-green-600"></span>
+            On Track
+          </span>
+        </div>
+      </div>
+
+      <!-- Row 2 -->
+      <div class="grid grid-cols-12 gap-4 px-6 py-5 border-b border-gray-100 hover:bg-gold-50 cursor-pointer transition-colors items-center group">
+        <div class="col-span-4">
+          <div class="flex items-center gap-3">
+            <div class="w-1 h-12 bg-amber-500 group-hover:w-2 transition-all"></div>
+            <div>
+              <p class="font-semibold text-black">Downtown Office</p>
+              <p class="text-sm text-gray-500">500 Business Ave, Tampa FL</p>
+            </div>
+          </div>
+        </div>
+        <div class="col-span-2">
+          <span class="text-xs uppercase tracking-wider text-gray-500">Commercial</span>
+          <span class="text-xs uppercase tracking-wider text-black ml-2 mono bg-gold-100 px-2 py-0.5">NEC 2023</span>
+        </div>
+        <div class="col-span-2 text-right">
+          <span class="text-2xl font-bold text-black mono">62%</span>
+        </div>
+        <div class="col-span-1 text-right">
+          <span class="text-lg font-semibold text-black mono">34</span>
+        </div>
+        <div class="col-span-1 text-right">
+          <span class="text-lg font-semibold text-red-600 mono">5</span>
+        </div>
+        <div class="col-span-2 text-right">
+          <span class="inline-flex items-center gap-2 text-sm font-medium text-amber-700 bg-amber-50 px-3 py-1">
+            <span class="w-2 h-2 bg-amber-500"></span>
+            Needs Review
+          </span>
+        </div>
+      </div>
+
+      <!-- Row 3 -->
+      <div class="grid grid-cols-12 gap-4 px-6 py-5 hover:bg-gold-50 cursor-pointer transition-colors items-center group">
+        <div class="col-span-4">
+          <div class="flex items-center gap-3">
+            <div class="w-1 h-12 bg-gray-300 group-hover:w-2 transition-all"></div>
+            <div>
+              <p class="font-semibold text-black">Sunset Apartments</p>
+              <p class="text-sm text-gray-500">2100 Palm Drive, Orlando FL</p>
+            </div>
+          </div>
+        </div>
+        <div class="col-span-2">
+          <span class="text-xs uppercase tracking-wider text-gray-500">Multi-Family</span>
+          <span class="text-xs uppercase tracking-wider text-gray-500 ml-2 mono bg-gray-100 px-2 py-0.5">NEC 2020</span>
+        </div>
+        <div class="col-span-2 text-right">
+          <span class="text-2xl font-bold text-black mono">28%</span>
+        </div>
+        <div class="col-span-1 text-right">
+          <span class="text-lg font-semibold text-black mono">48</span>
+        </div>
+        <div class="col-span-1 text-right">
+          <span class="text-lg font-semibold text-black mono">0</span>
+        </div>
+        <div class="col-span-2 text-right">
+          <span class="inline-flex items-center gap-2 text-sm font-medium text-gray-600 bg-gray-100 px-3 py-1">
+            <span class="w-2 h-2 bg-gray-400"></span>
+            In Progress
+          </span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Bottom Grid -->
+    <div class="grid grid-cols-3 gap-px bg-black mt-8">
+      <div class="bg-white p-6">
+        <p class="text-xs text-gray-500 uppercase tracking-wider mb-4 mono">Upcoming Events</p>
+        <div class="space-y-4">
+          <div class="flex items-center gap-4">
+            <div class="w-14 h-14 bg-gold-500 flex flex-col items-center justify-center">
+              <p class="text-xl font-bold mono">18</p>
+              <p class="text-xs uppercase">Feb</p>
+            </div>
+            <div>
+              <p class="font-semibold">Site Inspection</p>
+              <p class="text-sm text-gray-500">Downtown Office • 2:00 PM</p>
+            </div>
+          </div>
+          <div class="flex items-center gap-4">
+            <div class="w-14 h-14 bg-gray-100 flex flex-col items-center justify-center">
+              <p class="text-xl font-bold mono">20</p>
+              <p class="text-xs uppercase">Feb</p>
+            </div>
+            <div>
+              <p class="font-semibold">RFI Review Meeting</p>
+              <p class="text-sm text-gray-500">Smith Residence • 10:00 AM</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="bg-white p-6">
+        <p class="text-xs text-gray-500 uppercase tracking-wider mb-4 mono">Critical Issues</p>
+        <div class="space-y-3">
+          <div class="flex items-start gap-3 p-3 bg-red-50 border-l-4 border-red-500">
+            <div>
+              <p class="text-sm font-medium">Panel LP-1 overcurrent protection undersized</p>
+              <p class="text-xs text-gray-500 mono mt-1">NEC 240.4 • Downtown Office</p>
+            </div>
+          </div>
+          <div class="flex items-start gap-3 p-3 bg-red-50 border-l-4 border-red-500">
+            <div>
+              <p class="text-sm font-medium">Service conductor sizing insufficient</p>
+              <p class="text-xs text-gray-500 mono mt-1">NEC 230.42 • Downtown Office</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="bg-black text-white p-6">
+        <p class="text-xs text-gray-400 uppercase tracking-wider mb-4 mono">NEC Assistant</p>
+        <p class="text-lg font-semibold mb-2">AI-powered code compliance</p>
+        <p class="text-sm text-gray-400 mb-6">Get instant answers to NEC questions. References included.</p>
+        <button class="w-full bg-gold-500 text-black py-3 text-sm font-bold hover:bg-gold-400 transition-colors">
+          Ask a Question →
+        </button>
+      </div>
+    </div>
+  </main>
+
+  <!-- Design Label -->
+  <div class="fixed bottom-4 right-4 bg-gold-500 text-black px-4 py-2 font-bold text-sm">
+    Swiss + Gold Accent
+  </div>
+</body>
+</html>

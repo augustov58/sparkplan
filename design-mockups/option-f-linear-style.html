@@ -1,0 +1,350 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SparkPlan - Option F: Linear/Notion Style</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Inter', 'system-ui', 'sans-serif'],
+          },
+        }
+      }
+    }
+  </script>
+  <style>
+    body { 
+      font-family: 'Inter', system-ui, sans-serif;
+      background: linear-gradient(180deg, #0a0a0a 0%, #171717 100%);
+    }
+    .glow-border {
+      position: relative;
+    }
+    .glow-border::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      border-radius: inherit;
+      padding: 1px;
+      background: linear-gradient(135deg, rgba(255,255,255,0.1) 0%, transparent 50%, rgba(255,255,255,0.05) 100%);
+      -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+      mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+      -webkit-mask-composite: xor;
+      mask-composite: exclude;
+    }
+    .project-row:hover {
+      background: rgba(255,255,255,0.03);
+    }
+    .kbd {
+      background: rgba(255,255,255,0.1);
+      border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 4px;
+      padding: 2px 6px;
+      font-size: 11px;
+      font-family: monospace;
+    }
+  </style>
+</head>
+<body class="min-h-screen text-white">
+  <div class="flex">
+    <!-- Sidebar -->
+    <aside class="w-60 h-screen border-r border-white/10 flex flex-col fixed">
+      <div class="p-4 border-b border-white/10">
+        <div class="flex items-center gap-2">
+          <div class="w-6 h-6 bg-gradient-to-br from-yellow-400 to-orange-500 rounded flex items-center justify-center">
+            <svg class="w-4 h-4 text-black" fill="currentColor" viewBox="0 0 24 24">
+              <path d="M13 3L4 14h7l-2 7 9-11h-7l2-7z"/>
+            </svg>
+          </div>
+          <span class="font-semibold text-sm">SparkPlan</span>
+          <svg class="w-4 h-4 text-white/40 ml-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+          </svg>
+        </div>
+      </div>
+      
+      <div class="flex-1 py-2 overflow-y-auto">
+        <div class="px-3 py-2">
+          <div class="flex items-center gap-2 px-2 py-1.5 rounded-md bg-white/5 text-white text-sm">
+            <svg class="w-4 h-4 text-white/60" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"/>
+            </svg>
+            Projects
+            <span class="ml-auto text-white/40 text-xs">3</span>
+          </div>
+          <div class="flex items-center gap-2 px-2 py-1.5 rounded-md hover:bg-white/5 text-white/60 text-sm cursor-pointer">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/>
+            </svg>
+            Issues
+            <span class="ml-auto bg-orange-500/20 text-orange-400 text-xs px-1.5 rounded">7</span>
+          </div>
+          <div class="flex items-center gap-2 px-2 py-1.5 rounded-md hover:bg-white/5 text-white/60 text-sm cursor-pointer">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"/>
+            </svg>
+            RFIs
+            <span class="ml-auto text-white/40 text-xs">4</span>
+          </div>
+          <div class="flex items-center gap-2 px-2 py-1.5 rounded-md hover:bg-white/5 text-white/60 text-sm cursor-pointer">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+            </svg>
+            Calendar
+          </div>
+        </div>
+        
+        <div class="px-3 py-2 mt-4">
+          <p class="text-xs text-white/30 font-medium px-2 mb-2">TOOLS</p>
+          <div class="flex items-center gap-2 px-2 py-1.5 rounded-md hover:bg-white/5 text-white/60 text-sm cursor-pointer">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z"/>
+            </svg>
+            Calculators
+          </div>
+          <div class="flex items-center gap-2 px-2 py-1.5 rounded-md hover:bg-white/5 text-white/60 text-sm cursor-pointer">
+            <div class="w-4 h-4 rounded bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center">
+              <svg class="w-2.5 h-2.5 text-white" fill="currentColor" viewBox="0 0 24 24">
+                <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>
+              </svg>
+            </div>
+            NEC Assistant
+            <span class="kbd ml-auto">⌘K</span>
+          </div>
+        </div>
+      </div>
+      
+      <div class="p-3 border-t border-white/10">
+        <div class="flex items-center gap-2 px-2 py-1.5 rounded-md hover:bg-white/5 cursor-pointer">
+          <div class="w-6 h-6 bg-gradient-to-br from-blue-500 to-cyan-500 rounded-full flex items-center justify-center text-xs font-semibold">A</div>
+          <span class="text-sm text-white/80">Augusto</span>
+        </div>
+      </div>
+    </aside>
+
+    <!-- Main Content -->
+    <main class="ml-60 flex-1 min-h-screen">
+      <!-- Header -->
+      <header class="h-12 border-b border-white/10 flex items-center px-6 sticky top-0 bg-[#0a0a0a]/80 backdrop-blur-md z-10">
+        <div class="flex items-center gap-2 text-sm text-white/60">
+          <span>Projects</span>
+        </div>
+        <div class="ml-auto flex items-center gap-3">
+          <div class="flex items-center gap-2 px-3 py-1.5 rounded-md bg-white/5 border border-white/10 text-sm text-white/40">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+            </svg>
+            Search...
+            <span class="kbd">⌘F</span>
+          </div>
+          <button class="flex items-center gap-2 px-3 py-1.5 rounded-md bg-white text-black text-sm font-medium hover:bg-white/90 transition-colors">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+            </svg>
+            New Project
+          </button>
+        </div>
+      </header>
+
+      <div class="p-6">
+        <!-- Welcome -->
+        <div class="mb-8">
+          <h1 class="text-2xl font-semibold text-white mb-1">Good morning, Augusto</h1>
+          <p class="text-white/50">Here's what needs your attention.</p>
+        </div>
+
+        <!-- Quick Stats -->
+        <div class="grid grid-cols-4 gap-4 mb-8">
+          <div class="glow-border rounded-xl bg-white/[0.02] p-4">
+            <div class="flex items-center justify-between mb-3">
+              <span class="text-white/50 text-sm">Active</span>
+              <div class="w-8 h-8 rounded-lg bg-blue-500/10 flex items-center justify-center">
+                <svg class="w-4 h-4 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"/>
+                </svg>
+              </div>
+            </div>
+            <p class="text-3xl font-semibold text-white">3</p>
+            <p class="text-xs text-green-400 mt-1">+2 this week</p>
+          </div>
+          <div class="glow-border rounded-xl bg-white/[0.02] p-4">
+            <div class="flex items-center justify-between mb-3">
+              <span class="text-white/50 text-sm">Issues</span>
+              <div class="w-8 h-8 rounded-lg bg-orange-500/10 flex items-center justify-center">
+                <svg class="w-4 h-4 text-orange-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+                </svg>
+              </div>
+            </div>
+            <p class="text-3xl font-semibold text-white">7</p>
+            <p class="text-xs text-orange-400 mt-1">2 critical</p>
+          </div>
+          <div class="glow-border rounded-xl bg-white/[0.02] p-4">
+            <div class="flex items-center justify-between mb-3">
+              <span class="text-white/50 text-sm">RFIs</span>
+              <div class="w-8 h-8 rounded-lg bg-purple-500/10 flex items-center justify-center">
+                <svg class="w-4 h-4 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"/>
+                </svg>
+              </div>
+            </div>
+            <p class="text-3xl font-semibold text-white">4</p>
+            <p class="text-xs text-white/40 mt-1">Pending response</p>
+          </div>
+          <div class="glow-border rounded-xl bg-white/[0.02] p-4">
+            <div class="flex items-center justify-between mb-3">
+              <span class="text-white/50 text-sm">Compliance</span>
+              <div class="w-8 h-8 rounded-lg bg-green-500/10 flex items-center justify-center">
+                <svg class="w-4 h-4 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                </svg>
+              </div>
+            </div>
+            <p class="text-3xl font-semibold text-white">94%</p>
+            <p class="text-xs text-green-400 mt-1">+3% this month</p>
+          </div>
+        </div>
+
+        <!-- Projects Table -->
+        <div class="glow-border rounded-xl bg-white/[0.02] overflow-hidden">
+          <div class="px-4 py-3 border-b border-white/10 flex items-center justify-between">
+            <h2 class="font-medium text-white">Projects</h2>
+            <div class="flex items-center gap-2 text-sm">
+              <button class="px-2 py-1 rounded bg-white/5 text-white/60 hover:text-white transition-colors">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z"/>
+                </svg>
+              </button>
+              <button class="px-2 py-1 rounded bg-white/5 text-white/60 hover:text-white transition-colors">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 10h16M4 14h16M4 18h16"/>
+                </svg>
+              </button>
+            </div>
+          </div>
+          
+          <!-- Table Header -->
+          <div class="grid grid-cols-12 gap-4 px-4 py-2 text-xs text-white/40 font-medium border-b border-white/5 uppercase tracking-wider">
+            <div class="col-span-4">Project</div>
+            <div class="col-span-2">Type</div>
+            <div class="col-span-2">Compliance</div>
+            <div class="col-span-1 text-center">Loads</div>
+            <div class="col-span-1 text-center">Issues</div>
+            <div class="col-span-2">Status</div>
+          </div>
+          
+          <!-- Project Rows -->
+          <div class="project-row grid grid-cols-12 gap-4 px-4 py-3 items-center border-b border-white/5 cursor-pointer">
+            <div class="col-span-4 flex items-center gap-3">
+              <div class="w-8 h-8 rounded-lg bg-green-500/10 flex items-center justify-center">
+                <svg class="w-4 h-4 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/>
+                </svg>
+              </div>
+              <div>
+                <p class="font-medium text-white">Smith Residence</p>
+                <p class="text-xs text-white/40">1234 Oak Street, Miami FL</p>
+              </div>
+            </div>
+            <div class="col-span-2">
+              <span class="text-xs px-2 py-1 rounded bg-white/5 text-white/60">Residential</span>
+            </div>
+            <div class="col-span-2">
+              <div class="flex items-center gap-2">
+                <div class="flex-1 h-1.5 bg-white/10 rounded-full overflow-hidden">
+                  <div class="h-full bg-green-500 rounded-full" style="width: 85%"></div>
+                </div>
+                <span class="text-sm text-white/80 font-medium">85%</span>
+              </div>
+            </div>
+            <div class="col-span-1 text-center text-white/60">12</div>
+            <div class="col-span-1 text-center text-white/60">2</div>
+            <div class="col-span-2">
+              <span class="flex items-center gap-1.5 text-xs text-green-400">
+                <span class="w-1.5 h-1.5 rounded-full bg-green-400"></span>
+                On Track
+              </span>
+            </div>
+          </div>
+          
+          <div class="project-row grid grid-cols-12 gap-4 px-4 py-3 items-center border-b border-white/5 cursor-pointer">
+            <div class="col-span-4 flex items-center gap-3">
+              <div class="w-8 h-8 rounded-lg bg-blue-500/10 flex items-center justify-center">
+                <svg class="w-4 h-4 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/>
+                </svg>
+              </div>
+              <div>
+                <p class="font-medium text-white">Downtown Office</p>
+                <p class="text-xs text-white/40">500 Business Ave, Tampa FL</p>
+              </div>
+            </div>
+            <div class="col-span-2">
+              <span class="text-xs px-2 py-1 rounded bg-white/5 text-white/60">Commercial</span>
+            </div>
+            <div class="col-span-2">
+              <div class="flex items-center gap-2">
+                <div class="flex-1 h-1.5 bg-white/10 rounded-full overflow-hidden">
+                  <div class="h-full bg-orange-500 rounded-full" style="width: 62%"></div>
+                </div>
+                <span class="text-sm text-white/80 font-medium">62%</span>
+              </div>
+            </div>
+            <div class="col-span-1 text-center text-white/60">34</div>
+            <div class="col-span-1 text-center text-orange-400 font-medium">5</div>
+            <div class="col-span-2">
+              <span class="flex items-center gap-1.5 text-xs text-orange-400">
+                <span class="w-1.5 h-1.5 rounded-full bg-orange-400"></span>
+                Needs Attention
+              </span>
+            </div>
+          </div>
+          
+          <div class="project-row grid grid-cols-12 gap-4 px-4 py-3 items-center cursor-pointer">
+            <div class="col-span-4 flex items-center gap-3">
+              <div class="w-8 h-8 rounded-lg bg-purple-500/10 flex items-center justify-center">
+                <svg class="w-4 h-4 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 14v3m4-3v3m4-3v3M3 21h18M3 10h18M3 7l9-4 9 4M4 10h16v11H4V10z"/>
+                </svg>
+              </div>
+              <div>
+                <p class="font-medium text-white">Sunset Apartments</p>
+                <p class="text-xs text-white/40">2100 Palm Drive, Orlando FL</p>
+              </div>
+            </div>
+            <div class="col-span-2">
+              <span class="text-xs px-2 py-1 rounded bg-white/5 text-white/60">Multi-Family</span>
+            </div>
+            <div class="col-span-2">
+              <div class="flex items-center gap-2">
+                <div class="flex-1 h-1.5 bg-white/10 rounded-full overflow-hidden">
+                  <div class="h-full bg-white/40 rounded-full" style="width: 28%"></div>
+                </div>
+                <span class="text-sm text-white/80 font-medium">28%</span>
+              </div>
+            </div>
+            <div class="col-span-1 text-center text-white/60">48</div>
+            <div class="col-span-1 text-center text-white/60">0</div>
+            <div class="col-span-2">
+              <span class="flex items-center gap-1.5 text-xs text-white/40">
+                <span class="w-1.5 h-1.5 rounded-full bg-white/40"></span>
+                Just Started
+              </span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <!-- Design Label -->
+  <div class="fixed bottom-4 right-4 bg-white text-black px-4 py-2 rounded-lg shadow-lg font-medium text-sm">
+    Option F: Linear/Notion Style
+  </div>
+</body>
+</html>

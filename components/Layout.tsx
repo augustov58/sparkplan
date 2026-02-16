@@ -61,7 +61,7 @@ interface SidebarSectionProps {
 const SidebarSection: React.FC<SidebarSectionProps> = ({ title }) => {
   return (
     <div className="px-4 py-2 mt-4 mb-1">
-      <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider">{title}</h3>
+      <h3 className="text-xs font-bold text-[#888] uppercase tracking-wider">{title}</h3>
     </div>
   );
 };
@@ -104,17 +104,17 @@ const SidebarItem: React.FC<SidebarItemProps> = ({
       className={`
         flex items-center gap-3 cursor-pointer transition-all duration-200 group
         ${nested ? 'pl-12 pr-4 py-2' : 'px-4 py-3'}
-        ${active ? 'bg-gray-50 border-r-4 border-electric-500' : 'hover:bg-gray-50 border-r-4 border-transparent'}
+        ${active ? 'bg-[#f0f5f0] border-r-4 border-[#2d3b2d]' : 'hover:bg-[#faf9f7] border-r-4 border-transparent'}
       `}
     >
-      <Icon className={`${nested ? 'w-4 h-4' : 'w-5 h-5'} ${active ? 'text-electric-500' : 'text-gray-400 group-hover:text-gray-600'}`} />
-      <span className={`${nested ? 'text-xs' : 'text-sm'} font-medium flex-1 ${active ? 'text-gray-900' : 'text-gray-500 group-hover:text-gray-700'}`}>
+      <Icon className={`${nested ? 'w-4 h-4' : 'w-5 h-5'} ${active ? 'text-[#2d3b2d]' : 'text-[#888] group-hover:text-[#666]'}`} />
+      <span className={`${nested ? 'text-xs' : 'text-sm'} font-medium flex-1 ${active ? 'text-[#1a1a1a]' : 'text-[#666] group-hover:text-[#1a1a1a]'}`}>
         {label}
       </span>
       {hasChildren && (
         isExpanded ?
-          <ChevronDown className="w-4 h-4 text-gray-400" /> :
-          <ChevronRight className="w-4 h-4 text-gray-400" />
+          <ChevronDown className="w-4 h-4 text-[#888]" /> :
+          <ChevronRight className="w-4 h-4 text-[#888]" />
       )}
     </Link>
   );
@@ -207,23 +207,20 @@ export const Layout: React.FC<LayoutProps> = ({ children, title, showBack, onSig
 
       {/* Sidebar */}
       <aside className={`
-        w-64 border-r border-gray-200 h-screen flex flex-col bg-white z-50
+        w-64 border-r border-[#e8e6e3] h-screen flex flex-col bg-white z-50
         fixed md:sticky top-0
         transition-transform duration-300 ease-in-out
         ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}
       `}>
-        <div className="p-6 border-b border-gray-200">
+        <div className="p-6 border-b border-[#e8e6e3]">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2 cursor-pointer" onClick={() => navigate('/')}>
-              <div className="w-8 h-8 bg-electric-500 rounded flex items-center justify-center">
-                <Zap className="text-white w-5 h-5 fill-current" />
-              </div>
-              <span className="font-bold text-lg tracking-tight text-gray-900">SPARKPLAN</span>
+              <span className="font-serif font-semibold text-lg tracking-tight text-[#1a1a1a]">⚡ SparkPlan</span>
             </div>
             {/* Close button - only show on mobile */}
             <button
               onClick={() => setIsMobileMenuOpen(false)}
-              className="md:hidden text-gray-400 hover:text-gray-600 p-1"
+              className="md:hidden text-[#888] hover:text-[#666] p-1"
               aria-label="Close menu"
             >
               <X className="w-5 h-5" />
@@ -303,20 +300,20 @@ export const Layout: React.FC<LayoutProps> = ({ children, title, showBack, onSig
           )}
         </div>
 
-        <div className="p-4 border-t border-gray-200">
+        <div className="p-4 border-t border-[#e8e6e3]">
           <div className="flex items-center gap-3 mb-3">
-            <div className="w-8 h-8 rounded-full bg-electric-100 flex items-center justify-center text-xs font-bold text-electric-700">
+            <div className="w-8 h-8 rounded-full bg-[#2d3b2d] flex items-center justify-center text-xs font-bold text-white">
               {getUserInitials()}
             </div>
             <div className="text-xs overflow-hidden">
-              <p className="font-medium text-gray-900 truncate">{getUserDisplayName()}</p>
-              <p className="text-gray-400 truncate">{user?.email || 'No email'}</p>
+              <p className="font-medium text-[#1a1a1a] truncate">{getUserDisplayName()}</p>
+              <p className="text-[#888] truncate">{user?.email || 'No email'}</p>
             </div>
           </div>
           {onSignOut && (
             <button
               onClick={onSignOut}
-              className="w-full flex items-center gap-2 px-3 py-2 text-xs font-medium text-gray-500 hover:text-red-600 hover:bg-red-50 rounded transition-colors"
+              className="w-full flex items-center gap-2 px-3 py-2 text-xs font-medium text-[#666] hover:text-[#c44] hover:bg-[#ffeaea] rounded-md transition-colors"
             >
               <LogOut className="w-3 h-3" /> Sign Out
             </button>
@@ -325,21 +322,21 @@ export const Layout: React.FC<LayoutProps> = ({ children, title, showBack, onSig
       </aside>
 
       {/* Main Content */}
-      <main className="flex-1 min-w-0 bg-[var(--color-paper)]">
+      <main className="flex-1 min-w-0 bg-[#faf9f7]">
         {/* Trial Banner - shows for users on trial */}
         <TrialBanner />
 
-        <header className="h-16 border-b border-gray-200 flex items-center px-4 md:px-8 justify-between sticky top-0 bg-white z-10">
+        <header className="h-16 border-b border-[#e8e6e3] flex items-center px-4 md:px-8 justify-between sticky top-0 bg-white z-10">
           <div className="flex items-center gap-3">
             {/* Hamburger menu button - only show on mobile */}
             <button
               onClick={() => setIsMobileMenuOpen(true)}
-              className="md:hidden text-gray-600 hover:text-gray-900 p-2 -ml-2"
+              className="md:hidden text-[#666] hover:text-[#1a1a1a] p-2 -ml-2"
               aria-label="Open menu"
             >
               <Menu className="w-6 h-6" />
             </button>
-            <h1 className="text-lg md:text-xl font-medium text-gray-900">{title}</h1>
+            <h1 className="font-serif text-lg md:text-xl font-medium text-[#1a1a1a]">{title}</h1>
           </div>
           <div className="flex items-center gap-4">
              {/* Header Actions Could Go Here */}
@@ -347,7 +344,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, title, showBack, onSig
         </header>
         <div className="p-4 md:p-8 max-w-[1600px] mx-auto">
           {/* Content Panel - white paper with subtle border */}
-          <div className="bg-white border border-gray-200 rounded-lg p-3 sm:p-4 md:p-6 shadow-sm">
+          <div className="bg-white border border-[#e8e6e3] rounded-xl p-3 sm:p-4 md:p-6 shadow-sm">
             {children}
           </div>
         </div>
