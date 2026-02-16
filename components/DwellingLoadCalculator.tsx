@@ -1187,32 +1187,34 @@ export const DwellingLoadCalculator: React.FC<DwellingLoadCalculatorProps> = ({
         <div className="space-y-6">
           {/* Service Summary */}
           {loadResult && (
-            <div className="bg-gradient-to-br from-[#3d4f3d] to-[#2d3b2d] text-white rounded-lg p-6 shadow-lg">
-              <h3 className="text-lg font-medium mb-4 flex items-center gap-2">
-                <Zap className="w-5 h-5" />
-                Service Calculation
-              </h3>
-              <div className="space-y-3">
+            <div className="bg-white rounded-xl border border-[#e8e6e3] shadow-lg overflow-hidden">
+              <div className="bg-gradient-to-r from-[#2d3b2d] to-[#3d4f3d] px-6 py-3">
+                <h3 className="text-base font-semibold text-white flex items-center gap-2">
+                  <Zap className="w-5 h-5" />
+                  Service Calculation
+                </h3>
+              </div>
+              <div className="p-5 space-y-3">
                 <div className="flex justify-between items-center">
-                  <span className="text-[#e8f5e8]">Connected Load</span>
-                  <span className="text-xl font-bold">{(loadResult.totalConnectedVA / 1000).toFixed(1)} kVA</span>
+                  <span className="text-[#666]">Connected Load</span>
+                  <span className="text-xl font-bold text-[#1a1a1a]">{(loadResult.totalConnectedVA / 1000).toFixed(1)} kVA</span>
                 </div>
                 <div className="flex justify-between items-center">
-                  <span className="text-[#e8f5e8]">Demand Load</span>
-                  <span className="text-xl font-bold">{(loadResult.totalDemandVA / 1000).toFixed(1)} kVA</span>
+                  <span className="text-[#666]">Demand Load</span>
+                  <span className="text-xl font-bold text-[#1a1a1a]">{(loadResult.totalDemandVA / 1000).toFixed(1)} kVA</span>
                 </div>
                 <div className="flex justify-between items-center">
-                  <span className="text-[#e8f5e8]">Demand Factor</span>
-                  <span className="text-lg">{(loadResult.demandFactor * 100).toFixed(1)}%</span>
+                  <span className="text-[#666]">Demand Factor</span>
+                  <span className="text-lg text-[#1a1a1a]">{(loadResult.demandFactor * 100).toFixed(1)}%</span>
                 </div>
-                <div className="pt-3 mt-3 border-t border-[#2d3b2d]">
+                <div className="pt-3 mt-3 border-t border-[#e8e6e3]">
                   <div className="flex justify-between items-center">
-                    <span className="text-[#e8f5e8]">Service Current</span>
-                    <span className="text-xl font-bold">{loadResult.serviceAmps}A</span>
+                    <span className="text-[#666]">Service Current</span>
+                    <span className="text-xl font-bold text-[#2d3b2d]">{loadResult.serviceAmps}A</span>
                   </div>
                   <div className="flex justify-between items-center mt-2">
-                    <span className="text-[#e8f5e8]">Recommended Service</span>
-                    <span className="text-2xl font-bold">{loadResult.recommendedServiceSize}A</span>
+                    <span className="text-[#666]">Recommended Service</span>
+                    <span className="text-2xl font-bold text-[#2d3b2d]">{loadResult.recommendedServiceSize}A</span>
                   </div>
                 </div>
               </div>
