@@ -1610,19 +1610,21 @@ export const OneLineDiagram: React.FC<OneLineDiagramProps> = ({ project, updateP
       connection_type: 'delta-wye' as const
     };
 
-    await createTransformer(transformerData);
-    setNewTransformer({
-      name: '',
-      location: '',
-      kvaRating: 75,
-      primaryVoltage: project.serviceVoltage,
-      primaryPhase: project.servicePhase,
-      primaryBreakerAmps: 100,
-      secondaryVoltage: 208,
-      secondaryPhase: 3,
-      fedFromPanelId: '',
-      fedFromCircuitNumber: null
-    });
+    const result = await createTransformer(transformerData);
+    if (result) {
+      setNewTransformer({
+        name: '',
+        location: '',
+        kvaRating: 75,
+        primaryVoltage: project.serviceVoltage,
+        primaryPhase: project.servicePhase,
+        primaryBreakerAmps: 100,
+        secondaryVoltage: 208,
+        secondaryPhase: 3,
+        fedFromPanelId: '',
+        fedFromCircuitNumber: null
+      });
+    }
   };
 
   const removeTransformer = async (id: string) => {
@@ -2723,7 +2725,19 @@ export const OneLineDiagram: React.FC<OneLineDiagramProps> = ({ project, updateP
                  <label className="text-xs font-semibold text-gray-500 uppercase">Fed From Panel</label>
                  <select
                     value={newTransformer.fedFromPanelId}
-                    onChange={e => setNewTransformer({...newTransformer, fedFromPanelId: e.target.value, fedFromCircuitNumber: null})}
+                    onChange={e => {
+                      const panelId = e.target.value;
+                      const panel = panels.find(p => p.id === panelId);
+                      setNewTransformer({
+                        ...newTransformer,
+                        fedFromPanelId: panelId,
+                        fedFromCircuitNumber: null,
+                        ...(panel && {
+                          primaryVoltage: panel.voltage,
+                          primaryPhase: panel.phase as 1 | 3,
+                        })
+                      });
+                    }}
                     className="w-full border-gray-200 rounded text-sm py-2"
                  >
                    <option value="">Select panel...</option>

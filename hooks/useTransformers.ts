@@ -96,8 +96,9 @@ export function useTransformers(projectId: string | undefined): UseTransformersR
       showToast.success(toastMessages.transformer.created);
       return data;
     } catch (err) {
+      console.error('Failed to create transformer:', err);
       setError(err instanceof Error ? err.message : 'Failed to create transformer');
-      showToast.error(toastMessages.transformer.error);
+      showToast.error('Failed to create transformer');
       return null;
     }
   };
