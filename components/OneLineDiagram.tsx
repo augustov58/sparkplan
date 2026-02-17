@@ -1169,7 +1169,7 @@ export const OneLineDiagram: React.FC<OneLineDiagramProps> = ({ project, updateP
     }
 
     try {
-      await updateTransformer(editingTransformer.id, {
+      const updates: Record<string, any> = {
         name: editingTransformer.name,
         location: editingTransformer.location,
         kva_rating: editingTransformer.kvaRating,
@@ -1179,8 +1179,12 @@ export const OneLineDiagram: React.FC<OneLineDiagramProps> = ({ project, updateP
         secondary_voltage: editingTransformer.secondaryVoltage,
         secondary_phase: editingTransformer.secondaryPhase,
         fed_from_panel_id: editingTransformer.fedFromPanelId,
-        fed_from_circuit_number: editingTransformer.fedFromCircuitNumber
-      });
+      };
+      // Only include fed_from_circuit_number if set (column may not exist on older DBs)
+      if (editingTransformer.fedFromCircuitNumber != null) {
+        updates.fed_from_circuit_number = editingTransformer.fedFromCircuitNumber;
+      }
+      await updateTransformer(editingTransformer.id, updates);
 
       setEditingTransformer(null);
     } catch (error) {
@@ -1595,7 +1599,7 @@ export const OneLineDiagram: React.FC<OneLineDiagramProps> = ({ project, updateP
       return;
     }
 
-    const transformerData = {
+    const transformerData: Record<string, any> = {
       project_id: project.id,
       name: newTransformer.name,
       location: newTransformer.location || '',
@@ -1606,9 +1610,12 @@ export const OneLineDiagram: React.FC<OneLineDiagramProps> = ({ project, updateP
       secondary_voltage: newTransformer.secondaryVoltage,
       secondary_phase: newTransformer.secondaryPhase,
       fed_from_panel_id: newTransformer.fedFromPanelId,
-      fed_from_circuit_number: newTransformer.fedFromCircuitNumber,
       connection_type: 'delta-wye' as const
     };
+    // Only include fed_from_circuit_number if set (column may not exist on older DBs)
+    if (newTransformer.fedFromCircuitNumber != null) {
+      transformerData.fed_from_circuit_number = newTransformer.fedFromCircuitNumber;
+    }
 
     const result = await createTransformer(transformerData);
     if (result) {
