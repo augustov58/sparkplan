@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Search, Shield, Loader2, CheckCircle, AlertCircle, UserPlus, Trash2, Users } from 'lucide-react';
+import { Search, Shield, Loader2, CheckCircle, AlertCircle, UserPlus, Trash2, Users, MailCheck, MailX } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import type { SubscriptionPlan } from '@/hooks/useSubscription';
 
@@ -9,6 +9,7 @@ interface UserResult {
   id: string;
   email: string;
   user_created_at: string;
+  email_confirmed_at: string | null;
   plan: SubscriptionPlan | null;
   status: string | null;
   trial_end: string | null;
@@ -21,6 +22,7 @@ export const AdminPanel: React.FC = () => {
   const [searching, setSearching] = useState(false);
   const [updating, setUpdating] = useState<string | null>(null);
   const [deleting, setDeleting] = useState<string | null>(null);
+  const [confirming, setConfirming] = useState<string | null>(null);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
   // Add user form
@@ -142,6 +144,31 @@ export const AdminPanel: React.FC = () => {
     }
   };
 
+  const handleConfirmUser = async (email: string) => {
+    setConfirming(email);
+    setMessage(null);
+
+    const { data, error } = await supabase.rpc('admin_confirm_user', {
+      target_email: email,
+    });
+
+    setConfirming(null);
+
+    if (error) {
+      setMessage({ type: 'error', text: error.message });
+      return;
+    }
+
+    if (data?.success) {
+      setMessage({ type: 'success', text: `Confirmed ${email}.` });
+      setUsers(prev =>
+        prev.map(u => (u.email === email ? { ...u, email_confirmed_at: new Date().toISOString() } : u))
+      );
+    } else {
+      setMessage({ type: 'error', text: data?.error || 'Unknown error' });
+    }
+  };
+
   return (
     <div className="max-w-5xl mx-auto">
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 mb-6">
@@ -242,6 +269,7 @@ export const AdminPanel: React.FC = () => {
             <thead className="bg-gray-50 border-b border-gray-200">
               <tr>
                 <th className="text-left p-3 font-semibold text-gray-700">Email</th>
+                <th className="text-left p-3 font-semibold text-gray-700">Verified</th>
                 <th className="text-left p-3 font-semibold text-gray-700">Plan</th>
                 <th className="text-left p-3 font-semibold text-gray-700">Status</th>
                 <th className="text-left p-3 font-semibold text-gray-700">Joined</th>
@@ -253,6 +281,26 @@ export const AdminPanel: React.FC = () => {
               {users.map(user => (
                 <tr key={user.id} className="border-b border-gray-100 hover:bg-gray-50">
                   <td className="p-3 font-mono text-xs">{user.email}</td>
+                  <td className="p-3">
+                    {user.email_confirmed_at ? (
+                      <span className="text-green-600" title={`Verified ${new Date(user.email_confirmed_at).toLocaleString()}`}>
+                        <MailCheck className="w-4 h-4" />
+                      </span>
+                    ) : (
+                      <button
+                        onClick={() => handleConfirmUser(user.email)}
+                        disabled={confirming === user.email}
+                        className="text-amber-500 hover:text-green-600 transition-colors"
+                        title="Click to confirm email"
+                      >
+                        {confirming === user.email ? (
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                        ) : (
+                          <MailX className="w-4 h-4" />
+                        )}
+                      </button>
+                    )}
+                  </td>
                   <td className="p-3">
                     <span className="capitalize font-medium">{user.plan || 'none'}</span>
                     {user.trial_end && (
