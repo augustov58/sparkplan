@@ -578,25 +578,25 @@ export const DwellingLoadCalculator: React.FC<DwellingLoadCalculatorProps> = ({
   };
 
   return (
-    <div className="space-y-6 animate-in fade-in duration-500">
+    <div className="space-y-6 animate-in fade-in duration-500 overflow-x-hidden">
       {/* Header */}
-      <div className="flex justify-between items-start">
-        <div>
-          <h2 className="text-2xl font-light text-gray-900 flex items-center gap-2">
-            <Home className="w-6 h-6 text-[#3d6b3d]" />
-            Dwelling Load Calculator
+      <div className="flex flex-col lg:flex-row justify-between items-start gap-4">
+        <div className="min-w-0">
+          <h2 className="text-xl sm:text-2xl font-light text-gray-900 flex items-center gap-2">
+            <Home className="w-5 h-5 sm:w-6 sm:h-6 text-[#3d6b3d] flex-shrink-0" />
+            <span>Dwelling Load Calculator</span>
           </h2>
-          <p className="text-gray-500 mt-1">
+          <p className="text-gray-500 mt-1 text-sm sm:text-base">
             {isSingleFamily 
               ? 'NEC 220.82 - Standard Method for Single-Family Dwellings'
               : 'NEC 220.84 - Optional Calculation for Multi-Family Dwellings'
             }
           </p>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-2 sm:gap-3 w-full lg:w-auto">
           {/* Show current panel status */}
           {mainPanel && (
-            <div className="text-right">
+            <div className="text-left lg:text-right flex-1 lg:flex-none">
               <p className="text-sm text-gray-600">
                 Panel: <span className="font-medium">{mainPanel.name}</span>
               </p>
@@ -617,7 +617,7 @@ export const DwellingLoadCalculator: React.FC<DwellingLoadCalculatorProps> = ({
               title="Delete all circuits from panel"
             >
               <Trash2 className="w-4 h-4" />
-              Clear
+              <span className="hidden sm:inline">Clear</span>
             </button>
           )}
           
@@ -625,10 +625,11 @@ export const DwellingLoadCalculator: React.FC<DwellingLoadCalculatorProps> = ({
           <button
             onClick={handleGeneratePanelSchedule}
             disabled={isGenerating || !loadResult}
-            className="px-4 py-2 bg-[#2d3b2d] text-white rounded-md hover:bg-[#3d4f3d] transition-colors flex items-center gap-2 disabled:opacity-50"
+            className="px-3 sm:px-4 py-2 bg-[#2d3b2d] text-white rounded-md hover:bg-[#3d4f3d] transition-colors flex items-center gap-2 disabled:opacity-50 text-sm sm:text-base whitespace-nowrap"
           >
             <Calculator className="w-4 h-4" />
-            {mainPanelCircuits.length > 0 ? 'Regenerate Schedule' : 'Generate Panel Schedule'}
+            <span className="hidden sm:inline">{mainPanelCircuits.length > 0 ? 'Regenerate Schedule' : 'Generate Panel Schedule'}</span>
+            <span className="sm:hidden">Generate</span>
           </button>
         </div>
       </div>
@@ -1299,14 +1300,14 @@ export const DwellingLoadCalculator: React.FC<DwellingLoadCalculatorProps> = ({
               </button>
               
               {expandedSections.has('results') && (
-                <div className="p-4">
-                  <table className="w-full text-sm">
+                <div className="p-4 overflow-x-auto">
+                  <table className="w-full text-sm min-w-[400px]">
                     <thead>
                       <tr className="text-xs text-gray-500 uppercase">
-                        <th className="text-left pb-2">Category</th>
-                        <th className="text-right pb-2">Connected</th>
-                        <th className="text-right pb-2">Demand</th>
-                        <th className="text-right pb-2">Factor</th>
+                        <th className="text-left pb-2 whitespace-nowrap">Category</th>
+                        <th className="text-right pb-2 whitespace-nowrap">Connected</th>
+                        <th className="text-right pb-2 whitespace-nowrap">Demand</th>
+                        <th className="text-right pb-2 whitespace-nowrap">Factor</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-100">

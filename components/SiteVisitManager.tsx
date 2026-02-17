@@ -260,15 +260,15 @@ export const SiteVisitManager: React.FC<SiteVisitManagerProps> = ({ project }) =
   };
 
   return (
-    <div className="space-y-6 animate-in fade-in duration-500">
-      <div className="flex justify-between items-center">
+    <div className="space-y-6 animate-in fade-in duration-500 overflow-x-hidden">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
-          <h2 className="text-2xl font-light text-gray-900">Site Visit Logging</h2>
-          <p className="text-gray-500 mt-1">Track site visits, inspections, and field observations.</p>
+          <h2 className="text-xl sm:text-2xl font-light text-gray-900">Site Visit Logging</h2>
+          <p className="text-gray-500 mt-1 text-sm sm:text-base">Track site visits, inspections, and field observations.</p>
         </div>
         <button
           onClick={() => setIsCreating(!isCreating)}
-          className="bg-gray-900 text-white px-4 py-2 rounded text-sm font-medium flex items-center gap-2 hover:bg-black transition-colors"
+          className="bg-[#2d3b2d] text-white px-4 py-2 rounded text-sm font-medium flex items-center gap-2 hover:bg-[#3d4f3d] transition-colors w-full sm:w-auto justify-center"
         >
           <Plus className="w-4 h-4" /> Log Site Visit
         </button>

@@ -190,12 +190,12 @@ export const Dashboard: React.FC<DashboardProps> = ({ projects, createNewProject
   return (
     <div className="space-y-8 animate-in fade-in duration-500">
       {/* Header */}
-      <div className="flex justify-between items-end">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-end gap-4">
         <div>
-          <h2 className="font-serif text-2xl font-medium text-[#1a1a1a]">Welcome back, {getUserName()}</h2>
-          <p className="text-[#666] mt-1">You have <span className="font-medium text-[#3d6b3d]">{projects.length} active projects</span> requiring NEC compliance review.</p>
+          <h2 className="font-serif text-xl sm:text-2xl font-medium text-[#1a1a1a]">Welcome back, {getUserName()}</h2>
+          <p className="text-[#666] mt-1 text-sm sm:text-base">You have <span className="font-medium text-[#3d6b3d]">{projects.length} active projects</span> requiring NEC compliance review.</p>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-2 sm:gap-3 w-full sm:w-auto">
           <ProjectExportImportCompact
             onImportSuccess={(projectId, projectName) => {
               navigate(`/project/${projectId}`);
@@ -203,10 +203,10 @@ export const Dashboard: React.FC<DashboardProps> = ({ projects, createNewProject
           />
           <button
             onClick={createNewProject}
-            className="bg-[#2d3b2d] hover:bg-[#3d4f3d] text-white px-6 py-3 rounded-md font-medium flex items-center gap-2 transition-colors shadow-sm"
+            className="bg-[#2d3b2d] hover:bg-[#3d4f3d] text-white px-4 sm:px-6 py-2 sm:py-3 rounded-md font-medium flex items-center gap-2 transition-colors shadow-sm text-sm sm:text-base flex-1 sm:flex-none justify-center"
           >
-            <Plus className="w-5 h-5" />
-            Create New NEC Project
+            <Plus className="w-4 h-4 sm:w-5 sm:h-5" />
+            <span className="whitespace-nowrap">Create New NEC Project</span>
           </button>
         </div>
       </div>
