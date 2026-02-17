@@ -95,8 +95,8 @@ export function useTransformers(projectId: string | undefined): UseTransformersR
 
       showToast.success(toastMessages.transformer.created);
       return data;
-    } catch (err) {
-      console.error('Failed to create transformer:', err);
+    } catch (err: any) {
+      console.error('Failed to create transformer:', err?.message || err, 'Code:', err?.code, 'Details:', err?.details, 'Hint:', err?.hint);
       setError(err instanceof Error ? err.message : 'Failed to create transformer');
       showToast.error('Failed to create transformer');
       return null;
