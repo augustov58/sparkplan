@@ -1,6 +1,6 @@
 # SparkPlan - Roadmap
 
-## Current Phase: 2.5 (Multi-Family EV) - COMPLETE
+## Current Phase: 2.7 (Multi-Family Project Population) - COMPLETE
 
 ---
 
@@ -78,47 +78,51 @@
 
 ---
 
-## NEXT UP: Multi-Family Project Population (Phase 2.7)
+## Phase 2.7: Multi-Family Project Population - COMPLETE (Feb 2026)
 
-**The missing link:** MF EV Calculator → Project Panels/Circuits → Permit Packet
+**The missing link solved:** MF EV Calculator → Project Panels/Circuits → Permit Packet
 
-### Workflow Gap Today
+### Workflow Achieved
 ```
-MF EV Calculator → gives you numbers (PDF)
-                 → BUT cannot populate project panels/circuits
-                 → Permit Packet can't include the actual design
-```
-
-### Target Workflow
-```
-MF EV Calculator → "Apply to Project" button
-                 → Auto-generates: service entrance, meter stack, house panel,
-                   EV sub-panel, unit feeders, EVEMS circuits
+MF EV Calculator → "Apply to Project" / "Add EV Infrastructure" buttons
+                 → Auto-generates: MDP, meter stack, house panel,
+                   EV sub-panel, unit panels, feeders, EVEMS circuits
                  → Permit Packet includes complete multi-family design
+                   with meter stack schedule
 ```
 
-### Step 1: Multi-Family Dwelling Calculator Enhancement (18-25h)
+| Feature | Status |
+|---------|--------|
+| Auto-Generation Service (2 generators + orchestrator) | Complete |
+| Meter Stack & Meters DB Schema (migration applied) | Complete |
+| CT Cabinet in One-Line Diagram (interactive + print) | Complete |
+| Meter Stack Schedule in Permit Packet (PDF) | Complete |
+| "Apply to Project" UI (basic MF + EV infrastructure flows) | Complete |
+| Building/Unit Relationships (hooks + realtime sync) | Complete |
+| Unit Feeder Stub Generation | Complete (deferred auto-sizing — users input actual distances) |
 
-NEC 220.84 engine exists in `residentialLoad.ts` but needs integration with project population.
+**Key Files:**
+- `services/autogeneration/multiFamilyProjectGenerator.ts` — 3 generation modes
+- `services/autogeneration/projectPopulationOrchestrator.ts` — DB insertion in FK order
+- `services/pdfExport/MeterStackSchedulePDF.tsx` — Permit-ready meter schedule
+- `supabase/migrations/20260208_meter_stacks.sql` — meter_stacks + meters tables
 
-| Feature | Effort | Status |
-|---------|--------|--------|
-| NEC 220.84 Calculation Engine | 8-10h | Exists (residentialLoad.ts) |
-| Unit Count & Load Aggregation | 4-6h | Exists (residentialLoad.ts) |
-| Load Category Breakdown | 2-3h | Exists (multiFamilyEV.ts) |
-| Multi-Family PDF Reports | 4-6h | Partial (MF EV PDF exists) |
-| **Connect to Project Population** | 6-8h | **NOT STARTED** |
+---
 
-### Step 2: Auto-Generation Features (30-40h)
+## Phase 2.8: User Profiles & Settings - COMPLETE (Feb 2026)
 
-| Feature | Effort | Description |
-|---------|--------|-------------|
-| Multi-Family Circuit Auto-Gen | 8-12h | Generate apartment load schedules |
-| EVEMS Circuit Templates | 4-6h | Pre-designed EV infrastructure |
-| Unit Feeder Auto-Sizing | 3-4h | Size feeders from house panel to units |
-| Meter Room Panel Generation | 6-8h | CT cabinet + house panels |
-| Database Schema Updates | 2-3h | Building/unit relationships |
-| Multi-Family Permit PDFs | 8-10h | Unit-specific panel schedules |
+| Feature | Status |
+|---------|--------|
+| Profile creation trigger (auto-creates profile on signup) | Complete |
+| Backfill existing auth.users into profiles | Complete |
+| Account Settings page (/settings) | Complete |
+| Permit Packet auto-fill (Prepared By, License #) | Complete |
+| Sidebar display name from profile | Complete |
+
+**Key Files:**
+- `hooks/useProfile.ts` — Single-row profile fetch/update hook
+- `components/UserProfile.tsx` — Settings page
+- `supabase/migrations/20260217_profile_creation_trigger.sql` — Trigger + backfill
 
 ---
 

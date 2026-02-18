@@ -233,8 +233,23 @@ See [`.env.example`](./.env.example) and [`backend/.env.example`](./backend/.env
 
 ---
 
-## Session Log Maintenance
+## Documentation Maintenance
 
-`/docs/SESSION_LOG.md` tracks recent work for handoff continuity. **Keep only the last 2 sessions.** At the start of each new session, archive older entries by deleting them — the git history preserves everything.
+### Linked Documents — Keep in Sync
 
-When updating any documentation file, always update "Last Updated" dates to the current date. Never leave stale dates from previous months.
+When a feature, phase, or milestone is completed, **update all affected documentation** before closing out the work. Stale docs cause confusion across sessions. The following files branch from this CLAUDE.md and must stay current:
+
+| File | What to update |
+|------|----------------|
+| `ROADMAP.md` | Mark phases/features complete, update "Current Phase" header |
+| `docs/SESSION_LOG.md` | Add session entry. **Keep only last 2 sessions** — delete older ones (git preserves history) |
+| `docs/CHANGELOG.md` | Add entry for user-facing changes |
+| `business/STRATEGIC_ANALYSIS.md` | Update feature inventory and competitive positioning when major features ship |
+| `business/DISTRIBUTION_PLAYBOOK.md` | Update when new selling points or demo-ready features are added |
+| `docs/database-architecture.md` | Update when DB schema changes (new tables, columns, migrations) |
+
+### Rules
+- When updating any documentation file, always update "Last Updated" dates to the current date. Never leave stale dates from previous months.
+- After completing a feature: check ROADMAP.md and mark it done. Don't leave completed work showing as "NEXT UP" or "NOT STARTED".
+- After a DB migration: update `docs/database-architecture.md` with the new tables/columns.
+- After shipping a user-facing feature: add a CHANGELOG entry.
