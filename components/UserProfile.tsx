@@ -67,7 +67,8 @@ export const UserProfile: React.FC = () => {
               value={fullName}
               onChange={(e) => setFullName(e.target.value)}
               placeholder="Jane Smith"
-              className="w-full pl-9"
+              className="w-full"
+              style={{ paddingLeft: '2.25rem' }}
             />
           </div>
         </div>
@@ -85,7 +86,8 @@ export const UserProfile: React.FC = () => {
               value={companyName}
               onChange={(e) => setCompanyName(e.target.value)}
               placeholder="Smith Electrical Contractors"
-              className="w-full pl-9"
+              className="w-full"
+              style={{ paddingLeft: '2.25rem' }}
             />
           </div>
         </div>
@@ -103,7 +105,8 @@ export const UserProfile: React.FC = () => {
               value={licenseNumber}
               onChange={(e) => setLicenseNumber(e.target.value)}
               placeholder="e.g., C-10 #123456"
-              className="w-full pl-9"
+              className="w-full"
+              style={{ paddingLeft: '2.25rem' }}
             />
           </div>
           <p className="text-xs text-subtle mt-1">
