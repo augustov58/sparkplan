@@ -30,6 +30,7 @@ const AgentActivityLog = lazy(() => import('./components/AgentActivityLog').then
 const UtilityInterconnectionForm = lazy(() => import('./components/UtilityInterconnectionForm').then(m => ({ default: m.UtilityInterconnectionForm })));
 const PricingPage = lazy(() => import('./components/PricingPage').then(m => ({ default: m.PricingPage })));
 const AdminPanel = lazy(() => import('./components/AdminPanel').then(m => ({ default: m.AdminPanel })));
+const UserProfile = lazy(() => import('./components/UserProfile').then(m => ({ default: m.UserProfile })));
 // EVPanelTemplates moved to Calculators component
 import { Project, ProjectStatus, ProjectType } from './types';
 import { askNecAssistantWithTools } from './services/geminiService';
@@ -863,6 +864,17 @@ function AppContent() {
             <Layout title="Pricing & Plans" onSignOut={handleSignOut}>
               <Suspense fallback={<LoadingSpinner />}>
                 <PricingPage />
+              </Suspense>
+            </Layout>
+          </ProtectedRoute>
+        } />
+
+        {/* Account Settings */}
+        <Route path="/settings" element={
+          <ProtectedRoute>
+            <Layout title="Account Settings" onSignOut={handleSignOut}>
+              <Suspense fallback={<LoadingSpinner />}>
+                <UserProfile />
               </Suspense>
             </Layout>
           </ProtectedRoute>

@@ -3,7 +3,7 @@
  * UI for generating comprehensive permit application packets
  */
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { FileText, Download, Loader2, AlertCircle, CheckCircle, Info, Building2 } from 'lucide-react';
 import { generatePermitPacket, generateLightweightPermitPacket, type PermitPacketData } from '../services/pdfExport/permitPacketGenerator';
 import { usePanels } from '../hooks/usePanels';
@@ -16,6 +16,7 @@ import { useJurisdictions } from '../hooks/useJurisdictions';
 import { useShortCircuitCalculations } from '../hooks/useShortCircuitCalculations';
 import { useMeterStacks } from '../hooks/useMeterStacks';
 import { useMeters } from '../hooks/useMeters';
+import { useProfile } from '../hooks/useProfile';
 import { JurisdictionSearchWizard } from './JurisdictionSearchWizard';
 import { calculateMultiFamilyEV, type MultiFamilyEVInput } from '../services/calculations/multiFamilyEV';
 
@@ -56,6 +57,20 @@ export const PermitPacketGenerator: React.FC<PermitPacketGeneratorProps> = ({ pr
   const { calculations: shortCircuitCalculations } = useShortCircuitCalculations(projectId || '');
   const { meterStacks } = useMeterStacks(projectId || '');
   const { meters } = useMeters(projectId || '');
+  const { profile } = useProfile();
+
+  // Auto-fill from profile (only on first load, before user edits)
+  useEffect(() => {
+    if (profile?.full_name && !preparedBy) {
+      setPreparedBy(profile.full_name);
+    }
+  }, [profile?.full_name]);
+
+  useEffect(() => {
+    if (profile?.license_number && !contractorLicense) {
+      setContractorLicense(profile.license_number);
+    }
+  }, [profile?.license_number]);
 
   // Early return if no projectId
   if (!projectId) {

@@ -152,6 +152,12 @@ export const toastMessages = {
     error: 'Authentication failed',
   },
 
+  // User Profile
+  userProfile: {
+    updated: 'Profile saved',
+    error: 'Failed to save profile',
+  },
+
   // Generic
   saved: 'Changes saved',
   copied: 'Copied to clipboard',

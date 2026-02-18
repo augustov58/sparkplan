@@ -30,6 +30,7 @@ import {
   X
 } from 'lucide-react';
 import { useAuthContext } from './Auth/AuthProvider';
+import { useProfile } from '@/hooks/useProfile';
 import { ProjectType } from '../types';
 // AICopilotSidebar removed - AI features unified in NEC Copilot chatbot
 import { TrialBanner } from './TrialBanner';
@@ -124,20 +125,24 @@ export const Layout: React.FC<LayoutProps> = ({ children, title, showBack, onSig
   const navigate = useNavigate();
   const location = useLocation();
   const { user } = useAuthContext();
+  const { profile } = useProfile();
   const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({
     'Circuit Design': true // Default to expanded
   });
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
-  // Extract user initials from email
   const getUserInitials = () => {
+    if (profile?.full_name) {
+      const parts = profile.full_name.trim().split(/\s+/);
+      if (parts.length >= 2) return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+      return parts[0].slice(0, 2).toUpperCase();
+    }
     if (!user?.email) return '??';
-    const name = user.email.split('@')[0];
-    if (!name) return '??';
-    return name.slice(0, 2).toUpperCase();
+    return user.email.split('@')[0].slice(0, 2).toUpperCase();
   };
 
   const getUserDisplayName = () => {
+    if (profile?.full_name) return profile.full_name;
     if (!user?.email) return 'User';
     return user.email.split('@')[0];
   };
@@ -310,6 +315,12 @@ export const Layout: React.FC<LayoutProps> = ({ children, title, showBack, onSig
               <p className="text-[#888] truncate">{user?.email || 'No email'}</p>
             </div>
           </div>
+          <button
+            onClick={() => { navigate('/settings'); setIsMobileMenuOpen(false); }}
+            className="w-full flex items-center gap-2 px-3 py-2 text-xs font-medium text-[#666] hover:text-[#1a1a1a] hover:bg-[#faf9f7] rounded-md transition-colors mb-1"
+          >
+            <Settings className="w-3 h-3" /> Account Settings
+          </button>
           {onSignOut && (
             <button
               onClick={onSignOut}
