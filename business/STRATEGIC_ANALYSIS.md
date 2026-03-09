@@ -1,6 +1,6 @@
 # SparkPlan - Strategic Analysis
 
-**Last Updated:** February 9, 2026
+**Last Updated:** February 15, 2026
 **Review Cadence:** Monthly (see [Document Maintenance](#document-maintenance))
 **Status:** Pre-revenue. Product built. Entering go-to-market phase.
 
@@ -208,21 +208,10 @@ Two paths for determining existing building demand:
 | Multi-Family Population Pipeline (migration, auto-gen, CT cabinet, meter stack) | Complete |
 | Monetization System (Stripe, feature gating, trials, promo codes) | Complete |
 
-### In Progress
+| User Profile & Settings (auto-fill permit packets) | Complete |
+| Profile Creation Trigger (auto-creates on signup) | Complete |
 
-| Feature | Status | Branch |
-|---------|--------|--------|
-| MDP NEC 220.84 Demand Factor (project-level) | In Progress | `feat/mdp-nec-220-84-demand-factor` |
-
-### Remaining for Full MF Workflow
-
-| Feature | Effort | Priority |
-|---------|--------|----------|
-| EVEMS Circuit Templates | 4-6h | After current branch |
-| Unit Feeder Auto-Sizing | 3-4h | After current branch |
-| Multi-Family Permit PDFs (unit-specific schedules) | 8-10h | After current branch |
-
-**Assessment:** The product is complete enough to sell NOW. The remaining features improve the experience but aren't blockers for first customers.
+**Assessment:** The product is complete and ready to sell. All core workflows — calculation, project population, permit packet generation — are functional end-to-end.
 
 ---
 
