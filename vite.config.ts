@@ -16,5 +16,10 @@ export default defineConfig({
     alias: {
       '@': path.resolve(__dirname, '.'),
     }
+  },
+  test: {
+    globals: true,
+    include: ['tests/**/*.test.ts'],
+    exclude: ['tests/examples/**'],
   }
 });

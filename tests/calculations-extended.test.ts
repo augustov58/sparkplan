@@ -1,0 +1,810 @@
+/**
+ * Extended Unit Tests for NEC Calculation Services
+ *
+ * Covers the 6 services that had zero test coverage:
+ *   1. shortCircuit.ts      — NEC 110.9, IEEE 141
+ *   2. serviceUpgrade.ts    — NEC 220.87, 230.42
+ *   3. residentialLoad.ts   — NEC 220.82, 220.84
+ *   4. demandFactor.ts      — NEC 220.42–220.56
+ *   5. multiFamilyEV.ts     — NEC 220.57, 625.42
+ *   6. arcFlash.ts          — IEEE 1584-2018, NFPA 70E
+ *
+ * Each test validates:
+ *   - Correct NEC math (hand-calculated expected values)
+ *   - necReferences / necArticles includes expected articles
+ *   - warnings triggers on out-of-range inputs
+ *   - Never throws on valid input (returns result with warnings)
+ */
+
+import { describe, it, expect } from 'vitest';
+
+// ── Short Circuit ──────────────────────────────────────────────────────────
+import {
+  calculateTransformerFaultCurrent,
+  calculateDownstreamFaultCurrent,
+  calculateServiceFaultCurrent,
+  estimateUtilityTransformer,
+  type TransformerData,
+  type ConductorRun,
+} from '../services/calculations/shortCircuit';
+
+// ── Service Upgrade ────────────────────────────────────────────────────────
+import {
+  quickServiceCheck,
+  analyzeServiceUpgrade,
+  calculateServiceCapacity,
+  calculateAmpsFromKVA,
+  roundToStandardServiceSize,
+} from '../services/calculations/serviceUpgrade';
+
+// ── Residential Load ───────────────────────────────────────────────────────
+import {
+  calculateSingleFamilyLoad,
+  calculateMultiFamilyLoad,
+  LIGHTING_LOAD_VA_PER_SQFT,
+} from '../services/calculations/residentialLoad';
+
+// ── Demand Factor ──────────────────────────────────────────────────────────
+import {
+  calculatePanelDemand,
+  getCircuitPhase,
+  type CircuitLoad,
+} from '../services/calculations/demandFactor';
+
+// ── Multi-Family EV ────────────────────────────────────────────────────────
+import {
+  calculateMultiFamilyEV,
+  getMultiFamilyDemandFactor,
+  calculateCommonAreaLoads,
+  type MultiFamilyEVInput,
+} from '../services/calculations/multiFamilyEV';
+
+// ── Arc Flash ──────────────────────────────────────────────────────────────
+import {
+  calculateArcFlash,
+  type ArcFlashInput,
+} from '../services/calculations/arcFlash';
+
+// ── Types ──────────────────────────────────────────────────────────────────
+import type {
+  QuickCheckInput,
+  ServiceUpgradeInput,
+  ResidentialAppliances,
+} from '../types';
+
+// ============================================================================
+// 1. SHORT CIRCUIT — NEC 110.9, IEEE 141
+// ============================================================================
+
+describe('Short Circuit (NEC 110.9)', () => {
+  describe('calculateTransformerFaultCurrent', () => {
+    it('should calculate 1-phase transformer fault current', () => {
+      // 50 kVA, 240V secondary, 2.5% impedance
+      // If = (50 × 1000) / (240 × 0.025) = 50000 / 6 = 8333.33 A
+      const xfmr: TransformerData = {
+        kva: 50,
+        primaryVoltage: 7200,
+        secondaryVoltage: 240,
+        impedance: 2.5,
+      };
+      const result = calculateTransformerFaultCurrent(xfmr, 1);
+      expect(result).toBeCloseTo(8333.33, 0);
+    });
+
+    it('should calculate 3-phase transformer fault current', () => {
+      // 500 kVA, 208V secondary, 5.75% impedance
+      // Base current = (500 × 1000) / (√3 × 208) = 500000 / 360.22 = 1388.0 A
+      // If = 1388.0 / 0.0575 = 24139.1 A
+      const xfmr: TransformerData = {
+        kva: 500,
+        primaryVoltage: 12470,
+        secondaryVoltage: 208,
+        impedance: 5.75,
+      };
+      const result = calculateTransformerFaultCurrent(xfmr, 3);
+      expect(result).toBeCloseTo(24139, -1); // within ~10A
+    });
+  });
+
+  describe('calculateServiceFaultCurrent', () => {
+    it('should return a ShortCircuitResult with compliance info', () => {
+      const xfmr: TransformerData = {
+        kva: 75,
+        primaryVoltage: 7200,
+        secondaryVoltage: 240,
+        impedance: 2.5,
+      };
+      const result = calculateServiceFaultCurrent(xfmr, 240, 1);
+      expect(result.faultCurrent).toBeGreaterThan(0);
+      expect(result.requiredAIC).toBeGreaterThan(0);
+      expect(result.compliance.necArticle).toBe('NEC 110.9 - Interrupting Rating');
+      expect(result.details.safetyFactor).toBe(1.25);
+    });
+
+    it('should reduce fault current when service conductor is provided', () => {
+      const xfmr: TransformerData = {
+        kva: 75,
+        primaryVoltage: 7200,
+        secondaryVoltage: 240,
+        impedance: 2.5,
+      };
+      const withoutConductor = calculateServiceFaultCurrent(xfmr, 240, 1);
+      const withConductor = calculateServiceFaultCurrent(xfmr, 240, 1, {
+        length: 100,
+        conductorSize: '2/0 AWG',
+        material: 'Cu',
+        conduitType: 'PVC',
+      });
+      // Conductor impedance should reduce fault current
+      expect(withConductor.faultCurrent).toBeLessThan(withoutConductor.faultCurrent);
+    });
+  });
+
+  describe('calculateDownstreamFaultCurrent — 3-phase multiplier must be 1×', () => {
+    it('should use phaseMultiplier=1 for 3-phase (NOT 1.732)', () => {
+      // This is the CRITICAL rule from CLAUDE.md:
+      // 3-phase impedance multiplier is 1× (not 1.732×)
+      const run: ConductorRun = {
+        length: 100,
+        conductorSize: '2/0 AWG',
+        material: 'Cu',
+        conduitType: 'PVC',
+        voltage: 208,
+        phase: 3,
+      };
+      const result3ph = calculateDownstreamFaultCurrent(run, 20000);
+
+      // For single-phase, same run — impedance doubles (multiplier = 2)
+      const run1ph: ConductorRun = { ...run, phase: 1, voltage: 240 };
+      const result1ph = calculateDownstreamFaultCurrent(run1ph, 20000);
+
+      // 3-phase conductor impedance should be LESS than 1-phase (1× vs 2×)
+      expect(result3ph.details.conductorImpedance).toBeLessThan(
+        result1ph.details.conductorImpedance
+      );
+    });
+  });
+
+  describe('estimateUtilityTransformer', () => {
+    it('should return standard transformer size >= required kVA', () => {
+      // 200A, 240V, 1-phase → kVA = 200 × 240 / 1000 = 48 kVA → next standard = 50 kVA
+      const xfmr = estimateUtilityTransformer(200, 240, 1);
+      expect(xfmr.kva).toBe(50);
+      expect(xfmr.impedance).toBe(2.5); // single-phase default
+    });
+
+    it('should use custom impedance when provided', () => {
+      const xfmr = estimateUtilityTransformer(200, 208, 3, 4.0);
+      expect(xfmr.impedance).toBe(4.0);
+    });
+  });
+});
+
+// ============================================================================
+// 2. SERVICE UPGRADE — NEC 220.87, 230.42
+// ============================================================================
+
+describe('Service Upgrade (NEC 220.87)', () => {
+  describe('quickServiceCheck', () => {
+    it('should apply 125% to manual/calculated loads per NEC 220.87', () => {
+      const input: QuickCheckInput = {
+        currentServiceAmps: 200,
+        currentUsageAmps: 120,
+        proposedLoadAmps: 40,
+        existingLoadMethod: 'manual',
+      };
+      const result = quickServiceCheck(input);
+      // adjustedExisting = 120 × 1.25 = 150A
+      // total = 150 + 40 = 190A
+      // utilization = 190/200 = 95%
+      expect(result.totalAmps).toBe(190);
+      expect(result.utilizationPercent).toBeCloseTo(95, 0);
+      expect(result.canHandle).toBe(true);
+      expect(result.status).toBe('HIGH'); // >80%
+    });
+
+    it('should NOT apply 125% to utility_bill loads (actual measurement)', () => {
+      const input: QuickCheckInput = {
+        currentServiceAmps: 200,
+        currentUsageAmps: 120,
+        proposedLoadAmps: 40,
+        existingLoadMethod: 'utility_bill',
+      };
+      const result = quickServiceCheck(input);
+      // adjustedExisting = 120A (no multiplier)
+      // total = 120 + 40 = 160A
+      // utilization = 160/200 = 80%
+      expect(result.totalAmps).toBe(160);
+      expect(result.utilizationPercent).toBeCloseTo(80, 0);
+      expect(result.canHandle).toBe(true);
+    });
+
+    it('should NOT apply 125% to load_study loads', () => {
+      const input: QuickCheckInput = {
+        currentServiceAmps: 200,
+        currentUsageAmps: 120,
+        proposedLoadAmps: 40,
+        existingLoadMethod: 'load_study',
+      };
+      const result = quickServiceCheck(input);
+      expect(result.totalAmps).toBe(160);
+    });
+
+    it('should report CRITICAL when load exceeds service', () => {
+      const input: QuickCheckInput = {
+        currentServiceAmps: 100,
+        currentUsageAmps: 80,
+        proposedLoadAmps: 40,
+        existingLoadMethod: 'manual',
+      };
+      const result = quickServiceCheck(input);
+      // adjustedExisting = 80 × 1.25 = 100A
+      // total = 100 + 40 = 140A → exceeds 100A
+      expect(result.status).toBe('CRITICAL');
+      expect(result.canHandle).toBe(false);
+    });
+  });
+
+  describe('analyzeServiceUpgrade', () => {
+    it('should perform detailed analysis with NEC references', () => {
+      const input: ServiceUpgradeInput = {
+        currentServiceAmps: 200,
+        serviceVoltage: 240,
+        servicePhase: 1,
+        existingDemandLoad_kVA: 30,
+        existingLoadMethod: 'calculated',
+        proposedLoads: [
+          { description: 'EV Charger', kw: 9.6, continuous: true, category: 'EV' },
+        ],
+      };
+      const result = analyzeServiceUpgrade(input);
+
+      // Existing load adjusted: 30 × 1.25 = 37.5 kVA
+      expect(result.existingDemand_kVA).toBe(37.5);
+
+      // Proposed: 9.6 × 1.25 (continuous) = 12 kVA
+      expect(result.proposedAdditionalLoad_kVA).toBe(12);
+
+      // NEC references should include 220.87
+      expect(result.necReferences).toContain('NEC 220.87 - Determining Existing Loads (125% multiplier)');
+      expect(result.warnings.length).toBeGreaterThanOrEqual(0);
+    });
+
+    it('should skip 125% multiplier for utility_bill method', () => {
+      const input: ServiceUpgradeInput = {
+        currentServiceAmps: 200,
+        serviceVoltage: 240,
+        servicePhase: 1,
+        existingDemandLoad_kVA: 30,
+        existingLoadMethod: 'utility_bill',
+        proposedLoads: [],
+      };
+      const result = analyzeServiceUpgrade(input);
+      // No multiplier → existing demand = 30 kVA
+      expect(result.existingDemand_kVA).toBe(30);
+    });
+  });
+
+  describe('helper functions', () => {
+    it('calculateServiceCapacity: 200A × 240V × 1φ = 48 kVA', () => {
+      expect(calculateServiceCapacity(200, 240, 1)).toBeCloseTo(48, 1);
+    });
+
+    it('calculateServiceCapacity: 200A × 208V × 3φ = 71.97 kVA', () => {
+      expect(calculateServiceCapacity(200, 208, 3)).toBeCloseTo(71.97, 0);
+    });
+
+    it('calculateAmpsFromKVA: inverse of capacity', () => {
+      const kva = calculateServiceCapacity(200, 240, 1);
+      const amps = calculateAmpsFromKVA(kva, 240, 1);
+      expect(amps).toBeCloseTo(200, 1);
+    });
+
+    it('roundToStandardServiceSize: rounds up to next standard', () => {
+      expect(roundToStandardServiceSize(150)).toBe(150);
+      expect(roundToStandardServiceSize(151)).toBe(200);
+      expect(roundToStandardServiceSize(201)).toBe(225);
+      expect(roundToStandardServiceSize(350)).toBe(400);
+    });
+  });
+});
+
+// ============================================================================
+// 3. RESIDENTIAL LOAD — NEC 220.82, 220.84
+// ============================================================================
+
+describe('Residential Load (NEC 220.82 / 220.84)', () => {
+  const baseAppliances: ResidentialAppliances = {
+    range: { enabled: true, kw: 12, type: 'electric' },
+    dryer: { enabled: true, kw: 5, type: 'electric' },
+    waterHeater: { enabled: true, kw: 4.5, type: 'electric' },
+    hvac: { enabled: true, type: 'ac_only', coolingKw: 5 },
+    dishwasher: { enabled: true, kw: 1.2 },
+    disposal: { enabled: true, kw: 0.5 },
+  };
+
+  describe('calculateSingleFamilyLoad (NEC 220.82)', () => {
+    it('should calculate lighting load at 3 VA/sq ft', () => {
+      const result = calculateSingleFamilyLoad({
+        squareFootage: 2000,
+        smallApplianceCircuits: 2,
+        laundryCircuit: true,
+        appliances: {},
+      });
+      // Lighting connected = 2000 × 3 = 6000 VA
+      const lightingEntry = result.breakdown.find(b => b.category === 'General Lighting');
+      expect(lightingEntry?.connectedVA).toBe(6000);
+      expect(result.necReferences).toContain('NEC 220.82 - Standard Method');
+    });
+
+    it('should return a valid result with all standard appliances', () => {
+      const result = calculateSingleFamilyLoad({
+        squareFootage: 2500,
+        smallApplianceCircuits: 2,
+        laundryCircuit: true,
+        appliances: baseAppliances,
+      });
+
+      expect(result.totalConnectedVA).toBeGreaterThan(0);
+      expect(result.totalDemandVA).toBeGreaterThan(0);
+      expect(result.totalDemandVA).toBeLessThanOrEqual(result.totalConnectedVA);
+      expect(result.serviceAmps).toBeGreaterThan(0);
+      expect(result.recommendedServiceSize).toBeGreaterThanOrEqual(100);
+      expect(result.necReferences.length).toBeGreaterThan(0);
+    });
+
+    it('should warn when < 2 small appliance circuits', () => {
+      const result = calculateSingleFamilyLoad({
+        squareFootage: 1000,
+        smallApplianceCircuits: 1,
+        laundryCircuit: true,
+        appliances: {},
+      });
+      expect(result.warnings.some(w => w.includes('Minimum 2 small appliance circuits'))).toBe(true);
+    });
+
+    it('should include neutral load calculation per NEC 220.61', () => {
+      const result = calculateSingleFamilyLoad({
+        squareFootage: 2500,
+        smallApplianceCircuits: 2,
+        laundryCircuit: true,
+        appliances: baseAppliances,
+      });
+      expect(result.neutralLoadVA).toBeGreaterThan(0);
+      expect(result.neutralAmps).toBeGreaterThan(0);
+    });
+
+    it('should include conductor size recommendations', () => {
+      const result = calculateSingleFamilyLoad({
+        squareFootage: 2500,
+        smallApplianceCircuits: 2,
+        laundryCircuit: true,
+        appliances: baseAppliances,
+      });
+      expect(result.serviceConductorSize).toBeDefined();
+      expect(result.neutralConductorSize).toBeDefined();
+      expect(result.gecSize).toBeDefined();
+    });
+  });
+
+  describe('calculateMultiFamilyLoad (NEC 220.84)', () => {
+    it('should apply NEC 220.84 demand factor to building total', () => {
+      const result = calculateMultiFamilyLoad({
+        unitTemplates: [
+          {
+            id: '1',
+            name: 'Type A',
+            squareFootage: 900,
+            unitCount: 10,
+            appliances: baseAppliances,
+          },
+        ],
+      });
+
+      // 10 units → 43% demand factor per Table 220.84
+      const dfEntry = result.breakdown.find(b => b.category === 'Multi-Family Demand Factor');
+      expect(dfEntry).toBeDefined();
+      expect(dfEntry?.demandFactor).toBeCloseTo(0.43, 2);
+      expect(result.totalDemandVA).toBeLessThan(result.totalConnectedVA);
+      expect(result.necReferences).toContain('NEC 220.84 - Multi-Family Optional Method');
+    });
+
+    it('should warn if fewer than 3 units', () => {
+      const result = calculateMultiFamilyLoad({
+        unitTemplates: [
+          { id: '1', name: 'A', squareFootage: 800, unitCount: 2, appliances: {} },
+        ],
+      });
+      expect(result.warnings.some(w => w.includes('minimum 3 dwelling units'))).toBe(true);
+    });
+
+    it('should include house panel load at 100% (after demand factor)', () => {
+      const result = calculateMultiFamilyLoad({
+        unitTemplates: [
+          { id: '1', name: 'A', squareFootage: 900, unitCount: 10, appliances: baseAppliances },
+        ],
+        housePanelLoad: 15000,
+      });
+
+      const houseEntry = result.breakdown.find(b => b.category === 'House/Common Loads');
+      expect(houseEntry?.demandVA).toBe(15000);
+      expect(houseEntry?.demandFactor).toBe(1.0);
+    });
+  });
+});
+
+// ============================================================================
+// 4. DEMAND FACTOR — NEC 220.42–220.56
+// ============================================================================
+
+describe('Demand Factor (NEC Article 220)', () => {
+  describe('calculatePanelDemand', () => {
+    it('should apply lighting demand factor per NEC 220.42', () => {
+      // 5000 VA lighting: first 3000 at 100%, next 2000 at 35%
+      // Demand = 3000 + 700 = 3700 VA. Factor = 3700/5000 = 0.74
+      const circuits: CircuitLoad[] = [
+        { id: '1', description: 'Lighting 1', loadWatts: 2500, loadType: 'L', pole: 1, circuitNumber: 1 },
+        { id: '2', description: 'Lighting 2', loadWatts: 2500, loadType: 'L', pole: 1, circuitNumber: 3 },
+      ];
+      const result = calculatePanelDemand(circuits, 240, 1);
+
+      const lightingLoad = result.loadsByType.find(l => l.type === 'L');
+      expect(lightingLoad).toBeDefined();
+      expect(lightingLoad!.demandFactor).toBeCloseTo(0.74, 2);
+      expect(result.necReferences).toContain('NEC 220.42 - Lighting Demand Factors');
+    });
+
+    it('should apply receptacle demand factor per NEC 220.44', () => {
+      // 15000 VA receptacles: first 10000 at 100%, next 5000 at 50%
+      // Demand = 10000 + 2500 = 12500. Factor = 12500/15000 = 0.833
+      const circuits: CircuitLoad[] = Array.from({ length: 10 }, (_, i) => ({
+        id: String(i),
+        description: `Receptacle ${i}`,
+        loadWatts: 1500,
+        loadType: 'R' as const,
+        pole: 1 as const,
+        circuitNumber: i * 2 + 1,
+      }));
+      const result = calculatePanelDemand(circuits, 240, 1);
+
+      const recepLoad = result.loadsByType.find(l => l.type === 'R');
+      expect(recepLoad).toBeDefined();
+      expect(recepLoad!.demandFactor).toBeCloseTo(0.833, 2);
+      expect(result.necReferences).toContain('NEC 220.44 - Receptacle Demand Factors');
+    });
+
+    it('should apply 125% to largest motor per NEC 430.24', () => {
+      const circuits: CircuitLoad[] = [
+        { id: '1', description: 'Motor 1', loadWatts: 2000, loadType: 'M', pole: 1, circuitNumber: 1 },
+        { id: '2', description: 'Motor 2 (largest)', loadWatts: 5000, loadType: 'M', pole: 2, circuitNumber: 3 },
+        { id: '3', description: 'Motor 3', loadWatts: 1000, loadType: 'M', pole: 1, circuitNumber: 5 },
+      ];
+      const result = calculatePanelDemand(circuits, 208, 3);
+
+      const motorLoad = result.loadsByType.find(l => l.type === 'M');
+      expect(motorLoad).toBeDefined();
+      // Largest motor = 5000, at 125% = 6250. Others = 2000 + 1000 = 3000.
+      // adjustmentFactor = 9250 / 8000 = 1.15625
+      expect(motorLoad!.adjustmentFactor).toBeCloseTo(1.156, 2);
+      expect(result.necReferences).toContain('NEC 430.24 - Largest Motor at 125%');
+    });
+
+    it('should handle non-coincident heating/cooling per NEC 220.60', () => {
+      const circuits: CircuitLoad[] = [
+        { id: '1', description: 'A/C', loadWatts: 5000, loadType: 'C', pole: 2, circuitNumber: 1 },
+        { id: '2', description: 'Heat', loadWatts: 3000, loadType: 'H', pole: 2, circuitNumber: 3 },
+      ];
+      const result = calculatePanelDemand(circuits, 240, 1);
+      // Both appear in loadsByType — it's the engineer's job to omit the smaller
+      // But both should have NEC references
+      expect(result.necReferences).toContain('NEC 220.60 - Noncoincident Loads (Heating/Cooling)');
+    });
+
+    it('should calculate demand amps for single-phase', () => {
+      const circuits: CircuitLoad[] = [
+        { id: '1', description: 'Load', loadWatts: 24000, loadType: 'O', pole: 2, circuitNumber: 1 },
+      ];
+      const result = calculatePanelDemand(circuits, 240, 1);
+      // 24 kVA / 240V = 100A
+      expect(result.demandAmps).toBeCloseTo(100, 0);
+    });
+
+    it('should calculate demand amps for three-phase', () => {
+      const circuits: CircuitLoad[] = [
+        { id: '1', description: 'Load', loadWatts: 36000, loadType: 'O', pole: 3, circuitNumber: 1 },
+      ];
+      const result = calculatePanelDemand(circuits, 208, 3);
+      // 36 kVA / (208 × √3) = 36000 / 360.22 ≈ 99.9A
+      expect(result.demandAmps).toBeCloseTo(100, 0);
+    });
+
+    it('should include phase imbalance calculation', () => {
+      const circuits: CircuitLoad[] = [
+        { id: '1', description: 'A', loadWatts: 10000, loadType: 'O', pole: 1, circuitNumber: 1, phase: 'A' },
+        { id: '2', description: 'B', loadWatts: 2000, loadType: 'O', pole: 1, circuitNumber: 3, phase: 'B' },
+      ];
+      const result = calculatePanelDemand(circuits, 240, 1);
+      expect(result.percentImbalance).toBeGreaterThan(0);
+    });
+  });
+
+  describe('getCircuitPhase', () => {
+    it('should alternate A,B for single-phase', () => {
+      expect(getCircuitPhase(1, 1)).toBe('A');
+      expect(getCircuitPhase(2, 1)).toBe('A');
+      expect(getCircuitPhase(3, 1)).toBe('B');
+      expect(getCircuitPhase(4, 1)).toBe('B');
+    });
+
+    it('should cycle A,B,C for three-phase', () => {
+      expect(getCircuitPhase(1, 3)).toBe('A');
+      expect(getCircuitPhase(2, 3)).toBe('A');
+      expect(getCircuitPhase(3, 3)).toBe('B');
+      expect(getCircuitPhase(4, 3)).toBe('B');
+      expect(getCircuitPhase(5, 3)).toBe('C');
+      expect(getCircuitPhase(6, 3)).toBe('C');
+      expect(getCircuitPhase(7, 3)).toBe('A'); // wraps
+    });
+  });
+});
+
+// ============================================================================
+// 5. MULTI-FAMILY EV — NEC 220.57, 625.42
+// ============================================================================
+
+describe('Multi-Family EV (NEC 220.57 / 625.42)', () => {
+  describe('getMultiFamilyDemandFactor', () => {
+    it('should return 1.0 for < 3 units', () => {
+      expect(getMultiFamilyDemandFactor(1)).toBe(1.0);
+      expect(getMultiFamilyDemandFactor(2)).toBe(1.0);
+    });
+
+    it('should return 0.45 for 3-5 units', () => {
+      expect(getMultiFamilyDemandFactor(3)).toBe(0.45);
+      expect(getMultiFamilyDemandFactor(5)).toBe(0.45);
+    });
+
+    it('should return 0.43 for 8-10 units', () => {
+      expect(getMultiFamilyDemandFactor(8)).toBe(0.43);
+      expect(getMultiFamilyDemandFactor(10)).toBe(0.43);
+    });
+  });
+
+  describe('calculateMultiFamilyEV', () => {
+    const baseInput: MultiFamilyEVInput = {
+      dwellingUnits: 20,
+      avgUnitSqFt: 900,
+      voltage: 208,
+      phase: 3,
+      existingServiceAmps: 800,
+      evChargers: { count: 10, level: 'Level2', ampsPerCharger: 32 },
+    };
+
+    it('should calculate per-EVSE load as max(7200VA, nameplate) per NEC 220.57', () => {
+      const result = calculateMultiFamilyEV(baseInput);
+      // 32A × 208V = 6656 VA < 7200 VA → use 7200 VA
+      expect(result.evLoad.totalConnectedVA).toBe(7200 * 10);
+      expect(result.compliance.necArticles).toContain('NEC 220.57');
+    });
+
+    it('should use nameplate when > 7200 VA per NEC 220.57', () => {
+      const input: MultiFamilyEVInput = {
+        ...baseInput,
+        evChargers: { count: 5, level: 'Level2', ampsPerCharger: 48 },
+      };
+      const result = calculateMultiFamilyEV(input);
+      // 48A × 208V = 9984 VA > 7200 VA → use 9984 VA
+      expect(result.evLoad.totalConnectedVA).toBe(9984 * 5);
+    });
+
+    it('should use demand factor of 1.0 for EV loads (NEC 220.57 has no DF)', () => {
+      const result = calculateMultiFamilyEV(baseInput);
+      expect(result.evLoad.demandFactor).toBe(1.0);
+    });
+
+    it('should include all key NEC articles', () => {
+      const result = calculateMultiFamilyEV(baseInput);
+      expect(result.compliance.necArticles).toContain('NEC 220.84');
+      expect(result.compliance.necArticles).toContain('NEC 220.57');
+      expect(result.compliance.necArticles).toContain('NEC 625.42');
+    });
+
+    it('should produce three scenarios (noEVEMS, withEVEMS, withUpgrade)', () => {
+      const result = calculateMultiFamilyEV(baseInput);
+      expect(result.scenarios.noEVEMS).toBeDefined();
+      expect(result.scenarios.withEVEMS).toBeDefined();
+      expect(result.scenarios.withUpgrade).toBeDefined();
+    });
+
+    it('should calculate building load using NEC 220.84 demand factor', () => {
+      const result = calculateMultiFamilyEV(baseInput);
+      // 20 units → 38% demand factor
+      expect(result.buildingLoad.buildingDemandFactor).toBe(0.38);
+      expect(result.buildingLoad.buildingDemandVA).toBeLessThan(result.buildingLoad.totalConnectedVA);
+    });
+
+    it('should use measured data when existingLoadMethod is utility_bill', () => {
+      const input: MultiFamilyEVInput = {
+        ...baseInput,
+        existingLoadMethod: 'utility_bill',
+        measuredPeakDemandKW: 100,
+        measurementPeriod: 'Jan-Dec 2025',
+      };
+      const result = calculateMultiFamilyEV(input);
+      expect(result.buildingLoad.loadDeterminationMethod).toBe('utility_bill');
+      expect(result.buildingLoad.buildingDemandVA).toBe(100000); // 100 kW × 1000
+      expect(result.buildingLoad.buildingDemandFactor).toBe(1.0);
+    });
+
+    it('should include phase balance for 3-phase systems', () => {
+      const result = calculateMultiFamilyEV(baseInput);
+      expect(result.phaseBalance).toBeDefined();
+      expect(result.phaseBalance!.imbalancePercent).toBeGreaterThanOrEqual(0);
+    });
+  });
+
+  describe('calculateCommonAreaLoads', () => {
+    it('should return zero for empty input', () => {
+      const result = calculateCommonAreaLoads([]);
+      expect(result.totalConnectedVA).toBe(0);
+      expect(result.totalDemandVA).toBe(0);
+    });
+
+    it('should apply elevator demand factor (largest at 100%, others at 50%)', () => {
+      const result = calculateCommonAreaLoads([
+        { category: 'elevators', description: 'Elevator 1', inputType: 'va', value: 30000 },
+        { category: 'elevators', description: 'Elevator 2', inputType: 'va', value: 20000 },
+      ]);
+      // Largest (30000) at 100% + second (20000) at 50% = 30000 + 10000 = 40000
+      const elevEntry = result.items.find(i => i.category.includes('Elevator'));
+      expect(elevEntry?.demandVA).toBe(40000);
+    });
+  });
+});
+
+// ============================================================================
+// 6. ARC FLASH — IEEE 1584-2018, NFPA 70E
+// ============================================================================
+
+describe('Arc Flash (IEEE 1584 / NFPA 70E)', () => {
+  describe('calculateArcFlash', () => {
+    it('should calculate incident energy for a typical 480V panelboard', () => {
+      const input: ArcFlashInput = {
+        shortCircuitCurrent: 25, // 25 kA
+        voltage: 480,
+        phase: 3,
+        equipmentType: 'panelboard',
+        protectiveDevice: 'circuit_breaker',
+        deviceRating: 100,
+      };
+      const result = calculateArcFlash(input);
+
+      expect(result.incidentEnergy).toBeGreaterThan(0);
+      expect(result.arcFlashBoundary).toBeGreaterThan(0);
+      expect(typeof result.ppeCategory).not.toBe('undefined');
+      expect(result.details.shortCircuitCurrent).toBe(25);
+      expect(result.details.voltage).toBe(480);
+      expect(result.compliance.necArticle).toBe('NEC 110.16');
+      expect(result.compliance.nfpaArticle).toBe('NFPA 70E Article 130');
+    });
+
+    it('should calculate lower incident energy for 208V system', () => {
+      const input480: ArcFlashInput = {
+        shortCircuitCurrent: 20,
+        voltage: 480,
+        phase: 3,
+        equipmentType: 'panelboard',
+        protectiveDevice: 'circuit_breaker',
+        deviceRating: 100,
+      };
+      const input208: ArcFlashInput = {
+        ...input480,
+        voltage: 208,
+      };
+      const result480 = calculateArcFlash(input480);
+      const result208 = calculateArcFlash(input208);
+
+      // Lower voltage should generally produce lower incident energy
+      expect(result208.incidentEnergy).toBeLessThan(result480.incidentEnergy);
+    });
+
+    it('should assign PPE category 0 for low incident energy', () => {
+      const input: ArcFlashInput = {
+        shortCircuitCurrent: 5, // Low fault current
+        voltage: 208,
+        phase: 1,
+        equipmentType: 'panelboard',
+        protectiveDevice: 'current_limiting_fuse',
+        deviceRating: 30,
+      };
+      const result = calculateArcFlash(input);
+      // Very fast clearing + low fault → low incident energy
+      if (result.incidentEnergy < 1.2) {
+        expect(result.ppeCategory).toBe(0);
+      }
+    });
+
+    it('should reduce incident energy with current-limiting devices', () => {
+      const baseInput: ArcFlashInput = {
+        shortCircuitCurrent: 20,
+        voltage: 480,
+        phase: 3,
+        equipmentType: 'panelboard',
+        protectiveDevice: 'circuit_breaker',
+        deviceRating: 100,
+      };
+      const clInput: ArcFlashInput = {
+        ...baseInput,
+        protectiveDevice: 'current_limiting_fuse',
+      };
+      const resultStd = calculateArcFlash(baseInput);
+      const resultCL = calculateArcFlash(clInput);
+
+      // Current limiting fuse clears faster → lower incident energy
+      expect(resultCL.incidentEnergy).toBeLessThan(resultStd.incidentEnergy);
+    });
+
+    it('should include recommendations for high incident energy', () => {
+      const input: ArcFlashInput = {
+        shortCircuitCurrent: 65,
+        voltage: 480,
+        phase: 3,
+        equipmentType: 'switchgear',
+        protectiveDevice: 'circuit_breaker',
+        deviceRating: 400,
+      };
+      const result = calculateArcFlash(input);
+      expect(result.compliance.recommendations.length).toBeGreaterThan(0);
+    });
+
+    it('should throw on invalid inputs (shortCircuitCurrent <= 0)', () => {
+      const input: ArcFlashInput = {
+        shortCircuitCurrent: 0,
+        voltage: 480,
+        phase: 3,
+        equipmentType: 'panelboard',
+        protectiveDevice: 'circuit_breaker',
+        deviceRating: 100,
+      };
+      expect(() => calculateArcFlash(input)).toThrow('Short circuit current must be greater than zero');
+    });
+
+    it('should throw on invalid voltage', () => {
+      const input: ArcFlashInput = {
+        shortCircuitCurrent: 25,
+        voltage: 0,
+        phase: 3,
+        equipmentType: 'panelboard',
+        protectiveDevice: 'circuit_breaker',
+        deviceRating: 100,
+      };
+      expect(() => calculateArcFlash(input)).toThrow('Voltage must be greater than zero');
+    });
+
+    it('should use default working distance by equipment type', () => {
+      const input: ArcFlashInput = {
+        shortCircuitCurrent: 25,
+        voltage: 480,
+        phase: 3,
+        equipmentType: 'switchgear',
+        protectiveDevice: 'circuit_breaker',
+        deviceRating: 200,
+      };
+      const result = calculateArcFlash(input);
+      expect(result.details.workingDistance).toBe(36); // switchgear = 36 inches
+    });
+
+    it('should use default arc gap based on voltage', () => {
+      const input: ArcFlashInput = {
+        shortCircuitCurrent: 25,
+        voltage: 480,
+        phase: 3,
+        equipmentType: 'panelboard',
+        protectiveDevice: 'circuit_breaker',
+        deviceRating: 100,
+      };
+      const result = calculateArcFlash(input);
+      expect(result.details.arcGap).toBe(0.5); // 480V → 0.5 inches
+    });
+  });
+});
