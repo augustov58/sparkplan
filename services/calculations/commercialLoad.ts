@@ -491,16 +491,12 @@ export function calculateCommercialLoad(input: CommercialLoadInput): CommercialL
     (kitchenLoad_VA || 0) +
     (specialLoad_VA || 0);
 
-  // Total demand load (for display purposes, without 125% continuous factor)
-  const totalDemandLoad_VA =
-    lightingDemandLoad_VA +
-    receptacleDemandLoad_VA +
-    showWindowLoad_VA +
-    signLoad_VA +
-    hvacLoad_VA + // Note: HVAC already includes 125% if continuous
-    motorDemandLoad_VA +
-    (kitchenDemandLoad_VA || 0) +
-    (specialLoad_VA || 0); // Note: Special loads already include 125% if continuous
+  // Total demand load — sum of all demand values from breakdown
+  // (each item's demandLoad_VA already includes 125% where applicable, e.g. HVAC continuous)
+  const totalDemandLoad_VA = loadBreakdown.reduce(
+    (total, item) => total + item.demandLoad_VA,
+    0
+  );
 
   // ===== 8. SERVICE SIZING (NEC 230.42, 215.3) =====
   // Per NEC 2023 Example D3, three buckets:
