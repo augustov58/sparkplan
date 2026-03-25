@@ -274,17 +274,17 @@ export function calculateCommercialLoad(input: CommercialLoadInput): CommercialL
   const lightingDemandFactor = (lightingDemandLoad_VA / lightingLoad_VA) * 100;
 
   loadBreakdown.push({
-    category: 'General Lighting (Continuous)',
+    category: 'General Lighting (Continuous - 125% included in Table 220.42(A))',
     connectedLoad_VA: lightingLoad_VA,
     demandLoad_VA: lightingDemandLoad_VA,
     demandFactor: lightingDemandFactor,
     isContinuous: true,
-    serviceSizingLoad_VA: lightingDemandLoad_VA * 1.25,
-    necReference: 'NEC 220.12, Table 220.12',
+    serviceSizingLoad_VA: lightingDemandLoad_VA, // Table 220.42(A) values already include 125% continuous multiplier — no additional multiplier
+    necReference: 'NEC Table 220.42(A)',
   });
 
   notes.push(
-    `Lighting load calculated at ${lightingUnitLoad} VA/sq ft per NEC Table 220.12 (${OCCUPANCY_LABELS[input.occupancyType]}) - Continuous load`
+    `Lighting load calculated at ${lightingUnitLoad} VA/sq ft per NEC Table 220.42(A) (${OCCUPANCY_LABELS[input.occupancyType]}) - 125% continuous multiplier already included in table values`
   );
 
   // ===== 2. RECEPTACLE LOAD (NEC 220.14, 220.44) - NON-CONTINUOUS =====
@@ -503,24 +503,38 @@ export function calculateCommercialLoad(input: CommercialLoadInput): CommercialL
     (specialLoad_VA || 0); // Note: Special loads already include 125% if continuous
 
   // ===== 8. SERVICE SIZING (NEC 230.42, 215.3) =====
-  // Per Example D3: Noncontinuous (as-is) + Continuous (× 1.25)
+  // Per NEC 2023 Example D3, three buckets:
+  //   1. Noncontinuous loads (as-is)
+  //   2. Continuous loads NOT from Table 220.42(A) (× 1.25)
+  //   3. Continuous loads FROM Table 220.42(A) (as-is, 125% already included)
 
   // Sum up all service sizing loads from the breakdown
+  // Note: Each loadBreakdown item's serviceSizingLoad_VA already has the correct value:
+  //   - Lighting from Table 220.42(A): no additional multiplier (125% baked in)
+  //   - Other continuous loads (show window, sign, HVAC, etc.): × 1.25 applied
+  //   - Non-continuous loads: as-is
   const serviceSizingLoad_VA = loadBreakdown.reduce(
     (total, item) => total + item.serviceSizingLoad_VA,
     0
   );
 
   // Calculate breakdown for notes
-  const continuousItems = loadBreakdown.filter(item => item.isContinuous);
   const nonContinuousItems = loadBreakdown.filter(item => !item.isContinuous);
-
-  const totalContinuousDemand_VA = continuousItems.reduce((sum, item) => sum + item.demandLoad_VA, 0);
   const totalNonContinuous_VA = nonContinuousItems.reduce((sum, item) => sum + item.serviceSizingLoad_VA, 0);
 
-  notes.push(
-    `Service sizing per NEC 215.3/230.90: Non-continuous loads (${Math.round(totalNonContinuous_VA)} VA) + Continuous loads × 1.25 (${Math.round(totalContinuousDemand_VA)} VA × 1.25 = ${Math.round(totalContinuousDemand_VA * 1.25)} VA)`
-  );
+  // Separate continuous loads: Table 220.42(A) lighting vs other continuous
+  const lightingItem = loadBreakdown.find(item => item.necReference.includes('220.42(A)'));
+  const otherContinuousItems = loadBreakdown.filter(item => item.isContinuous && !item.necReference.includes('220.42(A)'));
+  const otherContinuousDemand_VA = otherContinuousItems.reduce((sum, item) => sum + item.demandLoad_VA, 0);
+
+  let sizingNote = `Service sizing per NEC 215.3/230.90: Non-continuous (${Math.round(totalNonContinuous_VA)} VA)`;
+  if (otherContinuousDemand_VA > 0) {
+    sizingNote += ` + Continuous NOT from Table 220.42(A) × 1.25 (${Math.round(otherContinuousDemand_VA)} × 1.25 = ${Math.round(otherContinuousDemand_VA * 1.25)} VA)`;
+  }
+  if (lightingItem) {
+    sizingNote += ` + Lighting from Table 220.42(A) (${Math.round(lightingItem.serviceSizingLoad_VA)} VA, 125% already included)`;
+  }
+  notes.push(sizingNote);
 
   let calculatedAmps = 0;
 
