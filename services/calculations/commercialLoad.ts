@@ -525,11 +525,11 @@ export function calculateCommercialLoad(input: CommercialLoadInput): CommercialL
   // Separate continuous loads: Table 220.42(A) lighting vs other continuous
   const lightingItem = loadBreakdown.find(item => item.necReference.includes('220.42(A)'));
   const otherContinuousItems = loadBreakdown.filter(item => item.isContinuous && !item.necReference.includes('220.42(A)'));
-  const otherContinuousDemand_VA = otherContinuousItems.reduce((sum, item) => sum + item.demandLoad_VA, 0);
+  const otherContinuousService_VA = otherContinuousItems.reduce((sum, item) => sum + item.serviceSizingLoad_VA, 0);
 
   let sizingNote = `Service sizing per NEC 215.3/230.90: Non-continuous (${Math.round(totalNonContinuous_VA)} VA)`;
-  if (otherContinuousDemand_VA > 0) {
-    sizingNote += ` + Continuous NOT from Table 220.42(A) × 1.25 (${Math.round(otherContinuousDemand_VA)} × 1.25 = ${Math.round(otherContinuousDemand_VA * 1.25)} VA)`;
+  if (otherContinuousService_VA > 0) {
+    sizingNote += ` + Continuous loads at 125% (${Math.round(otherContinuousService_VA)} VA)`;
   }
   if (lightingItem) {
     sizingNote += ` + Lighting from Table 220.42(A) (${Math.round(lightingItem.serviceSizingLoad_VA)} VA, 125% already included)`;

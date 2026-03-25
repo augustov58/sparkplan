@@ -1082,7 +1082,7 @@ export const CommercialLoadCalculator: React.FC<CommercialLoadCalculatorProps> =
                             <div className="text-gray-600 mb-0.5">Service</div>
                             <div className="font-semibold text-gray-900 tabular-nums calculated-value">
                               {formatVA_to_kVA(item.serviceSizingLoad_VA)} kVA
-                              {item.isContinuous && item.demandLoad_VA > 0 && (
+                              {item.isContinuous && item.demandLoad_VA > 0 && item.serviceSizingLoad_VA > item.demandLoad_VA * 1.01 && (
                                 <span className="ml-1 text-xs text-blue-600 font-normal">
                                   ×1.25
                                 </span>
