@@ -500,7 +500,7 @@ export const CommercialLoadCalculator: React.FC<CommercialLoadCalculatorProps> =
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                     <div>
-                      <label className="block text-xs text-gray-600 mb-1">FLA (Amps)</label>
+                      <label className="block text-xs text-gray-600 mb-1">MCA (Amps)</label>
                       <input
                         type="number"
                         value={hvac.nameplateFLA}

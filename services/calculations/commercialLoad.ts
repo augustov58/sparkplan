@@ -76,7 +76,7 @@ export interface CommercialLoadInput {
 
 export interface HVACLoad {
   description: string;
-  nameplateFLA: number; // Full Load Amps from nameplate
+  nameplateFLA: number; // MCA (Minimum Circuit Ampacity) per NEC 440.22
   voltage: number;
   phase: 1 | 3;
   isContinuous: boolean; // 125% factor if continuous (>3 hours)
