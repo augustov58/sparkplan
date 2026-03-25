@@ -15,24 +15,34 @@
 // ==================== TYPES ====================
 
 export type OccupancyType =
-  | 'armories_auditoriums'
-  | 'banks'
-  | 'barber_beauty'
-  | 'churches'
-  | 'clubs'
-  | 'courts'
+  | 'automotive_facility'
+  | 'convention_center'
+  | 'courthouse'
+  | 'dormitory'
   | 'dwelling_units'
-  | 'garages_commercial'
-  | 'halls_corridors'
+  | 'exercise_center'
+  | 'fire_station'
+  | 'gymnasium'
+  | 'health_care_clinic'
   | 'hospitals'
   | 'hotels_motels'
-  | 'industrial_commercial'
-  | 'lodge_rooms'
+  | 'library'
+  | 'manufacturing_facility'
+  | 'museum'
   | 'office_buildings'
+  | 'parking_garage'
+  | 'penitentiary'
+  | 'performing_arts_theater'
+  | 'police_station'
+  | 'post_office'
+  | 'religious_facility'
   | 'restaurants'
+  | 'retail'
   | 'schools'
-  | 'stores'
-  | 'warehouses_storage';
+  | 'sports_arena'
+  | 'town_hall'
+  | 'transportation'
+  | 'warehouse';
 
 export interface CommercialLoadInput {
   // Building Information
@@ -138,58 +148,80 @@ export interface LoadBreakdownItem {
   necReference: string;
 }
 
-// ==================== NEC TABLE 220.12 - GENERAL LIGHTING LOADS ====================
+// ==================== NEC 2023 TABLE 220.42(A) - GENERAL LIGHTING LOADS ====================
 
 /**
- * NEC 2023 Table 220.42(A) (formerly Table 220.12) - General Lighting Loads by Occupancy
+ * NEC 2023 Table 220.42(A) - General Lighting Loads by Occupancy
  * Unit load per square foot (VA/sq ft)
  *
- * Note: These values were updated in NEC 2020/2023 based on LED lighting efficiency
- * and include considerations for continuous loads
+ * IMPORTANT: These values already include the 125% continuous load multiplier
+ * per the table note: "The 125 percent multiplier for a continuous load in
+ * accordance with 215.3 and 230.42 is included in the unit values. Therefore,
+ * no additional multiplier shall be required."
  */
 export const LIGHTING_UNIT_LOAD: Record<OccupancyType, number> = {
-  armories_auditoriums: 1.0,
-  banks: 3.5,
-  barber_beauty: 3.0,
-  churches: 1.0,
-  clubs: 2.0,
-  courts: 2.0,
+  automotive_facility: 1.4,
+  convention_center: 2.0,
+  courthouse: 1.4,
+  dormitory: 1.5,
   dwelling_units: 3.0,
-  garages_commercial: 0.25,
-  halls_corridors: 0.5,
-  hospitals: 2.0,
-  hotels_motels: 2.0, // Guest rooms (was 1.0, corrected)
-  industrial_commercial: 2.0, // Loft buildings (was 1.0, corrected)
-  lodge_rooms: 1.5,
-  office_buildings: 1.0,
-  restaurants: 2.0,
-  schools: 1.5, // Changed from 3.0 in NEC 2020/2023
-  stores: 3.0, // Was 1.5, corrected to match Example D3
-  warehouses_storage: 0.25,
+  exercise_center: 1.5,
+  fire_station: 1.3,
+  gymnasium: 1.7,
+  health_care_clinic: 1.3,
+  hospitals: 1.6,
+  hotels_motels: 1.7,
+  library: 1.7,
+  manufacturing_facility: 2.2,
+  museum: 1.9,
+  office_buildings: 1.3,
+  parking_garage: 0.3,
+  penitentiary: 1.3,
+  performing_arts_theater: 1.8,
+  police_station: 1.3,
+  post_office: 1.5,
+  religious_facility: 2.2,
+  restaurants: 1.5,
+  retail: 1.9,
+  schools: 1.5,
+  sports_arena: 1.5,
+  town_hall: 1.4,
+  transportation: 1.8,
+  warehouse: 1.2,
 };
 
 /**
- * Occupancy display names for UI
+ * Occupancy display names for UI — matches NEC 2023 Table 220.42(A)
  */
 export const OCCUPANCY_LABELS: Record<OccupancyType, string> = {
-  armories_auditoriums: 'Armories and Auditoriums',
-  banks: 'Banks',
-  barber_beauty: 'Barber Shops / Beauty Parlors',
-  churches: 'Churches',
-  clubs: 'Clubs',
-  courts: 'Court Rooms',
+  automotive_facility: 'Automotive Facility',
+  convention_center: 'Convention Center',
+  courthouse: 'Courthouse',
+  dormitory: 'Dormitory',
   dwelling_units: 'Dwelling Units',
-  garages_commercial: 'Garages - Commercial (Storage)',
-  halls_corridors: 'Halls, Corridors, Closets, Stairways',
-  hospitals: 'Hospitals',
-  hotels_motels: 'Hotels / Motels (Guest Rooms)',
-  industrial_commercial: 'Industrial Commercial (Loft Buildings)',
-  lodge_rooms: 'Lodge Rooms',
-  office_buildings: 'Office Buildings',
-  restaurants: 'Restaurants',
-  schools: 'Schools',
-  stores: 'Stores',
-  warehouses_storage: 'Warehouses (Storage)',
+  exercise_center: 'Exercise Center',
+  fire_station: 'Fire Station',
+  gymnasium: 'Gymnasium',
+  health_care_clinic: 'Health Care Clinic',
+  hospitals: 'Hospital',
+  hotels_motels: 'Hotel and Motel',
+  library: 'Library',
+  manufacturing_facility: 'Manufacturing Facility',
+  museum: 'Museum',
+  office_buildings: 'Office',
+  parking_garage: 'Parking Garage',
+  penitentiary: 'Penitentiary',
+  performing_arts_theater: 'Performing Arts Theater',
+  police_station: 'Police Station',
+  post_office: 'Post Office',
+  religious_facility: 'Religious Facility',
+  restaurants: 'Restaurant',
+  retail: 'Retail',
+  schools: 'School',
+  sports_arena: 'Sports Arena',
+  town_hall: 'Town Hall',
+  transportation: 'Transportation',
+  warehouse: 'Warehouse',
 };
 
 // ==================== STANDARD SIZES ====================
@@ -587,7 +619,7 @@ function applyLightingDemandFactor(
   const hospitalHotelTypes: OccupancyType[] = [
     'hospitals',
     'hotels_motels',
-    'warehouses_storage',
+    'warehouse',
   ];
 
   if (hospitalHotelTypes.includes(occupancyType) && lightingLoad_VA > 20000) {
