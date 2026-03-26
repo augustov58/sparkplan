@@ -32,14 +32,15 @@ Main Distribution Panel (MDP)
 
 ## Decision
 
-**Use discriminated union pattern with 3 columns**:
+**Use discriminated union pattern with multiple columns**:
 
 ```sql
 CREATE TABLE panels (
   id UUID PRIMARY KEY,
-  fed_from_type TEXT CHECK (fed_from_type IN ('service', 'panel', 'transformer')),
+  fed_from_type TEXT CHECK (fed_from_type IN ('service', 'panel', 'transformer', 'meter_stack')),
   fed_from UUID REFERENCES panels(id),
-  fed_from_transformer_id UUID REFERENCES transformers(id)
+  fed_from_transformer_id UUID REFERENCES transformers(id),
+  fed_from_meter_stack_id UUID REFERENCES meter_stacks(id)  -- Added Phase 2.7 (Feb 2026)
 );
 ```
 
@@ -47,11 +48,14 @@ CREATE TABLE panels (
 ```typescript
 export interface Panel {
   id: string;
-  fed_from_type: 'service' | 'panel' | 'transformer';  // Discriminator
+  fed_from_type: 'service' | 'panel' | 'transformer' | 'meter_stack';  // Discriminator
   fed_from?: string;  // Panel ID (if type='panel')
   fed_from_transformer_id?: string;  // Transformer ID (if type='transformer')
+  fed_from_meter_stack_id?: string;  // Meter stack ID (if type='meter_stack') — Added Phase 2.7
 }
 ```
+
+> **Note (Phase 2.7)**: `meter_stack` was added as a fourth fed_from_type for multi-family projects. The CHECK constraint was updated in migration `20260208_meter_stacks.sql`. See MEMORY.md for the insertion order workaround with the orchestrator.
 
 **Usage**:
 ```typescript

@@ -1,8 +1,8 @@
 # Software Architecture Documentation
 ## SparkPlan Application
 
-**Last Updated**: 2026-01-15
-**Version**: 1.0
+**Last Updated**: 2026-03-20
+**Version**: 1.1
 **Technology Stack**: React 19.2.0 + TypeScript 5.8.3 + Supabase + Vite 6.4.1
 
 ---
@@ -338,6 +338,9 @@ useEffect(() => {
 
 **Currently Implemented**:
 - `useFeeders.ts` - `feeder-data-updated` event
+- `useMeterStacks.ts` - meter stack data events (Phase 2.7)
+- `useMeters.ts` - meter data events (Phase 2.7)
+- `dataRefreshEvents.ts` - centralized event type registry
 
 ---
 

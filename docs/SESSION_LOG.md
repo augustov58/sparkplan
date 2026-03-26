@@ -3,58 +3,37 @@
 **Purpose**: Tracks recent work for seamless handoff between Claude instances.
 **Maintenance Rule**: Keep only the last 2 sessions. At the start of a new session, delete older entries — git history preserves everything.
 
-**Last Updated**: 2026-01-31
+**Last Updated**: 2026-03-16
 
 ---
 
-### Session: 2026-01-31 - Multi-Family EV Bug Fixes & Merge
+### Session: 2026-03-16 - Documentation Audit & Cleanup
 
-**Focus**: Fix EVEMS calculation bugs, finalize Multi-Family EV Calculator, merge to main
-**Status**: Complete
-**Branch**: `feature/multi-family-ev` → Merged to `main`
+**Focus**: Repo-wide documentation consistency audit
+**Status**: In Progress
 
-**EVEMS Calculation Bug Fixes (Critical):**
+**Issues Found & Fixed:**
+1. ROADMAP.md header said Phase 2.7 — updated to Phase 2.8
+2. Phase 2.6 had "Pending" items inside a COMPLETE phase — moved to new Backlog section
+3. CHANGELOG missing Phase 2.7 and 2.8 entries — added both
+4. SESSION_LOG was 43 days stale — cleared and updated
+5. Deleted stray untracked file
 
-1. **EVEMS showing fewer max chargers than direct connection**
-   - Root cause: Variable `canAccommodateAllWithEVEMS` was removed but still referenced
-   - Fix: Added `directAlreadySufficient` check, shows "EVEMS not required" when direct works
-
-2. **kW per charger exceeding physical charger limits**
-   - Root cause: Code didn't cap at charger's physical maximum
-   - Fix: Added `const actualKWPerChargerWithEVEMS = Math.min(perEVSEMaxKW, theoreticalKWPerCharger)`
-
-**UI Cleanup:**
-- Removed Cost Comparison card from calculator
-- Cleaned up unused `DollarSign` import
-
-**Files Modified:**
-- `services/calculations/multiFamilyEV.ts` - EVEMS calculation fixes
-- `components/MultiFamilyEVCalculator.tsx` - Removed Cost Comparison card
-
-**Build Status**: Passing, 37/37 tests pass
+**Remaining (identified, not yet fixed):**
+- `docs/database-architecture.md` — 103 days stale, missing meter_stacks/buildings/units tables
+- `docs/architecture.md` and `docs/development-guide.md` — 59 days stale
+- ADR-005 missing `meter_stack` fed_from_type
+- Business docs need go-to-market status updates
 
 ---
 
-### Session: 2026-01-21 - Multi-Family EV Calculator (Phase 2.5)
+### Session: 2026-02-22 - Extended Calculation Test Suite
 
-**Focus**: Implement Multi-Family EV Readiness Calculator
+**Focus**: Add comprehensive test coverage for calculation services
 **Status**: Complete
-**Branch**: `feature/multi-family-ev`
 
-**Key Features Delivered:**
-- NEC 220.84 multi-family demand factors (23-45% based on unit count)
-- NEC 220.57 per-EVSE load calculation (max of 7,200 VA or nameplate)
-- NEC 625.42 EVEMS right-sizing (size to setpoint, not full connected load)
-- Itemized common area loads with proper NEC demand factors
-- Building service upgrade recommendation (none/panel-only/full-service)
-- EV capacity scenarios comparison (with/without EVEMS)
-- 3-page professional PDF export for city permit submittals
-- Integrated into Permit Packet Generator
+**Work Done:**
+- Added extended test suite covering 6 calculation services (99 tests total)
+- Fixed `fed_from_circuit_number` migration to target panels table
 
-**Files Created:**
-- `services/calculations/multiFamilyEV.ts` - Core calculation engine (1400+ lines)
-- `components/MultiFamilyEVCalculator.tsx` - UI component (~1100 lines)
-- `services/pdfExport/MultiFamilyEVDocuments.tsx` - PDF document (692 lines)
-- `services/pdfExport/multiFamilyEVPDF.tsx` - Export service (84 lines)
-
-**Build Status**: Passing
+**Build Status**: Passing, 99 tests pass

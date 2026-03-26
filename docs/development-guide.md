@@ -1,7 +1,7 @@
 # Development Guide
 ## SparkPlan Application
 
-**Last Updated**: 2026-01-15
+**Last Updated**: 2026-03-20
 **For**: Developers, LLMs continuing development
 **Prerequisites**: TypeScript, React, PostgreSQL basics
 
@@ -32,25 +32,51 @@ NEC-Compliance/
 │   ├── InspectionChecklist.tsx # Pre-inspection checklist
 │   ├── Layout.tsx              # App shell with sidebar navigation
 │   ├── LoadCalculator.tsx      # NEC load calculation interface
-│   ├── OneLineDiagram.tsx      # SVG electrical one-line diagram (1614 lines)
+│   ├── OneLineDiagram.tsx      # SVG electrical one-line diagram (~3,342 lines)
 │   ├── ProjectOverview.tsx     # Project details and settings
-│   └── FeederManager.tsx       # Feeder sizing tool (NEW)
+│   ├── FeederManager.tsx       # Feeder sizing tool
+│   ├── MultiFamilyEVCalculator.tsx  # NEC 220.84/220.57/625.42 calculator
+│   ├── ServiceUpgradeWizard.tsx     # NEC 220.87 service upgrade
+│   ├── UserProfile.tsx         # Account settings page
+│   └── EVEMSLoadManagement.tsx # NEC 625.42 EVEMS calculator
 │
 ├── hooks/               # Custom React hooks for data operations
 │   ├── useProjects.ts   # Projects CRUD + real-time sync
 │   ├── usePanels.ts     # Panels CRUD + hierarchy management
 │   ├── useCircuits.ts   # Circuits CRUD + phase assignment
 │   ├── useTransformers.ts  # Transformers CRUD + voltage tracking
-│   └── useLoads.ts      # Load entries for load calculations
+│   ├── useFeeders.ts      # Feeders CRUD + cross-component events
+│   ├── useMeterStacks.ts  # Meter stack CRUD (Phase 2.7)
+│   ├── useMeters.ts       # Individual meters CRUD (Phase 2.7)
+│   ├── useProfile.ts      # User profile fetch/update (Phase 2.8)
+│   ├── useSubscription.ts # Stripe subscription + feature gating
+│   └── useLoads.ts        # Load entries for load calculations
 │
 ├── services/            # Business logic (no React dependencies)
-│   ├── geminiService.ts         # Google Gemini AI integration
-│   └── calculations/            # NEC calculation engines
+│   ├── ai/                      # AI services
+│   │   └── geminiService.ts     # Google Gemini AI integration (System 1)
+│   ├── autogeneration/          # Multi-family auto-generation (Phase 2.7)
+│   │   ├── multiFamilyProjectGenerator.ts  # 3 generation modes
+│   │   └── projectPopulationOrchestrator.ts # DB insertion in FK order
+│   ├── pdfExport/               # PDF generation services
+│   │   ├── MultiFamilyEVDocuments.tsx  # MF EV 3-page PDF
+│   │   └── MeterStackSchedulePDF.tsx   # Meter stack permit schedule
+│   └── calculations/            # NEC calculation engines (16 services)
 │       ├── loadCalculation.ts   # NEC 220 load calculations
 │       ├── conductorSizing.ts   # NEC 310 conductor ampacity
 │       ├── voltageDrop.ts       # AC impedance voltage drop
 │       ├── breakerSizing.ts     # NEC 240.6(A) standard breakers
-│       └── feederSizing.ts      # NEC 215 feeder calculations
+│       ├── feederSizing.ts      # NEC 215 feeder calculations
+│       ├── multiFamilyEV.ts     # NEC 220.84/220.57/625.42 (Phase 2.5)
+│       ├── serviceUpgrade.ts    # NEC 220.87 (stable, safety-critical)
+│       ├── shortCircuit.ts      # IEEE 141 (stable, safety-critical)
+│       ├── arcFlash.ts          # NFPA 70E
+│       ├── evCharging.ts        # NEC Article 625
+│       ├── evemsLoadManagement.ts # NEC 625.42
+│       ├── solarPV.ts           # NEC Article 690
+│       ├── demandFactor.ts      # NEC 220.42/220.44/220.54/220.56
+│       ├── upstreamLoadAggregation.ts # Hierarchy load rollup
+│       └── residentialLoad.ts   # NEC 220.82 residential
 │
 ├── lib/                 # Utilities and generated types
 │   ├── supabase.ts      # Supabase client initialization
@@ -1134,7 +1160,7 @@ npm run type-check
 
 ## Testing Strategy
 
-**Last Updated**: 2026-01-15
+**Last Updated**: 2026-03-20
 **Current Coverage**: ~20% (calculation services only)
 **Target Coverage**: 75%
 **Framework**: Vitest 4.0.14 + React Testing Library
@@ -1163,7 +1189,7 @@ npm run type-check
 - **Purpose**: Test individual functions in isolation
 - **Speed**: Very fast (<1ms per test)
 - **Coverage target**: 100% for calculation services, 80% for utilities
-- **Current**: 11/11 passing (calculation services only)
+- **Current**: 99/99 passing (6 calculation services)
 
 **Integration Tests** (Middle):
 - **Purpose**: Test multiple components/hooks working together
@@ -1179,44 +1205,18 @@ npm run type-check
 
 ### Current Test Coverage
 
-#### ✅ What's Tested (11 tests, 100% passing)
+#### ✅ What's Tested (99 tests, 100% passing)
 
-**File**: `/tests/calculations.test.ts`
+**Files**: `/tests/calculations.test.ts` + `/tests/calculations-extended.test.ts`
 
-**Load Calculations (5 tests)**:
-```typescript
-describe('Load Calculations', () => {
-  it('calculates dwelling load per NEC 220.82') // ✅ PASSING
-  it('applies lighting demand factors per NEC Table 220.42') // ✅ PASSING
-  it('applies range demand factors per NEC Table 220.55') // ✅ PASSING
-  it('applies 125% continuous load factor') // ✅ PASSING
-  it('calculates commercial load per NEC 220.40') // ✅ PASSING
-});
-```
-
-**Conductor Sizing (3 tests)**:
-```typescript
-describe('Conductor Sizing', () => {
-  it('sizes conductors with temperature correction') // ✅ PASSING
-  it('applies bundling adjustment factors') // ✅ PASSING
-  it('selects correct conductor size from NEC Table 310.16') // ✅ PASSING
-});
-```
-
-**Breaker Sizing (2 tests)**:
-```typescript
-describe('Breaker Sizing', () => {
-  it('selects next standard breaker size per NEC 240.6(A)') // ✅ PASSING
-  it('applies 125% factor for continuous loads') // ✅ PASSING
-});
-```
-
-**Voltage Drop (1 test)**:
-```typescript
-describe('Voltage Drop', () => {
-  it('calculates voltage drop using AC impedance method') // ✅ PASSING
-});
-```
+**Covered Services** (6 calculation engines):
+- Load Calculations (NEC 220.82, 220.40)
+- Conductor Sizing (NEC 310.16, temperature/bundling corrections)
+- Breaker Sizing (NEC 240.6(A), continuous load factors)
+- Voltage Drop (AC impedance method)
+- Feeder Sizing (NEC 215)
+- Short Circuit Analysis (IEEE 141)
+- Multi-Family EV (NEC 220.84/220.57/625.42)
 
 #### ❌ What's NOT Tested
 
@@ -1483,8 +1483,8 @@ open coverage/index.html
 
 ### Summary
 
-**Current State**: 11 tests (calculations only), 100% passing
-**Target State**: 100+ tests across all layers, 75% coverage
+**Current State**: 99 tests across 6 calculation services, 100% passing (as of Feb 2026)
+**Target State**: 200+ tests across all layers, 75% coverage
 
 **Immediate Priorities**:
 1. Add hook tests (`usePanels`, `useCircuits`, `useTransformers`)

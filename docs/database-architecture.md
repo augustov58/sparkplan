@@ -1,9 +1,9 @@
 # Database Architecture
 ## SparkPlan Application
 
-**Last Updated**: 2025-12-03
+**Last Updated**: 2026-03-20
 **Database**: Supabase PostgreSQL 15
-**Schema Version**: 1.0
+**Schema Version**: 2.0
 **Location**: `/supabase/schema.sql` and migration files
 
 ---
@@ -60,8 +60,23 @@
 │  circuits   │
 └─────────────┘
 
+Multi-family tables (added Phase 2.7, Feb 2026):
+┌─────────────┐
+│ meter_stacks│←──── project_id
+└──────┬──────┘
+       │ 1:many
+       ↓
+┌─────────────┐
+│   meters    │
+└─────────────┘
+
+┌─────────────┐         ┌──────────────┐
+│  buildings  │←────────│    units     │
+└─────────────┘ 1:many  └──────────────┘
+
 Other project tables:
 - loads (1:many with projects)
+- feeders (1:many with projects, source_panel → destination_panel)
 - grounding_details (1:many with projects)
 - inspection_items (1:many with projects)
 - issues (1:many with projects)
@@ -83,6 +98,10 @@ CREATE TABLE profiles (
   id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
   email TEXT NOT NULL,
   full_name TEXT,
+  company_name TEXT,
+  license_number TEXT,
+  phone TEXT,
+  address TEXT,
   created_at TIMESTAMP DEFAULT NOW(),
   updated_at TIMESTAMP DEFAULT NOW()
 );
@@ -91,7 +110,7 @@ CREATE TABLE profiles (
 **Design Decisions**:
 - ✅ **1:1 with auth.users** - Profile ID matches user ID
 - ✅ **Cascading delete** - Profile deleted when user deleted
-- ✅ **Minimal fields** - Only application-specific data (email duplicated for convenience)
+- ✅ **Extended fields** (Phase 2.8) - Company, license, phone, address for permit packet auto-fill
 
 **Why separate from auth.users**:
 - `auth.users` is private schema (not accessible via RLS)
@@ -164,7 +183,7 @@ CREATE TABLE panels (
   main_breaker_amps INTEGER,
 
   -- Hierarchy (discriminated union)
-  fed_from_type TEXT NOT NULL CHECK (fed_from_type IN ('service', 'panel', 'transformer')),
+  fed_from_type TEXT NOT NULL CHECK (fed_from_type IN ('service', 'panel', 'transformer', 'meter_stack')),
   fed_from UUID REFERENCES panels(id) ON DELETE CASCADE,
   fed_from_transformer_id UUID REFERENCES transformers(id) ON DELETE CASCADE,
 
@@ -193,9 +212,10 @@ CREATE TABLE panels (
 
 **Discriminated Union Pattern** (See ADR-005):
 ```sql
-fed_from_type: 'service' | 'panel' | 'transformer'
+fed_from_type: 'service' | 'panel' | 'transformer' | 'meter_stack'
 fed_from: UUID (if fed_from_type = 'panel')
 fed_from_transformer_id: UUID (if fed_from_type = 'transformer')
+fed_from_meter_stack_id: UUID (if fed_from_type = 'meter_stack')
 ```
 
 **Why**:
@@ -408,8 +428,66 @@ demand_factor NUMERIC DEFAULT 1.0
 
 ---
 
+#### `meter_stacks` - Multi-Family Meter Stacks (Added Phase 2.7, Feb 2026)
+
+**Purpose**: Configure CT cabinet / meter stack for multi-family buildings
+
+**Key Columns**:
+- `id` UUID PK
+- `project_id` UUID FK → projects
+- `name` TEXT
+- `num_meters` INTEGER
+- `service_amps` INTEGER
+- `voltage` INTEGER
+- `ct_rated_amps` INTEGER (CT cabinet sizing)
+
+**Design**: One meter stack per multi-family project. Meters are child rows.
+
+---
+
+#### `meters` - Individual Meters in Stack (Added Phase 2.7, Feb 2026)
+
+**Purpose**: Individual meter units within a meter stack
+
+**Key Columns**:
+- `id` UUID PK
+- `meter_stack_id` UUID FK → meter_stacks (CASCADE)
+- `project_id` UUID FK → projects
+- `unit_number` TEXT (e.g., "101", "202")
+- `panel_id` UUID FK → panels (optional link to unit panel)
+
+---
+
+#### `buildings` - Multi-Family Buildings (Added Phase 2.7, Feb 2026)
+
+**Purpose**: Building-level data for multi-family projects
+
+**Key Columns**:
+- `id` UUID PK
+- `project_id` UUID FK → projects
+- `name` TEXT
+- `num_units` INTEGER
+- `floors` INTEGER
+
+---
+
+#### `units` - Dwelling Units (Added Phase 2.7, Feb 2026)
+
+**Purpose**: Individual apartment/condo units within a building
+
+**Key Columns**:
+- `id` UUID PK
+- `building_id` UUID FK → buildings (CASCADE)
+- `project_id` UUID FK → projects
+- `unit_number` TEXT
+- `sq_ft` NUMERIC
+- `panel_id` UUID FK → panels (optional link)
+
+---
+
 #### Other Tables
 
+**`feeders`** - Feeder conductors between panels/transformers
 **`grounding_details`** - Grounding electrode system data
 **`inspection_items`** - Pre-inspection checklist items
 **`issues`** - Code compliance issues tracking
@@ -576,16 +654,18 @@ SELECT * FROM panels WHERE project_id = 'abc123';
 
 ## Triggers and Functions
 
-### Profile Creation Trigger
+### Profile Creation Trigger (Updated Phase 2.8, Feb 2026)
 
 **Purpose**: Automatically create profile when user signs up
+
+**Migration**: `supabase/migrations/20260217_profile_creation_trigger.sql`
 
 ```sql
 CREATE OR REPLACE FUNCTION public.handle_new_user()
 RETURNS trigger AS $$
 BEGIN
-  INSERT INTO public.profiles (id, email, created_at)
-  VALUES (NEW.id, NEW.email, NOW());
+  INSERT INTO public.profiles (id, email, full_name, created_at)
+  VALUES (NEW.id, NEW.email, COALESCE(NEW.raw_user_meta_data->>'full_name', ''), NOW());
   RETURN NEW;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
@@ -594,6 +674,12 @@ CREATE TRIGGER on_auth_user_created
   AFTER INSERT ON auth.users
   FOR EACH ROW EXECUTE FUNCTION public.handle_new_user();
 ```
+
+**Backfill** (also in migration): Inserts profile rows for any existing `auth.users` that don't have one.
+
+**Profile Extended Fields** (Phase 2.8):
+- `full_name`, `company_name`, `license_number`, `phone`, `address`
+- Used by Permit Packet auto-fill ("Prepared By" section)
 
 **Why Needed**:
 - `auth.users` is private schema (Supabase managed)

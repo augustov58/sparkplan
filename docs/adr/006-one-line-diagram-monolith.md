@@ -14,9 +14,9 @@ The **one-line diagram** is a critical visualization showing electrical system h
 Utility → Meter → MDP → Panels/Transformers → Downstream Panels
 ```
 
-**Current state**: `OneLineDiagram.tsx` is 1614 lines in a single file.
+**Current state**: `OneLineDiagram.tsx` is ~3,342 lines in a single file (grown from 1,614 lines at time of original decision due to Phase 2.7 additions: CT cabinet rendering, meter stack visualization, print/export dual SVG).
 
-**Typical React wisdom**: Components >500 lines should be split. This component is **3x that threshold**.
+**Typical React wisdom**: Components >500 lines should be split. This component is **6x that threshold**.
 
 **Decision needed**: Should this component be refactored into smaller pieces?
 
@@ -24,7 +24,7 @@ Utility → Meter → MDP → Panels/Transformers → Downstream Panels
 
 ## Decision
 
-**Keep OneLineDiagram.tsx as a single 1614-line component (justified monolith).**
+**Keep OneLineDiagram.tsx as a single ~3,342-line component (justified monolith).**
 
 **Rationale**: The tight coupling between SVG rendering logic and electrical hierarchy traversal makes splitting counterproductive.
 
@@ -148,7 +148,7 @@ return (
 - ✅ **Easy coordinate calculations**: Constants shared across all rendering
 
 ### Negative Consequences
-- ❌ **Long file**: 1614 lines intimidating to new developers
+- ❌ **Long file**: ~3,342 lines intimidating to new developers
 - ❌ **Merge conflicts**: Multiple developers editing same file risk conflicts
 - ❌ **Scroll fatigue**: Must scroll to find specific rendering section
 
@@ -223,7 +223,7 @@ export default function OneLineDiagram() {
 
 **When to refactor**:
 - If adding **riser diagram** or **panel schedule diagram** → Extract shared rendering logic to `/lib/electrical/diagramRenderer.ts`
-- If file exceeds **2500 lines** → Split circuit editor modal to separate component
+- File has exceeded 2500 lines (now ~3,342) — consider extracting circuit editor modal or meter stack rendering to separate components in a future refactor
 - If **Canvas API** needed (100+ panels) → Rewrite as Canvas-based renderer
 
 ---
@@ -251,7 +251,7 @@ export default function OneLineDiagram() {
 
 **Metrics to track**:
 - Component render time (target: <100ms for 20 panels)
-- File length (alert if exceeds 2000 lines)
+- File length (currently ~3,342 — exceeded prior 2000 line alert threshold)
 - Developer time to understand diagram rendering (target: <2 hours)
 
 **Success criteria**:
@@ -259,7 +259,7 @@ export default function OneLineDiagram() {
 - ✅ Developers can debug rendering issues without excessive scrolling
 - ✅ No reported confusion about component organization
 
-**Review date**: 2026-06-01 (re-evaluate if file grows beyond 2000 lines)
+**Review date**: 2026-06-01 (file now ~3,342 lines — re-evaluate splitting CT cabinet / meter stack rendering)
 
 ---
 

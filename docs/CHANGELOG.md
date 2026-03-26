@@ -4,6 +4,39 @@ All notable changes to SparkPlan.
 
 ---
 
+## 2026-02-22: User Profiles & Settings (Phase 2.8)
+
+**New Features:**
+- **Profile auto-creation**: Trigger creates profile row on user signup
+- **Backfill migration**: Existing auth.users get profiles automatically
+- **Account Settings page** (`/settings`): Name, company, license number, contact info
+- **Permit Packet auto-fill**: "Prepared By" and license fields populate from profile
+- **Sidebar display name**: Shows user's name from profile in navigation
+
+**Files Created/Modified:**
+- `hooks/useProfile.ts` — Single-row profile fetch/update hook
+- `components/UserProfile.tsx` — Settings page
+- `supabase/migrations/20260217_profile_creation_trigger.sql` — Trigger + backfill
+
+---
+
+## 2026-02-08: Multi-Family Project Population (Phase 2.7)
+
+**New Features:**
+- **Auto-Generation Service**: "Apply to Project" button creates full electrical hierarchy from MF EV calculator results — MDP, meter stack, house panel, EV sub-panel, unit panels, feeders, EVEMS circuits
+- **Meter Stack & Meters**: New DB schema + hooks with realtime sync
+- **CT Cabinet in One-Line Diagram**: Current transformer metering visualization (both interactive and print views)
+- **Meter Stack Schedule PDF**: Permit-ready meter schedule in permit packet
+- **Building/Unit Relationships**: Hooks + realtime subscription for multi-family hierarchy
+
+**Files Created/Modified:**
+- `services/autogeneration/multiFamilyProjectGenerator.ts` — 3 generation modes
+- `services/autogeneration/projectPopulationOrchestrator.ts` — DB insertion in FK order
+- `services/pdfExport/MeterStackSchedulePDF.tsx` — Permit-ready meter schedule
+- `supabase/migrations/20260208_meter_stacks.sql` — meter_stacks + meters tables
+
+---
+
 ## 2026-02-04: NEC 220.87 Measurement Path & Smart Defaults
 
 **New Features:**

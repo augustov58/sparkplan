@@ -1,6 +1,6 @@
 # SparkPlan - Roadmap
 
-## Current Phase: 2.7 (Multi-Family Project Population) - COMPLETE
+## Latest Completed Phase: 2.8 (User Profiles & Settings) - Feb 2026
 
 ---
 
@@ -57,9 +57,6 @@
 |---------|--------|--------|
 | Conversation Memory | Complete | Multi-turn conversations |
 | Agentic Actions (12 tools) | Complete | Execute calculations via chat |
-| Streaming Responses | Pending | Faster perceived response |
-| Core NEC Tables RAG | Pending | Accurate table lookups |
-| Full NEC RAG | Pending | Complete knowledge base |
 
 ---
 
@@ -123,6 +120,16 @@ MF EV Calculator → "Apply to Project" / "Add EV Infrastructure" buttons
 - `hooks/useProfile.ts` — Single-row profile fetch/update hook
 - `components/UserProfile.tsx` — Settings page
 - `supabase/migrations/20260217_profile_creation_trigger.sql` — Trigger + backfill
+
+---
+
+## Backlog
+
+| Feature | Origin | Impact |
+|---------|--------|--------|
+| Streaming Responses | Phase 2.6 | Faster perceived AI response |
+| Core NEC Tables RAG | Phase 2.6 | Accurate table lookups in chatbot |
+| Full NEC RAG | Phase 2.6 | Complete NEC knowledge base |
 
 ---
 
