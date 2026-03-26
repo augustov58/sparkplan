@@ -552,8 +552,9 @@ const VoltageDropCalculator: React.FC = () => {
 
 const ConduitFillCalculator: React.FC = () => {
   const [tradeSize, setTradeSize] = useState("1");
-  const [conduitType, setConduitType] = useState<'EMT' | 'PVC-40' | 'RMC'>('EMT');
-  const [wireType, setWireType] = useState<'THHN' | 'THW' | 'XHHW'>('THHN');
+  const [conduitType, setConduitType] = useState<'EMT' | 'PVC-40' | 'PVC-80' | 'RMC' | 'IMC'>('EMT');
+  const [wireType, setWireType] = useState<'THHN' | 'THW' | 'XHHW' | 'RHW-2' | 'USE-2'>('THHN');
+  const [conductorMaterial, setConductorMaterial] = useState<'Cu' | 'Al'>('Cu');
 
   // Support for multiple wire groups (combinations)
   interface WireGroup {
@@ -595,7 +596,7 @@ const ConduitFillCalculator: React.FC = () => {
   const wireDetails: Array<{size: string; quantity: number; area: number; totalArea: number}> = [];
 
   wireGroups.forEach(group => {
-    const conductorDim = getConductorDimensions(group.size, wireType);
+    const conductorDim = getConductorDimensions(group.size, wireType, conductorMaterial);
     if (conductorDim) {
       const groupArea = conductorDim.area * group.quantity;
       totalWireArea += groupArea;
@@ -635,12 +636,14 @@ const ConduitFillCalculator: React.FC = () => {
               <label className="label-xs">Conduit Type</label>
               <select
                 value={conduitType}
-                onChange={e => setConduitType(e.target.value as 'EMT' | 'PVC-40' | 'RMC')}
+                onChange={e => setConduitType(e.target.value as 'EMT' | 'PVC-40' | 'PVC-80' | 'RMC' | 'IMC')}
                 className="input-std"
               >
                 <option value="EMT">EMT</option>
-                <option value="PVC-40">PVC Schedule 40</option>
+                <option value="IMC">IMC (Intermediate Metal)</option>
                 <option value="RMC">RMC (Rigid Metal)</option>
+                <option value="PVC-40">PVC Schedule 40</option>
+                <option value="PVC-80">PVC Schedule 80</option>
               </select>
             </div>
             <div>
@@ -660,21 +663,38 @@ const ConduitFillCalculator: React.FC = () => {
                 <option value="3">3"</option>
                 <option value="3-1/2">3-1/2"</option>
                 <option value="4">4"</option>
+                <option value="5">5"</option>
+                <option value="6">6"</option>
               </select>
             </div>
           </div>
 
-          <div className="mb-3">
-            <label className="label-xs">Conductor Insulation Type</label>
-            <select
-              value={wireType}
-              onChange={e => setWireType(e.target.value as 'THHN' | 'THW' | 'XHHW')}
-              className="input-std"
-            >
-              <option value="THHN">THHN/THWN-2 (90°C Dry)</option>
-              <option value="THW">THW/THW-2 (75°C Wet)</option>
-              <option value="XHHW">XHHW-2/RHW-2 (90°C)</option>
-            </select>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
+            <div>
+              <label className="label-xs">Conductor Insulation</label>
+              <select
+                value={wireType}
+                onChange={e => setWireType(e.target.value as 'THHN' | 'THW' | 'XHHW' | 'RHW-2' | 'USE-2')}
+                className="input-std"
+              >
+                <option value="THHN">THHN/THWN-2 (90°C)</option>
+                <option value="THW">THW/THW-2 (75°C)</option>
+                <option value="XHHW">XHHW-2 (90°C)</option>
+                <option value="RHW-2">RHW-2/RHH (90°C)</option>
+                <option value="USE-2">USE-2 (90°C Underground)</option>
+              </select>
+            </div>
+            <div>
+              <label className="label-xs">Conductor Material</label>
+              <select
+                value={conductorMaterial}
+                onChange={e => setConductorMaterial(e.target.value as 'Cu' | 'Al')}
+                className="input-std"
+              >
+                <option value="Cu">Copper</option>
+                <option value="Al">Aluminum</option>
+              </select>
+            </div>
           </div>
         </div>
 
