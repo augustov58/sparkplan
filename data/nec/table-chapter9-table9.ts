@@ -57,7 +57,53 @@ export const CHAPTER_9_TABLE_9: ConductorImpedance[] = [
   { size: '500 kcmil', material: 'Al', conduitType: 'PVC', resistanceOhmsPerKFt: 0.043, reactanceXLOhmsPerKFt: 0.036, effectiveZ: 0.041 },
   { size: '600 kcmil', material: 'Al', conduitType: 'PVC', resistanceOhmsPerKFt: 0.036, reactanceXLOhmsPerKFt: 0.035, effectiveZ: 0.035 },
   { size: '750 kcmil', material: 'Al', conduitType: 'PVC', resistanceOhmsPerKFt: 0.029, reactanceXLOhmsPerKFt: 0.034, effectiveZ: 0.029 },
-  { size: '1000 kcmil', material: 'Al', conduitType: 'PVC', resistanceOhmsPerKFt: 0.023, reactanceXLOhmsPerKFt: 0.033, effectiveZ: 0.024 }
+  { size: '1000 kcmil', material: 'Al', conduitType: 'PVC', resistanceOhmsPerKFt: 0.023, reactanceXLOhmsPerKFt: 0.033, effectiveZ: 0.024 },
+
+  // Copper in Steel conduit (EMT/RGS) — NEC 2023 Chapter 9 Table 9
+  // Steel conduit has higher reactance than PVC due to magnetic permeability
+  { size: '14 AWG', material: 'Cu', conduitType: 'Steel', resistanceOhmsPerKFt: 3.1, reactanceXLOhmsPerKFt: 0.058, effectiveZ: 2.7 },
+  { size: '12 AWG', material: 'Cu', conduitType: 'Steel', resistanceOhmsPerKFt: 2.0, reactanceXLOhmsPerKFt: 0.054, effectiveZ: 1.7 },
+  { size: '10 AWG', material: 'Cu', conduitType: 'Steel', resistanceOhmsPerKFt: 1.2, reactanceXLOhmsPerKFt: 0.050, effectiveZ: 1.0 },
+  { size: '8 AWG', material: 'Cu', conduitType: 'Steel', resistanceOhmsPerKFt: 0.78, reactanceXLOhmsPerKFt: 0.052, effectiveZ: 0.68 },
+  { size: '6 AWG', material: 'Cu', conduitType: 'Steel', resistanceOhmsPerKFt: 0.49, reactanceXLOhmsPerKFt: 0.051, effectiveZ: 0.44 },
+  { size: '4 AWG', material: 'Cu', conduitType: 'Steel', resistanceOhmsPerKFt: 0.31, reactanceXLOhmsPerKFt: 0.048, effectiveZ: 0.28 },
+  { size: '3 AWG', material: 'Cu', conduitType: 'Steel', resistanceOhmsPerKFt: 0.25, reactanceXLOhmsPerKFt: 0.047, effectiveZ: 0.23 },
+  { size: '2 AWG', material: 'Cu', conduitType: 'Steel', resistanceOhmsPerKFt: 0.19, reactanceXLOhmsPerKFt: 0.048, effectiveZ: 0.18 },
+  { size: '1 AWG', material: 'Cu', conduitType: 'Steel', resistanceOhmsPerKFt: 0.15, reactanceXLOhmsPerKFt: 0.051, effectiveZ: 0.15 },
+  { size: '1/0 AWG', material: 'Cu', conduitType: 'Steel', resistanceOhmsPerKFt: 0.12, reactanceXLOhmsPerKFt: 0.050, effectiveZ: 0.12 },
+  { size: '2/0 AWG', material: 'Cu', conduitType: 'Steel', resistanceOhmsPerKFt: 0.10, reactanceXLOhmsPerKFt: 0.049, effectiveZ: 0.10 },
+  { size: '3/0 AWG', material: 'Cu', conduitType: 'Steel', resistanceOhmsPerKFt: 0.077, reactanceXLOhmsPerKFt: 0.048, effectiveZ: 0.079 },
+  { size: '4/0 AWG', material: 'Cu', conduitType: 'Steel', resistanceOhmsPerKFt: 0.062, reactanceXLOhmsPerKFt: 0.047, effectiveZ: 0.063 },
+  { size: '250 kcmil', material: 'Cu', conduitType: 'Steel', resistanceOhmsPerKFt: 0.052, reactanceXLOhmsPerKFt: 0.048, effectiveZ: 0.054 },
+  { size: '300 kcmil', material: 'Cu', conduitType: 'Steel', resistanceOhmsPerKFt: 0.044, reactanceXLOhmsPerKFt: 0.047, effectiveZ: 0.047 },
+  { size: '350 kcmil', material: 'Cu', conduitType: 'Steel', resistanceOhmsPerKFt: 0.038, reactanceXLOhmsPerKFt: 0.046, effectiveZ: 0.042 },
+  { size: '400 kcmil', material: 'Cu', conduitType: 'Steel', resistanceOhmsPerKFt: 0.033, reactanceXLOhmsPerKFt: 0.045, effectiveZ: 0.038 },
+  { size: '500 kcmil', material: 'Cu', conduitType: 'Steel', resistanceOhmsPerKFt: 0.027, reactanceXLOhmsPerKFt: 0.043, effectiveZ: 0.033 },
+  { size: '600 kcmil', material: 'Cu', conduitType: 'Steel', resistanceOhmsPerKFt: 0.023, reactanceXLOhmsPerKFt: 0.042, effectiveZ: 0.030 },
+  { size: '750 kcmil', material: 'Cu', conduitType: 'Steel', resistanceOhmsPerKFt: 0.019, reactanceXLOhmsPerKFt: 0.041, effectiveZ: 0.027 },
+  { size: '1000 kcmil', material: 'Cu', conduitType: 'Steel', resistanceOhmsPerKFt: 0.015, reactanceXLOhmsPerKFt: 0.040, effectiveZ: 0.025 },
+
+  // Aluminum in Steel conduit (EMT/RGS) — NEC 2023 Chapter 9 Table 9
+  { size: '12 AWG', material: 'Al', conduitType: 'Steel', resistanceOhmsPerKFt: 3.2, reactanceXLOhmsPerKFt: 0.054, effectiveZ: 2.8 },
+  { size: '10 AWG', material: 'Al', conduitType: 'Steel', resistanceOhmsPerKFt: 2.0, reactanceXLOhmsPerKFt: 0.050, effectiveZ: 1.7 },
+  { size: '8 AWG', material: 'Al', conduitType: 'Steel', resistanceOhmsPerKFt: 1.3, reactanceXLOhmsPerKFt: 0.052, effectiveZ: 1.1 },
+  { size: '6 AWG', material: 'Al', conduitType: 'Steel', resistanceOhmsPerKFt: 0.81, reactanceXLOhmsPerKFt: 0.051, effectiveZ: 0.72 },
+  { size: '4 AWG', material: 'Al', conduitType: 'Steel', resistanceOhmsPerKFt: 0.51, reactanceXLOhmsPerKFt: 0.048, effectiveZ: 0.46 },
+  { size: '3 AWG', material: 'Al', conduitType: 'Steel', resistanceOhmsPerKFt: 0.40, reactanceXLOhmsPerKFt: 0.047, effectiveZ: 0.37 },
+  { size: '2 AWG', material: 'Al', conduitType: 'Steel', resistanceOhmsPerKFt: 0.32, reactanceXLOhmsPerKFt: 0.048, effectiveZ: 0.30 },
+  { size: '1 AWG', material: 'Al', conduitType: 'Steel', resistanceOhmsPerKFt: 0.25, reactanceXLOhmsPerKFt: 0.051, effectiveZ: 0.25 },
+  { size: '1/0 AWG', material: 'Al', conduitType: 'Steel', resistanceOhmsPerKFt: 0.20, reactanceXLOhmsPerKFt: 0.050, effectiveZ: 0.20 },
+  { size: '2/0 AWG', material: 'Al', conduitType: 'Steel', resistanceOhmsPerKFt: 0.16, reactanceXLOhmsPerKFt: 0.049, effectiveZ: 0.16 },
+  { size: '3/0 AWG', material: 'Al', conduitType: 'Steel', resistanceOhmsPerKFt: 0.13, reactanceXLOhmsPerKFt: 0.048, effectiveZ: 0.13 },
+  { size: '4/0 AWG', material: 'Al', conduitType: 'Steel', resistanceOhmsPerKFt: 0.10, reactanceXLOhmsPerKFt: 0.047, effectiveZ: 0.10 },
+  { size: '250 kcmil', material: 'Al', conduitType: 'Steel', resistanceOhmsPerKFt: 0.085, reactanceXLOhmsPerKFt: 0.048, effectiveZ: 0.087 },
+  { size: '300 kcmil', material: 'Al', conduitType: 'Steel', resistanceOhmsPerKFt: 0.071, reactanceXLOhmsPerKFt: 0.047, effectiveZ: 0.074 },
+  { size: '350 kcmil', material: 'Al', conduitType: 'Steel', resistanceOhmsPerKFt: 0.061, reactanceXLOhmsPerKFt: 0.046, effectiveZ: 0.065 },
+  { size: '400 kcmil', material: 'Al', conduitType: 'Steel', resistanceOhmsPerKFt: 0.054, reactanceXLOhmsPerKFt: 0.045, effectiveZ: 0.058 },
+  { size: '500 kcmil', material: 'Al', conduitType: 'Steel', resistanceOhmsPerKFt: 0.043, reactanceXLOhmsPerKFt: 0.043, effectiveZ: 0.048 },
+  { size: '600 kcmil', material: 'Al', conduitType: 'Steel', resistanceOhmsPerKFt: 0.036, reactanceXLOhmsPerKFt: 0.042, effectiveZ: 0.042 },
+  { size: '750 kcmil', material: 'Al', conduitType: 'Steel', resistanceOhmsPerKFt: 0.029, reactanceXLOhmsPerKFt: 0.041, effectiveZ: 0.036 },
+  { size: '1000 kcmil', material: 'Al', conduitType: 'Steel', resistanceOhmsPerKFt: 0.023, reactanceXLOhmsPerKFt: 0.040, effectiveZ: 0.033 }
 ];
 
 /**

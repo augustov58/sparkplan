@@ -86,16 +86,13 @@ export function getCircuitPhase(circuitNumber: number, panelPhase: 1 | 3): 'A' |
 
 /**
  * Calculate NEC 220.42 Lighting Demand Factor
- * First 3000 VA at 100%, next 117,000 VA at 35%, remainder at 25%
+ * NEC 2023 Table 220.42 (Dwelling Units): First 3,000 VA at 100%, all remainder at 35%
  */
 function calculateLightingDemandFactor(totalVA: number): number {
   if (totalVA <= 3000) {
     return 1.0;
-  } else if (totalVA <= 120000) {
-    const demandVA = 3000 + (totalVA - 3000) * 0.35;
-    return demandVA / totalVA;
   } else {
-    const demandVA = 3000 + (117000 * 0.35) + (totalVA - 120000) * 0.25;
+    const demandVA = 3000 + (totalVA - 3000) * 0.35;
     return demandVA / totalVA;
   }
 }
@@ -127,8 +124,8 @@ function calculateDryerDemandFactor(numDryers: number): number {
   if (numDryers <= 11) {
     return factors[numDryers] || 1.0;
   }
-  // 12+ dryers: 47% + (count - 11) × 0.5%
-  return Math.max(0.35, 0.47 - (numDryers - 11) * 0.005);
+  // 12+ dryers: 47% minus 1% per dryer over 11, minimum 35% (NEC 2023 Table 220.54)
+  return Math.max(0.35, 0.47 - (numDryers - 11) * 0.01);
 }
 
 /**

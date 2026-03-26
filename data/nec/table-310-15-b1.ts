@@ -24,7 +24,9 @@ export const TABLE_310_15_B1: TemperatureCorrectionFactor[] = [
   { ambientTempC: 65, temp60C: 0.00, temp75C: 0.47, temp90C: 0.65 },
   { ambientTempC: 70, temp60C: 0.00, temp75C: 0.33, temp90C: 0.58 },
   { ambientTempC: 75, temp60C: 0.00, temp75C: 0.00, temp90C: 0.50 },
-  { ambientTempC: 80, temp60C: 0.00, temp75C: 0.00, temp90C: 0.41 }
+  { ambientTempC: 80, temp60C: 0.00, temp75C: 0.00, temp90C: 0.41 },
+  { ambientTempC: 85, temp60C: 0.00, temp75C: 0.00, temp90C: 0.29 },
+  { ambientTempC: 90, temp60C: 0.00, temp75C: 0.00, temp90C: 0.00 }
 ];
 
 /**
@@ -44,20 +46,27 @@ export function getTemperatureCorrectionFactor(
   ambientTempC: number,
   insulationTemp: 60 | 75 | 90
 ): number {
-  // Find closest ambient temperature
-  let closest = TABLE_310_15_B1[0];
-  if (!closest) return 1.0; // Fallback to no correction
-  let minDiff = Math.abs(ambientTempC - closest.ambientTempC);
+  // NEC requires using the table row at or above the actual ambient temperature
+  // (round UP to next listed row for conservative derating)
+  if (TABLE_310_15_B1.length === 0) return 1.0;
 
+  // For temps at or below the lowest row (10°C), use that row (gives a bonus factor)
+  if (ambientTempC <= TABLE_310_15_B1[0].ambientTempC) {
+    const entry = TABLE_310_15_B1[0];
+    if (insulationTemp === 60) return entry.temp60C;
+    if (insulationTemp === 75) return entry.temp75C;
+    return entry.temp90C;
+  }
+
+  // Find the first row where table temp >= ambient temp (round up)
   for (const entry of TABLE_310_15_B1) {
-    const diff = Math.abs(ambientTempC - entry.ambientTempC);
-    if (diff < minDiff) {
-      closest = entry;
-      minDiff = diff;
+    if (entry.ambientTempC >= ambientTempC) {
+      if (insulationTemp === 60) return entry.temp60C;
+      if (insulationTemp === 75) return entry.temp75C;
+      return entry.temp90C;
     }
   }
 
-  if (insulationTemp === 60) return closest.temp60C;
-  if (insulationTemp === 75) return closest.temp75C;
-  return closest.temp90C;
+  // Ambient exceeds highest table row — conductor cannot be used at this temp
+  return 0.00;
 }

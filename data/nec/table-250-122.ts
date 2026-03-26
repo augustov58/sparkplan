@@ -44,9 +44,9 @@ export const TABLE_250_122: EgcSizeEntry[] = [
   { maxOcpdRating: 2000, copperEgcSize: '250', aluminumEgcSize: '400' },
   { maxOcpdRating: 2500, copperEgcSize: '350', aluminumEgcSize: '600' },
   { maxOcpdRating: 3000, copperEgcSize: '400', aluminumEgcSize: '600' },
-  { maxOcpdRating: 4000, copperEgcSize: '500', aluminumEgcSize: '750' },
-  { maxOcpdRating: 5000, copperEgcSize: '700', aluminumEgcSize: '1000' },
-  { maxOcpdRating: 6000, copperEgcSize: '800', aluminumEgcSize: '1000' },
+  { maxOcpdRating: 4000, copperEgcSize: '500', aluminumEgcSize: '800' },
+  { maxOcpdRating: 5000, copperEgcSize: '700', aluminumEgcSize: '1200' },
+  { maxOcpdRating: 6000, copperEgcSize: '800', aluminumEgcSize: '1200' },
 ];
 
 /**

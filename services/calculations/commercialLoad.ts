@@ -231,6 +231,7 @@ export const OCCUPANCY_LABELS: Record<OccupancyType, string> = {
  * These are the available main breaker/fuse ratings
  */
 const STANDARD_OCPD_SIZES = [
+  15, 20, 25, 30, 35, 40, 45, 50, 60, 70, 80, 90,
   100, 110, 125, 150, 175, 200, 225, 250, 300, 350, 400, 450, 500, 600, 700, 800,
   1000, 1200, 1600, 2000, 2500, 3000, 4000, 5000, 6000,
 ];
