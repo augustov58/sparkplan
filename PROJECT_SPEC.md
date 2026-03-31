@@ -1,6 +1,6 @@
 # SparkPlan — Project Specification
 
-**Last Updated:** February 22, 2026
+**Last Updated:** March 31, 2026
 **Domain:** [sparkplan.app](https://sparkplan.app)
 **Repository:** augustov58/nec_compliance
 
@@ -26,12 +26,13 @@
 
 ### 2.1 Core Calculators
 
-16 pure-function calculation engines in `services/calculations/`. All return `necReferences[]`, `warnings[]`, and itemized breakdowns. None throw on bad input — they return results with warnings.
+17 pure-function calculation engines in `services/calculations/`. All return `necReferences[]`, `warnings[]`, and itemized breakdowns. None throw on bad input — they return results with warnings.
 
 | Calculator | File | Key NEC References |
 |------------|------|--------------------|
 | Residential Load | `residentialLoad.ts` | 220.82, 220.83, 220.84 |
 | Commercial Load | `commercialLoad.ts` | 220.12, 220.42, 220.44, 220.56 |
+| Load Calculation | `loadCalculation.ts` | 220, demand factors, continuous loads |
 | Multi-Family EV | `multiFamilyEV.ts` | 220.84, 220.57, 625.42 |
 | Service Upgrade | `serviceUpgrade.ts` | 220.87 (125% calc vs. measured) |
 | Short Circuit | `shortCircuit.ts` | 110.9, IEEE 141 |
@@ -55,14 +56,14 @@
 |-------|---------------|---------|
 | `table-310-16.ts` | Table 310.16 | Conductor ampacity by size/material/temperature |
 | `table-310-15-b1.ts` | 310.15(B)(1) | Ampacity derating for bundled conductors |
-| `table-310-15-c1.ts` | 310.15(C)(1) | Temperature correction factors (60/75/90 C) |
-| `table-250-122.ts` | 250.122 | EGC sizing (14 AWG - 1000 kcmil) |
+| `table-310-15-c1.ts` | 310.15(C)(1) | Temperature correction factors (60/75/90°C) |
+| `table-250-122.ts` | 250.122 | EGC sizing (14 AWG - 1000 kcmil, Cu + Al) |
 | `table-220-42.ts` | 220.42 | Lighting demand factors by occupancy |
 | `table-220-55.ts` | 220.55 | Range demand factors |
 | `standard-breakers.ts` | 240.6(A) | Standard breaker sizes (15A - 6000A) |
-| `chapter9-table9.ts` | Chapter 9 Table 9 | AC impedance (R + jX) for voltage drop |
-| `chapter9-conductor-dimensions.ts` | Chapter 9 Table 4 | Conductor dimensions for conduit fill |
-| `chapter9-conduit-dimensions.ts` | Chapter 9 Table 3 | Conduit fill areas |
+| `chapter9-table9.ts` | Chapter 9 Table 9 | AC impedance (R + jX) for voltage drop — Cu/Al, steel/non-magnetic |
+| `chapter9-conductor-dimensions.ts` | Chapter 9 Table 5 | Conductor dimensions for conduit fill — 5 wire types (THHN, THW, XHHW, RHW-2, USE-2), Cu + Al |
+| `chapter9-conduit-dimensions.ts` | Chapter 9 Table 4 | Conduit/tubing areas — 5 types (EMT, PVC-40, PVC-80, RMC, IMC), 1/2" to 6" |
 | `conductor-properties.ts` | — | Conductor comparison & proportional EGC upsizing |
 
 ### 2.3 Design & Layout Tools
@@ -209,8 +210,8 @@ Route: `/settings`
 | 625.42 | EVEMS Load Management | `evemsLoadManagement.ts` |
 | 625.44 | EV Conductor Sizing | `evCharging.ts` |
 | Article 690 | Solar PV | `solarPV.ts` |
-| Chapter 9 Table 3 | Conduit Fill | `chapter9-conduit-dimensions.ts` |
-| Chapter 9 Table 4 | Conductor Dimensions | `chapter9-conductor-dimensions.ts` |
+| Chapter 9 Table 4 | Conduit/Tubing Dimensions | `chapter9-conduit-dimensions.ts` |
+| Chapter 9 Table 5 | Conductor Dimensions | `chapter9-conductor-dimensions.ts` |
 | Chapter 9 Table 9 | AC Impedance | `chapter9-table9.ts` |
 
 ### IEEE / NFPA Standards
