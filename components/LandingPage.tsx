@@ -52,7 +52,7 @@ export const LandingPage: React.FC = () => {
             onClick={() => navigate('/signup')}
             className="bg-[#2d3b2d] hover:bg-[#3d4f3d] text-white px-5 py-2 text-sm font-medium rounded-md transition-colors shadow-sm"
           >
-            Sign Up
+            Start Free Trial
           </button>
         </div>
 
@@ -69,7 +69,7 @@ export const LandingPage: React.FC = () => {
            <button onClick={() => scrollTo('pricing')} className="text-lg font-medium text-[#1a1a1a]">Pricing</button>
            <button onClick={() => scrollTo('faq')} className="text-lg font-medium text-[#1a1a1a]">FAQ</button>
            <button onClick={() => navigate('/login')} className="border border-[#e8e6e3] text-[#1a1a1a] py-3 rounded-md font-bold text-center">Sign In</button>
-           <button onClick={() => navigate('/signup')} className="bg-[#2d3b2d] text-white py-3 rounded-md font-bold text-center">Sign Up</button>
+           <button onClick={() => navigate('/signup')} className="bg-[#2d3b2d] text-white py-3 rounded-md font-bold text-center">Start Free Trial</button>
         </div>
       )}
 
@@ -79,15 +79,15 @@ export const LandingPage: React.FC = () => {
           SparkPlan. <br className="hidden md:block"/>
           <span className="text-[#c9a227]">Simplified. Automated.</span>
         </h1>
-        <p className="text-xl text-[#666] max-w-2xl mx-auto mb-10 leading-relaxed">
+        <p className="text-xl text-[#666] max-w-2xl mx-auto mb-8 leading-relaxed">
           The modern way to plan, verify, and document electrical installations. Get guided through every NEC step — from load calculations to inspection readiness.
         </p>
-        <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
+        <div className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-4">
           <button
             onClick={() => navigate('/signup')}
             className="w-full sm:w-auto bg-[#2d3b2d] hover:bg-[#3d4f3d] text-white px-8 py-4 text-base font-semibold rounded-md transition-all hover:-translate-y-1"
           >
-            Get Started Free
+            Start Your 14-Day Free Trial
           </button>
           <button
             onClick={() => navigate('/login')}
@@ -96,6 +96,7 @@ export const LandingPage: React.FC = () => {
             Sign In
           </button>
         </div>
+        <p className="text-sm text-[#888]">No credit card required · Full Business features for 14 days</p>
       </section>
 
       {/* 3. Social Proof */}
@@ -155,7 +156,11 @@ export const LandingPage: React.FC = () => {
         <div className="max-w-7xl mx-auto">
           <div className="text-center mb-16">
             <h2 className="font-serif text-3xl font-medium mb-4">Simple, transparent pricing.</h2>
-            <p className="text-white/70">Choose the plan that fits your team size.</p>
+            <p className="text-white/70 mb-3">Choose the plan that fits your team size.</p>
+            <div className="inline-flex items-center gap-2 bg-[#c9a227]/20 text-[#c9a227] px-4 py-2 rounded-full text-sm font-medium">
+              <Bolt className="w-4 h-4" />
+              Every new account starts with a 14-day Business trial — no credit card needed
+            </div>
           </div>
 
           <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6 max-w-6xl mx-auto">
@@ -174,7 +179,7 @@ export const LandingPage: React.FC = () => {
                 ))}
               </ul>
               <button onClick={() => navigate('/signup')} className="w-full bg-[#3d4f3d] text-white hover:bg-[#4d5f4d] py-2.5 rounded-md font-semibold transition-colors">
-                Get Started
+                Start 14-Day Free Trial
               </button>
             </div>
 
@@ -193,7 +198,7 @@ export const LandingPage: React.FC = () => {
                 ))}
               </ul>
               <button onClick={() => navigate('/signup')} className="w-full bg-white text-[#1a1a1a] hover:bg-gray-100 py-2.5 rounded-md font-semibold transition-colors">
-                Start Free Trial
+                Start 14-Day Free Trial
               </button>
             </div>
 
@@ -213,7 +218,7 @@ export const LandingPage: React.FC = () => {
                 ))}
               </ul>
               <button onClick={() => navigate('/signup')} className="w-full bg-[#c9a227] hover:bg-[#d4ad32] text-[#1a1a1a] py-2.5 rounded-md font-semibold transition-colors">
-                Start Pro Trial
+                Start 14-Day Free Trial
               </button>
             </div>
 
@@ -232,7 +237,7 @@ export const LandingPage: React.FC = () => {
                 ))}
               </ul>
               <button onClick={() => navigate('/signup')} className="w-full bg-white text-[#1a1a1a] hover:bg-gray-100 py-2.5 rounded-md font-semibold transition-colors">
-                Start Free Trial
+                Start 14-Day Free Trial
               </button>
             </div>
           </div>

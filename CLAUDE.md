@@ -228,8 +228,8 @@ See [`.env.example`](./.env.example) and [`backend/.env.example`](./backend/.env
 
 ## Resources
 
-- **GitHub**: `augustov58/nec_compliance`
-- **Backend**: https://neccompliance-production.up.railway.app
+- **GitHub**: `augustov58/sparkplan`
+- **Backend**: https://sparkplan.app
 
 ---
 

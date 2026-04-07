@@ -58,6 +58,7 @@ export function useAuth(): UseAuthReturn {
         data: {
           full_name: fullName || '',
         },
+        emailRedirectTo: window.location.origin + window.location.pathname,
       },
     });
     return { error };
