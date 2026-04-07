@@ -1,6 +1,6 @@
 # Stripe Integration Setup Guide
 
-This guide covers how to configure Stripe for the NEC Compliance subscription system.
+This guide covers how to configure Stripe for the SparkPlan subscription system.
 
 ## Overview
 
