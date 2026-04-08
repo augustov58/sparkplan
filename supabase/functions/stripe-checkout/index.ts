@@ -117,7 +117,17 @@ serve(async (req) => {
     const defaultSuccessUrl = `${baseUrl}/#/settings?checkout=success`
     const defaultCancelUrl = `${baseUrl}/#/pricing?checkout=canceled`
 
-    // Create checkout session
+    // Check if user is still within their app trial period
+    const { data: currentSub } = await supabaseAdmin
+      .from('subscriptions')
+      .select('status, trial_end')
+      .eq('user_id', user.id)
+      .single()
+
+    const isOnAppTrial = currentSub?.status === 'trialing' && currentSub?.trial_end &&
+      new Date(currentSub.trial_end) > new Date()
+
+    // Create checkout session — no Stripe trial if user already had their app trial
     const session = await stripe.checkout.sessions.create({
       customer: customerId,
       client_reference_id: user.id,
@@ -131,7 +141,6 @@ serve(async (req) => {
       success_url: successUrl || defaultSuccessUrl,
       cancel_url: cancelUrl || defaultCancelUrl,
       subscription_data: {
-        trial_period_days: 14, // 14-day free trial
         metadata: {
           supabase_user_id: user.id,
           plan: plan,

@@ -17,13 +17,11 @@ const stripe = new Stripe(Deno.env.get('STRIPE_SECRET_KEY') as string, {
 // Create Stripe SubtleCrypto provider for webhook verification
 const cryptoProvider = Stripe.createSubtleCryptoProvider()
 
-// Price ID to plan mapping (configure these in Stripe Dashboard)
+// Price ID to plan mapping - uses env vars with hardcoded fallbacks
 const PRICE_TO_PLAN: Record<string, string> = {
-  // These should match your Stripe Price IDs
-  'price_starter_monthly': 'starter',
-  'price_pro_monthly': 'pro',
-  'price_business_monthly': 'business',
-  // Add your actual Stripe price IDs here
+  [Deno.env.get('STRIPE_PRICE_STARTER') || 'price_starter_monthly']: 'starter',
+  [Deno.env.get('STRIPE_PRICE_PRO') || 'price_pro_monthly']: 'pro',
+  [Deno.env.get('STRIPE_PRICE_BUSINESS') || 'price_business_monthly']: 'business',
 }
 
 serve(async (req) => {
