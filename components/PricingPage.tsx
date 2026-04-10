@@ -114,6 +114,13 @@ export const PricingPage: React.FC = () => {
     }
 
     if (plan === 'free') {
+      if (isCurrentPlan) {
+        return (
+          <button disabled className="w-full bg-gray-600 text-gray-400 py-2.5 rounded-sm cursor-not-allowed">
+            Current Plan
+          </button>
+        );
+      }
       return subscription?.stripe_subscription_id ? (
         <button
           onClick={handleManageSubscription}
@@ -123,8 +130,8 @@ export const PricingPage: React.FC = () => {
           {portalLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Manage in Portal'}
         </button>
       ) : (
-        <button disabled className="w-full bg-gray-600 text-gray-400 py-2.5 rounded-sm cursor-not-allowed">
-          Current Plan
+        <button disabled className="w-full bg-gray-600 text-gray-400 py-2.5 rounded-sm font-semibold">
+          Free Tier
         </button>
       );
     }

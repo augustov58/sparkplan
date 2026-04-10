@@ -148,6 +148,10 @@ serve(async (req) => {
       },
       allow_promotion_codes: true,
       billing_address_collection: 'required',
+      customer_update: {
+        name: 'auto',
+        address: 'auto',
+      },
       tax_id_collection: {
         enabled: true,
       },
