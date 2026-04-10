@@ -152,14 +152,31 @@ export const PricingPage: React.FC = () => {
       );
     }
 
-    if (isDowngrade && subscription?.stripe_subscription_id) {
+    if (isDowngrade) {
+      // If user has a Stripe subscription, downgrade via portal
+      if (subscription?.stripe_subscription_id) {
+        return (
+          <button
+            onClick={handleManageSubscription}
+            disabled={portalLoading}
+            className="w-full bg-gray-700 text-white hover:bg-gray-600 py-2.5 rounded-sm font-semibold transition-colors flex items-center justify-center gap-2"
+          >
+            {portalLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Downgrade in Portal'}
+          </button>
+        );
+      }
+      // If user is on trial/admin/enterprise without Stripe, allow selecting any plan
       return (
         <button
-          onClick={handleManageSubscription}
-          disabled={portalLoading}
-          className="w-full bg-gray-700 text-white hover:bg-gray-600 py-2.5 rounded-sm font-semibold transition-colors flex items-center justify-center gap-2"
+          onClick={() => handleUpgrade(plan)}
+          disabled={isLoading}
+          className="w-full bg-white text-gray-900 hover:bg-gray-100 py-2.5 rounded-sm font-semibold transition-colors flex items-center justify-center gap-2"
         >
-          {portalLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Downgrade in Portal'}
+          {isLoading ? (
+            <Loader2 className="w-4 h-4 animate-spin" />
+          ) : (
+            `Choose ${plan.charAt(0).toUpperCase() + plan.slice(1)}`
+          )}
         </button>
       );
     }
