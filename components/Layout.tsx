@@ -27,7 +27,8 @@ import {
   ChevronDown,
   ChevronRight,
   Menu,
-  X
+  X,
+  CreditCard
 } from 'lucide-react';
 import { useAuthContext } from './Auth/AuthProvider';
 import { useProfile } from '@/hooks/useProfile';
@@ -315,6 +316,12 @@ export const Layout: React.FC<LayoutProps> = ({ children, title, showBack, onSig
               <p className="text-[#888] truncate">{user?.email || 'No email'}</p>
             </div>
           </div>
+          <button
+            onClick={() => { navigate('/pricing'); setIsMobileMenuOpen(false); }}
+            className="w-full flex items-center gap-2 px-3 py-2 text-xs font-medium text-[#666] hover:text-[#1a1a1a] hover:bg-[#faf9f7] rounded-md transition-colors mb-1"
+          >
+            <CreditCard className="w-3 h-3" /> Billing & Plans
+          </button>
           <button
             onClick={() => { navigate('/settings'); setIsMobileMenuOpen(false); }}
             className="w-full flex items-center gap-2 px-3 py-2 text-xs font-medium text-[#666] hover:text-[#1a1a1a] hover:bg-[#faf9f7] rounded-md transition-colors mb-1"
