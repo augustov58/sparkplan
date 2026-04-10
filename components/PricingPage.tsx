@@ -87,9 +87,8 @@ export const PricingPage: React.FC = () => {
 
   const getPlanButton = (plan: SubscriptionPlan) => {
     const isCurrentPlan = plan === currentPlan;
-    const isUpgrade = getPlanRank(plan) > getPlanRank(currentPlan);
-    const isDowngrade = getPlanRank(plan) < getPlanRank(currentPlan);
     const isLoading = checkoutLoading === plan;
+    const hasStripeSubscription = !!subscription?.stripe_subscription_id;
 
     if (plan === 'enterprise') {
       return (
@@ -102,6 +101,48 @@ export const PricingPage: React.FC = () => {
       );
     }
 
+    if (plan === 'free') {
+      if (!hasStripeSubscription) {
+        return (
+          <button disabled className="w-full bg-gray-600 text-gray-400 py-2.5 rounded-sm font-semibold cursor-not-allowed">
+            Free Tier
+          </button>
+        );
+      }
+      return (
+        <button
+          onClick={handleManageSubscription}
+          disabled={portalLoading}
+          className="w-full bg-gray-700 text-white hover:bg-gray-600 py-2.5 rounded-sm font-semibold transition-colors flex items-center justify-center gap-2"
+        >
+          {portalLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Manage in Portal'}
+        </button>
+      );
+    }
+
+    // During trial (no Stripe subscription) — all paid plans are selectable
+    if (isTrial && !hasStripeSubscription) {
+      const planName = plan.charAt(0).toUpperCase() + plan.slice(1);
+      return (
+        <button
+          onClick={() => handleUpgrade(plan)}
+          disabled={isLoading}
+          className={`w-full py-2.5 rounded-sm font-semibold transition-colors flex items-center justify-center gap-2 ${
+            plan === 'pro'
+              ? 'bg-[#2d3b2d] hover:bg-[#3d4f3d] text-white'
+              : 'bg-white text-gray-900 hover:bg-gray-100'
+          }`}
+        >
+          {isLoading ? (
+            <Loader2 className="w-4 h-4 animate-spin" />
+          ) : (
+            `Subscribe to ${planName}`
+          )}
+        </button>
+      );
+    }
+
+    // Active Stripe subscription — current plan is locked, others go through portal
     if (isCurrentPlan) {
       return (
         <button
@@ -113,80 +154,37 @@ export const PricingPage: React.FC = () => {
       );
     }
 
-    if (plan === 'free') {
-      if (isCurrentPlan) {
-        return (
-          <button disabled className="w-full bg-gray-600 text-gray-400 py-2.5 rounded-sm cursor-not-allowed">
-            Current Plan
-          </button>
-        );
-      }
-      return subscription?.stripe_subscription_id ? (
+    // Upgrade or downgrade via portal/checkout
+    if (hasStripeSubscription) {
+      return (
         <button
           onClick={handleManageSubscription}
           disabled={portalLoading}
           className="w-full bg-gray-700 text-white hover:bg-gray-600 py-2.5 rounded-sm font-semibold transition-colors flex items-center justify-center gap-2"
         >
-          {portalLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Manage in Portal'}
-        </button>
-      ) : (
-        <button disabled className="w-full bg-gray-600 text-gray-400 py-2.5 rounded-sm font-semibold">
-          Free Tier
+          {portalLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Change Plan'}
         </button>
       );
     }
 
-    if (isUpgrade) {
-      return (
-        <button
-          onClick={() => handleUpgrade(plan)}
-          disabled={isLoading}
-          className={`w-full py-2.5 rounded-sm font-semibold transition-colors flex items-center justify-center gap-2 ${
-            plan === 'pro'
-              ? 'bg-[#2d3b2d] hover:bg-[#2d3b2d] text-white'
-              : 'bg-white text-gray-900 hover:bg-gray-100'
-          }`}
-        >
-          {isLoading ? (
-            <Loader2 className="w-4 h-4 animate-spin" />
-          ) : (
-            <>
-              Upgrade to {plan.charAt(0).toUpperCase() + plan.slice(1)}
-              {isTrial && ' (14-day trial)'}
-            </>
-          )}
-        </button>
-      );
-    }
-
-    if (isDowngrade) {
-      // If user has a Stripe subscription, downgrade via portal
-      if (subscription?.stripe_subscription_id) {
-        return (
-          <button
-            onClick={handleManageSubscription}
-            disabled={portalLoading}
-            className="w-full bg-gray-700 text-white hover:bg-gray-600 py-2.5 rounded-sm font-semibold transition-colors flex items-center justify-center gap-2"
-          >
-            {portalLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Downgrade in Portal'}
-          </button>
-        );
-      }
-      // If user is on trial/admin/enterprise without Stripe, allow selecting any plan
-      return (
-        <button
-          onClick={() => handleUpgrade(plan)}
-          disabled={isLoading}
-          className="w-full bg-white text-gray-900 hover:bg-gray-100 py-2.5 rounded-sm font-semibold transition-colors flex items-center justify-center gap-2"
-        >
-          {isLoading ? (
-            <Loader2 className="w-4 h-4 animate-spin" />
-          ) : (
-            `Choose ${plan.charAt(0).toUpperCase() + plan.slice(1)}`
-          )}
-        </button>
-      );
-    }
+    // Fallback — no subscription at all (expired trial, free user)
+    return (
+      <button
+        onClick={() => handleUpgrade(plan)}
+        disabled={isLoading}
+        className={`w-full py-2.5 rounded-sm font-semibold transition-colors flex items-center justify-center gap-2 ${
+          plan === 'pro'
+            ? 'bg-[#2d3b2d] hover:bg-[#3d4f3d] text-white'
+            : 'bg-white text-gray-900 hover:bg-gray-100'
+        }`}
+      >
+        {isLoading ? (
+          <Loader2 className="w-4 h-4 animate-spin" />
+        ) : (
+          `Subscribe to ${plan.charAt(0).toUpperCase() + plan.slice(1)}`
+        )}
+      </button>
+    );
 
     return null;
   };
