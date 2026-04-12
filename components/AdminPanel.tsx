@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Search, Shield, Loader2, CheckCircle, AlertCircle, UserPlus, Trash2, Users, MailCheck, MailX } from 'lucide-react';
+import { Search, Shield, Loader2, CheckCircle, AlertCircle, UserPlus, Trash2, Users, MailCheck, MailX, RotateCcw } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import type { SubscriptionPlan } from '@/hooks/useSubscription';
 
@@ -23,6 +23,7 @@ export const AdminPanel: React.FC = () => {
   const [updating, setUpdating] = useState<string | null>(null);
   const [deleting, setDeleting] = useState<string | null>(null);
   const [confirming, setConfirming] = useState<string | null>(null);
+  const [refunding, setRefunding] = useState<string | null>(null);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
   // Add user form
@@ -169,6 +170,48 @@ export const AdminPanel: React.FC = () => {
     }
   };
 
+  const handleRefundUser = async (userId: string, email: string) => {
+    if (!confirm(`Refund latest payment and cancel subscription for ${email}?`)) return;
+
+    setRefunding(userId);
+    setMessage(null);
+
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/stripe-refund`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${session?.access_token}`,
+          },
+          body: JSON.stringify({ userId }),
+        }
+      );
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to process refund');
+      }
+
+      setMessage({ type: 'success', text: `Refunded and canceled subscription for ${email}.` });
+      setUsers(prev =>
+        prev.map(u =>
+          u.id === userId
+            ? { ...u, plan: 'free' as SubscriptionPlan, status: 'canceled', stripe_subscription_id: null }
+            : u
+        )
+      );
+    } catch (err: any) {
+      setMessage({ type: 'error', text: err.message || 'Refund failed' });
+    } finally {
+      setRefunding(null);
+    }
+  };
+
   return (
     <div className="max-w-5xl mx-auto">
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 mb-6">
@@ -275,6 +318,7 @@ export const AdminPanel: React.FC = () => {
                 <th className="text-left p-3 font-semibold text-gray-700">Joined</th>
                 <th className="text-left p-3 font-semibold text-gray-700">Set Plan</th>
                 <th className="text-left p-3 font-semibold text-gray-700 w-10"></th>
+                <th className="text-left p-3 font-semibold text-gray-700 w-10"></th>
               </tr>
             </thead>
             <tbody>
@@ -343,10 +387,26 @@ export const AdminPanel: React.FC = () => {
                     {updating === user.email && <Loader2 className="w-3 h-3 animate-spin inline ml-2" />}
                   </td>
                   <td className="p-3">
+                    {user.stripe_subscription_id && user.email !== 'augustovalbuena@gmail.com' && (
+                      <button
+                        onClick={() => handleRefundUser(user.id, user.email)}
+                        disabled={refunding === user.id}
+                        className="text-gray-400 hover:text-orange-500 transition-colors p-1"
+                        title={`Refund & cancel ${user.email}`}
+                      >
+                        {refunding === user.id ? (
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                        ) : (
+                          <RotateCcw className="w-4 h-4" />
+                        )}
+                      </button>
+                    )}
+                  </td>
+                  <td className="p-3">
                     {user.email !== 'augustovalbuena@gmail.com' && (
                       <button
                         onClick={() => handleDeleteUser(user.email)}
-                        disabled={deleting === user.email}
+                        disabled={deleting === user.email || refunding === user.id}
                         className="text-gray-400 hover:text-red-500 transition-colors p-1"
                         title={`Delete ${user.email}`}
                       >
