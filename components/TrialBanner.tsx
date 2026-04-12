@@ -40,7 +40,7 @@ export const TrialBanner: React.FC<TrialBannerProps> = ({ onDismiss, compact = f
             <div className="flex items-center gap-2">
               <button
                 onClick={() => navigate('/pricing')}
-                className="bg-[#f0f5f0]0 hover:bg-[#2d3b2d] text-white font-medium px-4 py-1.5 rounded-lg text-sm transition-colors"
+                className="bg-[#2d3b2d] hover:bg-[#3d4f3d] text-white font-medium px-4 py-1.5 rounded-lg text-sm transition-colors"
               >
                 View Plans
               </button>
@@ -140,7 +140,7 @@ export const TrialBanner: React.FC<TrialBannerProps> = ({ onDismiss, compact = f
                 isUrgent
                   ? 'bg-red-500 hover:bg-red-600 text-white'
                   : isWarning
-                  ? 'bg-[#f0f5f0]0 hover:bg-[#2d3b2d] text-white'
+                  ? 'bg-[#2d3b2d] hover:bg-[#3d4f3d] text-white'
                   : 'bg-[#2d3b2d] hover:bg-[#3d4f3d] text-white'
               }`}
             >

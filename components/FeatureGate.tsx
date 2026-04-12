@@ -83,7 +83,7 @@ export const FeatureGate: React.FC<FeatureGateProps> = ({
   subtle = false,
 }) => {
   const navigate = useNavigate();
-  const { hasFeature, plan: currentPlan } = useSubscription();
+  const { hasFeature, effectivePlan: currentPlan } = useSubscription();
 
   // Check if user has access
   const hasAccess = hasFeature(feature);
