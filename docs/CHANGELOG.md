@@ -4,6 +4,59 @@ All notable changes to SparkPlan.
 
 ---
 
+## 2026-04-12: Stripe Live Mode & Admin Panel (Phase 3.0)
+
+**New Features:**
+- **Stripe live mode**: Migrated from test to live API keys, created live products/prices, deployed new webhook endpoint
+- **Admin refund & cancel**: One-click refund of latest payment + subscription cancellation from admin panel
+- **Trial expiration UI fixes**: FeatureGate now uses `effectivePlan` (not `plan`) so expired trials show "Free" correctly; fixed invisible "View Plans" button CSS
+- **Branded email template**: SparkPlan-branded confirmation email with trial info and feature list
+- **SMTP setup guide**: Step-by-step Resend + Vercel DNS configuration
+
+**Files Created:**
+- `supabase/functions/stripe-refund/index.ts` — Admin-only refund edge function
+- `supabase/email-templates/confirmation.html` — Branded signup email
+- `supabase/email-templates/SETUP.md` — Resend SMTP setup guide
+
+**Files Modified:**
+- `components/AdminPanel.tsx` — Refund button, confirmation dialog
+- `components/FeatureGate.tsx` — `effectivePlan` fix for expired trials
+- `components/TrialBanner.tsx` — Button visibility CSS fix
+
+**Edge Functions Deployed:**
+- `stripe-checkout` v16, `stripe-portal` v15, `stripe-webhook` v22, `stripe-refund` v2
+
+---
+
+## 2026-03-08: Subscriptions & Feature Gating (Phase 2.9)
+
+**New Features:**
+- **5-tier subscription system**: Free, Starter ($29), Pro ($49), Business ($149), Enterprise (custom)
+- **Stripe Checkout**: Edge function creates checkout sessions with promo code support
+- **Stripe Webhooks**: Handles checkout.session.completed, subscription CRUD, invoice.paid/failed
+- **Stripe Billing Portal**: Self-service subscription management
+- **Feature gating**: 40+ features mapped to plan tiers via `FeatureGate` component (blocking, subtle, inline modes)
+- **14-day Business trial**: Auto-created on signup, countdown banner with urgency states
+- **Pricing page**: Plan cards, feature comparison table, FAQ section
+- **Admin panel**: User search, plan override, create/delete users, email confirmation
+- **Real-time sync**: Subscription changes propagate instantly via Supabase channels
+
+**Files Created:**
+- `hooks/useSubscription.ts` — Subscription state, feature checks, Stripe integration
+- `components/PricingPage.tsx` — Pricing page with comparison table
+- `components/FeatureGate.tsx` — Feature access control component
+- `components/TrialBanner.tsx` — Trial countdown + promo code input
+- `components/AdminPanel.tsx` — Admin dashboard
+- `supabase/functions/stripe-checkout/index.ts` — Checkout session creation
+- `supabase/functions/stripe-webhook/index.ts` — Webhook event handler
+- `supabase/functions/stripe-portal/index.ts` — Billing portal session
+- `supabase/migrations/20260105_subscriptions.sql` — Subscriptions table
+- `supabase/migrations/20260212_trial_and_admin.sql` — Admin RPC functions
+- `supabase/migrations/20260212_admin_user_management.sql` — User management RPCs
+- `supabase/migrations/20260217_admin_confirm_user.sql` — Email confirmation RPC
+
+---
+
 ## 2026-02-22: User Profiles & Settings (Phase 2.8)
 
 **New Features:**

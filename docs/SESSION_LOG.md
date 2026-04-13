@@ -3,37 +3,44 @@
 **Purpose**: Tracks recent work for seamless handoff between Claude instances.
 **Maintenance Rule**: Keep only the last 2 sessions. At the start of a new session, delete older entries — git history preserves everything.
 
-**Last Updated**: 2026-03-16
+**Last Updated**: 2026-04-12
 
 ---
 
-### Session: 2026-03-16 - Documentation Audit & Cleanup
+### Session: 2026-04-12 - Documentation: Billing & Admin Phases
 
-**Focus**: Repo-wide documentation consistency audit
-**Status**: In Progress
-
-**Issues Found & Fixed:**
-1. ROADMAP.md header said Phase 2.7 — updated to Phase 2.8
-2. Phase 2.6 had "Pending" items inside a COMPLETE phase — moved to new Backlog section
-3. CHANGELOG missing Phase 2.7 and 2.8 entries — added both
-4. SESSION_LOG was 43 days stale — cleared and updated
-5. Deleted stray untracked file
-
-**Remaining (identified, not yet fixed):**
-- `docs/database-architecture.md` — 103 days stale, missing meter_stacks/buildings/units tables
-- `docs/architecture.md` and `docs/development-guide.md` — 59 days stale
-- ADR-005 missing `meter_stack` fed_from_type
-- Business docs need go-to-market status updates
-
----
-
-### Session: 2026-02-22 - Extended Calculation Test Suite
-
-**Focus**: Add comprehensive test coverage for calculation services
+**Focus**: Document the subscription/billing/Stripe/admin panel features in ROADMAP.md and CHANGELOG.md
 **Status**: Complete
 
 **Work Done:**
-- Added extended test suite covering 6 calculation services (99 tests total)
-- Fixed `fed_from_circuit_number` migration to target panels table
+- Added Phase 2.9 (Subscriptions & Feature Gating) to ROADMAP.md
+- Added Phase 3.0 (Stripe Live Mode & Admin Panel) to ROADMAP.md
+- Updated "Latest Completed Phase" header to 3.0
+- Renumbered future phases (Design Copilot → Phase 4, Solar → Phase 5)
+- Added two CHANGELOG entries for Phase 2.9 and 3.0
+- Updated SESSION_LOG
 
-**Build Status**: Passing, 99 tests pass
+**Pending (non-code):**
+- Resend SMTP setup for custom domain emails (user doing manually)
+- Stripe statement descriptor change ("EEDUCATION" → "SPARKPLAN")
+
+---
+
+### Session: 2026-04-12 - Stripe Live Mode & Admin Refund
+
+**Focus**: Launch preparation — Stripe live mode, admin refund feature, trial UI fixes, email branding
+**Status**: Complete
+
+**Work Done:**
+- Migrated Stripe from test to live mode (new API keys, products, prices, webhook)
+- Created & deployed `stripe-refund` edge function (admin-only refund + cancel)
+- Updated AdminPanel.tsx with refund button and confirmation dialog
+- Fixed TrialBanner.tsx invisible button (CSS typo)
+- Fixed FeatureGate.tsx showing wrong plan for expired trials
+- Deleted test account (inverteczulia@gmail.com) from DB
+- Created branded email confirmation template
+- Created Resend SMTP setup guide
+- Configured Supabase Site URL for email redirects
+
+**Edge Functions Deployed:**
+- stripe-checkout v16, stripe-portal v15, stripe-webhook v22, stripe-refund v2

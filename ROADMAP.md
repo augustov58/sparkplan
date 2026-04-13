@@ -1,6 +1,6 @@
 # SparkPlan - Roadmap
 
-## Latest Completed Phase: 2.8 (User Profiles & Settings) - Feb 2026
+## Latest Completed Phase: 3.0 (Subscriptions, Billing & Admin) - Apr 2026
 
 ---
 
@@ -123,6 +123,79 @@ MF EV Calculator → "Apply to Project" / "Add EV Infrastructure" buttons
 
 ---
 
+## Phase 2.9: Subscriptions & Feature Gating - COMPLETE (Mar 2026)
+
+**Strategic Focus:** Monetization infrastructure. 5-tier subscription model with Stripe integration, feature gating, and 14-day trial funnel.
+
+| Feature | Status |
+|---------|--------|
+| Subscriptions table + RLS + auto-create on signup | Complete |
+| 5-tier plan system (Free → Starter → Pro → Business → Enterprise) | Complete |
+| Feature access control (40+ features mapped to plans) | Complete |
+| 14-day Business trial for new signups | Complete |
+| Stripe Checkout integration (edge function) | Complete |
+| Stripe Webhook handler (5 event types) | Complete |
+| Stripe Billing Portal (self-service management) | Complete |
+| Pricing page with feature comparison table + FAQ | Complete |
+| FeatureGate component (blocking, subtle, inline modes) | Complete |
+| Trial banner with countdown + urgency states | Complete |
+| Promo code redemption UI | Complete |
+| Real-time subscription sync via Supabase channels | Complete |
+
+**Pricing:**
+| Plan | Price | Target |
+|------|-------|--------|
+| Free | $0 | Entry point, 3 projects |
+| Starter | $29/mo | Solo electricians |
+| Pro | $49/mo | EV installers |
+| Business | $149/mo | AI-powered teams |
+| Enterprise | Custom | Large firms |
+
+**Key Files:**
+- `hooks/useSubscription.ts` — Plan state, feature checks, Stripe session creation
+- `components/PricingPage.tsx` — Plan cards, comparison table, checkout flow
+- `components/FeatureGate.tsx` — 3-mode feature access control component
+- `components/TrialBanner.tsx` — Trial countdown + promo code input
+- `supabase/functions/stripe-checkout/index.ts` — Checkout session creation
+- `supabase/functions/stripe-webhook/index.ts` — Webhook event handler
+- `supabase/functions/stripe-portal/index.ts` — Billing portal session
+- `supabase/migrations/20260105_subscriptions.sql` — Subscriptions table + triggers
+
+---
+
+## Phase 3.0: Stripe Live Mode & Admin Panel - COMPLETE (Apr 2026)
+
+**Strategic Focus:** Production-ready billing and admin tooling for launch.
+
+| Feature | Status |
+|---------|--------|
+| Stripe test → live mode migration (new keys, products, prices) | Complete |
+| Live webhook endpoint configured + signature verification | Complete |
+| All edge functions redeployed with live credentials | Complete |
+| Admin panel with user search (by email) | Complete |
+| Admin: set user plan (bypass Stripe) | Complete |
+| Admin: create user with specific plan | Complete |
+| Admin: delete user (cascade) | Complete |
+| Admin: confirm email manually | Complete |
+| Admin: refund latest payment + cancel subscription | Complete |
+| Trial expiration UI fixes (effectivePlan, button visibility) | Complete |
+| Branded email confirmation template | Complete |
+| SMTP setup guide (Resend + Vercel DNS) | Complete |
+
+**Key Files:**
+- `components/AdminPanel.tsx` — Full admin dashboard
+- `supabase/functions/stripe-refund/index.ts` — Admin refund + cancel
+- `supabase/migrations/20260212_trial_and_admin.sql` — Admin RPC functions
+- `supabase/migrations/20260212_admin_user_management.sql` — Create/delete user RPCs
+- `supabase/migrations/20260217_admin_confirm_user.sql` — Email confirmation RPC
+- `supabase/email-templates/confirmation.html` — Branded signup email
+- `supabase/email-templates/SETUP.md` — Resend SMTP setup guide
+
+**Edge Function Versions (deployed):**
+- `stripe-checkout` v16, `stripe-portal` v15, `stripe-webhook` v22, `stripe-refund` v2
+
+---
+
 ## Backlog
 
 | Feature | Origin | Impact |
@@ -133,7 +206,7 @@ MF EV Calculator → "Apply to Project" / "Add EV Infrastructure" buttons
 
 ---
 
-## Phase 3: Design Copilot (Future)
+## Phase 4: Design Copilot (Future)
 
 AI-powered auto-design: "Design 15,000 sq ft medical office with X-ray room" → Complete electrical design
 
@@ -145,7 +218,7 @@ AI-powered auto-design: "Design 15,000 sq ft medical office with X-ray room" →
 
 ---
 
-## Phase 4: Solar + Storage Expansion (Future)
+## Phase 5: Solar + Storage Expansion (Future)
 
 - Battery energy storage (NEC 706)
 - Hybrid inverter configuration
