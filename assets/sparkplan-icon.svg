@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <!-- Yellow rounded square background -->
+  <rect x="0" y="0" width="512" height="512" rx="96" ry="96" fill="#FFCC00"/>
+
+  <!-- Lightning bolt -->
+  <path d="M 296 48 L 168 272 L 248 272 L 216 464 L 344 240 L 264 240 Z" fill="#2d3b2d"/>
+</svg>
