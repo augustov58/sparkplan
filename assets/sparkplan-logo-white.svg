@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 320" width="1200" height="320">
+  <!-- Icon: Yellow rounded square with lightning bolt -->
+  <rect x="32" y="32" width="256" height="256" rx="48" ry="48" fill="#FFCC00"/>
+  <path d="M 192 64 L 120 176 L 168 176 L 148 256 L 220 144 L 172 144 Z" fill="#2d3b2d"/>
+
+  <!-- Text: SparkPlan (white) -->
+  <text x="320" y="210" font-family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="140" font-weight="700" fill="#ffffff" letter-spacing="-3">
+    SparkPlan
+  </text>
+
+  <!-- Subtitle (light green) -->
+  <text x="324" y="260" font-family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="36" fill="#a8c5a8" letter-spacing="1.5">
+    Electrical Design Platform
+  </text>
+</svg>
