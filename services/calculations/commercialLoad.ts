@@ -230,7 +230,7 @@ export const OCCUPANCY_LABELS: Record<OccupancyType, string> = {
  * Standard OCPD (Overcurrent Protection Device) sizes per NEC Table 240.6(A)
  * These are the available main breaker/fuse ratings
  */
-const STANDARD_OCPD_SIZES = [
+export const STANDARD_OCPD_SIZES = [
   15, 20, 25, 30, 35, 40, 45, 50, 60, 70, 80, 90,
   100, 110, 125, 150, 175, 200, 225, 250, 300, 350, 400, 450, 500, 600, 700, 800,
   1000, 1200, 1600, 2000, 2500, 3000, 4000, 5000, 6000,
@@ -248,7 +248,7 @@ const STANDARD_OCPD_SIZES = [
  * Note: Some OCPD sizes (175A, 250A, 300A, 350A, 450A, 500A, 700A) are not
  * commonly available as bus bar ratings. In these cases, use the next larger bus size.
  */
-const STANDARD_SERVICE_BUS_RATINGS = [
+export const STANDARD_SERVICE_BUS_RATINGS = [
   100, 125, 150, 200, 225, 400, 600, 800, 1000, 1200, 1600, 2000, 2500, 3000, 4000, 5000, 6000,
 ];
 
