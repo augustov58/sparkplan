@@ -12,3 +12,4 @@ export * from './table-310-15-c1';
 export * from './table-chapter9-table9';
 export * from './standard-breakers';
 export * from './conductor-properties';
+export * from './table-430-248-250';

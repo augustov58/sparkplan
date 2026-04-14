@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { AlertCircle, Plus, Trash2, Info, FileText, Cable } from 'lucide-react';
+import { AlertCircle, Plus, Trash2, Info, FileText, Cable, RotateCcw } from 'lucide-react';
 import {
   calculateCommercialLoad,
   OccupancyType,
@@ -10,11 +10,15 @@ import {
   CommercialLoadResult,
   OCCUPANCY_LABELS,
   LIGHTING_UNIT_LOAD,
+  STANDARD_OCPD_SIZES,
+  STANDARD_SERVICE_BUS_RATINGS,
   formatVA_to_kVA,
 } from '../services/calculations/commercialLoad';
 import { calculateFeederSizing } from '../services/calculations/feederSizing';
 import type { FeederCalculationInput, FeederCalculationResult } from '../types';
 import { usePersistedState } from '../hooks/usePersistedState';
+import { NumberInput } from './common/NumberInput';
+import { getMotorFLA } from '../data/nec/table-430-248-250';
 
 interface CommercialLoadCalculatorProps {
   projectId?: string;
@@ -74,6 +78,12 @@ export const CommercialLoadCalculator: React.FC<CommercialLoadCalculatorProps> =
   // Service Parameters
   const [serviceVoltage, setServiceVoltage] = usePersistedState<120 | 208 | 240 | 277 | 480>(`${pk}-voltage`, 208);
   const [servicePhase, setServicePhase] = usePersistedState<1 | 3>(`${pk}-phase`, 3);
+
+  // Manual overrides for the Recommended Service Sizing card.
+  // null = use the auto-computed NEC-compliant recommendation.
+  // Persisted so users don't lose their override on reload.
+  const [manualMainBreaker, setManualMainBreaker] = usePersistedState<number | null>(`${pk}-manualMainBreaker`, null);
+  const [manualBusRating, setManualBusRating] = usePersistedState<number | null>(`${pk}-manualBusRating`, null);
 
   // Calculation Result (derived, no need to persist)
   const [result, setResult] = useState<CommercialLoadResult | null>(null);
@@ -174,14 +184,19 @@ export const CommercialLoadCalculator: React.FC<CommercialLoadCalculatorProps> =
 
   // ===== MOTOR CRUD =====
   const addMotorLoad = () => {
+    const defaultHp = 5;
+    const defaultVoltage = servicePhase === 3 ? 208 : 240;
+    const defaultPhase = servicePhase;
+    // Pull FLA from NEC tables rather than hard-coding so it stays accurate if voltage/phase defaults change
+    const defaultFla = getMotorFLA(defaultHp, defaultVoltage, defaultPhase) ?? 16.7;
     setMotorLoads([
       ...motorLoads,
       {
         description: `Motor #${motorLoads.length + 1}`,
-        horsepower: 5,
-        voltage: 208,
-        phase: 3,
-        fullLoadAmps: 16.7, // 5 HP @ 208V 3-phase from NEC Table 430.250
+        horsepower: defaultHp,
+        voltage: defaultVoltage,
+        phase: defaultPhase,
+        fullLoadAmps: defaultFla,
       },
     ]);
   };
@@ -189,7 +204,25 @@ export const CommercialLoadCalculator: React.FC<CommercialLoadCalculatorProps> =
   const updateMotorLoad = (index: number, updated: Partial<MotorLoad>) => {
     const newLoads = [...motorLoads];
     if (newLoads[index]) {
-      newLoads[index] = { ...newLoads[index], ...updated };
+      const merged = { ...newLoads[index], ...updated };
+
+      // If HP, voltage, or phase changed (and user did not explicitly set FLA in this update),
+      // auto-populate FLA from NEC Tables 430.248/430.250. This mirrors how sizing calculators
+      // derive dependent fields from driver inputs — the user can still override FLA afterward.
+      const driverChanged =
+        updated.horsepower !== undefined ||
+        updated.voltage !== undefined ||
+        updated.phase !== undefined;
+      const userEditedFLA = updated.fullLoadAmps !== undefined;
+
+      if (driverChanged && !userEditedFLA) {
+        const autoFLA = getMotorFLA(merged.horsepower, merged.voltage, merged.phase);
+        if (autoFLA !== null) {
+          merged.fullLoadAmps = autoFLA;
+        }
+      }
+
+      newLoads[index] = merged;
       setMotorLoads(newLoads);
     }
   };
@@ -362,10 +395,9 @@ export const CommercialLoadCalculator: React.FC<CommercialLoadCalculatorProps> =
                     Total Floor Area
                   </label>
                   <div className="relative">
-                    <input
-                      type="number"
+                    <NumberInput
                       value={totalFloorArea}
-                      onChange={(e) => setTotalFloorArea(Number(e.target.value))}
+                      onChange={setTotalFloorArea}
                       className="w-full px-3 py-2 pr-12 border border-gray-300 rounded-md text-sm input-value"
                       min="0"
                       step="100"
@@ -429,10 +461,10 @@ export const CommercialLoadCalculator: React.FC<CommercialLoadCalculatorProps> =
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   General Receptacles (180 VA each)
                 </label>
-                <input
-                  type="number"
+                <NumberInput
                   value={generalReceptacleCount}
-                  onChange={(e) => setGeneralReceptacleCount(Number(e.target.value))}
+                  onChange={setGeneralReceptacleCount}
+                  allowDecimal={false}
                   className="w-full px-3 py-2 border border-gray-300 rounded-md"
                   min="0"
                 />
@@ -442,10 +474,9 @@ export const CommercialLoadCalculator: React.FC<CommercialLoadCalculatorProps> =
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Show Window Lighting (linear feet) - 200 VA/ft
                 </label>
-                <input
-                  type="number"
+                <NumberInput
                   value={showWindowLighting_linearFeet}
-                  onChange={(e) => setShowWindowLighting_linearFeet(Number(e.target.value))}
+                  onChange={setShowWindowLighting_linearFeet}
                   className="w-full px-3 py-2 border border-gray-300 rounded-md"
                   min="0"
                 />
@@ -455,10 +486,10 @@ export const CommercialLoadCalculator: React.FC<CommercialLoadCalculatorProps> =
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Sign Outlets (1200 VA each)
                 </label>
-                <input
-                  type="number"
+                <NumberInput
                   value={signOutlets}
-                  onChange={(e) => setSignOutlets(Number(e.target.value))}
+                  onChange={setSignOutlets}
+                  allowDecimal={false}
                   className="w-full px-3 py-2 border border-gray-300 rounded-md"
                   min="0"
                 />
@@ -501,10 +532,9 @@ export const CommercialLoadCalculator: React.FC<CommercialLoadCalculatorProps> =
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                     <div>
                       <label className="block text-xs text-gray-600 mb-1">MCA (Amps)</label>
-                      <input
-                        type="number"
+                      <NumberInput
                         value={hvac.nameplateFLA}
-                        onChange={(e) => updateHVACLoad(index, { nameplateFLA: Number(e.target.value) })}
+                        onChange={(val) => updateHVACLoad(index, { nameplateFLA: val })}
                         className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
                         step="0.1"
                       />
@@ -512,10 +542,9 @@ export const CommercialLoadCalculator: React.FC<CommercialLoadCalculatorProps> =
 
                     <div>
                       <label className="block text-xs text-gray-600 mb-1">Voltage</label>
-                      <input
-                        type="number"
+                      <NumberInput
                         value={hvac.voltage}
-                        onChange={(e) => updateHVACLoad(index, { voltage: Number(e.target.value) })}
+                        onChange={(val) => updateHVACLoad(index, { voltage: val })}
                         className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
                       />
                     </div>
@@ -567,7 +596,14 @@ export const CommercialLoadCalculator: React.FC<CommercialLoadCalculatorProps> =
             </div>
 
             <div className="space-y-3">
-              {motorLoads.map((motor, index) => (
+              {motorLoads.map((motor, index) => {
+                // Compute what the NEC table would return for the current driver inputs so we can show
+                // (a) the "NEC: X.X A" hint below the FLA field, and
+                // (b) detect whether the user's current FLA value is a manual override.
+                const necFla = getMotorFLA(motor.horsepower, motor.voltage, motor.phase);
+                const isFlaOverridden = necFla !== null && Math.abs(motor.fullLoadAmps - necFla) > 0.05;
+
+                return (
                 <div key={index} className="border border-gray-200 rounded-md p-3 space-y-2">
                   <div className="flex items-center justify-between">
                     <input
@@ -588,32 +624,52 @@ export const CommercialLoadCalculator: React.FC<CommercialLoadCalculatorProps> =
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                     <div>
                       <label className="block text-xs text-gray-600 mb-1">HP</label>
-                      <input
-                        type="number"
+                      <NumberInput
                         value={motor.horsepower}
-                        onChange={(e) => updateMotorLoad(index, { horsepower: Number(e.target.value) })}
+                        onChange={(val) => updateMotorLoad(index, { horsepower: val })}
                         className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
                         step="0.5"
                       />
                     </div>
 
                     <div>
-                      <label className="block text-xs text-gray-600 mb-1">FLA (Amps)</label>
-                      <input
-                        type="number"
+                      <label className="block text-xs text-gray-600 mb-1 flex items-center justify-between">
+                        <span>FLA (Amps)</span>
+                        {isFlaOverridden && (
+                          <button
+                            type="button"
+                            onClick={() => necFla !== null && updateMotorLoad(index, { fullLoadAmps: necFla })}
+                            className="flex items-center gap-0.5 text-[10px] text-blue-600 hover:text-blue-800 font-normal normal-case"
+                            title="Reset to NEC table value"
+                          >
+                            <RotateCcw className="w-2.5 h-2.5" />
+                            Reset
+                          </button>
+                        )}
+                      </label>
+                      <NumberInput
                         value={motor.fullLoadAmps}
-                        onChange={(e) => updateMotorLoad(index, { fullLoadAmps: Number(e.target.value) })}
+                        onChange={(val) => updateMotorLoad(index, { fullLoadAmps: val })}
                         className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
                         step="0.1"
                       />
+                      {necFla !== null ? (
+                        <p className="text-[10px] text-gray-500 mt-0.5">
+                          NEC Table 430.{motor.phase === 1 ? '248' : '250'}: {necFla} A
+                          {isFlaOverridden && <span className="ml-1 text-amber-600">• overridden</span>}
+                        </p>
+                      ) : (
+                        <p className="text-[10px] text-amber-600 mt-0.5">
+                          No NEC table value — using manual FLA
+                        </p>
+                      )}
                     </div>
 
                     <div>
                       <label className="block text-xs text-gray-600 mb-1">Voltage</label>
-                      <input
-                        type="number"
+                      <NumberInput
                         value={motor.voltage}
-                        onChange={(e) => updateMotorLoad(index, { voltage: Number(e.target.value) })}
+                        onChange={(val) => updateMotorLoad(index, { voltage: val })}
                         className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
                       />
                     </div>
@@ -631,7 +687,8 @@ export const CommercialLoadCalculator: React.FC<CommercialLoadCalculatorProps> =
                     </div>
                   </div>
                 </div>
-              ))}
+              );
+              })}
 
               {motorLoads.length === 0 && (
                 <p className="text-sm text-gray-500 text-center py-4">No motor loads added</p>
@@ -687,12 +744,9 @@ export const CommercialLoadCalculator: React.FC<CommercialLoadCalculatorProps> =
 
                     <div>
                       <label className="block text-xs text-gray-600 mb-1">Nameplate Rating (kW)</label>
-                      <input
-                        type="number"
+                      <NumberInput
                         value={equipment.nameplateRating_kW}
-                        onChange={(e) =>
-                          updateKitchenEquipment(index, { nameplateRating_kW: Number(e.target.value) })
-                        }
+                        onChange={(val) => updateKitchenEquipment(index, { nameplateRating_kW: val })}
                         className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
                         step="0.1"
                       />
@@ -742,10 +796,9 @@ export const CommercialLoadCalculator: React.FC<CommercialLoadCalculatorProps> =
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                     <div>
                       <label className="block text-xs text-gray-600 mb-1">Load (VA)</label>
-                      <input
-                        type="number"
+                      <NumberInput
                         value={load.load_VA}
-                        onChange={(e) => updateSpecialLoad(index, { load_VA: Number(e.target.value) })}
+                        onChange={(val) => updateSpecialLoad(index, { load_VA: val })}
                         className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
                         step="100"
                       />
@@ -810,10 +863,9 @@ export const CommercialLoadCalculator: React.FC<CommercialLoadCalculatorProps> =
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
                     <div>
                       <label className="block text-xs text-gray-600 mb-1">Load (VA)</label>
-                      <input
-                        type="number"
+                      <NumberInput
                         value={feeder.load_va}
-                        onChange={(e) => updateFeeder(index, { load_va: Number(e.target.value) })}
+                        onChange={(val) => updateFeeder(index, { load_va: val })}
                         className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
                         step="1000"
                       />
@@ -821,10 +873,9 @@ export const CommercialLoadCalculator: React.FC<CommercialLoadCalculatorProps> =
 
                     <div>
                       <label className="block text-xs text-gray-600 mb-1">Continuous %</label>
-                      <input
-                        type="number"
+                      <NumberInput
                         value={feeder.continuous_percent}
-                        onChange={(e) => updateFeeder(index, { continuous_percent: Number(e.target.value) })}
+                        onChange={(val) => updateFeeder(index, { continuous_percent: val })}
                         className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
                         min="0"
                         max="100"
@@ -834,10 +885,9 @@ export const CommercialLoadCalculator: React.FC<CommercialLoadCalculatorProps> =
 
                     <div>
                       <label className="block text-xs text-gray-600 mb-1">Distance (ft)</label>
-                      <input
-                        type="number"
+                      <NumberInput
                         value={feeder.distance_ft}
-                        onChange={(e) => updateFeeder(index, { distance_ft: Number(e.target.value) })}
+                        onChange={(val) => updateFeeder(index, { distance_ft: val })}
                         className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
                         step="10"
                       />
@@ -847,10 +897,9 @@ export const CommercialLoadCalculator: React.FC<CommercialLoadCalculatorProps> =
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
                     <div>
                       <label className="block text-xs text-gray-600 mb-1">Voltage</label>
-                      <input
-                        type="number"
+                      <NumberInput
                         value={feeder.voltage}
-                        onChange={(e) => updateFeeder(index, { voltage: Number(e.target.value) })}
+                        onChange={(val) => updateFeeder(index, { voltage: val })}
                         className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
                       />
                     </div>
@@ -929,11 +978,33 @@ export const CommercialLoadCalculator: React.FC<CommercialLoadCalculatorProps> =
             <>
               {/* Service Recommendation */}
               {(() => {
-                const utilization = (result.calculatedAmps / result.recommendedMainBreakerAmps) * 100;
+                // Effective values: use manual override if set, else the NEC-compliant auto-sized value.
+                const effectiveMainBreaker = manualMainBreaker ?? result.recommendedMainBreakerAmps;
+                const effectiveBusRating = manualBusRating ?? result.recommendedServiceBusRating;
+
+                const utilization = (result.calculatedAmps / effectiveMainBreaker) * 100;
                 const utilizationClass =
                   utilization > 95 ? 'utilization-critical' :
                   utilization > 80 ? 'utilization-warning' :
                   'utilization-good';
+
+                // Build OCPD dropdown options: ensure recommended size is always present even
+                // if somehow outside the standard list, and show only sizes >= calculatedAmps
+                // (sizing below code-minimum shouldn't be offered).
+                const minOcpd = Math.ceil(result.calculatedAmps);
+                const ocpdOptions = STANDARD_OCPD_SIZES.filter(s => s >= minOcpd);
+                if (!ocpdOptions.includes(result.recommendedMainBreakerAmps)) {
+                  ocpdOptions.unshift(result.recommendedMainBreakerAmps);
+                }
+
+                // Bus rating options: must be >= effective main breaker (bus can't be undersized vs OCPD)
+                const busOptions = STANDARD_SERVICE_BUS_RATINGS.filter(s => s >= effectiveMainBreaker);
+                if (!busOptions.includes(result.recommendedServiceBusRating)) {
+                  busOptions.unshift(result.recommendedServiceBusRating);
+                }
+
+                const isMainBreakerOverridden = manualMainBreaker !== null && manualMainBreaker !== result.recommendedMainBreakerAmps;
+                const isBusOverridden = manualBusRating !== null && manualBusRating !== result.recommendedServiceBusRating;
 
                 return (
                   <div className={`border-2 rounded-lg card-padding ${utilizationClass} shadow-md`}>
@@ -958,7 +1029,7 @@ export const CommercialLoadCalculator: React.FC<CommercialLoadCalculatorProps> =
                             stroke={utilization > 95 ? '#ef4444' : utilization > 80 ? '#f59e0b' : '#10b981'}
                             strokeWidth="8"
                             fill="none"
-                            strokeDasharray={`${(utilization / 100) * 352} 352`}
+                            strokeDasharray={`${(Math.min(utilization, 100) / 100) * 352} 352`}
                             strokeLinecap="round"
                           />
                         </svg>
@@ -969,28 +1040,83 @@ export const CommercialLoadCalculator: React.FC<CommercialLoadCalculatorProps> =
                       </div>
                     </div>
 
-                    {/* Main Breaker (OCPD) */}
+                    {/* Main Breaker (OCPD) — manual override dropdown */}
                     <div className="bg-white/80 rounded-lg p-3 mb-2">
                       <div className="text-center">
-                        <div className="text-xs text-gray-500 uppercase tracking-wide mb-1">Main Breaker (OCPD)</div>
-                        <div className="text-3xl font-bold text-blue-600 mb-1 tabular-nums">
-                          {result.recommendedMainBreakerAmps}A
+                        <div className="flex items-center justify-center gap-2 mb-1">
+                          <div className="text-xs text-gray-500 uppercase tracking-wide">Main Breaker (OCPD)</div>
+                          {isMainBreakerOverridden && (
+                            <button
+                              onClick={() => setManualMainBreaker(null)}
+                              className="flex items-center gap-1 text-xs text-gray-500 hover:text-blue-600"
+                              title="Reset to auto-calculated size"
+                            >
+                              <RotateCcw className="w-3 h-3" />
+                              Auto
+                            </button>
+                          )}
+                        </div>
+                        <div className="flex items-center justify-center gap-1">
+                          <select
+                            value={effectiveMainBreaker}
+                            onChange={(e) => {
+                              const val = Number(e.target.value);
+                              // If user picks the NEC-computed size, clear the override
+                              setManualMainBreaker(val === result.recommendedMainBreakerAmps ? null : val);
+                              // If bus rating would now be smaller than new breaker, clear bus override
+                              if (manualBusRating !== null && manualBusRating < val) {
+                                setManualBusRating(null);
+                              }
+                            }}
+                            className="text-3xl font-bold text-blue-600 tabular-nums bg-transparent border-none cursor-pointer hover:bg-blue-50 rounded px-2 focus:outline-none focus:ring-2 focus:ring-blue-300"
+                          >
+                            {ocpdOptions.map(size => (
+                              <option key={size} value={size}>
+                                {size}A{size === result.recommendedMainBreakerAmps ? ' (NEC)' : ''}
+                              </option>
+                            ))}
+                          </select>
                         </div>
                         <div className="text-xs text-gray-600">
                           <span className="nec-reference">NEC 240.6(A)</span>
+                          {isMainBreakerOverridden && <span className="ml-1 text-amber-600">• Manual override</span>}
                         </div>
                       </div>
                     </div>
 
-                    {/* Service Equipment Bus Rating */}
+                    {/* Service Equipment Bus Rating — manual override dropdown */}
                     <div className="bg-white/80 rounded-lg p-3 mb-3">
                       <div className="text-center">
-                        <div className="text-xs text-gray-500 uppercase tracking-wide mb-1">Service Bus Rating</div>
-                        <div className="text-3xl font-bold text-green-600 mb-1 tabular-nums">
-                          {result.recommendedServiceBusRating}A
+                        <div className="flex items-center justify-center gap-2 mb-1">
+                          <div className="text-xs text-gray-500 uppercase tracking-wide">Service Bus Rating</div>
+                          {isBusOverridden && (
+                            <button
+                              onClick={() => setManualBusRating(null)}
+                              className="flex items-center gap-1 text-xs text-gray-500 hover:text-green-700"
+                              title="Reset to auto-calculated size"
+                            >
+                              <RotateCcw className="w-3 h-3" />
+                              Auto
+                            </button>
+                          )}
                         </div>
+                        <select
+                          value={effectiveBusRating}
+                          onChange={(e) => {
+                            const val = Number(e.target.value);
+                            setManualBusRating(val === result.recommendedServiceBusRating ? null : val);
+                          }}
+                          className="text-3xl font-bold text-green-600 tabular-nums bg-transparent border-none cursor-pointer hover:bg-green-50 rounded px-2 focus:outline-none focus:ring-2 focus:ring-green-300"
+                        >
+                          {busOptions.map(size => (
+                            <option key={size} value={size}>
+                              {size}A{size === result.recommendedServiceBusRating ? ' (NEC)' : ''}
+                            </option>
+                          ))}
+                        </select>
                         <div className="text-xs text-gray-600">
                           Commercial Bus Size
+                          {isBusOverridden && <span className="ml-1 text-amber-600">• Manual override</span>}
                         </div>
                       </div>
                     </div>
@@ -1023,7 +1149,7 @@ export const CommercialLoadCalculator: React.FC<CommercialLoadCalculatorProps> =
                       <div>
                         <div className="text-gray-600 text-xs">Available</div>
                         <div className="font-semibold text-gray-900 tabular-nums">
-                          {(result.recommendedMainBreakerAmps - result.calculatedAmps).toFixed(1)} A
+                          {(effectiveMainBreaker - result.calculatedAmps).toFixed(1)} A
                         </div>
                       </div>
                     </div>
