@@ -162,6 +162,14 @@ export const OneLineDiagram: React.FC<OneLineDiagramProps> = ({ project, updateP
   const { meterStacks } = useMeterStacks(project.id);
   const { meters } = useMeters(project.id);
 
+  // Effective service voltage/phase for diagram labels.
+  // The MDP is the service entrance equipment and is the source of truth once created
+  // (e.g. user can add a 480V MDP while project.serviceVoltage is still the default 208).
+  // Fall back to project-level values when no MDP exists yet.
+  const mainPanelForDisplay = panels.find(p => p.is_main);
+  const effectiveServiceVoltage = mainPanelForDisplay?.voltage ?? project.serviceVoltage;
+  const effectiveServicePhase = mainPanelForDisplay?.phase ?? project.servicePhase;
+
   const [description, setDescription] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [exporting, setExporting] = useState(false);
@@ -1469,8 +1477,8 @@ export const OneLineDiagram: React.FC<OneLineDiagramProps> = ({ project, updateP
         diagramRef.current,
         project.name,
         project.address,
-        project.serviceVoltage,
-        project.servicePhase,
+        effectiveServiceVoltage,
+        effectiveServicePhase,
         { format, scale: 2 }
       );
     } catch (error) {
@@ -2279,7 +2287,7 @@ export const OneLineDiagram: React.FC<OneLineDiagramProps> = ({ project, updateP
       <div className="w-full h-[calc(100vh-4rem)] animate-in fade-in duration-500">
         <div className="bg-white border border-gray-100 rounded-lg h-full overflow-auto relative shadow-inner flex flex-col">
             <div className="absolute top-4 left-4 z-20 bg-white/90 backdrop-blur px-3 py-1 text-xs font-mono border border-gray-200 rounded">
-               {project.serviceVoltage}V {project.servicePhase}Φ Service
+               {effectiveServiceVoltage}V {effectiveServicePhase}Φ Service
             </div>
 
             {/* Export Buttons */}
@@ -2343,7 +2351,7 @@ export const OneLineDiagram: React.FC<OneLineDiagramProps> = ({ project, updateP
                 <circle cx={serviceX} cy={50} r="20" stroke="#111827" strokeWidth="2" fill="white" />
                 <text x={serviceX} y={55} textAnchor="middle" fontSize="10" fontWeight="bold" className="font-mono">UTIL</text>
                 <text x={serviceX} y={30} textAnchor="middle" fontSize="8" className="fill-gray-500">
-                  {project.serviceVoltage}V {project.servicePhase}Φ
+                  {effectiveServiceVoltage}V {effectiveServicePhase}Φ
                 </text>
 
                 {/* Service Drop Line */}
@@ -3232,7 +3240,7 @@ export const OneLineDiagram: React.FC<OneLineDiagramProps> = ({ project, updateP
         {/* Right Col: Diagram */}
         <div className="bg-white border border-gray-100 rounded-lg h-[70vh] sm:h-[600px] lg:h-[calc(100vh-12rem)] lg:sticky lg:top-4 overflow-hidden relative shadow-inner flex flex-col">
             <div className="absolute top-4 left-4 z-20 bg-white/90 backdrop-blur px-3 py-1 text-xs font-mono border border-gray-200 rounded">
-               {project.serviceVoltage}V {project.servicePhase}Φ Service
+               {effectiveServiceVoltage}V {effectiveServicePhase}Φ Service
             </div>
             
             {/* Export Buttons */}
@@ -3296,7 +3304,7 @@ export const OneLineDiagram: React.FC<OneLineDiagramProps> = ({ project, updateP
                 <circle cx={serviceX} cy={50} r="20" stroke="#111827" strokeWidth="2" fill="white" />
                 <text x={serviceX} y={55} textAnchor="middle" fontSize="10" fontWeight="bold" className="font-mono">UTIL</text>
                 <text x={serviceX} y={30} textAnchor="middle" fontSize="8" className="fill-gray-500">
-                  {project.serviceVoltage}V {project.servicePhase}Φ
+                  {effectiveServiceVoltage}V {effectiveServicePhase}Φ
                 </text>
 
                 {/* Service Drop Line */}
