@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { AlertCircle, Plus, Trash2, Info, FileText, Cable, RotateCcw } from 'lucide-react';
+import { AlertCircle, Plus, Trash2, Info, FileText, Cable, RotateCcw, Download, FileSpreadsheet } from 'lucide-react';
 import {
   calculateCommercialLoad,
   OccupancyType,
@@ -15,13 +15,20 @@ import {
   formatVA_to_kVA,
 } from '../services/calculations/commercialLoad';
 import { calculateFeederSizing } from '../services/calculations/feederSizing';
-import type { FeederCalculationInput, FeederCalculationResult } from '../types';
+import type { FeederCalculationInput, FeederCalculationResult, Project } from '../types';
 import { usePersistedState } from '../hooks/usePersistedState';
 import { NumberInput } from './common/NumberInput';
 import { getMotorFLA } from '../data/nec/table-430-248-250';
+import {
+  exportCommercialLoadPDF,
+  exportCommercialLoadCSV,
+} from '../services/pdfExport/commercialLoadExport';
+import { useProfile } from '../hooks/useProfile';
 
 interface CommercialLoadCalculatorProps {
   projectId?: string;
+  /** Full project — required for exports (PDF/CSV headers). Optional so legacy callers still work. */
+  project?: Project;
   onResultCalculated?: (result: CommercialLoadResult) => void;
 }
 
@@ -37,9 +44,17 @@ interface FeederInput {
 
 export const CommercialLoadCalculator: React.FC<CommercialLoadCalculatorProps> = ({
   projectId,
+  project,
   onResultCalculated,
 }) => {
-  const pk = `commercial-load-calc-${projectId ?? 'global'}`;
+  const pk = `commercial-load-calc-${projectId ?? project?.id ?? 'global'}`;
+
+  // User profile for "Prepared By" line on exported report (optional, quiet failure if absent)
+  const { profile } = useProfile();
+
+  // Export state
+  const [exportingPdf, setExportingPdf] = useState(false);
+  const [exportError, setExportError] = useState<string | null>(null);
 
   // Building Information
   const [occupancyType, setOccupancyType] = usePersistedState<OccupancyType>(`${pk}-occupancy`, 'office_buildings');
@@ -338,6 +353,68 @@ export const CommercialLoadCalculator: React.FC<CommercialLoadCalculatorProps> =
 
     setFeederResults(results);
   }, [feeders]);
+
+  // ===== EXPORT HANDLERS =====
+  // Build the export input from current state + result. Shared by PDF & CSV.
+  const buildExportInput = () => {
+    if (!result || !project) return null;
+    const effectiveMainBreaker = manualMainBreaker ?? result.recommendedMainBreakerAmps;
+    const effectiveBusRating = manualBusRating ?? result.recommendedServiceBusRating;
+    return {
+      project: {
+        id: project.id,
+        name: project.name,
+        address: project.address,
+        necEdition: project.necEdition,
+      },
+      occupancyType,
+      totalFloorArea,
+      generalReceptacleCount,
+      showWindowLighting_linearFeet,
+      signOutlets,
+      hvacLoads,
+      motorLoads,
+      kitchenEquipment: showKitchenSection ? kitchenEquipment : [],
+      specialLoads,
+      serviceVoltage,
+      servicePhase,
+      result,
+      effectiveMainBreaker,
+      effectiveBusRating,
+      isMainBreakerOverridden:
+        manualMainBreaker !== null && manualMainBreaker !== result.recommendedMainBreakerAmps,
+      isBusOverridden:
+        manualBusRating !== null && manualBusRating !== result.recommendedServiceBusRating,
+      preparedBy: profile?.full_name ?? undefined,
+    };
+  };
+
+  const handleExportPDF = async () => {
+    const input = buildExportInput();
+    if (!input) return;
+    setExportError(null);
+    setExportingPdf(true);
+    try {
+      await exportCommercialLoadPDF(input);
+    } catch (err) {
+      console.error('PDF export failed:', err);
+      setExportError(err instanceof Error ? err.message : 'PDF export failed');
+    } finally {
+      setExportingPdf(false);
+    }
+  };
+
+  const handleExportCSV = () => {
+    const input = buildExportInput();
+    if (!input) return;
+    setExportError(null);
+    try {
+      exportCommercialLoadCSV(input);
+    } catch (err) {
+      console.error('CSV export failed:', err);
+      setExportError(err instanceof Error ? err.message : 'CSV export failed');
+    }
+  };
 
   return (
     <div className="space-y-6">
@@ -976,6 +1053,34 @@ export const CommercialLoadCalculator: React.FC<CommercialLoadCalculatorProps> =
         <div className="space-y-6">
           {result && (
             <>
+              {/* Export Buttons — only render when a project is available (exports need project metadata).
+                  Disabled while the PDF renders in a worker to prevent double-clicks. */}
+              {project && (
+                <div className="flex items-center gap-2 bg-white border border-gray-200 rounded-lg p-3 shadow-sm">
+                  <span className="text-xs font-medium text-gray-600 mr-1">Export:</span>
+                  <button
+                    onClick={handleExportPDF}
+                    disabled={exportingPdf}
+                    className="flex items-center gap-1.5 px-3 py-1.5 bg-[#2d3b2d] text-white text-sm font-medium rounded-md hover:bg-[#3d4f3d] disabled:opacity-60 disabled:cursor-wait shadow-sm transition-all"
+                    title="Download submittal-quality PDF report"
+                  >
+                    <Download className="w-4 h-4" />
+                    {exportingPdf ? 'Generating…' : 'PDF'}
+                  </button>
+                  <button
+                    onClick={handleExportCSV}
+                    className="flex items-center gap-1.5 px-3 py-1.5 bg-white border border-gray-300 text-gray-700 text-sm font-medium rounded-md hover:bg-gray-50 shadow-sm transition-all"
+                    title="Download structured CSV (opens in Excel)"
+                  >
+                    <FileSpreadsheet className="w-4 h-4" />
+                    CSV
+                  </button>
+                  {exportError && (
+                    <span className="ml-2 text-xs text-red-600">{exportError}</span>
+                  )}
+                </div>
+              )}
+
               {/* Service Recommendation */}
               {(() => {
                 // Effective values: use manual override if set, else the NEC-compliant auto-sized value.
