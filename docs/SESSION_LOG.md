@@ -3,7 +3,44 @@
 **Purpose**: Tracks recent work for seamless handoff between Claude instances.
 **Maintenance Rule**: Keep only the last 2 sessions. At the start of a new session, delete older entries — git history preserves everything.
 
-**Last Updated**: 2026-04-12
+**Last Updated**: 2026-04-15
+
+---
+
+### Session: 2026-04-14 / 2026-04-15 - Commercial Load Calc UX + Export
+
+**Focus**: Fix three bugs in the Commercial Load Calculator, fix the Riser diagram voltage label, and add PDF/CSV export from the load calculator tab.
+**Status**: Complete (merged to main)
+
+**Work Done:**
+
+*Bug fixes (branch `fix/commercial-load-calc-bugs`, merged `c0d297e`):*
+- Manual override dropdowns on Recommended Service Sizing (main breaker + bus rating) with auto-reset and utilization recalculation
+- Motor FLA auto-populates from new NEC Tables 430.248 (1-phase) and 430.250 (3-phase) when HP/voltage/phase changes; manual override supported with "Reset to NEC" button
+- New `<NumberInput>` component (`components/common/NumberInput.tsx`) fixes two UX bugs across all 15 number inputs in the calculator: can't clear the field (it snapped back to 0) and typing produced leading zeros
+
+*Riser fix (branch `fix/riser-util-voltage-from-mdp`, merged `4a54533`):*
+- UTIL symbol and "…V …Φ Service" badge in the one-line diagram now derive from the MDP's voltage/phase (via `is_main: true`) rather than `project.serviceVoltage`; falls back to project when no MDP exists
+
+*Load Calc Export feature (branch `feat/commercial-load-calc-export`, merged `c380761`):*
+- 1-page-flow PDF report (can expand to 2-3 pages with lots of inputs): project info, service sizing cards, load breakdown table with NEC refs, service sizing math, input parameters, warnings, notes, signature block
+- Structured multi-section CSV: project info, service sizing summary, breakdown, per-category input tables, warnings, notes — RFC 4180-compliant with UTF-8 BOM for Excel
+- PDF compacted after initial 3-page version per user feedback: single `<Page>` with natural flow, tighter spacing, signature moved to end
+
+**Files Created:**
+- `data/nec/table-430-248-250.ts` — NEC motor FLA tables + `getMotorFLA()`
+- `components/common/NumberInput.tsx` — buffered string-state numeric input
+- `services/pdfExport/CommercialLoadDocument.tsx` — React-PDF document
+- `services/pdfExport/commercialLoadExport.ts` — PDF + CSV export helpers
+
+**Files Modified:**
+- `components/CommercialLoadCalculator.tsx` — all three features
+- `components/OneLineDiagram.tsx` — effectiveServiceVoltage/Phase derivation (4 display sites + export)
+- `services/calculations/commercialLoad.ts` — exported `STANDARD_OCPD_SIZES` + `STANDARD_SERVICE_BUS_RATINGS`
+- `App.tsx` — pass `project` prop to CommercialLoadCalculator
+
+**Pending (carried over):**
+- Stripe webhook signature verification still disabled — must re-enable before real live-mode traffic
 
 ---
 
@@ -23,24 +60,3 @@
 **Pending (non-code):**
 - Resend SMTP setup for custom domain emails (user doing manually)
 - Stripe statement descriptor change ("EEDUCATION" → "SPARKPLAN")
-
----
-
-### Session: 2026-04-12 - Stripe Live Mode & Admin Refund
-
-**Focus**: Launch preparation — Stripe live mode, admin refund feature, trial UI fixes, email branding
-**Status**: Complete
-
-**Work Done:**
-- Migrated Stripe from test to live mode (new API keys, products, prices, webhook)
-- Created & deployed `stripe-refund` edge function (admin-only refund + cancel)
-- Updated AdminPanel.tsx with refund button and confirmation dialog
-- Fixed TrialBanner.tsx invisible button (CSS typo)
-- Fixed FeatureGate.tsx showing wrong plan for expired trials
-- Deleted test account (inverteczulia@gmail.com) from DB
-- Created branded email confirmation template
-- Created Resend SMTP setup guide
-- Configured Supabase Site URL for email redirects
-
-**Edge Functions Deployed:**
-- stripe-checkout v16, stripe-portal v15, stripe-webhook v22, stripe-refund v2

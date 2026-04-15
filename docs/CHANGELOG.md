@@ -4,6 +4,32 @@ All notable changes to SparkPlan.
 
 ---
 
+## 2026-04-15: Commercial Load Calculator UX + Export
+
+**New Features:**
+- **PDF export from Commercial Load Calculator**: Submittal-quality report with project info, service sizing summary (main breaker / bus / utilization), itemized load breakdown with NEC refs, service sizing math, input parameters (HVAC/Motors/Kitchen/Special), warnings, NEC calculation notes, and a signature block. Single-page layout that flows naturally — small projects render on 1 sheet, dense projects expand to 2–3.
+- **CSV export from Commercial Load Calculator**: Structured multi-section CSV (project info, service sizing, breakdown, inputs per category, warnings, notes). RFC 4180-compliant with UTF-8 BOM so Excel correctly renders Φ and ⚠️ symbols. Includes testable pure `buildCommercialLoadCSV()` helper.
+- **Manual override of main breaker + bus rating** in the Recommended Service Sizing card: dropdown picks filtered to valid sizes (OCPD ≥ calculated amps, bus ≥ effective main breaker), utilization and color recalc live, "↺ Auto" resets to NEC-computed default. Overrides are tagged in both PDF and CSV exports with the NEC-auto value for audit trail.
+- **Motor FLA auto-populate** from NEC 2023 Tables 430.248 (single-phase) and 430.250 (three-phase) when HP/voltage/phase changes. Manual edits are preserved until any driver input changes again. NEC reference value shown as a hint below each FLA field with a "Reset to NEC" button when overridden.
+
+**Bug Fixes:**
+- **Number input UX**: Fixed two long-standing bugs affecting all 15 number inputs in the Commercial Load Calculator: users couldn't clear the field to empty (Number('') coerced to 0 and snapped back) and typing produced leading zeros (e.g., "10" rendered as "010"). New reusable `<NumberInput>` component buffers typing as a local string, allowing empty/partial states mid-typing and normalizing on blur.
+- **Riser / one-line diagram voltage label**: The UTIL symbol and "…V …Φ Service" badge in the top-left corner of the diagram were hardcoded to read `project.serviceVoltage` / `project.servicePhase`. Creating an MDP at a different voltage (e.g. 480V) left the labels stuck at the project default (e.g. 208V). Now derives from the MDP (`is_main: true`) when present, falling back to the project-level value.
+
+**Files Created:**
+- `data/nec/table-430-248-250.ts` — NEC 2023 motor full-load current tables + `getMotorFLA()` lookup with voltage-column mapping (120→115, 240→230, 480→460, 600→575)
+- `components/common/NumberInput.tsx` — Reusable controlled numeric input
+- `services/pdfExport/CommercialLoadDocument.tsx` — React-PDF Document component
+- `services/pdfExport/commercialLoadExport.ts` — `exportCommercialLoadPDF()`, `exportCommercialLoadCSV()`, `buildCommercialLoadCSV()`
+
+**Files Modified:**
+- `components/CommercialLoadCalculator.tsx` — Manual overrides, motor FLA auto-populate, all inputs migrated to NumberInput, export buttons
+- `components/OneLineDiagram.tsx` — Effective service voltage/phase derived from MDP at 4 display sites + export path
+- `services/calculations/commercialLoad.ts` — Exported `STANDARD_OCPD_SIZES` and `STANDARD_SERVICE_BUS_RATINGS` for UI dropdowns
+- `App.tsx` — Pass full `project` object (not just id) to CommercialLoadCalculator so exports can access metadata
+
+---
+
 ## 2026-04-12: Stripe Live Mode & Admin Panel (Phase 3.0)
 
 **New Features:**

@@ -1,6 +1,6 @@
 # SparkPlan - Roadmap
 
-## Latest Completed Phase: 3.0 (Subscriptions, Billing & Admin) - Apr 2026
+## Latest Completed Phase: 3.1 (Commercial Load Calc UX & Export) - Apr 2026
 
 ---
 
@@ -196,6 +196,30 @@ MF EV Calculator → "Apply to Project" / "Add EV Infrastructure" buttons
 
 ---
 
+## Phase 3.1: Commercial Load Calc UX & Export - COMPLETE (Apr 2026)
+
+**Strategic Focus:** Make the Commercial Load Calculator submittal-ready. Fix long-standing UX paper cuts, round out the Recommended Service Sizing workflow with engineer-overrides, and produce professional PDF + CSV outputs so the tool can serve as the primary artifact for permit submittals.
+
+| Feature | Status |
+|---------|--------|
+| Manual override of Main Breaker (OCPD) with auto-validated dropdown | Complete |
+| Manual override of Service Bus Rating with dependency on main breaker | Complete |
+| Motor FLA auto-populate from NEC 2023 Tables 430.248 / 430.250 | Complete |
+| Reusable `<NumberInput>` fixing empty-field + leading-zero bugs | Complete |
+| One-line diagram: UTIL symbol voltage derived from MDP (not project) | Complete |
+| Commercial Load Calc PDF export (submittal-quality, single-flow) | Complete |
+| Commercial Load Calc CSV export (RFC 4180, Excel-safe BOM) | Complete |
+
+**Key Files:**
+- `data/nec/table-430-248-250.ts` — NEC motor FLA tables with voltage-column mapping
+- `components/common/NumberInput.tsx` — Buffered controlled numeric input
+- `services/pdfExport/CommercialLoadDocument.tsx` — React-PDF document
+- `services/pdfExport/commercialLoadExport.ts` — PDF + CSV export helpers
+- `components/CommercialLoadCalculator.tsx` — Overrides, auto-populate, export UI
+- `components/OneLineDiagram.tsx` — Effective service voltage derived from MDP
+
+---
+
 ## Backlog
 
 | Feature | Origin | Impact |
@@ -232,8 +256,9 @@ AI-powered auto-design: "Design 15,000 sq ft medical office with X-ray room" →
 
 | Feature | NEC Reference |
 |---------|---------------|
-| Load Calculations | 220.82, 220.84 |
+| Load Calculations | 220.82, 220.84, 220.40-220.60 (Commercial) |
 | Conductor Sizing | 310.16, Table 310.16 |
+| Motor Full-Load Currents | Tables 430.248 (1Φ), 430.250 (3Φ) |
 | Voltage Drop | Chapter 9, Table 9 |
 | Demand Factors | 220.42, 220.44, 220.55 |
 | Feeder Sizing | Article 215 |
