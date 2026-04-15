@@ -1,14 +1,15 @@
 /**
  * Commercial Load Calculation PDF Document
  *
- * Three-page submittal-quality report for commercial/industrial load calculations
- * per NEC Article 220 Part III/IV. Matches the visual conventions of other
- * SparkPlan PDF exports (ShortCircuit, MultiFamilyEV, VoltageDrop).
+ * Submittal-quality report for commercial/industrial load calculations per NEC
+ * Article 220 Part III/IV. Content flows through a single <Page> so react-pdf
+ * creates physical page breaks only when content actually overflows — a small
+ * project renders on 1 page, a dense project expands to 2+ as needed.
  *
- * Pages:
- *   1. Executive Summary — project info, service sizing, utilization
- *   2. Load Breakdown — itemized table + service sizing math
- *   3. Inputs & Notes — raw inputs (HVAC/Motors/Kitchen/Special) + notes & warnings
+ * Flow: brand bar → title → project info grid → service sizing summary
+ *       → load breakdown table → service sizing math → input parameters
+ *       (receptacles / HVAC / motors / kitchen / special) → warnings → notes
+ *       → signature block. BrandBar & Footer are `fixed` so they repeat.
  */
 
 import React from 'react';
@@ -41,9 +42,10 @@ const BRAND_DARK = '#2d3b2d';
 
 const styles = StyleSheet.create({
   page: {
-    padding: 40,
-    paddingBottom: 60, // leave room for footer
-    fontSize: 10,
+    paddingTop: 28,
+    paddingHorizontal: 32,
+    paddingBottom: 44, // leave room for footer
+    fontSize: 9.5,
     fontFamily: 'Helvetica',
     color: '#111827',
   },
@@ -54,23 +56,23 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     backgroundColor: BRAND_DARK,
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    marginBottom: 16,
+    paddingVertical: 5,
+    paddingHorizontal: 10,
+    marginBottom: 10,
   },
   brandBarLeft: {
     flexDirection: 'row',
     alignItems: 'center',
   },
   brandBolt: {
-    width: 14,
-    height: 14,
+    width: 11,
+    height: 11,
     backgroundColor: BRAND_YELLOW,
     marginRight: 6,
   },
   brandName: {
     color: '#ffffff',
-    fontSize: 12,
+    fontSize: 11,
     fontFamily: 'Helvetica-Bold',
     letterSpacing: 1,
   },
@@ -81,108 +83,108 @@ const styles = StyleSheet.create({
 
   // --- Document title block ---
   titleBlock: {
-    marginBottom: 14,
-    borderBottomWidth: 2,
+    marginBottom: 8,
+    borderBottomWidth: 1.5,
     borderBottomColor: BRAND_DARK,
-    paddingBottom: 8,
+    paddingBottom: 4,
   },
   docTitle: {
-    fontSize: 18,
+    fontSize: 15,
     fontFamily: 'Helvetica-Bold',
     color: BRAND_DARK,
-    marginBottom: 2,
+    marginBottom: 1,
   },
   docSubtitle: {
-    fontSize: 10,
+    fontSize: 9,
     color: '#6b7280',
   },
 
   // --- Section headers ---
   sectionTitle: {
-    fontSize: 11,
+    fontSize: 10,
     fontFamily: 'Helvetica-Bold',
     color: '#ffffff',
     backgroundColor: BRAND_DARK,
-    paddingVertical: 4,
-    paddingHorizontal: 8,
-    marginTop: 14,
-    marginBottom: 6,
+    paddingVertical: 3,
+    paddingHorizontal: 7,
+    marginTop: 8,
+    marginBottom: 4,
     letterSpacing: 0.5,
   },
   subSectionTitle: {
-    fontSize: 10,
+    fontSize: 9.5,
     fontFamily: 'Helvetica-Bold',
     color: BRAND_DARK,
-    marginTop: 8,
-    marginBottom: 4,
+    marginTop: 6,
+    marginBottom: 2,
   },
 
-  // --- Project info grid (3 col) ---
+  // --- Project info grid (4 col for tighter layout) ---
   projectGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    marginBottom: 8,
+    marginBottom: 4,
   },
   projectCell: {
-    width: '33.33%',
-    paddingVertical: 4,
-    paddingRight: 8,
+    width: '25%',
+    paddingVertical: 2,
+    paddingRight: 6,
   },
   projectLabel: {
-    fontSize: 7,
+    fontSize: 6.5,
     color: '#6b7280',
     textTransform: 'uppercase',
     letterSpacing: 0.5,
-    marginBottom: 1,
+    marginBottom: 0,
   },
   projectValue: {
-    fontSize: 10,
+    fontSize: 9,
     fontFamily: 'Helvetica-Bold',
     color: '#111827',
   },
 
-  // --- Summary cards ---
+  // --- Summary cards (compact) ---
   summaryRow: {
     flexDirection: 'row',
-    marginTop: 10,
-    marginBottom: 10,
-    gap: 8,
+    marginTop: 4,
+    marginBottom: 4,
+    gap: 6,
   },
   summaryCard: {
     flex: 1,
     borderWidth: 1,
     borderColor: '#e5e7eb',
-    borderRadius: 4,
-    padding: 10,
+    borderRadius: 3,
+    padding: 6,
   },
   summaryCardHighlight: {
     flex: 1,
-    borderWidth: 2,
+    borderWidth: 1.5,
     borderColor: BRAND_YELLOW,
-    borderRadius: 4,
-    padding: 10,
+    borderRadius: 3,
+    padding: 6,
     backgroundColor: '#fffbe6',
   },
   summaryLabel: {
-    fontSize: 7,
+    fontSize: 6.5,
     color: '#6b7280',
     textTransform: 'uppercase',
-    marginBottom: 3,
+    marginBottom: 2,
   },
   summaryValue: {
-    fontSize: 18,
+    fontSize: 15,
     fontFamily: 'Helvetica-Bold',
     color: BRAND_DARK,
   },
   summaryUnit: {
-    fontSize: 10,
+    fontSize: 9,
     color: '#6b7280',
     marginLeft: 2,
   },
   summarySub: {
-    fontSize: 8,
+    fontSize: 7.5,
     color: '#6b7280',
-    marginTop: 3,
+    marginTop: 1,
   },
 
   // --- Tables ---
@@ -211,36 +213,36 @@ const styles = StyleSheet.create({
   tableTotalRow: {
     flexDirection: 'row',
     backgroundColor: BRAND_DARK,
-    paddingVertical: 4,
+    paddingVertical: 3,
   },
   th: {
-    fontSize: 8,
+    fontSize: 7.5,
     fontFamily: 'Helvetica-Bold',
     color: '#374151',
-    padding: 5,
+    padding: 3.5,
     textAlign: 'left',
   },
   td: {
-    fontSize: 8,
+    fontSize: 7.5,
     color: '#111827',
-    padding: 5,
+    padding: 3.5,
   },
   tdNum: {
-    fontSize: 8,
+    fontSize: 7.5,
     color: '#111827',
-    padding: 5,
+    padding: 3.5,
     textAlign: 'right',
   },
   tdBold: {
-    fontSize: 9,
+    fontSize: 8,
     color: '#ffffff',
-    padding: 5,
+    padding: 3.5,
     fontFamily: 'Helvetica-Bold',
   },
   tdBoldNum: {
-    fontSize: 9,
+    fontSize: 8,
     color: '#ffffff',
-    padding: 5,
+    padding: 3.5,
     textAlign: 'right',
     fontFamily: 'Helvetica-Bold',
   },
@@ -250,34 +252,34 @@ const styles = StyleSheet.create({
     backgroundColor: '#fffbeb',
     borderWidth: 1,
     borderColor: '#f59e0b',
-    borderLeftWidth: 3,
+    borderLeftWidth: 2.5,
     borderLeftColor: '#f59e0b',
-    padding: 8,
-    marginBottom: 6,
+    padding: 5,
+    marginBottom: 3,
   },
   warningText: {
-    fontSize: 9,
+    fontSize: 8.5,
     color: '#78350f',
   },
   noteBox: {
     backgroundColor: '#eff6ff',
     borderWidth: 1,
     borderColor: '#bfdbfe',
-    borderLeftWidth: 3,
+    borderLeftWidth: 2.5,
     borderLeftColor: '#3b82f6',
-    padding: 8,
-    marginBottom: 6,
+    padding: 5,
+    marginBottom: 3,
   },
   noteText: {
-    fontSize: 9,
+    fontSize: 8.5,
     color: '#1e3a8a',
   },
 
   // --- Signature block ---
   signatureBlock: {
     flexDirection: 'row',
-    marginTop: 30,
-    gap: 16,
+    marginTop: 12,
+    gap: 12,
   },
   sigField: {
     flex: 1,
@@ -285,11 +287,11 @@ const styles = StyleSheet.create({
   sigLine: {
     borderBottomWidth: 1,
     borderBottomColor: '#6b7280',
-    height: 24,
+    height: 18,
     marginBottom: 2,
   },
   sigLabel: {
-    fontSize: 7,
+    fontSize: 6.5,
     color: '#6b7280',
     textTransform: 'uppercase',
   },
@@ -299,36 +301,36 @@ const styles = StyleSheet.create({
     backgroundColor: '#f9fafb',
     borderWidth: 1,
     borderColor: '#e5e7eb',
-    padding: 10,
-    marginTop: 6,
-    marginBottom: 6,
+    padding: 6,
+    marginTop: 3,
+    marginBottom: 3,
   },
   mathLine: {
-    fontSize: 9,
+    fontSize: 8.5,
     color: '#374151',
-    marginBottom: 3,
+    marginBottom: 2,
     fontFamily: 'Helvetica',
   },
   mathResult: {
-    fontSize: 10,
+    fontSize: 9.5,
     color: BRAND_DARK,
     fontFamily: 'Helvetica-Bold',
-    marginTop: 4,
+    marginTop: 3,
   },
 
   // --- Footer ---
   footer: {
     position: 'absolute',
-    bottom: 24,
-    left: 40,
-    right: 40,
+    bottom: 18,
+    left: 32,
+    right: 32,
     flexDirection: 'row',
     justifyContent: 'space-between',
     fontSize: 7,
     color: '#9ca3af',
     borderTopWidth: 1,
     borderTopColor: '#e5e7eb',
-    paddingTop: 6,
+    paddingTop: 4,
   },
 
   necRef: {
@@ -437,7 +439,8 @@ export const CommercialLoadDocument: React.FC<CommercialLoadDocumentProps> = (pr
       author="SparkPlan"
       subject="Commercial Load Calculation Report"
     >
-      {/* ============ PAGE 1 — EXECUTIVE SUMMARY ============ */}
+      {/* Single Page — content flows naturally; react-pdf creates new physical pages only when needed.
+          Brand bar & footer are `fixed` so they repeat on every physical page. */}
       <Page size="LETTER" style={styles.page}>
         <BrandBar pageLabel="COMMERCIAL LOAD CALCULATION" />
 
@@ -448,11 +451,11 @@ export const CommercialLoadDocument: React.FC<CommercialLoadDocumentProps> = (pr
           </Text>
         </View>
 
-        {/* Project Info */}
+        {/* Project Info — 4-column grid packs 8 fields into 2 rows */}
         <Text style={styles.sectionTitle}>PROJECT INFORMATION</Text>
         <View style={styles.projectGrid}>
           <View style={styles.projectCell}>
-            <Text style={styles.projectLabel}>Project Name</Text>
+            <Text style={styles.projectLabel}>Project</Text>
             <Text style={styles.projectValue}>{project.name}</Text>
           </View>
           <View style={styles.projectCell}>
@@ -462,6 +465,10 @@ export const CommercialLoadDocument: React.FC<CommercialLoadDocumentProps> = (pr
           <View style={styles.projectCell}>
             <Text style={styles.projectLabel}>Date</Text>
             <Text style={styles.projectValue}>{todayStr()}</Text>
+          </View>
+          <View style={styles.projectCell}>
+            <Text style={styles.projectLabel}>NEC Edition</Text>
+            <Text style={styles.projectValue}>NEC {project.necEdition ?? '2023'}</Text>
           </View>
           <View style={styles.projectCell}>
             <Text style={styles.projectLabel}>Occupancy</Text>
@@ -478,11 +485,7 @@ export const CommercialLoadDocument: React.FC<CommercialLoadDocumentProps> = (pr
             </Text>
           </View>
           <View style={styles.projectCell}>
-            <Text style={styles.projectLabel}>NEC Edition</Text>
-            <Text style={styles.projectValue}>NEC {project.necEdition ?? '2023'}</Text>
-          </View>
-          <View style={styles.projectCell}>
-            <Text style={styles.projectLabel}>Lighting Unit Load</Text>
+            <Text style={styles.projectLabel}>Lighting Load</Text>
             <Text style={styles.projectValue}>
               {LIGHTING_UNIT_LOAD[occupancyType]} VA/sq ft
             </Text>
@@ -495,7 +498,7 @@ export const CommercialLoadDocument: React.FC<CommercialLoadDocumentProps> = (pr
           )}
         </View>
 
-        {/* Service Sizing Summary */}
+        {/* Service Sizing Summary — the money section: breaker, bus, utilization */}
         <Text style={styles.sectionTitle}>SERVICE SIZING SUMMARY</Text>
         <View style={styles.summaryRow}>
           <View style={styles.summaryCardHighlight}>
@@ -506,7 +509,7 @@ export const CommercialLoadDocument: React.FC<CommercialLoadDocumentProps> = (pr
             </Text>
             <Text style={styles.summarySub}>NEC 240.6(A), 215.3</Text>
             {isMainBreakerOverridden && (
-              <Text style={styles.overrideBadge}>MANUAL OVERRIDE (NEC auto: {result.recommendedMainBreakerAmps}A)</Text>
+              <Text style={styles.overrideBadge}>OVERRIDE (NEC: {result.recommendedMainBreakerAmps}A)</Text>
             )}
           </View>
           <View style={styles.summaryCardHighlight}>
@@ -517,7 +520,7 @@ export const CommercialLoadDocument: React.FC<CommercialLoadDocumentProps> = (pr
             </Text>
             <Text style={styles.summarySub}>Commercial equipment</Text>
             {isBusOverridden && (
-              <Text style={styles.overrideBadge}>MANUAL OVERRIDE (NEC auto: {result.recommendedServiceBusRating}A)</Text>
+              <Text style={styles.overrideBadge}>OVERRIDE (NEC: {result.recommendedServiceBusRating}A)</Text>
             )}
           </View>
           <View style={styles.summaryCard}>
@@ -540,60 +543,8 @@ export const CommercialLoadDocument: React.FC<CommercialLoadDocumentProps> = (pr
           </View>
         </View>
 
-        {/* Totals */}
-        <View style={styles.summaryRow}>
-          <View style={styles.summaryCard}>
-            <Text style={styles.summaryLabel}>CONNECTED LOAD</Text>
-            <Text style={styles.summaryValue}>
-              {fmtKVA(result.totalConnectedLoad_VA)}
-              <Text style={styles.summaryUnit}> kVA</Text>
-            </Text>
-            <Text style={styles.summarySub}>{fmtVA(result.totalConnectedLoad_VA)} VA</Text>
-          </View>
-          <View style={styles.summaryCard}>
-            <Text style={styles.summaryLabel}>DEMAND LOAD</Text>
-            <Text style={styles.summaryValue}>
-              {fmtKVA(result.totalDemandLoad_VA)}
-              <Text style={styles.summaryUnit}> kVA</Text>
-            </Text>
-            <Text style={styles.summarySub}>{fmtVA(result.totalDemandLoad_VA)} VA</Text>
-          </View>
-          <View style={styles.summaryCard}>
-            <Text style={styles.summaryLabel}>CALCULATED CURRENT</Text>
-            <Text style={styles.summaryValue}>
-              {fmtA(result.calculatedAmps)}
-              <Text style={styles.summaryUnit}> A</Text>
-            </Text>
-            <Text style={styles.summarySub}>
-              at {serviceVoltage}V {servicePhase}Φ
-            </Text>
-          </View>
-        </View>
-
-        {/* Signature block */}
-        <Text style={styles.sectionTitle}>CERTIFICATION</Text>
-        <View style={styles.signatureBlock}>
-          <View style={styles.sigField}>
-            <View style={styles.sigLine} />
-            <Text style={styles.sigLabel}>Prepared By (Signature)</Text>
-          </View>
-          <View style={styles.sigField}>
-            <View style={styles.sigLine} />
-            <Text style={styles.sigLabel}>License No.</Text>
-          </View>
-          <View style={styles.sigField}>
-            <View style={styles.sigLine} />
-            <Text style={styles.sigLabel}>Date</Text>
-          </View>
-        </View>
-
-        <Footer />
-      </Page>
-
-      {/* ============ PAGE 2 — LOAD BREAKDOWN ============ */}
-      <Page size="LETTER" style={styles.page}>
-        <BrandBar pageLabel="LOAD BREAKDOWN" />
-
+        {/* Load Breakdown — the itemized table with NEC refs. Connected/Demand totals are in the
+            bottom row here; no separate totals cards needed. */}
         <Text style={styles.sectionTitle}>LOAD BREAKDOWN BY CATEGORY</Text>
         <View style={styles.table}>
           {/* Header */}
@@ -656,13 +607,8 @@ export const CommercialLoadDocument: React.FC<CommercialLoadDocumentProps> = (pr
           </Text>
         </View>
 
-        <Footer />
-      </Page>
-
-      {/* ============ PAGE 3 — INPUTS, NOTES, WARNINGS ============ */}
-      <Page size="LETTER" style={styles.page}>
-        <BrandBar pageLabel="INPUTS &amp; NOTES" />
-
+        {/* Input parameters follow the math — inspectors want to verify the inputs
+            that produced the numbers above. */}
         <Text style={styles.sectionTitle}>INPUT PARAMETERS</Text>
 
         {/* Receptacles / Lighting auxiliaries */}
@@ -807,6 +753,23 @@ export const CommercialLoadDocument: React.FC<CommercialLoadDocumentProps> = (pr
             ))}
           </>
         )}
+
+        {/* Certification signature block — at the end where it belongs in a submittal */}
+        <Text style={styles.sectionTitle}>CERTIFICATION</Text>
+        <View style={styles.signatureBlock}>
+          <View style={styles.sigField}>
+            <View style={styles.sigLine} />
+            <Text style={styles.sigLabel}>Prepared By (Signature)</Text>
+          </View>
+          <View style={styles.sigField}>
+            <View style={styles.sigLine} />
+            <Text style={styles.sigLabel}>License No.</Text>
+          </View>
+          <View style={styles.sigField}>
+            <View style={styles.sigLine} />
+            <Text style={styles.sigLabel}>Date</Text>
+          </View>
+        </View>
 
         <Footer />
       </Page>
