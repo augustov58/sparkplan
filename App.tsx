@@ -97,7 +97,7 @@ const ProjectWrapper = ({ projects, updateProject, deleteProject, onSignOut }: {
                                 {project.type === ProjectType.RESIDENTIAL ? (
                                     <DwellingLoadCalculator project={project} updateProject={updateProject} />
                                 ) : project.type === ProjectType.COMMERCIAL || project.type === ProjectType.INDUSTRIAL ? (
-                                    <CommercialLoadCalculator projectId={project.id} />
+                                    <CommercialLoadCalculator projectId={project.id} project={project} />
                                 ) : (
                                     <LoadCalculator project={project} updateProject={updateProject} />
                                 )}
