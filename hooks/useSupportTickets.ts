@@ -18,8 +18,10 @@ export interface SupportTicket {
   status: TicketStatus;
   priority: TicketPriority;
   user_email: string;
+  user_last_seen_at: string | null;
   created_at: string;
   updated_at: string;
+  unread_count?: number;
 }
 
 export interface SupportReply {
@@ -49,6 +51,7 @@ export interface UseSupportTicketsReturn {
   addReply: (ticketId: string, message: string, isAdmin?: boolean) => Promise<SupportReply | null>;
   updateTicketStatus: (ticketId: string, status: TicketStatus) => Promise<void>;
   updateTicketPriority: (ticketId: string, priority: TicketPriority) => Promise<void>;
+  markTicketSeen: (ticketId: string) => Promise<void>;
   refetch: () => Promise<void>;
 }
 
@@ -72,7 +75,7 @@ export function useSupportTickets(adminMode = false): UseSupportTicketsReturn {
 
       let query = supabase
         .from('support_tickets')
-        .select('*')
+        .select('*, support_replies(created_at, is_admin)')
         .order('created_at', { ascending: false });
 
       if (!adminMode) {
@@ -89,7 +92,23 @@ export function useSupportTickets(adminMode = false): UseSupportTicketsReturn {
       const { data, error: fetchError } = await query;
       if (fetchError) throw fetchError;
 
-      setTickets((data as SupportTicket[]) || []);
+      // Compute unread_count per ticket (admin replies after user_last_seen_at)
+      const enriched = ((data || []) as any[]).map((row) => {
+        const lastSeen = row.user_last_seen_at
+          ? new Date(row.user_last_seen_at).getTime()
+          : 0;
+        const replies = (row.support_replies || []) as Array<{
+          created_at: string;
+          is_admin: boolean;
+        }>;
+        const unread = replies.filter(
+          (r) => r.is_admin && new Date(r.created_at).getTime() > lastSeen
+        ).length;
+        const { support_replies, ...ticket } = row;
+        return { ...ticket, unread_count: unread } as SupportTicket;
+      });
+
+      setTickets(enriched);
     } catch (err: any) {
       setError(err.message || 'Failed to fetch support tickets');
       console.error('Error fetching tickets:', err);
@@ -102,7 +121,8 @@ export function useSupportTickets(adminMode = false): UseSupportTicketsReturn {
     fetchTickets();
   }, [fetchTickets]);
 
-  // Realtime subscription — refetch on any change to this table
+  // Realtime subscription — refetch on any change to tickets or replies
+  // (need replies so unread badge + history list update when admin replies come in)
   useEffect(() => {
     const channel = supabase
       .channel(`support_tickets_${adminMode ? 'admin' : 'user'}`)
@@ -112,6 +132,17 @@ export function useSupportTickets(adminMode = false): UseSupportTicketsReturn {
           event: '*',
           schema: 'public',
           table: 'support_tickets',
+        },
+        () => {
+          fetchTickets();
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'support_replies',
         },
         () => {
           fetchTickets();
@@ -254,6 +285,9 @@ export function useSupportTickets(adminMode = false): UseSupportTicketsReturn {
 
   const updateTicketStatus = async (ticketId: string, status: TicketStatus): Promise<void> => {
     const previous = [...tickets];
+    const targetTicket = previous.find((t) => t.id === ticketId);
+    const oldStatus = targetTicket?.status;
+
     setTickets((prev) => prev.map((t) => (t.id === ticketId ? { ...t, status } : t)));
 
     const { error: updateError } = await supabase
@@ -265,6 +299,40 @@ export function useSupportTickets(adminMode = false): UseSupportTicketsReturn {
       setTickets(previous);
       setError(updateError.message);
       console.error('Error updating status:', updateError);
+      return;
+    }
+
+    // Only email the user when admin changes status (not when it auto-bumps to in_progress
+    // from the user's own reply on their own ticket). Admin-mode is the proxy for "admin did it".
+    if (adminMode && targetTicket && oldStatus !== status) {
+      supabase.functions
+        .invoke('support-notify', {
+          body: {
+            type: 'status_changed',
+            ticketId,
+            newStatus: status,
+            recipientEmail: targetTicket.user_email,
+            subject: targetTicket.subject,
+          },
+        })
+        .catch((err) => console.warn('support-notify (status_changed) failed:', err));
+    }
+  };
+
+  const markTicketSeen = async (ticketId: string): Promise<void> => {
+    // Optimistic: update local state so unread count drops immediately
+    const now = new Date().toISOString();
+    setTickets((prev) =>
+      prev.map((t) => (t.id === ticketId ? { ...t, user_last_seen_at: now } : t))
+    );
+
+    const { error: updateError } = await supabase
+      .from('support_tickets')
+      .update({ user_last_seen_at: now })
+      .eq('id', ticketId);
+
+    if (updateError) {
+      console.error('Error marking ticket seen:', updateError);
     }
   };
 
@@ -296,6 +364,7 @@ export function useSupportTickets(adminMode = false): UseSupportTicketsReturn {
     addReply,
     updateTicketStatus,
     updateTicketPriority,
+    markTicketSeen,
     refetch: fetchTickets,
   };
 }

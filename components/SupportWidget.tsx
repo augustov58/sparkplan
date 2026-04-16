@@ -139,6 +139,7 @@ export const SupportWidget: React.FC = () => {
     createTicket,
     getReplies,
     addReply,
+    markTicketSeen,
   } = useSupportTickets(false);
 
   const [isOpen, setIsOpen] = useState(false);
@@ -164,7 +165,7 @@ export const SupportWidget: React.FC = () => {
     reset({ category: selectedCategory, subject: '', message: '' });
   }, [selectedCategory, reset]);
 
-  const unreadAdminReplies = 0; // placeholder — future: count replies since last-seen timestamp
+  const unreadAdminReplies = tickets.reduce((sum, t) => sum + (t.unread_count || 0), 0);
 
   const onSubmit = async (data: SupportTicketFormData) => {
     if (!user) return;
@@ -219,7 +220,7 @@ export const SupportWidget: React.FC = () => {
         <button
           type="button"
           onClick={() => setIsOpen(true)}
-          className="fixed bottom-4 left-4 md:bottom-6 md:left-6 z-50 bg-[#2d3b2d] hover:bg-[#1f2a1f] text-white rounded-full shadow-lg hover:shadow-xl transition-all w-14 h-14 flex items-center justify-center group"
+          className="fixed bottom-4 left-4 md:bottom-6 md:left-[17rem] z-50 bg-[#2d3b2d] hover:bg-[#1f2a1f] text-white rounded-full shadow-lg hover:shadow-xl transition-all w-14 h-14 flex items-center justify-center group"
           aria-label="Open support"
         >
           <LifeBuoy className="w-6 h-6 group-hover:scale-110 transition-transform" />
@@ -233,7 +234,7 @@ export const SupportWidget: React.FC = () => {
 
       {/* Slide-up Panel */}
       {isOpen && (
-        <div className="fixed bottom-4 left-4 md:bottom-6 md:left-6 z-50 w-[calc(100vw-2rem)] md:w-96 max-w-md bg-white rounded-2xl shadow-2xl border border-gray-200 flex flex-col overflow-hidden"
+        <div className="fixed bottom-4 left-4 md:bottom-6 md:left-[17rem] z-50 w-[calc(100vw-2rem)] md:w-96 max-w-md bg-white rounded-2xl shadow-2xl border border-gray-200 flex flex-col overflow-hidden"
           style={{ maxHeight: 'min(85vh, 640px)' }}
         >
           {/* Header */}
@@ -252,8 +253,8 @@ export const SupportWidget: React.FC = () => {
                   <ArrowLeft className="w-4 h-4" />
                 </button>
               )}
-              <LifeBuoy className="w-5 h-5" />
-              <h3 className="font-semibold text-sm">
+              <LifeBuoy className="w-5 h-5 text-white" />
+              <h3 className="font-semibold text-sm text-white">
                 {view === 'form' && 'Contact Support'}
                 {view === 'history' && 'My Tickets'}
                 {view === 'detail' && 'Ticket Details'}
@@ -286,13 +287,18 @@ export const SupportWidget: React.FC = () => {
               <button
                 type="button"
                 onClick={() => setView('history')}
-                className={`flex-1 py-2 text-sm font-medium transition-colors ${
+                className={`flex-1 py-2 text-sm font-medium transition-colors inline-flex items-center justify-center gap-1.5 ${
                   view === 'history'
                     ? 'text-[#2d3b2d] border-b-2 border-[#2d3b2d]'
                     : 'text-gray-500 hover:text-gray-700'
                 }`}
               >
                 My tickets {tickets.length > 0 && `(${tickets.length})`}
+                {unreadAdminReplies > 0 && (
+                  <span className="bg-red-500 text-white text-[10px] font-bold rounded-full min-w-[18px] h-[18px] px-1 inline-flex items-center justify-center">
+                    {unreadAdminReplies}
+                  </span>
+                )}
               </button>
             </div>
           )}
@@ -465,6 +471,8 @@ export const SupportWidget: React.FC = () => {
                 onSelect={(id) => {
                   setSelectedTicketId(id);
                   setView('detail');
+                  // Mark as seen on open (fire-and-forget)
+                  markTicketSeen(id);
                 }}
                 onStartNew={() => setView('form')}
               />
@@ -476,6 +484,7 @@ export const SupportWidget: React.FC = () => {
                 ticket={tickets.find((t) => t.id === selectedTicketId)}
                 getReplies={getReplies}
                 addReply={addReply}
+                markTicketSeen={markTicketSeen}
               />
             )}
           </div>
@@ -532,23 +541,33 @@ const TicketHistory: React.FC<TicketHistoryProps> = ({
         const cat = CATEGORY_META[ticket.category];
         const status = STATUS_META[ticket.status];
         const StatusIcon = status.Icon;
+        const unread = ticket.unread_count || 0;
         return (
           <button
             key={ticket.id}
             type="button"
             onClick={() => onSelect(ticket.id)}
-            className="w-full text-left px-4 py-3 hover:bg-gray-50 transition-colors"
+            className={`w-full text-left px-4 py-3 transition-colors ${
+              unread > 0 ? 'bg-red-50/40 hover:bg-red-50' : 'hover:bg-gray-50'
+            }`}
           >
             <div className="flex items-start justify-between gap-2 mb-1">
-              <h4 className="text-sm font-medium text-gray-900 line-clamp-1">
+              <h4 className={`text-sm line-clamp-1 ${unread > 0 ? 'font-bold text-gray-900' : 'font-medium text-gray-900'}`}>
                 {ticket.subject}
               </h4>
-              <span
-                className={`flex-shrink-0 inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium ${status.badge}`}
-              >
-                <StatusIcon className="w-2.5 h-2.5" />
-                {status.label}
-              </span>
+              <div className="flex-shrink-0 flex items-center gap-1.5">
+                {unread > 0 && (
+                  <span className="bg-red-500 text-white text-[10px] font-bold rounded-full min-w-[18px] h-[18px] px-1 inline-flex items-center justify-center">
+                    {unread}
+                  </span>
+                )}
+                <span
+                  className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium ${status.badge}`}
+                >
+                  <StatusIcon className="w-2.5 h-2.5" />
+                  {status.label}
+                </span>
+              </div>
             </div>
             <div className="flex items-center gap-2 text-[11px] text-gray-500">
               <span className={`px-1.5 py-0.5 rounded font-medium ${cat.badge}`}>
@@ -556,6 +575,12 @@ const TicketHistory: React.FC<TicketHistoryProps> = ({
               </span>
               <span>·</span>
               <span>{new Date(ticket.created_at).toLocaleDateString()}</span>
+              {unread > 0 && (
+                <>
+                  <span>·</span>
+                  <span className="text-red-600 font-semibold">New reply</span>
+                </>
+              )}
             </div>
           </button>
         );
@@ -573,6 +598,7 @@ interface TicketDetailProps {
   ticket: SupportTicket | undefined;
   getReplies: (id: string) => Promise<SupportReply[]>;
   addReply: (id: string, message: string, isAdmin?: boolean) => Promise<SupportReply | null>;
+  markTicketSeen: (id: string) => Promise<void>;
 }
 
 const TicketDetail: React.FC<TicketDetailProps> = ({
@@ -580,6 +606,7 @@ const TicketDetail: React.FC<TicketDetailProps> = ({
   ticket,
   getReplies,
   addReply,
+  markTicketSeen,
 }) => {
   const [replies, setReplies] = useState<SupportReply[]>([]);
   const [replyText, setReplyText] = useState('');
@@ -622,17 +649,23 @@ const TicketDetail: React.FC<TicketDetailProps> = ({
           filter: `ticket_id=eq.${ticketId}`,
         },
         (payload) => {
+          const newReply = payload.new as SupportReply;
           setReplies((prev) => {
-            if (prev.some((r) => r.id === (payload.new as any).id)) return prev;
-            return [...prev, payload.new as SupportReply];
+            if (prev.some((r) => r.id === newReply.id)) return prev;
+            return [...prev, newReply];
           });
+          // If the user is actively viewing this ticket and an admin reply
+          // arrives, mark it seen immediately so the badge stays accurate.
+          if (newReply.is_admin) {
+            markTicketSeen(ticketId);
+          }
         }
       )
       .subscribe();
     return () => {
       channel.unsubscribe();
     };
-  }, [ticketId]);
+  }, [ticketId, markTicketSeen]);
 
   const handleSendReply = async () => {
     const msg = replyText.trim();

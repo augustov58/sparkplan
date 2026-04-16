@@ -1397,6 +1397,7 @@ export type Database = {
           updated_at: string
           user_email: string
           user_id: string
+          user_last_seen_at: string | null
         }
         Insert: {
           attachment_urls?: string[]
@@ -1413,6 +1414,7 @@ export type Database = {
           updated_at?: string
           user_email: string
           user_id: string
+          user_last_seen_at?: string | null
         }
         Update: {
           attachment_urls?: string[]
@@ -1429,6 +1431,7 @@ export type Database = {
           updated_at?: string
           user_email?: string
           user_id?: string
+          user_last_seen_at?: string | null
         }
         Relationships: []
       }

@@ -45,7 +45,45 @@ interface AdminReplyPayload {
   subject: string;
 }
 
-type Payload = NewTicketPayload | AdminReplyPayload;
+interface StatusChangedPayload {
+  type: 'status_changed';
+  ticketId: string;
+  newStatus: 'open' | 'in_progress' | 'resolved' | 'closed';
+  recipientEmail: string;
+  subject: string;
+}
+
+type Payload = NewTicketPayload | AdminReplyPayload | StatusChangedPayload;
+
+function statusLabel(status: string): string {
+  switch (status) {
+    case 'open':
+      return 'Open';
+    case 'in_progress':
+      return 'In progress';
+    case 'resolved':
+      return 'Resolved';
+    case 'closed':
+      return 'Closed';
+    default:
+      return status;
+  }
+}
+
+function statusBlurb(status: string): string {
+  switch (status) {
+    case 'in_progress':
+      return "We're looking into it and will reply soon.";
+    case 'resolved':
+      return "We believe this is resolved. If you're still running into the issue, just reply and we'll re-open.";
+    case 'closed':
+      return 'This ticket has been closed. Feel free to open a new one any time.';
+    case 'open':
+      return "We've re-opened this ticket.";
+    default:
+      return '';
+  }
+}
 
 function escapeHtml(input: string): string {
   return input
@@ -211,6 +249,60 @@ serve(async (req) => {
         apiKey: resendApiKey,
         to: recipientEmail,
         subject: `Re: ${subject}`,
+        html,
+        replyTo: SUPPORT_INBOX,
+      });
+
+      return new Response(JSON.stringify({ success: true }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 200,
+      });
+    }
+
+    if (body.type === 'status_changed') {
+      // Only admin can send status-change notifications
+      if (user.email !== ADMIN_EMAIL) {
+        return new Response(
+          JSON.stringify({ error: 'Unauthorized: admin access required' }),
+          {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            status: 403,
+          }
+        );
+      }
+
+      const { ticketId, newStatus, recipientEmail, subject } = body;
+      const label = statusLabel(newStatus);
+      const blurb = statusBlurb(newStatus);
+
+      const html = `
+        <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; max-width: 600px; margin: 0 auto; padding: 24px; background: #faf9f7;">
+          <div style="background: #2d3b2d; color: white; padding: 16px 24px; border-radius: 8px 8px 0 0;">
+            <h1 style="margin: 0; font-size: 18px;">Ticket status updated</h1>
+          </div>
+          <div style="background: white; padding: 24px; border: 1px solid #e5e7eb; border-top: 0; border-radius: 0 0 8px 8px;">
+            <p style="font-size: 13px; color: #6b7280; margin: 0 0 8px;">
+              Re: <strong>${escapeHtml(subject)}</strong>
+            </p>
+            <p style="font-size: 14px; color: #111827; margin: 0 0 12px;">
+              Your ticket status is now
+              <span style="display: inline-block; background: #e8f5e8; color: #2d3b2d; font-weight: 600; padding: 2px 10px; border-radius: 12px; font-size: 13px; margin-left: 4px;">${escapeHtml(label)}</span>.
+            </p>
+            ${blurb ? `<p style="font-size: 13px; color: #4b5563; margin: 0 0 16px;">${escapeHtml(blurb)}</p>` : ''}
+            <p style="font-size: 13px; color: #4b5563;">
+              Open the support widget (bottom-left in SparkPlan) to see the full thread or reply.
+            </p>
+            <p style="font-size: 11px; color: #9ca3af; margin-top: 24px; padding-top: 16px; border-top: 1px solid #e5e7eb;">
+              Ticket ID: ${escapeHtml(ticketId)}
+            </p>
+          </div>
+        </div>
+      `;
+
+      await sendEmail({
+        apiKey: resendApiKey,
+        to: recipientEmail,
+        subject: `[SparkPlan Support] Status updated: ${label} — ${subject}`,
         html,
         replyTo: SUPPORT_INBOX,
       });
