@@ -4,6 +4,42 @@ All notable changes to SparkPlan.
 
 ---
 
+## 2026-04-16: In-App Support System (Phase 3.2)
+
+**New Features:**
+- **In-app support ticket system**: Users open tickets from a floating support bubble (bottom-left). Tickets capture category, subject, message, optional image attachments (up to 5), current page URL, plan tier, and browser info. Admin replies from the Admin Panel "Support" tab; threaded replies appear in the widget. No more mailto: hand-off — the entire conversation stays in-app.
+- **Email notifications via Resend**: New ticket → `support@sparkplan.app` (with reply-to set to the user for quick email replies); admin reply → user's registered email with "continue in SparkPlan" CTA; status changes (open / in_progress / resolved / closed) → user email with a branded status badge.
+- **Unread-reply badges**: Red badges appear on the floating bubble, the "My tickets" tab, and each ticket row when the admin has replied since the user last opened the ticket. Opening a ticket (or receiving a reply while the ticket is already open) clears it. Implementation uses a per-ticket `user_last_seen_at` high-water mark rather than per-reply read receipts.
+- **Realtime sync**: Supabase postgres_changes subscriptions on both `support_tickets` and `support_replies` — new admin replies show up instantly with the badge incremented without refresh.
+- **Admin Support Panel**: List / filter / search tickets by status or email; set priority (low / normal / high / urgent); set status; compose replies inline; view full user thread with image attachments rendered via signed URLs.
+
+**Bug Fixes:**
+- **"permission denied for table users" on ticket insert**: Root cause was admin RLS policies subquerying `auth.users`, but the `authenticated` role has no SELECT grant on that table. Because policies are OR-combined, every user (not just admins) hit the error. Fixed by switching admin checks to `(auth.jwt() ->> 'email') = 'augustovalbuena@gmail.com'`, which reads the email claim from the JWT instead of joining against auth.users. Applied to support_tickets, support_replies, and storage.objects.
+- **Support bubble overlap**: Floating bubble position changed from `md:left-6` to `md:left-[17rem]` so it sits past the 16rem sidebar instead of covering "Sign Out" / "Account Settings".
+- **Widget title readability**: Forced `text-white` on the heading (was reading as dark green on the dark-green gradient).
+
+**Files Created:**
+- `components/SupportWidget.tsx` — Floating bubble + form + history + threaded reply view
+- `components/AdminSupportPanel.tsx` — Admin ticket dashboard
+- `hooks/useSupportTickets.ts` — Supabase CRUD + realtime + unread computation
+- `supabase/functions/support-notify/index.ts` — Resend edge function (new_ticket / admin_reply / status_changed)
+- `supabase/migrations/20260416_support_tickets.sql` — Tables + RLS + storage bucket
+- `supabase/migrations/20260416_fix_support_rls_use_jwt.sql` — JWT-claim admin policy fix
+- `supabase/migrations/20260416_support_tickets_last_seen.sql` — Unread watermark column + restricted UPDATE grant
+
+**Files Modified:**
+- `App.tsx` — Mount SupportWidget + lazy-load AdminSupportPanel behind AdminPanel tab
+- `components/AdminPanel.tsx` — New "Support" tab wiring
+- `lib/database.types.ts` — support_tickets / support_replies / user_last_seen_at
+- `lib/validation-schemas.ts` — Ticket form schemas
+- `lib/toast.ts` — Support-flow toast messages
+- `lib/dataRefreshEvents.ts` — Support entity refresh events
+
+**Edge Functions Deployed:**
+- `support-notify` v3 (via MCP `deploy_edge_function`)
+
+---
+
 ## 2026-04-15: Commercial Load Calculator UX + Export
 
 **New Features:**

@@ -1,9 +1,9 @@
 # Database Architecture
 ## SparkPlan Application
 
-**Last Updated**: 2026-03-20
+**Last Updated**: 2026-04-16
 **Database**: Supabase PostgreSQL 15
-**Schema Version**: 2.0
+**Schema Version**: 2.1
 **Location**: `/supabase/schema.sql` and migration files
 
 ---
@@ -80,6 +80,12 @@ Other project tables:
 - grounding_details (1:many with projects)
 - inspection_items (1:many with projects)
 - issues (1:many with projects)
+
+Support tables (added Phase 3.2, Apr 2026):
+┌──────────────────┐         ┌──────────────────┐
+│ support_tickets  │←────────│ support_replies  │
+└──────────────────┘ 1:many  └──────────────────┘
+       ↑ user_id → auth.users
 ```
 
 ---
@@ -493,6 +499,66 @@ demand_factor NUMERIC DEFAULT 1.0
 **`issues`** - Code compliance issues tracking
 
 *(Similar structure: UUID, project_id FK, domain-specific fields)*
+
+---
+
+#### `support_tickets` / `support_replies` — In-App Support (Added Phase 3.2, Apr 2026)
+
+**Purpose**: Threaded support conversations between users and admin, with email notifications via Resend.
+
+**Schema**:
+```sql
+CREATE TABLE support_tickets (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  user_email TEXT NOT NULL,
+  category TEXT NOT NULL CHECK (category IN ('bug', 'question', 'feedback', 'feature_request')),
+  subject TEXT NOT NULL,
+  message TEXT NOT NULL,
+  attachment_urls TEXT[] DEFAULT '{}',
+  page_url TEXT,
+  plan_tier TEXT,
+  browser_info TEXT,
+  status TEXT NOT NULL DEFAULT 'open' CHECK (status IN ('open', 'in_progress', 'resolved', 'closed')),
+  priority TEXT NOT NULL DEFAULT 'normal' CHECK (priority IN ('low', 'normal', 'high', 'urgent')),
+  user_last_seen_at TIMESTAMPTZ DEFAULT NOW(),  -- unread-badge watermark
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE TABLE support_replies (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  ticket_id UUID NOT NULL REFERENCES support_tickets(id) ON DELETE CASCADE,
+  user_id UUID NOT NULL REFERENCES auth.users(id),
+  message TEXT NOT NULL,
+  is_admin BOOLEAN NOT NULL DEFAULT FALSE,
+  attachment_urls TEXT[] DEFAULT '{}',
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+```
+
+**Design Decisions**:
+
+**Unread-badge watermark (not per-reply read receipts)**:
+- `user_last_seen_at` stores a single timestamp per ticket
+- `unread_count` is computed client-side: admin replies where `created_at > user_last_seen_at`
+- ✅ Simpler than a separate `support_reply_reads` table
+- ✅ Supported by PostgREST nested select: `select('*, support_replies(created_at, is_admin)')`
+- ❌ Loses per-reply granularity (but UX only needs a count, not which specific replies)
+
+**Admin RLS via JWT claim, not auth.users subquery**:
+- Admin policies check `(auth.jwt() ->> 'email') = 'augustovalbuena@gmail.com'`
+- Originally used `(SELECT email FROM auth.users WHERE id = auth.uid())` — but `authenticated` role has no grant on `auth.users`, and RLS policies are OR-combined, so every insert raised "permission denied for table users"
+- Fix: `supabase/migrations/20260416_fix_support_rls_use_jwt.sql`
+
+**Restricted column-level UPDATE grant**:
+- Users can only update their own ticket's `user_last_seen_at` (for unread-badge sync) — not status, priority, or message
+- Implemented via `GRANT UPDATE (user_last_seen_at) ON support_tickets TO authenticated` + a matching RLS policy
+
+**Storage bucket**:
+- `support-attachments` bucket for image uploads (up to 5 per ticket, max 5MB each)
+- User folder pattern `{user_id}/{ticket_id}/{filename}` enforced by storage.objects RLS
+- Admin read-all storage policy uses the same JWT-claim pattern
 
 ---
 

@@ -1,6 +1,6 @@
 # SparkPlan - Roadmap
 
-## Latest Completed Phase: 3.1 (Commercial Load Calc UX & Export) - Apr 2026
+## Latest Completed Phase: 3.2 (In-App Support System) - Apr 2026
 
 ---
 
@@ -217,6 +217,34 @@ MF EV Calculator → "Apply to Project" / "Add EV Infrastructure" buttons
 - `services/pdfExport/commercialLoadExport.ts` — PDF + CSV export helpers
 - `components/CommercialLoadCalculator.tsx` — Overrides, auto-populate, export UI
 - `components/OneLineDiagram.tsx` — Effective service voltage derived from MDP
+
+---
+
+## Phase 3.2: In-App Support System - COMPLETE (Apr 2026)
+
+**Strategic Focus:** Close the feedback loop with users. Replace the mailto-only support channel with a threaded in-app ticketing system that captures context (page URL, browser, plan tier), supports image attachments, and notifies both sides via email without requiring the user to leave SparkPlan.
+
+| Feature | Status |
+|---------|--------|
+| Support ticket & reply schema with RLS (admin via `auth.jwt()` claim) | Complete |
+| Floating support widget (bottom-left bubble, sidebar-aware positioning) | Complete |
+| Ticket form with category / subject / message / image attachments | Complete |
+| Ticket history + threaded reply view (user-side) | Complete |
+| Admin Panel "Support" tab with search, status/priority controls, reply composer | Complete |
+| Resend-powered email notifications (new ticket → inbox, admin reply → user) | Complete |
+| Status-change email to user (open / in_progress / resolved / closed) | Complete |
+| Realtime subscriptions (tickets + replies) + unread-reply badges | Complete |
+| Per-ticket `user_last_seen_at` high-water mark for unread count | Complete |
+| Image attachment storage bucket + RLS + signed-URL rendering | Complete |
+
+**Key Files:**
+- `components/SupportWidget.tsx` — Floating bubble, new-ticket form, ticket history, threaded reply view
+- `components/AdminSupportPanel.tsx` — Admin ticket list, filters, status/priority controls, reply composer
+- `hooks/useSupportTickets.ts` — CRUD + realtime + unread computation + mark-seen
+- `supabase/functions/support-notify/index.ts` — Resend emails for new_ticket / admin_reply / status_changed
+- `supabase/migrations/20260416_support_tickets.sql` — Tables + RLS + storage bucket
+- `supabase/migrations/20260416_fix_support_rls_use_jwt.sql` — Switch admin policies to JWT email claim (avoids auth.users grant error)
+- `supabase/migrations/20260416_support_tickets_last_seen.sql` — Unread-badge watermark column
 
 ---
 

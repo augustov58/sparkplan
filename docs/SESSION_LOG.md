@@ -3,11 +3,57 @@
 **Purpose**: Tracks recent work for seamless handoff between Claude instances.
 **Maintenance Rule**: Keep only the last 2 sessions. At the start of a new session, delete older entries — git history preserves everything.
 
-**Last Updated**: 2026-04-15
+**Last Updated**: 2026-04-16
 
 ---
 
-### Session: 2026-04-14 / 2026-04-15 - Commercial Load Calc UX + Export
+### Session: 2026-04-16 — In-App Support System
+
+**Focus**: Build an end-to-end support ticket system to replace the mailto-only channel. Deploy to Vercel preview for validation, then merge to main.
+**Status**: Complete (merged to main via PR #3, merge commit `123324a`)
+
+**Work Done:**
+
+*Scaffold (branch `feat/support-system`, landed in `052ed7e`):*
+- `support_tickets` + `support_replies` tables with RLS; storage bucket for image attachments
+- `SupportWidget` floating bubble + ticket form + history + threaded reply view
+- `AdminSupportPanel` with search/filter/status/priority controls and reply composer
+- `useSupportTickets` hook: CRUD, realtime postgres_changes, optimistic updates
+- `support-notify` edge function (Resend): `new_ticket` → support@sparkplan.app, `admin_reply` → user
+- Deployed edge function v1/v2 via MCP `deploy_edge_function` (Supabase CLI wasn't authenticated)
+
+*RLS fix (landed in `7896976`):*
+- Diagnosed "permission denied for table users" error from Supabase postgres logs (MCP `get_logs`). Admin policies were subquerying `auth.users`, which `authenticated` role has no grant on. Because policies are OR-combined, every user hit the error — not just admins.
+- Replaced all `(SELECT email FROM auth.users WHERE id = auth.uid())` subqueries with `(auth.jwt() ->> 'email')` which reads from the JWT claim.
+- Migration: `supabase/migrations/20260416_fix_support_rls_use_jwt.sql`. Applied to support_tickets, support_replies, and storage.objects.
+
+*Polish pass before merging (landed in `310d1a9`):*
+- **Bubble position**: `md:left-6` → `md:left-[17rem]` so it clears the 16rem sidebar instead of overlapping "Sign Out" / "Account Settings"
+- **Title color**: Forced `text-white` on the "Support" heading (was rendering as dark-green-on-dark-green)
+- **Unread badges**: Added `user_last_seen_at` column + per-ticket `unread_count` computed via nested PostgREST select `'*, support_replies(created_at, is_admin)'`. Red badges on the floating bubble, "My tickets" tab, and individual ticket rows. Opening a ticket calls `markTicketSeen(id)` to bump the watermark.
+- **Status-change email**: New `status_changed` payload type in `support-notify` (v3). Only fires from `adminMode` so the user's own reply auto-bumping to in_progress doesn't email them.
+- **Replies realtime**: Added `support_replies` INSERT subscription so unread badge increments the instant an admin replies (no page refresh needed).
+
+**Key Files:**
+- `components/SupportWidget.tsx` — floating bubble, form, history, threaded view, unread badges
+- `components/AdminSupportPanel.tsx` — admin dashboard
+- `hooks/useSupportTickets.ts` — CRUD + realtime + unread + markTicketSeen + status-change email trigger
+- `supabase/functions/support-notify/index.ts` — Resend handler for all 3 notification types
+- `supabase/migrations/20260416_support_tickets.sql` — tables + RLS + storage bucket
+- `supabase/migrations/20260416_fix_support_rls_use_jwt.sql` — JWT-claim admin policy fix
+- `supabase/migrations/20260416_support_tickets_last_seen.sql` — unread watermark column
+
+**Testing Flow:**
+- User tests on Vercel preview (not locally) — workflow was commit → push → wait for preview → validate.
+- Preview validated bubble position, title color, unread badge flow, and status-change email before merge.
+
+**Pending (carried over):**
+- Stripe webhook signature verification still disabled — must re-enable before real live-mode traffic
+- No inbound-email → reply pipeline. Admin replies only work from the Admin Panel today; Gmail replies to notification emails won't thread back into the ticket system.
+
+---
+
+### Session: 2026-04-14 / 2026-04-15 — Commercial Load Calc UX + Export
 
 **Focus**: Fix three bugs in the Commercial Load Calculator, fix the Riser diagram voltage label, and add PDF/CSV export from the load calculator tab.
 **Status**: Complete (merged to main)
@@ -41,22 +87,3 @@
 
 **Pending (carried over):**
 - Stripe webhook signature verification still disabled — must re-enable before real live-mode traffic
-
----
-
-### Session: 2026-04-12 - Documentation: Billing & Admin Phases
-
-**Focus**: Document the subscription/billing/Stripe/admin panel features in ROADMAP.md and CHANGELOG.md
-**Status**: Complete
-
-**Work Done:**
-- Added Phase 2.9 (Subscriptions & Feature Gating) to ROADMAP.md
-- Added Phase 3.0 (Stripe Live Mode & Admin Panel) to ROADMAP.md
-- Updated "Latest Completed Phase" header to 3.0
-- Renumbered future phases (Design Copilot → Phase 4, Solar → Phase 5)
-- Added two CHANGELOG entries for Phase 2.9 and 3.0
-- Updated SESSION_LOG
-
-**Pending (non-code):**
-- Resend SMTP setup for custom domain emails (user doing manually)
-- Stripe statement descriptor change ("EEDUCATION" → "SPARKPLAN")
