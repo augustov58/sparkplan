@@ -1,7 +1,13 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { Search, Shield, Loader2, CheckCircle, AlertCircle, UserPlus, Trash2, Users, MailCheck, MailX, RotateCcw } from 'lucide-react';
+import React, { useState, useEffect, useCallback, lazy, Suspense } from 'react';
+import { Search, Shield, Loader2, CheckCircle, AlertCircle, UserPlus, Trash2, Users, MailCheck, MailX, RotateCcw, LifeBuoy } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import type { SubscriptionPlan } from '@/hooks/useSubscription';
+
+const AdminSupportPanel = lazy(() =>
+  import('./AdminSupportPanel').then((m) => ({ default: m.AdminSupportPanel }))
+);
+
+type AdminTab = 'users' | 'support';
 
 const PLANS: SubscriptionPlan[] = ['free', 'starter', 'pro', 'business', 'enterprise'];
 
@@ -25,6 +31,9 @@ export const AdminPanel: React.FC = () => {
   const [confirming, setConfirming] = useState<string | null>(null);
   const [refunding, setRefunding] = useState<string | null>(null);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+
+  // Active tab
+  const [activeTab, setActiveTab] = useState<AdminTab>('users');
 
   // Add user form
   const [showAddForm, setShowAddForm] = useState(false);
@@ -214,20 +223,64 @@ export const AdminPanel: React.FC = () => {
 
   return (
     <div className="max-w-5xl mx-auto">
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 mb-6">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 mb-4">
         <div className="flex items-center gap-3">
           <Shield className="w-6 h-6 text-[#2d3b2d]" />
           <h1 className="text-2xl font-bold text-gray-900">Admin Panel</h1>
         </div>
+        {activeTab === 'users' && (
+          <button
+            onClick={() => setShowAddForm(!showAddForm)}
+            className="bg-[#2d3b2d] hover:bg-[#2d3b2d] text-white px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-2 transition-colors"
+          >
+            <UserPlus className="w-4 h-4" />
+            Add User
+          </button>
+        )}
+      </div>
+
+      {/* Tabs */}
+      <div className="flex gap-1 mb-6 border-b border-gray-200">
         <button
-          onClick={() => setShowAddForm(!showAddForm)}
-          className="bg-[#2d3b2d] hover:bg-[#2d3b2d] text-white px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-2 transition-colors"
+          type="button"
+          onClick={() => setActiveTab('users')}
+          className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors inline-flex items-center gap-2 ${
+            activeTab === 'users'
+              ? 'border-[#2d3b2d] text-[#2d3b2d]'
+              : 'border-transparent text-gray-500 hover:text-gray-700'
+          }`}
         >
-          <UserPlus className="w-4 h-4" />
-          Add User
+          <Users className="w-4 h-4" />
+          Users
+        </button>
+        <button
+          type="button"
+          onClick={() => setActiveTab('support')}
+          className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors inline-flex items-center gap-2 ${
+            activeTab === 'support'
+              ? 'border-[#2d3b2d] text-[#2d3b2d]'
+              : 'border-transparent text-gray-500 hover:text-gray-700'
+          }`}
+        >
+          <LifeBuoy className="w-4 h-4" />
+          Support
         </button>
       </div>
 
+      {activeTab === 'support' && (
+        <Suspense
+          fallback={
+            <div className="py-10 flex items-center justify-center">
+              <Loader2 className="w-5 h-5 text-gray-400 animate-spin" />
+            </div>
+          }
+        >
+          <AdminSupportPanel />
+        </Suspense>
+      )}
+
+      {activeTab === 'users' && (
+        <>
       {/* Add User Form */}
       {showAddForm && (
         <div className="bg-white border border-[#2d3b2d]/30 rounded-lg p-6 mb-6">
@@ -431,6 +484,8 @@ export const AdminPanel: React.FC = () => {
           <Users className="w-8 h-8 mx-auto mb-3 opacity-40" />
           <p>No users found.</p>
         </div>
+      )}
+        </>
       )}
     </div>
   );
