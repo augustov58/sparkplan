@@ -66,11 +66,11 @@ export function Signup({ onSuccess }: SignupProps) {
               <ol className="space-y-1.5 text-xs text-[#3d6b3d]">
                 <li className="flex items-start gap-2">
                   <span className="font-bold text-[#2d3b2d] mt-px">1.</span>
-                  Confirm your email by clicking the link
+                  Open the confirmation email and click the link
                 </li>
                 <li className="flex items-start gap-2">
                   <span className="font-bold text-[#2d3b2d] mt-px">2.</span>
-                  You'll be signed in automatically
+                  Sign in with the password you just created
                 </li>
                 <li className="flex items-start gap-2">
                   <span className="font-bold text-[#2d3b2d] mt-px">3.</span>
@@ -82,7 +82,14 @@ export function Signup({ onSuccess }: SignupProps) {
               </p>
             </div>
 
-            <p className="text-xs text-[#888]">
+            <Link
+              to="/login"
+              className="inline-block w-full text-center bg-[#2d3b2d] text-white font-semibold py-2.5 px-4 rounded-lg hover:bg-[#3d4f3d] transition-colors mb-4"
+            >
+              Go to Sign In
+            </Link>
+
+            <p className="text-xs text-[#888] mb-2">
               Didn't receive the email? Check your spam folder or{' '}
               <button
                 onClick={() => setSuccess(false)}
@@ -90,6 +97,11 @@ export function Signup({ onSuccess }: SignupProps) {
               >
                 try again
               </button>
+            </p>
+            <p className="text-[10px] text-[#aaa]">
+              Some corporate email systems (Outlook, Office 365) may confirm your account
+              automatically. If the link shows an error, your account is likely already
+              confirmed — just sign in above.
             </p>
           </div>
         </div>
