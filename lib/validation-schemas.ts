@@ -6,6 +6,26 @@
 import { z } from 'zod';
 
 // ============================================
+// Support Ticket Schemas
+// ============================================
+
+export const supportTicketSchema = z.object({
+  category: z.enum(['bug', 'question', 'feedback', 'feature_request'], {
+    errorMap: () => ({ message: 'Please select a category' }),
+  }),
+
+  subject: z.string()
+    .min(1, 'Subject is required')
+    .max(200, 'Subject must be less than 200 characters'),
+
+  message: z.string()
+    .min(10, 'Please provide more detail (at least 10 characters)')
+    .max(5000, 'Message must be less than 5,000 characters'),
+});
+
+export type SupportTicketFormData = z.infer<typeof supportTicketSchema>;
+
+// ============================================
 // Project Schemas
 // ============================================
 

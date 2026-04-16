@@ -57,6 +57,10 @@ import type { ProjectTemplate } from './data/project-templates';
 import { Toaster } from 'react-hot-toast';
 import { TemplateType, createProjectFromTemplate } from './services/sampleTemplates';
 
+const SupportWidget = lazy(() =>
+  import('./components/SupportWidget').then((m) => ({ default: m.SupportWidget }))
+);
+
 // Note: Mock data removed - now using Supabase database
 
 // Wrapper component to fetch data for Utility Interconnection Form
@@ -925,6 +929,11 @@ function AppContent() {
       />
 
       {user && <NecAssistant />}
+      {user && (
+        <Suspense fallback={null}>
+          <SupportWidget />
+        </Suspense>
+      )}
     </>
   );
 }

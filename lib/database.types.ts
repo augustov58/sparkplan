@@ -1343,6 +1343,98 @@ export type Database = {
           },
         ]
       }
+      support_replies: {
+        Row: {
+          attachment_urls: string[]
+          created_at: string
+          id: string
+          is_admin: boolean
+          message: string
+          ticket_id: string
+          user_id: string
+        }
+        Insert: {
+          attachment_urls?: string[]
+          created_at?: string
+          id?: string
+          is_admin?: boolean
+          message: string
+          ticket_id: string
+          user_id: string
+        }
+        Update: {
+          attachment_urls?: string[]
+          created_at?: string
+          id?: string
+          is_admin?: boolean
+          message?: string
+          ticket_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "support_replies_ticket_id_fkey"
+            columns: ["ticket_id"]
+            isOneToOne: false
+            referencedRelation: "support_tickets"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      support_tickets: {
+        Row: {
+          attachment_urls: string[]
+          browser_info: string | null
+          category: string
+          created_at: string
+          id: string
+          message: string
+          page_url: string | null
+          plan_tier: string | null
+          priority: string
+          status: string
+          subject: string
+          updated_at: string
+          user_email: string
+          user_id: string
+          user_last_seen_at: string | null
+        }
+        Insert: {
+          attachment_urls?: string[]
+          browser_info?: string | null
+          category: string
+          created_at?: string
+          id?: string
+          message: string
+          page_url?: string | null
+          plan_tier?: string | null
+          priority?: string
+          status?: string
+          subject: string
+          updated_at?: string
+          user_email: string
+          user_id: string
+          user_last_seen_at?: string | null
+        }
+        Update: {
+          attachment_urls?: string[]
+          browser_info?: string | null
+          category?: string
+          created_at?: string
+          id?: string
+          message?: string
+          page_url?: string | null
+          plan_tier?: string | null
+          priority?: string
+          status?: string
+          subject?: string
+          updated_at?: string
+          user_email?: string
+          user_id?: string
+          user_last_seen_at?: string | null
+        }
+        Relationships: []
+      }
       transformers: {
         Row: {
           catalog_number: string | null

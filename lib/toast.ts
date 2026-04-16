@@ -158,6 +158,19 @@ export const toastMessages = {
     error: 'Failed to save profile',
   },
 
+  // Support Tickets
+  supportTicket: {
+    created: "Support ticket submitted! We'll get back to you soon.",
+    replied: 'Reply sent',
+    resolved: 'Ticket marked as resolved',
+    closed: 'Ticket closed',
+    statusUpdated: 'Ticket status updated',
+    priorityUpdated: 'Ticket priority updated',
+    attachmentUploadError: 'Failed to upload attachment',
+    error: 'Failed to submit support ticket',
+    replyError: 'Failed to send reply',
+  },
+
   // Generic
   saved: 'Changes saved',
   copied: 'Copied to clipboard',
