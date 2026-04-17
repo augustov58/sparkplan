@@ -4,6 +4,49 @@ All notable changes to SparkPlan.
 
 ---
 
+## 2026-04-17: Support System — Inbound Email Replies (Gmail polling) + AI-Investigation Scaffolding
+
+**New Features:**
+- **Email replies thread back into tickets**: Both admin and customer email replies are now automatically attached to the originating ticket as `support_replies` rows. No dashboard visit required for quick back-and-forth. Realtime subscriptions mean the reply appears live in both SupportWidget and AdminSupportPanel without refresh.
+- **Per-ticket plus-addressed `Reply-To`**: All outbound mail types (`new_ticket`, `admin_reply`, `status_changed`, and new `user_reply`) set `Reply-To: support+ticket-<uuid>@sparkplan.app`. Gmail delivers plus-addressed mail to the same inbox, so the ticket ID rides every thread for free — no extra MX records, no new domain.
+- **`support-inbound` edge function (Gmail API polling)**: pg_cron fires the function every minute with a shared secret. It lists unread messages matching `to:support+ticket- is:unread newer_than:1d`, extracts the ticket UUID from the recipient, authenticates the sender (admin email or ticket owner), strips quoted reply history, inserts into `support_replies` via service_role, emits a `support_ticket_events` row, then echoes via `support-notify` to keep the *other* party informed. Admin email replies auto-bump `open → in_progress` matching dashboard behavior.
+- **`support-investigate` edge function (stub)**: Architectural seam for a future Claude Code runner that picks up bug tickets, investigates, and reports findings to Slack + the admin dashboard. Currently returns 202 Accepted and writes `status='skipped'` investigation rows so the UI can show "deferred" without further migrations. The schema (`support_ticket_investigations`) already carries everything the runner will eventually write: `findings`, `artifacts` (JSONB), `notified_via`, `completed_at`, `error_message`.
+
+**Architecture:**
+- **Gmail API over Resend Inbound**: The existing Google Workspace mailbox handles receiving for free; Resend Pro ($20/mo) was avoided. Code structure is provider-agnostic — swapping to a webhook-based provider later would only touch `support-inbound`'s entry point.
+- **Append-only event log**: New `support_ticket_events` table captures every lifecycle event (`ticket_created`, `user_reply`, `admin_reply`, `status_changed`, `priority_changed`, `investigation_requested`, `investigation_completed`) with a `source` discriminator (`widget` / `dashboard` / `email` / `system`). This is the integration point for the future AI-investigation handler and any other event-driven downstream (Slack, analytics, audit).
+- **Investigation scaffolding is forward-compatible**: `investigator` column is a CHECK-constrained enum that already includes `'claude-code'`, `'human'`, `'automated-check'`. Status column covers the full lifecycle (`pending` → `running` → `completed` / `failed` / `skipped`). Adding the real runner is a code-only change.
+- **Shared helpers**: `supabase/functions/_shared/gmail.ts` (OAuth refresh-token flow, message listing, base64url decoding, MIME tree walk) and `supabase/functions/_shared/supportEvents.ts` (event emit, ticket-ID extraction, quoted-reply stripping) keep edge functions thin.
+- **Internal-trust bypass in support-notify**: `support-inbound` calls `support-notify` with the service_role bearer token to trigger user_reply echoes. support-notify now detects service_role callers and treats them as trusted system-level without requiring a user session.
+
+**New Tables:**
+- `support_ticket_events` — append-only event log (admin-read-only RLS, service_role writes)
+- `support_ticket_investigations` — AI/human investigation records (realtime enabled for live dashboard updates)
+- `support_gmail_sync_state` — singleton polling watermark for operational visibility
+
+**Configuration Required Before Live Use:**
+- Google Cloud Console: enable Gmail API on a project, create OAuth 2.0 Desktop-app credentials, grant `https://www.googleapis.com/auth/gmail.modify` scope
+- Run `deno run --allow-net scripts/gmail-oauth.ts` once to obtain the offline refresh token
+- Supabase Edge Function secrets: `GMAIL_CLIENT_ID`, `GMAIL_CLIENT_SECRET`, `GMAIL_REFRESH_TOKEN`, `GMAIL_MAILBOX=support@sparkplan.app`, `SUPPORT_INBOUND_SECRET` (strong random), `SUPPORT_ADMIN_AUTH_USER_ID` (admin's `auth.users.id`)
+- Supabase Vault: `support_inbound_secret` (same value as the env var) and `supabase_functions_base_url` (so the pg_cron migration can read them)
+- Apply migrations: `20260417_support_events_and_investigations.sql`, `20260417_support_inbound_cron.sql`
+- Deploy edge functions: `support-notify` (updated), `support-inbound` (new), `support-investigate` (new stub)
+
+**Files Created:**
+- `supabase/migrations/20260417_support_events_and_investigations.sql` — event log + investigations + Gmail sync state
+- `supabase/migrations/20260417_support_inbound_cron.sql` — pg_cron schedule + pg_net call
+- `supabase/functions/_shared/gmail.ts` — Gmail API REST helpers
+- `supabase/functions/_shared/supportEvents.ts` — shared event emit + email parsing
+- `supabase/functions/support-inbound/index.ts` — Gmail polling handler
+- `supabase/functions/support-investigate/index.ts` — AI-investigation stub
+- `scripts/gmail-oauth.ts` — one-shot OAuth bootstrap
+
+**Files Modified:**
+- `supabase/functions/support-notify/index.ts` — plus-addressed `Reply-To`, service_role internal-trust path, new `user_reply` payload type
+- `lib/database.types.ts` — added 3 new table types
+
+---
+
 ## 2026-04-16: In-App Support System (Phase 3.2)
 
 **New Features:**

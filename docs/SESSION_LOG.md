@@ -3,7 +3,73 @@
 **Purpose**: Tracks recent work for seamless handoff between Claude instances.
 **Maintenance Rule**: Keep only the last 2 sessions. At the start of a new session, delete older entries — git history preserves everything.
 
-**Last Updated**: 2026-04-16
+**Last Updated**: 2026-04-17
+
+---
+
+### Session: 2026-04-17 — Stripe Custom Email Domain + Support Inbound (Gmail polling) + AI-Investigation Scaffolding
+
+**Focus**: Verify `sparkplan.app` for Stripe's custom email domain, then close out Phase 3.2 by wiring an email-reply → ticket pipeline. Initially attempted Resend Inbound, pivoted to Gmail API polling after hitting the Resend free-tier paywall. Bake in architectural hooks for a future Claude Code bug-investigation runner.
+**Status**: All code landed on branch `feat/support-email-inbound`. Stripe DNS verified. Support-inbound ready to deploy once Gmail OAuth bootstrap + Supabase secrets + pg_cron Vault entries are set by user.
+
+**Work Done:**
+
+*Stripe custom email domain (DNS, no code):*
+- Added 8 records to Vercel DNS for `sparkplan.app`: root TXT (`stripe-verification=...`), 6 DKIM CNAMEs under `*._domainkey`, `bounce` CNAME → `custom-email-domain.stripe.com`. Pre-existing `_dmarc` reused. Accepted Vercel's wildcard-override prompts per DKIM CNAME. Stripe verified successfully.
+
+*Architecture pivot — Resend → Gmail API polling:*
+- Initial plan was a Resend Inbound webhook on `reply.sparkplan.app`. Hit blocker: Resend free tier allows 1 domain and Receiving is bound to domain root, conflicting with Google Workspace MX.
+- Chose "Path A-lite": poll Gmail directly via the existing Google Workspace mailbox using plus-addressing (`support+ticket-<uuid>@sparkplan.app`). Zero new infra, zero monthly cost.
+
+*Email-reply pipeline + event log + investigation scaffolding:*
+- New migration `20260417_support_events_and_investigations.sql` — three tables:
+  - `support_ticket_events` (append-only lifecycle log; discriminator columns `event_type` + `source`; admin-read-only RLS + service_role writes)
+  - `support_ticket_investigations` (forward-compatible schema for the future Claude Code runner — `investigator` enum, `status` lifecycle, `findings TEXT`, `artifacts JSONB`, `notified_via` + `notified_at`; added to realtime publication)
+  - `support_gmail_sync_state` (singleton polling watermark)
+- New migration `20260417_support_inbound_cron.sql` — enables `pg_cron` + `pg_net`, schedules one-minute polling via `vault.decrypted_secrets` for both the URL and shared secret. Safe to re-apply (drops existing job first).
+- Shared edge-function helpers:
+  - `supabase/functions/_shared/gmail.ts` — OAuth refresh-token flow, list/get/markAsRead, base64url-UTF8 decoding, MIME tree walk with text/plain preferred and HTML stripped fallback
+  - `supabase/functions/_shared/supportEvents.ts` — `emitSupportEvent()` (never throws), `getAdminClient()`, `extractTicketIdFromText()` (supports BOTH plus-addressing AND `ticket-<uuid>@reply.*` subdomain scheme for future flexibility), `stripQuotedReply()` (multi-marker conservative), `extractBareAddress()`
+- `supabase/functions/support-inbound/index.ts` rewritten for Gmail polling:
+  - pg_cron shared-secret auth via `x-support-inbound-secret` header (constant-time compare)
+  - Gmail query: `to:support+ticket- is:unread newer_than:1d`
+  - Flow: fetch → extract ticket UUID → auth sender (admin vs ticket owner, rejects anything else) → strip quoted → insert reply → emit event → bump status if admin reply on open ticket → fetch `support-notify` to echo to OTHER party → mark-as-read (on any outcome except `error`, which allows retry on transient DB failures)
+- `supabase/functions/support-notify/index.ts` updated:
+  - Plus-addressed Reply-To: `support+ticket-<uuid>@sparkplan.app` (was `ticket-<uuid>@reply.sparkplan.app`)
+  - Internal-trust path: service_role bearer token bypasses user lookup and is treated as admin (needed so support-inbound can echo)
+  - New `user_reply` payload type: customer-reply echo to admin with "Customer replied via email" template
+- `supabase/functions/support-investigate/index.ts` — stub that inserts `status='skipped'` investigations and emits `investigation_requested` events. Clearly marked TODO points for wiring up Claude Code runner + Slack webhook without future migration churn.
+- `scripts/gmail-oauth.ts` — one-shot OAuth bootstrap script (OOB flow, gmail.modify scope, `prompt=consent` to force refresh_token, prints Supabase secrets set command)
+- `lib/database.types.ts` — added Row/Insert/Update for all 3 new tables
+- `npm run build` ✓ (no regressions)
+- `npm test` ✓ 99/99
+
+**Key Files:**
+- `supabase/migrations/20260417_support_events_and_investigations.sql` — events + investigations + sync state
+- `supabase/migrations/20260417_support_inbound_cron.sql` — pg_cron schedule
+- `supabase/functions/_shared/gmail.ts`, `supabase/functions/_shared/supportEvents.ts` — shared helpers
+- `supabase/functions/support-inbound/index.ts` — Gmail polling handler
+- `supabase/functions/support-investigate/index.ts` — stub for future Claude Code integration
+- `supabase/functions/support-notify/index.ts` — plus-addressing + user_reply + service_role trust
+- `scripts/gmail-oauth.ts` — OAuth bootstrap
+- `lib/database.types.ts`, `docs/CHANGELOG.md`, `docs/SESSION_LOG.md` — updated
+
+**Pending (requires infra work by user before the feature goes live):**
+- Google Cloud Console: create project, enable Gmail API, create Desktop-app OAuth 2.0 credentials with `gmail.modify` scope, add self as test user
+- Run `deno run --allow-net scripts/gmail-oauth.ts` once to obtain the offline refresh token
+- Set Edge Function secrets: `GMAIL_CLIENT_ID`, `GMAIL_CLIENT_SECRET`, `GMAIL_REFRESH_TOKEN`, `GMAIL_MAILBOX=support@sparkplan.app`, `SUPPORT_INBOUND_SECRET` (strong random), `SUPPORT_ADMIN_AUTH_USER_ID` (admin's auth.users.id)
+- Supabase Vault: `support_inbound_secret` (same as env var) + `supabase_functions_base_url` (so the cron migration can read them)
+- Deploy edge functions: `support-notify` (updated), `support-inbound` (new), `support-investigate` (new stub)
+- Open PR from `feat/support-email-inbound` → `main` after infra work validates the flow end-to-end on preview
+
+**Pending (future AI-investigation runner — design only, not implemented):**
+- Wire `CLAUDE_CODE_WEBHOOK_URL` + `SLACK_WEBHOOK_URL` env vars on `support-investigate`
+- Flip the scaffolding stub: change `status='skipped'` → `status='pending'` and either POST to the runner or let a worker poll
+- Add pg trigger on `support_ticket_events` that calls `support-investigate` for qualifying events (e.g., new `bug` category tickets)
+- Runner itself writes findings back via UPDATE to `support_ticket_investigations`
+
+**Pending (carried over from prior sessions):**
+- Stripe webhook signature verification: secret hardcoded in deployed edge function (Supabase env var was failing). Must rotate + re-harden per `memory/stripe_webhook_signature.md` before scaling real-payment volume.
 
 ---
 
@@ -51,39 +117,3 @@
 - Stripe webhook signature verification still disabled — must re-enable before real live-mode traffic
 - No inbound-email → reply pipeline. Admin replies only work from the Admin Panel today; Gmail replies to notification emails won't thread back into the ticket system.
 
----
-
-### Session: 2026-04-14 / 2026-04-15 — Commercial Load Calc UX + Export
-
-**Focus**: Fix three bugs in the Commercial Load Calculator, fix the Riser diagram voltage label, and add PDF/CSV export from the load calculator tab.
-**Status**: Complete (merged to main)
-
-**Work Done:**
-
-*Bug fixes (branch `fix/commercial-load-calc-bugs`, merged `c0d297e`):*
-- Manual override dropdowns on Recommended Service Sizing (main breaker + bus rating) with auto-reset and utilization recalculation
-- Motor FLA auto-populates from new NEC Tables 430.248 (1-phase) and 430.250 (3-phase) when HP/voltage/phase changes; manual override supported with "Reset to NEC" button
-- New `<NumberInput>` component (`components/common/NumberInput.tsx`) fixes two UX bugs across all 15 number inputs in the calculator: can't clear the field (it snapped back to 0) and typing produced leading zeros
-
-*Riser fix (branch `fix/riser-util-voltage-from-mdp`, merged `4a54533`):*
-- UTIL symbol and "…V …Φ Service" badge in the one-line diagram now derive from the MDP's voltage/phase (via `is_main: true`) rather than `project.serviceVoltage`; falls back to project when no MDP exists
-
-*Load Calc Export feature (branch `feat/commercial-load-calc-export`, merged `c380761`):*
-- 1-page-flow PDF report (can expand to 2-3 pages with lots of inputs): project info, service sizing cards, load breakdown table with NEC refs, service sizing math, input parameters, warnings, notes, signature block
-- Structured multi-section CSV: project info, service sizing summary, breakdown, per-category input tables, warnings, notes — RFC 4180-compliant with UTF-8 BOM for Excel
-- PDF compacted after initial 3-page version per user feedback: single `<Page>` with natural flow, tighter spacing, signature moved to end
-
-**Files Created:**
-- `data/nec/table-430-248-250.ts` — NEC motor FLA tables + `getMotorFLA()`
-- `components/common/NumberInput.tsx` — buffered string-state numeric input
-- `services/pdfExport/CommercialLoadDocument.tsx` — React-PDF document
-- `services/pdfExport/commercialLoadExport.ts` — PDF + CSV export helpers
-
-**Files Modified:**
-- `components/CommercialLoadCalculator.tsx` — all three features
-- `components/OneLineDiagram.tsx` — effectiveServiceVoltage/Phase derivation (4 display sites + export)
-- `services/calculations/commercialLoad.ts` — exported `STANDARD_OCPD_SIZES` + `STANDARD_SERVICE_BUS_RATINGS`
-- `App.tsx` — pass `project` prop to CommercialLoadCalculator
-
-**Pending (carried over):**
-- Stripe webhook signature verification still disabled — must re-enable before real live-mode traffic
