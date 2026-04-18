@@ -114,15 +114,21 @@ async function processMessage(
     return result;
   }
 
-  // Authenticate the sender — must match admin or ticket owner
+  // Authenticate the sender — must match admin or ticket owner.
+  // Admin identity = EITHER the registered admin login email (used by the app)
+  // OR the shared support mailbox (the one we poll, used for outbound replies).
   const fromHeader = msg.headers['from'] ?? '';
   const from = extractBareAddress(fromHeader);
+  const supportMailbox = (Deno.env.get('GMAIL_MAILBOX') ?? '').toLowerCase();
+  const isSenderAdmin =
+    from === ADMIN_EMAIL.toLowerCase() ||
+    (supportMailbox.length > 0 && from === supportMailbox);
 
   let isAdmin = false;
   let authorUserId: string;
   let authorEmail: string;
 
-  if (from === ADMIN_EMAIL.toLowerCase()) {
+  if (isSenderAdmin) {
     const adminAuthId = Deno.env.get('SUPPORT_ADMIN_AUTH_USER_ID');
     if (!adminAuthId) {
       result.outcome = 'error';
