@@ -1,12 +1,21 @@
 /**
  * Supabase Edge Function: Support Notifications
  *
- * Two modes:
- *  - type: 'new_ticket'   → emails support@sparkplan.app that a new ticket was submitted
- *  - type: 'admin_reply'  → emails the ticket creator with the admin's reply
+ * Payload types:
+ *  - 'new_ticket'     → emails support@sparkplan.app that a new ticket was submitted
+ *  - 'admin_reply'    → emails the ticket creator with the admin's reply
+ *  - 'user_reply'     → emails admin when a customer replies via email (echoed by support-inbound)
+ *  - 'status_changed' → emails the ticket creator when status changes
  *
- * Authenticates the caller via the Supabase Auth header.
- * For admin_reply, caller email must match ADMIN_EMAIL.
+ * Authentication:
+ *  - Normal callers authenticate via Supabase Auth header (logged-in user).
+ *  - admin_reply / status_changed require the caller's email to match ADMIN_EMAIL.
+ *  - Internal edge-function callers (support-inbound) pass the service_role key as the bearer
+ *    token — this bypasses user resolution and is treated as trusted system-level.
+ *
+ * Reply-To addressing uses plus-addressing on our Google Workspace mailbox:
+ *    support+ticket-<uuid>@sparkplan.app
+ * The support-inbound Gmail poller extracts the ticket UUID and threads replies back in.
  *
  * Uses Resend (already configured for sparkplan.app). Requires RESEND_API_KEY in Edge Function secrets.
  */
@@ -25,6 +34,13 @@ const corsHeaders = {
 const ADMIN_EMAIL = 'augustovalbuena@gmail.com';
 const SUPPORT_FROM = 'SparkPlan Support <support@sparkplan.app>';
 const SUPPORT_INBOX = 'support@sparkplan.app';
+const SUPPORT_DOMAIN = 'sparkplan.app';
+
+// Plus-addressing on the existing Google Workspace mailbox — Gmail delivers
+// support+anything@sparkplan.app to the same inbox, where support-inbound polls it.
+function ticketReplyAddress(ticketId: string): string {
+  return `support+ticket-${ticketId}@${SUPPORT_DOMAIN}`;
+}
 
 interface NewTicketPayload {
   type: 'new_ticket';
@@ -53,7 +69,22 @@ interface StatusChangedPayload {
   subject: string;
 }
 
-type Payload = NewTicketPayload | AdminReplyPayload | StatusChangedPayload;
+// Emitted by support-inbound when a customer replies via email.
+// Recipient is always the admin; senderEmail is the customer who replied.
+interface UserReplyPayload {
+  type: 'user_reply';
+  ticketId: string;
+  replyMessage: string;
+  recipientEmail: string;   // admin
+  senderEmail: string;      // the customer who sent the email
+  subject: string;
+}
+
+type Payload =
+  | NewTicketPayload
+  | AdminReplyPayload
+  | StatusChangedPayload
+  | UserReplyPayload;
 
 function statusLabel(status: string): string {
   switch (status) {
@@ -146,17 +177,32 @@ serve(async (req) => {
     const authHeader = req.headers.get('Authorization');
     if (!authHeader) throw new Error('Missing Authorization header');
 
-    const supabaseClient = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_ANON_KEY') ?? '',
-      { global: { headers: { Authorization: authHeader } } }
-    );
+    const bearerToken = authHeader.replace(/^Bearer\s+/i, '').trim();
+    const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
 
-    const {
-      data: { user },
-      error: userError,
-    } = await supabaseClient.auth.getUser();
-    if (userError || !user) throw new Error('Unauthorized');
+    // Internal-trust path: support-inbound (pg_cron-driven) calls us with the
+    // service_role key. Treat as trusted — no user lookup needed.
+    const isInternalCall = !!serviceRoleKey && bearerToken === serviceRoleKey;
+
+    let callerEmail: string | null = null;
+    if (!isInternalCall) {
+      const supabaseClient = createClient(
+        Deno.env.get('SUPABASE_URL') ?? '',
+        Deno.env.get('SUPABASE_ANON_KEY') ?? '',
+        { global: { headers: { Authorization: authHeader } } }
+      );
+
+      const {
+        data: { user },
+        error: userError,
+      } = await supabaseClient.auth.getUser();
+      if (userError || !user) throw new Error('Unauthorized');
+      callerEmail = user.email ?? null;
+    }
+
+    // Helper: is this caller authorized to act as the admin?
+    // Service-role internal calls are always trusted; user calls must match ADMIN_EMAIL.
+    const isAdminCaller = isInternalCall || callerEmail === ADMIN_EMAIL;
 
     const resendApiKey = Deno.env.get('RESEND_API_KEY');
     if (!resendApiKey) throw new Error('RESEND_API_KEY not configured');
@@ -202,7 +248,7 @@ serve(async (req) => {
         to: SUPPORT_INBOX,
         subject: `[SparkPlan Support] ${categoryLabel(category)}: ${subject}`,
         html,
-        replyTo: userEmail,
+        replyTo: ticketReplyAddress(ticketId),
       });
 
       return new Response(JSON.stringify({ success: true }), {
@@ -212,8 +258,8 @@ serve(async (req) => {
     }
 
     if (body.type === 'admin_reply') {
-      // Only admin can trigger replies
-      if (user.email !== ADMIN_EMAIL) {
+      // Only admin (or internal service_role calls) can trigger this
+      if (!isAdminCaller) {
         return new Response(
           JSON.stringify({ error: 'Unauthorized: admin access required' }),
           {
@@ -250,7 +296,7 @@ serve(async (req) => {
         to: recipientEmail,
         subject: `Re: ${subject}`,
         html,
-        replyTo: SUPPORT_INBOX,
+        replyTo: ticketReplyAddress(ticketId),
       });
 
       return new Response(JSON.stringify({ success: true }), {
@@ -260,8 +306,8 @@ serve(async (req) => {
     }
 
     if (body.type === 'status_changed') {
-      // Only admin can send status-change notifications
-      if (user.email !== ADMIN_EMAIL) {
+      // Only admin (or internal service_role calls) can send status-change notifications
+      if (!isAdminCaller) {
         return new Response(
           JSON.stringify({ error: 'Unauthorized: admin access required' }),
           {
@@ -304,7 +350,60 @@ serve(async (req) => {
         to: recipientEmail,
         subject: `[SparkPlan Support] Status updated: ${label} — ${subject}`,
         html,
-        replyTo: SUPPORT_INBOX,
+        replyTo: ticketReplyAddress(ticketId),
+      });
+
+      return new Response(JSON.stringify({ success: true }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 200,
+      });
+    }
+
+    if (body.type === 'user_reply') {
+      // Echo from support-inbound (Gmail poller) → notify admin that a customer replied.
+      // Only internal service_role callers should trigger this; if a logged-in user tried
+      // to send it they'd be impersonating another customer.
+      if (!isInternalCall) {
+        return new Response(
+          JSON.stringify({ error: 'Unauthorized: internal caller required' }),
+          {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            status: 403,
+          }
+        );
+      }
+
+      const { ticketId, replyMessage, recipientEmail, senderEmail, subject } = body;
+
+      const html = `
+        <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; max-width: 600px; margin: 0 auto; padding: 24px; background: #faf9f7;">
+          <div style="background: #2d3b2d; color: white; padding: 16px 24px; border-radius: 8px 8px 0 0;">
+            <h1 style="margin: 0; font-size: 18px;">Customer replied via email</h1>
+          </div>
+          <div style="background: white; padding: 24px; border: 1px solid #e5e7eb; border-top: 0; border-radius: 0 0 8px 8px;">
+            <p style="font-size: 13px; color: #6b7280; margin: 0 0 4px;">
+              Re: <strong>${escapeHtml(subject)}</strong>
+            </p>
+            <p style="font-size: 13px; color: #6b7280; margin: 0 0 16px;">
+              From: <strong>${escapeHtml(senderEmail)}</strong>
+            </p>
+            <div style="background: #f9fafb; border-left: 3px solid #2d3b2d; padding: 16px; border-radius: 4px; white-space: pre-wrap; font-size: 14px; color: #111827; margin-bottom: 20px;">${escapeHtml(replyMessage)}</div>
+            <p style="font-size: 13px; color: #4b5563;">
+              This reply is already threaded in the Admin Panel → Support tab. Reply there (or directly from Gmail) to continue.
+            </p>
+            <p style="font-size: 11px; color: #9ca3af; margin-top: 24px; padding-top: 16px; border-top: 1px solid #e5e7eb;">
+              Ticket ID: ${escapeHtml(ticketId)}
+            </p>
+          </div>
+        </div>
+      `;
+
+      await sendEmail({
+        apiKey: resendApiKey,
+        to: recipientEmail,
+        subject: `[SparkPlan Support] Customer reply — ${subject}`,
+        html,
+        replyTo: ticketReplyAddress(ticketId),
       });
 
       return new Response(JSON.stringify({ success: true }), {

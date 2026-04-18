@@ -1435,6 +1435,128 @@ export type Database = {
         }
         Relationships: []
       }
+      support_ticket_events: {
+        Row: {
+          created_at: string
+          event_type: string
+          id: string
+          payload: Json
+          source: string
+          ticket_id: string
+        }
+        Insert: {
+          created_at?: string
+          event_type: string
+          id?: string
+          payload?: Json
+          source: string
+          ticket_id: string
+        }
+        Update: {
+          created_at?: string
+          event_type?: string
+          id?: string
+          payload?: Json
+          source?: string
+          ticket_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "support_ticket_events_ticket_id_fkey"
+            columns: ["ticket_id"]
+            isOneToOne: false
+            referencedRelation: "support_tickets"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      support_ticket_investigations: {
+        Row: {
+          artifacts: Json | null
+          completed_at: string | null
+          created_at: string
+          error_message: string | null
+          findings: string | null
+          id: string
+          investigator: string
+          notified_at: string | null
+          notified_via: string | null
+          status: string
+          ticket_id: string
+          triggered_by_event_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          artifacts?: Json | null
+          completed_at?: string | null
+          created_at?: string
+          error_message?: string | null
+          findings?: string | null
+          id?: string
+          investigator?: string
+          notified_at?: string | null
+          notified_via?: string | null
+          status?: string
+          ticket_id: string
+          triggered_by_event_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          artifacts?: Json | null
+          completed_at?: string | null
+          created_at?: string
+          error_message?: string | null
+          findings?: string | null
+          id?: string
+          investigator?: string
+          notified_at?: string | null
+          notified_via?: string | null
+          status?: string
+          ticket_id?: string
+          triggered_by_event_id?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "support_ticket_investigations_ticket_id_fkey"
+            columns: ["ticket_id"]
+            isOneToOne: false
+            referencedRelation: "support_tickets"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "support_ticket_investigations_triggered_by_event_id_fkey"
+            columns: ["triggered_by_event_id"]
+            isOneToOne: false
+            referencedRelation: "support_ticket_events"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      support_gmail_sync_state: {
+        Row: {
+          id: number
+          last_error: string | null
+          last_history_id: string | null
+          last_synced_at: string | null
+          updated_at: string
+        }
+        Insert: {
+          id?: number
+          last_error?: string | null
+          last_history_id?: string | null
+          last_synced_at?: string | null
+          updated_at?: string
+        }
+        Update: {
+          id?: number
+          last_error?: string | null
+          last_history_id?: string | null
+          last_synced_at?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       transformers: {
         Row: {
           catalog_number: string | null

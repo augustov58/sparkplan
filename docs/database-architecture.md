@@ -562,6 +562,93 @@ CREATE TABLE support_replies (
 
 ---
 
+#### `support_ticket_events` — Append-Only Lifecycle Log (Added Apr 17, 2026)
+
+**Purpose**: Observable, append-only record of every lifecycle event on a support ticket. Source of truth for analytics, audit, and event-driven downstream handlers (Gmail polling, future Claude Code investigations, Slack notifications).
+
+**Schema**:
+```sql
+CREATE TABLE support_ticket_events (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  ticket_id UUID NOT NULL REFERENCES support_tickets(id) ON DELETE CASCADE,
+  event_type TEXT NOT NULL CHECK (event_type IN (
+    'ticket_created', 'user_reply', 'admin_reply',
+    'status_changed', 'priority_changed',
+    'investigation_requested', 'investigation_completed'
+  )),
+  source TEXT NOT NULL CHECK (source IN ('widget', 'dashboard', 'email', 'system')),
+  payload JSONB NOT NULL DEFAULT '{}'::jsonb,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+```
+
+**Design Decisions**:
+- **Append-only** — Rows are never updated or deleted by application code (the FK `ON DELETE CASCADE` handles ticket deletion)
+- **Discriminator pair** (`event_type` + `source`) enables selective handler filtering without joins
+- **Per-event payload** is JSONB — each event type writes its own shape. Examples:
+  - `user_reply` / `admin_reply`: `{ reply_id, author_email, message_preview, gmail_message_id? }`
+  - `status_changed`: `{ old_status, new_status }`
+  - `ticket_created`: `{ category, subject, plan_tier, page_url }`
+- **RLS**: admin-read-only (`auth.jwt() ->> 'email' = ...`). `service_role` is the only writer — edge functions use it, users never write directly.
+
+---
+
+#### `support_ticket_investigations` — AI / Human Investigation Records (Added Apr 17, 2026)
+
+**Purpose**: Durable record of automated (Claude Code) or human investigations attached to a ticket. The schema is *forward-compatible* — the future Claude Code integration only needs to write rows, not migrate.
+
+**Schema**:
+```sql
+CREATE TABLE support_ticket_investigations (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  ticket_id UUID NOT NULL REFERENCES support_tickets(id) ON DELETE CASCADE,
+  triggered_by_event_id UUID REFERENCES support_ticket_events(id) ON DELETE SET NULL,
+  investigator TEXT NOT NULL DEFAULT 'claude-code'
+    CHECK (investigator IN ('claude-code', 'human', 'automated-check')),
+  status TEXT NOT NULL DEFAULT 'pending'
+    CHECK (status IN ('pending', 'running', 'completed', 'failed', 'skipped')),
+  findings TEXT,
+  artifacts JSONB DEFAULT '{}'::jsonb,
+  notified_via TEXT CHECK (notified_via IN ('slack', 'email', 'admin-panel')),
+  notified_at TIMESTAMPTZ,
+  error_message TEXT,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW(),
+  completed_at TIMESTAMPTZ
+);
+```
+
+**Design Decisions**:
+- **Stub today, real tomorrow**: `supabase/functions/support-investigate` currently writes `status='skipped'` rows. When the Claude Code runner is wired, it will switch to `status='pending'` → `'running'` → `'completed'` without schema changes.
+- **Artifacts JSONB** is intentionally loose — each investigator defines its own shape (suspected files, log excerpts, reproduction steps, git refs).
+- **notified_via** distinguishes "findings stored but not yet surfaced" from "findings pushed to Slack / email / admin-panel". Set by the notification handler after it posts.
+- **Partial index** on `status IN ('pending', 'running')` for cheap worker-polling queries.
+- **Realtime enabled** — the admin panel can subscribe and show live investigation progress when the runner lands.
+
+---
+
+#### `support_gmail_sync_state` — Gmail Polling Watermark (Added Apr 17, 2026)
+
+**Purpose**: Singleton row tracking the state of the Gmail-polling edge function. Purely operational — used for dashboards and debugging, not correctness (Gmail's own `is:unread` label is the real watermark).
+
+**Schema**:
+```sql
+CREATE TABLE support_gmail_sync_state (
+  id SMALLINT PRIMARY KEY DEFAULT 1 CHECK (id = 1),  -- enforces singleton
+  last_history_id TEXT,
+  last_synced_at TIMESTAMPTZ,
+  last_error TEXT,
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+INSERT INTO support_gmail_sync_state (id) VALUES (1) ON CONFLICT DO NOTHING;
+```
+
+**Design Decisions**:
+- **Singleton via CHECK**: `id = 1` prevents accidental multi-row state drift. Pattern: `UPDATE ... WHERE id = 1`.
+- **`last_error` + `last_synced_at`** surfaced to admin dashboard so polling failures are visible without log diving.
+
+---
+
 ## Table Relationships
 
 ### Cascading Delete Behavior
