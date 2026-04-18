@@ -8,7 +8,7 @@ This guide walks through the one-time setup for the support-inbound email-reply 
 
 ## Prerequisites
 
-- Access to the Google Cloud Console as the owner of `augustovalbuena@gmail.com` (or whichever admin account manages the `support@sparkplan.app` mailbox)
+- **`support@sparkplan.app` credentials** — this account is both the Workspace super-admin and the mailbox we'll poll. Use this one account for every Google-side step below. (The unrelated `GEMINI_API_KEY` you got via Google AI Studio lives under your personal Gmail — that's a different Google context entirely and doesn't apply here.)
 - Supabase project URL + service role access (Settings → API)
 - Deno installed locally (for the OAuth bootstrap script)
 
@@ -16,18 +16,24 @@ This guide walks through the one-time setup for the support-inbound email-reply 
 
 ## Step 1 — Google Cloud Console: Create OAuth credentials
 
-1. Go to https://console.cloud.google.com
-2. Create a new project (or reuse an existing SparkPlan project). Note the project name.
-3. **Enable the Gmail API**: APIs & Services → Library → search "Gmail API" → Enable.
-4. **Configure the OAuth consent screen**:
-   - User Type: **External** (since `support@sparkplan.app` is a Google Workspace account but the OAuth app lives in a consumer-style project)
+Sign into https://console.cloud.google.com as `support@sparkplan.app`. On first-time access, accept the terms prompt.
+
+1. **Create a new project**. Look at the **org selector** at the top of the page:
+   - If `sparkplan.app` appears as an org, pick it — this unlocks the cleaner "Internal" consent screen below
+   - If only "No organization" appears, use that — Workspace orgs sometimes don't auto-bind to Cloud Console new-account flows; the rest works identically
+   - Name the project `SparkPlan Support Inbound` (or similar)
+2. **Enable the Gmail API**: APIs & Services → Library → search "Gmail API" → Enable.
+3. **Configure the OAuth consent screen**:
+   - **User Type**:
+     - Pick **Internal** if available (only appears if the project sits inside the `sparkplan.app` Workspace org) — no test-user cap, no 6-month refresh-token expiry, no "unverified app" warning
+     - Otherwise pick **External** — works identically but requires listing `support@sparkplan.app` as a test user (Step below)
    - App name: `SparkPlan Support Inbound`
-   - User support email: `augustovalbuena@gmail.com`
+   - User support email: `support@sparkplan.app`
    - Developer contact: same
    - Scopes: add `https://www.googleapis.com/auth/gmail.modify` (read messages + mark as read). Do NOT add `gmail.send` or broader scopes — we only need read + modify.
-   - Test users: add `support@sparkplan.app` (and your personal Gmail if different)
-   - Publishing status: leave as "Testing" unless you plan to productionize; testing tokens are valid for 6 months without reuse.
-5. **Create OAuth 2.0 Client ID**:
+   - Test users (External only): add `support@sparkplan.app`
+   - Publishing status: leave as "Testing" — External tokens in Testing mode expire after 6 months of non-use, so re-run the bootstrap script at least twice a year if you stay on External
+4. **Create OAuth 2.0 Client ID**:
    - APIs & Services → Credentials → Create Credentials → OAuth client ID
    - Application type: **Desktop app**
    - Name: `SparkPlan Support Inbound — CLI`
@@ -45,13 +51,13 @@ deno run --allow-net scripts/gmail-oauth.ts
 
 The script will:
 1. Prompt for the Client ID and Client Secret from Step 1
-2. Print a URL — open it in a browser logged in as `support@sparkplan.app`
+2. Print a URL — open it in a browser signed in as `support@sparkplan.app` (sign out of any other Google identities first; copy-paste the URL into a private/incognito window if helpful)
 3. Click "Allow" on the consent screen
 4. Google shows an authorization code — copy it
 5. Paste the code back into the script
 6. The script prints the refresh token and a ready-to-run `supabase secrets set` command
 
-**If Google refuses to show a refresh token** (returns only `access_token`): you've previously granted consent to this OAuth client. Revoke it at https://myaccount.google.com/permissions, then re-run the script. The `prompt=consent` query parameter we pass should prevent this in most cases.
+**If Google refuses to show a refresh token** (returns only `access_token`): you've previously granted consent to this OAuth client. Revoke it at https://myaccount.google.com/permissions (while signed in as `support@sparkplan.app`), then re-run the script. The `prompt=consent` query parameter we pass should prevent this in most cases.
 
 ---
 
