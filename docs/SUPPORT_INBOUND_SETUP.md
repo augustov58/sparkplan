@@ -143,10 +143,133 @@ Or use the MCP `deploy_edge_function` tool — the Supabase CLI auth and the MCP
    - A new `support_replies` row with `is_admin=false`
    - An admin notification email with "Customer replied via email" in the subject
 
-**If nothing happens**: Check the `support_gmail_sync_state` row — if `last_error` is populated, that's your clue. Common issues:
-- OAuth consent in "Testing" mode with a user that isn't listed as a test user → mailbox lookup fails
-- Vault secrets not set → cron fails silently; look at the `cron.job_run_details` table
-- `SUPPORT_INBOUND_SECRET` mismatch between env var and Vault → function returns 401
+---
+
+## Troubleshooting — diagnostic playbook
+
+The pipeline has **five** stages. When something breaks, run the queries below **in order** and look at the first stage that fails. Each stage has a distinct diagnostic query and a distinct failure signature, so following the order isolates the fault fast.
+
+### Stage 1 — Is the cron job firing at all?
+
+```sql
+SELECT start_time AT TIME ZONE 'UTC' AS at, status, return_message
+FROM cron.job_run_details
+WHERE jobid = (SELECT jobid FROM cron.job WHERE jobname = 'support-inbound-poll')
+ORDER BY start_time DESC LIMIT 5;
+```
+
+- **Zero rows**: pg_cron job isn't scheduled. Re-apply `supabase/migrations/20260417000001_support_inbound_cron.sql`. Verify `pg_cron` and `pg_net` extensions are enabled.
+- **Rows but `status='failed'`**: read `return_message`. Usually means a Vault lookup failed (the `vault.decrypted_secrets` SELECT returned NULL because the entry doesn't exist, or is misnamed).
+- **Rows with `status='succeeded'`**: pg_cron enqueued the HTTP call successfully. Move to Stage 2. (Note: `return_message='1 row'` just means the SELECT ran — it doesn't mean the HTTP call succeeded.)
+
+### Stage 2 — What did the edge function actually return?
+
+```sql
+SELECT id, created AT TIME ZONE 'UTC' AS at, status_code, LEFT(content, 600) AS body
+FROM net._http_response
+WHERE created > NOW() - INTERVAL '15 minutes'
+ORDER BY created DESC LIMIT 10;
+```
+
+**The response body tells you which layer failed. Don't just look at the status code.**
+
+| status_code | body contains | what it means | fix |
+|---|---|---|---|
+| `401` | `UNAUTHORIZED_NO_AUTH_HEADER` or `Missing authorization header` | Supabase **gateway** JWT verification is blocking the call before the function runs | Redeploy with `supabase functions deploy support-inbound --no-verify-jwt` |
+| `401` | `{"error":"Unauthorized"}` | **Function-level** auth rejected it. The `x-support-inbound-secret` header didn't match `SUPPORT_INBOUND_SECRET` env var. | Vault entry ≠ env var. See Stage 3. |
+| `200` | `"processed":0,"results":[]` | Function ran but Gmail query returned no messages. Either inbox is empty OR everyone's read (see Stage 5). | Mark a test email as unread; wait 60s. |
+| `200` | `"outcome":"ignored-unauthorized"` | Function ran, found an email, but rejected the sender. See Stage 4. | Fix `ADMIN_EMAIL` / `GMAIL_MAILBOX` / `ticket.user_email` mapping. |
+| `200` | `"outcome":"inserted"` | Success path — move to Stage 6 to verify downstream. | — |
+
+### Stage 3 — Do the shared secrets actually match?
+
+```sql
+SELECT
+  name,
+  LENGTH(decrypted_secret) AS len,
+  decrypted_secret ~ '^[a-f0-9]+$' AS is_pure_hex
+FROM vault.decrypted_secrets
+WHERE name = 'support_inbound_secret';
+```
+
+- If `len = 64` and `is_pure_hex = true`, the Vault value is a valid `openssl rand -hex 32` output. Good.
+- If anything else (bracketed placeholder, whitespace, wrong length): the Vault entry was never populated correctly. Generate a fresh `openssl rand -hex 32`, then update **both** sides:
+  ```sql
+  SELECT vault.update_secret(
+    (SELECT id FROM vault.secrets WHERE name = 'support_inbound_secret'),
+    '<new-hex-value>',
+    'support_inbound_secret',
+    'Shared secret for pg_cron → support-inbound'
+  );
+  ```
+  ```bash
+  supabase secrets set SUPPORT_INBOUND_SECRET=<same-new-hex-value>
+  ```
+  Both must be **identical** — the function does a constant-time compare.
+
+### Stage 4 — Why was the sender rejected?
+
+If Stage 2 showed `ignored-unauthorized`, the `reason` field in the response body names the sender and the ticket owner. The function accepts **three** possible admin identities:
+
+1. `ADMIN_EMAIL` constant in `support-inbound/index.ts` (hardcoded registered admin login email)
+2. `GMAIL_MAILBOX` env var (the shared support mailbox we poll — e.g. `support@sparkplan.app`)
+3. `ticket.user_email` for the specific ticket (the customer)
+
+If a legitimate sender is being rejected, either they're replying from an unexpected address (e.g. a forwarded email with a different `From:` header) or you need to add their email to the admin-recognition list in the function code.
+
+### Stage 5 — Why did the Gmail poll return zero messages?
+
+The Gmail API query is hardcoded to:
+
+```
+to:support+ticket- is:unread newer_than:1d
+```
+
+Most common cause of missing messages:
+- **Someone opened the email in the `support@sparkplan.app` Gmail UI before cron polled it.** The `is:unread` filter excludes read messages. Fix: right-click → Mark as unread. Then wait ≤60s.
+- **Message older than 1 day**. Fix: drop the `newer_than:1d` clause or manually inject the reply.
+- **Recipient not plus-addressed**. The client's reply must go to `support+ticket-<uuid>@sparkplan.app`, not the bare `support@sparkplan.app`. Check the outbound email's `Reply-To:` header rendered the plus-address correctly.
+
+To verify the mailbox directly without waiting for cron, log into Gmail as `support@sparkplan.app` and search with the exact query above — you should see the same messages cron sees.
+
+### Stage 6 — Reply inserted but no echo email delivered?
+
+The insert happens before the echo, so this means `support-notify` failed. Check:
+
+```sql
+-- Look at support-notify logs via MCP or:
+SELECT * FROM net._http_response WHERE created > NOW() - INTERVAL '5 minutes' ORDER BY created DESC;
+```
+
+Or query edge-function platform logs for `support-notify`. Common causes:
+- `support-notify` deployed **without** `--no-verify-jwt` → gateway rejects internal service-role calls from support-inbound (because new-format `sb_secret_...` keys aren't JWTs). Redeploy.
+- `RESEND_API_KEY` env var not set or revoked.
+- `ticket.user_email` is null or malformed.
+
+### Stage 7 — Gmail OAuth refresh token invalidated?
+
+Symptoms: `support-inbound` returns 200 with an empty result but `support_gmail_sync_state.last_error` shows `invalid_grant` or `Token has been expired or revoked`.
+
+Fix:
+```bash
+deno run --allow-net scripts/gmail-oauth.ts
+# Follow the prompts, copy the new refresh token, then:
+supabase secrets set GMAIL_REFRESH_TOKEN=<new-token>
+```
+
+Triggers that invalidate a refresh token:
+- `support@sparkplan.app` password changed
+- User revoked access in https://myaccount.google.com/permissions
+- OAuth app scopes changed in Google Cloud Console
+- App in "Testing" mode + External consent screen + 6 months of non-use
+
+---
+
+## Known limitations
+
+- **`is:unread` Gmail query strands opened messages**. Future fix: switch to Gmail History API using the `support_gmail_sync_state.last_history_id` column already provisioned.
+- **Single admin identity**. The function recognizes exactly one admin email constant + one shared mailbox. Multi-admin support requires a DB-backed admin list.
+- **No retry on transient insert failures**. If `support_replies` insert fails, the message is left unread for the next poll — but if the function crashes mid-flow, the message *might* be marked read without insertion. Acceptable for now given ~1/min retry cadence.
 
 ---
 

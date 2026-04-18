@@ -4,6 +4,32 @@ All notable changes to SparkPlan.
 
 ---
 
+## 2026-04-18: Support Inbound Pipeline — Live Deployment + Debug Playbook
+
+**Operational:**
+- **End-to-end email-reply pipeline is live in production.** Admin replies from `support@sparkplan.app` and customer replies to notification emails now thread back into the originating ticket, get persisted to `support_replies`, and trigger a cross-echo email to the other party. Widget + Admin Panel update in realtime without refresh.
+- Resolved migration history drift across 29 local migration files (timestamp prefixes normalized to unique 14-digit `YYYYMMDDHHMMSS` format so `supabase db push` can track them).
+
+**Bugs Fixed During Live Validation:**
+- **Gateway-level 401**: Supabase's default JWT verification rejected pg_cron's custom shared-secret header. Redeployed `support-inbound` with `--no-verify-jwt` (application-layer `verifySecret()` still enforces auth).
+- **Vault placeholder never replaced**: `support_inbound_secret` Vault row held a literal template string instead of the 64-hex random value. Generated `openssl rand -hex 32` and synced both the Vault entry (via `vault.update_secret()`) and the edge function secret.
+- **Admin identity too narrow**: Inbound function only recognized the admin's login email (augustovalbuena@gmail.com), so replies from the shared `support@sparkplan.app` mailbox were rejected as `ignored-unauthorized`. Widened `isSenderAdmin` to accept either `ADMIN_EMAIL` or `GMAIL_MAILBOX`.
+- **Internal service-role call rejected**: `support-inbound` → `support-notify` invocations returned 401 because Supabase's new API key format (`sb_secret_...`) isn't a JWT. Redeployed `support-notify` with `--no-verify-jwt`; the function's own `isInternalCall` check continues to validate the service-role bearer.
+
+**Known Limitation (Documented, Not Yet Fixed):**
+- **`is:unread` strands opened messages**: If you preview a reply in Gmail before cron polls, it gets marked read and excluded from `to:support+ticket- is:unread newer_than:1d`. Workaround is to mark unread; future fix is to migrate to Gmail History API using the already-provisioned `support_gmail_sync_state.last_history_id` column.
+
+**Documentation:**
+- Expanded `docs/SUPPORT_INBOUND_SETUP.md` with a 7-stage diagnostic playbook (cron fired? response body fingerprint? Vault/secret parity? sender authorized? Gmail query returning? echo emitted? token valid?). Each stage lists the exact SQL query and the specific fix.
+- Added a response-body fingerprint table mapping HTTP body → root cause → fix, so future debugging sessions start from a string match rather than first-principles.
+
+**Files Modified:**
+- `supabase/functions/support-inbound/index.ts` — accept shared mailbox as admin identity
+- `docs/SUPPORT_INBOUND_SETUP.md` — comprehensive troubleshooting playbook
+- 29 migration files renamed to unique 14-digit timestamps
+
+---
+
 ## 2026-04-17: Support System — Inbound Email Replies (Gmail polling) + AI-Investigation Scaffolding
 
 **New Features:**
