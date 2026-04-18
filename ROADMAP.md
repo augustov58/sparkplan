@@ -222,7 +222,9 @@ MF EV Calculator → "Apply to Project" / "Add EV Infrastructure" buttons
 
 ## Phase 3.2: In-App Support System - COMPLETE (Apr 2026)
 
-**Strategic Focus:** Close the feedback loop with users. Replace the mailto-only support channel with a threaded in-app ticketing system that captures context (page URL, browser, plan tier), supports image attachments, and notifies both sides via email without requiring the user to leave SparkPlan.
+**Strategic Focus:** Close the feedback loop with users. Replace the mailto-only support channel with a threaded in-app ticketing system that captures context (page URL, browser, plan tier), supports image attachments, and notifies both sides via email — with full bidirectional email replies so conversations can continue in Gmail or in-app interchangeably.
+
+### 3.2a — In-App Ticketing (Apr 16, 2026)
 
 | Feature | Status |
 |---------|--------|
@@ -237,14 +239,45 @@ MF EV Calculator → "Apply to Project" / "Add EV Infrastructure" buttons
 | Per-ticket `user_last_seen_at` high-water mark for unread count | Complete |
 | Image attachment storage bucket + RLS + signed-URL rendering | Complete |
 
+### 3.2b — Inbound Email Pipeline + AI-Investigation Scaffolding (Apr 17–18, 2026)
+
+| Feature | Status |
+|---------|--------|
+| Plus-addressed `Reply-To` on every outbound notification (`support+ticket-<uuid>@sparkplan.app`) | Complete |
+| `support-inbound` edge function — Gmail API polling every 60s via pg_cron | Complete |
+| Sender authentication (admin email OR shared mailbox OR ticket owner) | Complete |
+| Quoted-reply stripping + empty-body detection | Complete |
+| Admin reply auto-bumps `open → in_progress` (mirrors dashboard) | Complete |
+| Cross-echo to the *other* party via `support-notify` service-role call | Complete |
+| Append-only `support_ticket_events` log (7 event types, 4 sources) | Complete |
+| `support_ticket_investigations` schema (forward-compatible with Claude Code runner) | Complete |
+| `support-investigate` stub edge function | Complete |
+| Live deployment + four-bug debug (gateway JWT, Vault placeholder, admin mailbox, service-role call) | Complete |
+| 7-stage troubleshooting playbook with response-body fingerprint table | Complete |
+
 **Key Files:**
 - `components/SupportWidget.tsx` — Floating bubble, new-ticket form, ticket history, threaded reply view
 - `components/AdminSupportPanel.tsx` — Admin ticket list, filters, status/priority controls, reply composer
 - `hooks/useSupportTickets.ts` — CRUD + realtime + unread computation + mark-seen
-- `supabase/functions/support-notify/index.ts` — Resend emails for new_ticket / admin_reply / status_changed
-- `supabase/migrations/20260416_support_tickets.sql` — Tables + RLS + storage bucket
-- `supabase/migrations/20260416_fix_support_rls_use_jwt.sql` — Switch admin policies to JWT email claim (avoids auth.users grant error)
-- `supabase/migrations/20260416_support_tickets_last_seen.sql` — Unread-badge watermark column
+- `supabase/functions/support-notify/index.ts` — Resend emails for new_ticket / admin_reply / status_changed / user_reply, with service-role internal-trust
+- `supabase/functions/support-inbound/index.ts` — Gmail-polling reply ingestion
+- `supabase/functions/support-investigate/index.ts` — AI-investigation stub (forward-compatible)
+- `supabase/functions/_shared/gmail.ts` — Gmail API REST helpers (OAuth refresh, listing, MIME tree walk)
+- `supabase/functions/_shared/supportEvents.ts` — Shared event emit + quoted-reply stripping + ticket-ID extraction
+- `scripts/gmail-oauth.ts` — One-shot OAuth bootstrap (loopback-IP flow)
+- `supabase/migrations/20260416161645_support_tickets.sql` — Tables + RLS + storage bucket
+- `supabase/migrations/20260416193739_fix_support_rls_use_jwt.sql` — Admin policies via JWT email claim
+- `supabase/migrations/20260416200057_support_tickets_last_seen.sql` — Unread-badge watermark column
+- `supabase/migrations/20260417000000_support_events_and_investigations.sql` — Event log + investigations + Gmail sync state
+- `supabase/migrations/20260417000001_support_inbound_cron.sql` — pg_cron schedule + pg_net call via Vault secrets
+
+**Operational Docs:**
+- `docs/SUPPORT_INBOUND_SETUP.md` — One-time setup (OAuth, Vault, secrets) + 7-stage diagnostic playbook
+- `docs/database-architecture.md` — Schema docs for all 5 support tables with design-decision rationale
+
+**Known Non-Blocking Limitations:**
+- Gmail polling uses `is:unread newer_than:1d` — messages opened in the inbox before the 60s cron tick get stranded (fix: mark unread, or migrate to Gmail History API using already-provisioned `support_gmail_sync_state.last_history_id`)
+- `support-investigate` is a stub that writes `status='skipped'` rows — wiring up the real Claude Code runner is a code-only change (schema is forward-compatible)
 
 ---
 
