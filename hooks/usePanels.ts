@@ -291,14 +291,33 @@ export function usePanels(projectId: string | undefined): UsePanelsReturn {
 
   const deletePanel = async (id: string) => {
     try {
+      // Cascade-delete dependent feeders first. The FKs on feeders.source_panel_id
+      // and feeders.destination_panel_id are ON DELETE SET NULL, but a CHECK
+      // constraint (feeders_source_and_destination_check) requires exactly one of
+      // {panel_id, transformer_id} per side. SET NULL would leave both null and
+      // the panel delete rolls back with a 400. Removing the feeders first avoids
+      // the conflict. Callers are expected to confirm before reaching here.
+      const { error: feedersError } = await supabase
+        .from('feeders')
+        .delete()
+        .or(`source_panel_id.eq.${id},destination_panel_id.eq.${id}`);
+      if (feedersError) throw feedersError;
+
       const { error } = await supabase.from('panels').delete().eq('id', id);
 
       if (error) throw error;
       showToast.success(toastMessages.panel.deleted);
       dataRefreshEvents.emit('panels');
+      // Feeders may have been cascaded; nudge useFeeders instances to refetch
+      // via its own window event (it does not subscribe to dataRefreshEvents).
+      if (projectId) {
+        window.dispatchEvent(
+          new CustomEvent('feeder-data-updated', { detail: { projectId } })
+        );
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to delete panel');
-      showToast.error(toastMessages.panel.error);
+      showToast.error(toastMessages.panel.deleteError);
     }
   };
 

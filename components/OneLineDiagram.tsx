@@ -984,24 +984,34 @@ export const OneLineDiagram: React.FC<OneLineDiagramProps> = ({ project, updateP
     const panel = panels.find(p => p.id === id);
     if (!panel) return; // Guard check
 
+    // Count feeders that reference this panel. They will be deleted alongside
+    // the panel (DB CHECK constraint prevents ON DELETE SET NULL from working
+    // on feeders). Surface the count in the confirm so users aren't surprised.
+    const affectedFeederCount = feeders.filter(
+      f => f.source_panel_id === id || f.destination_panel_id === id
+    ).length;
+    const feederNote = affectedFeederCount > 0
+      ? `\n\nThis will also delete ${affectedFeederCount} feeder${affectedFeederCount === 1 ? '' : 's'} connected to this panel.`
+      : '';
+
     if (panel.is_main) {
       const mainPanels = panels.filter(p => p.is_main);
 
       // Warn user if deleting the only main panel
       if (mainPanels.length === 1) {
-        const confirmMessage = `Delete "${panel.name}" (Main Distribution Panel)?\n\n⚠️ WARNING: This is your only main panel. Deleting it will remove the service entrance.\n\nYou'll need to create a new MDP before adding any subpanels.\n\nAre you sure you want to delete it?`;
+        const confirmMessage = `Delete "${panel.name}" (Main Distribution Panel)?\n\n⚠️ WARNING: This is your only main panel. Deleting it will remove the service entrance.\n\nYou'll need to create a new MDP before adding any subpanels.${feederNote}\n\nAre you sure you want to delete it?`;
         if (!confirm(confirmMessage)) {
           return;
         }
       } else {
         // Multiple main panels - confirm deletion
-        if (!confirm(`Delete "${panel.name}"? (You have ${mainPanels.length} main panels)`)) {
+        if (!confirm(`Delete "${panel.name}"? (You have ${mainPanels.length} main panels)${feederNote}`)) {
           return;
         }
       }
     } else {
       // Non-main panel - simple confirmation
-      if (!confirm(`Delete panel "${panel.name}"?`)) {
+      if (!confirm(`Delete panel "${panel.name}"?${feederNote}`)) {
         return;
       }
     }
