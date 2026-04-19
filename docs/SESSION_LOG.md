@@ -7,10 +7,55 @@
 
 ---
 
-### Session: 2026-04-18 — Support Inbound Live-Deployment + Four-Bug Debug
+### Session: 2026-04-18 (PM) — Stripe Webhook Signature Alignment + Dual-Endpoint Cleanup
+
+**Focus**: Close the long-standing "Stripe webhook secret hardcoded in deployed function" carry-over. Root-cause why the env-var approach had failed and re-align deployed source with git so future redeploys don't silently re-break signature verification.
+**Status**: ✅ Resolved. `stripe-webhook` v38 is live, env-var based, `verify_jwt: false`. Positive + negative HMAC probes both confirmed. PR #6 open.
+
+**Work Done:**
+
+*Root cause of the drift:*
+- Deployed function was at v35 with signing secret hardcoded as `whsec_P0LA...`. Git source was already env-var based (`Deno.env.get('STRIPE_WEBHOOK_SECRET')`) — the hardcode was a workaround never committed back.
+- Checked stored `STRIPE_WEBHOOK_SECRET` Supabase secret digest: `ab59c2b1...`. Computed `sha256sum` of the known-working hardcoded value: `1f72f3f6...`. Digests didn't match — so the stored env var was simply wrong, not some Supabase bug as the old memory claimed. That's why the original "env var failed, hardcode works" theory looked real.
+
+*Fix procedure:*
+1. Saved the deployed v35 as `.rollback/stripe-webhook-v35.ts` (gitignored — contains live signing secret).
+2. Overwrote the Supabase env var: `supabase secrets set STRIPE_WEBHOOK_SECRET=whsec_P0LA... --project-ref ioarszhzltpisxsxrsgl`. New digest `1f72f3f6...` matched. Proved Supabase uses plain SHA-256 (not salted) for digest display.
+3. Redeployed git source: `supabase functions deploy stripe-webhook --no-verify-jwt --project-ref ioarszhzltpisxsxrsgl`. First attempt produced v37 with `verify_jwt: true` (CLI defaults to JWT-on) — would have 401'd every Stripe event at the gateway. Re-ran with the flag → v38, `verify_jwt: false`.
+
+*Verification via direct HMAC probes (no Stripe dashboard needed):*
+- Valid signed POST (HMAC-SHA256 of `{timestamp}.{body}` with signing secret) → `200 {"received":true}` ✓
+- Forged signature → `400 "No signatures found matching the expected signature..."` ✓ (Stripe library's canonical error, proves verification is executing, not bypassed)
+- Gateway accepted both (no `401 UNAUTHORIZED_NO_AUTH_HEADER`), confirming `verify_jwt: false`
+
+*Duplicate webhook endpoint discovered + neutralized:*
+- Stripe account had TWO live endpoints pointed at the same URL: `we_1TL9gpBBy9cD3s46mfHz0owG` (the intended one, 6 events) and `we_1TKnPTBBy9cD3s46is2owYNA` ("adventurous-splendor", 7 events, 35/35 failure rate this week).
+- Endpoint B's signing secret was never in our env var — hence its 100% failure. Only unique event: `customer.subscription.paused`, which is already caught transitively by `customer.subscription.updated`, so disabling is zero-coverage-loss.
+- User **disabled** (not deleted) endpoint B — safe rollback path preserved.
+
+**Key Files Touched:**
+- `.gitignore` — added `.rollback/` to prevent committing the v35 snapshot
+- `.rollback/stripe-webhook-v35.ts` — v35 snapshot (gitignored, contains live signing secret)
+- `docs/SESSION_LOG.md`, `docs/CHANGELOG.md` — updated
+- `memory/stripe_webhook_signature.md` — rewritten: resolved, rotation playbook, duplicate-endpoint gotcha
+
+**Commits (branch `fix/stripe-webhook-env-secret`):**
+- `e15c297` — fix(stripe-webhook): verify deployed function matches git (env-var-based sig verification)
+
+**PR**: #6 — https://github.com/augustov58/sparkplan/pull/6 (open, awaiting merge)
+
+**Pending:**
+- Merge PR #6
+- First real Stripe event in live traffic is the final belt-and-suspenders confirmation (watch for 200 in edge-function logs next subscription/invoice event)
+- **Recommended hygiene**: rotate signing secret via Stripe dashboard "Roll signing secret" — invalidates the value that's been shared through conversation history and the `.rollback/` snapshot. Follow steps 3-5 in `memory/stripe_webhook_signature.md`.
+- Consider deleting endpoint B (`adventurous-splendor`) once a real event has passed through endpoint A cleanly
+
+---
+
+### Session: 2026-04-18 (AM) — Support Inbound Live-Deployment + Four-Bug Debug
 
 **Focus**: Take the Gmail-polling support-inbound pipeline from code-complete to live-verified. User handled infra (Google Cloud OAuth, Supabase secrets, Vault); this session ran `supabase db push`, deployed the three edge functions, and diagnosed/fixed four distinct bugs found during end-to-end testing.
-**Status**: Fully operational. Admin→user replies via email thread back into the ticket widget. User→admin replies thread back and notify the admin. Branch `feat/support-email-inbound` ready for PR merge.
+**Status**: Fully operational. Admin→user replies via email thread back into the ticket widget. User→admin replies thread back and notify the admin. PR #5 merged (`fd80444`).
 
 **Work Done:**
 
@@ -27,89 +72,21 @@
 
 3. **Shared mailbox not recognized as admin**: The `ADMIN_EMAIL` constant was hardcoded to the registered admin login email (`augustovalbuena@gmail.com`), but admin replies in practice always originate from the shared `support@sparkplan.app` Workspace mailbox. Patched `support-inbound/index.ts` to accept either `ADMIN_EMAIL` OR the `GMAIL_MAILBOX` env var as admin identities.
 
-4. **`is:unread` Gmail query strands opened messages**: The Gmail search filter `is:unread` means any message a human opens in the `support@sparkplan.app` inbox before cron polls it becomes invisible to the function. User opening received messages to verify they arrived inadvertently marked them read. Workaround documented: mark as unread to re-trigger. Future fix: switch to Gmail History API (the `last_history_id` column is already provisioned).
+4. **`is:unread` Gmail query strands opened messages**: The Gmail search filter `is:unread` means any message a human opens in the `support@sparkplan.app` inbox before cron polls it becomes invisible to the function. Workaround documented: mark as unread to re-trigger. Future fix: switch to Gmail History API (the `last_history_id` column is already provisioned).
 
 *Documentation:*
-- Expanded `docs/SUPPORT_INBOUND_SETUP.md` troubleshooting section into a **7-stage diagnostic playbook** with exact SQL queries, response-body fingerprints, and remediation steps for every layer from cron firing through echo-email delivery. Includes a "Known limitations" section.
+- Expanded `docs/SUPPORT_INBOUND_SETUP.md` troubleshooting section into a **7-stage diagnostic playbook** with exact SQL queries, response-body fingerprints, and remediation steps for every layer from cron firing through echo-email delivery.
 
 **Key Files Touched:**
 - `supabase/migrations/*` — renamed all 29 migration files to unique 14-digit timestamps
 - `supabase/functions/support-inbound/index.ts` — added `GMAIL_MAILBOX` as admin identity
 - `docs/SUPPORT_INBOUND_SETUP.md` — full troubleshooting playbook
-- `docs/SESSION_LOG.md`, `docs/CHANGELOG.md` — updated
 
-**Commits (branch `feat/support-email-inbound`):**
+**Commits (branch `feat/support-email-inbound`, merged as PR #5):**
 - `267452a` — chore(migrations): migrate to 14-digit timestamps; deploy support-inbound stack
 - `e0f9614` — fix(support-inbound): recognize shared support mailbox as admin sender
+- `9ad2e77` — docs: support-inbound troubleshooting playbook + 2026-04-18 session entry
+- `9f36b8a` — docs(roadmap): extend Phase 3.2 to cover inbound email pipeline
 
 **Pending:**
-- Open PR `feat/support-email-inbound` → `main` (code is green, fully tested live)
 - Future: Gmail History API migration to replace `is:unread` polling (`support_gmail_sync_state.last_history_id` already provisioned)
-- Future: Stripe webhook signature verification (still disabled — unchanged from prior sessions)
-
----
-
-### Session: 2026-04-17 — Stripe Custom Email Domain + Support Inbound (Gmail polling) + AI-Investigation Scaffolding
-
-**Focus**: Verify `sparkplan.app` for Stripe's custom email domain, then close out Phase 3.2 by wiring an email-reply → ticket pipeline. Initially attempted Resend Inbound, pivoted to Gmail API polling after hitting the Resend free-tier paywall. Bake in architectural hooks for a future Claude Code bug-investigation runner.
-**Status**: All code landed on branch `feat/support-email-inbound`. Stripe DNS verified. Support-inbound ready to deploy once Gmail OAuth bootstrap + Supabase secrets + pg_cron Vault entries are set by user.
-
-**Work Done:**
-
-*Stripe custom email domain (DNS, no code):*
-- Added 8 records to Vercel DNS for `sparkplan.app`: root TXT (`stripe-verification=...`), 6 DKIM CNAMEs under `*._domainkey`, `bounce` CNAME → `custom-email-domain.stripe.com`. Pre-existing `_dmarc` reused. Accepted Vercel's wildcard-override prompts per DKIM CNAME. Stripe verified successfully.
-
-*Architecture pivot — Resend → Gmail API polling:*
-- Initial plan was a Resend Inbound webhook on `reply.sparkplan.app`. Hit blocker: Resend free tier allows 1 domain and Receiving is bound to domain root, conflicting with Google Workspace MX.
-- Chose "Path A-lite": poll Gmail directly via the existing Google Workspace mailbox using plus-addressing (`support+ticket-<uuid>@sparkplan.app`). Zero new infra, zero monthly cost.
-
-*Email-reply pipeline + event log + investigation scaffolding:*
-- New migration `20260417_support_events_and_investigations.sql` — three tables:
-  - `support_ticket_events` (append-only lifecycle log; discriminator columns `event_type` + `source`; admin-read-only RLS + service_role writes)
-  - `support_ticket_investigations` (forward-compatible schema for the future Claude Code runner — `investigator` enum, `status` lifecycle, `findings TEXT`, `artifacts JSONB`, `notified_via` + `notified_at`; added to realtime publication)
-  - `support_gmail_sync_state` (singleton polling watermark)
-- New migration `20260417_support_inbound_cron.sql` — enables `pg_cron` + `pg_net`, schedules one-minute polling via `vault.decrypted_secrets` for both the URL and shared secret. Safe to re-apply (drops existing job first).
-- Shared edge-function helpers:
-  - `supabase/functions/_shared/gmail.ts` — OAuth refresh-token flow, list/get/markAsRead, base64url-UTF8 decoding, MIME tree walk with text/plain preferred and HTML stripped fallback
-  - `supabase/functions/_shared/supportEvents.ts` — `emitSupportEvent()` (never throws), `getAdminClient()`, `extractTicketIdFromText()` (supports BOTH plus-addressing AND `ticket-<uuid>@reply.*` subdomain scheme for future flexibility), `stripQuotedReply()` (multi-marker conservative), `extractBareAddress()`
-- `supabase/functions/support-inbound/index.ts` rewritten for Gmail polling:
-  - pg_cron shared-secret auth via `x-support-inbound-secret` header (constant-time compare)
-  - Gmail query: `to:support+ticket- is:unread newer_than:1d`
-  - Flow: fetch → extract ticket UUID → auth sender (admin vs ticket owner, rejects anything else) → strip quoted → insert reply → emit event → bump status if admin reply on open ticket → fetch `support-notify` to echo to OTHER party → mark-as-read (on any outcome except `error`, which allows retry on transient DB failures)
-- `supabase/functions/support-notify/index.ts` updated:
-  - Plus-addressed Reply-To: `support+ticket-<uuid>@sparkplan.app` (was `ticket-<uuid>@reply.sparkplan.app`)
-  - Internal-trust path: service_role bearer token bypasses user lookup and is treated as admin (needed so support-inbound can echo)
-  - New `user_reply` payload type: customer-reply echo to admin with "Customer replied via email" template
-- `supabase/functions/support-investigate/index.ts` — stub that inserts `status='skipped'` investigations and emits `investigation_requested` events. Clearly marked TODO points for wiring up Claude Code runner + Slack webhook without future migration churn.
-- `scripts/gmail-oauth.ts` — one-shot OAuth bootstrap script (OOB flow, gmail.modify scope, `prompt=consent` to force refresh_token, prints Supabase secrets set command)
-- `lib/database.types.ts` — added Row/Insert/Update for all 3 new tables
-- `npm run build` ✓ (no regressions)
-- `npm test` ✓ 99/99
-
-**Key Files:**
-- `supabase/migrations/20260417_support_events_and_investigations.sql` — events + investigations + sync state
-- `supabase/migrations/20260417_support_inbound_cron.sql` — pg_cron schedule
-- `supabase/functions/_shared/gmail.ts`, `supabase/functions/_shared/supportEvents.ts` — shared helpers
-- `supabase/functions/support-inbound/index.ts` — Gmail polling handler
-- `supabase/functions/support-investigate/index.ts` — stub for future Claude Code integration
-- `supabase/functions/support-notify/index.ts` — plus-addressing + user_reply + service_role trust
-- `scripts/gmail-oauth.ts` — OAuth bootstrap
-- `lib/database.types.ts`, `docs/CHANGELOG.md`, `docs/SESSION_LOG.md` — updated
-
-**Pending (requires infra work by user before the feature goes live):**
-- Google Cloud Console: create project, enable Gmail API, create Desktop-app OAuth 2.0 credentials with `gmail.modify` scope, add self as test user
-- Run `deno run --allow-net scripts/gmail-oauth.ts` once to obtain the offline refresh token
-- Set Edge Function secrets: `GMAIL_CLIENT_ID`, `GMAIL_CLIENT_SECRET`, `GMAIL_REFRESH_TOKEN`, `GMAIL_MAILBOX=support@sparkplan.app`, `SUPPORT_INBOUND_SECRET` (strong random), `SUPPORT_ADMIN_AUTH_USER_ID` (admin's auth.users.id)
-- Supabase Vault: `support_inbound_secret` (same as env var) + `supabase_functions_base_url` (so the cron migration can read them)
-- Deploy edge functions: `support-notify` (updated), `support-inbound` (new), `support-investigate` (new stub)
-- Open PR from `feat/support-email-inbound` → `main` after infra work validates the flow end-to-end on preview
-
-**Pending (future AI-investigation runner — design only, not implemented):**
-- Wire `CLAUDE_CODE_WEBHOOK_URL` + `SLACK_WEBHOOK_URL` env vars on `support-investigate`
-- Flip the scaffolding stub: change `status='skipped'` → `status='pending'` and either POST to the runner or let a worker poll
-- Add pg trigger on `support_ticket_events` that calls `support-investigate` for qualifying events (e.g., new `bug` category tickets)
-- Runner itself writes findings back via UPDATE to `support_ticket_investigations`
-
-**Pending (carried over from prior sessions):**
-- Stripe webhook signature verification: secret hardcoded in deployed edge function (Supabase env var was failing). Must rotate + re-harden per `memory/stripe_webhook_signature.md` before scaling real-payment volume.
-

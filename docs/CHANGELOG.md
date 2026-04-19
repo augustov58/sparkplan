@@ -4,6 +4,20 @@ All notable changes to SparkPlan.
 
 ---
 
+## 2026-04-18 (PM): Stripe Webhook Signature Verification — Re-aligned to Env-Var Source of Truth
+
+**Operational:**
+- **`stripe-webhook` deployed function now matches git source.** Previously, the deployed v35 had the `whsec_...` signing secret hardcoded as a workaround for an env var that was silently set to the wrong value. Overwrote the Supabase secret with the correct value; redeployed git source (env-var based) as v38 with `verify_jwt: false`.
+- **Signature verification confirmed via direct HMAC probes** (independent of Stripe infrastructure): valid HMAC → `200 {"received":true}`, forged HMAC → `400 "No signatures found matching..."`. Gateway accepts both, confirming `verify_jwt: false`.
+- **Duplicate webhook endpoint neutralized.** Stripe account had a second live endpoint (`adventurous-splendor`) at 35/35 failure rate — its signing secret was never propagated. Disabled (not deleted) so it can be re-enabled if needed. The only event it caught that endpoint A doesn't (`customer.subscription.paused`) is redundant — already handled via `customer.subscription.updated`.
+- **Memory updated** with rotation playbook and the duplicate-endpoint gotcha (`memory/stripe_webhook_signature.md`). Added `.rollback/` to `.gitignore` to prevent local v35 snapshot from leaking.
+
+**Recommended follow-up**: rotate the webhook signing secret when convenient — the `whsec_P0LA...` value has effectively been exposed through conversation history and the local rollback snapshot.
+
+**PR:** #6
+
+---
+
 ## 2026-04-18: Support Inbound Pipeline — Live Deployment + Debug Playbook
 
 **Operational:**
