@@ -229,51 +229,94 @@ function getEquipmentName(
   return 'Unknown';
 }
 
+// Placeholder result used when a feeder calculation throws — keeps the PDF
+// rendering path alive so one bad row can't blow up the whole document.
+const makeCalcErrorResult = (message: string): FeederCalculationResult => ({
+  design_load_va: 0,
+  design_current_amps: 0,
+  phase_conductor_size: 'ERR',
+  phase_conductor_ampacity: 0,
+  neutral_conductor_size: 'ERR',
+  egc_size: 'ERR',
+  recommended_conduit_size: 'ERR',
+  voltage_drop_percent: 0,
+  voltage_drop_volts: 0,
+  meets_voltage_drop: false,
+  warnings: [`Calculation failed: ${message}`],
+  necReferences: [],
+});
+
 /**
- * Calculate voltage drop for all feeders
+ * Calculate voltage drop for all feeders. Each feeder is wrapped in a
+ * try/catch so one bad row produces a readable error row instead of
+ * crashing the whole PDF generation pipeline.
  */
 function calculateAllFeederVoltageDrops(
   feeders: Feeder[],
   panels: Panel[],
   transformers: Transformer[]
 ): FeederVoltageDropData[] {
-  return feeders.map(feeder => {
-    const fromName = getEquipmentName(feeder.source_panel_id, panels, transformers);
-    const toName = getEquipmentName(
-      feeder.destination_panel_id || feeder.destination_transformer_id,
-      panels,
-      transformers
-    );
+  return feeders.map((feeder, idx) => {
+    try {
+      const fromName = getEquipmentName(feeder.source_panel_id, panels, transformers);
+      const toName = getEquipmentName(
+        feeder.destination_panel_id || feeder.destination_transformer_id,
+        panels,
+        transformers
+      );
 
-    // Get source panel to determine voltage and phase
-    const sourcePanel = panels.find(p => p.id === feeder.source_panel_id);
-    const voltage = sourcePanel?.voltage || 120; // Default to 120V if not found
-    const phase = (sourcePanel?.phase || 1) as 1 | 3; // Default to 1-phase
+      // Get source panel to determine voltage and phase
+      const sourcePanel = panels.find(p => p.id === feeder.source_panel_id);
+      const voltage = sourcePanel?.voltage || 120;
+      const phase = (sourcePanel?.phase || 1) as 1 | 3;
 
-    // Build input for feeder sizing calculation
-    const input: FeederCalculationInput = {
-      source_voltage: voltage,
-      source_phase: phase,
-      destination_voltage: voltage,
-      destination_phase: phase,
-      total_load_va: feeder.total_load_va || 0,
-      continuous_load_va: (feeder.total_load_va || 0) * 0.8, // Assume 80% continuous (conservative)
-      noncontinuous_load_va: (feeder.total_load_va || 0) * 0.2,
-      distance_ft: feeder.distance_ft || 0,
-      conductor_material: (feeder.conductor_material as 'Cu' | 'Al') || 'Cu',
-      ambient_temperature_c: 30, // Default ambient temperature
-      num_current_carrying: 3, // Default for typical 3-conductor + ground
-      max_voltage_drop_percent: 3.0,
-    };
+      const input: FeederCalculationInput = {
+        source_voltage: voltage,
+        source_phase: phase,
+        destination_voltage: voltage,
+        destination_phase: phase,
+        total_load_va: feeder.total_load_va || 0,
+        continuous_load_va: (feeder.total_load_va || 0) * 0.8,
+        noncontinuous_load_va: (feeder.total_load_va || 0) * 0.2,
+        distance_ft: feeder.distance_ft || 0,
+        conductor_material: (feeder.conductor_material as 'Cu' | 'Al') || 'Cu',
+        ambient_temperature_c: 30,
+        num_current_carrying: 3,
+        max_voltage_drop_percent: 3.0,
+      };
 
-    const calculation = calculateFeederSizing(input);
+      const calculation = calculateFeederSizing(input);
 
-    return {
-      feeder,
-      fromName,
-      toName,
-      calculation,
-    };
+      // Defensive: calculateFeederSizing is contracted never to throw, but
+      // older code paths could return undefined fields if the input is odd.
+      // Coerce any missing fields so the render never hits `.toFixed` on
+      // undefined and the `.warnings.map` never hits undefined.
+      const safeCalc: FeederCalculationResult = {
+        ...calculation,
+        voltage_drop_percent: Number.isFinite(calculation.voltage_drop_percent)
+          ? calculation.voltage_drop_percent : 0,
+        voltage_drop_volts: Number.isFinite(calculation.voltage_drop_volts)
+          ? calculation.voltage_drop_volts : 0,
+        design_current_amps: Number.isFinite(calculation.design_current_amps)
+          ? calculation.design_current_amps : 0,
+        warnings: Array.isArray(calculation.warnings) ? calculation.warnings : [],
+      };
+
+      return { feeder, fromName, toName, calculation: safeCalc };
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      console.error(`[voltage-drop-pdf] feeder[${idx}] ${feeder?.name ?? '?'} calc threw:`, err);
+      return {
+        feeder,
+        fromName: getEquipmentName(feeder?.source_panel_id, panels, transformers),
+        toName: getEquipmentName(
+          feeder?.destination_panel_id || feeder?.destination_transformer_id,
+          panels,
+          transformers
+        ),
+        calculation: makeCalcErrorResult(message),
+      };
+    }
   });
 }
 
@@ -391,22 +434,22 @@ const VoltageDropTable: React.FC<{ feederData: FeederVoltageDropData[] }> = ({ f
       {/* Data Rows */}
       {feederData.map((data, index) => (
         <View key={index} style={styles.tableRow}>
-          <Text style={styles.col1}>{data.feeder.name}</Text>
-          <Text style={styles.col2}>{data.fromName} → {data.toName}</Text>
+          <Text style={styles.col1}>{String(data.feeder?.name ?? '')}</Text>
+          <Text style={styles.col2}>{`${data.fromName} -> ${data.toName}`}</Text>
           <Text style={[styles.col3, styles.cellCenter]}>
-            {data.feeder.distance_ft || 0} ft
+            {`${data.feeder?.distance_ft || 0} ft`}
           </Text>
           <Text style={styles.col4}>
-            {data.calculation.phase_conductor_size || 'N/A'} {data.feeder.conductor_material || 'Cu'}
+            {`${data.calculation.phase_conductor_size || 'N/A'} ${data.feeder?.conductor_material || 'Cu'}`}
           </Text>
           <Text style={[styles.col5, styles.cellCenter]}>
-            {(data.calculation.design_current_amps || 0).toFixed(1)} A
+            {`${(data.calculation.design_current_amps || 0).toFixed(1)} A`}
           </Text>
           <Text style={[styles.col6, styles.cellCenter]}>
             {(data.calculation.voltage_drop_volts || 0).toFixed(2)}
           </Text>
           <Text style={[styles.col7, styles.cellCenter]}>
-            {(data.calculation.voltage_drop_percent || 0).toFixed(2)}%
+            {`${(data.calculation.voltage_drop_percent || 0).toFixed(2)}%`}
           </Text>
           <Text
             style={[
@@ -415,7 +458,7 @@ const VoltageDropTable: React.FC<{ feederData: FeederVoltageDropData[] }> = ({ f
               data.calculation.meets_voltage_drop ? styles.compliantText : styles.nonCompliantText,
             ]}
           >
-            {data.calculation.meets_voltage_drop ? '✓ Compliant' : '✗ Non-Compliant'}
+            {data.calculation.meets_voltage_drop ? 'Compliant' : 'Non-Compliant'}
           </Text>
         </View>
       ))}
@@ -433,7 +476,7 @@ const WarningsSection: React.FC<{ feederData: FeederVoltageDropData[] }> = ({ fe
     return (
       <View style={styles.infoBox}>
         <Text style={styles.infoText}>
-          ✓ All feeders meet NEC 210.19 voltage drop recommendation (≤3%).
+          All feeders meet NEC 210.19 voltage drop recommendation (within 3%).
         </Text>
       </View>
     );
@@ -441,17 +484,23 @@ const WarningsSection: React.FC<{ feederData: FeederVoltageDropData[] }> = ({ fe
 
   return (
     <View style={styles.section}>
-      <Text style={styles.sectionTitle}>⚠️ Voltage Drop Warnings</Text>
-      {nonCompliantFeeders.map((data, index) => (
-        <View key={index} style={styles.warningBox}>
-          <Text style={styles.warningText}>
-            {data.feeder.name}: {data.calculation.voltage_drop_percent.toFixed(2)}% voltage drop exceeds 3% recommendation
-          </Text>
-          {data.calculation.warnings.map((warning, wIndex) => (
-            <Text key={wIndex} style={styles.warningText}>• {warning}</Text>
-          ))}
-        </View>
-      ))}
+      <Text style={styles.sectionTitle}>Voltage Drop Warnings</Text>
+      {nonCompliantFeeders.map((data, index) => {
+        const pct = Number.isFinite(data.calculation.voltage_drop_percent)
+          ? data.calculation.voltage_drop_percent : 0;
+        const warnings = Array.isArray(data.calculation.warnings)
+          ? data.calculation.warnings : [];
+        return (
+          <View key={index} style={styles.warningBox}>
+            <Text style={styles.warningText}>
+              {`${data.feeder?.name ?? ''}: ${pct.toFixed(2)}% voltage drop exceeds 3% recommendation`}
+            </Text>
+            {warnings.map((warning, wIndex) => (
+              <Text key={wIndex} style={styles.warningText}>{`- ${String(warning ?? '')}`}</Text>
+            ))}
+          </View>
+        );
+      })}
     </View>
   );
 };
