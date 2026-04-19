@@ -12,6 +12,11 @@ import {
   calculateAggregatedLoad,
   type AggregatedLoad,
 } from '../calculations/upstreamLoadAggregation';
+import {
+  BrandBar,
+  Footer as BrandFooter,
+  themeStyles,
+} from './permitPacketTheme';
 
 type MeterStack = Database['public']['Tables']['meter_stacks']['Row'];
 type MeterDB = Database['public']['Tables']['meters']['Row'];
@@ -182,104 +187,106 @@ export const CoverPage: React.FC<CoverPageProps> = ({
   meterLocation,
   serviceConductorRouting,
 }) => (
-  <Page size="LETTER" style={permitStyles.coverPage}>
-    <View>
-      <Text style={permitStyles.coverTitle}>ELECTRICAL PERMIT APPLICATION</Text>
-      <Text style={permitStyles.coverSubtitle}>NEC 2023 Compliant Design Package</Text>
+  <Page size="LETTER" style={themeStyles.page}>
+    <BrandBar pageLabel="PERMIT APPLICATION" />
+
+    <View style={themeStyles.titleBlock}>
+      <Text style={themeStyles.docTitle}>Electrical Permit Application</Text>
+      <Text style={themeStyles.docSubtitle}>
+        NEC 2023 Compliant Design Package
+      </Text>
     </View>
 
-    <View style={permitStyles.coverSection}>
-      <Text style={permitStyles.coverSectionTitle}>PROJECT INFORMATION</Text>
-      <View style={permitStyles.coverInfoRow}>
-        <Text style={permitStyles.coverInfoLabel}>Project Name:</Text>
-        <Text style={permitStyles.coverInfoValue}>{projectName}</Text>
+    <Text style={themeStyles.sectionTitle}>PROJECT INFORMATION</Text>
+    <View style={themeStyles.projectGrid}>
+      <View style={themeStyles.projectCell}>
+        <Text style={themeStyles.projectLabel}>Project Name</Text>
+        <Text style={themeStyles.projectValue}>{projectName}</Text>
       </View>
-      <View style={permitStyles.coverInfoRow}>
-        <Text style={permitStyles.coverInfoLabel}>Project Address:</Text>
-        <Text style={permitStyles.coverInfoValue}>{projectAddress || 'Not specified'}</Text>
+      <View style={themeStyles.projectCellWide}>
+        <Text style={themeStyles.projectLabel}>Project Address</Text>
+        <Text style={themeStyles.projectValue}>
+          {projectAddress || 'Not specified'}
+        </Text>
       </View>
-      <View style={permitStyles.coverInfoRow}>
-        <Text style={permitStyles.coverInfoLabel}>Project Type:</Text>
-        <Text style={permitStyles.coverInfoValue}>{projectType}</Text>
+      <View style={themeStyles.projectCell}>
+        <Text style={themeStyles.projectLabel}>Project Type</Text>
+        <Text style={themeStyles.projectValue}>{projectType}</Text>
       </View>
-      <View style={permitStyles.coverInfoRow}>
-        <Text style={permitStyles.coverInfoLabel}>Service:</Text>
-        <Text style={permitStyles.coverInfoValue}>
-          {serviceVoltage}V {servicePhase === 3 ? '3-Phase' : 'Single-Phase'}
+      <View style={themeStyles.projectCell}>
+        <Text style={themeStyles.projectLabel}>Service</Text>
+        <Text style={themeStyles.projectValue}>
+          {`${serviceVoltage}V ${servicePhase === 3 ? '3' : '1'}-Phase`}
         </Text>
       </View>
       {permitNumber && (
-        <View style={permitStyles.coverInfoRow}>
-          <Text style={permitStyles.coverInfoLabel}>Permit Number:</Text>
-          <Text style={permitStyles.coverInfoValue}>{permitNumber}</Text>
+        <View style={themeStyles.projectCell}>
+          <Text style={themeStyles.projectLabel}>Permit Number</Text>
+          <Text style={themeStyles.projectValue}>{permitNumber}</Text>
         </View>
       )}
     </View>
 
-    <View style={permitStyles.coverSection}>
-      <Text style={permitStyles.coverSectionTitle}>PREPARATION DETAILS</Text>
+    <Text style={themeStyles.sectionTitle}>PREPARATION DETAILS</Text>
+    <View style={themeStyles.projectGrid}>
       {preparedBy && (
-        <View style={permitStyles.coverInfoRow}>
-          <Text style={permitStyles.coverInfoLabel}>Prepared By:</Text>
-          <Text style={permitStyles.coverInfoValue}>{preparedBy}</Text>
+        <View style={themeStyles.projectCell}>
+          <Text style={themeStyles.projectLabel}>Prepared By</Text>
+          <Text style={themeStyles.projectValue}>{preparedBy}</Text>
         </View>
       )}
       {contractorLicense && (
-        <View style={permitStyles.coverInfoRow}>
-          <Text style={permitStyles.coverInfoLabel}>Contractor License:</Text>
-          <Text style={permitStyles.coverInfoValue}>{contractorLicense}</Text>
+        <View style={themeStyles.projectCell}>
+          <Text style={themeStyles.projectLabel}>Contractor License</Text>
+          <Text style={themeStyles.projectValue}>{contractorLicense}</Text>
         </View>
       )}
-      <View style={permitStyles.coverInfoRow}>
-        <Text style={permitStyles.coverInfoLabel}>Date Prepared:</Text>
-        <Text style={permitStyles.coverInfoValue}>{date}</Text>
+      <View style={themeStyles.projectCell}>
+        <Text style={themeStyles.projectLabel}>Date Prepared</Text>
+        <Text style={themeStyles.projectValue}>{date}</Text>
       </View>
-      <View style={permitStyles.coverInfoRow}>
-        <Text style={permitStyles.coverInfoLabel}>NEC Edition:</Text>
-        <Text style={permitStyles.coverInfoValue}>2023</Text>
+      <View style={themeStyles.projectCell}>
+        <Text style={themeStyles.projectLabel}>NEC Edition</Text>
+        <Text style={themeStyles.projectValue}>NEC 2023</Text>
       </View>
     </View>
 
     {scopeOfWork && (
-      <View style={permitStyles.coverSection}>
-        <Text style={permitStyles.coverSectionTitle}>SCOPE OF WORK</Text>
-        <Text style={{ fontSize: 10, lineHeight: 1.5 }}>{scopeOfWork}</Text>
-      </View>
+      <>
+        <Text style={themeStyles.sectionTitle}>SCOPE OF WORK</Text>
+        <Text style={themeStyles.proseBlock}>{scopeOfWork}</Text>
+      </>
     )}
 
     {(serviceType || meterLocation || serviceConductorRouting) && (
-      <View style={permitStyles.coverSection}>
-        <Text style={permitStyles.coverSectionTitle}>SERVICE ENTRANCE DETAILS</Text>
-        {serviceType && (
-          <View style={permitStyles.coverInfoRow}>
-            <Text style={permitStyles.coverInfoLabel}>Service Type:</Text>
-            <Text style={permitStyles.coverInfoValue}>
-              {serviceType === 'overhead' ? 'Overhead' : 'Underground'}
-            </Text>
-          </View>
-        )}
-        {meterLocation && (
-          <View style={permitStyles.coverInfoRow}>
-            <Text style={permitStyles.coverInfoLabel}>Meter Location:</Text>
-            <Text style={permitStyles.coverInfoValue}>{meterLocation}</Text>
-          </View>
-        )}
-        {serviceConductorRouting && (
-          <View style={permitStyles.coverInfoRow}>
-            <Text style={permitStyles.coverInfoLabel}>Conductor Routing:</Text>
-            <Text style={permitStyles.coverInfoValue}>{serviceConductorRouting}</Text>
-          </View>
-        )}
-      </View>
+      <>
+        <Text style={themeStyles.sectionTitle}>SERVICE ENTRANCE DETAILS</Text>
+        <View style={themeStyles.projectGrid}>
+          {serviceType && (
+            <View style={themeStyles.projectCell}>
+              <Text style={themeStyles.projectLabel}>Service Type</Text>
+              <Text style={themeStyles.projectValue}>
+                {serviceType === 'overhead' ? 'Overhead' : 'Underground'}
+              </Text>
+            </View>
+          )}
+          {meterLocation && (
+            <View style={themeStyles.projectCell}>
+              <Text style={themeStyles.projectLabel}>Meter Location</Text>
+              <Text style={themeStyles.projectValue}>{meterLocation}</Text>
+            </View>
+          )}
+          {serviceConductorRouting && (
+            <View style={themeStyles.projectCellWide}>
+              <Text style={themeStyles.projectLabel}>Conductor Routing</Text>
+              <Text style={themeStyles.projectValue}>{serviceConductorRouting}</Text>
+            </View>
+          )}
+        </View>
+      </>
     )}
 
-    <Text
-      fixed
-      style={permitStyles.footer}
-      render={({ pageNumber, totalPages }) =>
-        `SparkPlan Permit Package \u2022 NEC 2023 \u2022 ${projectName} \u2022 Page ${pageNumber} of ${totalPages}`
-      }
-    />
+    <BrandFooter projectName={projectName} />
   </Page>
 );
 
