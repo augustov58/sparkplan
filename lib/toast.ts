@@ -63,6 +63,7 @@ export const toastMessages = {
     updated: 'Transformer updated',
     deleted: 'Transformer removed',
     error: 'Failed to update transformer',
+    deleteError: 'Failed to delete transformer',
   },
 
   // Meter Stacks
