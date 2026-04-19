@@ -48,6 +48,7 @@ import { getConductorDimensions, STANDARD_WIRE_SIZES } from '../data/nec/chapter
 import { analyzeChangeImpact } from '../services/api/pythonBackend';
 import { EVPanelTemplates } from './EVPanelTemplates';
 import { MultiFamilyEVCalculator } from './MultiFamilyEVCalculator';
+import { NumberInput } from './common/NumberInput';
 
 interface CalculatorsProps {
   projectId?: string;
@@ -379,7 +380,7 @@ const VoltageDropCalculator: React.FC = () => {
            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
              <div>
                <label className="label-xs">Voltage (V)</label>
-               <input type="number" value={voltage} onChange={e => setVoltage(Number(e.target.value))} className="input-std" />
+               <NumberInput value={voltage} onChange={setVoltage} className="input-std" />
              </div>
              <div>
                <label className="label-xs">Phase</label>
@@ -390,11 +391,11 @@ const VoltageDropCalculator: React.FC = () => {
              </div>
              <div>
                <label className="label-xs">Length (ft, one-way)</label>
-               <input type="number" value={length} onChange={e => setLength(Number(e.target.value))} className="input-std" />
+               <NumberInput value={length} onChange={setLength} className="input-std" />
              </div>
              <div>
                <label className="label-xs">Load Current (A)</label>
-               <input type="number" value={current} onChange={e => setCurrent(Number(e.target.value))} className="input-std" />
+               <NumberInput value={current} onChange={setCurrent} className="input-std" />
              </div>
              <div>
                <label className="label-xs">Conductor Size</label>
@@ -740,12 +741,12 @@ const ConduitFillCalculator: React.FC = () => {
                   </div>
                   <div>
                     <label className="label-xs">Quantity</label>
-                    <input
-                      type="number"
+                    <NumberInput
                       value={group.quantity}
-                      onChange={e => updateWireGroup(group.id, 'quantity', Number(e.target.value))}
+                      onChange={v => updateWireGroup(group.id, 'quantity', v)}
                       min="1"
                       max="100"
+                      allowDecimal={false}
                       className="input-std"
                     />
                   </div>
@@ -1012,10 +1013,9 @@ const ShortCircuitCalculator: React.FC<ShortCircuitCalculatorProps> = ({ project
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="label-xs">Service Amps</label>
-                  <input
-                    type="number"
+                  <NumberInput
                     value={serviceAmps}
-                    onChange={(e) => setServiceAmps(Number(e.target.value))}
+                    onChange={setServiceAmps}
                     className="input-std"
                   />
                 </div>
@@ -1064,11 +1064,10 @@ const ShortCircuitCalculator: React.FC<ShortCircuitCalculatorProps> = ({ project
                   </div>
                   <div>
                     <label className="label-xs">Impedance (%)</label>
-                    <input
-                      type="number"
+                    <NumberInput
                       step="0.1"
                       value={transformerImpedance}
-                      onChange={(e) => setTransformerImpedance(Number(e.target.value))}
+                      onChange={setTransformerImpedance}
                       className="input-std"
                     />
                   </div>
@@ -1086,10 +1085,9 @@ const ShortCircuitCalculator: React.FC<ShortCircuitCalculatorProps> = ({ project
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
                     <label className="label-xs">Conductor Length (ft)</label>
-                    <input
-                      type="number"
+                    <NumberInput
                       value={serviceConductorLength}
-                      onChange={(e) => setServiceConductorLength(Number(e.target.value))}
+                      onChange={setServiceConductorLength}
                       className="input-std"
                     />
                   </div>
@@ -1168,10 +1166,9 @@ const ShortCircuitCalculator: React.FC<ShortCircuitCalculatorProps> = ({ project
               <div className="space-y-4">
                 <div>
                   <label className="label-xs">Source Fault Current (A)</label>
-                  <input
-                    type="number"
+                  <NumberInput
                     value={sourceFaultCurrent}
-                    onChange={(e) => setSourceFaultCurrent(Number(e.target.value))}
+                    onChange={setSourceFaultCurrent}
                     className="input-std"
                   />
                   <p className="text-xs text-[#888] mt-1">
@@ -1182,10 +1179,9 @@ const ShortCircuitCalculator: React.FC<ShortCircuitCalculatorProps> = ({ project
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
                     <label className="label-xs">Feeder Length (ft)</label>
-                    <input
-                      type="number"
+                    <NumberInput
                       value={feederLength}
-                      onChange={(e) => setFeederLength(Number(e.target.value))}
+                      onChange={setFeederLength}
                       className="input-std"
                     />
                   </div>
@@ -1556,35 +1552,33 @@ const EVChargingCalculator: React.FC = () => {
             
             <div>
               <label className="block text-xs font-semibold text-[#888] uppercase mb-1">Number of Chargers</label>
-              <input
-                type="number"
+              <NumberInput
                 min={1}
                 max={50}
+                allowDecimal={false}
                 value={numChargers}
-                onChange={e => setNumChargers(Number(e.target.value))}
+                onChange={setNumChargers}
                 className="w-full border-[#e8e6e3] rounded text-sm py-2 focus:border-[#2d3b2d] focus:ring-[#2d3b2d]/20"
               />
             </div>
             
             <div>
               <label className="block text-xs font-semibold text-[#888] uppercase mb-1">Simultaneous Use %</label>
-              <input
-                type="number"
+              <NumberInput
                 min={10}
                 max={100}
                 value={simultaneousUse}
-                onChange={e => setSimultaneousUse(Number(e.target.value))}
+                onChange={setSimultaneousUse}
                 className="w-full border-[#e8e6e3] rounded text-sm py-2 focus:border-[#2d3b2d] focus:ring-[#2d3b2d]/20"
               />
             </div>
             
             <div>
               <label className="block text-xs font-semibold text-[#888] uppercase mb-1">Circuit Length (ft)</label>
-              <input
-                type="number"
+              <NumberInput
                 min={1}
                 value={circuitLength}
-                onChange={e => setCircuitLength(Number(e.target.value))}
+                onChange={setCircuitLength}
                 className="w-full border-[#e8e6e3] rounded text-sm py-2 focus:border-[#2d3b2d] focus:ring-[#2d3b2d]/20"
               />
             </div>
@@ -1608,28 +1602,25 @@ const EVChargingCalculator: React.FC = () => {
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               <div>
                 <label className="block text-xs text-[#888] mb-1">Battery (kWh)</label>
-                <input
-                  type="number"
+                <NumberInput
                   value={batteryCapacity}
-                  onChange={e => setBatteryCapacity(Number(e.target.value))}
+                  onChange={setBatteryCapacity}
                   className="w-full border-[#e8e6e3] rounded text-sm py-1 focus:border-[#2d3b2d] focus:ring-[#2d3b2d]/20"
                 />
               </div>
               <div>
                 <label className="block text-xs text-[#888] mb-1">Start SOC %</label>
-                <input
-                  type="number"
+                <NumberInput
                   value={currentSOC}
-                  onChange={e => setCurrentSOC(Number(e.target.value))}
+                  onChange={setCurrentSOC}
                   className="w-full border-[#e8e6e3] rounded text-sm py-1 focus:border-[#2d3b2d] focus:ring-[#2d3b2d]/20"
                 />
               </div>
               <div>
                 <label className="block text-xs text-[#888] mb-1">Target SOC %</label>
-                <input
-                  type="number"
+                <NumberInput
                   value={targetSOC}
-                  onChange={e => setTargetSOC(Number(e.target.value))}
+                  onChange={setTargetSOC}
                   className="w-full border-[#e8e6e3] rounded text-sm py-1 focus:border-[#2d3b2d] focus:ring-[#2d3b2d]/20"
                 />
               </div>
@@ -1792,22 +1783,22 @@ const SolarPVCalculator: React.FC = () => {
               </div>
               <div>
                 <label className="block text-xs text-[#888] mb-1">Number of Panels</label>
-                <input
-                  type="number"
+                <NumberInput
                   min={1}
+                  allowDecimal={false}
                   value={numPanels}
-                  onChange={e => setNumPanels(Number(e.target.value))}
+                  onChange={setNumPanels}
                   className="w-full border-[#e8e6e3] rounded text-sm py-2 focus:border-[#2d3b2d] focus:ring-[#2d3b2d]/20"
                 />
               </div>
               <div>
                 <label className="block text-xs text-[#888] mb-1">Panels per String</label>
-                <input
-                  type="number"
+                <NumberInput
                   min={1}
                   max={maxPanelsPerString}
+                  allowDecimal={false}
                   value={panelsPerString}
-                  onChange={e => setPanelsPerString(Number(e.target.value))}
+                  onChange={setPanelsPerString}
                   className="w-full border-[#e8e6e3] rounded text-sm py-2 focus:border-[#2d3b2d] focus:ring-[#2d3b2d]/20"
                 />
               </div>
@@ -1835,20 +1826,18 @@ const SolarPVCalculator: React.FC = () => {
             </div>
             <div>
               <label className="block text-xs font-semibold text-[#888] uppercase mb-1">Inverter Power (kW)</label>
-              <input
-                type="number"
+              <NumberInput
                 step={0.1}
                 value={inverterPower}
-                onChange={e => setInverterPower(Number(e.target.value))}
+                onChange={setInverterPower}
                 className="w-full border-[#e8e6e3] rounded text-sm py-2 focus:border-[#2d3b2d] focus:ring-[#2d3b2d]/20"
               />
             </div>
             <div>
               <label className="block text-xs font-semibold text-[#888] uppercase mb-1">Max DC Voltage (V)</label>
-              <input
-                type="number"
+              <NumberInput
                 value={inverterMaxVdc}
-                onChange={e => setInverterMaxVdc(Number(e.target.value))}
+                onChange={setInverterMaxVdc}
                 className="w-full border-[#e8e6e3] rounded text-sm py-2 focus:border-[#2d3b2d] focus:ring-[#2d3b2d]/20"
               />
             </div>
@@ -1893,19 +1882,17 @@ const SolarPVCalculator: React.FC = () => {
             </div>
             <div>
               <label className="block text-xs font-semibold text-[#888] uppercase mb-1">DC Run Length (ft)</label>
-              <input
-                type="number"
+              <NumberInput
                 value={dcLength}
-                onChange={e => setDcLength(Number(e.target.value))}
+                onChange={setDcLength}
                 className="w-full border-[#e8e6e3] rounded text-sm py-2 focus:border-[#2d3b2d] focus:ring-[#2d3b2d]/20"
               />
             </div>
             <div>
               <label className="block text-xs font-semibold text-[#888] uppercase mb-1">AC Run Length (ft)</label>
-              <input
-                type="number"
+              <NumberInput
                 value={acLength}
-                onChange={e => setAcLength(Number(e.target.value))}
+                onChange={setAcLength}
                 className="w-full border-[#e8e6e3] rounded text-sm py-2 focus:border-[#2d3b2d] focus:ring-[#2d3b2d]/20"
               />
             </div>
@@ -2055,7 +2042,7 @@ const ArcFlashCalculator: React.FC = () => {
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
               <label className="block text-xs font-semibold text-[#888] uppercase mb-1">Short Circuit Current (kA)</label>
-              <input type="number" value={shortCircuitCurrent} onChange={e => setShortCircuitCurrent(Number(e.target.value))} min="0.1" max="200" step="0.1" className="w-full border-[#e8e6e3] rounded text-sm py-2 px-3 focus:border-[#2d3b2d] focus:ring-[#2d3b2d]/20" />
+              <NumberInput value={shortCircuitCurrent} onChange={setShortCircuitCurrent} min="0.1" max="200" step="0.1" className="w-full border-[#e8e6e3] rounded text-sm py-2 px-3 focus:border-[#2d3b2d] focus:ring-[#2d3b2d]/20" />
             </div>
             <div>
               <label className="block text-xs font-semibold text-[#888] uppercase mb-1">Voltage (V)</label>
@@ -2097,7 +2084,7 @@ const ArcFlashCalculator: React.FC = () => {
             </div>
             <div>
               <label className="block text-xs font-semibold text-[#888] uppercase mb-1">Device Rating (A)</label>
-              <input type="number" value={deviceRating} onChange={e => setDeviceRating(Number(e.target.value))} min="1" max="5000" step="1" className="w-full border-[#e8e6e3] rounded text-sm py-2 px-3 focus:border-[#2d3b2d] focus:ring-[#2d3b2d]/20" />
+              <NumberInput value={deviceRating} onChange={setDeviceRating} min="1" max="5000" step="1" allowDecimal={false} className="w-full border-[#e8e6e3] rounded text-sm py-2 px-3 focus:border-[#2d3b2d] focus:ring-[#2d3b2d]/20" />
             </div>
             <div>
               <label className="block text-xs font-semibold text-[#888] uppercase mb-1">Working Distance (inches)</label>
