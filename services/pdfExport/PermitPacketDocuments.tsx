@@ -641,18 +641,34 @@ const assignYPositions = (node: RiserNode, y: number): void => {
   }
 };
 
-// Renders one node and recursively its descendants into `elements`.
-// All coordinates are SVG user units (= PDF points inside the <Svg>).
-const renderRiserNode = (
-  node: RiserNode,
-  elements: React.ReactElement[]
-): void => {
+// A text label rendered OUTSIDE the <Svg> via absolute-positioned View+Text.
+// @react-pdf v4's SVG <Text> expects <Tspan> children, not raw strings, and
+// doesn't support `textAlign`/`color`. Using flow-layout Text on top of the
+// SVG geometry avoids every SVG-text edge case and keeps the code simple.
+interface RiserLabel {
+  key: string;
+  x: number;         // left edge, in SVG user units
+  y: number;         // top edge, in SVG user units
+  width: number;     // width of the label area
+  content: string;
+  fontSize: number;
+  bold?: boolean;
+  color?: string;
+  align?: 'left' | 'center' | 'right';
+}
+
+interface RiserDraw {
+  geometry: React.ReactElement[];  // Rect + Line only
+  labels: RiserLabel[];
+}
+
+const buildRiserDraw = (node: RiserNode, draw: RiserDraw): void => {
   const x = node.x ?? 0;
   const y = node._y ?? 0;
   const fill = NODE_FILL[node.kind];
   const stroke = NODE_STROKE[node.kind];
 
-  elements.push(
+  draw.geometry.push(
     <Rect
       key={`rect-${node.id}`}
       x={x}
@@ -665,66 +681,60 @@ const renderRiserNode = (
     />
   );
 
-  const cx = x + NODE_W / 2;
-  elements.push(
-    <Text
-      key={`l1-${node.id}`}
-      x={cx}
-      y={y + 16}
-      style={{
-        fontSize: 9,
-        fontFamily: 'Helvetica-Bold',
-        textAlign: 'center',
-      }}
-    >
-      {node.line1}
-    </Text>
-  );
+  draw.labels.push({
+    key: `l1-${node.id}`,
+    x,
+    y: y + 6,
+    width: NODE_W,
+    content: node.line1,
+    fontSize: 9,
+    bold: true,
+    align: 'center',
+  });
   if (node.line2) {
-    elements.push(
-      <Text
-        key={`l2-${node.id}`}
-        x={cx}
-        y={y + 30}
-        style={{ fontSize: 8, textAlign: 'center' }}
-      >
-        {node.line2}
-      </Text>
-    );
+    draw.labels.push({
+      key: `l2-${node.id}`,
+      x,
+      y: y + 21,
+      width: NODE_W,
+      content: node.line2,
+      fontSize: 8,
+      align: 'center',
+    });
   }
   if (node.line3) {
-    elements.push(
-      <Text
-        key={`l3-${node.id}`}
-        x={cx}
-        y={y + 44}
-        style={{ fontSize: 8, color: '#555', textAlign: 'center' }}
-      >
-        {node.line3}
-      </Text>
-    );
+    draw.labels.push({
+      key: `l3-${node.id}`,
+      x,
+      y: y + 35,
+      width: NODE_W,
+      content: node.line3,
+      fontSize: 8,
+      color: '#555',
+      align: 'center',
+    });
   }
 
+  const cx = x + NODE_W / 2;
   for (const child of node.children) {
-    const parentMid = cx;
     const childMid = (child.x ?? 0) + NODE_W / 2;
     const parentBottom = y + NODE_H;
     const childTop = child._y ?? 0;
     const mid = (parentBottom + childTop) / 2;
 
-    elements.push(
+    draw.geometry.push(
       <Line
         key={`line-${node.id}-${child.id}-v1`}
-        x1={parentMid}
+        x1={cx}
         y1={parentBottom}
-        x2={parentMid}
+        x2={cx}
         y2={mid}
         strokeWidth={1}
         stroke="#333"
       />,
       <Line
         key={`line-${node.id}-${child.id}-h`}
-        x1={parentMid}
+        x1={cx}
         y1={mid}
         x2={childMid}
         y2={mid}
@@ -743,19 +753,19 @@ const renderRiserNode = (
     );
 
     if (child.feederLabel) {
-      elements.push(
-        <Text
-          key={`feeder-${child.id}`}
-          x={childMid + 4}
-          y={mid - 2}
-          style={{ fontSize: 7, color: '#222' }}
-        >
-          {child.feederLabel}
-        </Text>
-      );
+      draw.labels.push({
+        key: `feeder-${child.id}`,
+        x: childMid + 4,
+        y: mid - 8,
+        width: Math.max(NODE_W - 8, 80),
+        content: child.feederLabel,
+        fontSize: 7,
+        color: '#222',
+        align: 'left',
+      });
     }
 
-    renderRiserNode(child, elements);
+    buildRiserDraw(child, draw);
   }
 };
 
@@ -792,7 +802,7 @@ export const RiserDiagram: React.FC<RiserDiagramProps> = ({
 
   let svgWidth = NODE_W;
   let svgHeight = NODE_H;
-  const elements: React.ReactElement[] = [];
+  const draw: RiserDraw = { geometry: [], labels: [] };
 
   if (tree) {
     computeSubtreeWidth(tree);
@@ -800,11 +810,19 @@ export const RiserDiagram: React.FC<RiserDiagramProps> = ({
     assignYPositions(tree, 0);
     svgWidth = tree.subtreeWidth ?? NODE_W;
     svgHeight = depth(tree) * (NODE_H + V_GAP) - V_GAP;
-    renderRiserNode(tree, elements);
+    buildRiserDraw(tree, draw);
   }
 
-  // Landscape letter content area ~712×532pt; scale viewBox to fit width.
+  // Landscape letter content area ~712×532pt. Scale the whole diagram down
+  // proportionally if the natural tree width exceeds the available space.
   const TARGET_W = 712;
+  const TARGET_H_MAX = 460;
+  const widthScale = svgWidth > 0 ? TARGET_W / svgWidth : 1;
+  const heightScale = svgHeight > 0 ? TARGET_H_MAX / svgHeight : 1;
+  const scale = Math.min(1, widthScale, heightScale);
+  const renderedW = svgWidth * scale;
+  const renderedH = svgHeight * scale;
+
   return (
     <Page size="LETTER" orientation="landscape" style={permitStyles.page}>
       <Text style={permitStyles.sectionTitle}>RISER DIAGRAM</Text>
@@ -815,13 +833,43 @@ export const RiserDiagram: React.FC<RiserDiagramProps> = ({
       </Text>
 
       {tree ? (
-        <Svg
-          width={TARGET_W}
-          height={Math.min(460, (TARGET_W / svgWidth) * svgHeight)}
-          viewBox={`-8 -8 ${svgWidth + 16} ${svgHeight + 16}`}
+        <View
+          style={{
+            position: 'relative',
+            width: renderedW,
+            height: renderedH,
+          }}
         >
-          <G>{elements}</G>
-        </Svg>
+          <Svg
+            width={renderedW}
+            height={renderedH}
+            viewBox={`0 0 ${svgWidth} ${svgHeight}`}
+          >
+            <G>{draw.geometry}</G>
+          </Svg>
+          {draw.labels.map(label => (
+            <View
+              key={label.key}
+              style={{
+                position: 'absolute',
+                left: label.x * scale,
+                top: label.y * scale,
+                width: label.width * scale,
+              }}
+            >
+              <Text
+                style={{
+                  fontSize: Math.max(6, label.fontSize * scale),
+                  fontFamily: label.bold ? 'Helvetica-Bold' : 'Helvetica',
+                  color: label.color || '#000',
+                  textAlign: label.align || 'left',
+                }}
+              >
+                {label.content}
+              </Text>
+            </View>
+          ))}
+        </View>
       ) : (
         <Text style={{ fontSize: 10, fontStyle: 'italic', color: '#999' }}>
           No main distribution panel defined for this project.
