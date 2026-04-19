@@ -13,12 +13,16 @@ import {
   Page,
   Text,
   View,
-  StyleSheet,
-  Font
+  StyleSheet
 } from '@react-pdf/renderer';
 import type { Database } from '../../lib/database.types';
 import { calculateFeederSizing } from '../calculations/feederSizing';
 import type { FeederCalculationInput, FeederCalculationResult } from '../../types';
+import {
+  BrandBar,
+  Footer as BrandFooter,
+  themeStyles,
+} from './permitPacketTheme';
 
 // Type aliases from database schema
 type Feeder = Database['public']['Tables']['feeders']['Row'];
@@ -38,12 +42,14 @@ const styles = StyleSheet.create({
   },
   header: {
     marginBottom: 20,
-    borderBottom: '2pt solid #1f2937',
+    borderBottomWidth: 2,
+    borderBottomColor: '#1f2937',
+    borderBottomStyle: 'solid',
     paddingBottom: 10,
   },
   title: {
     fontSize: 16,
-    fontWeight: 'bold',
+    fontFamily: 'Helvetica-Bold',
     color: '#1f2937',
     marginBottom: 4,
   },
@@ -56,10 +62,12 @@ const styles = StyleSheet.create({
   },
   sectionTitle: {
     fontSize: 11,
-    fontWeight: 'bold',
+    fontFamily: 'Helvetica-Bold',
     color: '#1f2937',
     marginBottom: 8,
-    borderBottom: '1pt solid #d1d5db',
+    borderBottomWidth: 1,
+    borderBottomColor: '#d1d5db',
+    borderBottomStyle: 'solid',
     paddingBottom: 4,
   },
   table: {
@@ -71,13 +79,17 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     backgroundColor: '#f3f4f6',
     padding: 6,
-    fontWeight: 'bold',
-    borderBottom: '1pt solid #9ca3af',
+    fontFamily: 'Helvetica-Bold',
+    borderBottomWidth: 1,
+    borderBottomColor: '#9ca3af',
+    borderBottomStyle: 'solid',
   },
   tableRow: {
     flexDirection: 'row',
     padding: 6,
-    borderBottom: '0.5pt solid #e5e7eb',
+    borderBottomWidth: 0.5,
+    borderBottomColor: '#e5e7eb',
+    borderBottomStyle: 'solid',
   },
   // Column widths for voltage drop table
   col1: { width: '12%' }, // Feeder Name
@@ -96,15 +108,17 @@ const styles = StyleSheet.create({
   },
   compliantText: {
     color: '#059669',
-    fontWeight: 'bold',
+    fontFamily: 'Helvetica-Bold',
   },
   nonCompliantText: {
     color: '#dc2626',
-    fontWeight: 'bold',
+    fontFamily: 'Helvetica-Bold',
   },
   infoBox: {
     backgroundColor: '#eff6ff',
-    border: '1pt solid #3b82f6',
+    borderWidth: 1,
+    borderColor: '#3b82f6',
+    borderStyle: 'solid',
     borderRadius: 4,
     padding: 8,
     marginTop: 10,
@@ -112,7 +126,9 @@ const styles = StyleSheet.create({
   },
   warningBox: {
     backgroundColor: '#fef3c7',
-    border: '1pt solid #f59e0b',
+    borderWidth: 1,
+    borderColor: '#f59e0b',
+    borderStyle: 'solid',
     borderRadius: 4,
     padding: 8,
     marginTop: 10,
@@ -145,12 +161,16 @@ const styles = StyleSheet.create({
     fontSize: 7,
     color: '#9ca3af',
     textAlign: 'center',
-    borderTop: '0.5pt solid #e5e7eb',
+    borderTopWidth: 0.5,
+    borderTopColor: '#e5e7eb',
+    borderTopStyle: 'solid',
     paddingTop: 5,
   },
   summaryBox: {
     backgroundColor: '#f9fafb',
-    border: '1pt solid #d1d5db',
+    borderWidth: 1,
+    borderColor: '#d1d5db',
+    borderStyle: 'solid',
     borderRadius: 4,
     padding: 10,
     marginBottom: 15,
@@ -166,7 +186,7 @@ const styles = StyleSheet.create({
   },
   summaryValue: {
     fontSize: 9,
-    fontWeight: 'bold',
+    fontFamily: 'Helvetica-Bold',
     color: '#1f2937',
   },
 });
@@ -214,51 +234,94 @@ function getEquipmentName(
   return 'Unknown';
 }
 
+// Placeholder result used when a feeder calculation throws — keeps the PDF
+// rendering path alive so one bad row can't blow up the whole document.
+const makeCalcErrorResult = (message: string): FeederCalculationResult => ({
+  design_load_va: 0,
+  design_current_amps: 0,
+  phase_conductor_size: 'ERR',
+  phase_conductor_ampacity: 0,
+  neutral_conductor_size: 'ERR',
+  egc_size: 'ERR',
+  recommended_conduit_size: 'ERR',
+  voltage_drop_percent: 0,
+  voltage_drop_volts: 0,
+  meets_voltage_drop: false,
+  warnings: [`Calculation failed: ${message}`],
+  necReferences: [],
+});
+
 /**
- * Calculate voltage drop for all feeders
+ * Calculate voltage drop for all feeders. Each feeder is wrapped in a
+ * try/catch so one bad row produces a readable error row instead of
+ * crashing the whole PDF generation pipeline.
  */
 function calculateAllFeederVoltageDrops(
   feeders: Feeder[],
   panels: Panel[],
   transformers: Transformer[]
 ): FeederVoltageDropData[] {
-  return feeders.map(feeder => {
-    const fromName = getEquipmentName(feeder.source_panel_id, panels, transformers);
-    const toName = getEquipmentName(
-      feeder.destination_panel_id || feeder.destination_transformer_id,
-      panels,
-      transformers
-    );
+  return feeders.map((feeder, idx) => {
+    try {
+      const fromName = getEquipmentName(feeder.source_panel_id, panels, transformers);
+      const toName = getEquipmentName(
+        feeder.destination_panel_id || feeder.destination_transformer_id,
+        panels,
+        transformers
+      );
 
-    // Get source panel to determine voltage and phase
-    const sourcePanel = panels.find(p => p.id === feeder.source_panel_id);
-    const voltage = sourcePanel?.voltage || 120; // Default to 120V if not found
-    const phase = (sourcePanel?.phase || 1) as 1 | 3; // Default to 1-phase
+      // Get source panel to determine voltage and phase
+      const sourcePanel = panels.find(p => p.id === feeder.source_panel_id);
+      const voltage = sourcePanel?.voltage || 120;
+      const phase = (sourcePanel?.phase || 1) as 1 | 3;
 
-    // Build input for feeder sizing calculation
-    const input: FeederCalculationInput = {
-      source_voltage: voltage,
-      source_phase: phase,
-      destination_voltage: voltage,
-      destination_phase: phase,
-      total_load_va: feeder.total_load_va || 0,
-      continuous_load_va: (feeder.total_load_va || 0) * 0.8, // Assume 80% continuous (conservative)
-      noncontinuous_load_va: (feeder.total_load_va || 0) * 0.2,
-      distance_ft: feeder.distance_ft || 0,
-      conductor_material: (feeder.conductor_material as 'Cu' | 'Al') || 'Cu',
-      ambient_temperature_c: 30, // Default ambient temperature
-      num_current_carrying: 3, // Default for typical 3-conductor + ground
-      max_voltage_drop_percent: 3.0,
-    };
+      const input: FeederCalculationInput = {
+        source_voltage: voltage,
+        source_phase: phase,
+        destination_voltage: voltage,
+        destination_phase: phase,
+        total_load_va: feeder.total_load_va || 0,
+        continuous_load_va: (feeder.total_load_va || 0) * 0.8,
+        noncontinuous_load_va: (feeder.total_load_va || 0) * 0.2,
+        distance_ft: feeder.distance_ft || 0,
+        conductor_material: (feeder.conductor_material as 'Cu' | 'Al') || 'Cu',
+        ambient_temperature_c: 30,
+        num_current_carrying: 3,
+        max_voltage_drop_percent: 3.0,
+      };
 
-    const calculation = calculateFeederSizing(input);
+      const calculation = calculateFeederSizing(input);
 
-    return {
-      feeder,
-      fromName,
-      toName,
-      calculation,
-    };
+      // Defensive: calculateFeederSizing is contracted never to throw, but
+      // older code paths could return undefined fields if the input is odd.
+      // Coerce any missing fields so the render never hits `.toFixed` on
+      // undefined and the `.warnings.map` never hits undefined.
+      const safeCalc: FeederCalculationResult = {
+        ...calculation,
+        voltage_drop_percent: Number.isFinite(calculation.voltage_drop_percent)
+          ? calculation.voltage_drop_percent : 0,
+        voltage_drop_volts: Number.isFinite(calculation.voltage_drop_volts)
+          ? calculation.voltage_drop_volts : 0,
+        design_current_amps: Number.isFinite(calculation.design_current_amps)
+          ? calculation.design_current_amps : 0,
+        warnings: Array.isArray(calculation.warnings) ? calculation.warnings : [],
+      };
+
+      return { feeder, fromName, toName, calculation: safeCalc };
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      console.error(`[voltage-drop-pdf] feeder[${idx}] ${feeder?.name ?? '?'} calc threw:`, err);
+      return {
+        feeder,
+        fromName: getEquipmentName(feeder?.source_panel_id, panels, transformers),
+        toName: getEquipmentName(
+          feeder?.destination_panel_id || feeder?.destination_transformer_id,
+          panels,
+          transformers
+        ),
+        calculation: makeCalcErrorResult(message),
+      };
+    }
   });
 }
 
@@ -302,12 +365,11 @@ const Header: React.FC<{ projectName: string; projectAddress?: string }> = ({
   projectName,
   projectAddress,
 }) => (
-  <View style={styles.header}>
-    <Text style={styles.title}>VOLTAGE DROP ANALYSIS REPORT</Text>
-    <Text style={styles.subtitle}>{projectName}</Text>
-    {projectAddress && <Text style={styles.subtitle}>{projectAddress}</Text>}
-    <Text style={styles.subtitle}>
-      Generated: {new Date().toLocaleDateString()} {new Date().toLocaleTimeString()}
+  <View style={themeStyles.titleBlock}>
+    <Text style={themeStyles.docTitle}>Voltage Drop Analysis Report</Text>
+    <Text style={themeStyles.docSubtitle}>
+      {projectName}
+      {projectAddress ? ` \u2022 ${projectAddress}` : ''}
     </Text>
   </View>
 );
@@ -323,7 +385,7 @@ const SummaryBox: React.FC<{ stats: ReturnType<typeof getSummaryStats> }> = ({ s
       <Text style={styles.summaryValue}>{stats.totalFeeders}</Text>
     </View>
     <View style={styles.summaryRow}>
-      <Text style={styles.summaryLabel}>Compliant (≤3%):</Text>
+      <Text style={styles.summaryLabel}>{`Compliant (<=3%):`}</Text>
       <Text style={[styles.summaryValue, styles.compliantText]}>
         {stats.compliantFeeders} ({stats.totalFeeders > 0 ? ((stats.compliantFeeders / stats.totalFeeders) * 100).toFixed(0) : 0}%)
       </Text>
@@ -364,7 +426,7 @@ const VoltageDropTable: React.FC<{ feederData: FeederVoltageDropData[] }> = ({ f
       {/* Header Row */}
       <View style={styles.tableHeader}>
         <Text style={[styles.col1, styles.cellCenter]}>Feeder</Text>
-        <Text style={[styles.col2, styles.cellCenter]}>From → To</Text>
+        <Text style={[styles.col2, styles.cellCenter]}>From -&gt; To</Text>
         <Text style={[styles.col3, styles.cellCenter]}>Distance</Text>
         <Text style={[styles.col4, styles.cellCenter]}>Conductor</Text>
         <Text style={[styles.col5, styles.cellCenter]}>Current</Text>
@@ -376,22 +438,22 @@ const VoltageDropTable: React.FC<{ feederData: FeederVoltageDropData[] }> = ({ f
       {/* Data Rows */}
       {feederData.map((data, index) => (
         <View key={index} style={styles.tableRow}>
-          <Text style={styles.col1}>{data.feeder.name}</Text>
-          <Text style={styles.col2}>{data.fromName} → {data.toName}</Text>
+          <Text style={styles.col1}>{String(data.feeder?.name ?? '')}</Text>
+          <Text style={styles.col2}>{`${data.fromName} -> ${data.toName}`}</Text>
           <Text style={[styles.col3, styles.cellCenter]}>
-            {data.feeder.distance_ft || 0} ft
+            {`${data.feeder?.distance_ft || 0} ft`}
           </Text>
           <Text style={styles.col4}>
-            {data.calculation.phase_conductor_size || 'N/A'} {data.feeder.conductor_material || 'Cu'}
+            {`${data.calculation.phase_conductor_size || 'N/A'} ${data.feeder?.conductor_material || 'Cu'}`}
           </Text>
           <Text style={[styles.col5, styles.cellCenter]}>
-            {(data.calculation.design_current_amps || 0).toFixed(1)} A
+            {`${(data.calculation.design_current_amps || 0).toFixed(1)} A`}
           </Text>
           <Text style={[styles.col6, styles.cellCenter]}>
             {(data.calculation.voltage_drop_volts || 0).toFixed(2)}
           </Text>
           <Text style={[styles.col7, styles.cellCenter]}>
-            {(data.calculation.voltage_drop_percent || 0).toFixed(2)}%
+            {`${(data.calculation.voltage_drop_percent || 0).toFixed(2)}%`}
           </Text>
           <Text
             style={[
@@ -400,7 +462,7 @@ const VoltageDropTable: React.FC<{ feederData: FeederVoltageDropData[] }> = ({ f
               data.calculation.meets_voltage_drop ? styles.compliantText : styles.nonCompliantText,
             ]}
           >
-            {data.calculation.meets_voltage_drop ? '✓ Compliant' : '✗ Non-Compliant'}
+            {data.calculation.meets_voltage_drop ? 'Compliant' : 'Non-Compliant'}
           </Text>
         </View>
       ))}
@@ -418,7 +480,7 @@ const WarningsSection: React.FC<{ feederData: FeederVoltageDropData[] }> = ({ fe
     return (
       <View style={styles.infoBox}>
         <Text style={styles.infoText}>
-          ✓ All feeders meet NEC 210.19 voltage drop recommendation (≤3%).
+          All feeders meet NEC 210.19 voltage drop recommendation (within 3%).
         </Text>
       </View>
     );
@@ -426,17 +488,23 @@ const WarningsSection: React.FC<{ feederData: FeederVoltageDropData[] }> = ({ fe
 
   return (
     <View style={styles.section}>
-      <Text style={styles.sectionTitle}>⚠️ Voltage Drop Warnings</Text>
-      {nonCompliantFeeders.map((data, index) => (
-        <View key={index} style={styles.warningBox}>
-          <Text style={styles.warningText}>
-            {data.feeder.name}: {data.calculation.voltage_drop_percent.toFixed(2)}% voltage drop exceeds 3% recommendation
-          </Text>
-          {data.calculation.warnings.map((warning, wIndex) => (
-            <Text key={wIndex} style={styles.warningText}>• {warning}</Text>
-          ))}
-        </View>
-      ))}
+      <Text style={styles.sectionTitle}>Voltage Drop Warnings</Text>
+      {nonCompliantFeeders.map((data, index) => {
+        const pct = Number.isFinite(data.calculation.voltage_drop_percent)
+          ? data.calculation.voltage_drop_percent : 0;
+        const warnings = Array.isArray(data.calculation.warnings)
+          ? data.calculation.warnings : [];
+        return (
+          <View key={index} style={styles.warningBox}>
+            <Text style={styles.warningText}>
+              {`${data.feeder?.name ?? ''}: ${pct.toFixed(2)}% voltage drop exceeds 3% recommendation`}
+            </Text>
+            {warnings.map((warning, wIndex) => (
+              <Text key={wIndex} style={styles.warningText}>{`- ${String(warning ?? '')}`}</Text>
+            ))}
+          </View>
+        );
+      })}
     </View>
   );
 };
@@ -491,7 +559,7 @@ const Footer: React.FC = () => (
 /**
  * Main Voltage Drop Report PDF Document
  */
-export const VoltageDropDocument: React.FC<VoltageDropDocumentProps> = ({
+export const VoltageDropPages: React.FC<VoltageDropDocumentProps> = ({
   projectName,
   projectAddress,
   feeders,
@@ -504,29 +572,29 @@ export const VoltageDropDocument: React.FC<VoltageDropDocumentProps> = ({
   const stats = getSummaryStats(feederData);
 
   return (
-    <Document>
-      <Page size="LETTER" orientation="portrait" style={styles.page}>
-        {/* Header */}
-        <Header projectName={projectName} projectAddress={projectAddress} />
+    <Page size="LETTER" orientation="portrait" style={themeStyles.page}>
+      <BrandBar pageLabel="VOLTAGE DROP" />
 
-        {/* Summary Box */}
-        <SummaryBox stats={stats} />
+      <Header projectName={projectName} projectAddress={projectAddress} />
 
-        {/* Voltage Drop Table */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Feeder Voltage Drop Analysis</Text>
-          <VoltageDropTable feederData={feederData} />
-        </View>
+      <SummaryBox stats={stats} />
 
-        {/* Warnings Section */}
-        <WarningsSection feederData={feederData} />
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>Feeder Voltage Drop Analysis</Text>
+        <VoltageDropTable feederData={feederData} />
+      </View>
 
-        {/* NEC References */}
-        {includeNECReferences && <NECReferencesSection />}
+      <WarningsSection feederData={feederData} />
 
-        {/* Footer */}
-        <Footer />
-      </Page>
-    </Document>
+      {includeNECReferences && <NECReferencesSection />}
+
+      <BrandFooter projectName={projectName} />
+    </Page>
   );
 };
+
+export const VoltageDropDocument: React.FC<VoltageDropDocumentProps> = (props) => (
+  <Document>
+    <VoltageDropPages {...props} />
+  </Document>
+);

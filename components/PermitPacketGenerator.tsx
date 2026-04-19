@@ -86,10 +86,16 @@ export const PermitPacketGenerator: React.FC<PermitPacketGeneratorProps> = ({ pr
 
   const dataLoading = panelsLoading || circuitsLoading || feedersLoading || transformersLoading || groundingLoading;
 
-  // Validation
-  const canGenerate = 
-    currentProject &&
+  // Validation — contractor license + scope of work are both marked required
+  // in the UI (red asterisk). Gate generation on them so the submittal-quality
+  // promise holds (most AHJs reject packets missing either).
+  const hasLicense = contractorLicense.trim().length > 0;
+  const hasScope = scopeOfWork.trim().length > 0;
+  const canGenerate =
+    !!currentProject &&
     panels.length > 0 &&
+    hasLicense &&
+    hasScope &&
     !dataLoading;
 
   const handleGenerate = async () => {
@@ -537,11 +543,32 @@ export const PermitPacketGenerator: React.FC<PermitPacketGeneratorProps> = ({ pr
 
       {/* Error Message */}
       {error && (
-        <div className="bg-red-50 border border-red-200 rounded-lg p-4 flex items-center gap-3">
-          <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0" />
-          <div>
-            <p className="font-medium text-red-900">Error</p>
-            <p className="text-sm text-red-700">{error}</p>
+        <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+          <div className="flex items-start gap-3">
+            <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center justify-between mb-2">
+                <p className="font-medium text-red-900">Error generating permit packet</p>
+                <button
+                  type="button"
+                  className="text-xs text-red-700 underline hover:text-red-900"
+                  onClick={() => {
+                    if (navigator.clipboard) {
+                      navigator.clipboard.writeText(error).catch(() => {});
+                    }
+                  }}
+                >
+                  Copy
+                </button>
+              </div>
+              <pre className="text-xs text-red-800 bg-red-100/50 rounded p-3 overflow-auto max-h-80 whitespace-pre-wrap font-mono">
+                {error}
+              </pre>
+              <p className="text-xs text-red-600 mt-2">
+                Please open your browser devtools console for additional logs (prefixed
+                with <code className="font-mono">[permit-packet]</code>).
+              </p>
+            </div>
           </div>
         </div>
       )}
@@ -587,6 +614,8 @@ export const PermitPacketGenerator: React.FC<PermitPacketGeneratorProps> = ({ pr
               <p className="font-medium mb-1">Cannot generate permit packet</p>
               <ul className="list-disc list-inside space-y-1">
                 {panels.length === 0 && <li>At least one panel is required</li>}
+                {!hasLicense && <li>Contractor License is required</li>}
+                {!hasScope && <li>Scope of Work is required</li>}
               </ul>
             </div>
           </div>

@@ -24,6 +24,11 @@ import React from 'react';
 import { Page, Text, View, StyleSheet, Document } from '@react-pdf/renderer';
 import type { Jurisdiction } from '../../types';
 import { DOCUMENT_LABELS, CALCULATION_LABELS } from '../../types';
+import {
+  BrandBar,
+  Footer as BrandFooter,
+  themeStyles,
+} from './permitPacketTheme';
 
 // ============================================================================
 // STYLES
@@ -37,7 +42,7 @@ const styles = StyleSheet.create({
   },
   header: {
     fontSize: 16,
-    fontWeight: 'bold',
+    fontFamily: 'Helvetica-Bold',
     marginBottom: 20,
     borderBottom: '2pt solid black',
     paddingBottom: 8,
@@ -47,7 +52,7 @@ const styles = StyleSheet.create({
   },
   sectionTitle: {
     fontSize: 11,
-    fontWeight: 'bold',
+    fontFamily: 'Helvetica-Bold',
     marginBottom: 8,
     color: '#1e40af',  // Blue-700
   },
@@ -105,27 +110,21 @@ interface JurisdictionRequirementsDocumentProps {
   projectName: string;
 }
 
-export const JurisdictionRequirementsDocument: React.FC<JurisdictionRequirementsDocumentProps> = ({
+export const JurisdictionRequirementsPages: React.FC<JurisdictionRequirementsDocumentProps> = ({
   jurisdiction,
   projectName,
 }) => {
   return (
-    <Document>
-      <Page size="LETTER" orientation="portrait" style={styles.page}>
-
-        {/* Header */}
-        <Text style={styles.header}>
-          JURISDICTION REQUIREMENTS CHECKLIST
-        </Text>
-
-        {/* Project Info */}
-        <Text style={{ fontSize: 10, marginBottom: 15 }}>
-          Project: {projectName}
-        </Text>
+    <Page size="LETTER" orientation="portrait" style={themeStyles.page}>
+        <BrandBar pageLabel="JURISDICTION REQUIREMENTS" />
+        <View style={themeStyles.titleBlock}>
+          <Text style={themeStyles.docTitle}>Jurisdiction Requirements Checklist</Text>
+          <Text style={themeStyles.docSubtitle}>{projectName}</Text>
+        </View>
 
         {/* Jurisdiction Info Box */}
         <View style={styles.jurisdictionInfo}>
-          <Text style={{ fontSize: 11, fontWeight: 'bold', marginBottom: 4 }}>
+          <Text style={{ fontSize: 11, fontFamily: 'Helvetica-Bold', marginBottom: 4 }}>
             {jurisdiction.jurisdiction_name}
           </Text>
           {jurisdiction.ahj_name && (
@@ -173,7 +172,7 @@ export const JurisdictionRequirementsDocument: React.FC<JurisdictionRequirements
         {/* Special Notes Section */}
         {jurisdiction.notes && (
           <View style={styles.notes}>
-            <Text style={{ fontSize: 8, fontWeight: 'bold', marginBottom: 4 }}>
+            <Text style={{ fontSize: 8, fontFamily: 'Helvetica-Bold', marginBottom: 4 }}>
               Special Requirements:
             </Text>
             <Text style={{ fontSize: 8 }}>
@@ -185,7 +184,7 @@ export const JurisdictionRequirementsDocument: React.FC<JurisdictionRequirements
         {/* Data Source Section */}
         {(jurisdiction.data_source || jurisdiction.source_url) && (
           <View style={{ marginTop: 15, padding: 10, backgroundColor: '#f9fafb', borderRadius: 4 }}>
-            <Text style={{ fontSize: 8, fontWeight: 'bold', marginBottom: 4, color: '#374151' }}>
+            <Text style={{ fontSize: 8, fontFamily: 'Helvetica-Bold', marginBottom: 4, color: '#374151' }}>
               Data Source:
             </Text>
             {jurisdiction.data_source && (
@@ -206,15 +205,13 @@ export const JurisdictionRequirementsDocument: React.FC<JurisdictionRequirements
           </View>
         )}
 
-        {/* Footer Disclaimer */}
-        <View style={styles.footer}>
-          <Text>
-            This checklist is for reference only. Verify requirements with{' '}
-            {jurisdiction.ahj_name || 'your local Authority Having Jurisdiction (AHJ)'}{' '}
-            before submittal.
-          </Text>
-        </View>
+        <BrandFooter projectName={projectName} />
       </Page>
-    </Document>
   );
 };
+
+export const JurisdictionRequirementsDocument: React.FC<JurisdictionRequirementsDocumentProps> = (props) => (
+  <Document>
+    <JurisdictionRequirementsPages {...props} />
+  </Document>
+);

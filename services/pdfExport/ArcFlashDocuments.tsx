@@ -6,6 +6,11 @@
 import React from 'react';
 import { Document, Page, Text, View, StyleSheet } from '@react-pdf/renderer';
 import type { ArcFlashResult } from '../calculations/arcFlash';
+import {
+  BrandBar,
+  Footer as BrandFooter,
+  themeStyles,
+} from './permitPacketTheme';
 
 const styles = StyleSheet.create({
   page: {
@@ -21,7 +26,7 @@ const styles = StyleSheet.create({
   },
   title: {
     fontSize: 18,
-    fontWeight: 'bold',
+    fontFamily: 'Helvetica-Bold',
     marginBottom: 5,
   },
   subtitle: {
@@ -35,7 +40,7 @@ const styles = StyleSheet.create({
   },
   sectionTitle: {
     fontSize: 12,
-    fontWeight: 'bold',
+    fontFamily: 'Helvetica-Bold',
     marginBottom: 8,
     paddingBottom: 3,
     borderBottomWidth: 1,
@@ -56,7 +61,7 @@ const styles = StyleSheet.create({
   },
   value: {
     fontSize: 10,
-    fontWeight: 'bold',
+    fontFamily: 'Helvetica-Bold',
   },
   table: {
     marginTop: 10,
@@ -69,7 +74,7 @@ const styles = StyleSheet.create({
   },
   tableHeader: {
     backgroundColor: '#f3f4f6',
-    fontWeight: 'bold',
+    fontFamily: 'Helvetica-Bold',
   },
   tableCol: {
     fontSize: 9,
@@ -97,7 +102,7 @@ const styles = StyleSheet.create({
   },
   hazardText: {
     fontSize: 10,
-    fontWeight: 'bold',
+    fontFamily: 'Helvetica-Bold',
   },
   complianceBox: {
     padding: 10,
@@ -138,7 +143,7 @@ interface ArcFlashDocumentProps {
   };
 }
 
-export const ArcFlashDocument: React.FC<ArcFlashDocumentProps> = ({
+export const ArcFlashPages: React.FC<ArcFlashDocumentProps> = ({
   projectName,
   projectAddress,
   equipmentName,
@@ -154,26 +159,33 @@ export const ArcFlashDocument: React.FC<ArcFlashDocumentProps> = ({
   };
 
   const getHazardLabel = () => {
-    if (result.incidentEnergy >= 40) return '🔴 DANGER - Extreme Hazard';
-    if (result.incidentEnergy >= 8) return '🟡 WARNING - High Hazard';
-    return '🟢 CAUTION - Moderate Hazard';
+    if (result.incidentEnergy >= 40) return 'DANGER - Extreme Hazard';
+    if (result.incidentEnergy >= 8) return 'WARNING - High Hazard';
+    return 'CAUTION - Moderate Hazard';
+  };
+
+  const getHazardColor = () => {
+    if (result.incidentEnergy >= 40) return '#991b1b';
+    if (result.incidentEnergy >= 8) return '#92400e';
+    return '#166534';
   };
 
   return (
-    <Document>
-      <Page size="LETTER" style={styles.page}>
-        {/* Header */}
-        <View style={styles.header}>
-          <Text style={styles.title}>ARC FLASH HAZARD ANALYSIS</Text>
-          <Text style={styles.subtitle}>{projectName}</Text>
-          {projectAddress && <Text style={styles.subtitle}>{projectAddress}</Text>}
-          <Text style={{ fontSize: 10, marginTop: 5 }}>Equipment: {equipmentName}</Text>
+    <Page size="LETTER" style={themeStyles.page}>
+        <BrandBar pageLabel="ARC FLASH ANALYSIS" />
+        <View style={themeStyles.titleBlock}>
+          <Text style={themeStyles.docTitle}>Arc Flash Hazard Analysis</Text>
+          <Text style={themeStyles.docSubtitle}>
+            {projectName}
+            {projectAddress ? ` \u2022 ${projectAddress}` : ''}
+            {` \u2022 ${equipmentName}`}
+          </Text>
         </View>
 
         {/* Incident Energy Result */}
         <View style={[styles.hazardBox, getHazardStyle()]}>
-          <Text style={styles.hazardText}>{getHazardLabel()}</Text>
-          <Text style={{ fontSize: 14, fontWeight: 'bold', marginTop: 5 }}>
+          <Text style={[styles.hazardText, { color: getHazardColor() }]}>{getHazardLabel()}</Text>
+          <Text style={{ fontSize: 14, fontFamily: 'Helvetica-Bold', marginTop: 5 }}>
             Incident Energy: {result.incidentEnergy.toFixed(2)} cal/cm²
           </Text>
           <Text style={{ fontSize: 10, marginTop: 3 }}>
@@ -252,7 +264,7 @@ export const ArcFlashDocument: React.FC<ArcFlashDocumentProps> = ({
 
         {/* NFPA 70E Compliance */}
         <View style={styles.complianceBox}>
-          <Text style={{ fontSize: 10, fontWeight: 'bold', color: '#1e40af', marginBottom: 5 }}>
+          <Text style={{ fontSize: 10, fontFamily: 'Helvetica-Bold', color: '#1e40af', marginBottom: 5 }}>
             NFPA 70E Compliance Notes:
           </Text>
           <Text style={styles.complianceText}>
@@ -271,8 +283,8 @@ export const ArcFlashDocument: React.FC<ArcFlashDocumentProps> = ({
 
         {/* Warning Label */}
         <View style={{ marginTop: 20, padding: 12, backgroundColor: '#fef3c7', borderRadius: 4, borderWidth: 1, borderColor: '#f59e0b' }}>
-          <Text style={{ fontSize: 9, fontWeight: 'bold', marginBottom: 4, color: '#92400e' }}>
-            ⚠️ ARC FLASH HAZARD LABEL REQUIRED
+          <Text style={{ fontSize: 9, fontFamily: 'Helvetica-Bold', marginBottom: 4, color: '#92400e' }}>
+            ARC FLASH HAZARD LABEL REQUIRED
           </Text>
           <Text style={{ fontSize: 8, color: '#92400e' }}>
             Per NFPA 70E 130.5, equipment must be labeled with arc flash boundary,
@@ -280,16 +292,13 @@ export const ArcFlashDocument: React.FC<ArcFlashDocumentProps> = ({
           </Text>
         </View>
 
-        {/* Footer */}
-        <View style={styles.footer}>
-          <Text>
-            Arc Flash Analysis per IEEE 1584-2018 and NFPA 70E-2021
-          </Text>
-          <Text style={{ marginTop: 3 }}>
-            This analysis is valid only for the specified equipment configuration and operating conditions
-          </Text>
-        </View>
+        <BrandFooter projectName={projectName} />
       </Page>
-    </Document>
   );
 };
+
+export const ArcFlashDocument: React.FC<ArcFlashDocumentProps> = (props) => (
+  <Document>
+    <ArcFlashPages {...props} />
+  </Document>
+);

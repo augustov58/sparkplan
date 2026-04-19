@@ -13,7 +13,7 @@
  */
 
 import React from 'react';
-import { Document, Page, Text, View, StyleSheet, Font } from '@react-pdf/renderer';
+import { Document, Page, Text, View, StyleSheet } from '@react-pdf/renderer';
 import type { Project } from '../../types';
 import type {
   CommercialLoadResult,
@@ -25,14 +25,7 @@ import type {
 } from '../calculations/commercialLoad';
 import { OCCUPANCY_LABELS, LIGHTING_UNIT_LOAD } from '../calculations/commercialLoad';
 
-// Register Helvetica for professional typography (matches other PDFs in this codebase)
-Font.register({
-  family: 'Helvetica',
-  fonts: [
-    { src: 'Helvetica' },
-    { src: 'Helvetica-Bold', fontWeight: 'bold' },
-  ],
-});
+// Helvetica + Helvetica-Bold are built-in standard PDF fonts; do not register.
 
 // ==================== STYLES ====================
 
