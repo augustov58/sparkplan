@@ -256,6 +256,10 @@ export function usePanels(projectId: string | undefined): UsePanelsReturn {
       }
 
       showToast.success(toastMessages.panel.created);
+      // Notify peer usePanels instances (e.g. FeederManager dropdown) to refetch.
+      // Supabase realtime can miss the second subscriber when two components share
+      // a channel name; this event bus guarantees every instance on the page refreshes.
+      dataRefreshEvents.emit('panels');
       return data;
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to create panel');
@@ -278,6 +282,7 @@ export function usePanels(projectId: string | undefined): UsePanelsReturn {
         throw error;
       }
       showToast.success(toastMessages.panel.updated);
+      dataRefreshEvents.emit('panels');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to update panel');
       showToast.error(toastMessages.panel.error);
@@ -290,6 +295,7 @@ export function usePanels(projectId: string | undefined): UsePanelsReturn {
 
       if (error) throw error;
       showToast.success(toastMessages.panel.deleted);
+      dataRefreshEvents.emit('panels');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to delete panel');
       showToast.error(toastMessages.panel.error);
