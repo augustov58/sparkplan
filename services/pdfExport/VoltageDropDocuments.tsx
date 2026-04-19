@@ -18,6 +18,11 @@ import {
 import type { Database } from '../../lib/database.types';
 import { calculateFeederSizing } from '../calculations/feederSizing';
 import type { FeederCalculationInput, FeederCalculationResult } from '../../types';
+import {
+  BrandBar,
+  Footer as BrandFooter,
+  themeStyles,
+} from './permitPacketTheme';
 
 // Type aliases from database schema
 type Feeder = Database['public']['Tables']['feeders']['Row'];
@@ -360,12 +365,11 @@ const Header: React.FC<{ projectName: string; projectAddress?: string }> = ({
   projectName,
   projectAddress,
 }) => (
-  <View style={styles.header}>
-    <Text style={styles.title}>VOLTAGE DROP ANALYSIS REPORT</Text>
-    <Text style={styles.subtitle}>{projectName}</Text>
-    {projectAddress && <Text style={styles.subtitle}>{projectAddress}</Text>}
-    <Text style={styles.subtitle}>
-      Generated: {new Date().toLocaleDateString()} {new Date().toLocaleTimeString()}
+  <View style={themeStyles.titleBlock}>
+    <Text style={themeStyles.docTitle}>Voltage Drop Analysis Report</Text>
+    <Text style={themeStyles.docSubtitle}>
+      {projectName}
+      {projectAddress ? ` \u2022 ${projectAddress}` : ''}
     </Text>
   </View>
 );
@@ -381,7 +385,7 @@ const SummaryBox: React.FC<{ stats: ReturnType<typeof getSummaryStats> }> = ({ s
       <Text style={styles.summaryValue}>{stats.totalFeeders}</Text>
     </View>
     <View style={styles.summaryRow}>
-      <Text style={styles.summaryLabel}>Compliant (≤3%):</Text>
+      <Text style={styles.summaryLabel}>{`Compliant (<=3%):`}</Text>
       <Text style={[styles.summaryValue, styles.compliantText]}>
         {stats.compliantFeeders} ({stats.totalFeeders > 0 ? ((stats.compliantFeeders / stats.totalFeeders) * 100).toFixed(0) : 0}%)
       </Text>
@@ -422,7 +426,7 @@ const VoltageDropTable: React.FC<{ feederData: FeederVoltageDropData[] }> = ({ f
       {/* Header Row */}
       <View style={styles.tableHeader}>
         <Text style={[styles.col1, styles.cellCenter]}>Feeder</Text>
-        <Text style={[styles.col2, styles.cellCenter]}>From → To</Text>
+        <Text style={[styles.col2, styles.cellCenter]}>From -&gt; To</Text>
         <Text style={[styles.col3, styles.cellCenter]}>Distance</Text>
         <Text style={[styles.col4, styles.cellCenter]}>Conductor</Text>
         <Text style={[styles.col5, styles.cellCenter]}>Current</Text>
@@ -568,27 +572,23 @@ export const VoltageDropPages: React.FC<VoltageDropDocumentProps> = ({
   const stats = getSummaryStats(feederData);
 
   return (
-    <Page size="LETTER" orientation="portrait" style={styles.page}>
-      {/* Header */}
+    <Page size="LETTER" orientation="portrait" style={themeStyles.page}>
+      <BrandBar pageLabel="VOLTAGE DROP" />
+
       <Header projectName={projectName} projectAddress={projectAddress} />
 
-      {/* Summary Box */}
       <SummaryBox stats={stats} />
 
-      {/* Voltage Drop Table */}
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Feeder Voltage Drop Analysis</Text>
         <VoltageDropTable feederData={feederData} />
       </View>
 
-      {/* Warnings Section */}
       <WarningsSection feederData={feederData} />
 
-      {/* NEC References */}
       {includeNECReferences && <NECReferencesSection />}
 
-      {/* Footer */}
-      <Footer />
+      <BrandFooter projectName={projectName} />
     </Page>
   );
 };

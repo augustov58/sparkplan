@@ -6,6 +6,12 @@
 import React from 'react';
 import { Document, Page, Text, View, StyleSheet } from '@react-pdf/renderer';
 import type { ShortCircuitCalculation } from '../../lib/database.types';
+import {
+  BrandBar,
+  Footer as BrandFooter,
+  phaseLabel,
+  themeStyles,
+} from './permitPacketTheme';
 
 // Helvetica + Helvetica-Bold are built-in standard PDF fonts; do not register.
 
@@ -196,13 +202,15 @@ export const ShortCircuitCalculationPages: React.FC<CalcProps> = ({
   const results = calculation.results as unknown as ShortCircuitResult;
 
   return (
-    <Page size="LETTER" style={styles.page}>
-        {/* Header */}
-        <View style={styles.header}>
-          <Text style={styles.title}>SHORT CIRCUIT CALCULATION REPORT</Text>
-          <Text style={styles.subtitle}>{projectName}</Text>
-          {projectAddress && <Text style={styles.subtitle}>{projectAddress}</Text>}
-          <Text style={styles.subtitle}>{calculation.location_name}</Text>
+    <Page size="LETTER" style={themeStyles.page}>
+        <BrandBar pageLabel="SHORT CIRCUIT ANALYSIS" />
+        <View style={themeStyles.titleBlock}>
+          <Text style={themeStyles.docTitle}>Short Circuit Calculation Report</Text>
+          <Text style={themeStyles.docSubtitle}>
+            {projectName}
+            {projectAddress ? ` \u2022 ${projectAddress}` : ''}
+            {calculation.location_name ? ` \u2022 ${calculation.location_name}` : ''}
+          </Text>
         </View>
 
         {/* Results Summary */}
@@ -235,7 +243,7 @@ export const ShortCircuitCalculationPages: React.FC<CalcProps> = ({
                 <View style={styles.tableRow}>
                   <Text style={styles.tableCellLabel}>Service Rating:</Text>
                   <Text style={styles.tableCellValue}>
-                    {calculation.service_amps}A, {calculation.service_voltage}V, {calculation.service_phase}φ
+                    {calculation.service_amps}A, {calculation.service_voltage}V, {phaseLabel(calculation.service_phase)}
                   </Text>
                 </View>
                 {calculation.transformer_kva && (
@@ -290,7 +298,7 @@ export const ShortCircuitCalculationPages: React.FC<CalcProps> = ({
                 <View style={styles.tableRow}>
                   <Text style={styles.tableCellLabel}>Feeder Voltage/Phase:</Text>
                   <Text style={styles.tableCellValue}>
-                    {calculation.feeder_voltage}V, {calculation.feeder_phase}φ
+                    {calculation.feeder_voltage}V, {phaseLabel(calculation.feeder_phase)}
                   </Text>
                 </View>
                 <View style={styles.tableRow}>
@@ -315,12 +323,12 @@ export const ShortCircuitCalculationPages: React.FC<CalcProps> = ({
             {(calculation.calculation_type === 'panel' || (calculation.calculation_type === 'service' && results.details.conductorImpedance && results.details.conductorImpedance > 0)) && (
               <View style={styles.tableRow}>
                 <Text style={styles.tableCellLabel}>Conductor Impedance (Z):</Text>
-                <Text style={styles.tableCellValue}>{results.details.conductorImpedance?.toFixed(4)} Ω</Text>
+                <Text style={styles.tableCellValue}>{results.details.conductorImpedance?.toFixed(4)} ohms</Text>
               </View>
             )}
             <View style={styles.tableRow}>
               <Text style={styles.tableCellLabel}>Total Impedance (Ztotal):</Text>
-              <Text style={styles.tableCellValue}>{results.details.totalImpedance.toFixed(4)} Ω</Text>
+              <Text style={styles.tableCellValue}>{results.details.totalImpedance.toFixed(4)} ohms</Text>
             </View>
             <View style={styles.tableRow}>
               <Text style={styles.tableCellLabel}>Fault Current at Point:</Text>
@@ -339,8 +347,17 @@ export const ShortCircuitCalculationPages: React.FC<CalcProps> = ({
         <View style={[styles.complianceBox, results.compliance.compliant ? styles.complianceBoxPass : styles.complianceBoxFail]}>
           <Text style={styles.complianceTitle}>{results.compliance.necArticle}</Text>
           <Text style={styles.complianceText}>{results.compliance.message}</Text>
-          <Text style={[styles.complianceText, { marginTop: 5, fontFamily: 'Helvetica-Bold' }]}>
-            Status: {results.compliance.compliant ? '✓ COMPLIANT' : '✗ REQUIRES REVIEW'}
+          <Text
+            style={[
+              styles.complianceText,
+              {
+                marginTop: 5,
+                fontFamily: 'Helvetica-Bold',
+                color: results.compliance.compliant ? '#166534' : '#991b1b',
+              },
+            ]}
+          >
+            Status: {results.compliance.compliant ? 'COMPLIANT' : 'REQUIRES REVIEW'}
           </Text>
         </View>
 
@@ -352,10 +369,7 @@ export const ShortCircuitCalculationPages: React.FC<CalcProps> = ({
           </View>
         )}
 
-        {/* Footer */}
-        <Text style={styles.footer}>
-          Generated by SparkPlan • {new Date().toLocaleDateString()} • Page 1 of 1
-        </Text>
+        <BrandFooter projectName={projectName} />
       </Page>
   );
 };
@@ -382,7 +396,8 @@ export const ShortCircuitSystemReport: React.FC<SystemReportProps> = ({
   return (
     <Document>
       {/* Cover Page */}
-      <Page size="LETTER" style={styles.page}>
+      <Page size="LETTER" style={themeStyles.page}>
+        <BrandBar pageLabel="SHORT CIRCUIT ANALYSIS" />
         <View style={styles.coverPage}>
           <Text style={styles.coverTitle}>SHORT CIRCUIT ANALYSIS</Text>
           <Text style={styles.coverSubtitle}>{projectName}</Text>
@@ -394,6 +409,7 @@ export const ShortCircuitSystemReport: React.FC<SystemReportProps> = ({
             {calculations.length} Calculation{calculations.length !== 1 ? 's' : ''}
           </Text>
         </View>
+        <BrandFooter projectName={projectName} />
       </Page>
 
       {/* Individual Calculation Pages */}
@@ -402,13 +418,13 @@ export const ShortCircuitSystemReport: React.FC<SystemReportProps> = ({
         const panel = panels?.find(p => p.id === calc.panel_id);
 
         return (
-          <Page key={calc.id} size="LETTER" style={styles.page}>
-            {/* Header */}
-            <View style={styles.header}>
-              <Text style={styles.title}>{calc.location_name}</Text>
+          <Page key={calc.id} size="LETTER" style={themeStyles.page}>
+            <BrandBar pageLabel="SHORT CIRCUIT ANALYSIS" />
+            <View style={themeStyles.titleBlock}>
+              <Text style={themeStyles.docTitle}>{calc.location_name}</Text>
               {panel && (
-                <Text style={styles.subtitle}>
-                  {panel.bus_rating}A Panel • {panel.voltage}V • {panel.phase}φ
+                <Text style={themeStyles.docSubtitle}>
+                  {`${panel.bus_rating}A Panel \u2022 ${panel.voltage}V \u2022 ${phaseLabel(panel.phase)}`}
                 </Text>
               )}
             </View>
@@ -426,8 +442,13 @@ export const ShortCircuitSystemReport: React.FC<SystemReportProps> = ({
               </View>
               <View style={styles.gridItem}>
                 <Text style={styles.label}>COMPLIANCE</Text>
-                <Text style={styles.value}>
-                  {results.compliance.compliant ? '✓ Pass' : '✗ Review'}
+                <Text
+                  style={[
+                    styles.value,
+                    { color: results.compliance.compliant ? '#166534' : '#991b1b' },
+                  ]}
+                >
+                  {results.compliance.compliant ? 'Pass' : 'Review'}
                 </Text>
               </View>
             </View>
@@ -441,7 +462,7 @@ export const ShortCircuitSystemReport: React.FC<SystemReportProps> = ({
                     <View style={styles.tableRow}>
                       <Text style={styles.tableCellLabel}>Service:</Text>
                       <Text style={styles.tableCellValue}>
-                        {calc.service_amps}A, {calc.service_voltage}V, {calc.service_phase}φ
+                        {calc.service_amps}A, {calc.service_voltage}V, {phaseLabel(calc.service_phase)}
                       </Text>
                     </View>
                     {calc.transformer_kva && (
@@ -479,7 +500,7 @@ export const ShortCircuitSystemReport: React.FC<SystemReportProps> = ({
                 )}
                 <View style={styles.tableRow}>
                   <Text style={styles.tableCellLabel}>Total Impedance:</Text>
-                  <Text style={styles.tableCellValue}>{results.details.totalImpedance.toFixed(4)} Ω</Text>
+                  <Text style={styles.tableCellValue}>{results.details.totalImpedance.toFixed(4)} ohms</Text>
                 </View>
               </View>
             </View>
@@ -497,10 +518,7 @@ export const ShortCircuitSystemReport: React.FC<SystemReportProps> = ({
               </View>
             )}
 
-            {/* Footer */}
-            <Text style={styles.footer}>
-              {projectName} • Page {index + 2} of {calculations.length + 1}
-            </Text>
+            <BrandFooter projectName={projectName} />
           </Page>
         );
       })}

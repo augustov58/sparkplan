@@ -6,6 +6,11 @@
 import React from 'react';
 import { Document, Page, Text, View, StyleSheet } from '@react-pdf/renderer';
 import type { Database } from '../../lib/database.types';
+import {
+  BrandBar,
+  Footer as BrandFooter,
+  themeStyles,
+} from './permitPacketTheme';
 
 type GroundingDetail = Database['public']['Tables']['grounding_details']['Row'];
 
@@ -23,7 +28,7 @@ const styles = StyleSheet.create({
   },
   title: {
     fontSize: 18,
-    fontWeight: 'bold',
+    fontFamily: 'Helvetica-Bold',
     marginBottom: 5,
   },
   subtitle: {
@@ -37,7 +42,7 @@ const styles = StyleSheet.create({
   },
   sectionTitle: {
     fontSize: 12,
-    fontWeight: 'bold',
+    fontFamily: 'Helvetica-Bold',
     marginBottom: 8,
     paddingBottom: 3,
     borderBottomWidth: 1,
@@ -58,7 +63,7 @@ const styles = StyleSheet.create({
   },
   value: {
     fontSize: 10,
-    fontWeight: 'bold',
+    fontFamily: 'Helvetica-Bold',
   },
   table: {
     marginTop: 10,
@@ -74,7 +79,7 @@ const styles = StyleSheet.create({
   },
   tableHeader: {
     backgroundColor: '#f3f4f6',
-    fontWeight: 'bold',
+    fontFamily: 'Helvetica-Bold',
   },
   tableCol: {
     fontSize: 9,
@@ -134,7 +139,7 @@ const styles = StyleSheet.create({
     fontSize: 10,
     marginRight: 6,
     color: '#10b981',
-    fontWeight: 'bold',
+    fontFamily: 'Helvetica-Bold',
     fontFamily: 'Courier',
   },
   itemText: {
@@ -162,14 +167,14 @@ export const GroundingPlanPages: React.FC<GroundingPlanDocumentProps> = ({
   const isCompliant = grounding.electrodes && grounding.electrodes.length > 0 && grounding.gec_size;
 
   return (
-    <Page size="LETTER" style={styles.page}>
-        {/* Header */}
-        <View style={styles.header}>
-          <Text style={styles.title}>GROUNDING ELECTRODE SYSTEM PLAN</Text>
-          <Text style={styles.subtitle}>{projectName}</Text>
-          {projectAddress && <Text style={styles.subtitle}>{projectAddress}</Text>}
-          <Text style={{ fontSize: 9, marginTop: 5, color: '#666' }}>
-            Per NEC Article 250 - Grounding and Bonding
+    <Page size="LETTER" style={themeStyles.page}>
+        <BrandBar pageLabel="GROUNDING PLAN" />
+        <View style={themeStyles.titleBlock}>
+          <Text style={themeStyles.docTitle}>Grounding Electrode System Plan</Text>
+          <Text style={themeStyles.docSubtitle}>
+            {projectName}
+            {projectAddress ? ` \u2022 ${projectAddress}` : ''}
+            {` \u2022 Per NEC Article 250`}
           </Text>
         </View>
 
@@ -336,8 +341,8 @@ export const GroundingPlanPages: React.FC<GroundingPlanDocumentProps> = ({
         {/* NEC Compliance Status */}
         {isCompliant ? (
           <View style={styles.compliantBox}>
-            <Text style={{ fontSize: 10, fontWeight: 'bold', color: '#065f46', marginBottom: 5 }}>
-              ✓ NEC ARTICLE 250 COMPLIANT
+            <Text style={{ fontSize: 10, fontFamily: 'Helvetica-Bold', color: '#065f46', marginBottom: 5 }}>
+              NEC ARTICLE 250 COMPLIANT
             </Text>
             <Text style={{ fontSize: 9, color: '#065f46' }}>
               Grounding electrode system meets NEC requirements for {serviceAmperage}A service
@@ -345,8 +350,8 @@ export const GroundingPlanPages: React.FC<GroundingPlanDocumentProps> = ({
           </View>
         ) : (
           <View style={styles.nonCompliantBox}>
-            <Text style={{ fontSize: 10, fontWeight: 'bold', color: '#991b1b', marginBottom: 5 }}>
-              ⚠️ INCOMPLETE GROUNDING SYSTEM
+            <Text style={{ fontSize: 10, fontFamily: 'Helvetica-Bold', color: '#991b1b', marginBottom: 5 }}>
+              INCOMPLETE GROUNDING SYSTEM
             </Text>
             <Text style={{ fontSize: 9, color: '#991b1b' }}>
               Additional information required to verify NEC Article 250 compliance
@@ -356,7 +361,7 @@ export const GroundingPlanPages: React.FC<GroundingPlanDocumentProps> = ({
 
         {/* NEC References */}
         <View style={styles.necReference}>
-          <Text style={{ fontSize: 10, fontWeight: 'bold', color: '#1e40af', marginBottom: 5 }}>
+          <Text style={{ fontSize: 10, fontFamily: 'Helvetica-Bold', color: '#1e40af', marginBottom: 5 }}>
             Key NEC References:
           </Text>
           <Text style={styles.necText}>
@@ -379,13 +384,7 @@ export const GroundingPlanPages: React.FC<GroundingPlanDocumentProps> = ({
           </Text>
         </View>
 
-        {/* Footer */}
-        <View style={styles.footer}>
-          <Text>Grounding System Design per NEC 2023 Article 250</Text>
-          <Text style={{ marginTop: 3 }}>
-            All installations must be inspected and approved by local Authority Having Jurisdiction (AHJ)
-          </Text>
-        </View>
+        <BrandFooter projectName={projectName} />
       </Page>
   );
 };

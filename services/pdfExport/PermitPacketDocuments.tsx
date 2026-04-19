@@ -15,6 +15,8 @@ import {
 import {
   BrandBar,
   Footer as BrandFooter,
+  PHASE,
+  phaseLabel,
   themeStyles,
 } from './permitPacketTheme';
 
@@ -310,112 +312,130 @@ export const EquipmentSchedule: React.FC<EquipmentScheduleProps> = ({
   const mainPanel = panels.find(p => p.is_main);
   const subPanels = panels.filter(p => !p.is_main);
 
+  const thCol = (w: string) => [themeStyles.th, { width: w }];
+  const tdCol = (w: string) => [themeStyles.td, { width: w }];
+
   return (
-    <Page size="LETTER" style={permitStyles.page}>
-      <Text style={permitStyles.sectionTitle}>EQUIPMENT SCHEDULE</Text>
+    <Page size="LETTER" style={themeStyles.page}>
+      <BrandBar pageLabel="EQUIPMENT SCHEDULE" />
+
+      <View style={themeStyles.titleBlock}>
+        <Text style={themeStyles.docTitle}>Equipment Schedule</Text>
+        <Text style={themeStyles.docSubtitle}>
+          Panels, transformers, and feeders for the service
+        </Text>
+      </View>
 
       {/* Main Distribution Panel */}
       {mainPanel && (
-        <View style={{ marginBottom: 20 }}>
-          <Text style={{ fontSize: 12, fontFamily: 'Helvetica-Bold', marginBottom: 8 }}>
-            MAIN DISTRIBUTION PANEL
-          </Text>
-          <View style={permitStyles.tableContainer}>
-            <View style={permitStyles.tableHeader}>
-              <Text style={{ width: '20%' }}>Name</Text>
-              <Text style={{ width: '15%' }}>Voltage</Text>
-              <Text style={{ width: '10%' }}>Phase</Text>
-              <Text style={{ width: '15%' }}>Bus Rating</Text>
-              <Text style={{ width: '15%' }}>Main Breaker</Text>
-              <Text style={{ width: '25%' }}>Location</Text>
+        <>
+          <Text style={themeStyles.sectionTitle}>MAIN DISTRIBUTION PANEL</Text>
+          <View style={themeStyles.table}>
+            <View style={themeStyles.tableHeaderRow}>
+              <Text style={thCol('20%')}>Name</Text>
+              <Text style={thCol('15%')}>Voltage</Text>
+              <Text style={thCol('10%')}>Phase</Text>
+              <Text style={thCol('15%')}>Bus Rating</Text>
+              <Text style={thCol('15%')}>Main Breaker</Text>
+              <Text style={thCol('25%')}>Location</Text>
             </View>
-            <View style={permitStyles.tableRow}>
-              <Text style={{ width: '20%' }}>{mainPanel.name}</Text>
-              <Text style={{ width: '15%' }}>{mainPanel.voltage}V</Text>
-              <Text style={{ width: '10%' }}>{mainPanel.phase}φ</Text>
-              <Text style={{ width: '15%' }}>{mainPanel.bus_rating}A</Text>
-              <Text style={{ width: '15%' }}>{mainPanel.main_breaker_amps || 'MLO'}</Text>
-              <Text style={{ width: '25%' }}>{mainPanel.location || 'N/A'}</Text>
+            <View style={themeStyles.tableRow} wrap={false}>
+              <Text style={tdCol('20%')}>{mainPanel.name}</Text>
+              <Text style={tdCol('15%')}>{mainPanel.voltage}V</Text>
+              <Text style={tdCol('10%')}>{phaseLabel(mainPanel.phase)}</Text>
+              <Text style={tdCol('15%')}>{mainPanel.bus_rating}A</Text>
+              <Text style={tdCol('15%')}>{mainPanel.main_breaker_amps || 'MLO'}</Text>
+              <Text style={tdCol('25%')}>{mainPanel.location || 'N/A'}</Text>
             </View>
           </View>
-        </View>
+        </>
       )}
 
       {/* Sub-Panels */}
       {subPanels.length > 0 && (
-        <View style={{ marginBottom: 20 }}>
-          <Text style={{ fontSize: 12, fontFamily: 'Helvetica-Bold', marginBottom: 8 }}>
+        <>
+          <Text style={themeStyles.sectionTitle}>
             SUB-PANELS ({subPanels.length})
           </Text>
-          <View style={permitStyles.tableContainer}>
-            <View style={permitStyles.tableHeader}>
-              <Text style={{ width: '20%' }}>Name</Text>
-              <Text style={{ width: '15%' }}>Voltage</Text>
-              <Text style={{ width: '10%' }}>Phase</Text>
-              <Text style={{ width: '15%' }}>Bus Rating</Text>
-              <Text style={{ width: '15%' }}>Main Breaker</Text>
-              <Text style={{ width: '25%' }}>Location</Text>
+          <View style={themeStyles.table}>
+            <View style={themeStyles.tableHeaderRow}>
+              <Text style={thCol('20%')}>Name</Text>
+              <Text style={thCol('15%')}>Voltage</Text>
+              <Text style={thCol('10%')}>Phase</Text>
+              <Text style={thCol('15%')}>Bus Rating</Text>
+              <Text style={thCol('15%')}>Main Breaker</Text>
+              <Text style={thCol('25%')}>Location</Text>
             </View>
             {subPanels.map((panel, idx) => (
-              <View key={panel.id} style={idx % 2 === 0 ? permitStyles.tableRow : permitStyles.tableRowAlt}>
-                <Text style={{ width: '20%' }}>{panel.name}</Text>
-                <Text style={{ width: '15%' }}>{panel.voltage}V</Text>
-                <Text style={{ width: '10%' }}>{panel.phase}φ</Text>
-                <Text style={{ width: '15%' }}>{panel.bus_rating}A</Text>
-                <Text style={{ width: '15%' }}>{panel.main_breaker_amps || 'MLO'}</Text>
-                <Text style={{ width: '25%' }}>{panel.location || 'N/A'}</Text>
+              <View
+                key={panel.id}
+                style={idx % 2 === 0 ? themeStyles.tableRow : themeStyles.tableRowAlt}
+                wrap={false}
+              >
+                <Text style={tdCol('20%')}>{panel.name}</Text>
+                <Text style={tdCol('15%')}>{panel.voltage}V</Text>
+                <Text style={tdCol('10%')}>{phaseLabel(panel.phase)}</Text>
+                <Text style={tdCol('15%')}>{panel.bus_rating}A</Text>
+                <Text style={tdCol('15%')}>{panel.main_breaker_amps || 'MLO'}</Text>
+                <Text style={tdCol('25%')}>{panel.location || 'N/A'}</Text>
               </View>
             ))}
           </View>
-        </View>
+        </>
       )}
 
       {/* Transformers */}
       {transformers.length > 0 && (
-        <View style={{ marginBottom: 20 }}>
-          <Text style={{ fontSize: 12, fontFamily: 'Helvetica-Bold', marginBottom: 8 }}>
+        <>
+          <Text style={themeStyles.sectionTitle}>
             TRANSFORMERS ({transformers.length})
           </Text>
-          <View style={permitStyles.tableContainer}>
-            <View style={permitStyles.tableHeader}>
-              <Text style={{ width: '25%' }}>Name</Text>
-              <Text style={{ width: '15%' }}>kVA Rating</Text>
-              <Text style={{ width: '20%' }}>Primary Voltage</Text>
-              <Text style={{ width: '20%' }}>Secondary Voltage</Text>
-              <Text style={{ width: '20%' }}>Fed From</Text>
+          <View style={themeStyles.table}>
+            <View style={themeStyles.tableHeaderRow}>
+              <Text style={thCol('25%')}>Name</Text>
+              <Text style={thCol('15%')}>kVA Rating</Text>
+              <Text style={thCol('20%')}>Primary Voltage</Text>
+              <Text style={thCol('20%')}>Secondary Voltage</Text>
+              <Text style={thCol('20%')}>Fed From</Text>
             </View>
             {transformers.map((xfmr, idx) => (
-              <View key={xfmr.id} style={idx % 2 === 0 ? permitStyles.tableRow : permitStyles.tableRowAlt}>
-                <Text style={{ width: '25%' }}>{xfmr.name}</Text>
-                <Text style={{ width: '15%' }}>{xfmr.kva_rating}kVA</Text>
-                <Text style={{ width: '20%' }}>{xfmr.primary_voltage}V</Text>
-                <Text style={{ width: '20%' }}>{xfmr.secondary_voltage}V</Text>
-                <Text style={{ width: '20%' }}>
-                  {xfmr.fed_from_panel_id ? panels.find(p => p.id === xfmr.fed_from_panel_id)?.name || 'N/A' : 'N/A'}
+              <View
+                key={xfmr.id}
+                style={idx % 2 === 0 ? themeStyles.tableRow : themeStyles.tableRowAlt}
+                wrap={false}
+              >
+                <Text style={tdCol('25%')}>{xfmr.name}</Text>
+                <Text style={tdCol('15%')}>{xfmr.kva_rating}kVA</Text>
+                <Text style={tdCol('20%')}>{xfmr.primary_voltage}V</Text>
+                <Text style={tdCol('20%')}>{xfmr.secondary_voltage}V</Text>
+                <Text style={tdCol('20%')}>
+                  {xfmr.fed_from_panel_id
+                    ? panels.find(p => p.id === xfmr.fed_from_panel_id)?.name || 'N/A'
+                    : 'N/A'}
                 </Text>
               </View>
             ))}
           </View>
-        </View>
+        </>
       )}
 
       {/* Feeders */}
       {feeders.length > 0 && (
-        <View>
-          <Text style={{ fontSize: 12, fontFamily: 'Helvetica-Bold', marginBottom: 8 }}>
+        <>
+          <Text style={themeStyles.sectionTitle}>
             FEEDERS ({feeders.length})
           </Text>
-          <View style={permitStyles.tableContainer}>
-            <View style={permitStyles.tableHeader}>
-              <Text style={{ width: '20%' }}>Name</Text>
-              <Text style={{ width: '25%' }}>Source Panel</Text>
-              <Text style={{ width: '25%' }}>Destination</Text>
-              <Text style={{ width: '15%' }}>Conductor</Text>
-              <Text style={{ width: '15%' }}>Load (kVA)</Text>
+          <View style={themeStyles.table}>
+            <View style={themeStyles.tableHeaderRow}>
+              <Text style={thCol('20%')}>Name</Text>
+              <Text style={thCol('25%')}>Source Panel</Text>
+              <Text style={thCol('25%')}>Destination</Text>
+              <Text style={thCol('15%')}>Conductor</Text>
+              <Text style={thCol('15%')}>Load (kVA)</Text>
             </View>
             {feeders.map((feeder, idx) => {
               const sourcePanel = panels.find(p => p.id === feeder.source_panel_id);
-              const destPanel = feeder.destination_panel_id 
+              const destPanel = feeder.destination_panel_id
                 ? panels.find(p => p.id === feeder.destination_panel_id)
                 : null;
               const destTransformer = feeder.destination_transformer_id
@@ -427,20 +447,24 @@ export const EquipmentSchedule: React.FC<EquipmentScheduleProps> = ({
                 typeof feeder.design_load_va === 'number' ? feeder.design_load_va : null;
               const loadCell = loadVA != null ? `${(loadVA / 1000).toFixed(1)}` : '—';
               return (
-                <View key={feeder.id} style={idx % 2 === 0 ? permitStyles.tableRow : permitStyles.tableRowAlt}>
-                  <Text style={{ width: '20%' }}>{feeder.name}</Text>
-                  <Text style={{ width: '25%' }}>{sourcePanel?.name || 'Unknown'}</Text>
-                  <Text style={{ width: '25%' }}>{destination}</Text>
-                  <Text style={{ width: '15%' }}>{feeder.phase_conductor_size || 'N/A'}</Text>
-                  <Text style={{ width: '15%' }}>{loadCell}</Text>
+                <View
+                  key={feeder.id}
+                  style={idx % 2 === 0 ? themeStyles.tableRow : themeStyles.tableRowAlt}
+                  wrap={false}
+                >
+                  <Text style={tdCol('20%')}>{feeder.name}</Text>
+                  <Text style={tdCol('25%')}>{sourcePanel?.name || 'Unknown'}</Text>
+                  <Text style={tdCol('25%')}>{destination}</Text>
+                  <Text style={tdCol('15%')}>{feeder.phase_conductor_size || 'N/A'}</Text>
+                  <Text style={tdCol('15%')}>{loadCell}</Text>
                 </View>
               );
             })}
           </View>
-        </View>
+        </>
       )}
 
-      <SectionFooter label="Equipment Schedule" projectName={projectName} />
+      <BrandFooter projectName={projectName} />
     </Page>
   );
 };
@@ -492,7 +516,7 @@ const buildPanelSubtree = (
     id: panel.id,
     kind: 'panel',
     line1: panel.name + (panel.is_main ? ' (MDP)' : ''),
-    line2: `${panel.voltage}V ${panel.phase}\u03C6 \u2022 ${panel.bus_rating}A bus`,
+    line2: `${panel.voltage}V ${phaseLabel(panel.phase)} \u2022 ${panel.bus_rating}A bus`,
     line3: panel.main_breaker_amps ? `${panel.main_breaker_amps}A Main` : 'MLO',
     feederLabel,
     children: [],
@@ -516,7 +540,7 @@ const buildPanelSubtree = (
           kind: 'transformer',
           line1: xfmr.name,
           line2: `${xfmr.kva_rating} kVA`,
-          line3: `${xfmr.primary_voltage}V \u2192 ${xfmr.secondary_voltage}V`,
+          line3: `${xfmr.primary_voltage}V -> ${xfmr.secondary_voltage}V`,
           feederLabel: label,
           children: [],
         };
@@ -557,7 +581,7 @@ const buildRiserTree = (
         id: stack.id,
         kind: 'meter_stack',
         line1: stack.name,
-        line2: `${stack.voltage}V ${stack.phase}\u03C6 \u2022 ${stack.bus_rating_amps}A bus`,
+        line2: `${stack.voltage}V ${phaseLabel(stack.phase)} \u2022 ${stack.bus_rating_amps}A bus`,
         line3: `${stack.num_meter_positions} meter positions`,
         children: [],
       };
@@ -576,7 +600,7 @@ const buildRiserTree = (
         id: 'utility',
         kind: 'utility',
         line1: 'UTILITY',
-        line2: `${serviceVoltage}V ${servicePhase}\u03C6 service`,
+        line2: `${serviceVoltage}V ${phaseLabel(servicePhase)} service`,
         children: [stackNode],
       };
     }
@@ -820,10 +844,13 @@ export const RiserDiagram: React.FC<RiserDiagramProps> = ({
     buildRiserDraw(tree, draw);
   }
 
-  // Landscape letter content area ~712×532pt. Scale the whole diagram down
-  // proportionally if the natural tree width exceeds the available space.
-  const TARGET_W = 712;
-  const TARGET_H_MAX = 460;
+  // Landscape letter content area is ~720×540pt. Leave room for the BrandBar
+  // (≈30pt), title block (≈40pt), description (≈24pt), legend (≈72pt), and
+  // the fixed footer (≈44pt). That leaves ~330pt of vertical space; cap the
+  // diagram at 330 to prevent it spilling onto a blank page with the legend
+  // stranded underneath.
+  const TARGET_W = 720;
+  const TARGET_H_MAX = 330;
   const widthScale = svgWidth > 0 ? TARGET_W / svgWidth : 1;
   const heightScale = svgHeight > 0 ? TARGET_H_MAX / svgHeight : 1;
   const scale = Math.min(1, widthScale, heightScale);
@@ -831,13 +858,16 @@ export const RiserDiagram: React.FC<RiserDiagramProps> = ({
   const renderedH = svgHeight * scale;
 
   return (
-    <Page size="LETTER" orientation="landscape" style={permitStyles.page}>
-      <Text style={permitStyles.sectionTitle}>RISER DIAGRAM</Text>
-      <Text style={{ fontSize: 9, marginBottom: 10, color: '#555' }}>
-        Electrical power distribution from utility service through the MDP and
-        all downstream panels, transformers, and meter banks. Conductor sizes
-        and design kVA are shown on each feeder.
-      </Text>
+    <Page size="LETTER" orientation="landscape" style={themeStyles.page}>
+      <BrandBar pageLabel="RISER DIAGRAM" />
+
+      <View style={themeStyles.titleBlock}>
+        <Text style={themeStyles.docTitle}>Riser Diagram</Text>
+        <Text style={themeStyles.docSubtitle}>
+          Electrical power distribution from utility service through the MDP
+          and all downstream panels, transformers, and meter banks.
+        </Text>
+      </View>
 
       {tree ? (
         <View
@@ -845,6 +875,8 @@ export const RiserDiagram: React.FC<RiserDiagramProps> = ({
             position: 'relative',
             width: renderedW,
             height: renderedH,
+            alignSelf: 'center',
+            marginBottom: 8,
           }}
         >
           <Svg
@@ -883,34 +915,18 @@ export const RiserDiagram: React.FC<RiserDiagramProps> = ({
         </Text>
       )}
 
-      <View
-        style={{
-          marginTop: 18,
-          padding: 10,
-          backgroundColor: '#f6f6f6',
-          borderWidth: 1,
-          borderColor: '#ddd',
-          borderStyle: 'solid',
-        }}
-      >
-        <Text
-          style={{ fontSize: 9, fontFamily: 'Helvetica-Bold', marginBottom: 4 }}
-        >
-          LEGEND
-        </Text>
-        <Text style={{ fontSize: 8, marginBottom: 2 }}>
-          Utility service \u2022 Meter stack (multi-family) \u2022 Panel /
-          MDP \u2022 Transformer
-        </Text>
-        <Text style={{ fontSize: 8, marginBottom: 2 }}>
-          MLO = Main Lug Only (no main breaker)
-        </Text>
-        <Text style={{ fontSize: 8 }}>
-          Feeder labels show conductor size + design load in kVA
-        </Text>
-      </View>
+      <Text style={themeStyles.sectionTitle}>LEGEND</Text>
+      <Text style={{ fontSize: 8, marginBottom: 2 }}>
+        {`Utility service \u2022 Meter stack (multi-family) \u2022 Panel / MDP \u2022 Transformer`}
+      </Text>
+      <Text style={{ fontSize: 8, marginBottom: 2 }}>
+        MLO = Main Lug Only (no main breaker)
+      </Text>
+      <Text style={{ fontSize: 8 }}>
+        Feeder labels show conductor size + design load in kVA
+      </Text>
 
-      <SectionFooter label="Riser Diagram" projectName={projectName} />
+      <BrandFooter projectName={projectName} />
     </Page>
   );
 };
@@ -974,178 +990,196 @@ export const LoadCalculationSummary: React.FC<LoadSummaryProps> = ({
       ? totalDemandVA / (serviceVoltage * Math.sqrt(3))
       : totalDemandVA / serviceVoltage;
 
-  return (
-    <Page size="LETTER" style={permitStyles.page}>
-      <Text style={permitStyles.sectionTitle}>LOAD CALCULATION SUMMARY</Text>
+  const thCol = (w: string) => [themeStyles.th, { width: w }];
+  const tdCol = (w: string) => [themeStyles.td, { width: w }];
+  const tdNumCol = (w: string) => [themeStyles.tdNum, { width: w }];
 
-      <View style={{ marginBottom: 16 }}>
-        <Text
-          style={{ fontSize: 12, fontFamily: 'Helvetica-Bold', marginBottom: 8 }}
-        >
-          SYSTEM TOTALS
+  return (
+    <Page size="LETTER" style={themeStyles.page}>
+      <BrandBar pageLabel="LOAD CALCULATION" />
+
+      <View style={themeStyles.titleBlock}>
+        <Text style={themeStyles.docTitle}>Load Calculation Summary</Text>
+        <Text style={themeStyles.docSubtitle}>
+          NEC Article 220 demand calculation applied to the full hierarchy
         </Text>
-        <View style={{ marginLeft: 10 }}>
-          <View style={permitStyles.coverInfoRow}>
-            <Text style={permitStyles.coverInfoLabel}>Service:</Text>
-            <Text style={permitStyles.coverInfoValue}>
-              {serviceVoltage}V {servicePhase === 3 ? '3-Phase' : 'Single-Phase'}
-            </Text>
-          </View>
-          <View style={permitStyles.coverInfoRow}>
-            <Text style={permitStyles.coverInfoLabel}>Occupancy:</Text>
-            <Text style={permitStyles.coverInfoValue}>
-              {occupancy.charAt(0).toUpperCase() + occupancy.slice(1)}
-            </Text>
-          </View>
-          <View style={permitStyles.coverInfoRow}>
-            <Text style={permitStyles.coverInfoLabel}>Total Connected Load:</Text>
-            <Text style={permitStyles.coverInfoValue}>
-              {(totalConnectedVA / 1000).toFixed(2)} kVA (
-              {totalConnectedVA.toLocaleString()} VA)
-            </Text>
-          </View>
-          <View style={permitStyles.coverInfoRow}>
-            <Text style={permitStyles.coverInfoLabel}>
-              Calculated Demand Load:
-            </Text>
-            <Text style={permitStyles.coverInfoValue}>
-              {(totalDemandVA / 1000).toFixed(2)} kVA (
-              {(overallDf * 100).toFixed(1)}% overall demand factor)
-            </Text>
-          </View>
-          <View style={permitStyles.coverInfoRow}>
-            <Text style={permitStyles.coverInfoLabel}>Demand Current:</Text>
-            <Text style={permitStyles.coverInfoValue}>
-              {Number.isFinite(demandAmps) ? demandAmps.toFixed(0) : '—'} A @{' '}
-              {serviceVoltage}V {servicePhase === 3 ? '3\u03C6' : '1\u03C6'}
-            </Text>
-          </View>
-          <View style={permitStyles.coverInfoRow}>
-            <Text style={permitStyles.coverInfoLabel}>Total Panels:</Text>
-            <Text style={permitStyles.coverInfoValue}>{panels.length}</Text>
-          </View>
-          <View style={permitStyles.coverInfoRow}>
-            <Text style={permitStyles.coverInfoLabel}>Total Circuits:</Text>
-            <Text style={permitStyles.coverInfoValue}>{circuits.length}</Text>
-          </View>
+      </View>
+
+      <Text style={themeStyles.sectionTitle}>SYSTEM TOTALS</Text>
+      <View style={themeStyles.projectGrid}>
+        <View style={themeStyles.projectCell}>
+          <Text style={themeStyles.projectLabel}>Service</Text>
+          <Text style={themeStyles.projectValue}>
+            {serviceVoltage}V {servicePhase === 3 ? '3-Phase' : 'Single-Phase'}
+          </Text>
+        </View>
+        <View style={themeStyles.projectCell}>
+          <Text style={themeStyles.projectLabel}>Occupancy</Text>
+          <Text style={themeStyles.projectValue}>
+            {occupancy.charAt(0).toUpperCase() + occupancy.slice(1)}
+          </Text>
+        </View>
+        <View style={themeStyles.projectCell}>
+          <Text style={themeStyles.projectLabel}>Total Panels</Text>
+          <Text style={themeStyles.projectValue}>{panels.length}</Text>
+        </View>
+        <View style={themeStyles.projectCell}>
+          <Text style={themeStyles.projectLabel}>Total Circuits</Text>
+          <Text style={themeStyles.projectValue}>{circuits.length}</Text>
+        </View>
+      </View>
+
+      <View style={themeStyles.summaryRow}>
+        <View style={themeStyles.summaryCard}>
+          <Text style={themeStyles.summaryLabel}>Connected Load</Text>
+          <Text style={themeStyles.summaryValue}>
+            {(totalConnectedVA / 1000).toFixed(2)}
+            <Text style={themeStyles.summaryUnit}> kVA</Text>
+          </Text>
+          <Text style={themeStyles.summarySub}>
+            {totalConnectedVA.toLocaleString()} VA
+          </Text>
+        </View>
+        <View style={themeStyles.summaryCardHighlight}>
+          <Text style={themeStyles.summaryLabel}>Calculated Demand</Text>
+          <Text style={themeStyles.summaryValue}>
+            {(totalDemandVA / 1000).toFixed(2)}
+            <Text style={themeStyles.summaryUnit}> kVA</Text>
+          </Text>
+          <Text style={themeStyles.summarySub}>
+            {(overallDf * 100).toFixed(1)}% overall DF
+          </Text>
+        </View>
+        <View style={themeStyles.summaryCard}>
+          <Text style={themeStyles.summaryLabel}>Demand Current</Text>
+          <Text style={themeStyles.summaryValue}>
+            {Number.isFinite(demandAmps) ? demandAmps.toFixed(0) : '—'}
+            <Text style={themeStyles.summaryUnit}> A</Text>
+          </Text>
+          <Text style={themeStyles.summarySub}>
+            @ {serviceVoltage}V {phaseLabel(servicePhase)}
+          </Text>
         </View>
       </View>
 
       {aggregate && aggregate.demandBreakdown.length > 0 && (
-        <View style={{ marginBottom: 18 }}>
-          <Text
-            style={{
-              fontSize: 12,
-              fontFamily: 'Helvetica-Bold',
-              marginBottom: 6,
-            }}
-          >
+        <>
+          <Text style={themeStyles.sectionTitle}>
             DEMAND FACTOR BREAKDOWN (NEC ARTICLE 220)
           </Text>
-          <View style={permitStyles.tableContainer}>
-            <View style={permitStyles.tableHeader}>
-              <Text style={{ width: '28%' }}>Load Type</Text>
-              <Text style={{ width: '17%' }}>Connected (kVA)</Text>
-              <Text style={{ width: '12%' }}>Factor</Text>
-              <Text style={{ width: '17%' }}>Demand (kVA)</Text>
-              <Text style={{ width: '26%' }}>NEC Reference</Text>
+          <View style={themeStyles.table}>
+            <View style={themeStyles.tableHeaderRow}>
+              <Text style={thCol('28%')}>Load Type</Text>
+              <Text style={[themeStyles.th, { width: '17%', textAlign: 'right' }]}>
+                Connected (kVA)
+              </Text>
+              <Text style={[themeStyles.th, { width: '12%', textAlign: 'right' }]}>
+                Factor
+              </Text>
+              <Text style={[themeStyles.th, { width: '17%', textAlign: 'right' }]}>
+                Demand (kVA)
+              </Text>
+              <Text style={thCol('26%')}>NEC Reference</Text>
             </View>
             {aggregate.demandBreakdown.map((d, idx) => (
               <View
                 key={`${d.loadType}-${idx}`}
-                style={
-                  idx % 2 === 0 ? permitStyles.tableRow : permitStyles.tableRowAlt
-                }
+                style={idx % 2 === 0 ? themeStyles.tableRow : themeStyles.tableRowAlt}
+                wrap={false}
               >
-                <Text style={{ width: '28%' }}>{d.loadType}</Text>
-                <Text style={{ width: '17%' }}>
+                <Text style={tdCol('28%')}>{d.loadType}</Text>
+                <Text style={tdNumCol('17%')}>
                   {(d.connectedVA / 1000).toFixed(2)}
                 </Text>
-                <Text style={{ width: '12%' }}>
+                <Text style={tdNumCol('12%')}>
                   {(d.demandFactor * 100).toFixed(0)}%
                 </Text>
-                <Text style={{ width: '17%' }}>
+                <Text style={tdNumCol('17%')}>
                   {(d.demandVA / 1000).toFixed(2)}
                 </Text>
-                <Text style={{ width: '26%' }}>{d.necReference}</Text>
+                <Text style={tdCol('26%')}>{d.necReference}</Text>
               </View>
             ))}
+            <View style={themeStyles.tableTotalRow} wrap={false}>
+              <Text style={[themeStyles.tdBold, { width: '28%' }]}>TOTAL</Text>
+              <Text style={[themeStyles.tdBoldNum, { width: '17%' }]}>
+                {(totalConnectedVA / 1000).toFixed(2)}
+              </Text>
+              <Text style={[themeStyles.tdBoldNum, { width: '12%' }]}>
+                {(overallDf * 100).toFixed(1)}%
+              </Text>
+              <Text style={[themeStyles.tdBoldNum, { width: '17%' }]}>
+                {(totalDemandVA / 1000).toFixed(2)}
+              </Text>
+              <Text style={[themeStyles.tdBold, { width: '26%' }]}> </Text>
+            </View>
           </View>
           {aggregate.necReferences.length > 0 && (
             <Text
               style={{
                 fontSize: 8,
                 color: '#555',
-                marginTop: 6,
+                marginTop: 2,
+                marginBottom: 4,
                 fontStyle: 'italic',
               }}
             >
               Applied: {aggregate.necReferences.join('; ')}
             </Text>
           )}
-        </View>
+        </>
       )}
 
-      <View>
-        <Text
-          style={{ fontSize: 12, fontFamily: 'Helvetica-Bold', marginBottom: 8 }}
-        >
-          CONNECTED LOAD BY PANEL
-        </Text>
-        <View style={permitStyles.tableContainer}>
-          <View style={permitStyles.tableHeader}>
-            <Text style={{ width: '25%' }}>Panel Name</Text>
-            <Text style={{ width: '15%' }}>Voltage</Text>
-            <Text style={{ width: '10%' }}>Phase</Text>
-            <Text style={{ width: '15%' }}>Circuits</Text>
-            <Text style={{ width: '20%' }}>Connected Load (kVA)</Text>
-            <Text style={{ width: '15%' }}>Bus Rating</Text>
-          </View>
-          {panelLoads.map((pl, idx) => (
-            <View
-              key={pl.panel.id}
-              style={idx % 2 === 0 ? permitStyles.tableRow : permitStyles.tableRowAlt}
-            >
-              <Text style={{ width: '25%' }}>{pl.panel.name}</Text>
-              <Text style={{ width: '15%' }}>{pl.panel.voltage}V</Text>
-              <Text style={{ width: '10%' }}>{pl.panel.phase}\u03C6</Text>
-              <Text style={{ width: '15%' }}>{pl.circuitCount}</Text>
-              <Text style={{ width: '20%' }}>{pl.loadkVA.toFixed(2)}</Text>
-              <Text style={{ width: '15%' }}>{pl.panel.bus_rating}A</Text>
-            </View>
-          ))}
+      <Text style={themeStyles.sectionTitle}>CONNECTED LOAD BY PANEL</Text>
+      <View style={themeStyles.table}>
+        <View style={themeStyles.tableHeaderRow}>
+          <Text style={thCol('25%')}>Panel Name</Text>
+          <Text style={thCol('15%')}>Voltage</Text>
+          <Text style={thCol('10%')}>Phase</Text>
+          <Text style={[themeStyles.th, { width: '15%', textAlign: 'right' }]}>
+            Circuits
+          </Text>
+          <Text style={[themeStyles.th, { width: '20%', textAlign: 'right' }]}>
+            Connected (kVA)
+          </Text>
+          <Text style={thCol('15%')}>Bus Rating</Text>
         </View>
+        {panelLoads.map((pl, idx) => (
+          <View
+            key={pl.panel.id}
+            style={idx % 2 === 0 ? themeStyles.tableRow : themeStyles.tableRowAlt}
+            wrap={false}
+          >
+            <Text style={tdCol('25%')}>{pl.panel.name}</Text>
+            <Text style={tdCol('15%')}>{pl.panel.voltage}V</Text>
+            <Text style={tdCol('10%')}>{phaseLabel(pl.panel.phase)}</Text>
+            <Text style={tdNumCol('15%')}>{pl.circuitCount}</Text>
+            <Text style={tdNumCol('20%')}>{pl.loadkVA.toFixed(2)}</Text>
+            <Text style={tdCol('15%')}>{pl.panel.bus_rating}A</Text>
+          </View>
+        ))}
       </View>
 
       {!aggregate && (
-        <View
-          style={{
-            marginTop: 16,
-            padding: 10,
-            backgroundColor: '#fff7e6',
-            borderWidth: 1,
-            borderColor: '#d97706',
-            borderStyle: 'solid',
-          }}
-        >
+        <View style={themeStyles.warningBox}>
           <Text
             style={{
               fontSize: 9,
               fontFamily: 'Helvetica-Bold',
-              marginBottom: 4,
+              marginBottom: 2,
               color: '#7a3e00',
             }}
           >
             No MDP identified
           </Text>
-          <Text style={{ fontSize: 8, color: '#7a3e00' }}>
-            Mark a panel as the Main Distribution Panel to enable NEC 220 demand
-            calculation. The figures above reflect connected load only.
+          <Text style={themeStyles.warningText}>
+            Mark a panel as the Main Distribution Panel to enable NEC 220
+            demand calculation. The figures above reflect connected load only.
           </Text>
         </View>
       )}
 
-      <SectionFooter label="Load Calculation Summary" projectName={projectName} />
+      <BrandFooter projectName={projectName} />
     </Page>
   );
 };
@@ -1173,101 +1207,137 @@ export const ComplianceSummary: React.FC<ComplianceSummaryProps> = ({
   const totalCircuits = circuits.length;
   const totalFeeders = feeders.length;
 
-  // Check for common compliance items
-  const complianceChecks = [
+  // Status values are ASCII-only; Helvetica StandardEncoding can't render
+  // checkmark / x-mark / warning glyphs reliably across viewers.
+  const complianceChecks: Array<{
+    item: string;
+    status: string;
+    ok: 'pass' | 'fail' | 'warn';
+    article: string;
+  }> = [
     {
       item: 'Main Distribution Panel Identified',
-      status: mainPanel ? '✓ Compliant' : '✗ Missing',
+      status: mainPanel ? 'Compliant' : 'Missing',
+      ok: mainPanel ? 'pass' : 'fail',
       article: 'NEC 408.3',
     },
     {
       item: 'Panel Bus Ratings Specified',
-      status: panels.every(p => p.bus_rating) ? '✓ Compliant' : '✗ Incomplete',
+      status: panels.every(p => p.bus_rating) ? 'Compliant' : 'Incomplete',
+      ok: panels.every(p => p.bus_rating) ? 'pass' : 'fail',
       article: 'NEC 408.30',
     },
     {
       item: 'Circuit Overcurrent Protection',
-      status: circuits.every(c => c.breaker_amps) ? '✓ Compliant' : '✗ Incomplete',
+      status: circuits.every(c => c.breaker_amps) ? 'Compliant' : 'Incomplete',
+      ok: circuits.every(c => c.breaker_amps) ? 'pass' : 'fail',
       article: 'NEC 240.4',
     },
     {
       item: 'Conductor Sizing Specified',
-      status: circuits.every(c => c.conductor_size) ? '✓ Compliant' : '✗ Incomplete',
+      status: circuits.every(c => c.conductor_size) ? 'Compliant' : 'Incomplete',
+      ok: circuits.every(c => c.conductor_size) ? 'pass' : 'fail',
       article: 'NEC 310.16',
     },
     {
       item: 'Grounding & Bonding System',
-      status: hasGrounding ? '✓ Compliant' : '⚠ Review Required',
+      status: hasGrounding ? 'Compliant' : 'Review Required',
+      ok: hasGrounding ? 'pass' : 'warn',
       article: 'NEC 250',
     },
     {
       item: 'Feeder Sizing Calculated',
-      status: feeders.every(f => f.phase_conductor_size) ? '✓ Compliant' : '⚠ Partial',
+      status: feeders.every(f => f.phase_conductor_size) ? 'Compliant' : 'Partial',
+      ok: feeders.every(f => f.phase_conductor_size) ? 'pass' : 'warn',
       article: 'NEC 215',
     },
   ];
 
+  const statusColor = (ok: 'pass' | 'fail' | 'warn') =>
+    ok === 'pass' ? '#166534' : ok === 'fail' ? '#991b1b' : '#92400e';
+
+  const thCol = (w: string) => [themeStyles.th, { width: w }];
+  const tdCol = (w: string) => [themeStyles.td, { width: w }];
+
   return (
-    <Page size="LETTER" style={permitStyles.page}>
-      <Text style={permitStyles.sectionTitle}>NEC COMPLIANCE SUMMARY</Text>
+    <Page size="LETTER" style={themeStyles.page}>
+      <BrandBar pageLabel="COMPLIANCE SUMMARY" />
 
-      <View style={{ marginBottom: 20 }}>
-        <Text style={{ fontSize: 12, fontFamily: 'Helvetica-Bold', marginBottom: 10 }}>
-          COMPLIANCE CHECKLIST
+      <View style={themeStyles.titleBlock}>
+        <Text style={themeStyles.docTitle}>NEC Compliance Summary</Text>
+        <Text style={themeStyles.docSubtitle}>
+          NEC 2023 design review checklist
         </Text>
-        <View style={permitStyles.tableContainer}>
-          <View style={permitStyles.tableHeader}>
-            <Text style={{ width: '50%' }}>Compliance Item</Text>
-            <Text style={{ width: '25%' }}>Status</Text>
-            <Text style={{ width: '25%' }}>NEC Reference</Text>
-          </View>
-          {complianceChecks.map((check, idx) => (
-            <View key={idx} style={idx % 2 === 0 ? permitStyles.tableRow : permitStyles.tableRowAlt}>
-              <Text style={{ width: '50%' }}>{check.item}</Text>
-              <Text style={{ width: '25%' }}>{check.status}</Text>
-              <Text style={{ width: '25%' }}>{check.article}</Text>
-            </View>
-          ))}
+      </View>
+
+      <Text style={themeStyles.sectionTitle}>SYSTEM OVERVIEW</Text>
+      <View style={themeStyles.projectGrid}>
+        <View style={themeStyles.projectCell}>
+          <Text style={themeStyles.projectLabel}>Total Panels</Text>
+          <Text style={themeStyles.projectValue}>{panels.length}</Text>
+        </View>
+        <View style={themeStyles.projectCell}>
+          <Text style={themeStyles.projectLabel}>Total Circuits</Text>
+          <Text style={themeStyles.projectValue}>{totalCircuits}</Text>
+        </View>
+        <View style={themeStyles.projectCell}>
+          <Text style={themeStyles.projectLabel}>Total Feeders</Text>
+          <Text style={themeStyles.projectValue}>{totalFeeders}</Text>
+        </View>
+        <View style={themeStyles.projectCell}>
+          <Text style={themeStyles.projectLabel}>NEC Edition</Text>
+          <Text style={themeStyles.projectValue}>2023</Text>
         </View>
       </View>
 
-      <View style={{ marginTop: 20 }}>
-        <Text style={{ fontSize: 12, fontFamily: 'Helvetica-Bold', marginBottom: 10 }}>
-          SYSTEM OVERVIEW
-        </Text>
-        <View style={{ marginLeft: 10 }}>
-          <View style={permitStyles.coverInfoRow}>
-            <Text style={permitStyles.coverInfoLabel}>Total Panels:</Text>
-            <Text style={permitStyles.coverInfoValue}>{panels.length}</Text>
-          </View>
-          <View style={permitStyles.coverInfoRow}>
-            <Text style={permitStyles.coverInfoLabel}>Total Circuits:</Text>
-            <Text style={permitStyles.coverInfoValue}>{totalCircuits}</Text>
-          </View>
-          <View style={permitStyles.coverInfoRow}>
-            <Text style={permitStyles.coverInfoLabel}>Total Feeders:</Text>
-            <Text style={permitStyles.coverInfoValue}>{totalFeeders}</Text>
-          </View>
-          <View style={permitStyles.coverInfoRow}>
-            <Text style={permitStyles.coverInfoLabel}>NEC Edition:</Text>
-            <Text style={permitStyles.coverInfoValue}>2023</Text>
-          </View>
+      <Text style={themeStyles.sectionTitle}>COMPLIANCE CHECKLIST</Text>
+      <View style={themeStyles.table}>
+        <View style={themeStyles.tableHeaderRow}>
+          <Text style={thCol('55%')}>Compliance Item</Text>
+          <Text style={thCol('25%')}>Status</Text>
+          <Text style={thCol('20%')}>NEC Reference</Text>
         </View>
+        {complianceChecks.map((check, idx) => (
+          <View
+            key={idx}
+            style={idx % 2 === 0 ? themeStyles.tableRow : themeStyles.tableRowAlt}
+            wrap={false}
+          >
+            <Text style={tdCol('55%')}>{check.item}</Text>
+            <Text
+              style={[
+                themeStyles.td,
+                {
+                  width: '25%',
+                  color: statusColor(check.ok),
+                  fontFamily: 'Helvetica-Bold',
+                },
+              ]}
+            >
+              {check.status}
+            </Text>
+            <Text style={tdCol('20%')}>{check.article}</Text>
+          </View>
+        ))}
       </View>
 
-      <View style={{ marginTop: 20, padding: 10, backgroundColor: '#f0f8ff', borderWidth: 1, borderColor: '#0066cc' }}>
-        <Text style={{ fontSize: 9, fontFamily: 'Helvetica-Bold', marginBottom: 5, color: '#0066cc' }}>
-          IMPORTANT NOTES:
+      <View style={themeStyles.noteBox}>
+        <Text
+          style={{
+            fontSize: 9,
+            fontFamily: 'Helvetica-Bold',
+            marginBottom: 3,
+            color: '#1e3a8a',
+          }}
+        >
+          IMPORTANT NOTES
         </Text>
-        <Text style={{ fontSize: 8, color: '#333', lineHeight: 1.5 }}>
-          • This summary is based on the design data provided. Field verification is required.{'\n'}
-          • All calculations comply with NEC 2023.{'\n'}
-          • Final approval is subject to local building code requirements and inspector review.{'\n'}
-          • For detailed compliance analysis, use the Inspector Mode AI feature.
+        <Text style={themeStyles.noteText}>
+          {`\u2022 This summary is based on the design data provided. Field verification is required.\n\u2022 All calculations comply with NEC 2023.\n\u2022 Final approval is subject to local building code requirements and inspector review.\n\u2022 For detailed compliance analysis, use the Inspector Mode AI feature.`}
         </Text>
       </View>
 
-      <SectionFooter label="NEC Compliance Summary" projectName={projectName} />
+      <BrandFooter projectName={projectName} />
     </Page>
   );
 };
