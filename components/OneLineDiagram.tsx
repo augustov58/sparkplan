@@ -141,6 +141,11 @@ import {
 import { DiagramPanZoom } from './DiagramPanZoom';
 import { exportDiagram, DiagramExportOptions } from '../services/pdfExport/oneLineDiagramExport';
 import { calculateTreeLayout, getDescendantIds } from '../services/diagram/treeLayoutCalculator';
+import {
+  getPanelDownstream,
+  getTransformerDownstream,
+  formatDependencyMessage,
+} from '../services/equipmentDependencies';
 import type { Database } from '../lib/database.types';
 
 // Database types for glyph functions
@@ -984,6 +989,16 @@ export const OneLineDiagram: React.FC<OneLineDiagramProps> = ({ project, updateP
     const panel = panels.find(p => p.id === id);
     if (!panel) return; // Guard check
 
+    // Block mid-tree deletes. Downstream panels/transformers get ON DELETE
+    // SET NULL at the DB layer, which leaves them orphaned (pass the loose
+    // panels_fed_from_check, but disappear from the tree-layout SVG).
+    // Force the user to delete leaves first.
+    const deps = getPanelDownstream(id, { panels, transformers });
+    if (deps.length > 0) {
+      alert(formatDependencyMessage(panel.name, deps));
+      return;
+    }
+
     // Count feeders that reference this panel. They will be deleted alongside
     // the panel (DB CHECK constraint prevents ON DELETE SET NULL from working
     // on feeders). Surface the count in the confirm so users aren't surprised.
@@ -1653,12 +1668,30 @@ export const OneLineDiagram: React.FC<OneLineDiagramProps> = ({ project, updateP
   };
 
   const removeTransformer = async (id: string) => {
-    // Check if any panels are fed from this transformer
-    const dependentPanels = panels.filter(p => p.fed_from_transformer_id === id);
-    if (dependentPanels.length > 0) {
-      alert(`Cannot delete transformer. ${dependentPanels.length} panel(s) are fed from it: ${dependentPanels.map(p => p.name).join(', ')}`);
+    const transformer = transformers.find(t => t.id === id);
+    if (!transformer) return;
+
+    // Block mid-tree deletes (same rationale as removePanel).
+    const deps = getTransformerDownstream(id, { panels });
+    if (deps.length > 0) {
+      alert(formatDependencyMessage(transformer.name, deps));
       return;
     }
+
+    // Count feeders that reference this transformer. Mirrors the panel-delete
+    // feeder cascade — deleteTransformer in useTransformers removes them first
+    // to avoid the feeders_source_and_destination_check violation.
+    const affectedFeederCount = feeders.filter(
+      f => f.source_transformer_id === id || f.destination_transformer_id === id
+    ).length;
+    const feederNote = affectedFeederCount > 0
+      ? `\n\nThis will also delete ${affectedFeederCount} feeder${affectedFeederCount === 1 ? '' : 's'} connected to this transformer.`
+      : '';
+
+    if (!confirm(`Delete transformer "${transformer.name}"?${feederNote}`)) {
+      return;
+    }
+
     await deleteTransformer(id);
   };
 
