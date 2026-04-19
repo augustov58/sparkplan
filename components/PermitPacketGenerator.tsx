@@ -86,10 +86,16 @@ export const PermitPacketGenerator: React.FC<PermitPacketGeneratorProps> = ({ pr
 
   const dataLoading = panelsLoading || circuitsLoading || feedersLoading || transformersLoading || groundingLoading;
 
-  // Validation
-  const canGenerate = 
-    currentProject &&
+  // Validation — contractor license + scope of work are both marked required
+  // in the UI (red asterisk). Gate generation on them so the submittal-quality
+  // promise holds (most AHJs reject packets missing either).
+  const hasLicense = contractorLicense.trim().length > 0;
+  const hasScope = scopeOfWork.trim().length > 0;
+  const canGenerate =
+    !!currentProject &&
     panels.length > 0 &&
+    hasLicense &&
+    hasScope &&
     !dataLoading;
 
   const handleGenerate = async () => {
@@ -587,6 +593,8 @@ export const PermitPacketGenerator: React.FC<PermitPacketGeneratorProps> = ({ pr
               <p className="font-medium mb-1">Cannot generate permit packet</p>
               <ul className="list-disc list-inside space-y-1">
                 {panels.length === 0 && <li>At least one panel is required</li>}
+                {!hasLicense && <li>Contractor License is required</li>}
+                {!hasScope && <li>Scope of Work is required</li>}
               </ul>
             </div>
           </div>

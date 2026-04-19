@@ -51,7 +51,6 @@ export interface PermitPacketData {
   serviceType?: 'overhead' | 'underground';
   meterLocation?: string;
   serviceConductorRouting?: string;
-  riserDiagramSvg?: string; // SVG string of the one-line diagram
   // Tier 3: Jurisdiction Requirements
   jurisdictionId?: string;
   jurisdiction?: Jurisdiction; // Full jurisdiction object for PDF generation
@@ -137,6 +136,8 @@ export const generatePermitPacket = async (data: PermitPacketData): Promise<void
           panels={data.panels}
           transformers={data.transformers}
           feeders={data.feeders}
+          meterStacks={data.meterStacks}
+          meters={data.meters}
           projectName={data.projectName}
           serviceVoltage={data.serviceVoltage}
           servicePhase={data.servicePhase}
@@ -146,9 +147,11 @@ export const generatePermitPacket = async (data: PermitPacketData): Promise<void
         <LoadCalculationSummary
           panels={data.panels}
           circuits={data.circuits}
+          transformers={data.transformers}
           projectName={data.projectName}
           serviceVoltage={data.serviceVoltage}
           servicePhase={data.servicePhase}
+          projectType={data.projectType}
         />
 
         {/* NEC Compliance Summary */}
@@ -319,9 +322,11 @@ export const generateLightweightPermitPacket = async (data: PermitPacketData): P
         <LoadCalculationSummary
           panels={data.panels}
           circuits={data.circuits}
+          transformers={data.transformers}
           projectName={data.projectName}
           serviceVoltage={data.serviceVoltage}
           servicePhase={data.servicePhase}
+          projectType={data.projectType}
         />
         <ComplianceSummary
           panels={data.panels}
