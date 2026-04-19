@@ -256,6 +256,10 @@ export function usePanels(projectId: string | undefined): UsePanelsReturn {
       }
 
       showToast.success(toastMessages.panel.created);
+      // Notify peer usePanels instances (e.g. FeederManager dropdown) to refetch.
+      // Supabase realtime can miss the second subscriber when two components share
+      // a channel name; this event bus guarantees every instance on the page refreshes.
+      dataRefreshEvents.emit('panels');
       return data;
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to create panel');
@@ -278,6 +282,7 @@ export function usePanels(projectId: string | undefined): UsePanelsReturn {
         throw error;
       }
       showToast.success(toastMessages.panel.updated);
+      dataRefreshEvents.emit('panels');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to update panel');
       showToast.error(toastMessages.panel.error);
@@ -286,13 +291,33 @@ export function usePanels(projectId: string | undefined): UsePanelsReturn {
 
   const deletePanel = async (id: string) => {
     try {
+      // Cascade-delete dependent feeders first. The FKs on feeders.source_panel_id
+      // and feeders.destination_panel_id are ON DELETE SET NULL, but a CHECK
+      // constraint (feeders_source_and_destination_check) requires exactly one of
+      // {panel_id, transformer_id} per side. SET NULL would leave both null and
+      // the panel delete rolls back with a 400. Removing the feeders first avoids
+      // the conflict. Callers are expected to confirm before reaching here.
+      const { error: feedersError } = await supabase
+        .from('feeders')
+        .delete()
+        .or(`source_panel_id.eq.${id},destination_panel_id.eq.${id}`);
+      if (feedersError) throw feedersError;
+
       const { error } = await supabase.from('panels').delete().eq('id', id);
 
       if (error) throw error;
       showToast.success(toastMessages.panel.deleted);
+      dataRefreshEvents.emit('panels');
+      // Feeders may have been cascaded; nudge useFeeders instances to refetch
+      // via its own window event (it does not subscribe to dataRefreshEvents).
+      if (projectId) {
+        window.dispatchEvent(
+          new CustomEvent('feeder-data-updated', { detail: { projectId } })
+        );
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to delete panel');
-      showToast.error(toastMessages.panel.error);
+      showToast.error(toastMessages.panel.deleteError);
     }
   };
 

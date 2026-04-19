@@ -45,6 +45,7 @@ export const toastMessages = {
     updated: 'Panel updated',
     deleted: 'Panel removed',
     error: 'Failed to update panel',
+    deleteError: 'Failed to delete panel',
   },
 
   // Circuits
