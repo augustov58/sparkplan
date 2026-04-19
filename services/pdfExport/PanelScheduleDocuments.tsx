@@ -4,17 +4,12 @@
  */
 
 import React from 'react';
-import { Document, Page, Text, View, StyleSheet, Font } from '@react-pdf/renderer';
+import { Document, Page, Text, View, StyleSheet } from '@react-pdf/renderer';
 import type { Panel, Circuit } from '../../lib/database.types';
 
-// Register fonts (optional, for better rendering)
-Font.register({
-  family: 'Helvetica',
-  fonts: [
-    { src: 'Helvetica' },
-    { src: 'Helvetica-Bold', fontWeight: 'bold' },
-  ]
-});
+// Helvetica + Helvetica-Bold are built-in PDF standard fonts in react-pdf —
+// calling Font.register() on them corrupts the font cache and causes
+// "Cannot read properties of null (reading 'props')" at render time.
 
 // Professional black & white styling for print
 export const styles = StyleSheet.create({

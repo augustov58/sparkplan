@@ -9,21 +9,14 @@
  */
 
 import React from 'react';
-import { Page, Text, View, StyleSheet, Font } from '@react-pdf/renderer';
+import { Page, Text, View, StyleSheet } from '@react-pdf/renderer';
 import type { Database } from '../../lib/database.types';
 
 type MeterStack = Database['public']['Tables']['meter_stacks']['Row'];
 type Meter = Database['public']['Tables']['meters']['Row'];
 type Panel = Database['public']['Tables']['panels']['Row'];
 
-// Register fonts
-Font.register({
-  family: 'Helvetica',
-  fonts: [
-    { src: 'Helvetica' },
-    { src: 'Helvetica-Bold', fontWeight: 'bold' },
-  ]
-});
+// Helvetica + Helvetica-Bold are built-in standard PDF fonts; do not register.
 
 const styles = StyleSheet.create({
   page: {

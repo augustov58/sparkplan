@@ -5,17 +5,10 @@
  */
 
 import React from 'react';
-import { Document, Page, Text, View, StyleSheet, Font } from '@react-pdf/renderer';
+import { Document, Page, Text, View, StyleSheet } from '@react-pdf/renderer';
 import type { MultiFamilyEVResult } from '../calculations/multiFamilyEV';
 
-// Register fonts
-Font.register({
-  family: 'Helvetica',
-  fonts: [
-    { src: 'Helvetica' },
-    { src: 'Helvetica-Bold', fontWeight: 'bold' },
-  ]
-});
+// Helvetica + Helvetica-Bold are built-in standard PDF fonts; do not register.
 
 // Professional styling
 const styles = StyleSheet.create({

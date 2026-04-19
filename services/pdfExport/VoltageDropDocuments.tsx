@@ -13,8 +13,7 @@ import {
   Page,
   Text,
   View,
-  StyleSheet,
-  Font
+  StyleSheet
 } from '@react-pdf/renderer';
 import type { Database } from '../../lib/database.types';
 import { calculateFeederSizing } from '../calculations/feederSizing';
