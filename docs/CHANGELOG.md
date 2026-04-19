@@ -4,6 +4,22 @@ All notable changes to SparkPlan.
 
 ---
 
+## 2026-04-19: `/circuits` Bug Sweep — Inputs, Cross-Component Refresh, Cascade-Delete
+
+**User-Facing Bug Fixes:**
+- **Numeric input fields no longer prefix a stubborn `0`.** Previously, clearing a number field and retyping produced values like `036` or `0120` because the controlled input re-rendered with `value="0"` mid-edit. All affected sites across the Dwelling Load Calculator and the standalone Calculators (voltage-drop, conduit-fill, short-circuit, EV charging, solar PV, arc flash) now use the buffered `NumberInput` component — typing behaves as expected.
+- **Newly created panels now appear immediately in the Feeder Sizing dropdown.** On `/circuits`, creating, renaming, or deleting a panel in the diagram now reflects in FeederManager's Destination Panel dropdown without refreshing the page.
+- **Panels with connected feeders can now be deleted.** Previously this failed with a confusing "Failed to update panel" error and the panel stayed. Deletion now succeeds and the confirmation dialog warns "This will also delete N feeder(s) connected to this panel." before proceeding. Error toasts for delete failures now read "Failed to delete panel" instead of "Failed to update panel".
+
+**Technical:**
+- `usePanels` now emits `dataRefreshEvents.emit('panels')` on every successful CRUD operation. This works around Supabase realtime's behavior when multiple components on the same page subscribe to a shared channel name (`panels_${projectId}`) — every peer hook instance refetches regardless.
+- `usePanels.deletePanel` performs an app-level cascade: it deletes feeders referencing the panel (`source_panel_id = id OR destination_panel_id = id`) before the panel itself. This is required because the `feeders` table has an FK at `ON DELETE SET NULL` combined with a CHECK constraint that requires exactly one of `{panel_id, transformer_id}` per side — the two would otherwise conflict and roll back the delete.
+- After cascading, `deletePanel` dispatches the `feeder-data-updated` window event so `useFeeders` instances also refetch.
+
+**PRs:** #8, #9
+
+---
+
 ## 2026-04-18 (PM): Stripe Webhook Signature Verification — Re-aligned to Env-Var Source of Truth
 
 **Operational:**

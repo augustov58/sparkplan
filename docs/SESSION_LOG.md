@@ -3,7 +3,54 @@
 **Purpose**: Tracks recent work for seamless handoff between Claude instances.
 **Maintenance Rule**: Keep only the last 2 sessions. At the start of a new session, delete older entries — git history preserves everything.
 
-**Last Updated**: 2026-04-18
+**Last Updated**: 2026-04-19
+
+---
+
+### Session: 2026-04-19 — `/circuits` Bug Sweep: Number Inputs + Panel CRUD Cross-Component Refresh + Cascade-Delete
+
+**Focus**: Three user-reported bugs all surfacing on `/circuits`:
+1. Every controlled `<input type="number">` retained a leading "0" after clear-and-retype (typed `3` → `03`, typed `36` → `036`).
+2. A newly created panel did not appear in FeederManager's Destination Panel dropdown until page refresh, even though it was visible elsewhere on the page.
+3. Deleting a panel that was referenced by any feeder returned a 400 and a misleading "Failed to update panel" toast.
+**Status**: ✅ All three fixed, verified live by user. PR #8 and PR #9 merged to main.
+
+**Work Done:**
+
+*Bug 1 — Leading-zero echo on numeric inputs (PR #8, commit `e8f8029`):*
+- Root cause: controlled pattern `value={n} onChange={e => setN(Number(e.target.value))}` re-renders as `value="0"` while the user is typing, because `Number("") === 0`. The browser echoes the `0` back into the input.
+- Fix: replaced 39 controlled sites with the existing `NumberInput` component (`components/common/NumberInput.tsx`), which keeps a local string buffer and only commits to the numeric state on valid parse / blur. Touched `DwellingLoadCalculator.tsx` (16 sites) and `Calculators.tsx` (23 sites). Skipped 5 nullable sites that already used the `value={x || ''}` + `... ? Number(...) : null` pattern (they dodge the bug).
+- Did NOT touch `LoadCalculator.tsx` — its two number inputs use react-hook-form's `{...register(...valueAsNumber: true)}`, which is uncontrolled and has no echo-back.
+
+*Bug 2 — Panel CRUD not refreshing peer `usePanels` instances (PR #9, commit `0d395f5`):*
+- Root cause: `/circuits` mounts TWO `usePanels(projectId)` instances — one inside `OneLineDiagram`, one inside `FeederManager`. Both open a Supabase realtime channel named `panels_${projectId}`; the second subscriber on a shared channel can miss `postgres_changes` events during reconnects. The hook already subscribed to `dataRefreshEvents.subscribe('panels', ...)` as a belt-and-suspenders fallback, but none of `createPanel`/`updatePanel`/`deletePanel` ever emitted — the bus was half-wired.
+- Fix: `createPanel` / `updatePanel` / `deletePanel` emit `'panels'` on success. Symmetry gap noted for `useCircuits.ts` / `useMeters.ts` / `useMeterStacks.ts` (subscribe-only, no emit) but deferred since no repro reported.
+
+*Bug 3 — Panel delete rejected by feeder CHECK constraint (PR #9, commit `545ef2e`):*
+- Root cause discovered via live Supabase logs. API log: `DELETE | 400 | /rest/v1/panels?id=eq.607442d3-...`. Postgres log at same timestamp: `ERROR: new row for relation "feeders" violates check constraint "feeders_source_and_destination_check"`. The feeders table has ON DELETE SET NULL on `source_panel_id` / `destination_panel_id`, but `feeders_source_and_destination_check` requires exactly one of `{panel_id, transformer_id}` per side. For a panel→panel feeder, the cascade leaves both sides null → constraint fires → delete rolls back with a 400.
+- Secondary UX bug: `toastMessages.panel.error` was hard-coded to "Failed to update panel" regardless of verb, so a delete failure looked like an update failure.
+- Fix (app-level cascade, not DB schema change):
+  - `deletePanel` now deletes dependent feeders via `.or('source_panel_id.eq.${id},destination_panel_id.eq.${id}')` before deleting the panel, then dispatches the `feeder-data-updated` window event so `useFeeders` instances refetch.
+  - `OneLineDiagram.removePanel` counts affected feeders from already-loaded state and adds "This will also delete N feeders connected to this panel." to the confirm dialog.
+  - Added `toastMessages.panel.deleteError` for verb-specific error wording.
+- Considered and rejected: changing FK to `ON DELETE CASCADE` (silently loses user data on misclick); loosening the CHECK (permits orphaned feeders at rest).
+
+**Key Files Touched:**
+- `components/DwellingLoadCalculator.tsx`, `components/Calculators.tsx` — NumberInput migration (PR #8)
+- `hooks/usePanels.ts` — emits `'panels'` on CRUD; cascade-deletes feeders in `deletePanel` (PR #9)
+- `components/OneLineDiagram.tsx` — `removePanel` now warns about feeder cascade count (PR #9)
+- `lib/toast.ts` — added `panel.deleteError` (PR #9)
+
+**Commits:**
+- `e8f8029` — fix(calculators): replace plain numeric inputs with NumberInput [PR #8, merged `2c32adf`]
+- `0d395f5` — fix(panels): emit dataRefreshEvents on CRUD so peer hooks refresh [PR #9]
+- `545ef2e` — fix(panels): cascade-delete dependent feeders to avoid CHECK conflict [PR #9, merged `2ec1079`]
+
+**PRs**: #8 (merged), #9 (merged)
+
+**Pending / Follow-ups:**
+- Same subscribe/emit asymmetry exists in `useCircuits.ts` / `useMeters.ts` / `useMeterStacks.ts` — candidate for the same one-line fix per CRUD function if a repro surfaces.
+- Transient "Add Panel button does nothing" report during Bug 2 diagnosis was self-resolved by user: Zod panelSchema rejects `bus_rating < 100`, and `showValidationErrors` uses `alert()` which browsers suppress after repeated dismissals. User confirmed 100A works and said no code change needed.
 
 ---
 
@@ -49,44 +96,3 @@
 - First real Stripe event in live traffic is the final belt-and-suspenders confirmation (watch for 200 in edge-function logs next subscription/invoice event)
 - **Recommended hygiene**: rotate signing secret via Stripe dashboard "Roll signing secret" — invalidates the value that's been shared through conversation history and the `.rollback/` snapshot. Follow steps 3-5 in `memory/stripe_webhook_signature.md`.
 - Consider deleting endpoint B (`adventurous-splendor`) once a real event has passed through endpoint A cleanly
-
----
-
-### Session: 2026-04-18 (AM) — Support Inbound Live-Deployment + Four-Bug Debug
-
-**Focus**: Take the Gmail-polling support-inbound pipeline from code-complete to live-verified. User handled infra (Google Cloud OAuth, Supabase secrets, Vault); this session ran `supabase db push`, deployed the three edge functions, and diagnosed/fixed four distinct bugs found during end-to-end testing.
-**Status**: Fully operational. Admin→user replies via email thread back into the ticket widget. User→admin replies thread back and notify the admin. PR #5 merged (`fd80444`).
-
-**Work Done:**
-
-*Migration history drift resolution:*
-- Remote tracking table had 4 MCP-applied migrations in `YYYYMMDDHHMMSS` format; local files used `YYYYMMDD_name` date-only format. CLI refused to reconcile.
-- Renamed all local migration files to unique 14-digit timestamps. Used `supabase migration repair --status applied`/`reverted` to align tracking rows with the new names.
-- Applied `20260417000000_support_events_and_investigations.sql` and `20260417000001_support_inbound_cron.sql` to production.
-
-*Four bugs fixed in sequence (each only visible after the prior fix):*
-
-1. **Gateway JWT rejection (both functions)**: Supabase Edge Functions gateway verifies JWT by default. pg_cron's `x-support-inbound-secret` header scheme isn't a JWT, so gateway returned `401 UNAUTHORIZED_NO_AUTH_HEADER` before `support-inbound` ever ran. Similarly, the internal `support-inbound → support-notify` call uses the new-format `sb_secret_...` API key which **is not a JWT** (Supabase's 2025 key redesign), so the gateway rejected that too. Fix: deploy both functions with `--no-verify-jwt`. Each function has its own auth check internally (constant-time secret compare in support-inbound, service-role-match in support-notify).
-
-2. **Vault secret placeholder never replaced**: The Supabase Vault entry for `support_inbound_secret` was the literal template string `<paste openssl_rand_hex output here>` (35 chars, first char `<`, last char `>`). The user had only set the env-var side of the secret pair. Fix: generated fresh `openssl rand -hex 32`, updated both Vault (via `vault.update_secret`) and the edge-function env (via `supabase secrets set`) to matching values.
-
-3. **Shared mailbox not recognized as admin**: The `ADMIN_EMAIL` constant was hardcoded to the registered admin login email (`augustovalbuena@gmail.com`), but admin replies in practice always originate from the shared `support@sparkplan.app` Workspace mailbox. Patched `support-inbound/index.ts` to accept either `ADMIN_EMAIL` OR the `GMAIL_MAILBOX` env var as admin identities.
-
-4. **`is:unread` Gmail query strands opened messages**: The Gmail search filter `is:unread` means any message a human opens in the `support@sparkplan.app` inbox before cron polls it becomes invisible to the function. Workaround documented: mark as unread to re-trigger. Future fix: switch to Gmail History API (the `last_history_id` column is already provisioned).
-
-*Documentation:*
-- Expanded `docs/SUPPORT_INBOUND_SETUP.md` troubleshooting section into a **7-stage diagnostic playbook** with exact SQL queries, response-body fingerprints, and remediation steps for every layer from cron firing through echo-email delivery.
-
-**Key Files Touched:**
-- `supabase/migrations/*` — renamed all 29 migration files to unique 14-digit timestamps
-- `supabase/functions/support-inbound/index.ts` — added `GMAIL_MAILBOX` as admin identity
-- `docs/SUPPORT_INBOUND_SETUP.md` — full troubleshooting playbook
-
-**Commits (branch `feat/support-email-inbound`, merged as PR #5):**
-- `267452a` — chore(migrations): migrate to 14-digit timestamps; deploy support-inbound stack
-- `e0f9614` — fix(support-inbound): recognize shared support mailbox as admin sender
-- `9ad2e77` — docs: support-inbound troubleshooting playbook + 2026-04-18 session entry
-- `9f36b8a` — docs(roadmap): extend Phase 3.2 to cover inbound email pipeline
-
-**Pending:**
-- Future: Gmail History API migration to replace `is:unread` polling (`support_gmail_sync_state.last_history_id` already provisioned)
