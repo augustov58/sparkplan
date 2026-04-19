@@ -21,14 +21,14 @@ import {
   LoadCalculationSummary,
   ComplianceSummary
 } from './PermitPacketDocuments';
-import { PanelScheduleDocument } from './PanelScheduleDocuments';
-import { EquipmentSpecsDocument } from './EquipmentSpecsDocuments';
-import { VoltageDropDocument } from './VoltageDropDocuments';
-import { JurisdictionRequirementsDocument } from './JurisdictionDocuments';
-import { ShortCircuitCalculationDocument } from './ShortCircuitDocuments';
-import { ArcFlashDocument } from './ArcFlashDocuments';
-import { GroundingPlanDocument } from './GroundingPlanDocuments';
-import { MultiFamilyEVDocument } from './MultiFamilyEVDocuments';
+import { PanelSchedulePages } from './PanelScheduleDocuments';
+import { EquipmentSpecsPages } from './EquipmentSpecsDocuments';
+import { VoltageDropPages } from './VoltageDropDocuments';
+import { JurisdictionRequirementsPages } from './JurisdictionDocuments';
+import { ShortCircuitCalculationPages } from './ShortCircuitDocuments';
+import { ArcFlashPages } from './ArcFlashDocuments';
+import { GroundingPlanPages } from './GroundingPlanDocuments';
+import { MultiFamilyEVPages } from './MultiFamilyEVDocuments';
 import { MeterStackScheduleDocument } from './MeterStackSchedulePDF';
 
 export interface PermitPacketData {
@@ -220,7 +220,7 @@ export const generatePermitPacket = async (data: PermitPacketData): Promise<void
   pages.push({
     name: 'EquipmentSpecs',
     element: (
-      <EquipmentSpecsDocument
+      <EquipmentSpecsPages
         projectName={data.projectName}
         projectAddress={data.projectAddress}
         panels={data.panels}
@@ -234,7 +234,7 @@ export const generatePermitPacket = async (data: PermitPacketData): Promise<void
     pages.push({
       name: 'VoltageDrop',
       element: (
-        <VoltageDropDocument
+        <VoltageDropPages
           projectName={data.projectName}
           projectAddress={data.projectAddress}
           feeders={data.feeders}
@@ -251,7 +251,7 @@ export const generatePermitPacket = async (data: PermitPacketData): Promise<void
       pages.push({
         name: `ShortCircuit[${idx}:${calc.panel_name ?? calc.calculation_type ?? calc.id ?? '?'}]`,
         element: (
-          <ShortCircuitCalculationDocument
+          <ShortCircuitCalculationPages
             calculation={calc}
             projectName={data.projectName}
             projectAddress={data.projectAddress}
@@ -266,7 +266,7 @@ export const generatePermitPacket = async (data: PermitPacketData): Promise<void
     pages.push({
       name: 'ArcFlash',
       element: (
-        <ArcFlashDocument
+        <ArcFlashPages
           projectName={data.projectName}
           projectAddress={data.projectAddress}
           equipmentName={data.arcFlashData.equipmentName}
@@ -280,7 +280,7 @@ export const generatePermitPacket = async (data: PermitPacketData): Promise<void
     pages.push({
       name: 'GroundingPlan',
       element: (
-        <GroundingPlanDocument
+        <GroundingPlanPages
           projectName={data.projectName}
           projectAddress={data.projectAddress}
           grounding={data.groundingSystem}
@@ -310,7 +310,7 @@ export const generatePermitPacket = async (data: PermitPacketData): Promise<void
     pages.push({
       name: 'MultiFamilyEV',
       element: (
-        <MultiFamilyEVDocument
+        <MultiFamilyEVPages
           result={data.multiFamilyEVAnalysis.result}
           buildingName={data.multiFamilyEVAnalysis.buildingName || data.projectName}
         />
@@ -322,7 +322,7 @@ export const generatePermitPacket = async (data: PermitPacketData): Promise<void
     pages.push({
       name: 'JurisdictionRequirements',
       element: (
-        <JurisdictionRequirementsDocument
+        <JurisdictionRequirementsPages
           jurisdiction={data.jurisdiction}
           projectName={data.projectName}
         />
@@ -335,7 +335,7 @@ export const generatePermitPacket = async (data: PermitPacketData): Promise<void
     pages.push({
       name: `PanelSchedule[${panel.name}]`,
       element: (
-        <PanelScheduleDocument
+        <PanelSchedulePages
           panel={panel}
           circuits={panelCircuits}
           projectName={data.projectName}

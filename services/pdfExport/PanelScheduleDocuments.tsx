@@ -198,8 +198,8 @@ interface PanelSchedulePDFProps {
   datePreppared?: string;
 }
 
-// Main PDF Document Component for single panel
-export const PanelScheduleDocument: React.FC<PanelSchedulePDFProps> = ({
+// Main PDF Component for single panel — page-level fragment for embedding.
+export const PanelSchedulePages: React.FC<PanelSchedulePDFProps> = ({
   panel,
   circuits,
   projectName,
@@ -233,13 +233,12 @@ export const PanelScheduleDocument: React.FC<PanelSchedulePDFProps> = ({
     phaseBalancing.phaseC_VA;
 
   return (
-    <Document>
-      <Page size="LETTER" style={styles.page}>
-        {/* Header Section */}
-        <View style={styles.header}>
-          <Text style={styles.title}>PANEL SCHEDULE</Text>
-          <Text style={styles.subtitle}>{projectName}</Text>
-          {projectAddress && <Text style={styles.subtitle}>{projectAddress}</Text>}
+    <Page size="LETTER" style={styles.page}>
+      {/* Header Section */}
+      <View style={styles.header}>
+        <Text style={styles.title}>PANEL SCHEDULE</Text>
+        <Text style={styles.subtitle}>{projectName}</Text>
+        {projectAddress && <Text style={styles.subtitle}>{projectAddress}</Text>}
 
           <View style={styles.infoGrid}>
             <View style={styles.infoColumn}>
@@ -414,9 +413,15 @@ export const PanelScheduleDocument: React.FC<PanelSchedulePDFProps> = ({
           </Text>
         </View>
       </Page>
-    </Document>
   );
 };
+
+// Standalone single-panel Document (used by panel-specific PDF exporters).
+export const PanelScheduleDocument: React.FC<PanelSchedulePDFProps> = (props) => (
+  <Document>
+    <PanelSchedulePages {...props} />
+  </Document>
+);
 
 /**
  * Multi-Panel Document Component

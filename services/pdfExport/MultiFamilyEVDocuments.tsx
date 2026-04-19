@@ -247,9 +247,10 @@ interface MultiFamilyEVDocumentProps {
 }
 
 /**
- * Single Multi-Family EV Analysis Document
+ * Single Multi-Family EV Analysis — page-level fragment.
+ * Use when embedding inside a parent <Document>.
  */
-export const MultiFamilyEVDocument: React.FC<MultiFamilyEVDocumentProps> = ({
+export const MultiFamilyEVPages: React.FC<MultiFamilyEVDocumentProps> = ({
   result,
   buildingName,
   preparedBy,
@@ -262,7 +263,7 @@ export const MultiFamilyEVDocument: React.FC<MultiFamilyEVDocumentProps> = ({
   });
 
   return (
-    <Document>
+    <>
       <Page size="LETTER" style={styles.page}>
         {/* Header */}
         <View style={styles.header}>
@@ -689,6 +690,15 @@ export const MultiFamilyEVDocument: React.FC<MultiFamilyEVDocumentProps> = ({
           <Text>This report is for engineering reference purposes. Verify all calculations per local AHJ requirements.</Text>
         </View>
       </Page>
-    </Document>
+    </>
   );
 };
+
+/**
+ * Single Multi-Family EV Analysis Document (standalone).
+ */
+export const MultiFamilyEVDocument: React.FC<MultiFamilyEVDocumentProps> = (props) => (
+  <Document>
+    <MultiFamilyEVPages {...props} />
+  </Document>
+);

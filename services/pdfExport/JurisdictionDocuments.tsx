@@ -105,13 +105,12 @@ interface JurisdictionRequirementsDocumentProps {
   projectName: string;
 }
 
-export const JurisdictionRequirementsDocument: React.FC<JurisdictionRequirementsDocumentProps> = ({
+export const JurisdictionRequirementsPages: React.FC<JurisdictionRequirementsDocumentProps> = ({
   jurisdiction,
   projectName,
 }) => {
   return (
-    <Document>
-      <Page size="LETTER" orientation="portrait" style={styles.page}>
+    <Page size="LETTER" orientation="portrait" style={styles.page}>
 
         {/* Header */}
         <Text style={styles.header}>
@@ -215,6 +214,11 @@ export const JurisdictionRequirementsDocument: React.FC<JurisdictionRequirements
           </Text>
         </View>
       </Page>
-    </Document>
   );
 };
+
+export const JurisdictionRequirementsDocument: React.FC<JurisdictionRequirementsDocumentProps> = (props) => (
+  <Document>
+    <JurisdictionRequirementsPages {...props} />
+  </Document>
+);

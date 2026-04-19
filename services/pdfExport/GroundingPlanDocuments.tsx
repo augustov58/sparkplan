@@ -151,7 +151,7 @@ interface GroundingPlanDocumentProps {
   conductorMaterial: 'Cu' | 'Al';
 }
 
-export const GroundingPlanDocument: React.FC<GroundingPlanDocumentProps> = ({
+export const GroundingPlanPages: React.FC<GroundingPlanDocumentProps> = ({
   projectName,
   projectAddress,
   grounding,
@@ -162,8 +162,7 @@ export const GroundingPlanDocument: React.FC<GroundingPlanDocumentProps> = ({
   const isCompliant = grounding.electrodes && grounding.electrodes.length > 0 && grounding.gec_size;
 
   return (
-    <Document>
-      <Page size="LETTER" style={styles.page}>
+    <Page size="LETTER" style={styles.page}>
         {/* Header */}
         <View style={styles.header}>
           <Text style={styles.title}>GROUNDING ELECTRODE SYSTEM PLAN</Text>
@@ -388,6 +387,11 @@ export const GroundingPlanDocument: React.FC<GroundingPlanDocumentProps> = ({
           </Text>
         </View>
       </Page>
-    </Document>
   );
 };
+
+export const GroundingPlanDocument: React.FC<GroundingPlanDocumentProps> = (props) => (
+  <Document>
+    <GroundingPlanPages {...props} />
+  </Document>
+);

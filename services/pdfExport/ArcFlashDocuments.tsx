@@ -138,7 +138,7 @@ interface ArcFlashDocumentProps {
   };
 }
 
-export const ArcFlashDocument: React.FC<ArcFlashDocumentProps> = ({
+export const ArcFlashPages: React.FC<ArcFlashDocumentProps> = ({
   projectName,
   projectAddress,
   equipmentName,
@@ -160,8 +160,7 @@ export const ArcFlashDocument: React.FC<ArcFlashDocumentProps> = ({
   };
 
   return (
-    <Document>
-      <Page size="LETTER" style={styles.page}>
+    <Page size="LETTER" style={styles.page}>
         {/* Header */}
         <View style={styles.header}>
           <Text style={styles.title}>ARC FLASH HAZARD ANALYSIS</Text>
@@ -290,6 +289,11 @@ export const ArcFlashDocument: React.FC<ArcFlashDocumentProps> = ({
           </Text>
         </View>
       </Page>
-    </Document>
   );
 };
+
+export const ArcFlashDocument: React.FC<ArcFlashDocumentProps> = (props) => (
+  <Document>
+    <ArcFlashPages {...props} />
+  </Document>
+);

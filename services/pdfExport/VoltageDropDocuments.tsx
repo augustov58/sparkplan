@@ -490,7 +490,7 @@ const Footer: React.FC = () => (
 /**
  * Main Voltage Drop Report PDF Document
  */
-export const VoltageDropDocument: React.FC<VoltageDropDocumentProps> = ({
+export const VoltageDropPages: React.FC<VoltageDropDocumentProps> = ({
   projectName,
   projectAddress,
   feeders,
@@ -503,29 +503,33 @@ export const VoltageDropDocument: React.FC<VoltageDropDocumentProps> = ({
   const stats = getSummaryStats(feederData);
 
   return (
-    <Document>
-      <Page size="LETTER" orientation="portrait" style={styles.page}>
-        {/* Header */}
-        <Header projectName={projectName} projectAddress={projectAddress} />
+    <Page size="LETTER" orientation="portrait" style={styles.page}>
+      {/* Header */}
+      <Header projectName={projectName} projectAddress={projectAddress} />
 
-        {/* Summary Box */}
-        <SummaryBox stats={stats} />
+      {/* Summary Box */}
+      <SummaryBox stats={stats} />
 
-        {/* Voltage Drop Table */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Feeder Voltage Drop Analysis</Text>
-          <VoltageDropTable feederData={feederData} />
-        </View>
+      {/* Voltage Drop Table */}
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>Feeder Voltage Drop Analysis</Text>
+        <VoltageDropTable feederData={feederData} />
+      </View>
 
-        {/* Warnings Section */}
-        <WarningsSection feederData={feederData} />
+      {/* Warnings Section */}
+      <WarningsSection feederData={feederData} />
 
-        {/* NEC References */}
-        {includeNECReferences && <NECReferencesSection />}
+      {/* NEC References */}
+      {includeNECReferences && <NECReferencesSection />}
 
-        {/* Footer */}
-        <Footer />
-      </Page>
-    </Document>
+      {/* Footer */}
+      <Footer />
+    </Page>
   );
 };
+
+export const VoltageDropDocument: React.FC<VoltageDropDocumentProps> = (props) => (
+  <Document>
+    <VoltageDropPages {...props} />
+  </Document>
+);
