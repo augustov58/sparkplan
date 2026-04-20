@@ -2291,7 +2291,7 @@ const ChangeImpactAnalyzer: React.FC<ChangeImpactAnalyzerProps> = ({ projectId }
             <div>
               <p className="text-sm font-medium text-green-900">Analysis started!</p>
               <p className="text-sm text-green-700 mt-1">
-                Check the <strong>AI Copilot sidebar</strong> (right side) for detailed results including service impact, cost estimates, and recommendations.
+                Open <strong>Spark Copilot</strong> (bottom-right) for detailed results including service impact, cost estimates, and recommendations.
               </p>
             </div>
           </div>
@@ -2415,7 +2415,7 @@ const ChangeImpactAnalyzer: React.FC<ChangeImpactAnalyzerProps> = ({ projectId }
           <li>✓ Step-by-step recommendations with NEC references</li>
         </ul>
         <p className="text-xs text-[#888] mt-3">
-          Results appear in the AI Copilot sidebar. You can approve or reject the analysis.
+          Results appear in Spark Copilot (bottom-right). You can approve or reject the analysis.
         </p>
       </div>
     </div>

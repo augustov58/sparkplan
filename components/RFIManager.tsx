@@ -274,8 +274,8 @@ export const RFIManager: React.FC<RFIManagerProps> = ({ project }) => {
                       // Call Python backend to draft RFI
                       await draftRFI(project.id, aiTopic, aiContext);
 
-                      // Success! The draft will appear in AI Copilot sidebar
-                      alert('AI RFI draft started! Check the AI Copilot sidebar (right side) for the generated RFI. You can review and approve it there.');
+                      // Success! The draft will appear in Spark Copilot
+                      alert('AI RFI draft started! Open Spark Copilot (bottom-right) for the generated RFI. You can review and approve it there.');
 
                       // Reset AI form
                       setAiTopic('');

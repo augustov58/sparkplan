@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect, Suspense, lazy } from 'react';
+import React, { useState, useEffect, useRef, Suspense, lazy } from 'react';
 import { HashRouter, Routes, Route, Navigate, useParams, useNavigate, useLocation } from 'react-router-dom';
 import { Layout } from './components/Layout';
 import { Dashboard } from './components/Dashboard';
@@ -40,7 +40,7 @@ import { usePanels } from './hooks/usePanels';
 import { useCircuits } from './hooks/useCircuits';
 import { useFeeders } from './hooks/useFeeders';
 import { useTransformers } from './hooks/useTransformers';
-import { Send, MessageSquare, Info, Copy, Check, Bot, User, Sparkles, Maximize2, Minimize2 } from 'lucide-react';
+import { Send, MessageSquare, Info, Copy, Check, User, Sparkles, Maximize2, Minimize2, Trash2, Square, RotateCw, Lock, ChevronDown, ChevronRight } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { nanoid } from 'nanoid';
@@ -280,32 +280,67 @@ interface Message {
     };
 }
 
+const COPILOT_STORAGE_PREFIX = 'sparkplan.copilot.history';
+const copilotStorageKey = (projectId?: string) => `${COPILOT_STORAGE_PREFIX}.${projectId || 'global'}`;
+
+const loadCopilotHistory = (projectId?: string): Message[] => {
+    try {
+        const raw = localStorage.getItem(copilotStorageKey(projectId));
+        if (!raw) return [];
+        const parsed = JSON.parse(raw) as Array<Omit<Message, 'timestamp'> & { timestamp: string }>;
+        return parsed.map(m => ({ ...m, timestamp: new Date(m.timestamp) }));
+    } catch {
+        return [];
+    }
+};
+
+const saveCopilotHistory = (projectId: string | undefined, history: Message[]) => {
+    try {
+        if (history.length === 0) {
+            localStorage.removeItem(copilotStorageKey(projectId));
+        } else {
+            localStorage.setItem(copilotStorageKey(projectId), JSON.stringify(history));
+        }
+    } catch {
+        // storage full or disabled — silently ignore
+    }
+};
+
+const linkNecReferences = (text: string): string =>
+    text.replace(
+        /(?:NEC|Article)\s+(\d+(?:\.\d+)?)/gi,
+        (match) => `[${match}](https://www.nfpa.org/codes-and-standards/all-codes-and-standards/list-of-codes-and-standards/detail?code=70)`
+    );
+
 const NecAssistant = () => {
     const { hasFeature } = useSubscription();
-    const [isOpen, setIsOpen] = useState(false);
-    const [isEnlarged, setIsEnlarged] = useState(false);
-    const [query, setQuery] = useState('');
-    const [history, setHistory] = useState<Message[]>([]);
-    const [loading, setLoading] = useState(false);
-    const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
-    const messagesEndRef = React.useRef<HTMLDivElement>(null);
+    const navigate = useNavigate();
     const location = useLocation();
 
-    // Detect project context from URL
     const projectMatch = location.pathname.match(/\/project\/([^/]+)/);
     const projectId = projectMatch ? projectMatch[1] : undefined;
 
-    // Fetch project data if in project context
+    const [isOpen, setIsOpen] = useState(false);
+    const [isEnlarged, setIsEnlarged] = useState(false);
+    const [query, setQuery] = useState('');
+    const [history, setHistory] = useState<Message[]>(() => loadCopilotHistory(projectId));
+    const [loading, setLoading] = useState(false);
+    const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
+    const [expandedToolIdx, setExpandedToolIdx] = useState<number | null>(null);
+    const [errorMessage, setErrorMessage] = useState<string | null>(null);
+    const [, forceTick] = useState(0);
+    const messagesEndRef = useRef<HTMLDivElement>(null);
+    const textareaRef = useRef<HTMLTextAreaElement>(null);
+    const generationIdRef = useRef<string | null>(null);
+
     const { panels } = usePanels(projectId);
     const { circuits } = useCircuits(projectId);
     const { feeders } = useFeeders(projectId);
     const { transformers } = useTransformers(projectId);
 
-    // Get project info from projects list (if available)
     const { projects } = useProjects();
     const currentProject = projectId ? projects.find(p => p.id === projectId) : undefined;
 
-    // Build context if in project
     const hasContext = projectId && currentProject && panels.length > 0;
     const projectContext = hasContext && currentProject
         ? buildProjectContext(
@@ -322,20 +357,75 @@ const NecAssistant = () => {
           )
         : null;
 
-    // Auto-scroll to bottom when new messages arrive
+    useEffect(() => {
+        setHistory(loadCopilotHistory(projectId));
+        setErrorMessage(null);
+    }, [projectId]);
+
+    useEffect(() => {
+        saveCopilotHistory(projectId, history);
+    }, [history, projectId]);
+
     useEffect(() => {
         messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-    }, [history, loading]);
+    }, [history, loading, errorMessage]);
 
-    // AI Copilot is gated to Business tier (must be after all hooks)
-    if (!hasFeature('ai-copilot')) return null;
+    useEffect(() => {
+        if (!isOpen || history.length === 0) return;
+        const id = setInterval(() => forceTick(t => t + 1), 60_000);
+        return () => clearInterval(id);
+    }, [isOpen, history.length]);
 
-    // Format timestamp
+    useEffect(() => {
+        if (!isOpen) return;
+        const t = setTimeout(() => textareaRef.current?.focus(), 120);
+        return () => clearTimeout(t);
+    }, [isOpen]);
+
+    useEffect(() => {
+        const onKey = (e: KeyboardEvent) => {
+            if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
+                e.preventDefault();
+                setIsOpen(v => !v);
+                return;
+            }
+            if (e.key === 'Escape' && isOpen) {
+                setIsOpen(false);
+            }
+        };
+        window.addEventListener('keydown', onKey);
+        return () => window.removeEventListener('keydown', onKey);
+    }, [isOpen]);
+
+    useEffect(() => {
+        const el = textareaRef.current;
+        if (!el) return;
+        el.style.height = 'auto';
+        el.style.height = Math.min(el.scrollHeight, 120) + 'px';
+    }, [query]);
+
+    if (!hasFeature('ai-copilot')) {
+        return (
+            <div className="fixed bottom-4 right-4 md:bottom-6 md:right-6 z-50">
+                <button
+                    onClick={() => navigate('/pricing')}
+                    className="bg-[var(--color-primary)] hover:bg-[var(--color-primary-hover)] text-white w-14 h-14 rounded-full shadow-lg flex items-center justify-center transition-all relative"
+                    aria-label="Spark Copilot (upgrade required)"
+                    title="Spark Copilot — Upgrade to unlock"
+                >
+                    <Sparkles className="w-6 h-6 text-[var(--color-accent-300)]" />
+                    <span className="absolute -top-1 -right-1 bg-white text-[var(--color-primary)] rounded-full w-5 h-5 flex items-center justify-center shadow-sm">
+                        <Lock className="w-3 h-3" />
+                    </span>
+                </button>
+            </div>
+        );
+    }
+
     const formatTime = (date: Date) => {
         const now = new Date();
         const diff = now.getTime() - date.getTime();
         const minutes = Math.floor(diff / 60000);
-        
         if (minutes < 1) return 'Just now';
         if (minutes < 60) return `${minutes}m ago`;
         const hours = Math.floor(minutes / 60);
@@ -343,7 +433,6 @@ const NecAssistant = () => {
         return date.toLocaleDateString();
     };
 
-    // Copy message to clipboard
     const handleCopy = async (text: string, index: number) => {
         try {
             await navigator.clipboard.writeText(text);
@@ -354,19 +443,19 @@ const NecAssistant = () => {
         }
     };
 
-    // Extract and link NEC article references
-    const processNecReferences = (text: string): string => {
-        // Pattern: NEC 220.42, Article 250, etc.
-        return text.replace(
-            /(?:NEC|Article)\s+(\d+(?:\.\d+)?)/gi,
-            (match, article) => {
-                const articleNum = article.replace(/\./g, '-');
-                return `[${match}](https://www.nfpa.org/codes-and-standards/all-codes-and-standards/list-of-codes-and-standards/detail?code=70&tab=code-chapters)`;
-            }
-        );
+    const handleClear = () => {
+        if (history.length === 0) return;
+        if (!window.confirm('Clear this conversation? This cannot be undone.')) return;
+        setHistory([]);
+        setErrorMessage(null);
+        setExpandedToolIdx(null);
     };
 
-    // Quick action examples
+    const handleStop = () => {
+        generationIdRef.current = null;
+        setLoading(false);
+    };
+
     const quickActions = hasContext ? [
         `Can I use #10 wire for the AC unit on panel ${panels[0]?.name || 'H1'}?`,
         `Is my service sized correctly?`,
@@ -384,26 +473,27 @@ const NecAssistant = () => {
         if (!q) return;
 
         setQuery('');
+        setErrorMessage(null);
+
+        const priorHistory = history;
         const newUserMessage: Message = { role: 'user', text: q, timestamp: new Date() };
         setHistory(prev => [...prev, newUserMessage]);
         setLoading(true);
 
+        const thisGen = nanoid();
+        generationIdRef.current = thisGen;
+
         try {
-            // Build conversation history for memory (format for AI)
             const conversationHistory = buildConversationHistory(
-                history.map(m => ({
+                priorHistory.map(m => ({
                     id: nanoid(),
                     role: m.role === 'ai' ? 'assistant' : 'user',
                     content: m.text,
                     timestamp: m.timestamp
                 })),
-                10 // Keep last 10 messages for context
+                10
             );
-
-            // Determine if this is the first message (for context inclusion)
-            const isFirstMessage = history.length === 0;
-
-            // Build project context for tools (or empty fallback)
+            const isFirstMessage = priorHistory.length === 0;
             const context: ProjectContext = projectContext || {
                 projectId: '',
                 projectName: 'General',
@@ -418,146 +508,148 @@ const NecAssistant = () => {
                 totalLoad: { connectedVA: 0, demandVA: 0 }
             };
 
-            // Call with tools for agentic capabilities
-            const result = await askNecAssistantWithTools(
-                q,
-                conversationHistory,
-                context,
-                isFirstMessage
-            );
+            const result = await askNecAssistantWithTools(q, conversationHistory, context, isFirstMessage);
 
-            // Build response message with tool info
+            if (generationIdRef.current !== thisGen) return;
+
             const aiMessage: Message = {
                 role: 'ai',
                 text: result.response || 'Sorry, I could not retrieve that information.',
                 timestamp: new Date(),
                 toolUsed: result.toolUsed
             };
-
             setHistory(prev => [...prev, aiMessage]);
-        } catch (error) {
+        } catch (error: any) {
+            if (generationIdRef.current !== thisGen) return;
             console.error('Chat error:', error);
-            setHistory(prev => [...prev, {
-                role: 'ai',
-                text: 'Sorry, I encountered an error. Please try again.',
-                timestamp: new Date()
-            }]);
+            setErrorMessage(error?.message || 'Something went wrong. Please try again.');
         } finally {
-            setLoading(false);
+            if (generationIdRef.current === thisGen) {
+                setLoading(false);
+                generationIdRef.current = null;
+            }
         }
+    };
+
+    const handleRetry = () => {
+        const lastUser = [...history].reverse().find(m => m.role === 'user');
+        if (!lastUser) return;
+        setHistory(prev => prev.filter((_, i) => !(i === prev.length - 1 && prev[i].role === 'user')));
+        setErrorMessage(null);
+        handleAsk(lastUser.text);
     };
 
     return (
         <div className="fixed bottom-4 right-4 left-4 md:left-auto md:bottom-6 md:right-6 z-50 flex flex-col items-end">
             {isOpen && (
-                <div className={`bg-white border border-gray-200 shadow-2xl rounded-lg mb-4 flex flex-col overflow-hidden animate-in slide-in-from-bottom-10 fade-in duration-300 transition-all w-full ${
-                    isEnlarged ? 'md:w-[600px] h-[90vh] md:h-[700px]' : 'md:w-96 h-[70vh] md:h-[500px]'
-                }`}>
+                <div
+                    role="dialog"
+                    aria-label="Spark Copilot"
+                    className={`bg-white border border-[var(--color-border)] shadow-2xl rounded-xl mb-4 flex flex-col overflow-hidden animate-in slide-in-from-bottom-10 fade-in duration-300 transition-all w-full ${
+                        isEnlarged ? 'md:w-[600px] h-[90vh] md:h-[700px]' : 'md:w-96 h-[70vh] md:h-[500px]'
+                    }`}
+                >
                     {/* Header */}
-                    <div className="bg-gradient-to-r from-gray-900 to-gray-800 text-white p-4 flex justify-between items-center">
-                        <div className="flex items-center gap-2">
-                            <Sparkles className="w-4 h-4 text-electric-500"/>
-                            <span className="font-medium">NEC Copilot</span>
+                    <div className="bg-[var(--color-primary)] text-white px-4 py-3 flex justify-between items-center">
+                        <div className="flex items-center gap-2 min-w-0">
+                            <Sparkles className="w-4 h-4 text-[var(--color-accent-300)] flex-shrink-0" />
+                            <span className="font-serif text-base truncate">Spark Copilot</span>
                             {hasContext && (
-                                <span className="text-xs bg-electric-500 text-black px-2 py-0.5 rounded-full font-medium flex items-center gap-1">
+                                <span className="text-[10px] uppercase tracking-wider bg-[var(--color-accent-100)] text-[var(--color-accent-700)] px-2 py-0.5 rounded-full font-semibold flex items-center gap-1 flex-shrink-0">
                                     <Info className="w-3 h-3" />
-                                    Project Context
+                                    Project
                                 </span>
                             )}
                         </div>
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-1">
+                            <button
+                                onClick={handleClear}
+                                disabled={history.length === 0}
+                                className="text-white/60 hover:text-white transition-colors p-1.5 rounded hover:bg-white/10 disabled:opacity-30 disabled:cursor-not-allowed"
+                                aria-label="Clear conversation"
+                                title="Clear conversation"
+                            >
+                                <Trash2 className="w-4 h-4" />
+                            </button>
                             <button
                                 onClick={() => setIsEnlarged(!isEnlarged)}
-                                className="text-gray-400 hover:text-white transition-colors p-1 rounded hover:bg-gray-700"
+                                className="text-white/60 hover:text-white transition-colors p-1.5 rounded hover:bg-white/10"
                                 aria-label={isEnlarged ? "Minimize chat" : "Maximize chat"}
                                 title={isEnlarged ? "Minimize" : "Maximize"}
                             >
-                                {isEnlarged ? (
-                                    <Minimize2 className="w-4 h-4" />
-                                ) : (
-                                    <Maximize2 className="w-4 h-4" />
-                                )}
+                                {isEnlarged ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
                             </button>
-                            <button 
-                                onClick={() => setIsOpen(false)} 
-                                className="text-gray-400 hover:text-white transition-colors"
+                            <button
+                                onClick={() => setIsOpen(false)}
+                                className="text-white/60 hover:text-white transition-colors p-1.5 rounded hover:bg-white/10"
                                 aria-label="Close chat"
+                                title="Close (Esc)"
                             >
-                                ×
+                                <span className="text-lg leading-none">×</span>
                             </button>
                         </div>
                     </div>
 
                     {/* Messages Area */}
-                    <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-gray-50">
+                    <div
+                        className="flex-1 overflow-y-auto p-4 space-y-4 bg-[var(--color-paper)]"
+                        aria-live="polite"
+                        aria-busy={loading}
+                    >
                         {history.length === 0 && (
-                            <div className="text-center text-gray-500 text-sm mt-8">
-                                {hasContext ? (
-                                    <>
-                                        <Bot className="w-12 h-12 mx-auto mb-3 text-gray-300" />
-                                        <p className="font-medium text-gray-700 mb-3">Ask about your project</p>
-                                        <div className="space-y-2">
-                                            {quickActions.map((action, idx) => (
-                                                <button
-                                                    key={idx}
-                                                    onClick={() => handleAsk(action)}
-                                                    className="block w-full text-left text-xs bg-white border border-gray-200 rounded-lg px-3 py-2 hover:border-electric-500 hover:bg-electric-50 transition-colors text-gray-600"
-                                                >
-                                                    "{action}"
-                                                </button>
-                                            ))}
-                                        </div>
-                                        <p className="text-xs text-gray-400 mt-4">Or type your own question</p>
-                                    </>
-                                ) : (
-                                    <>
-                                        <Bot className="w-12 h-12 mx-auto mb-3 text-gray-300" />
-                                        <p className="font-medium text-gray-700 mb-3">Ask any NEC question</p>
-                                        <div className="space-y-2">
-                                            {quickActions.map((action, idx) => (
-                                                <button
-                                                    key={idx}
-                                                    onClick={() => handleAsk(action)}
-                                                    className="block w-full text-left text-xs bg-white border border-gray-200 rounded-lg px-3 py-2 hover:border-electric-500 hover:bg-electric-50 transition-colors text-gray-600"
-                                                >
-                                                    "{action}"
-                                                </button>
-                                            ))}
-                                        </div>
-                                    </>
+                            <div className="text-center text-[var(--color-muted)] text-sm mt-8">
+                                <div className="w-12 h-12 mx-auto mb-3 rounded-full bg-[var(--color-primary)]/10 flex items-center justify-center">
+                                    <Sparkles className="w-6 h-6 text-[var(--color-primary)]" />
+                                </div>
+                                <p className="font-serif text-base text-[var(--color-ink)] mb-3">
+                                    {hasContext ? 'Ask about your project' : 'Ask any NEC question'}
+                                </p>
+                                <div className="space-y-2">
+                                    {quickActions.map((action, idx) => (
+                                        <button
+                                            key={idx}
+                                            onClick={() => handleAsk(action)}
+                                            className="block w-full text-left text-xs bg-white border border-[var(--color-border)] rounded-lg px-3 py-2 hover:border-[var(--color-primary)] hover:bg-[var(--color-accent-50)] transition-colors text-[var(--color-muted)]"
+                                        >
+                                            "{action}"
+                                        </button>
+                                    ))}
+                                </div>
+                                {hasContext && (
+                                    <p className="text-xs text-[var(--color-subtle)] mt-4">Or type your own question</p>
                                 )}
                             </div>
                         )}
-                        
+
                         {history.map((msg, idx) => (
-                            <div 
-                                key={idx} 
+                            <div
+                                key={idx}
                                 className={`flex gap-2 ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
                             >
                                 {msg.role === 'ai' && (
-                                    <div className="flex-shrink-0 w-8 h-8 rounded-full bg-gradient-to-br from-electric-400 to-electric-600 flex items-center justify-center mt-1">
-                                        <Bot className="w-4 h-4 text-black" />
+                                    <div className="flex-shrink-0 w-8 h-8 rounded-full bg-white border border-[var(--color-border)] flex items-center justify-center mt-1 shadow-sm">
+                                        <Sparkles className="w-4 h-4 text-[var(--color-primary)]" />
                                     </div>
                                 )}
                                 <div className={`flex flex-col max-w-[80%] ${msg.role === 'user' ? 'items-end' : 'items-start'}`}>
-                                    <div className={`group relative rounded-lg p-3 text-sm ${
-                                        msg.role === 'user' 
-                                        ? 'bg-gradient-to-br from-electric-400 to-electric-500 text-black' 
-                                        : 'bg-white border border-gray-200 text-gray-700 shadow-sm'
+                                    <div className={`group relative rounded-xl p-3 text-sm ${
+                                        msg.role === 'user'
+                                        ? 'bg-[var(--color-primary)] text-white'
+                                        : 'bg-white border border-[var(--color-border)] text-[var(--color-ink)] shadow-sm'
                                     }`}>
                                         {msg.role === 'ai' ? (
-                                            <div className="prose prose-sm max-w-none">
+                                            <div className="prose prose-sm max-w-none pr-6">
                                                 <ReactMarkdown
                                                     remarkPlugins={[remarkGfm]}
                                                     components={{
                                                         a: ({node, ...props}) => (
-                                                            <a {...props} target="_blank" rel="noopener noreferrer" className="text-electric-600 hover:text-electric-700 underline" />
+                                                            <a {...props} target="_blank" rel="noopener noreferrer" className="text-[var(--color-primary)] hover:text-[var(--color-primary-hover)] underline" />
                                                         ),
                                                         code: ({node, ...props}) => (
-                                                            <code {...props} className="bg-gray-100 px-1 py-0.5 rounded text-xs font-mono" />
+                                                            <code {...props} className="bg-[var(--color-border-light)] px-1 py-0.5 rounded text-xs font-mono" />
                                                         ),
                                                         pre: ({node, ...props}) => (
-                                                            <pre {...props} className="bg-gray-100 p-2 rounded text-xs overflow-x-auto" />
+                                                            <pre {...props} className="bg-[var(--color-border-light)] p-2 rounded text-xs overflow-x-auto" />
                                                         ),
                                                         ul: ({node, ...props}) => (
                                                             <ul {...props} className="list-disc list-inside space-y-1 my-2" />
@@ -566,29 +658,30 @@ const NecAssistant = () => {
                                                             <ol {...props} className="list-decimal list-inside space-y-1 my-2" />
                                                         ),
                                                         strong: ({node, ...props}) => (
-                                                            <strong {...props} className="font-semibold text-gray-900" />
+                                                            <strong {...props} className="font-semibold text-[var(--color-ink)]" />
                                                         ),
                                                     }}
                                                 >
-                                                    {msg.text}
+                                                    {linkNecReferences(msg.text)}
                                                 </ReactMarkdown>
                                             </div>
                                         ) : (
                                             <p className="whitespace-pre-wrap">{msg.text}</p>
                                         )}
-                                        
-                                        {/* Copy button - always visible for AI messages */}
+
                                         {msg.role === 'ai' && (
                                             <button
                                                 onClick={() => handleCopy(msg.text, idx)}
-                                                className={`absolute top-2 right-2 transition-all bg-gray-100 hover:bg-gray-200 p-1.5 rounded text-gray-600 hover:text-gray-900 ${
-                                                    copiedIndex === idx ? 'opacity-100 bg-green-100 hover:bg-green-200' : 'opacity-70 group-hover:opacity-100'
+                                                className={`absolute top-2 right-2 transition-all p-1.5 rounded ${
+                                                    copiedIndex === idx
+                                                        ? 'opacity-100 bg-[var(--color-success-bg)] text-[var(--color-success)]'
+                                                        : 'opacity-0 group-hover:opacity-100 bg-[var(--color-border-light)] hover:bg-[var(--color-border)] text-[var(--color-muted)] hover:text-[var(--color-ink)]'
                                                 }`}
                                                 aria-label="Copy message"
                                                 title="Copy message"
                                             >
                                                 {copiedIndex === idx ? (
-                                                    <Check className="w-3.5 h-3.5 text-green-600" />
+                                                    <Check className="w-3.5 h-3.5" />
                                                 ) : (
                                                     <Copy className="w-3.5 h-3.5" />
                                                 )}
@@ -596,47 +689,64 @@ const NecAssistant = () => {
                                         )}
                                     </div>
                                     <div className="flex items-center gap-2 mt-1">
-                                        <span className="text-xs text-gray-400 px-1">
+                                        <span className="text-xs text-[var(--color-subtle)] px-1">
                                             {formatTime(msg.timestamp)}
                                         </span>
                                         {msg.toolUsed && (
-                                            <span className="text-xs bg-purple-100 text-purple-700 px-2 py-0.5 rounded-full font-medium flex items-center gap-1">
+                                            <button
+                                                onClick={() => setExpandedToolIdx(expandedToolIdx === idx ? null : idx)}
+                                                className="text-xs bg-[var(--color-accent-50)] text-[var(--color-accent-700)] border border-[var(--color-accent-200)] px-2 py-0.5 rounded-full font-medium flex items-center gap-1 hover:bg-[var(--color-accent-100)] transition-colors"
+                                                title="Show tool details"
+                                            >
                                                 <Sparkles className="w-3 h-3" />
                                                 {msg.toolUsed.name.replace(/_/g, ' ')}
-                                            </span>
-                                        )}
-                                        {msg.role === 'ai' && (
-                                            <button
-                                                onClick={() => handleCopy(msg.text, idx)}
-                                                className="text-xs text-gray-400 hover:text-electric-600 transition-colors flex items-center gap-1 opacity-0 group-hover:opacity-100"
-                                                title="Copy message"
-                                            >
-                                                <Copy className="w-3 h-3" />
-                                                {copiedIndex === idx && <span className="text-green-600">Copied!</span>}
+                                                {expandedToolIdx === idx
+                                                    ? <ChevronDown className="w-3 h-3" />
+                                                    : <ChevronRight className="w-3 h-3" />}
                                             </button>
                                         )}
                                     </div>
+                                    {msg.toolUsed && expandedToolIdx === idx && (
+                                        <pre className="mt-1 max-w-full overflow-x-auto text-[10px] bg-white border border-[var(--color-border)] rounded p-2 text-[var(--color-muted)] font-mono">
+                                            {JSON.stringify(msg.toolUsed.result, null, 2).slice(0, 2000)}
+                                        </pre>
+                                    )}
                                 </div>
                                 {msg.role === 'user' && (
-                                    <div className="flex-shrink-0 w-8 h-8 rounded-full bg-gray-700 flex items-center justify-center mt-1">
+                                    <div className="flex-shrink-0 w-8 h-8 rounded-full bg-[var(--color-primary-800)] flex items-center justify-center mt-1">
                                         <User className="w-4 h-4 text-white" />
                                     </div>
                                 )}
                             </div>
                         ))}
-                        
-                        {/* Typing Indicator */}
+
                         {loading && (
                             <div className="flex gap-2 justify-start">
-                                <div className="flex-shrink-0 w-8 h-8 rounded-full bg-gradient-to-br from-electric-400 to-electric-600 flex items-center justify-center">
-                                    <Bot className="w-4 h-4 text-black" />
+                                <div className="flex-shrink-0 w-8 h-8 rounded-full bg-white border border-[var(--color-border)] flex items-center justify-center shadow-sm">
+                                    <Sparkles className="w-4 h-4 text-[var(--color-primary)] animate-pulse" />
                                 </div>
-                                <div className="bg-white border border-gray-200 rounded-lg p-3">
+                                <div className="bg-white border border-[var(--color-border)] rounded-xl p-3">
                                     <div className="flex gap-1">
-                                        <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
-                                        <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
-                                        <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
+                                        <div className="w-2 h-2 bg-[var(--color-primary)]/40 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
+                                        <div className="w-2 h-2 bg-[var(--color-primary)]/40 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
+                                        <div className="w-2 h-2 bg-[var(--color-primary)]/40 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
                                     </div>
+                                </div>
+                            </div>
+                        )}
+
+                        {errorMessage && !loading && (
+                            <div className="flex gap-2 items-start bg-[var(--color-danger-bg)] border border-[var(--color-danger)]/30 rounded-xl p-3 text-xs">
+                                <Info className="w-4 h-4 text-[var(--color-danger)] flex-shrink-0 mt-0.5" />
+                                <div className="flex-1 min-w-0">
+                                    <p className="text-[var(--color-danger)] font-medium">Request failed</p>
+                                    <p className="text-[var(--color-muted)] mt-0.5 break-words">{errorMessage}</p>
+                                    <button
+                                        onClick={handleRetry}
+                                        className="mt-2 inline-flex items-center gap-1 text-[var(--color-primary)] font-medium hover:text-[var(--color-primary-hover)]"
+                                    >
+                                        <RotateCw className="w-3 h-3" /> Retry
+                                    </button>
                                 </div>
                             </div>
                         )}
@@ -644,11 +754,13 @@ const NecAssistant = () => {
                     </div>
 
                     {/* Input Area */}
-                    <div className="p-3 bg-white border-t border-gray-100">
-                        <div className="flex gap-2">
-                            <input 
-                                className="flex-1 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:border-electric-500 focus:ring-2 focus:ring-electric-500/20 outline-none transition-all"
-                                placeholder="Type your question..."
+                    <div className="p-3 bg-white border-t border-[var(--color-border)]">
+                        <div className="flex gap-2 items-end">
+                            <textarea
+                                ref={textareaRef}
+                                rows={1}
+                                className="flex-1 border border-[var(--color-border)] rounded-lg px-3 py-2 text-sm focus:border-[var(--color-primary)] focus:ring-2 focus:ring-[var(--color-primary)]/15 outline-none transition-all resize-none bg-white"
+                                placeholder="Type your question… (Shift+Enter for newline)"
                                 value={query}
                                 onChange={(e) => setQuery(e.target.value)}
                                 onKeyDown={(e) => {
@@ -659,26 +771,42 @@ const NecAssistant = () => {
                                 }}
                                 disabled={loading}
                             />
-                            <button 
-                                onClick={() => handleAsk()} 
-                                disabled={loading || !query.trim()} 
-                                className="bg-gray-900 text-white p-2 rounded-lg hover:bg-black disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                                aria-label="Send message"
-                            >
-                                <Send className="w-4 h-4" />
-                            </button>
+                            {loading ? (
+                                <button
+                                    onClick={handleStop}
+                                    className="bg-[var(--color-danger)] text-white p-2 rounded-lg hover:opacity-90 transition-all"
+                                    aria-label="Stop generation"
+                                    title="Stop"
+                                >
+                                    <Square className="w-4 h-4" />
+                                </button>
+                            ) : (
+                                <button
+                                    onClick={() => handleAsk()}
+                                    disabled={!query.trim()}
+                                    className="bg-[var(--color-primary)] text-white p-2 rounded-lg hover:bg-[var(--color-primary-hover)] disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                                    aria-label="Send message"
+                                    title="Send (Enter)"
+                                >
+                                    <Send className="w-4 h-4" />
+                                </button>
+                            )}
                         </div>
+                        <p className="text-[10px] text-[var(--color-subtle)] mt-1.5 px-1">
+                            Press <kbd className="px-1 py-0.5 bg-[var(--color-border-light)] rounded font-mono">⌘K</kbd> / <kbd className="px-1 py-0.5 bg-[var(--color-border-light)] rounded font-mono">Ctrl+K</kbd> to toggle
+                        </p>
                     </div>
                 </div>
             )}
-            <button 
+            <button
                 onClick={() => setIsOpen(!isOpen)}
-                className="bg-gray-900 hover:bg-black text-white w-14 h-14 rounded-full shadow-lg flex items-center justify-center transition-transform hover:scale-105 relative"
-                aria-label="Open chat"
+                className="bg-[var(--color-primary)] hover:bg-[var(--color-primary-hover)] text-white w-14 h-14 rounded-full shadow-lg flex items-center justify-center transition-transform hover:scale-105 relative"
+                aria-label={isOpen ? "Close Spark Copilot" : "Open Spark Copilot"}
+                title="Spark Copilot (⌘K)"
             >
-                <MessageSquare className="w-6 h-6 text-electric-500" />
-                {history.length > 0 && (
-                    <span className="absolute -top-1 -right-1 bg-electric-500 text-black text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center">
+                <Sparkles className="w-6 h-6 text-[var(--color-accent-300)]" />
+                {!isOpen && history.length > 0 && (
+                    <span className="absolute -top-1 -right-1 bg-[var(--color-accent-500)] text-white text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center shadow-sm">
                         {history.length}
                     </span>
                 )}

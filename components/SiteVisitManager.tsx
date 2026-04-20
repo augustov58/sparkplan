@@ -532,7 +532,7 @@ export const SiteVisitManager: React.FC<SiteVisitManagerProps> = ({ project }) =
 
                             alert(
                               `Successfully analyzed ${newVisit.photos.length} photo${newVisit.photos.length > 1 ? 's' : ''}!\n\n` +
-                              'Check the AI Copilot sidebar (right side) for:\n' +
+                              'Open Spark Copilot (bottom-right) for:\n' +
                               '• Equipment identification\n' +
                               '• NEC violations detected\n' +
                               '• Safety concerns\n' +
