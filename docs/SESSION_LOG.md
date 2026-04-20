@@ -7,13 +7,14 @@
 
 ---
 
-### Session: 2026-04-19 — `/circuits` Bug Sweep: Number Inputs + Panel CRUD Cross-Component Refresh + Cascade-Delete
+### Session: 2026-04-19 — `/circuits` Bug Sweep: Number Inputs + Panel CRUD Cross-Component Refresh + Cascade-Delete + Hierarchy-Delete Safety
 
-**Focus**: Three user-reported bugs all surfacing on `/circuits`:
+**Focus**: Four user-reported bugs all surfacing on `/circuits`:
 1. Every controlled `<input type="number">` retained a leading "0" after clear-and-retype (typed `3` → `03`, typed `36` → `036`).
 2. A newly created panel did not appear in FeederManager's Destination Panel dropdown until page refresh, even though it was visible elsewhere on the page.
 3. Deleting a panel that was referenced by any feeder returned a 400 and a misleading "Failed to update panel" toast.
-**Status**: ✅ All three fixed, verified live by user. PR #8 and PR #9 merged to main.
+4. Deleting a mid-tree panel (e.g. L1) silently orphaned its downstream panels: they stayed in the DB with `fed_from=null` (passes `panels_fed_from_check`) but dropped off the tree-layout SVG. Same latent 400 existed for transformer deletes (feeder CHECK conflict).
+**Status**: ✅ All four fixed, verified live by user. PRs #8, #9, #10 merged to main.
 
 **Work Done:**
 
@@ -35,21 +36,38 @@
   - Added `toastMessages.panel.deleteError` for verb-specific error wording.
 - Considered and rejected: changing FK to `ON DELETE CASCADE` (silently loses user data on misclick); loosening the CHECK (permits orphaned feeders at rest).
 
+*Bug 4 — Mid-tree delete orphaning + latent transformer-delete 400 (PR #10, commits `45b253b`, `f58c054`):*
+- Surfaced while testing PR #9: deleting L1 correctly cascaded the feeders, but LP (fed from L1) survived in the DB with `fed_from` nulled out. The `panels_fed_from_check` is loose — it only requires `fed_from IS NOT NULL OR is_main=true` — so LP passed. The tree-layout SVG only renders panels reachable from the MDP via `fed_from`, so LP disappeared from the diagram but remained in the Panel Schedule list. Confusing state; user could never re-parent from the UI.
+- Examined the full FK cascade map (`panels → {panels, transformers, circuits, meters, short_circuit_calculations, feeders}` plus transformer/meter-stack parents). Direct children under `panels.fed_from` and `transformers.fed_from_panel_id` are the orphan sources.
+- Discovered transformer delete had the **exact same** 400 bug as pre-PR-9 panel delete: `feeders.source_transformer_id` / `destination_transformer_id` are ON DELETE SET NULL, same CHECK violation — no one had reported it because transformer-as-feeder-endpoint is less common in the current sample data.
+- Fix (app-level guard + symmetric cascade):
+  - New `services/equipmentDependencies.ts` pure helper: `getPanelDownstream(id, {panels, transformers})`, `getTransformerDownstream(id, {panels})`, `getMeterStackDownstream(id, {panels})`, `formatDependencyMessage(name, deps)`. No Supabase imports — can be unit-tested and reused by chatbot-tool guards or permit-packet validation later.
+  - `OneLineDiagram.removePanel` (line ~983): added pre-delete `getPanelDownstream` check; aborts with formatted alert if any child panels or child transformers exist.
+  - `OneLineDiagram.removeTransformer` (line ~1655): replaced ad-hoc inline check with the shared helper; also added a feeder-count warning to the confirm dialog (mirrors `removePanel` UX, which was missing previously).
+  - `useTransformers.deleteTransformer`: pre-cascade feeders on `source_transformer_id` / `destination_transformer_id` before deleting the transformer, then dispatch `feeder-data-updated`. Added `toast.transformer.deleteError`.
+- Considered and rejected: tightening `panels_fed_from_check` to forbid `fed_from=null` when `is_main=false` (would require a DB migration + manual data cleanup for any existing orphans); DB-level ON DELETE RESTRICT (would give the user a Postgres error instead of a friendly list). The app-level guard gives the clearest UX and requires no schema change.
+- `useMeterStacks.deleteMeterStack` was examined — it exists in the hook but has **no UI caller** (nothing invokes it from OneLineDiagram or MeterStackManager). Left alone; if a caller is added later, the `getMeterStackDownstream` helper is already wired in `equipmentDependencies.ts`.
+
 **Key Files Touched:**
 - `components/DwellingLoadCalculator.tsx`, `components/Calculators.tsx` — NumberInput migration (PR #8)
 - `hooks/usePanels.ts` — emits `'panels'` on CRUD; cascade-deletes feeders in `deletePanel` (PR #9)
-- `components/OneLineDiagram.tsx` — `removePanel` now warns about feeder cascade count (PR #9)
-- `lib/toast.ts` — added `panel.deleteError` (PR #9)
+- `hooks/useTransformers.ts` — cascade-deletes feeders in `deleteTransformer`; dispatches `feeder-data-updated` (PR #10)
+- `components/OneLineDiagram.tsx` — `removePanel` warns about feeder cascade count (PR #9); `removePanel` + `removeTransformer` now block mid-tree deletes via shared helper (PR #10)
+- `services/equipmentDependencies.ts` — new pure helper for downstream-dependency lookup (PR #10)
+- `lib/toast.ts` — added `panel.deleteError` (PR #9) and `transformer.deleteError` (PR #10)
 
 **Commits:**
 - `e8f8029` — fix(calculators): replace plain numeric inputs with NumberInput [PR #8, merged `2c32adf`]
 - `0d395f5` — fix(panels): emit dataRefreshEvents on CRUD so peer hooks refresh [PR #9]
 - `545ef2e` — fix(panels): cascade-delete dependent feeders to avoid CHECK conflict [PR #9, merged `2ec1079`]
+- `45b253b` — feat(diagram): block mid-tree panel/transformer deletes with downstream alert [PR #10]
+- `f58c054` — fix(transformers): cascade-delete dependent feeders to avoid CHECK conflict [PR #10, merged `0e55790`]
 
-**PRs**: #8 (merged), #9 (merged)
+**PRs**: #8 (merged), #9 (merged), #10 (merged)
 
 **Pending / Follow-ups:**
 - Same subscribe/emit asymmetry exists in `useCircuits.ts` / `useMeters.ts` / `useMeterStacks.ts` — candidate for the same one-line fix per CRUD function if a repro surfaces.
+- `useMeterStacks.deleteMeterStack` exists but has no UI caller. If one is added (e.g., from MeterStackManager), apply the same `getMeterStackDownstream` guard that `removePanel` / `removeTransformer` now use.
 - Transient "Add Panel button does nothing" report during Bug 2 diagnosis was self-resolved by user: Zod panelSchema rejects `bus_rating < 100`, and `showValidationErrors` uses `alert()` which browsers suppress after repeated dismissals. User confirmed 100A works and said no code change needed.
 
 ---
