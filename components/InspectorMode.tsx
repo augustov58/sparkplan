@@ -869,7 +869,7 @@ const AIActivitySection: React.FC<AIActivitySectionProps> = ({ projectId }) => {
           <p className="text-gray-600 font-medium">No AI suggestions found</p>
           <p className="text-sm text-gray-500 mt-1">
             {actions.length === 0
-              ? "AI suggestions will appear here as you use the AI Copilot features"
+              ? "AI suggestions will appear here as you use Spark Copilot features"
               : "Try adjusting your filters to see more results"}
           </p>
         </div>

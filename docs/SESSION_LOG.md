@@ -3,7 +3,75 @@
 **Purpose**: Tracks recent work for seamless handoff between Claude instances.
 **Maintenance Rule**: Keep only the last 2 sessions. At the start of a new session, delete older entries — git history preserves everything.
 
-**Last Updated**: 2026-04-19
+**Last Updated**: 2026-04-20
+
+---
+
+### Session: 2026-04-20 — Spark Copilot Chatbot Refresh (Rebrand + Harvey-Theme Re-skin + UX Pass)
+
+**Focus**: The floating chatbot in the bottom-right corner still wore the old "NEC Pro" / electric-yellow skin — dark-gray gradient header, yellow bubbles, "NEC Copilot" title, sans-serif, `rounded-lg` — while the rest of the app had already moved to the Harvey-inspired theme (forest green `#2d3b2d` primary, gold accent, cream paper, serif headings, `rounded-xl`). User asked to adapt it to current design and bundle any technical improvements I'd recommend.
+**Status**: ✅ Shipped on branch `fix/chatbot-design-refresh`. `npm run build` clean in 4.4s, `npm test` 124/124 pass. Browser verification deferred to user (see "Not Verified").
+
+**Work Done (all in `App.tsx` `NecAssistant`, plus a small rename sweep):**
+
+*Rebrand — "NEC Copilot" → "Spark Copilot":*
+- `App.tsx` chatbot title + FAB aria/title; `components/Layout.tsx` x2 comments; `docs/AI_CHATBOT_TOOLS.md` heading+body; `PROJECT_SPEC.md` L129.
+- Stale "check the AI Copilot sidebar" strings (the sidebar was removed last sprint but these pointers were never updated) rewritten to "Open Spark Copilot (bottom-right)": `components/Calculators.tsx` (2 sites), `components/SiteVisitManager.tsx`, `components/RFIManager.tsx`, `components/TestAgentButton.tsx`, `components/InspectorMode.tsx`.
+
+*Design re-skin (tokens from `index.css:7-81`, not hardcoded hex):*
+- Header: `bg-gradient-to-r from-gray-900 to-gray-800` → solid `bg-[var(--color-primary)]`, serif title, gold `Sparkles` icon (`--color-accent-300`).
+- Project context badge: yellow-on-black pill → `bg-[var(--color-accent-100)] text-[var(--color-accent-700)]`, uppercase + tighter tracking to match the Harvey `.badge` style.
+- User message bubbles: electric-yellow gradient → `bg-[var(--color-primary)] text-white`.
+- AI avatar: yellow `Bot` → neutral white-ringed `Sparkles` in primary green.
+- Send button: `bg-gray-900` → `bg-[var(--color-primary)]` / `--color-primary-hover`.
+- Input focus: electric-500 ring → primary ring @ 15% alpha, matching the global `input:focus` style in `index.css:241-245`.
+- Corners: `rounded-lg` → `rounded-xl` everywhere (panel, bubbles, errors) to match `.card`.
+- Messages bg: `bg-gray-50` → `bg-[var(--color-paper)]` (#faf9f7).
+- Borders: `border-gray-200` → `border-[var(--color-border)]`.
+- FAB: dark-gray → `bg-[var(--color-primary)]` with gold `Sparkles`. Unread-count badge now uses `--color-accent-500` on white instead of yellow-on-black.
+- `Bot` icon import removed entirely (replaced with `Sparkles` for a consistent brand mark).
+
+*Technical improvements (bundled per user's ask):*
+- **Persist conversation to `localStorage`** keyed by `projectId` (or `'global'` when outside a project). Hydrates on mount, rewrites on every history change, clears the key when history is emptied. Re-hydrates when `projectId` changes (navigating between projects swaps conversations).
+- **Clear button** (`Trash2` in header, disabled when empty) with a `window.confirm` gate.
+- **Stop/abort via generation-id pattern.** Each `handleAsk` assigns a `nanoid` to `generationIdRef`. Clicking Stop nulls the ref; when the Gemini reply returns, the handler checks whether the ref still matches and discards the response otherwise. `askNecAssistantWithTools` doesn't accept an `AbortSignal` today — threading one through would require changes to `services/geminiService.ts` `callGeminiProxyWithTools` + `callGeminiProxyWithToolResult` and the Supabase edge function. Left as a follow-up; this pattern gives the perceived-stop UX without that plumbing.
+- **Error as state, not message.** Previously an "I encountered an error" bubble was pushed into the history; now errors live in a separate `errorMessage` state and render a distinct red-bordered card with a **Retry** button that removes the orphaned last user message from history and re-sends it. Keeps conversation history clean across failures.
+- **Accessibility:** `role="dialog"`, `aria-label="Spark Copilot"`, `aria-live="polite"` + `aria-busy={loading}` on the messages region, **Esc to close** via window keydown, auto-focus on textarea ~120ms after open (animation delay).
+- **`Cmd/Ctrl+K` global toggle.** Listener attached to `window.keydown`; shown as a kbd hint below the input so discoverability doesn't rely on memory.
+- **Textarea instead of input.** Auto-grows up to 120px (~5 lines), `Enter` sends, `Shift+Enter` newline. Placeholder updated to document the shortcut.
+- **Upsell FAB** for users without `ai-copilot` feature. Previous behavior was `return null` (silent). Now a locked FAB with `Lock` badge navigates to `/pricing` on click. Hover tooltip explains the gate.
+- **Dedupe copy button.** The AI bubble had two copy buttons (absolute-positioned in the bubble + inline below the timestamp). Kept the absolute one; deleted the inline duplicate.
+- **Wired `processNecReferences`.** This function was dead code in the original — declared but never invoked, and contained an unused `articleNum` var. Renamed to `linkNecReferences`, removed the unused var, and applied it to `msg.text` before passing to ReactMarkdown. AI responses mentioning "NEC 220.42" or "Article 250" now render as clickable links. Kept (not deleted) per user's request.
+- **Tool-use disclosure.** The purple pill showing `toolUsed.name` is now a button; clicking expands a `<pre>` with `JSON.stringify(result, null, 2).slice(0, 2000)` beneath the message. Helps users trust/debug what the agent actually did.
+- **Timestamp auto-refresh.** Previously `"2m ago"` was computed once and never re-rendered. Added a `setInterval(60_000)` that bumps a throwaway state while the panel is open and non-empty.
+
+*Not modified:*
+- `components/AICopilotSidebar.tsx` — still in the tree but no longer rendered (removed from `Layout.tsx` in a previous sprint). Decided against deletion in this PR to keep scope tight; separate cleanup task.
+- `services/geminiService.ts` — streaming + real `AbortSignal` plumbing is a bigger change that deserves its own PR.
+- `components/Auth/Signup.tsx` + `components/LandingPage.tsx` — still say "AI Copilot" in marketing feature-list copy. Those refer to a feature category, not the chatbot's branded name, so left as-is. Easy to change later if desired.
+
+**Not Verified (flagged for user):**
+- Did **not** run the chatbot in a live browser — the CLI harness has no browser driver hooked up for this session. Build + typecheck + unit tests are all green, but the CLAUDE.md "UI protocol" rule about dev-server + golden-path clicks was not satisfied. Please eyeball:
+  - Open/close FAB animation and color
+  - Header look + all four header icons (clear / maximize / close / + clear gated to disabled when empty)
+  - User-message (green) vs AI-message (white) contrast
+  - `Cmd+K` toggle from anywhere in the app
+  - Error path: disconnect network, ask a question, click Retry
+  - Persistence: refresh page mid-conversation, history should survive
+
+**Key Files Touched:**
+- `App.tsx` — `NecAssistant` component rewritten (L283-688 → ~L283-?); `Bot` import removed, `Trash2 Square RotateCw Lock ChevronDown ChevronRight useRef` added.
+- `components/Layout.tsx` — comment rename
+- `components/Calculators.tsx`, `components/SiteVisitManager.tsx`, `components/RFIManager.tsx`, `components/TestAgentButton.tsx`, `components/InspectorMode.tsx` — stale "AI Copilot sidebar" strings redirected to Spark Copilot
+- `docs/AI_CHATBOT_TOOLS.md`, `PROJECT_SPEC.md` — title rename
+- `docs/SESSION_LOG.md`, `docs/CHANGELOG.md` — this entry
+
+**Commits (branch `fix/chatbot-design-refresh`):** TBD — commit pending user review of the diff.
+
+**Pending:**
+- Open PR.
+- Follow-up PR for streaming responses + real AbortSignal through `services/geminiService.ts`.
+- Optional: delete `components/AICopilotSidebar.tsx` (now unreferenced) in a cleanup PR.
 
 ---
 
@@ -69,48 +137,3 @@
 - Same subscribe/emit asymmetry exists in `useCircuits.ts` / `useMeters.ts` / `useMeterStacks.ts` — candidate for the same one-line fix per CRUD function if a repro surfaces.
 - `useMeterStacks.deleteMeterStack` exists but has no UI caller. If one is added (e.g., from MeterStackManager), apply the same `getMeterStackDownstream` guard that `removePanel` / `removeTransformer` now use.
 - Transient "Add Panel button does nothing" report during Bug 2 diagnosis was self-resolved by user: Zod panelSchema rejects `bus_rating < 100`, and `showValidationErrors` uses `alert()` which browsers suppress after repeated dismissals. User confirmed 100A works and said no code change needed.
-
----
-
-### Session: 2026-04-18 (PM) — Stripe Webhook Signature Alignment + Dual-Endpoint Cleanup
-
-**Focus**: Close the long-standing "Stripe webhook secret hardcoded in deployed function" carry-over. Root-cause why the env-var approach had failed and re-align deployed source with git so future redeploys don't silently re-break signature verification.
-**Status**: ✅ Resolved. `stripe-webhook` v38 is live, env-var based, `verify_jwt: false`. Positive + negative HMAC probes both confirmed. PR #6 open.
-
-**Work Done:**
-
-*Root cause of the drift:*
-- Deployed function was at v35 with signing secret hardcoded as `whsec_P0LA...`. Git source was already env-var based (`Deno.env.get('STRIPE_WEBHOOK_SECRET')`) — the hardcode was a workaround never committed back.
-- Checked stored `STRIPE_WEBHOOK_SECRET` Supabase secret digest: `ab59c2b1...`. Computed `sha256sum` of the known-working hardcoded value: `1f72f3f6...`. Digests didn't match — so the stored env var was simply wrong, not some Supabase bug as the old memory claimed. That's why the original "env var failed, hardcode works" theory looked real.
-
-*Fix procedure:*
-1. Saved the deployed v35 as `.rollback/stripe-webhook-v35.ts` (gitignored — contains live signing secret).
-2. Overwrote the Supabase env var: `supabase secrets set STRIPE_WEBHOOK_SECRET=whsec_P0LA... --project-ref ioarszhzltpisxsxrsgl`. New digest `1f72f3f6...` matched. Proved Supabase uses plain SHA-256 (not salted) for digest display.
-3. Redeployed git source: `supabase functions deploy stripe-webhook --no-verify-jwt --project-ref ioarszhzltpisxsxrsgl`. First attempt produced v37 with `verify_jwt: true` (CLI defaults to JWT-on) — would have 401'd every Stripe event at the gateway. Re-ran with the flag → v38, `verify_jwt: false`.
-
-*Verification via direct HMAC probes (no Stripe dashboard needed):*
-- Valid signed POST (HMAC-SHA256 of `{timestamp}.{body}` with signing secret) → `200 {"received":true}` ✓
-- Forged signature → `400 "No signatures found matching the expected signature..."` ✓ (Stripe library's canonical error, proves verification is executing, not bypassed)
-- Gateway accepted both (no `401 UNAUTHORIZED_NO_AUTH_HEADER`), confirming `verify_jwt: false`
-
-*Duplicate webhook endpoint discovered + neutralized:*
-- Stripe account had TWO live endpoints pointed at the same URL: `we_1TL9gpBBy9cD3s46mfHz0owG` (the intended one, 6 events) and `we_1TKnPTBBy9cD3s46is2owYNA` ("adventurous-splendor", 7 events, 35/35 failure rate this week).
-- Endpoint B's signing secret was never in our env var — hence its 100% failure. Only unique event: `customer.subscription.paused`, which is already caught transitively by `customer.subscription.updated`, so disabling is zero-coverage-loss.
-- User **disabled** (not deleted) endpoint B — safe rollback path preserved.
-
-**Key Files Touched:**
-- `.gitignore` — added `.rollback/` to prevent committing the v35 snapshot
-- `.rollback/stripe-webhook-v35.ts` — v35 snapshot (gitignored, contains live signing secret)
-- `docs/SESSION_LOG.md`, `docs/CHANGELOG.md` — updated
-- `memory/stripe_webhook_signature.md` — rewritten: resolved, rotation playbook, duplicate-endpoint gotcha
-
-**Commits (branch `fix/stripe-webhook-env-secret`):**
-- `e15c297` — fix(stripe-webhook): verify deployed function matches git (env-var-based sig verification)
-
-**PR**: #6 — https://github.com/augustov58/sparkplan/pull/6 (open, awaiting merge)
-
-**Pending:**
-- Merge PR #6
-- First real Stripe event in live traffic is the final belt-and-suspenders confirmation (watch for 200 in edge-function logs next subscription/invoice event)
-- **Recommended hygiene**: rotate signing secret via Stripe dashboard "Roll signing secret" — invalidates the value that's been shared through conversation history and the `.rollback/` snapshot. Follow steps 3-5 in `memory/stripe_webhook_signature.md`.
-- Consider deleting endpoint B (`adventurous-splendor`) once a real event has passed through endpoint A cleanly

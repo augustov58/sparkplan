@@ -38,7 +38,7 @@ export const TestAgentButton: React.FC = () => {
       );
 
       console.log('✅ Agent action created:', action);
-      setResult(`Success! Agent action created: ${action.id}\n\nCheck the AI Copilot sidebar on the right →`);
+      setResult(`Success! Agent action created: ${action.id}\n\nOpen Spark Copilot (bottom-right) to view →`);
 
     } catch (error: any) {
       console.error('❌ Test failed:', error);

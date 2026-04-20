@@ -4,6 +4,38 @@ All notable changes to SparkPlan.
 
 ---
 
+## 2026-04-20: Spark Copilot Chatbot — Rebrand, Theme Re-skin, and UX Pass
+
+**User-Facing:**
+- **Renamed "NEC Copilot" → "Spark Copilot"** across the chatbot UI, docs, and in-app pointers. Stale "Check the AI Copilot sidebar" strings (the sidebar was removed last sprint) in Calculators, SiteVisitManager, RFIManager, TestAgentButton, and InspectorMode now correctly point users at Spark Copilot (bottom-right).
+- **Chatbot now matches the rest of the app.** Dark-gray + electric-yellow skin replaced with the Harvey-inspired theme: forest-green header (`--color-primary`), serif title, gold `Sparkles` brand mark, primary-green user bubbles, `rounded-xl` corners, cream-paper message area, primary-ring input focus. FAB is green with a gold icon and an accent-gold unread badge.
+- **Conversation persists across refreshes.** History is saved to `localStorage` keyed by the current `projectId` (or globally when you're outside a project). Navigating between projects swaps conversations automatically.
+- **Clear-conversation button** (🗑 in the header) with a confirm gate. Disabled when history is empty.
+- **Stop / retry.** Mid-response the Send button becomes a red Stop button — clicking discards the in-flight reply. Errors now surface as a red-bordered card inside the panel (instead of an "I encountered an error" bubble polluting history) with a **Retry** button that re-sends the last question.
+- **Cmd/Ctrl+K** toggles the chatbot from anywhere in the app. Hint is printed below the input.
+- **Multi-line input.** Replaced the single-line `<input>` with an auto-growing textarea. Enter sends; Shift+Enter adds a newline.
+- **Clickable NEC references.** Anywhere the AI says "NEC 220.42" or "Article 250" in a response, it's now a link to the NFPA code landing page. (This codepath was previously dead code.)
+- **Expandable tool-use disclosure.** The purple pill showing which tool the agent called is now clickable — it reveals a JSON view of the tool result underneath the message.
+- **Upsell FAB** for users without the AI Copilot feature. Previously the FAB was silently hidden; now it shows a locked icon and navigates to `/pricing` on click.
+- **A11y:** `role="dialog"`, `aria-live="polite"` on messages, Esc-to-close, auto-focus on open.
+
+**Technical:**
+- New helpers at top of `App.tsx`: `loadCopilotHistory` / `saveCopilotHistory` with `localStorage` key `sparkplan.copilot.history.<projectId|'global'>`. Date objects are serialized via ISO string and rehydrated on load. Failures (storage full, cookies-disabled) are swallowed silently — the feature degrades to session-only history.
+- Stop/abort uses a **generation-id pattern** (`generationIdRef` + `nanoid()`) rather than a real `AbortSignal`. Each ask assigns a fresh id; Stop nulls it; when the Gemini reply returns, the handler checks whether the id still matches and discards otherwise. `services/geminiService.ts` `askNecAssistantWithTools` doesn't accept an `AbortSignal` today — threading one through to the Supabase edge function + Gemini SDK is bigger than this PR's scope and is left as a follow-up.
+- Removed the duplicate copy button that was rendered both as an absolute overlay inside the AI bubble AND as an inline button below the timestamp. Kept the overlay; deleted the inline.
+- Removed the `Bot` lucide icon in favor of `Sparkles` as a single consistent brand mark across FAB, AI avatar, loading state, and empty state.
+- `processNecReferences` was declared-but-never-called with a dead `articleNum` variable. Renamed to `linkNecReferences`, removed the unused var, and wired it to run against `msg.text` before `ReactMarkdown` renders.
+- `AICopilotSidebar.tsx` remains in the tree but is not rendered (it was disconnected from `Layout.tsx` in a previous sprint). Deferred deletion to a separate cleanup PR.
+
+**Not shipped in this PR (candidates for follow-ups):**
+- Streaming responses (requires changes to `services/geminiService.ts` and the edge function).
+- Real `AbortSignal` plumbing through the service layer.
+- Delete the orphaned `AICopilotSidebar.tsx` component.
+
+**Branch**: `fix/chatbot-design-refresh` — build clean, 124/124 tests pass. Live browser verification deferred to user (see SESSION_LOG for checklist).
+
+---
+
 ## 2026-04-19: `/circuits` Bug Sweep — Inputs, Cross-Component Refresh, Cascade-Delete, Hierarchy-Delete Safety
 
 **User-Facing Bug Fixes:**

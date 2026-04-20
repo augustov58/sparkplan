@@ -1,6 +1,6 @@
-# NEC Copilot - AI Chatbot Tools Reference
+# Spark Copilot - AI Chatbot Tools Reference
 
-The NEC Copilot chatbot (bottom-right corner) provides an intelligent assistant that can read project data, perform calculations, and modify your electrical design through natural language commands.
+The Spark Copilot chatbot (bottom-right corner) provides an intelligent assistant that can read project data, perform calculations, and modify your electrical design through natural language commands.
 
 ## Overview
 

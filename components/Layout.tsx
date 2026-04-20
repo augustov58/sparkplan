@@ -33,7 +33,7 @@ import {
 import { useAuthContext } from './Auth/AuthProvider';
 import { useProfile } from '@/hooks/useProfile';
 import { ProjectType } from '../types';
-// AICopilotSidebar removed - AI features unified in NEC Copilot chatbot
+// AICopilotSidebar removed - AI features unified in Spark Copilot chatbot
 import { TrialBanner } from './TrialBanner';
 
 interface LayoutProps {
@@ -368,7 +368,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, title, showBack, onSig
         </div>
       </main>
 
-      {/* AI Copilot Sidebar removed - features unified in NEC Copilot chatbot */}
+      {/* AI Copilot Sidebar removed - features unified in Spark Copilot chatbot */}
     </div>
   );
 };

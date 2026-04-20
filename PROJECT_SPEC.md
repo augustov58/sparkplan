@@ -126,7 +126,7 @@ End-to-end workflow for multi-family EV readiness projects:
 
 #### System 1: Gemini Chatbot (Fast Q&A)
 - **Tech:** Supabase Edge Functions (Deno) + Gemini 2.0 Flash
-- **Interface:** Floating NEC Copilot panel with conversation memory
+- **Interface:** Floating Spark Copilot panel with conversation memory
 - **12 agentic tools:**
   - `calculate_voltage_drop` — Circuit voltage drop analysis
   - `calculate_short_circuit` — Fault current at panels
