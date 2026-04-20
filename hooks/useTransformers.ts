@@ -120,6 +120,18 @@ export function useTransformers(projectId: string | undefined): UseTransformersR
 
   const deleteTransformer = async (id: string) => {
     try {
+      // Cascade-delete dependent feeders first. feeders.source_transformer_id /
+      // destination_transformer_id are ON DELETE SET NULL, but
+      // feeders_source_and_destination_check requires exactly one of
+      // {panel_id, transformer_id} per side — SET NULL would violate it and
+      // roll back the transformer delete with a 400. Same pattern as
+      // deletePanel in usePanels.
+      const { error: feedersError } = await supabase
+        .from('feeders')
+        .delete()
+        .or(`source_transformer_id.eq.${id},destination_transformer_id.eq.${id}`);
+      if (feedersError) throw feedersError;
+
       const { error } = await supabase
         .from('transformers')
         .delete()
@@ -127,9 +139,16 @@ export function useTransformers(projectId: string | undefined): UseTransformersR
 
       if (error) throw error;
       showToast.success(toastMessages.transformer.deleted);
+      // Nudge useFeeders consumers to refetch since the cascade bypassed
+      // their postgres_changes listener timing.
+      if (projectId) {
+        window.dispatchEvent(
+          new CustomEvent('feeder-data-updated', { detail: { projectId } })
+        );
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to delete transformer');
-      showToast.error(toastMessages.transformer.error);
+      showToast.error(toastMessages.transformer.deleteError);
     }
   };
 
