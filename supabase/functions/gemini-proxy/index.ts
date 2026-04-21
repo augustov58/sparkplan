@@ -21,6 +21,7 @@ interface GeminiRequest {
   model?: string
   pdfData?: string // Base64 encoded PDF
   imageData?: string // Base64 encoded image
+  imageMimeType?: string // e.g. image/jpeg, image/png, image/webp
   tools?: ToolDefinition[] // Function calling tools
   toolResult?: { // Result from a tool call to continue conversation
     toolName: string
@@ -79,7 +80,7 @@ serve(async (req) => {
     }
 
     // Parse request body
-    const { prompt, systemInstruction, model = 'gemini-2.5-flash', pdfData, imageData, tools, toolResult }: GeminiRequest = await req.json()
+    const { prompt, systemInstruction, model = 'gemini-2.5-flash', pdfData, imageData, imageMimeType, tools, toolResult }: GeminiRequest = await req.json()
 
     if (!prompt) {
       throw new Error('Prompt is required')
@@ -105,7 +106,7 @@ serve(async (req) => {
     if (imageData) {
       inputParts.push({
         inline_data: {
-          mime_type: "image/jpeg", // Assume JPEG, could be enhanced
+          mime_type: imageMimeType || "image/jpeg",
           data: imageData
         }
       })
