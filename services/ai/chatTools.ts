@@ -1254,7 +1254,7 @@ Can specify:
       const existingCircuits = context.projectContext.circuits.filter(c => c.panelName === panel.name);
 
       // Panel slot count: MDP/Main = 30 slots, Branch panels = 42 slots
-      const totalSlots = panel.isMain ? 30 : 42;
+      const totalSlots = panel.numSpaces ?? (panel.isMain ? 30 : 42);
 
       // Calculate occupied slots (including multi-pole circuit expansions)
       const occupiedSlots = new Set<number>();
@@ -1779,7 +1779,7 @@ Examples: "fill the rest with spares", "add spare circuits to panel H7", "fill r
       }
 
       // Panel slot count: MDP/Main = 30 slots, Branch panels = 42 slots
-      const totalSlots = panel.isMain ? 30 : 42;
+      const totalSlots = panel.numSpaces ?? (panel.isMain ? 30 : 42);
 
       // Get existing circuits DIRECTLY from database (not context) to ensure fresh data
       const { data: existingCircuits, error: circuitsError } = await supabase

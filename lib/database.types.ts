@@ -853,6 +853,7 @@ export type Database = {
           name: string
           nema_enclosure_type: string | null
           notes: string | null
+          num_spaces: number
           phase: number
           project_id: string
           series_rating: boolean | null
@@ -882,6 +883,7 @@ export type Database = {
           name: string
           nema_enclosure_type?: string | null
           notes?: string | null
+          num_spaces?: number
           phase: number
           project_id: string
           series_rating?: boolean | null
@@ -911,6 +913,7 @@ export type Database = {
           name?: string
           nema_enclosure_type?: string | null
           notes?: string | null
+          num_spaces?: number
           phase?: number
           project_id?: string
           series_rating?: boolean | null

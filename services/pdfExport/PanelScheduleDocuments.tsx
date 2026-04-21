@@ -307,8 +307,8 @@ export const PanelSchedulePages: React.FC<PanelSchedulePDFProps> = ({
 
           {/* Circuit Rows - Two Column Format */}
           {(() => {
-            // Determine max slots based on panel type
-            const maxSlots = panel.is_main ? 30 : 42;
+            // Panels have an explicit num_spaces column; fall back for legacy rows.
+            const maxSlots = panel.num_spaces ?? (panel.is_main ? 30 : 42);
             const numRows = maxSlots / 2;
 
             const rows = [];
@@ -512,7 +512,7 @@ export const MultiPanelDocument: React.FC<MultiPanelDocumentProps> = ({
 
             {(() => {
               const sortedCircuits = circuits.sort((a, b) => a.circuit_number - b.circuit_number);
-              const maxSlots = panel.is_main ? 30 : 42;
+              const maxSlots = panel.num_spaces ?? (panel.is_main ? 30 : 42);
               const numRows = maxSlots / 2;
 
               const rows = [];
