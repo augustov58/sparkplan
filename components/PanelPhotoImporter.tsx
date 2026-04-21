@@ -83,7 +83,7 @@ export const PanelPhotoImporter: React.FC<PanelPhotoImporterProps> = ({
       setStep('analyzing');
 
       try {
-        const result: ExtractionResult = await extractCircuitsFromPhoto(base64, panelName, maxCircuits);
+        const result: ExtractionResult = await extractCircuitsFromPhoto(base64, panelName, maxCircuits, file.type || 'image/jpeg');
 
         if (result.error) {
           setError(result.error);

@@ -38,6 +38,7 @@ interface PanelSummary {
   voltage: number;
   phase: 1 | 3;
   busRating: number;
+  numSpaces: number;
   mainBreaker?: number;
   circuitCount: number;
   totalLoadVA: number;
@@ -142,6 +143,7 @@ export function buildProjectContext(
       voltage: panel.voltage,
       phase: panel.phase,
       busRating: panel.bus_rating,
+      numSpaces: panel.num_spaces ?? (panel.is_main ? 30 : 42),
       mainBreaker: panel.main_breaker_amps || undefined,
       circuitCount: panelCircuits.length,
       totalLoadVA,

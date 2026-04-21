@@ -173,7 +173,8 @@ Rules:
 export async function extractCircuitsFromPhoto(
   imageBase64: string,
   panelName: string,
-  maxCircuits: number
+  maxCircuits: number,
+  imageMimeType: string = 'image/jpeg'
 ): Promise<ExtractionResult> {
   try {
     // Check authentication
@@ -195,17 +196,27 @@ export async function extractCircuitsFromPhoto(
       body: {
         prompt,
         imageData: imageBase64,
-        model: 'gemini-2.0-flash-exp',
+        imageMimeType,
+        model: 'gemini-2.5-flash',
       },
     });
 
     if (response.error) {
-      console.error('Gemini proxy error:', response.error);
+      // FunctionsHttpError wraps the real body; read it to surface the server's message
+      let detail = response.error.message || 'Failed to analyze image';
+      const ctx: any = (response.error as any).context;
+      if (ctx && typeof ctx.json === 'function') {
+        try {
+          const body = await ctx.json();
+          if (body?.error) detail = body.error;
+        } catch { /* body not JSON, keep generic message */ }
+      }
+      console.error('Gemini proxy error:', detail);
       return {
         circuits: [],
         confidence: 'low',
         warnings: [],
-        error: response.error.message || 'Failed to analyze image',
+        error: detail,
       };
     }
 

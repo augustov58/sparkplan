@@ -863,10 +863,47 @@ Requires panel name, circuit description, breaker size, and load.`,
         };
       }
 
-      // Get next available circuit number
+      // Find the next circuit slot that can actually fit this breaker:
+      // - Must be within the panel's num_spaces bounds
+      // - Must not collide with any existing circuit (including multi-pole expansions)
+      // Mirrors the logic in fill_panel_with_test_loads so the single-add
+      // and bulk-fill paths pick slots the same way.
       const existingCircuits = context.projectContext.circuits.filter(c => c.panelName === panel.name);
-      const maxCircuitNum = existingCircuits.reduce((max, c) => Math.max(max, c.circuitNumber), 0);
-      const nextCircuitNum = maxCircuitNum + (poles === 1 ? 1 : 2);
+      const totalSlots = panel.numSpaces ?? (panel.isMain ? 30 : 42);
+
+      const occupiedSlots = new Set<number>();
+      for (const ckt of existingCircuits) {
+        occupiedSlots.add(ckt.circuitNumber);
+        const pole = ckt.pole || 1;
+        for (let i = 1; i < pole; i++) {
+          occupiedSlots.add(ckt.circuitNumber + i * 2);
+        }
+      }
+
+      const canFitCircuit = (slotNum: number, pole: number): boolean => {
+        for (let i = 0; i < pole; i++) {
+          const slot = slotNum + i * 2;
+          if (slot > totalSlots || occupiedSlots.has(slot)) return false;
+        }
+        return true;
+      };
+
+      let nextCircuitNum: number | null = null;
+      for (let slot = 1; slot <= totalSlots; slot++) {
+        if (canFitCircuit(slot, poles)) {
+          nextCircuitNum = slot;
+          break;
+        }
+      }
+
+      if (nextCircuitNum === null) {
+        return {
+          success: false,
+          error: `Panel "${panel.name}" has no room for a ${poles}-pole breaker ` +
+            `(${existingCircuits.length} circuits already occupy its ${totalSlots} spaces). ` +
+            `Free a slot, reduce the pole count, or increase the panel's number of spaces.`,
+        };
+      }
 
       // Default wire size based on breaker
       const defaultWireSize = breaker_amps <= 15 ? '14 AWG' :
@@ -1254,7 +1291,7 @@ Can specify:
       const existingCircuits = context.projectContext.circuits.filter(c => c.panelName === panel.name);
 
       // Panel slot count: MDP/Main = 30 slots, Branch panels = 42 slots
-      const totalSlots = panel.isMain ? 30 : 42;
+      const totalSlots = panel.numSpaces ?? (panel.isMain ? 30 : 42);
 
       // Calculate occupied slots (including multi-pole circuit expansions)
       const occupiedSlots = new Set<number>();
@@ -1779,7 +1816,7 @@ Examples: "fill the rest with spares", "add spare circuits to panel H7", "fill r
       }
 
       // Panel slot count: MDP/Main = 30 slots, Branch panels = 42 slots
-      const totalSlots = panel.isMain ? 30 : 42;
+      const totalSlots = panel.numSpaces ?? (panel.isMain ? 30 : 42);
 
       // Get existing circuits DIRECTLY from database (not context) to ensure fresh data
       const { data: existingCircuits, error: circuitsError } = await supabase

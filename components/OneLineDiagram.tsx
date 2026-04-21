@@ -195,6 +195,7 @@ export const OneLineDiagram: React.FC<OneLineDiagramProps> = ({ project, updateP
     location: string;
     voltage: number;
     phase: 1 | 3;
+    numSpaces: number;
   } | null>(null);
 
   // Equipment Specifications Editor State
@@ -228,6 +229,7 @@ export const OneLineDiagram: React.FC<OneLineDiagramProps> = ({ project, updateP
     voltage: project.serviceVoltage,
     phase: project.servicePhase,
     isMain: false,
+    numSpaces: 42,
     fedFromType: 'panel' as 'panel' | 'transformer' | 'service',
     fedFromId: '', // Can be panel ID or transformer ID depending on fedFromType
     fedFromCircuitNumber: null as number | null // Breaker slot in parent panel, null = feed-thru lug
@@ -967,6 +969,7 @@ export const OneLineDiagram: React.FC<OneLineDiagramProps> = ({ project, updateP
       fed_from_transformer_id: fedFromTransformerId,
       fed_from_type: fedFromType,
       is_main: newPanel.isMain,
+      num_spaces: newPanel.numSpaces,
       fed_from_circuit_number: fedFromType === 'panel' ? newPanel.fedFromCircuitNumber : null
     };
 
@@ -979,6 +982,7 @@ export const OneLineDiagram: React.FC<OneLineDiagramProps> = ({ project, updateP
       voltage: project.serviceVoltage,
       phase: project.servicePhase,
       isMain: false,
+      numSpaces: 42,
       fedFromType: 'panel',
       fedFromId: '',
       fedFromCircuitNumber: null
@@ -1046,7 +1050,8 @@ export const OneLineDiagram: React.FC<OneLineDiagramProps> = ({ project, updateP
       mainBreakerAmps: panel.main_breaker_amps || panel.bus_rating,
       location: panel.location || '',
       voltage: panel.voltage,
-      phase: panel.phase
+      phase: panel.phase,
+      numSpaces: panel.num_spaces ?? (panel.is_main ? 30 : 42)
     });
 
     // Initialize equipment specs from panel data
@@ -1110,6 +1115,7 @@ export const OneLineDiagram: React.FC<OneLineDiagramProps> = ({ project, updateP
         location: editingPanel.location,
         voltage: editingPanel.voltage,
         phase: editingPanel.phase,
+        num_spaces: editingPanel.numSpaces,
         // Equipment specifications
         ...(editingEquipmentSpecs && {
           manufacturer: editingEquipmentSpecs.manufacturer,
@@ -1289,7 +1295,7 @@ export const OneLineDiagram: React.FC<OneLineDiagramProps> = ({ project, updateP
     const allOccupied = new Set([...occupiedByCircuits, ...occupiedByFeeders]);
 
     // Calculate total slots based on panel size
-    const totalSlots = parentPanel.is_main ? 30 : 42;
+    const totalSlots = parentPanel.num_spaces ?? (parentPanel.is_main ? 30 : 42);
 
     // Find available slots
     const available: number[] = [];
@@ -2656,6 +2662,23 @@ export const OneLineDiagram: React.FC<OneLineDiagramProps> = ({ project, updateP
                  </div>
                </div>
                <div>
+                 <label className="text-xs font-semibold text-gray-500 uppercase">Number of Spaces</label>
+                 <select
+                    value={newPanel.numSpaces}
+                    onChange={e => setNewPanel({...newPanel, numSpaces: Number(e.target.value)})}
+                    className="w-full border-gray-200 rounded text-sm py-2"
+                 >
+                   <option value={12}>12 spaces</option>
+                   <option value={20}>20 spaces</option>
+                   <option value={24}>24 spaces</option>
+                   <option value={30}>30 spaces</option>
+                   <option value={42}>42 spaces</option>
+                   <option value={54}>54 spaces</option>
+                   <option value={66}>66 spaces</option>
+                   <option value={84}>84 spaces</option>
+                 </select>
+               </div>
+               <div>
                   <label className="text-xs font-semibold text-gray-500 uppercase">Location</label>
                   <input
                     type="text"
@@ -2670,7 +2693,16 @@ export const OneLineDiagram: React.FC<OneLineDiagramProps> = ({ project, updateP
                    type="checkbox"
                    id="isMainPanel"
                    checked={newPanel.isMain}
-                   onChange={e => setNewPanel({...newPanel, isMain: e.target.checked})}
+                   onChange={e => {
+                     const isMain = e.target.checked;
+                     // Nudge default spaces toward the common convention; the user
+                     // can still override after toggling.
+                     setNewPanel({
+                       ...newPanel,
+                       isMain,
+                       numSpaces: isMain ? 30 : 42,
+                     });
+                   }}
                    className="rounded border-gray-300 text-[#2d3b2d] focus:ring-[#2d3b2d]/20"
                  />
                  <label htmlFor="isMainPanel" className="ml-2 text-sm text-gray-700 cursor-pointer">
@@ -3184,6 +3216,23 @@ export const OneLineDiagram: React.FC<OneLineDiagramProps> = ({ project, updateP
                                className="w-full border-gray-200 rounded text-xs py-1 px-2"
                              />
                            </div>
+                         </div>
+                         <div>
+                           <label className="text-xs text-gray-500 uppercase">Spaces</label>
+                           <select
+                             value={editingPanel.numSpaces}
+                             onChange={e => setEditingPanel({ ...editingPanel, numSpaces: Number(e.target.value) })}
+                             className="w-full border-gray-200 rounded text-xs py-1 px-2"
+                           >
+                             <option value={12}>12 spaces</option>
+                             <option value={20}>20 spaces</option>
+                             <option value={24}>24 spaces</option>
+                             <option value={30}>30 spaces</option>
+                             <option value={42}>42 spaces</option>
+                             <option value={54}>54 spaces</option>
+                             <option value={66}>66 spaces</option>
+                             <option value={84}>84 spaces</option>
+                           </select>
                          </div>
                          <input
                            type="text"
