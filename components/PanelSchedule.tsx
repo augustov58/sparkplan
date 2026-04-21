@@ -453,38 +453,42 @@ export const PanelSchedule: React.FC<PanelScheduleProps> = ({ project }) => {
     return occupied;
   };
 
-  // Check if a circuit with given number and pole count can be placed
+  // Check if a circuit with given number and pole count can be placed.
+  // A slot is "available" only if (a) it exists in this panel (<= totalSlots)
+  // and (b) none of the pole's occupied slots are already taken.
   const isCircuitSlotAvailable = (circuitNumber: number, pole: number): boolean => {
     const occupied = getOccupiedSlots();
 
-    // Check if the base slot and all required slots are free
+    if (circuitNumber < 1) return false;
+
     for (let i = 0; i < pole; i++) {
       const slotNumber = circuitNumber + (i * 2);
-      if (occupied.has(slotNumber)) {
-        return false; // Slot is occupied
-      }
+      if (slotNumber > totalSlots) return false; // Out of panel bounds
+      if (occupied.has(slotNumber)) return false; // Slot is occupied
     }
 
-    return true; // All required slots are free
+    return true;
   };
 
-  const getNextAvailableCircuitNumber = (side: 'left' | 'right', pole: number = 1) => {
+  // Returns the next free slot on the requested side, or null if none fits.
+  const getNextAvailableCircuitNumber = (side: 'left' | 'right', pole: number = 1): number | null => {
     const startNumber = side === 'left' ? 1 : 2;
-    const occupied = getOccupiedSlots();
 
-    // Find the first available slot on this side
-    for (let num = startNumber; num <= 100; num += 2) {
+    for (let num = startNumber; num <= totalSlots; num += 2) {
       if (isCircuitSlotAvailable(num, pole)) {
         return num;
       }
     }
 
-    // If no slot available, return a high number (shouldn't happen in practice)
-    return side === 'left' ? 101 : 102;
+    return null;
   };
 
   const startAddCircuit = (side: 'left' | 'right') => {
     const circuitNumber = getNextAvailableCircuitNumber(side, 1);
+    if (circuitNumber === null) {
+      alert(`No available slots on the ${side} side of this ${totalSlots}-space panel. Free a slot or increase the panel's number of spaces.`);
+      return;
+    }
     setNewCircuit({
       breakerAmps: 20,
       loadWatts: 0,
@@ -503,11 +507,18 @@ export const PanelSchedule: React.FC<PanelScheduleProps> = ({ project }) => {
     // If current number is still valid for new pole count, keep it
     if (currentNumber && isCircuitSlotAvailable(currentNumber, newPole)) {
       setNewCircuit({...newCircuit, pole: newPole});
-    } else {
-      // Otherwise, find next available slot for this pole count
-      const nextAvailable = getNextAvailableCircuitNumber(addingCircuit || 'left', newPole);
-      setNewCircuit({...newCircuit, pole: newPole, circuitNumber: nextAvailable});
+      return;
     }
+
+    // Otherwise, find next available slot for this pole count.
+    // If none exists (e.g., last single odd slot + 2-pole request), clear
+    // the number so the inline validation on the form surfaces the error.
+    const nextAvailable = getNextAvailableCircuitNumber(addingCircuit || 'left', newPole);
+    setNewCircuit({
+      ...newCircuit,
+      pole: newPole,
+      circuitNumber: nextAvailable ?? undefined,
+    });
   };
 
   // Handle manual circuit number entry
@@ -538,8 +549,14 @@ export const PanelSchedule: React.FC<PanelScheduleProps> = ({ project }) => {
       return;
     }
 
-    const circuitNumber = newCircuit.circuitNumber || getNextAvailableCircuitNumber(addingCircuit || 'left', newCircuit.pole || 1);
     const pole = newCircuit.pole || 1;
+    const circuitNumber = newCircuit.circuitNumber
+      ?? getNextAvailableCircuitNumber(addingCircuit || 'left', pole);
+
+    if (circuitNumber === null || circuitNumber === undefined) {
+      alert(`This ${totalSlots}-space panel has no room for a ${pole}-pole breaker on the ${addingCircuit} side.`);
+      return;
+    }
 
     // CRITICAL: Validate that the slot is available
     if (!isCircuitSlotAvailable(circuitNumber, pole)) {
