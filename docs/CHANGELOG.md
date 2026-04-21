@@ -4,6 +4,28 @@ All notable changes to SparkPlan.
 
 ---
 
+## 2026-04-21: Panel Photo Upload — OCR Refresh + `num_spaces` Overflow Fixes
+
+**User-Facing Bug Fixes:**
+- **Panel photo upload works again.** The "Edge Function returned a non-2xx status code" error users hit when uploading panel schedule photos is fixed — the underlying Gemini model (`gemini-2.0-flash-exp`) was sunset by Google. Replaced with `gemini-2.5-flash` (current GA). Error messages from the edge function now surface the real Gemini error body instead of the opaque wrapper.
+- **PNG and WEBP panel photos now upload.** The edge function was hardcoding `"image/jpeg"` for all uploads; now honors the file's actual MIME type so non-JPEG captures (iPhone HEIC→PNG conversion, screenshots, etc.) analyze correctly.
+- **Panel number-of-spaces is now editable.** New "Number of Spaces" dropdown in the panel create + edit forms on the One-Line Diagram: 12 / 20 / 24 / 30 / 42 / 54 / 66 / 84. Previously the app inferred size from `is_main` (MDP → 30, branch → 42), which silently dropped circuits whenever your real panel didn't match the inference (e.g., a 42-space MDP or a 24-space sub-panel).
+- **Photo import no longer silently loses circuits.** When the AI extracted more circuits than the panel has spaces (e.g., 42 circuits imported into a 30-space MDP), the extra rows used to be written to the database as invisible orphans. Now the importer reports how many were skipped in a dialog: *"Imported 30 of 42 circuits. Skipped 12 circuit(s) past slot 30 (#31, #33...). Increase the panel's number of spaces to import them."*
+- **Manual Add Circuit now bounds-checks against the panel's real size.** Previously, adding a 2-pole breaker at slot 41 of a 42-space panel would succeed even though slot 43 doesn't exist — producing orphan rows. Now rejected with a clear alert. The "+" button on a full panel alerts instead of silently doing nothing.
+- **AI chat `add_circuit` now bounds-checks and scans for gaps.** Previously, asking the AI to add a circuit to a nearly-full panel wrote the next sequential number regardless of whether it fit (so slot 31 on a 30-space panel, or colliding with an existing circuit). Now uses the same bounded gap-scan as `fill_panel_with_test_loads`, and returns an actionable error when the panel is full.
+
+**Technical:**
+- New migration `supabase/migrations/20260421_panels_num_spaces.sql` adds `panels.num_spaces INTEGER NOT NULL DEFAULT 42 CHECK (num_spaces > 0 AND num_spaces <= 84)`. Backfilled from `is_main` at apply time (MDP → 30, branch → 42) so existing panels preserve their inferred size. Applied to the production Supabase project prior to the PR merging.
+- `services/panelOcrService.ts` reads `FunctionsHttpError.context.json()` to surface the real Gemini error body (`{ error: "..."}`) through the wrapper, and forwards the image MIME type to the edge function.
+- `supabase/functions/gemini-proxy/index.ts` v34 accepts `imageMimeType` on the request and falls back to `"image/jpeg"` when absent.
+- Eliminated the `is_main ? 30 : 42` inference across **6 call sites in 4 files**: `OneLineDiagram` (available-slot finder), `PanelSchedule` (totalSlots computation, manual-add guard, photo-import guard), `PanelScheduleDocuments` (PDF export, 2 sites), `chatTools` (AI tools, 2 sites), and `projectContextBuilder` (AI context extraction). All sites now read `num_spaces` from the panel row with the legacy inference only as a defensive fallback for any row that somehow bypassed the migration backfill.
+- `isCircuitSlotAvailable` and `getNextAvailableCircuitNumber` in `PanelSchedule.tsx` now respect `totalSlots`. The latter returns `null` when no slot fits; callers handle the null with user-facing alerts instead of writing phantom slot numbers like 101/102 (previous sentinel behavior).
+- `chatTools.add_circuit` ported the `canFitCircuit` / bounded-scan pattern from `fill_panel_with_test_loads`. Builds an occupancy set that expands multi-pole breakers (2-pole at slot 1 blocks 1 *and* 3), scans 1..totalSlots for the first pole-sized gap, returns an actionable error when the panel is full.
+
+**PR:** #12, merged `ccbb55b`.
+
+---
+
 ## 2026-04-20: Spark Copilot Chatbot — Rebrand, Theme Re-skin, and UX Pass
 
 **User-Facing:**

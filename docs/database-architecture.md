@@ -1,9 +1,9 @@
 # Database Architecture
 ## SparkPlan Application
 
-**Last Updated**: 2026-04-16
+**Last Updated**: 2026-04-21
 **Database**: Supabase PostgreSQL 15
-**Schema Version**: 2.1
+**Schema Version**: 2.2
 **Location**: `/supabase/schema.sql` and migration files
 
 ---
@@ -187,6 +187,7 @@ CREATE TABLE panels (
   phase INTEGER NOT NULL CHECK (phase IN (1, 3)),
   bus_rating_amps INTEGER NOT NULL,
   main_breaker_amps INTEGER,
+  num_spaces INTEGER NOT NULL DEFAULT 42 CHECK (num_spaces > 0 AND num_spaces <= 84),
 
   -- Hierarchy (discriminated union)
   fed_from_type TEXT NOT NULL CHECK (fed_from_type IN ('service', 'panel', 'transformer', 'meter_stack')),
@@ -244,6 +245,14 @@ fed_from UUID REFERENCES panels(id) ON DELETE CASCADE
 - Identifies Main Distribution Panel (MDP)
 - Application logic prevents multiple MDPs per project
 - Future: Add UNIQUE constraint `(project_id, is_main) WHERE is_main = true`
+
+**`num_spaces` Column** (added 2026-04-21, migration `20260421_panels_num_spaces.sql`):
+- Integer count of breaker spaces physically available in the panelboard
+- Standard catalog sizes exposed in UI: 12, 20, 24, 30, 42, 54, 66, 84
+- Backfilled from `is_main` at migration time (MDP → 30, branch → 42) to preserve the legacy inference
+- CHECK constraint caps at 84 (largest standard catalog size) and requires > 0
+- Used by `PanelSchedule.totalSlots`, `OneLineDiagram` available-slot finder, `PanelScheduleDocuments` PDF export, `chatTools` `add_circuit` / `fill_panel_with_test_loads`, and the photo-import guard in `PanelSchedule.handlePhotoImport`
+- Replaces the former `is_main ? 30 : 42` heuristic, which silently orphaned circuits whenever a real-world panel had a non-inferred size (e.g., 24-space sub-panel, 42-space MDP)
 
 ---
 

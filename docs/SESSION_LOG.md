@@ -3,7 +3,65 @@
 **Purpose**: Tracks recent work for seamless handoff between Claude instances.
 **Maintenance Rule**: Keep only the last 2 sessions. At the start of a new session, delete older entries — git history preserves everything.
 
-**Last Updated**: 2026-04-20
+**Last Updated**: 2026-04-21
+
+---
+
+### Session: 2026-04-21 — Panel Photo Upload: OCR Refresh + `num_spaces` Overflow Fixes
+
+**Focus**: Three sequential user bug reports, all converging on the panel photo upload surface:
+1. Upload itself was failing with an opaque "Edge Function returned a non-2xx status code" error.
+2. After fixing the upload, circuits extracted beyond the panel's slot count were silently orphaned in the database (42-circuit photo into a 30-space MDP wrote 12 invisible rows).
+3. After exposing `num_spaces` in the UI, the user correctly asked whether the same overflow class of bug existed in the manual Add Circuit and AI chat `add_circuit` paths — it did.
+
+**Status**: ✅ All three shipped in PR #12 (`ccbb55b`), merged to main. `npm run build` clean, 124/124 tests pass across three intermediate commits.
+
+**Root causes:**
+1. **OCR failure**: Google sunset `gemini-2.0-flash-exp` (the model the edge function was hardcoded to). Client-side `FunctionsHttpError` swallowed the real response body, masking the `{ error: "model not found" }` payload behind a generic wrapper.
+2. **Silent orphans**: `is_main ? 30 : 42` slot-count inference was baked into 6 call sites in 4 files, and the `handlePhotoImport` handler wrote every extracted row to the DB with no bounds check. `maxCircuits={42}` was also hardcoded on the `<PanelPhotoImporter>` prop regardless of panel.
+3. **Manual + AI overflow**: `isCircuitSlotAvailable` only checked occupancy, not bounds — a 2-pole at slot 41 on a 42-space panel reported "available" because slot 43 wasn't in the occupied set (it didn't exist). `chatTools.add_circuit` used a naive `maxCircuitNum + 1` with no occupancy scan and no num_spaces awareness.
+
+**Work Done:**
+
+*Commit 1 — `1081f02` fix(panel-ocr):*
+- `supabase/functions/gemini-proxy/index.ts` v34: accepts optional `imageMimeType` on request body, falls back to `image/jpeg`. Model: `gemini-2.0-flash-exp` → `gemini-2.5-flash`. Deployed via MCP.
+- `services/panelOcrService.ts`: passes `file.type || 'image/jpeg'` through to the edge function; reads `FunctionsHttpError.context.json()` to surface the real error body.
+- `components/PanelPhotoImporter.tsx`: passes the File's MIME type as the 4th arg to `extractCircuitsFromPhoto`.
+
+*Commit 2 — `70563d5` fix(panels) num_spaces refactor:*
+- Migration `supabase/migrations/20260421_panels_num_spaces.sql`: `ADD COLUMN num_spaces integer` → backfill `is_main ? 30 : 42` → `NOT NULL DEFAULT 42` → `CHECK (num_spaces > 0 AND num_spaces <= 84)`. Applied to prod via MCP (`success: true`).
+- `lib/database.types.ts`: added `num_spaces: number` to Row (required) + `num_spaces?: number` to Insert/Update.
+- `components/OneLineDiagram.tsx`: new `<select>` dropdowns (12/20/24/30/42/54/66/84) in both the create form (~L2665) and the edit form (~L3220). `isMain` toggle auto-defaults to 30/42 but user can override. Wired through `editingPanel`/`newPanel` state, initial reset state, create payload, update payload, and `startEditPanel`. Replaced the legacy inference at line 1295 (available-slots computation).
+- `components/PanelSchedule.tsx`: `totalSlots` derives from `num_spaces`. `maxCircuits={42}` on `<PanelPhotoImporter>` → `maxCircuits={totalSlots}`. `handlePhotoImport` rejects extracted rows whose footprint (`circuit_number + (pole-1)*2`) exceeds `totalSlots`, alerts user with count + skipped numbers.
+- `services/pdfExport/PanelScheduleDocuments.tsx`: both `maxSlots` sites (L311, L515) now read `num_spaces` with fallback.
+- `services/ai/projectContextBuilder.ts`: `PanelSummary` interface gains `numSpaces`; populated from `panel.num_spaces ?? (panel.is_main ? 30 : 42)`.
+- `services/ai/chatTools.ts`: both inference sites (L1257, L1782) replaced via `replace_all`.
+
+*Commit 3 — `67cd0c1` fix(panels): overflow guards:*
+- `components/PanelSchedule.tsx`:
+  - `isCircuitSlotAvailable`: rejects `slotNumber > totalSlots` (and `circuitNumber < 1`), not just occupancy.
+  - `getNextAvailableCircuitNumber`: caps search at `totalSlots`, returns `null` instead of sentinel 101/102.
+  - `startAddCircuit`: alerts and aborts if null.
+  - `handlePoleChange`: clears `circuitNumber` if the new pole count doesn't fit on the current side.
+  - `handleAddCircuit`: alerts and aborts if no slot fits.
+- `services/ai/chatTools.ts` `add_circuit`: replaced naive `maxCircuitNum + 1` with the `canFitCircuit`/bounded-scan pattern from `fill_panel_with_test_loads`. Builds occupancy set with multi-pole expansion, scans 1..totalSlots, returns actionable error when full.
+
+**Key Files Touched:**
+- `supabase/functions/gemini-proxy/index.ts`, `supabase/migrations/20260421_panels_num_spaces.sql`
+- `services/panelOcrService.ts`, `services/ai/chatTools.ts`, `services/ai/projectContextBuilder.ts`, `services/pdfExport/PanelScheduleDocuments.tsx`
+- `components/OneLineDiagram.tsx`, `components/PanelSchedule.tsx`, `components/PanelPhotoImporter.tsx`
+- `lib/database.types.ts`
+- `docs/CHANGELOG.md`, `docs/database-architecture.md`, `docs/SESSION_LOG.md` (this entry)
+
+**Commits (squashed into `ccbb55b` via PR #12):**
+- `1081f02` — fix(panel-ocr): replace sunset gemini-2.0-flash-exp + surface real errors
+- `70563d5` — fix(panels): add num_spaces column + eliminate 30/42 inference
+- `67cd0c1` — fix(panels): bound-check manual + AI add-circuit against num_spaces
+
+**PR:** #12 (merged, branch deleted).
+
+**Pending / Follow-ups:**
+- None known for this feature. The `num_spaces` field is now the single source of truth across the UI, DB, PDF export, AI tools, and photo importer.
 
 ---
 
@@ -73,67 +131,3 @@
 - Follow-up PR for streaming responses + real AbortSignal through `services/geminiService.ts`.
 - Optional: delete `components/AICopilotSidebar.tsx` (now unreferenced) in a cleanup PR.
 
----
-
-### Session: 2026-04-19 — `/circuits` Bug Sweep: Number Inputs + Panel CRUD Cross-Component Refresh + Cascade-Delete + Hierarchy-Delete Safety
-
-**Focus**: Four user-reported bugs all surfacing on `/circuits`:
-1. Every controlled `<input type="number">` retained a leading "0" after clear-and-retype (typed `3` → `03`, typed `36` → `036`).
-2. A newly created panel did not appear in FeederManager's Destination Panel dropdown until page refresh, even though it was visible elsewhere on the page.
-3. Deleting a panel that was referenced by any feeder returned a 400 and a misleading "Failed to update panel" toast.
-4. Deleting a mid-tree panel (e.g. L1) silently orphaned its downstream panels: they stayed in the DB with `fed_from=null` (passes `panels_fed_from_check`) but dropped off the tree-layout SVG. Same latent 400 existed for transformer deletes (feeder CHECK conflict).
-**Status**: ✅ All four fixed, verified live by user. PRs #8, #9, #10 merged to main.
-
-**Work Done:**
-
-*Bug 1 — Leading-zero echo on numeric inputs (PR #8, commit `e8f8029`):*
-- Root cause: controlled pattern `value={n} onChange={e => setN(Number(e.target.value))}` re-renders as `value="0"` while the user is typing, because `Number("") === 0`. The browser echoes the `0` back into the input.
-- Fix: replaced 39 controlled sites with the existing `NumberInput` component (`components/common/NumberInput.tsx`), which keeps a local string buffer and only commits to the numeric state on valid parse / blur. Touched `DwellingLoadCalculator.tsx` (16 sites) and `Calculators.tsx` (23 sites). Skipped 5 nullable sites that already used the `value={x || ''}` + `... ? Number(...) : null` pattern (they dodge the bug).
-- Did NOT touch `LoadCalculator.tsx` — its two number inputs use react-hook-form's `{...register(...valueAsNumber: true)}`, which is uncontrolled and has no echo-back.
-
-*Bug 2 — Panel CRUD not refreshing peer `usePanels` instances (PR #9, commit `0d395f5`):*
-- Root cause: `/circuits` mounts TWO `usePanels(projectId)` instances — one inside `OneLineDiagram`, one inside `FeederManager`. Both open a Supabase realtime channel named `panels_${projectId}`; the second subscriber on a shared channel can miss `postgres_changes` events during reconnects. The hook already subscribed to `dataRefreshEvents.subscribe('panels', ...)` as a belt-and-suspenders fallback, but none of `createPanel`/`updatePanel`/`deletePanel` ever emitted — the bus was half-wired.
-- Fix: `createPanel` / `updatePanel` / `deletePanel` emit `'panels'` on success. Symmetry gap noted for `useCircuits.ts` / `useMeters.ts` / `useMeterStacks.ts` (subscribe-only, no emit) but deferred since no repro reported.
-
-*Bug 3 — Panel delete rejected by feeder CHECK constraint (PR #9, commit `545ef2e`):*
-- Root cause discovered via live Supabase logs. API log: `DELETE | 400 | /rest/v1/panels?id=eq.607442d3-...`. Postgres log at same timestamp: `ERROR: new row for relation "feeders" violates check constraint "feeders_source_and_destination_check"`. The feeders table has ON DELETE SET NULL on `source_panel_id` / `destination_panel_id`, but `feeders_source_and_destination_check` requires exactly one of `{panel_id, transformer_id}` per side. For a panel→panel feeder, the cascade leaves both sides null → constraint fires → delete rolls back with a 400.
-- Secondary UX bug: `toastMessages.panel.error` was hard-coded to "Failed to update panel" regardless of verb, so a delete failure looked like an update failure.
-- Fix (app-level cascade, not DB schema change):
-  - `deletePanel` now deletes dependent feeders via `.or('source_panel_id.eq.${id},destination_panel_id.eq.${id}')` before deleting the panel, then dispatches the `feeder-data-updated` window event so `useFeeders` instances refetch.
-  - `OneLineDiagram.removePanel` counts affected feeders from already-loaded state and adds "This will also delete N feeders connected to this panel." to the confirm dialog.
-  - Added `toastMessages.panel.deleteError` for verb-specific error wording.
-- Considered and rejected: changing FK to `ON DELETE CASCADE` (silently loses user data on misclick); loosening the CHECK (permits orphaned feeders at rest).
-
-*Bug 4 — Mid-tree delete orphaning + latent transformer-delete 400 (PR #10, commits `45b253b`, `f58c054`):*
-- Surfaced while testing PR #9: deleting L1 correctly cascaded the feeders, but LP (fed from L1) survived in the DB with `fed_from` nulled out. The `panels_fed_from_check` is loose — it only requires `fed_from IS NOT NULL OR is_main=true` — so LP passed. The tree-layout SVG only renders panels reachable from the MDP via `fed_from`, so LP disappeared from the diagram but remained in the Panel Schedule list. Confusing state; user could never re-parent from the UI.
-- Examined the full FK cascade map (`panels → {panels, transformers, circuits, meters, short_circuit_calculations, feeders}` plus transformer/meter-stack parents). Direct children under `panels.fed_from` and `transformers.fed_from_panel_id` are the orphan sources.
-- Discovered transformer delete had the **exact same** 400 bug as pre-PR-9 panel delete: `feeders.source_transformer_id` / `destination_transformer_id` are ON DELETE SET NULL, same CHECK violation — no one had reported it because transformer-as-feeder-endpoint is less common in the current sample data.
-- Fix (app-level guard + symmetric cascade):
-  - New `services/equipmentDependencies.ts` pure helper: `getPanelDownstream(id, {panels, transformers})`, `getTransformerDownstream(id, {panels})`, `getMeterStackDownstream(id, {panels})`, `formatDependencyMessage(name, deps)`. No Supabase imports — can be unit-tested and reused by chatbot-tool guards or permit-packet validation later.
-  - `OneLineDiagram.removePanel` (line ~983): added pre-delete `getPanelDownstream` check; aborts with formatted alert if any child panels or child transformers exist.
-  - `OneLineDiagram.removeTransformer` (line ~1655): replaced ad-hoc inline check with the shared helper; also added a feeder-count warning to the confirm dialog (mirrors `removePanel` UX, which was missing previously).
-  - `useTransformers.deleteTransformer`: pre-cascade feeders on `source_transformer_id` / `destination_transformer_id` before deleting the transformer, then dispatch `feeder-data-updated`. Added `toast.transformer.deleteError`.
-- Considered and rejected: tightening `panels_fed_from_check` to forbid `fed_from=null` when `is_main=false` (would require a DB migration + manual data cleanup for any existing orphans); DB-level ON DELETE RESTRICT (would give the user a Postgres error instead of a friendly list). The app-level guard gives the clearest UX and requires no schema change.
-- `useMeterStacks.deleteMeterStack` was examined — it exists in the hook but has **no UI caller** (nothing invokes it from OneLineDiagram or MeterStackManager). Left alone; if a caller is added later, the `getMeterStackDownstream` helper is already wired in `equipmentDependencies.ts`.
-
-**Key Files Touched:**
-- `components/DwellingLoadCalculator.tsx`, `components/Calculators.tsx` — NumberInput migration (PR #8)
-- `hooks/usePanels.ts` — emits `'panels'` on CRUD; cascade-deletes feeders in `deletePanel` (PR #9)
-- `hooks/useTransformers.ts` — cascade-deletes feeders in `deleteTransformer`; dispatches `feeder-data-updated` (PR #10)
-- `components/OneLineDiagram.tsx` — `removePanel` warns about feeder cascade count (PR #9); `removePanel` + `removeTransformer` now block mid-tree deletes via shared helper (PR #10)
-- `services/equipmentDependencies.ts` — new pure helper for downstream-dependency lookup (PR #10)
-- `lib/toast.ts` — added `panel.deleteError` (PR #9) and `transformer.deleteError` (PR #10)
-
-**Commits:**
-- `e8f8029` — fix(calculators): replace plain numeric inputs with NumberInput [PR #8, merged `2c32adf`]
-- `0d395f5` — fix(panels): emit dataRefreshEvents on CRUD so peer hooks refresh [PR #9]
-- `545ef2e` — fix(panels): cascade-delete dependent feeders to avoid CHECK conflict [PR #9, merged `2ec1079`]
-- `45b253b` — feat(diagram): block mid-tree panel/transformer deletes with downstream alert [PR #10]
-- `f58c054` — fix(transformers): cascade-delete dependent feeders to avoid CHECK conflict [PR #10, merged `0e55790`]
-
-**PRs**: #8 (merged), #9 (merged), #10 (merged)
-
-**Pending / Follow-ups:**
-- Same subscribe/emit asymmetry exists in `useCircuits.ts` / `useMeters.ts` / `useMeterStacks.ts` — candidate for the same one-line fix per CRUD function if a repro surfaces.
-- `useMeterStacks.deleteMeterStack` exists but has no UI caller. If one is added (e.g., from MeterStackManager), apply the same `getMeterStackDownstream` guard that `removePanel` / `removeTransformer` now use.
-- Transient "Add Panel button does nothing" report during Bug 2 diagnosis was self-resolved by user: Zod panelSchema rejects `bus_rating < 100`, and `showValidationErrors` uses `alert()` which browsers suppress after repeated dismissals. User confirmed 100A works and said no code change needed.
