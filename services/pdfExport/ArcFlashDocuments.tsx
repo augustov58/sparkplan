@@ -150,6 +150,29 @@ export const ArcFlashPages: React.FC<ArcFlashDocumentProps> = ({
   arcFlashData,
 }) => {
   const { result } = arcFlashData;
+  const formatNumber = (value: number | undefined, digits: number, fallback = 'N/A') =>
+    typeof value === 'number' && Number.isFinite(value) ? value.toFixed(digits) : fallback;
+
+  const arcDuration = result.details?.clearingTime ?? arcFlashData.clearingTime;
+  const arcRating = (() => {
+    switch (result.ppeCategory) {
+      case 0:
+        return 'N/A';
+      case 1:
+        return '4';
+      case 2:
+        return '8';
+      case 3:
+        return '25';
+      case 4:
+        return '40';
+      default:
+        return '> 40';
+    }
+  })();
+  const requiredPPE = Array.isArray(result.requiredPPE)
+    ? result.requiredPPE
+    : [result.requiredPPE].filter(Boolean);
 
   // Determine hazard level styling
   const getHazardStyle = () => {
@@ -186,10 +209,10 @@ export const ArcFlashPages: React.FC<ArcFlashDocumentProps> = ({
         <View style={[styles.hazardBox, getHazardStyle()]}>
           <Text style={[styles.hazardText, { color: getHazardColor() }]}>{getHazardLabel()}</Text>
           <Text style={{ fontSize: 14, fontFamily: 'Helvetica-Bold', marginTop: 5 }}>
-            Incident Energy: {result.incidentEnergy.toFixed(2)} cal/cm²
+            Incident Energy: {formatNumber(result.incidentEnergy, 2)} cal/cm²
           </Text>
           <Text style={{ fontSize: 10, marginTop: 3 }}>
-            Arc Flash Boundary: {result.arcFlashBoundary.toFixed(1)} inches
+            Arc Flash Boundary: {formatNumber(result.arcFlashBoundary, 1)} inches
           </Text>
         </View>
 
@@ -221,7 +244,7 @@ export const ArcFlashPages: React.FC<ArcFlashDocumentProps> = ({
             </View>
             <View style={styles.gridItem}>
               <Text style={styles.label}>Arc Duration</Text>
-              <Text style={styles.value}>{result.arcDuration.toFixed(3)} seconds</Text>
+              <Text style={styles.value}>{formatNumber(arcDuration, 3)} seconds</Text>
             </View>
           </View>
         </View>
@@ -244,7 +267,9 @@ export const ArcFlashPages: React.FC<ArcFlashDocumentProps> = ({
             <View style={styles.tableRow}>
               <Text style={{ ...styles.tableCol, width: '30%' }}>Arc-Rated Clothing:</Text>
               <Text style={{ ...styles.tableCol, width: '70%' }}>
-                Minimum {result.arcRating} cal/cm² arc rating
+                {arcRating === 'N/A'
+                  ? 'Arc-rated clothing not required by calculated PPE category'
+                  : `Minimum ${arcRating} cal/cm² arc rating`}
               </Text>
             </View>
 
@@ -252,7 +277,7 @@ export const ArcFlashPages: React.FC<ArcFlashDocumentProps> = ({
             <View style={styles.tableRow}>
               <Text style={{ ...styles.tableCol, width: '30%' }}>Required PPE:</Text>
               <View style={{ width: '70%' }}>
-                {result.requiredPPE.map((item, index) => (
+                {requiredPPE.map((item, index) => (
                   <Text key={index} style={{ ...styles.tableCol, marginBottom: 2 }}>
                     • {item}
                   </Text>
@@ -277,7 +302,7 @@ export const ArcFlashPages: React.FC<ArcFlashDocumentProps> = ({
             • Arc flash boundary calculated using 1.2 cal/cm² threshold
           </Text>
           <Text style={styles.complianceText}>
-            • All personnel must wear appropriate PPE when working within {result.arcFlashBoundary.toFixed(1)}" of energized equipment
+            • All personnel must wear appropriate PPE when working within {formatNumber(result.arcFlashBoundary, 1)}" of energized equipment
           </Text>
         </View>
 

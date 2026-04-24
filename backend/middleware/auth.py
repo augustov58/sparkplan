@@ -28,11 +28,9 @@ async def get_current_user(credentials: HTTPAuthorizationCredentials = Security(
     token = credentials.credentials
 
     try:
-        # Verify JWT token with Supabase
-        logger.info(f"Validating token: {token[:20]}...")
+        # Verify JWT token with Supabase. Do not log token contents or full auth
+        # responses; they can contain sensitive user metadata.
         response = supabase.auth.get_user(token)
-        logger.info(f"Auth response type: {type(response)}")
-        logger.info(f"Auth response: {response}")
 
         if not response or not response.user:
             logger.error("No user in auth response")
@@ -42,7 +40,7 @@ async def get_current_user(credentials: HTTPAuthorizationCredentials = Security(
             )
 
         user = response.user
-        logger.info(f"User authenticated: {user.email}")
+        logger.info("User authenticated")
 
         return {
             "id": user.id,
@@ -54,11 +52,9 @@ async def get_current_user(credentials: HTTPAuthorizationCredentials = Security(
         raise
     except Exception as e:
         logger.error(f"Authentication error: {type(e).__name__}: {str(e)}")
-        import traceback
-        logger.error(traceback.format_exc())
         raise HTTPException(
             status_code=401,
-            detail=f"Could not validate credentials: {str(e)}"
+            detail="Could not validate credentials"
         )
 
 

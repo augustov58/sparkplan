@@ -96,6 +96,23 @@ async def queue_agent_action(
     return AgentActionResponse(**response.data[0])
 
 
+async def assert_project_access(
+    supabase: Client,
+    user_id: str,
+    project_id: str
+) -> None:
+    """Ensure the authenticated user owns the project before using service role reads."""
+    response = supabase.table('projects') \
+        .select('id') \
+        .eq('id', project_id) \
+        .eq('user_id', user_id) \
+        .limit(1) \
+        .execute()
+
+    if not response.data:
+        raise HTTPException(status_code=404, detail="Project not found")
+
+
 # ============================================================================
 # AGENT ENDPOINTS
 # ============================================================================
@@ -118,6 +135,8 @@ async def trigger_change_impact_analysis(
         Agent action queued for approval
     """
     try:
+        await assert_project_access(supabase, user['id'], request.project_id)
+
         # Convert Pydantic models to dicts for agent
         proposed_loads_dict = [load.model_dump() for load in request.proposed_loads]
 
@@ -147,6 +166,8 @@ async def trigger_change_impact_analysis(
 
         return action
 
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Error in change impact analysis: {e}")
         raise HTTPException(status_code=500, detail=str(e))
@@ -172,6 +193,8 @@ async def trigger_rfi_drafter(
         Agent action with drafted RFI
     """
     try:
+        await assert_project_access(supabase, user['id'], project_id)
+
         # Run agent
         rfi_draft: RFIDraft = await draft_rfi(
             supabase=supabase,
@@ -197,6 +220,8 @@ async def trigger_rfi_drafter(
 
         return action
 
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Error in RFI drafting: {e}")
         raise HTTPException(status_code=500, detail=str(e))
@@ -222,6 +247,8 @@ async def trigger_photo_analyzer(
         Agent action with photo analysis and detected violations
     """
     try:
+        await assert_project_access(supabase, user['id'], project_id)
+
         # Read photo
         photo_data = await photo.read()
 
@@ -254,6 +281,8 @@ async def trigger_photo_analyzer(
 
         return action
 
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Error in photo analysis: {e}")
         raise HTTPException(status_code=500, detail=str(e))
@@ -275,6 +304,8 @@ async def trigger_predictive_inspector(
         Agent action with inspection failure prediction
     """
     try:
+        await assert_project_access(supabase, user['id'], project_id)
+
         # Run predictive analysis
         prediction: InspectionPrediction = await predict_inspection(
             supabase=supabase,
@@ -306,6 +337,8 @@ async def trigger_predictive_inspector(
 
         return action
 
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Error in inspection prediction: {e}")
         raise HTTPException(status_code=500, detail=str(e))
@@ -332,6 +365,8 @@ async def get_pending_actions(
         List of pending agent actions
     """
     try:
+        await assert_project_access(supabase, user['id'], project_id)
+
         query = supabase.table('agent_actions') \
             .select('*') \
             .eq('project_id', project_id) \
@@ -347,6 +382,8 @@ async def get_pending_actions(
 
         return [AgentActionResponse(**action) for action in response.data]
 
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Error fetching agent actions: {e}")
         raise HTTPException(status_code=500, detail=str(e))
@@ -388,6 +425,8 @@ async def approve_action(
 
         return {"success": True, "message": "Agent action approved"}
 
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Error approving action: {e}")
         raise HTTPException(status_code=500, detail=str(e))
@@ -426,6 +465,8 @@ async def reject_action(
 
         return {"success": True, "message": "Agent action rejected"}
 
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Error rejecting action: {e}")
         raise HTTPException(status_code=500, detail=str(e))

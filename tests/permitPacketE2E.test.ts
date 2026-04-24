@@ -454,16 +454,7 @@ describe('Permit packet: each themed page renders in isolation', () => {
   // page regresses we get a pin-pointed failure instead of a vague
   // "full document failed" error.
   //
-  // NOTE: The ArcFlash page is currently broken in a way that predates the
-  // themed rollout — `ArcFlashPages` reads `result.requiredPPE` as an array
-  // via `.map()`, but the `ArcFlashResult` interface declares it as a
-  // `string`. It also reads `result.arcDuration` and `result.arcRating`,
-  // which don't exist on the interface at all. The bug is NOT reachable
-  // from the real UI today because `components/PermitPacketGenerator.tsx`
-  // hard-codes `arcFlashData: undefined`, so the generator's `if
-  // (data.arcFlashData)` branch never fires from a button click. See test
-  // quarantine below with `test.fails`.
-  const pageCases: Array<{ name: string; element: React.ReactElement; known?: 'arc-flash-preexisting' }> = [
+  const pageCases: Array<{ name: string; element: React.ReactElement }> = [
     { name: 'CoverPage', element: React.createElement(CoverPage, {
       projectName: fullPacket.projectName,
       projectAddress: fullPacket.projectAddress,
@@ -516,7 +507,7 @@ describe('Permit packet: each themed page renders in isolation', () => {
       projectName: fullPacket.projectName,
       projectAddress: fullPacket.projectAddress,
     }) },
-    { name: 'ArcFlash', known: 'arc-flash-preexisting', element: React.createElement(ArcFlashPages, {
+    { name: 'ArcFlash', element: React.createElement(ArcFlashPages, {
       projectName: fullPacket.projectName,
       projectAddress: fullPacket.projectAddress,
       equipmentName: 'MDP',
@@ -556,19 +547,7 @@ describe('Permit packet: each themed page renders in isolation', () => {
     }) },
   ];
 
-  for (const { name, element, known } of pageCases) {
-    if (known === 'arc-flash-preexisting') {
-      // Known-failing, pre-existing bug (see describe-block comment).
-      // Not reachable from the real UI. Use `test.fails` so it's a
-      // red-flag signal if the bug ever gets fixed without removing
-      // the quarantine.
-      it.fails(`renders ${name} alone (quarantined: pre-existing bug, not reachable from UI)`, async () => {
-        const doc = React.createElement(Document, null, element);
-        const blob = await pdf(doc).toBlob();
-        expect(blob.size).toBeGreaterThan(500);
-      });
-      continue;
-    }
+  for (const { name, element } of pageCases) {
     it(`renders ${name} alone`, async () => {
       const doc = React.createElement(Document, null, element);
       const blob = await pdf(doc).toBlob();
@@ -601,10 +580,7 @@ describe('Permit packet: full generator E2E (mirrors button click)', () => {
     expect(head).toBe('%PDF-');
   }, 60_000);
 
-  // Regression lock for the pre-existing ArcFlash bug. Currently fails
-  // (see the quarantine comment above). When the bug is fixed, flip this
-  // from `it.fails` to `it` so we get coverage of the arc flash branch.
-  it.fails('generates full packet WITH arc flash (not reachable from UI today)', async () => {
+  it('generates full packet WITH arc flash (not reachable from UI today)', async () => {
     downloads.length = 0;
     await generatePermitPacket(fullPacket);
     expect(downloads).toHaveLength(1);

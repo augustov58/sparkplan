@@ -1922,7 +1922,9 @@ export function getToolDefinitionsForGemini(): Array<{
 }> {
   return CHAT_TOOLS.map(tool => ({
     name: tool.name,
-    description: tool.description,
+    description: tool.requiresConfirmation
+      ? `${tool.description}\n\nThis tool changes project data and requires explicit user confirmation before execution.`
+      : tool.description,
     parameters: tool.parameters,
   }));
 }
@@ -1945,6 +1947,25 @@ export async function executeTool(
   const tool = getTool(name);
   if (!tool) {
     return { success: false, error: `Unknown tool: ${name}` };
+  }
+
+  if (tool.requiresConfirmation) {
+    return {
+      success: true,
+      data: {
+        requiresConfirmation: true,
+        toolName: name,
+        requestedParams: params,
+        message: 'This action changes project data and was not executed. Ask the user to confirm the exact change before applying it.',
+      },
+      display: {
+        type: 'confirmation',
+        content: {
+          toolName: name,
+          params,
+        },
+      },
+    };
   }
 
   try {

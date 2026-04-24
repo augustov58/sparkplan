@@ -366,13 +366,13 @@ function determinePPECategory(
 export function calculateArcFlash(input: ArcFlashInput): ArcFlashResult {
   // Validate inputs
   if (input.shortCircuitCurrent <= 0) {
-    throw new Error('Short circuit current must be greater than zero');
+    return invalidArcFlashResult(input, 'Short circuit current must be greater than zero');
   }
   if (input.voltage <= 0) {
-    throw new Error('Voltage must be greater than zero');
+    return invalidArcFlashResult(input, 'Voltage must be greater than zero');
   }
   if (input.deviceRating <= 0) {
-    throw new Error('Device rating must be greater than zero');
+    return invalidArcFlashResult(input, 'Device rating must be greater than zero');
   }
   
   // Set defaults
@@ -465,3 +465,27 @@ export function calculateArcFlash(input: ArcFlashInput): ArcFlashResult {
   };
 }
 
+function invalidArcFlashResult(input: ArcFlashInput, message: string): ArcFlashResult {
+  return {
+    incidentEnergy: 0,
+    arcFlashBoundary: 0,
+    ppeCategory: 'N/A',
+    requiredPPE: 'Invalid input - correct calculation inputs before relying on PPE guidance.',
+    details: {
+      shortCircuitCurrent: input.shortCircuitCurrent,
+      arcingCurrent: 0,
+      clearingTime: 0,
+      workingDistance: input.workingDistance ?? STANDARD_WORKING_DISTANCES[input.equipmentType],
+      arcGap: input.arcGap ?? 0,
+      voltage: input.voltage,
+      phase: input.phase,
+    },
+    compliance: {
+      necArticle: 'NEC 110.16',
+      nfpaArticle: 'NFPA 70E Article 130',
+      compliant: false,
+      message,
+      recommendations: [message],
+    },
+  };
+}
