@@ -72,10 +72,22 @@ export function calculateVoltageDropAC(
   const impedanceData = getConductorImpedance(conductorSize, material, conduitType);
 
   if (!impedanceData) {
-    throw new Error(
-      `Cannot find impedance data for ${conductorSize} ${material} in ${conduitType} conduit. ` +
-      `Check NEC Chapter 9 Table 9 for available sizes.`
+    warnings.push(
+      `⚠️ CRITICAL: Cannot find impedance data for ${conductorSize} ${material} in ${conduitType} conduit. Check NEC Chapter 9 Table 9 for available sizes.`
     );
+    return {
+      voltageDropVolts: 0,
+      voltageDropPercent: 0,
+      isCompliant: false,
+      maxRecommendedPercent: 3.0,
+      method: 'AC Impedance (Chapter 9 Table 9)',
+      effectiveZ: 0,
+      distance: lengthFeet,
+      current: loadAmps,
+      necReferences,
+      warnings,
+      notes
+    };
   }
 
   // Use effective Z at 0.85 PF from table (most accurate)
@@ -169,7 +181,20 @@ export function calculateVoltageDropKFactor(
   // Get circular mils for conductor
   const circularMils = getCircularMils(conductorSize);
   if (!circularMils) {
-    throw new Error(`Unknown conductor size: ${conductorSize}`);
+    warnings.push(`⚠️ CRITICAL: Unknown conductor size: ${conductorSize}`);
+    return {
+      voltageDropVolts: 0,
+      voltageDropPercent: 0,
+      isCompliant: false,
+      maxRecommendedPercent: 3.0,
+      method: 'K-Factor (Simplified)',
+      effectiveZ: 0,
+      distance: lengthFeet,
+      current: loadAmps,
+      necReferences,
+      warnings,
+      notes
+    };
   }
 
   // Calculate voltage drop
@@ -239,9 +264,11 @@ export function calculateMaxCircuitLength(
   const impedanceData = getConductorImpedance(conductorSize, material, conduitType);
 
   if (!impedanceData) {
-    throw new Error(
-      `Cannot find impedance data for ${conductorSize} ${material} in ${conduitType} conduit.`
-    );
+    return {
+      maxLengthFeet: 0,
+      voltageDropVolts: 0,
+      necReference: `NEC 210.19(A)(1) - Cannot calculate max length: missing impedance data for ${conductorSize} ${material} in ${conduitType} conduit`
+    };
   }
 
   const effectiveZ = impedanceData.effectiveZ;

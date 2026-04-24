@@ -17,11 +17,19 @@ const stripe = new Stripe(Deno.env.get('STRIPE_SECRET_KEY') as string, {
 // Create Stripe SubtleCrypto provider for webhook verification
 const cryptoProvider = Stripe.createSubtleCryptoProvider()
 
-// Price ID to plan mapping - uses env vars with hardcoded fallbacks
-const PRICE_TO_PLAN: Record<string, string> = {
-  [Deno.env.get('STRIPE_PRICE_STARTER') || 'price_starter_monthly']: 'starter',
-  [Deno.env.get('STRIPE_PRICE_PRO') || 'price_pro_monthly']: 'pro',
-  [Deno.env.get('STRIPE_PRICE_BUSINESS') || 'price_business_monthly']: 'business',
+function getRequiredEnv(name: string): string {
+  const value = Deno.env.get(name)
+  if (!value) {
+    throw new Error(`${name} is not configured`)
+  }
+  return value
+}
+
+// Price ID to plan mapping. Unknown or missing prices must fail closed.
+const PRICE_TO_PLAN: Record<string, 'starter' | 'pro' | 'business'> = {
+  [getRequiredEnv('STRIPE_PRICE_STARTER')]: 'starter',
+  [getRequiredEnv('STRIPE_PRICE_PRO')]: 'pro',
+  [getRequiredEnv('STRIPE_PRICE_BUSINESS')]: 'business',
 }
 
 serve(async (req) => {
@@ -152,7 +160,11 @@ async function handleSubscriptionUpdate(
 ) {
   const customerId = subscription.customer as string
   const priceId = subscription.items.data[0]?.price.id
-  const plan = PRICE_TO_PLAN[priceId] || 'pro' // Default to pro if unknown
+  const plan = priceId ? PRICE_TO_PLAN[priceId] : undefined
+
+  if (!priceId || !plan) {
+    throw new Error(`Unknown Stripe price ID for subscription ${subscription.id}`)
+  }
 
   console.log(`Subscription update for customer ${customerId}: ${subscription.status}`)
 

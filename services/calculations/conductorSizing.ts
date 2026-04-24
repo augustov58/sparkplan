@@ -45,6 +45,27 @@ export interface ConductorSizingResult {
   warnings: string[];
 }
 
+function invalidConductorSizingResult(
+  loadAmps: number,
+  message: string,
+  necReferences: string[]
+): ConductorSizingResult {
+  return {
+    conductorSize: 'N/A',
+    ampacity: 0,
+    adjustedAmpacity: 0,
+    egcSize: 'N/A',
+    egcUpsized: false,
+    baseTempCorrection: 1,
+    bundlingAdjustment: 1,
+    continuousLoadFactor: 1,
+    requiredAmpacity: loadAmps,
+    baseAmpacity: 0,
+    necReferences,
+    warnings: [`⚠️ CRITICAL: ${message}`],
+  };
+}
+
 /**
  * Calculate Equipment Grounding Conductor (EGC) size
  * Per NEC 250.122 with proportional upsizing per 250.122(B)
@@ -230,7 +251,11 @@ export function sizeConductor(
   );
 
   if (!conductor) {
-    throw new Error(`Cannot find conductor for ${baseAmpacityNeeded}A at ${settings.temperatureRating}°C with ${settings.conductorMaterial}`);
+    return invalidConductorSizingResult(
+      loadAmps,
+      `Cannot find conductor for ${baseAmpacityNeeded}A at ${settings.temperatureRating}°C with ${settings.conductorMaterial}`,
+      necReferences
+    );
   }
 
   // Get actual base ampacity from table
@@ -409,7 +434,15 @@ export function sizeParallelConductors(
   isContinuous: boolean = true
 ): ConductorSizingResult & { totalConductors: number; perConductorAmps: number } {
   if (numParallel < 2) {
-    throw new Error('Parallel conductors require at least 2 conductors per phase');
+    return {
+      ...invalidConductorSizingResult(
+        totalLoadAmps,
+        'Parallel conductors require at least 2 conductors per phase',
+        ['NEC 310.10(G) - Conductors in Parallel']
+      ),
+      totalConductors: numParallel,
+      perConductorAmps: totalLoadAmps,
+    };
   }
 
   // NEC 310.10(G) - Parallel conductors must be same length, material, size, and insulation
@@ -464,7 +497,12 @@ export function calculateVoltageDrop(
   // Get circular mils for conductor
   const circularMils = getCircularMils(conductorSize);
   if (!circularMils) {
-    throw new Error(`Unknown conductor size: ${conductorSize}`);
+    return {
+      voltageDropVolts: 0,
+      voltageDropPercent: 0,
+      isCompliant: false,
+      necReference: `NEC 210.19 Informational Note No. 4 - Unknown conductor size: ${conductorSize}`
+    };
   }
 
   // Calculate voltage drop

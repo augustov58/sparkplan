@@ -139,7 +139,6 @@ const styles = StyleSheet.create({
     fontSize: 10,
     marginRight: 6,
     color: '#10b981',
-    fontFamily: 'Helvetica-Bold',
     fontFamily: 'Courier',
   },
   itemText: {

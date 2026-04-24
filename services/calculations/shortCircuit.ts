@@ -108,7 +108,22 @@ export function calculateDownstreamFaultCurrent(
   }
 
   if (!conductorData) {
-    throw new Error(`Conductor ${conductorSize} ${material} not found in NEC Table 9`);
+    return {
+      faultCurrent: 0,
+      requiredAIC: STANDARD_AIC_RATINGS[STANDARD_AIC_RATINGS.length - 1],
+      details: {
+        sourceFaultCurrent,
+        conductorImpedance: 0,
+        totalImpedance: 0,
+        faultCurrentAtPoint: 0,
+        safetyFactor: 1.25,
+      },
+      compliance: {
+        necArticle: 'NEC 110.9',
+        compliant: false,
+        message: `Conductor ${conductorSize} ${material} not found in NEC Table 9`,
+      },
+    };
   }
 
   // Calculate source impedance (ohms)

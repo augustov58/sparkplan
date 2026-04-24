@@ -19,12 +19,20 @@ const stripe = new Stripe(Deno.env.get('STRIPE_SECRET_KEY') as string, {
   apiVersion: '2024-11-20.acacia'
 })
 
-// Plan to Stripe Price ID mapping
-// TODO: Replace with your actual Stripe Price IDs from the dashboard
+function getRequiredEnv(name: string): string {
+  const value = Deno.env.get(name)
+  if (!value) {
+    throw new Error(`${name} is not configured`)
+  }
+  return value
+}
+
+// Plan to Stripe Price ID mapping. Missing price IDs must fail closed instead of
+// creating checkout sessions with placeholder prices.
 const PLAN_PRICES: Record<string, string> = {
-  starter: Deno.env.get('STRIPE_PRICE_STARTER') || 'price_starter_monthly',
-  pro: Deno.env.get('STRIPE_PRICE_PRO') || 'price_pro_monthly',
-  business: Deno.env.get('STRIPE_PRICE_BUSINESS') || 'price_business_monthly',
+  starter: getRequiredEnv('STRIPE_PRICE_STARTER'),
+  pro: getRequiredEnv('STRIPE_PRICE_PRO'),
+  business: getRequiredEnv('STRIPE_PRICE_BUSINESS'),
 }
 
 interface CheckoutRequest {

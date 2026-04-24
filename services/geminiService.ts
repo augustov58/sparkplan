@@ -470,16 +470,8 @@ export const askNecAssistantWithTools = async (
   if (initialResponse.functionCall) {
     const { name, args } = initialResponse.functionCall;
 
-    console.log('[askNecAssistantWithTools] Tool call requested:', name);
-    console.log('[askNecAssistantWithTools] Tool args:', JSON.stringify(args, null, 2));
-
     // Execute the tool
     const toolResult = await executeTool(name, args, toolContext);
-
-    console.log('[askNecAssistantWithTools] Tool result success:', toolResult.success);
-    if (!toolResult.success) {
-      console.log('[askNecAssistantWithTools] Tool error:', toolResult.error);
-    }
 
     // Send tool result back to Gemini for natural language response
     const finalResponse = await callGeminiProxyWithToolResult(

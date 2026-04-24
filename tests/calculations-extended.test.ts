@@ -757,7 +757,7 @@ describe('Arc Flash (IEEE 1584 / NFPA 70E)', () => {
       expect(result.compliance.recommendations.length).toBeGreaterThan(0);
     });
 
-    it('should throw on invalid inputs (shortCircuitCurrent <= 0)', () => {
+    it('should return non-compliant warnings on invalid inputs (shortCircuitCurrent <= 0)', () => {
       const input: ArcFlashInput = {
         shortCircuitCurrent: 0,
         voltage: 480,
@@ -766,10 +766,13 @@ describe('Arc Flash (IEEE 1584 / NFPA 70E)', () => {
         protectiveDevice: 'circuit_breaker',
         deviceRating: 100,
       };
-      expect(() => calculateArcFlash(input)).toThrow('Short circuit current must be greater than zero');
+      const result = calculateArcFlash(input);
+      expect(result.compliance.compliant).toBe(false);
+      expect(result.compliance.message).toBe('Short circuit current must be greater than zero');
+      expect(result.compliance.recommendations).toContain('Short circuit current must be greater than zero');
     });
 
-    it('should throw on invalid voltage', () => {
+    it('should return non-compliant warnings on invalid voltage', () => {
       const input: ArcFlashInput = {
         shortCircuitCurrent: 25,
         voltage: 0,
@@ -778,7 +781,10 @@ describe('Arc Flash (IEEE 1584 / NFPA 70E)', () => {
         protectiveDevice: 'circuit_breaker',
         deviceRating: 100,
       };
-      expect(() => calculateArcFlash(input)).toThrow('Voltage must be greater than zero');
+      const result = calculateArcFlash(input);
+      expect(result.compliance.compliant).toBe(false);
+      expect(result.compliance.message).toBe('Voltage must be greater than zero');
+      expect(result.compliance.recommendations).toContain('Voltage must be greater than zero');
     });
 
     it('should use default working distance by equipment type', () => {
