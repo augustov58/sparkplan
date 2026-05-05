@@ -10,6 +10,7 @@ import type { Panel, Circuit, Feeder, Transformer, ShortCircuitCalculation, Data
 import type { Jurisdiction } from '../../types';
 import type { ArcFlashResult } from '../calculations/arcFlash';
 import type { MultiFamilyEVResult } from '../calculations/multiFamilyEV';
+import type { MultiFamilyContext } from '../calculations/upstreamLoadAggregation';
 
 type GroundingDetail = Database['public']['Tables']['grounding_details']['Row'];
 type MeterStack = Database['public']['Tables']['meter_stacks']['Row'];
@@ -74,6 +75,14 @@ export interface PermitPacketData {
     result: MultiFamilyEVResult;
     buildingName?: string;
   };
+  /**
+   * NEC 220.84 multifamily context for the MDP load-calculation summary.
+   * Build with `buildMultiFamilyContext(mdp, panels, circuits, transformers, settings)`
+   * — pass `undefined` for projects that aren't multi-family with 3+ units. When
+   * provided, the load-calc page applies the Optional Method blanket DF instead of
+   * the standard NEC 220 cascade.
+   */
+  multiFamilyContext?: MultiFamilyContext;
 }
 
 const downloadBlob = (blob: Blob, fileName: string): void => {
@@ -200,6 +209,7 @@ export const generatePermitPacket = async (data: PermitPacketData): Promise<void
         serviceVoltage={data.serviceVoltage}
         servicePhase={data.servicePhase}
         projectType={data.projectType}
+        multiFamilyContext={data.multiFamilyContext}
       />
     ),
   });
@@ -443,6 +453,7 @@ export const generateLightweightPermitPacket = async (data: PermitPacketData): P
           serviceVoltage={data.serviceVoltage}
           servicePhase={data.servicePhase}
           projectType={data.projectType}
+          multiFamilyContext={data.multiFamilyContext}
         />
         <ComplianceSummary
           panels={data.panels}

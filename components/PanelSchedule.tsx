@@ -19,7 +19,7 @@ import {
   getLoadTypeColor,
   type CircuitLoad 
 } from '../services/calculations/demandFactor';
-import { calculateAggregatedLoad, type MultiFamilyContext } from '../services/calculations/upstreamLoadAggregation';
+import { calculateAggregatedLoad, buildMultiFamilyContext, type MultiFamilyContext } from '../services/calculations/upstreamLoadAggregation';
 import type { LoadTypeCode } from '../types';
 
 // Load type options for dropdown
@@ -97,44 +97,11 @@ export const PanelSchedule: React.FC<PanelScheduleProps> = ({ project }) => {
     return transformers.filter(t => t.fed_from_panel_id === selectedPanelId);
   }, [selectedPanelId, transformers]);
 
-  // NEC 220.84: Multi-family MDP gets blanket demand factor instead of per-load-type factors
-  // EV panel load is excluded from 220.84 base and added separately (NEC 625.42)
+  // NEC 220.84: Multi-family MDP gets blanket demand factor instead of per-load-type factors.
+  // Gate logic + EV/house exclusion lives in `buildMultiFamilyContext` so the same rule
+  // is reused by the permit-packet PDF generator (no drift between UI and PDF).
   const multiFamilyCtx: MultiFamilyContext | undefined = useMemo(() => {
-    if (
-      selectedPanel?.is_main &&
-      project.settings?.occupancyType === 'dwelling' &&
-      project.settings?.residential?.dwellingType === 'multi_family' &&
-      (project.settings?.residential?.totalUnits || 0) >= 3
-    ) {
-      // Identify non-dwelling loads to exclude from 220.84 base
-      const occupancy = project.settings?.occupancyType || 'commercial';
-      const downstreamFromMDP = panels.filter(
-        p => p.fed_from_type === 'panel' && p.fed_from === selectedPanel.id
-      );
-
-      // EV panels (NEC 625.42 — added at EVEMS-managed value)
-      const evLoadVA = downstreamFromMDP
-        .filter(p => p.name.toLowerCase().includes('ev'))
-        .reduce((sum, p) => {
-          const load = calculateAggregatedLoad(p.id, panels, circuits, transformers, occupancy);
-          return sum + load.totalConnectedVA;
-        }, 0);
-
-      // House/common area panels (not dwelling unit loads)
-      const housePanelLoadVA = downstreamFromMDP
-        .filter(p => p.name.toLowerCase().includes('house'))
-        .reduce((sum, p) => {
-          const load = calculateAggregatedLoad(p.id, panels, circuits, transformers, occupancy);
-          return sum + load.totalConnectedVA;
-        }, 0);
-
-      return {
-        dwellingUnits: project.settings!.residential!.totalUnits!,
-        evLoadVA: evLoadVA > 0 ? evLoadVA : undefined,
-        housePanelLoadVA: housePanelLoadVA > 0 ? housePanelLoadVA : undefined,
-      };
-    }
-    return undefined;
+    return buildMultiFamilyContext(selectedPanel, panels, circuits, transformers, project.settings);
   }, [selectedPanel, panels, circuits, transformers, project.settings?.occupancyType, project.settings?.residential]);
 
   // Create "virtual feeder circuits" for downstream equipment

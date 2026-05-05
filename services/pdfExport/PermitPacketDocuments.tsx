@@ -11,6 +11,7 @@ import { PanelScheduleDocument } from './PanelScheduleDocuments';
 import {
   calculateAggregatedLoad,
   type AggregatedLoad,
+  type MultiFamilyContext,
 } from '../calculations/upstreamLoadAggregation';
 import {
   BrandBar,
@@ -946,6 +947,14 @@ interface LoadSummaryProps {
   serviceVoltage: number;
   servicePhase: number;
   projectType?: string;
+  /**
+   * NEC 220.84 multifamily context. When supplied, `calculateAggregatedLoad`
+   * applies the Optional Method blanket demand factor at the MDP instead of
+   * the standard NEC 220 per-load-type cascade. Caller is responsible for
+   * gating (via `buildMultiFamilyContext`) — pass `undefined` for any project
+   * that is not a multi-family dwelling with 3+ units.
+   */
+  multiFamilyContext?: MultiFamilyContext;
 }
 
 export const LoadCalculationSummary: React.FC<LoadSummaryProps> = ({
@@ -956,6 +965,7 @@ export const LoadCalculationSummary: React.FC<LoadSummaryProps> = ({
   serviceVoltage,
   servicePhase,
   projectType,
+  multiFamilyContext,
 }) => {
   const mdp = panels.find(p => p.is_main);
   const occupancy = mapProjectTypeToOccupancy(projectType);
@@ -975,9 +985,10 @@ export const LoadCalculationSummary: React.FC<LoadSummaryProps> = ({
     };
   });
 
-  // Real NEC 220 aggregation on the MDP (entire system)
+  // Real NEC 220 aggregation on the MDP (entire system).
+  // multiFamilyContext flips this to the NEC 220.84 Optional Method when applicable.
   const aggregate: AggregatedLoad | null = mdp
-    ? calculateAggregatedLoad(mdp.id, panels, circuits, transformers, occupancy)
+    ? calculateAggregatedLoad(mdp.id, panels, circuits, transformers, occupancy, multiFamilyContext)
     : null;
 
   const totalConnectedVA = aggregate

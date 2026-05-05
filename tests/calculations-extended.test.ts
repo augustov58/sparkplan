@@ -59,6 +59,13 @@ import {
   type MultiFamilyEVInput,
 } from '../services/calculations/multiFamilyEV';
 
+// ── Upstream Load Aggregation (NEC 220.40 + 220.84 Optional Method) ─────────
+import {
+  calculateAggregatedLoad,
+  buildMultiFamilyContext,
+} from '../services/calculations/upstreamLoadAggregation';
+import type { Panel, Circuit, Transformer } from '../lib/database.types';
+
 // ── Arc Flash ──────────────────────────────────────────────────────────────
 import {
   calculateArcFlash,
@@ -811,6 +818,211 @@ describe('Arc Flash (IEEE 1584 / NFPA 70E)', () => {
       };
       const result = calculateArcFlash(input);
       expect(result.details.arcGap).toBe(0.5); // 480V → 0.5 inches
+    });
+  });
+});
+
+// ============================================================================
+// UPSTREAM LOAD AGGREGATION — NEC 220.84 OPTIONAL METHOD WIRING (C1)
+// ============================================================================
+// Regression test for the C1 fix: PDF Load-Calc page must consume the same
+// 220.84 Optional Method result that the in-app MDP "Aggregated Load" tile
+// shows, instead of falling through to the standard NEC 220 cascade where all
+// 'O' (Other) circuits get summed at 100% under NEC 220.14.
+//
+// Scenario mirrors the audit packet (12 dwelling units + house + EVEMS-managed
+// EV sub-panel, 240V single-phase, 1000A service) so this test fails if the
+// wiring regresses to the pre-C1 behavior.
+
+describe('Upstream Load Aggregation — NEC 220.84 Optional Method (C1)', () => {
+  // Minimal Panel/Circuit factories — only the fields the aggregation engine
+  // actually reads. Cast through `unknown` to skip DB columns we don't need.
+  const makePanel = (overrides: Partial<Panel> & Pick<Panel, 'id' | 'name'>): Panel =>
+    ({
+      bus_rating: 200,
+      voltage: 240,
+      phase: 1,
+      num_spaces: 42,
+      project_id: 'proj-1',
+      is_main: false,
+      fed_from: null,
+      fed_from_type: null,
+      fed_from_transformer_id: null,
+      ...overrides,
+    } as unknown as Panel);
+
+  const makeCircuit = (
+    panelId: string,
+    loadVA: number,
+    loadType: string = 'O',
+    idSuffix: string = '',
+  ): Circuit =>
+    ({
+      id: `c-${panelId}-${loadVA}-${idSuffix}`,
+      panel_id: panelId,
+      load_watts: loadVA,
+      load_type: loadType,
+      project_id: 'proj-1',
+      circuit_number: 1,
+      pole: 1,
+      breaker_amps: 20,
+      description: 'test',
+    } as unknown as Circuit);
+
+  // 12-unit MF building: MDP + 12 unit panels (36.2 kVA each) + House panel
+  // (13.8 kVA) + EV sub-panel (50.3 kVA EVEMS-managed). All circuits tagged
+  // 'O' to mirror the real audit packet — that's why the un-fixed PDF dumps
+  // everything into the NEC 220.14 "Other 100%" bucket.
+  const buildFixture = () => {
+    const mdp = makePanel({ id: 'mdp', name: 'Multifamily Test MDP', is_main: true, bus_rating: 1000 });
+    const housePanel = makePanel({
+      id: 'p-house', name: 'House Panel',
+      fed_from_type: 'panel', fed_from: 'mdp',
+    });
+    const evPanel = makePanel({
+      id: 'p-ev', name: 'EV Sub-Panel',
+      fed_from_type: 'panel', fed_from: 'mdp', bus_rating: 400,
+    });
+    const unitPanels: Panel[] = Array.from({ length: 12 }, (_, i) =>
+      makePanel({
+        id: `p-unit-${101 + i}`,
+        name: `Unit ${101 + i} Panel`,
+        fed_from_type: 'panel',
+        fed_from: 'mdp',
+      }),
+    );
+
+    const panels: Panel[] = [mdp, housePanel, evPanel, ...unitPanels];
+
+    const circuits: Circuit[] = [
+      // House panel: 13.8 kVA total
+      makeCircuit('p-house', 13_800, 'O', 'house'),
+      // EV sub-panel: 50.3 kVA EVEMS-managed setpoint
+      makeCircuit('p-ev', 50_300, 'O', 'ev'),
+      // Each unit panel: 36.2 kVA — matches the audit packet
+      ...unitPanels.map(p => makeCircuit(p.id, 36_200, 'O', 'unit')),
+    ];
+
+    const transformers: Transformer[] = [];
+    return { panels, circuits, transformers, mdp };
+  };
+
+  describe('buildMultiFamilyContext gate', () => {
+    it('returns context when all 4 conditions are met', () => {
+      const { panels, circuits, transformers, mdp } = buildFixture();
+      const ctx = buildMultiFamilyContext(mdp, panels, circuits, transformers, {
+        occupancyType: 'dwelling',
+        residential: { dwellingType: 'multi_family', totalUnits: 12 },
+      });
+      expect(ctx).toBeDefined();
+      expect(ctx?.dwellingUnits).toBe(12);
+      // House and EV totals collected via name-match
+      expect(ctx?.housePanelLoadVA).toBe(13_800);
+      expect(ctx?.evLoadVA).toBe(50_300);
+    });
+
+    it('returns undefined for commercial occupancy (no MF override)', () => {
+      const { panels, circuits, transformers, mdp } = buildFixture();
+      const ctx = buildMultiFamilyContext(mdp, panels, circuits, transformers, {
+        occupancyType: 'commercial',
+        residential: { dwellingType: 'multi_family', totalUnits: 12 },
+      });
+      expect(ctx).toBeUndefined();
+    });
+
+    it('returns undefined for fewer than 3 units (NEC 220.84 minimum)', () => {
+      const { panels, circuits, transformers, mdp } = buildFixture();
+      const ctx = buildMultiFamilyContext(mdp, panels, circuits, transformers, {
+        occupancyType: 'dwelling',
+        residential: { dwellingType: 'multi_family', totalUnits: 2 },
+      });
+      expect(ctx).toBeUndefined();
+    });
+
+    it('returns undefined for single-family dwelling type', () => {
+      const { panels, circuits, transformers, mdp } = buildFixture();
+      const ctx = buildMultiFamilyContext(mdp, panels, circuits, transformers, {
+        occupancyType: 'dwelling',
+        residential: { dwellingType: 'single_family', totalUnits: 12 },
+      });
+      expect(ctx).toBeUndefined();
+    });
+
+    it('returns undefined when called on a non-MDP panel', () => {
+      const { panels, circuits, transformers } = buildFixture();
+      const unitPanel = panels.find(p => p.id === 'p-unit-101')!;
+      const ctx = buildMultiFamilyContext(unitPanel, panels, circuits, transformers, {
+        occupancyType: 'dwelling',
+        residential: { dwellingType: 'multi_family', totalUnits: 12 },
+      });
+      expect(ctx).toBeUndefined();
+    });
+  });
+
+  describe('calculateAggregatedLoad with multi-family context', () => {
+    it('applies NEC 220.84 (41% for 12 units), house @ 100%, EVEMS @ 100%', () => {
+      const { panels, circuits, transformers, mdp } = buildFixture();
+      const ctx = buildMultiFamilyContext(mdp, panels, circuits, transformers, {
+        occupancyType: 'dwelling',
+        residential: { dwellingType: 'multi_family', totalUnits: 12 },
+      });
+
+      const result = calculateAggregatedLoad(mdp.id, panels, circuits, transformers, 'dwelling', ctx);
+
+      // Total connected: 12 × 36.2 + 13.8 + 50.3 = 498.5 kVA
+      expect(result.totalConnectedVA).toBe(498_500);
+
+      // Dwelling demand: 12 × 36.2 × 0.41 = 178.104 kVA
+      // House: 13.8 kVA @ 100%
+      // EVEMS: 50.3 kVA @ 100%
+      // Total demand: 178.104 + 13.8 + 50.3 ≈ 242.2 kVA
+      expect(result.totalDemandVA).toBeGreaterThanOrEqual(242_000);
+      expect(result.totalDemandVA).toBeLessThanOrEqual(242_500);
+
+      // Three breakdown rows — Dwelling, House, EV — not the legacy "Other" row
+      expect(result.demandBreakdown).toHaveLength(3);
+
+      const dwelling = result.demandBreakdown.find(d => d.loadType.includes('Multi-Family Dwelling'));
+      expect(dwelling).toBeDefined();
+      expect(dwelling?.demandFactor).toBeCloseTo(0.41, 2);
+      expect(dwelling?.necReference).toContain('220.84');
+
+      const house = result.demandBreakdown.find(d => d.loadType.includes('House'));
+      expect(house?.demandFactor).toBe(1.0);
+
+      const ev = result.demandBreakdown.find(d => d.loadType.includes('EV'));
+      expect(ev?.demandFactor).toBe(1.0);
+      expect(ev?.necReference).toContain('625.42');
+    });
+
+    it('REGRESSION: without context falls back to NEC 220.14 Other @100% (the C1 bug)', () => {
+      // Confirms the pre-C1 broken behavior is reproducible — this is the
+      // failure mode that the audit packet exhibited (498.4 kVA / 100% / "Other").
+      const { panels, circuits, transformers, mdp } = buildFixture();
+
+      const result = calculateAggregatedLoad(mdp.id, panels, circuits, transformers, 'dwelling');
+
+      // No context → standard NEC 220 path → all 'O' circuits in the Other bucket
+      const other = result.demandBreakdown.find(d => d.loadType === 'Other');
+      expect(other).toBeDefined();
+      expect(other?.demandFactor).toBe(1.0);
+      expect(other?.necReference).toContain('220.14');
+
+      // Without context the "demand" equals the connected total (no DF reduction)
+      expect(result.totalDemandVA).toBe(result.totalConnectedVA);
+      expect(result.totalDemandVA).toBe(498_500);
+    });
+
+    it('commercial occupancy is unaffected by the C1 fix (no MF context built)', () => {
+      const { panels, circuits, transformers, mdp } = buildFixture();
+      const ctx = buildMultiFamilyContext(mdp, panels, circuits, transformers, {
+        occupancyType: 'commercial',
+      });
+      expect(ctx).toBeUndefined();
+
+      // Commercial path uses standard NEC 220 cascade — no behavior change
+      const result = calculateAggregatedLoad(mdp.id, panels, circuits, transformers, 'commercial', ctx);
+      expect(result.totalDemandVA).toBe(result.totalConnectedVA);
     });
   });
 });
