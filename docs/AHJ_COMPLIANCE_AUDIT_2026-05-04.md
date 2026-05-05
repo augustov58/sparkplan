@@ -201,11 +201,18 @@ EVEMS narrative content requirements (H10):
 
 ## Fix Sequencing
 
-### Sprint 1 — Engine bugs (calculation correctness) — **starting next**
+### Sprint 1 — Engine bugs (calculation correctness) — **in progress**
 
 Order: **C1 → C2 → C4 → C3**.
 
-C1 is first because the 220.84 demand factor is the central technical claim of the product. C2 second because the 14 AWG / 0 A symptom is partially a downstream effect of C1's load aggregation (via `upstreamLoadAggregation.ts`). C4 third — the per-EVSE branch math depends on C2 being settled. C3 last — easier validation work, can be parallelized with the others.
+| # | Status | Resolution date | Notes |
+|---|---|---|---|
+| **C1** | ✅ RESOLVED | 2026-05-04 | PR #15 merged. PDF now applies NEC 220.84 multifamily Optional Method correctly. Visually verified by user on Vercel preview. |
+| **C2** | ✅ RESOLVED | 2026-05-05 | Branch `fix/c2-evse-feeder-aggregation` pushed. PDF voltage drop now live-derives feeder load from destination panel demand. Visual verification on Vercel preview pending. |
+| **C4** | ⏳ Next up | — | Per-EVSE branch circuit math + EVEMS-managed feeder math. Per-EVSE shows ~3,996 VA when NEC 220.57 requires `max(7,200 VA, nameplate)`; EVEMS reduction is being applied at branch-circuit level when it should only apply to feeder/service. |
+| **C3** | ⏳ Pending | — | Project metadata validation: address "TBD", permit # "test", contractor license "test" pass through to PDF. Lower-risk validation work, can be parallelized. |
+
+**Insight from the C1 + C2 fixes:** Both turned out to be PDF call-site wiring bugs, not calculation engine bugs. The engine modules (`upstreamLoadAggregation.ts`, `feederSizing.ts`, `conductorSizing.ts`) were already correct; the consumers were just feeding them stale or incomplete data. **C4 is likely the same pattern** — the per-EVSE math in `evCharging.ts` and the EVEMS sizing in `evemsLoadManagement.ts` are probably correct, but the panel-render layer is computing per-charger circuit values by dividing the EVEMS aggregate setpoint by N rather than calling the per-EVSE function. Worth verifying the engine code first before assuming a calc rewrite is needed (saved ~5 days of estimated work on C1+C2 by checking that first).
 
 C5 (PE seal workflow) is large enough to be its own sprint and is sequenced after the engine is correct — sealing wrong calculations would compound the problem.
 
