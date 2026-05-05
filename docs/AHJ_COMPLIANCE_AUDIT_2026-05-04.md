@@ -78,7 +78,7 @@ The "Florida Permit Mode" wedge described in `business/STRATEGIC_ANALYSIS.md` is
 - **Visual verification still required:** User must regenerate the example permit packet and confirm page 8 voltage-drop table now shows the EV Sub-Panel feeder with realistic conductor (likely 3/0–4/0 AWG Cu range), real design current (~210 A), real voltage drop %, and `meets_voltage_drop` reflecting the actual NEC 215.2 / voltage-drop check.
 - **NEC references:** 240.4(D) small-conductor protection (already enforced, no change); 215.2(A)(1) feeder ampacity sizing to noncontinuous + 125% continuous; 220.40 feeder load calculation
 
-#### **C3 — Project metadata is test placeholder text**
+#### **C3 — Project metadata is test placeholder text** (bundled with B-1 in next session)
 
 - **Symptom:** Page 1 cover shows `Project Address: TBD`, `Permit Number: test`, `Contractor License: test`.
 - **Why this matters:** Every Florida AHJ rejects on intake without a real project address and a valid contractor license. Orlando ProjectDox won't accept submittal.
@@ -89,6 +89,10 @@ The "Florida Permit Mode" wedge described in `business/STRATEGIC_ANALYSIS.md` is
 - **Code locations to inspect:**
   - `lib/validation-schemas.ts` (Zod schemas, per CLAUDE.md "Forms")
   - Project / company profile creation flow
+- **Bundled scope — also fix B-1 (chatTools.ts AI assistant staleness):**
+  - **B-1 symptom:** `services/ai/chatTools.ts:293` reads `feeder.voltageDropPercent` (cached column) when the AI answers "is feeder X compliant?" questions. Same staleness pattern that caused C2 — AI gives wrong answers on the same data the PDF used to.
+  - **B-1 fix:** call `computeFeederLoadVA(feeder, panels, circuits, transformers)` from `services/feeder/feederLoadSync.ts` and `calculateFeederSizing(...)` from `services/calculations/feederSizing.ts` live before responding, instead of reading the cached column. Mirrors the C2 architecture (live-derive on read, leave persisted column alone for future PE seal workflow).
+  - **Why bundled with C3:** Both are small, low-risk validation/wiring fixes. Single PR keeps the audit closure tight.
 
 #### **C4 — NEC 625.42 EVEMS sizing math doesn't reconcile**
 
@@ -209,8 +213,8 @@ Order: **C1 → C2 → C4 → C3**.
 |---|---|---|---|
 | **C1** | ✅ RESOLVED | 2026-05-04 | PR #15 merged. PDF now applies NEC 220.84 multifamily Optional Method correctly. Visually verified by user on Vercel preview. |
 | **C2** | ✅ RESOLVED | 2026-05-05 | Branch `fix/c2-evse-feeder-aggregation` pushed. PDF voltage drop now live-derives feeder load from destination panel demand. Visual verification on Vercel preview pending. |
-| **C4** | ⏳ Next up | — | Per-EVSE branch circuit math + EVEMS-managed feeder math. Per-EVSE shows ~3,996 VA when NEC 220.57 requires `max(7,200 VA, nameplate)`; EVEMS reduction is being applied at branch-circuit level when it should only apply to feeder/service. |
-| **C3** | ⏳ Pending | — | Project metadata validation: address "TBD", permit # "test", contractor license "test" pass through to PDF. Lower-risk validation work, can be parallelized. |
+| **C3 + B-1** | ⏳ **Next up (bundled)** | — | Two small low-risk fixes shipping together: (a) project metadata validation (address/permit#/contractor-license required + format-checked at form submit), and (b) chatTools.ts AI assistant calls `computeFeederLoadVA` + `calculateFeederSizing` live instead of reading cached `feeder.voltageDropPercent`. User decision 2026-05-05: bundle these because both are wiring/validation work with no calculation engine changes. |
+| **C4** | ⏳ Pending | — | Per-EVSE branch circuit math + EVEMS-managed feeder math. Per-EVSE shows ~3,996 VA when NEC 220.57 requires `max(7,200 VA, nameplate)`; EVEMS reduction is being applied at branch-circuit level when it should only apply to feeder/service. **Hypothesis:** likely another consumer-bug-not-engine-bug — `evCharging.ts` and `evemsLoadManagement.ts` are probably correct, but the panel-render layer divides EVEMS aggregate by N rather than calling the per-EVSE function. Verify engine first before assuming a rewrite is needed. |
 
 **Insight from the C1 + C2 fixes:** Both turned out to be PDF call-site wiring bugs, not calculation engine bugs. The engine modules (`upstreamLoadAggregation.ts`, `feederSizing.ts`, `conductorSizing.ts`) were already correct; the consumers were just feeding them stale or incomplete data. **C4 is likely the same pattern** — the per-EVSE math in `evCharging.ts` and the EVEMS sizing in `evemsLoadManagement.ts` are probably correct, but the panel-render layer is computing per-charger circuit values by dividing the EVEMS aggregate setpoint by N rather than calling the per-EVSE function. Worth verifying the engine code first before assuming a calc rewrite is needed (saved ~5 days of estimated work on C1+C2 by checking that first).
 
@@ -261,3 +265,77 @@ Per CLAUDE.md "NEC table data is safety-critical": before changing any 220.84 de
 - FBPE — Florida Board of Professional Engineers, signing/sealing requirements
 - FS 471.003(2)(h) — Contractor design exemption thresholds
 - Florida Building Code 8th ed (2023); NFPA-70 (2020)
+
+---
+
+## 🚀 Next Session Brief — C3 + B-1 (bundled)
+
+**Status as of 2026-05-05:** C1 ✅ merged (PR #15). C2 ✅ merged (branch `fix/c2-evse-feeder-aggregation`, user verified + pushed).
+
+**This is the entry point for the next Claude session after a context clear.** Read this section first, then jump straight to implementation — all decisions are already made, no re-planning needed.
+
+### Scope
+
+Ship two small fixes in one PR:
+
+1. **C3 — Project metadata validation.** Address "TBD" / Permit # "test" / Contractor License "test" must be required-non-empty + format-validated at form-submit time. See `#### **C3 — Project metadata is test placeholder text**` above for fix detail.
+2. **B-1 — chatTools.ts AI assistant staleness.** AI gives wrong answers on stale `feeder.voltageDropPercent`. Replace the cached read at `services/ai/chatTools.ts:293` with a live-derive call (mirrors C2 architecture).
+
+### Pre-flight checklist (do this before coding)
+
+1. Sync to main: `git checkout main && git pull --ff-only origin main`. Verify the C2 PR landed (`git log --oneline -5` should show the C2 fix commit).
+2. New branch: `git checkout -b fix/c3-metadata-validation-and-chattools-staleness` (or shorter — `fix/c3-b1-bundle`).
+3. Confirm test baseline: `npm test` should be 138/138 pass. `npm run build` should exit 0.
+
+### C3 implementation steps
+
+1. **Find the metadata input flow.** Project creation/edit and company profile are the two surfaces. `lib/validation-schemas.ts` is the Zod home per CLAUDE.md "Forms". Grep for the Zod schema that includes `permit_number`, `contractor_license`, `address` (or whatever the columns are actually named — check `lib/database.types.ts` for the canonical field names).
+2. **Update or create Zod schemas:**
+   - Address: street + city + state + ZIP, all `.min(1)`. State should be a 2-letter `.length(2)` (or limit to FL only at this stage of the pilot).
+   - FL Contractor License: `.regex(/^E[CR]\d{7}$/, 'Format: EC#######')`.
+   - Permit Number: `.optional()` but if present `.min(4)`.
+3. **Wire the schemas into the form components** (React Hook Form + zodResolver per CLAUDE.md). Inline error display.
+4. **Block PDF generation when fields are missing/invalid** — check the permit-packet generator's pre-flight; throw a user-friendly error in `components/PermitPacketGenerator.tsx` if validation fails on the project being exported. Do NOT add validation inside the calculation services (CLAUDE.md: pure functions).
+5. **Add tests** to `tests/calculations-extended.test.ts` or an appropriate validation test file. Cover: license-format passes/fails, missing-address fails, optional-permit-# accepts blank.
+
+### B-1 implementation steps
+
+1. **Read `services/ai/chatTools.ts` lines 280–320** — that's where the feeder-related AI tool currently produces compliance answers from the cached column.
+2. **Replace the cached read** with a live-derive:
+   ```typescript
+   import { computeFeederLoadVA } from '../feeder/feederLoadSync';
+   import { calculateFeederSizing } from '../calculations/feederSizing';
+   // ... inside the tool handler:
+   const liveLoadVA = computeFeederLoadVA(feeder, panels, circuits, transformers);
+   const sizingInput: FeederCalculationInput = { /* same shape as VoltageDropDocuments.tsx:278 */ };
+   const result = calculateFeederSizing(sizingInput);
+   // Then use result.voltage_drop_percent, result.meets_voltage_drop instead of feeder.voltageDropPercent.
+   ```
+3. The data shape for the AI tool result already exists; just swap the data source so what gets returned to the user is current truth.
+4. **Add a test** confirming a feeder with stale cache + fresh circuits produces a live (not stale) compliance answer through the AI tool path.
+
+### Verification protocol (per CLAUDE.md)
+
+1. `npm run build` — exit 0.
+2. `npm test` — 138 + new tests, zero failures.
+3. **Functional smoke (browser, since C3 is UI-form work):** open project create form → leave address blank → submit → expect inline error. Enter `EX1234567` license → expect "Format: EC#######" error. Enter valid `EC1234567` → form accepts.
+4. **B-1 smoke:** open Spark Copilot → ask "is the MDP→EV Sub-Panel feeder voltage drop compliant?" on the same 12-unit MF project — answer should match what the regenerated PDF shows (post-C2), not 0%.
+5. Update this audit doc — mark C3 + B-1 as ✅ RESOLVED with file pointers + commit refs.
+6. Update `docs/CHANGELOG.md` — new dated entry, user-facing impact + technical detail.
+7. Update `docs/SESSION_LOG.md` — new session entry, rotate older sessions per "keep last 2".
+8. Open PR for Vercel preview, get user's visual confirmation, merge.
+
+### Pattern to keep in mind (from C1 + C2 retrospective)
+
+Both prior fixes turned out to be **PDF/consumer call-site wiring bugs, not calculation engine bugs**. C3 follows that pattern (validation work, no engine change). B-1 follows that pattern (replace one cached read with a live-derive call, no engine change). **C4 likely follows the same pattern too** — when you get to it after this bundle, audit the panel-render layer in `components/PanelSchedule.tsx` first to see whether it's dividing EVEMS aggregate by N rather than calling the per-EVSE function in `evCharging.ts`. Don't assume an engine rewrite is needed until you've verified the engine is wrong.
+
+### Files most likely to touch (advance read list)
+
+- `lib/validation-schemas.ts` — Zod home
+- `lib/database.types.ts` — canonical field names
+- `components/PermitPacketGenerator.tsx` — pre-flight validation gate before PDF gen
+- Project create/edit form (grep for `useForm` + `zodResolver`)
+- Company profile form (grep for `contractor_license` or similar)
+- `services/ai/chatTools.ts` — line 293 area for B-1
+- `services/feeder/feederLoadSync.ts` — already exports `computeFeederLoadVA` (no changes needed, just import it)
+- `services/calculations/feederSizing.ts` — `calculateFeederSizing` for B-1 live recompute
