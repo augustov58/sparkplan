@@ -59,20 +59,24 @@ The "Florida Permit Mode" wedge described in `business/STRATEGIC_ANALYSIS.md` is
 - **Test results:** 132/132 vitest pass (was 123 pre-fix, +9 new). `npm run build` exits 0 in 4.68s.
 - **Visual verification still required:** User must regenerate the example permit packet from the same 12-unit MF + EVEMS project and confirm PDF page 4 now shows three demand-factor rows (Multi-Family Dwelling 41% / House 100% / EV 100%) summing to ≈242 kVA / ≈1,008 A. The current `example_reports/Permit_Packet_Multifamily_Test_2026-05-05.pdf` is the *broken* output; replacing it with a fresh export confirms the fix end-to-end.
 
-#### **C2 — EV Sub-Panel feeder shown as 14 AWG Cu**
+#### **C2 — EV Sub-Panel feeder shown as 14 AWG Cu** ✅ RESOLVED 2026-05-05
 
-- **Symptom:** Page 8 voltage-drop table: `MDP → EV Sub-Panel | 75 ft | 14 AWG Cu | 0.0 A | 0.00% | Compliant`.
-- **What's wrong:** EV Sub-Panel is rated 400 A. 14 AWG Cu is rated 15 A (NEC 240.4(D) small-conductor protection). Engine reports 0 A current, meaning the EVSE branch loads (12 chargers × 48 A continuous) are not being aggregated up the feeder.
-- **Two engine bugs in one finding:**
-  1. Feeder load aggregation isn't including EVSE downstream loads.
-  2. Conductor sizing isn't enforcing NEC 240.4(D) (or there's no warning when conductor < OCPD-required size).
-- **CLAUDE.md alignment:** "Calculations never throw on bad results. Return the result with warnings instead." Engine is reporting "Compliant" green check on a clearly non-compliant configuration — should escalate to **CRITICAL warning**.
-- **Code locations to inspect:**
-  - `services/calculations/feederSizing.ts`
-  - `services/calculations/voltageDrop.ts`
-  - `services/calculations/upstreamLoadAggregation.ts` (very likely root cause — is it running on the EV sub-panel feeder?)
-  - `services/calculations/conductorSizing.ts`
-- **NEC references:** 240.4(D) small-conductor protection; 215.2 feeder ampacity; 220.40 feeder load calculation
+- **Symptom (pre-fix):** Page 8 voltage-drop table: `MDP → EV Sub-Panel | 75 ft | 14 AWG Cu | 0.0 A | 0.00% | Compliant`.
+- **Reclassified after code verification:** Not three nested bugs — one root cause with cascading symptoms. The `feeders` table stores `total_load_va` as a cached value set at feeder-creation time. Auto-population workflows (Multi-Family EV calculator, templates) create feeders before destination panel circuits exist, persisting `total_load_va = 0`. The PDF generator at `services/pdfExport/VoltageDropDocuments.tsx:283-285` was reading the cached value verbatim, so `calculateFeederSizing` received `total_load_va = 0` and returned the smallest entry in the ampacity table (14 AWG, NEC 310.16) with vacuous-truth voltage drop (0 A × R × L = 0 V → "Compliant"). NEC 240.4(D) enforcement at `services/calculations/conductorSizing.ts:342-365` was already correct — the 14 AWG result was the right answer for the wrong input.
+- **Fix shape:** Live-derive on read. New `computeFeederLoadVA(feeder, panels, circuits, transformers)` helper in `services/feeder/feederLoadSync.ts` calls `calculateAggregatedLoad` against the destination panel and returns `totalDemandVA` (post-NEC 220 cascade per NEC 215.2(A)(1)). PDF generators and gating helpers now consult the helper instead of reading `feeder.total_load_va`. The cached column is preserved unchanged for the future PE seal workflow (C5), where we'll want to snapshot the as-of-seal-time value.
+- **Why not run a sync-on-PDF-gen and persist (Option B)?** Write-on-read invites race conditions when two PDF previews run in parallel; the live-derive approach is idempotent and side-effect-free.
+- **Why not drop the column entirely (Option C)?** PE seal workflow needs a snapshot field; throwing it away closes off that design space.
+- **Files modified:**
+  - `services/feeder/feederLoadSync.ts` — added `computeFeederLoadVA` helper (live-derive via `calculateAggregatedLoad`, falls back to cached for transformer feeders)
+  - `services/pdfExport/VoltageDropDocuments.tsx` — `VoltageDropDocumentProps.circuits?` added; `calculateAllFeederVoltageDrops` accepts circuits and uses helper
+  - `services/pdfExport/voltageDropPDF.tsx` — `exportVoltageDropReport` accepts optional `circuits`; `hasVoltageDropData` / `getVoltageDropDataCount` / `validateFeedersForVoltageDropReport` all accept optional `panels/circuits/transformers` for opt-in live-derive
+  - `services/pdfExport/permitPacketGenerator.tsx` — passes `data.circuits` through to `<VoltageDropPages>`
+  - `components/FeederManager.tsx` — UI gating (4 `hasVoltageDropData` calls + diagnostic count) now passes `panels/circuits/transformers` for live truth; export button handler forwards `circuits`
+  - `tests/calculations-extended.test.ts` — 6 regression tests (helper happy path, transformer fallback, missing-panel fallback, empty-panel fallback, end-to-end EVSE feeder picks correct conductor, regression test that pre-C2 input reproduces the 14 AWG / 0 A bug)
+- **Commercial-impact verification:** All non-feeder code paths untouched. Per-feeder card display (`feeder.design_load_va` at `FeederManager.tsx:1317`) intentionally left as a "what was last sized at" snapshot — semantically correct because it sits next to a Recalculate button. Transformer feeders fall back to cached value unchanged. Gating helpers remain opt-in: callers that don't pass `panels/circuits/transformers` get the legacy cached behavior, so legacy test fixtures and any unforeseen consumer keep working.
+- **Test results:** 138/138 vitest pass (was 132 pre-C2, +6 new). `npm run build` exits 0 in 4.64s.
+- **Visual verification still required:** User must regenerate the example permit packet and confirm page 8 voltage-drop table now shows the EV Sub-Panel feeder with realistic conductor (likely 3/0–4/0 AWG Cu range), real design current (~210 A), real voltage drop %, and `meets_voltage_drop` reflecting the actual NEC 215.2 / voltage-drop check.
+- **NEC references:** 240.4(D) small-conductor protection (already enforced, no change); 215.2(A)(1) feeder ampacity sizing to noncontinuous + 125% continuous; 220.40 feeder load calculation
 
 #### **C3 — Project metadata is test placeholder text**
 
