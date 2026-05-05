@@ -1026,3 +1026,221 @@ describe('Upstream Load Aggregation — NEC 220.84 Optional Method (C1)', () => 
     });
   });
 });
+
+// ============================================================================
+// FEEDER LOAD SYNC — LIVE-DERIVE FROM DESTINATION PANEL DEMAND (C2)
+// ============================================================================
+// Regression test for the C2 fix: PDF Voltage Drop generator must compute
+// feeder loads from the destination panel's current aggregated demand instead
+// of reading the cached `feeder.total_load_va` column. The cache becomes stale
+// whenever auto-population (Multi-Family EV calculator, templates) creates a
+// feeder before the destination panel's circuits exist — the audit packet's
+// 14 AWG / 0.0 A "Compliant" EVSE feeder was the visible symptom.
+//
+// Scenario mirrors the audit packet: MDP → EV Sub-Panel feeder, 75 ft, no
+// cached load, but the destination panel has 50.3 kVA of EVSE-managed circuits.
+// computeFeederLoadVA must return ~50,300 VA so calculateFeederSizing picks
+// the right conductor (≈210 A continuous → 4/0 AWG range) instead of falling
+// back to the smallest entry in the ampacity table (14 AWG).
+
+import { computeFeederLoadVA } from '../services/feeder/feederLoadSync';
+import { calculateFeederSizing } from '../services/calculations/feederSizing';
+import type { Feeder, FeederCalculationInput } from '../types';
+
+describe('Feeder Load Sync — live-derive from destination panel (C2)', () => {
+  // Same factory shape as the C1 fixture — Panel/Circuit casts through unknown
+  // because we only need the columns the calculation engine reads, not the full
+  // Supabase row shape (created_at, updated_at, etc).
+  const makePanel = (overrides: Partial<Panel> & Pick<Panel, 'id' | 'name'>): Panel =>
+    ({
+      bus_rating: 200,
+      voltage: 240,
+      phase: 1,
+      num_spaces: 42,
+      project_id: 'proj-1',
+      is_main: false,
+      fed_from: null,
+      fed_from_type: null,
+      fed_from_transformer_id: null,
+      ...overrides,
+    } as unknown as Panel);
+
+  const makeCircuit = (
+    panelId: string,
+    loadVA: number,
+    loadType: string = 'O',
+    idSuffix: string = '',
+  ): Circuit =>
+    ({
+      id: `c-${panelId}-${loadVA}-${idSuffix}`,
+      panel_id: panelId,
+      load_watts: loadVA,
+      load_type: loadType,
+      project_id: 'proj-1',
+      circuit_number: 1,
+      pole: 1,
+      breaker_amps: 20,
+      description: 'test',
+    } as unknown as Circuit);
+
+  const makeFeeder = (overrides: Partial<Feeder> & Pick<Feeder, 'id' | 'name'>): Feeder =>
+    ({
+      project_id: 'proj-1',
+      source_panel_id: null,
+      source_transformer_id: null,
+      destination_panel_id: null,
+      destination_transformer_id: null,
+      distance_ft: 75,
+      conductor_material: 'Cu',
+      conduit_type: 'PVC',
+      ambient_temperature_c: 30,
+      num_current_carrying: 3,
+      total_load_va: 0,
+      continuous_load_va: 0,
+      noncontinuous_load_va: 0,
+      design_load_va: null,
+      phase_conductor_size: null,
+      voltage_drop_percent: null,
+      ...overrides,
+    } as unknown as Feeder);
+
+  describe('computeFeederLoadVA', () => {
+    it('returns destination panel demand when feeder.total_load_va is stale (the C2 bug)', () => {
+      const mdp = makePanel({ id: 'mdp', name: 'MDP', is_main: true, bus_rating: 1000 });
+      const evPanel = makePanel({
+        id: 'p-ev', name: 'EV Sub-Panel',
+        fed_from_type: 'panel', fed_from: 'mdp', bus_rating: 400,
+      });
+      const panels = [mdp, evPanel];
+      // Real downstream: 50.3 kVA of EVSE-managed circuits on the EV panel
+      const circuits = [makeCircuit('p-ev', 50_300, 'O', 'evems')];
+      const transformers: Transformer[] = [];
+
+      // Stale cache: feeder created before circuits were populated
+      const feeder = makeFeeder({
+        id: 'f-mdp-ev', name: 'MDP→EV Feeder',
+        source_panel_id: 'mdp', destination_panel_id: 'p-ev',
+        total_load_va: 0,  // ← the bug: cached at 0
+      });
+
+      const liveLoad = computeFeederLoadVA(feeder, panels, circuits, transformers);
+      expect(liveLoad).toBe(50_300);
+    });
+
+    it('falls back to cached value for transformer feeders (no destination_panel_id)', () => {
+      const transformers: Transformer[] = [];
+      const xfmrFeeder = makeFeeder({
+        id: 'f-xfmr', name: 'MDP→XFMR Feeder',
+        source_panel_id: 'mdp',
+        destination_panel_id: null,
+        destination_transformer_id: 't-1',
+        total_load_va: 75_000,
+      });
+      const result = computeFeederLoadVA(xfmrFeeder, [], [], transformers);
+      expect(result).toBe(75_000);
+    });
+
+    it('falls back to cached value when destination panel cannot be found (data integrity)', () => {
+      const orphanFeeder = makeFeeder({
+        id: 'f-orphan', name: 'Orphan',
+        destination_panel_id: 'p-deleted',
+        total_load_va: 12_000,
+      });
+      const result = computeFeederLoadVA(orphanFeeder, [], [], []);
+      expect(result).toBe(12_000);
+    });
+
+    it('returns 0 when destination panel exists but has no circuits', () => {
+      const emptyPanel = makePanel({ id: 'p-empty', name: 'Empty Panel' });
+      const feeder = makeFeeder({
+        id: 'f-empty', name: 'To Empty',
+        destination_panel_id: 'p-empty',
+        total_load_va: 99_999,  // stale cached value should be ignored
+      });
+      const result = computeFeederLoadVA(feeder, [emptyPanel], [], []);
+      expect(result).toBe(0);
+    });
+  });
+
+  describe('end-to-end: live-derived feeder sizing avoids the 14 AWG / 0 A bug', () => {
+    it('picks a real conductor size for an EVSE sub-panel feeder', () => {
+      // Reconstruct the audit packet's exact symptom: pre-fix the EVSE feeder
+      // showed 14 AWG / 0.0 A / "Compliant" because feeder.total_load_va was 0
+      // even though the destination panel had 50.3 kVA of downstream load.
+      const mdp = makePanel({ id: 'mdp', name: 'MDP', is_main: true, bus_rating: 1000 });
+      const evPanel = makePanel({
+        id: 'p-ev', name: 'EV Sub-Panel',
+        fed_from_type: 'panel', fed_from: 'mdp', bus_rating: 400,
+      });
+      const panels = [mdp, evPanel];
+      const circuits = [makeCircuit('p-ev', 50_300, 'O', 'evems')];
+
+      const feeder = makeFeeder({
+        id: 'f-evse', name: 'MDP→EVSE',
+        source_panel_id: 'mdp', destination_panel_id: 'p-ev',
+        total_load_va: 0,
+      });
+
+      const liveLoad = computeFeederLoadVA(feeder, panels, circuits, []);
+      // 50,300 VA / 240 V = ~210 A — well above 14 AWG's 15 A NEC 240.4(D) limit
+      expect(liveLoad).toBe(50_300);
+
+      const sizingInput: FeederCalculationInput = {
+        source_voltage: 240,
+        source_phase: 1,
+        destination_voltage: 240,
+        destination_phase: 1,
+        total_load_va: liveLoad,
+        continuous_load_va: liveLoad * 0.8,
+        noncontinuous_load_va: liveLoad * 0.2,
+        distance_ft: 75,
+        conductor_material: 'Cu',
+        ambient_temperature_c: 30,
+        num_current_carrying: 3,
+        max_voltage_drop_percent: 3.0,
+      };
+
+      const result = calculateFeederSizing(sizingInput);
+
+      // Design current should be ~210 A (50,300 / 240), not 0 A
+      expect(result.design_current_amps).toBeGreaterThan(150);
+      expect(result.design_current_amps).toBeLessThan(300);
+
+      // Conductor must NOT be the 14 AWG fallback — at ~210 A continuous
+      // we expect at least 3/0 AWG Cu or larger per NEC 310.16
+      expect(result.phase_conductor_size).not.toBe('14');
+      expect(result.phase_conductor_size).not.toBe('12');
+      expect(result.phase_conductor_size).not.toBe('10');
+
+      // Voltage drop should be a real non-zero number, not the vacuous 0%
+      expect(result.voltage_drop_volts).toBeGreaterThan(0);
+      expect(result.voltage_drop_percent).toBeGreaterThan(0);
+    });
+
+    it('REGRESSION: pre-C2 stale read produces the 14 AWG / 0 A bug', () => {
+      // Confirms the broken behavior is reproducible — when callers don't pass
+      // panels/circuits, calculateFeederSizing receives 0 VA and returns the
+      // smallest table entry (14 AWG). This is what the audit packet showed.
+      const sizingInput: FeederCalculationInput = {
+        source_voltage: 240,
+        source_phase: 1,
+        destination_voltage: 240,
+        destination_phase: 1,
+        total_load_va: 0,
+        continuous_load_va: 0,
+        noncontinuous_load_va: 0,
+        distance_ft: 75,
+        conductor_material: 'Cu',
+        ambient_temperature_c: 30,
+        num_current_carrying: 3,
+        max_voltage_drop_percent: 3.0,
+      };
+
+      const result = calculateFeederSizing(sizingInput);
+      expect(result.design_current_amps).toBe(0);
+      // VD = 0 × R × L = 0 V → "Compliant" by vacuous truth (the displayed bug)
+      expect(result.voltage_drop_percent).toBe(0);
+      expect(result.meets_voltage_drop).toBe(true);
+    });
+  });
+});

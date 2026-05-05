@@ -22,6 +22,7 @@ import { validateFeederConnectivityEnhanced, getValidFeederDestinations, getVali
 import { checkFeederLoadStatus, getStaleFeedersList } from '../services/feeder/feederLoadSync';
 import { calculateAggregatedLoad } from '../services/calculations/upstreamLoadAggregation';
 import { exportVoltageDropReport, hasVoltageDropData } from '../services/pdfExport/voltageDropPDF';
+import { computeFeederLoadVA } from '../services/feeder/feederLoadSync';
 import type { Feeder, FeederCalculationResult } from '../types';
 
 interface FeederManagerProps {
@@ -591,7 +592,8 @@ export const FeederManager: React.FC<FeederManagerProps> = ({
         panels,
         transformers,
         projectAddress,
-        true // Include NEC references
+        true, // Include NEC references
+        circuits, // C2: live-derive feeder load from destination panel demand
       );
     } catch (error) {
       console.error('Failed to export voltage drop report:', error);
@@ -665,13 +667,15 @@ export const FeederManager: React.FC<FeederManagerProps> = ({
           <p className="text-sm text-gray-500 mt-1">
             Manage feeders between panels and transformers
           </p>
-          {/* Debug info for voltage drop export */}
-          {feeders.length > 0 && !hasVoltageDropData(feeders) && (
+          {/* Debug info for voltage drop export. C2: live-derive feeder loads
+              so newly-populated EVSE/sub-panels gate correctly without requiring
+              a manual recalc click. */}
+          {feeders.length > 0 && !hasVoltageDropData(feeders, panels, circuits, transformers) && (
             <p className="text-xs text-[#3d6b3d] mt-2 flex items-center gap-1">
               <Info className="w-3 h-3" />
               Voltage drop export requires at least one feeder with length and calculated load.
               {' '}({feeders.filter(f => f.distance_ft && f.distance_ft > 0).length} of {feeders.length} have length,
-              {' '}{feeders.filter(f => f.total_load_va && f.total_load_va > 0).length} of {feeders.length} have load)
+              {' '}{feeders.filter(f => computeFeederLoadVA(f, panels, circuits, transformers) > 0).length} of {feeders.length} have load)
             </p>
           )}
         </div>
@@ -681,14 +685,14 @@ export const FeederManager: React.FC<FeederManagerProps> = ({
             {feeders.length > 0 && (
               <button
                 onClick={handleExportVoltageDropReport}
-                disabled={!hasVoltageDropData(feeders)}
+                disabled={!hasVoltageDropData(feeders, panels, circuits, transformers)}
                 className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-colors text-sm font-medium ${
-                  hasVoltageDropData(feeders)
+                  hasVoltageDropData(feeders, panels, circuits, transformers)
                     ? 'bg-gray-700 text-white hover:bg-gray-800'
                     : 'bg-gray-300 text-gray-500 cursor-not-allowed'
                 }`}
                 title={
-                  hasVoltageDropData(feeders)
+                  hasVoltageDropData(feeders, panels, circuits, transformers)
                     ? 'Export voltage drop analysis report (PDF)'
                     : 'Add length and load data to feeders to enable export'
                 }

@@ -17,6 +17,7 @@ import {
 } from '@react-pdf/renderer';
 import type { Database } from '../../lib/database.types';
 import { calculateFeederSizing } from '../calculations/feederSizing';
+import { computeFeederLoadVA } from '../feeder/feederLoadSync';
 import type { FeederCalculationInput, FeederCalculationResult } from '../../types';
 import {
   BrandBar,
@@ -28,6 +29,7 @@ import {
 type Feeder = Database['public']['Tables']['feeders']['Row'];
 type Panel = Database['public']['Tables']['panels']['Row'];
 type Transformer = Database['public']['Tables']['transformers']['Row'];
+type Circuit = Database['public']['Tables']['circuits']['Row'];
 
 // ============================================================================
 // STYLES
@@ -201,6 +203,13 @@ export interface VoltageDropDocumentProps {
   feeders: Feeder[];
   panels: Panel[];
   transformers: Transformer[];
+  /**
+   * Required for live-derived feeder load (C2). When omitted, the renderer
+   * falls back to `feeder.total_load_va` cached values — useful for legacy
+   * test fixtures but produces stale results if the destination panel's
+   * downstream circuits have changed since the feeder was last recalculated.
+   */
+  circuits?: Circuit[];
   includeNECReferences?: boolean;
 }
 
@@ -259,7 +268,8 @@ const makeCalcErrorResult = (message: string): FeederCalculationResult => ({
 function calculateAllFeederVoltageDrops(
   feeders: Feeder[],
   panels: Panel[],
-  transformers: Transformer[]
+  transformers: Transformer[],
+  circuits?: Circuit[]
 ): FeederVoltageDropData[] {
   return feeders.map((feeder, idx) => {
     try {
@@ -275,14 +285,21 @@ function calculateAllFeederVoltageDrops(
       const voltage = sourcePanel?.voltage || 120;
       const phase = (sourcePanel?.phase || 1) as 1 | 3;
 
+      // C2: live-derive feeder load from destination panel demand. Falls back to
+      // cached feeder.total_load_va when circuits aren't supplied (legacy callers,
+      // test fixtures) or the feeder targets a transformer instead of a panel.
+      const liveLoadVA = circuits
+        ? computeFeederLoadVA(feeder, panels, circuits, transformers)
+        : (feeder.total_load_va || 0);
+
       const input: FeederCalculationInput = {
         source_voltage: voltage,
         source_phase: phase,
         destination_voltage: voltage,
         destination_phase: phase,
-        total_load_va: feeder.total_load_va || 0,
-        continuous_load_va: (feeder.total_load_va || 0) * 0.8,
-        noncontinuous_load_va: (feeder.total_load_va || 0) * 0.2,
+        total_load_va: liveLoadVA,
+        continuous_load_va: liveLoadVA * 0.8,
+        noncontinuous_load_va: liveLoadVA * 0.2,
         distance_ft: feeder.distance_ft || 0,
         conductor_material: (feeder.conductor_material as 'Cu' | 'Al') || 'Cu',
         ambient_temperature_c: 30,
@@ -565,10 +582,13 @@ export const VoltageDropPages: React.FC<VoltageDropDocumentProps> = ({
   feeders,
   panels,
   transformers,
+  circuits,
   includeNECReferences = true,
 }) => {
-  // Calculate voltage drop for all feeders
-  const feederData = calculateAllFeederVoltageDrops(feeders, panels, transformers);
+  // Calculate voltage drop for all feeders. Pass circuits so each feeder's
+  // load is live-derived from the destination panel's demand (C2) instead of
+  // the potentially-stale cached `feeder.total_load_va`.
+  const feederData = calculateAllFeederVoltageDrops(feeders, panels, transformers, circuits);
   const stats = getSummaryStats(feederData);
 
   return (
