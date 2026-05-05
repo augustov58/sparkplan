@@ -4,6 +4,26 @@ All notable changes to SparkPlan.
 
 ---
 
+## 2026-05-05: AHJ Compliance Audit — Permit Submittal Validation + AI Live-Derive (C3 + B-1)
+
+**User-Facing Bug Fixes:**
+- **Permit packet generation now blocks placeholder data ("TBD", "test") in submittal-critical fields.** Previously, exporting a permit packet for a project with `address: "TBD"` or contractor license `test` produced a packet that every Florida AHJ would reject on intake. Three new validation layers now refuse to print the PDF until the data is real: project address must contain a street # or ZIP and ≥ 8 chars; contractor license must match FL DBPR format `EC#######` or `ER#######`; permit number is optional but must be ≥ 4 chars if entered. Errors appear inline on the form (red border + specific message) and as a structured "would be rejected at AHJ intake" warning block listing every problem.
+- **Spark Copilot ("is this feeder voltage drop compliant?") no longer gives false-confident answers from stale cached data.** The C2 staleness pattern that was fixed in the PDF was still present in the AI assistant: ask "is the MDP→EV Sub-Panel feeder compliant?" on a project where the feeder was auto-created before its destination panel had circuits, and Spark Copilot would answer "Compliant — 0.00%" because it was reading the same stale `feeder.voltageDropPercent` cache the PDF used to. The chat tool now live-derives feeder voltage drop from the destination panel's current NEC 220 demand, returning real values that match what the (post-C2) PDF reports.
+
+**Why this matters for the FL pilot:** C3 is a hard intake gate for all five pilot AHJs (Orlando ProjectDox, Miami-Dade, Pompano, Davie, Hillsborough); without it, demos and submittals look unprofessional and produce intake rejections regardless of whether the underlying calcs are correct. B-1 closes the staleness loop — users who ask the AI for compliance answers now get the same numbers the PDF prints, so the "trust but verify" workflow doesn't produce contradictory results.
+
+**Technical:**
+- **C3 — `lib/validation-schemas.ts`, `components/PermitPacketGenerator.tsx`:** Three new exported Zod schemas (`projectAddressSchema`, `flContractorLicenseSchema`, `permitNumberSchema`) with a shared `PLACEHOLDER_VALUES` rejection list (`tbd`, `test`, `n/a`, `na`, `tba`, `todo`, `xxx`, `unknown`, case-insensitive). The existing `projectSchema.address` now references `projectAddressSchema`. PDF gen pre-flight in `PermitPacketGenerator.tsx` calls `safeParse` on all three before invoking `generatePermitPacket`; canGenerate predicate + warning block + per-input red-border styling all consume the same Zod errors so the message the user sees in the warning block matches the message under the input.
+- **B-1 — `services/ai/chatTools.ts`, `services/geminiService.ts`, `App.tsx`:** Plumbed raw DB rows alongside the lossy `ProjectContext` summary so chat tools can compute live values. `ToolContext` gained optional `rawPanels`, `rawCircuits`, `rawFeeders`, `rawTransformers` arrays. `askNecAssistantWithTools` accepts an optional `AgenticRawData` arg that threads into ToolContext. The single caller in `App.tsx:511` passes `{ panels, circuits, feeders, transformers }` from existing hook scope when project context is available. The `calculate_feeder_voltage_drop` tool now calls `computeFeederLoadVA` + `calculateFeederSizing` live (mirroring `services/pdfExport/VoltageDropDocuments.tsx:268-308`) and returns `{ voltageDropPercent, compliant, conductorSize, designCurrentAmps, liveLoadVA, calculationSource: 'live' | 'cached', warnings? }`. Falls back to the cached summary value with `calculationSource: 'cached'` when raw rows aren't wired (legacy callers, transformer-destination feeders).
+- **22 new regression tests** in `tests/calculations-extended.test.ts` covering: 21 schema acceptance/rejection cases (FL license format, permit-number length & placeholders, address placeholders & missing-digit detection); 3 AI tool tests (live-derive happy path proving the cached `voltageDropPercent` is ignored, cached fallback when raw rows aren't provided, regression test that the pre-B-1 stale-cache behavior is reproducible). Total suite: 160/160 pass (was 138 pre-bundle). `npm run build` exits 0.
+- **No data-model changes.** No DB migration. The cached `feeder.voltageDropPercent` and `feeder.total_load_va` columns are preserved unchanged for the future PE seal snapshot workflow.
+
+**Audit doc:** [`docs/AHJ_COMPLIANCE_AUDIT_2026-05-04.md`](AHJ_COMPLIANCE_AUDIT_2026-05-04.md). C3 and B-1 marked ✅ RESOLVED. Open: C4 (per-EVSE / EVEMS branch math), C5 (PE seal workflow), all H-tier and M-tier findings.
+
+**PRs:** Branch `fix/c3-b1-bundle` (visual verification on Vercel preview before merge).
+
+---
+
 ## 2026-05-05: AHJ Compliance Audit — Permit Packet Wiring Fixes (C1 + C2)
 
 **User-Facing Bug Fixes:**
