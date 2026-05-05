@@ -1,385 +1,211 @@
-# SparkPlan - Strategic Analysis
+# SparkPlan — Strategic Analysis
 
-**Last Updated:** February 15, 2026
-**Review Cadence:** Monthly (see [Document Maintenance](#document-maintenance))
-**Status:** Pre-revenue. Product built. Entering go-to-market phase.
+**Last Updated:** 2026-05-04
+**Status:** Pre-revenue. Product built. Entering Florida pilot.
+**Authoritative source:** This file summarizes the operational decisions derived from the deeper analyses in the personal Obsidian vault (`SparkPlan Analysis/` — Reconciliation Notes May 2 2026, OAI Market Viability May 2026, Competitive Landscape Apr 2026, FL Pilot Revised Feb 2026). Where this file disagrees with the Obsidian Reconciliation Notes, Reconciliation Notes win.
 
 ---
 
 ## Executive Summary
 
-### The Opportunity
+### The Wedge
 
-Multi-family EV charging is the highest-pain, highest-willingness-to-pay niche in the electrical contracting market. Contractors are turning down $10,000-$50,000 jobs because they cannot produce the NEC 220.84 calculations inspectors require. Engineering firms charge $2-10K per project. No affordable software exists to bridge this gap.
+**Permit-acceptance for multi-family EV + EVEMS in Florida.** The product wins on whether AHJs accept the packet on first submittal — not on EV-mandate compliance.
 
-**SparkPlan** automates these calculations at $49-149/mo — a 40x+ ROI on the first project.
+Florida is the pilot because:
+- §366.94 **preempts** local EV-charging ordinances. Mandate-tailwind narratives (CA 2026, NY MF law) do not apply here, so the product must justify itself on workflow value alone — a stronger validation signal.
+- 443,911 registered electric vehicles statewide (FLHSMV Aug 2025); ~44% concentrated in Miami-Dade / Broward / Orange / Hillsborough.
+- Right to Charge (FS §718.113(8)-(9)) forces condo associations to permit EV chargers, creating recurring multi-family permit volume in older buildings near electrical capacity.
+- The FS 471.003(2)(h) PE-licensure exemption (≤$125k system value, ≤600A residential / ≤800A commercial @ 240V) creates a **dual-path workflow** — contractor-exempt lane + PE-sealed lane — that no national competitor productizes.
 
-### What We Know vs What We Assume
+### What's Validated vs Assumed
 
-| Category | Status | Evidence |
-|----------|--------|----------|
-| Pain exists | **Validated** | Forum posts, contractor quotes, engineering fee data |
-| No competitor in this niche | **Validated** | Competitive analysis across all tiers (Feb 2026) |
-| Regulatory tailwinds are real | **Validated** | CA 2026 mandate, NY law, 11+ state ZEV standards |
-| Product works | **Validated** | Calculator, PDF export, permit integration all functional |
-| Contractors will pay for this | **NOT VALIDATED** | Zero paying customers. This is the critical unknown. |
-| $49/mo is the right price | **NOT VALIDATED** | Reasonable based on contractor economics, untested |
+| Item | Status | Evidence |
+|---|---|---|
+| Multi-family EV permit pain is real | **Validated** | Mike Holt forum threads, FORUM_RESEARCH_FINDINGS.md, AHJ checklist intensity (Pompano, Davie, Orlando) |
+| No competitor unifies NEC calcs + permit packet + AHJ checklist + PE seal + EVEMS | **Validated** | Apr 2026 competitive matrix (Kopperfield, PermitFlow, PowerCalc, Design Master, FlashWorks) |
+| Product works end-to-end | **Validated** | Calculator → PDF → permit packet pipeline functional |
+| Florida AHJs explicitly demand riser + load calc + manuals + site plan + HOA letter | **Validated** | Pompano Beach EV checklist, Orlando engineering permit flow, Miami-Dade plan review guidelines |
+| Contractors will pay $X/mo | **NOT VALIDATED** | Zero paying customers. Pricing is the open question (see below) |
+| First-pass acceptance rate improves measurably | **NOT VALIDATED** | Need 20–40 real packets through 2–3 AHJs in pilot |
 
 ### The Single Most Important Thing Right Now
 
-**Get the first paying customer.** Everything else — pricing optimization, feature expansion, marketing campaigns — is premature until someone gives us money.
+**Run the Florida pilot — 20–40 real permits across 2–3 AHJs.** The go-criterion is ≥70% first-pass acceptance in at least 2 AHJs (FL_PILOT_REVISED §9). Everything else is premature until that loop produces evidence.
 
 ---
 
-## Market Intelligence
+## Pricing — Open Decision
 
-### Market Sizing
+The Obsidian Reconciliation Notes flag this as the **#1 unresolved contradiction** across reports. We have not picked a lane:
 
-#### Total Addressable Market (TAM)
+| Strategy | Tiers | Year-1 ARR implied | Best when… |
+|---|---|---|---|
+| **Undercut Kopperfield (PLG)** | $29 / $49 / $149 | $50K–$150K | High-volume, self-serve, low-touch; relies on freemium funnel |
+| **Premium PE-led** | $249–$599/mo + per-seal upsell | $100K–$300K + $50K–$250K seal | Vertically-integrated PE service; lower volume, higher ARPU |
 
-| Dimension | Number | Source |
-|-----------|--------|--------|
-| US electrical contractor businesses | 251,789 | IBISWorld 2025 |
-| US electrical contracting revenue | $237.6B/yr | Arizton 2023 |
-| Electrical contractor software market | $1.6B (global) | Verified Market Reports |
-| US EV charging infrastructure market | $5.09B, 30.3% CAGR | Grand View Research |
-| Multi-family units completed (2024) | 608,000 (38-year high) | NAHB |
+**Action required before any pitch copy or paid acquisition runs:** pick one. The Y1 revenue projection collapses to a different number under each.
 
-**TAM (all US contractors):** 251,789 x $49-149/mo = $148M - $450M ARR
+For pilot purposes we are **operating at $29 / $49 / $149** because that's what the product currently bills; this is a default, not a decision.
 
-#### Serviceable Addressable Market (SAM)
+---
 
-| Filter | Contractors | Rationale |
-|--------|-------------|-----------|
-| Do commercial/multi-family work | ~100,000 | ~40% of contractors (NECA profile) |
-| Actively doing or pursuing EV work | ~25,000 | EV still emerging but growing fast |
-| Willing to pay for calculation software | ~12,500 | 50% FSM adoption rate as proxy |
+## Market Sizing — Calibrated Anchors
 
-**SAM:** 12,500 x $49/mo = **$7.35M ARR**
+The Obsidian OAI deep research replaces the older IBISWorld figures with more recent industry-sourced anchors:
 
-#### Serviceable Obtainable Market (SOM) — Realistic Targets
+| Anchor | Number | Source |
+|---|---|---|
+| US electrical contracting businesses | **81,046 (2023)** | IEC Economic Impact Report 2025 |
+| US electrical contracting revenue | $260.1B/yr | IEC 2025 |
+| US electricians employed | 818,700 (2024); 65% by ECs | BLS |
+| FL electrical contractor licensees | ~18,000 | FL DBPR |
+| FL registered EVs | 443,911 (Aug 2025) | FLHSMV — top 4 metros = 44% |
+| FL multifamily under construction | 33,000+ units (Miami-Dade + Broward) | RentCafe Q2 2025 |
 
-| Timeframe | Subscribers | MRR | ARR |
-|-----------|-------------|-----|-----|
-| Year 1 | 200 | $9,800 | $117,600 |
-| Year 2 | 1,000 | $49,000 | $588,000 |
-| Year 3 | 3,000 | $147,000 | $1,764,000 |
+**Account-based ceiling (US):** 81,046 × $49/mo × 12 ≈ **$47.7M ARR** (ceiling, not forecast). At $149/mo: ~$144.9M. *This is not a multi-billion-ARR category* without expanding beyond contractors or layering high-ARPA services (PE review, enterprise workflows, broader construction ops).
 
-**Reality check:** ServiceTitan has 100,000+ contractors at much higher price points. 1,000-3,000 in a specialized niche is achievable.
+**Florida pilot SAM (12-month):**
+- Target metros: Miami-Dade, Broward, Orange, Hillsborough.
+- Addressable: 150–600 firms doing EVSE / service upgrades / multi-family.
+- Year-1 penetration: 2–8%.
 
-### Contractor Demographics
+**Year-1 ARR — realistic range**
 
-| Metric | Data | Source |
-|--------|------|--------|
-| 51% of firms have 1-9 employees | Small businesses, tight budgets | NECA 2024 |
-| 42% generate under $1M revenue | Price-sensitive buyers | NECA 2024 |
-| Average contractor age: 57-61 years | Lower tech comfort, needs simple UX | NECA 2024 |
-| 50% use field service management software | Willingness to adopt SaaS tools | Industry surveys |
-| Net profit margins: 2-18% | Wide range; tools that save time = margin improvement | Multiple sources |
+| Scenario | ARR | Customers | Avg ARPU |
+|---|---|---|---|
+| Conservative | $50K–$75K | 20–30 | ~$200/mo |
+| Moderate | $100K–$150K | 40–60 | ~$200/mo |
+| Aggressive | $200K–$300K | 80–120 | ~$200/mo |
 
-### Regulatory Tailwinds
-
-| Mandate | Requirement | Timeline |
-|---------|-------------|----------|
-| **California 2026** | 100% of MF parking spaces EV-ready | Effective now |
-| **NY State Law** | Overrides NYC for MF EV requirements | April 2025 (active) |
-| **11 states + DC** | Adopted CA ZEV standards | Rolling 2025-2030 |
-| **NEC 2026 cycle** | Article 220 renumbered to 120; new EVSE rules | 2026-2029 adoption |
-
-**Key insight:** State mandates are proceeding regardless of federal policy. California alone drives massive demand.
+Calibration: median micro-SaaS MRR is $500/mo (Freemius 2025); only 12% of indie SaaS founders cross $100K ARR. The Moderate scenario places SparkPlan in the top ~15% of micro-SaaS outcomes.
 
 ---
 
 ## Competitive Landscape
 
-### The Whitespace
+### Direct competitor: Kopperfield
 
-**Nobody occupies the intersection of:**
-- NEC 220.84 multi-family demand factors
-- NEC 220.57 EVSE load calculation
-- NEC 625.42 EVEMS right-sizing
-- Permit-ready PDF output
-- Cloud-based SaaS at $49-149/mo
+The benchmark customers will compare against. Verified Apr 2026:
 
-### By Tier
+- **Pricing:** $44.99–$99.99/mo (Commercial Pro at $99.99/mo); team add-ons at $14.99/seat.
+- **Funding:** $5M (BIG Ventures, Climate Capital, Daft Capital).
+- **Strengths:** NEC 2017/2020/2023 chatbot (and possibly NEC 2026 Article 120 Part III — *verify before claiming code parity*); generator sizing; AI panel-photo auto-population; "Smart Property Data" address lookup; SPAN/Emporia/WattBuy partnerships; iOS + Android.
+- **Weaknesses (= our opening):** individual one-page PDFs (no assembled packet); zero FL AHJ awareness; no PE seal workflow; EVEMS support is line-item only, not NEC 625.42; declares "Data isn't encrypted" on Google Play.
 
-#### Enterprise ($3K-$80K/year) — Not competitors; they're our price anchor
+### Adjacent / non-threats
 
-| Player | Price | Focus | MF EV? |
-|--------|-------|-------|--------|
-| ETAP (Schneider) | $3K-$25K/yr | Utilities, large eng. firms | No |
-| SKM PowerTools | $2.8K-$22K/yr | Top 40 eng. firms | No |
-| EasyPower (Bentley) | Contact sales | Industrial, municipalities | No |
+| Player | Pricing | Why not a direct threat |
+|---|---|---|
+| **PermitFlow** | Custom ($91M raised, Series B) | General construction permit submission; does **no** electrical engineering. Could be an integration partner. |
+| **PowerCalc** | $69.95–$89.95/user/mo | Cloud NEC engineering for engineers/architects. No permit packets, no AHJ awareness, no EVEMS. |
+| **Design Master** | $125/seat/mo + AutoCAD (~$2k/yr) | Desktop AutoCAD plugin for MEP engineers. Total cost ~$290/mo — 6× our Pro tier. |
+| **FlashWorks** | Not published (desktop) | FL-PE-built legacy NEC service calc tool; supports NEC 2017/2020 only. **Most culturally aligned competitor** — possible acquisition target rather than competitor. |
+| **ETAP / SKM / EasyPower** | $2.8K–$25K/yr | Engineering-grade incumbents. Not at our price point; they shape arc-flash output expectations but don't compete for contractor permit workflow. |
 
-#### Mid-Market ($1.5K-$5K/year) — Tangential
+### The defensible whitespace
 
-| Player | Price | Focus | MF EV? | Threat |
-|--------|-------|-------|--------|--------|
-| Trace Software | $1.5K-$4.5K/yr | Engineers (Europe, IEC) | EV module (IEC, not NEC) | Low |
-| PowerCalc | Unknown | Engineers, architects | No | Medium |
-| IntelliBid | $2.3K-$6K one-time | Estimating | Basic NEC 220 | Low |
+**No tool unifies:** NEC Art. 220 calcs + permit packet assembly + FL AHJ checklists + PE seal workflow + multi-family EV/EVEMS at ≤$150/mo. That's the entire product positioning in one sentence.
 
-#### SMB/Contractor ($0-$1.2K/year) — Our competitive set
-
-| Player | Price | Focus | MF EV? | Threat |
-|--------|-------|-------|--------|--------|
-| **Kopperfield** | Free (basic) | Residential load calcs | No | **Medium** — closest overlap |
-| KalcMate | Unknown | Generic calculations | No | Low |
-| Mike Holt tools | $62-$500 | Training/reference | No | Low |
-
-#### EV-Specific Tools — Different problem (operations, not design)
-
-ChargeLab, Ampcontrol, Sitetracker, NREL EVI-X — all focus on charging network management, not NEC load calculations for building electrical systems.
-
-### Threat to Monitor
-
-**Kopperfield** is the most likely competitor to move into this space. They already have free load calcs and permit reports for residential. If they add multi-family EV support, it compresses our moat. Monitor their product updates monthly.
+**Moat sources, ranked:**
+1. **PE license** — vertically integrated calculation + review + seal. Cannot be replicated without hiring/partnering with PEs in each jurisdiction.
+2. **AHJ template accumulation** — every checklist learned, every passed packet, compounds. National tools cannot maintain this at our granularity.
+3. **Multi-family EVEMS depth** — the EVEMS market is hardware-centric (Black Box Innovations, simpleSwitch, VariableGrid); no software produces the NEC-compliant engineering for it.
 
 ---
 
-## Customer & Pain Point Validation
+## Florida-Specific Pain Points (Validated)
 
-### Validated Pain Points (Forum Research, Jan 2026)
+| Pain | Evidence |
+|---|---|
+| EV permit packets explicitly require riser + load calcs + manuals + site plan + HOA letter | Pompano Beach, Davie, Orlando AHJ checklists |
+| Orlando ties EV charging to an associated **engineering permit** + signed/sealed plans + NOC > $5k | City of Orlando permitting page |
+| Miami-Dade specifies plan ID conventions ("E" prefix), Florida Building Code 8th ed (2023), NFPA-70 (2020) | Miami-Dade commercial electrical plan review guideline |
+| Davie adds Knox-box emergency shutoff + NEC 625.42 breaker locking for commercial | Davie EV checklist |
+| Multi-family EV requires demand factor knowledge (NEC 220.84) most contractors lack | Mike Holt forum threads ("there is no FEASABLE answer…") |
+| Older condos run near service capacity → EVEMS or service upgrade needed | Forum threads, RentCafe MF data |
+| FS 471.003(2)(h) creates a contractor design exemption — but AHJs may still demand sealed plans | FBPE guidance, Pompano anchoring requirements |
 
-| Pain Point | Evidence | Frequency |
-|------------|----------|-----------|
-| "I don't know how to do EV load calculations" | Master electricians asking basic questions | Very High |
-| Contractors turning down profitable work | "We've stopped installing multi unit chargers" | High |
-| Multi-family = impossible | "There is no FEASABLE answer for your problem" | High |
-| $2-10K engineering quotes | Contractors paying or walking away | Medium |
-| Inspection failures | Permits issued, finals fail for missing calcs | Medium |
-| NEC 220.84 confusion with EVSE | Mike Holt Forum threads, conflicting interpretations | High |
+### Hidden opportunity: NEC 220.84 + 220.87 measurement path
 
-**Source:** See [market-research/FORUM_RESEARCH_FINDINGS.md](market-research/FORUM_RESEARCH_FINDINGS.md)
+Most contractors don't know:
+- 220.84 demand factors drop multi-family load to **23–45%** of naive sum (35-unit building: 1,400A actual vs 3,500A naive).
+- 220.87(A) measurement path often shows **30–50% more available capacity** than the 220.87(B) calculation path. Difference between "turn down the job" and "submit the bid."
 
-### The Hidden Opportunity: NEC 220.84 Demand Factors
-
-Most contractors don't know NEC 220.84 allows massive demand factor reductions:
-- 3-5 units: 45% demand factor
-- 6-20 units: 38-44%
-- 21-62+ units: 23-36%
-
-**Example:** 35-unit building
-- Naive calculation: 35 x 100A = 3,500A needed
-- NEC 220.84 method: ~1,400A actual demand
-
-**Contractors conclude "impossible" when "feasible" is the correct answer.**
-
-### NEC 220.87: The Measurement Path Differentiator
-
-Two paths for determining existing building demand:
-
-| Method | NEC Reference | Result |
-|--------|--------------|--------|
-| **Calculation** | 220.87(B) | Conservative (worst-case assumptions) |
-| **Measurement** | 220.87(A) | Often shows 30-50% MORE available capacity |
-
-**Example:** Building calculated at 400A demand might only use 180A peak. That's 220A available for EV charging vs 0A using calculation alone. This is the difference between "turn down the job" and "submit the bid."
-
-**No competitor supports the measurement path.** This is our strongest differentiator.
-
-### What Remains UNVALIDATED
-
-| Assumption | Risk | How to Test |
-|------------|------|-------------|
-| Contractors will pay $49/mo | High | Get 10 paying customers |
-| Time savings are 1-2+ hours per project | Medium | Run 10 free calculations, measure |
-| Contractors won't just use spreadsheets | Medium | Observe actual tool adoption |
-| Permit-ready PDFs are accepted by AHJs | Medium | Submit 5 real permits using our output |
-| The "freak out" test passes | High | Would users panic if we shut down for a day? |
+**No competitor supports the measurement path.** Strongest single technical differentiator.
 
 ---
 
-## Product Status (February 2026)
+## Niches Ranked by Opportunity × Defensibility
 
-### Complete
-
-| Feature | Status |
-|---------|--------|
-| Multi-Family EV Calculator Engine | Complete |
-| NEC 220.84 Demand Factors (23-45% tiered) | Complete |
-| NEC 220.57 Per-EVSE Load | Complete |
-| NEC 625.42 EVEMS Integration | Complete |
-| NEC 220.87 Measurement Path (utility billing / load study) | Complete |
-| Building Type Presets (smart defaults) | Complete |
-| Common Area Load Itemization | Complete |
-| 3-Page Professional PDF Export | Complete |
-| Permit Packet Integration | Complete |
-| Multi-Family Population Pipeline (migration, auto-gen, CT cabinet, meter stack) | Complete |
-| Monetization System (Stripe, feature gating, trials, promo codes) | Complete |
-
-| User Profile & Settings (auto-fill permit packets) | Complete |
-| Profile Creation Trigger (auto-creates on signup) | Complete |
-
-**Assessment:** The product is complete and ready to sell. All core workflows — calculation, project population, permit packet generation — are functional end-to-end.
-
----
-
-## Pricing Strategy
-
-### Current Tiers
-
-| Tier | Price | Target | MF EV Access |
-|------|-------|--------|-------------|
-| **Free** | $0 | Lead generation | 3 projects, basic calcs |
-| **Starter** | $29/mo | Solo residential electricians | No MF EV |
-| **Pro** | $49/mo | Active EV contractors | Unlimited MF EV calcs |
-| **Business** | $149/mo | High-volume specialists, teams | Everything + PM suite |
-
-### Price Anchoring
-
-| Alternative | Cost | SparkPlan Savings |
-|-------------|------|----------------|
-| Engineering firm (per project) | $2,000-$10,000 | 40x+ ROI on first project |
-| PE stamp (per project) | $150-$1,500 | 3-30x savings per project |
-| ETAP/SKM (annual) | $3,000-$25,000 | 5-50x cheaper |
-| Turning down the job entirely | $10,000-$50,000 lost revenue | Infinite ROI |
-
-### Realistic Value Analysis
-
-| Scenario | Jobs/mo | Hours saved/mo | Value at $60/hr | 10% capture |
-|----------|---------|---------------|-----------------|-------------|
-| Conservative | 8 | 3.2 | $192 | $19/mo |
-| Realistic | 12 | 9 | $540 | $54/mo |
-| Optimistic | 40 | 70 | $4,200 | $420/mo |
-
-**Conclusion:** $49/mo is correctly priced for the average contractor. Don't raise prices before validating. Get 50 users first, then consider a premium tier for high-volume shops ($499/mo with SLA, API, priority support).
-
-### Per-Project Alternative
-
-For occasional multi-family work: $199-499/analysis (vs $2-10K engineering fees). No subscription required.
-
----
-
-## Go-to-Market Strategy
-
-### Phase 1: Validate (Now - 30 days)
-
-**Goal:** First 10 users (free), first paying customer.
-
-| Action | Channel | Timeline |
-|--------|---------|----------|
-| Record demo video (35-unit building scenario) | YouTube, forums | This week |
-| Post on Mike Holt Forums with real example | Forum (organic) | This week |
-| Offer 10 free calculations to contractors | Forum DMs, Reddit, LinkedIn | Weeks 1-2 |
-| Convert most enthusiastic user to $49/mo | Direct outreach | Weeks 3-4 |
-
-### Phase 2: Acquire (Months 2-3)
-
-**Goal:** 50 paying users.
-
-| Action | Channel | Budget |
-|--------|---------|--------|
-| Google Ads: "NEC 220.84 calculator", "multi-family EV load calculation" | Paid search | $200-500/mo |
-| Content: NEC 220.84 tutorials, measurement path explainers | YouTube, blog | Time only |
-| Reddit r/electricians presence | Organic | Time only |
-| NECA chapter outreach (California focus) | Industry associations | Minimal |
-
-### Phase 3: Scale (Months 4-12)
-
-**Goal:** 200+ paying users, $10K MRR.
-
-Tactics depend on Phase 1-2 learnings. Don't plan this in detail until you've validated.
-
-### California-First Focus
-
-California has the strictest EV-ready mandates (100% of MF parking by 2026) and the highest construction volume (27% of national MF completions). Target California contractors first — the regulatory mandate removes the "do I really need this?" objection.
+| Rank | Niche | Why |
+|---|---|---|
+| **#1** | Multi-family EV + EVEMS | Highest WTP, regulatory pressure (Right to Charge), zero purpose-built software, hardware-only EVEMS market |
+| **#2** | Permit completeness scoring / pre-submit QA for FL AHJs | Universal pain (rejection = "missing paperwork"); AHJ data accumulates as moat |
+| **#3** | Service upgrade + load justification (non-EV, non-MF) | Less differentiated, but high-frequency commercial TI / restaurant / HVAC churn keeps revenue resilient if EV demand softens |
+| **#4** | Emergency shutoff / EVSE labeling compliance (NEC 625.43) | Narrow but no tool exists; embed in #1 |
+| **#5** | Solar PV + storage + interconnection | Aurora / OpenSolar / 10+ incumbents own this. Phase 2 only as the *electrical* complement (storage interconnection, MSP upgrade). |
 
 ---
 
 ## Risk Matrix
 
 | Risk | Probability | Impact | Mitigation |
-|------|-------------|--------|------------|
-| Contractors don't adopt software | Low (30%) | High | Free tier on-ramp, ROI is self-evident |
-| Kopperfield adds MF EV calcs | Medium (40%) | Medium | First-mover advantage, NEC depth |
-| Enterprise player builds down-market | Low (15%) | High | Speed, UX, niche focus |
-| Solo developer bandwidth | **High (60%)** | **High** | **Stop building, start selling** |
-| AI commoditizes calculations | Low (20%) | Medium | Permit-ready output + NEC expertise = moat |
-| EV mandates rolled back | Very Low (10%) | High | State mandates independent of federal |
-| Users churn after 1 project | Medium (35%) | Medium | Expand to full project lifecycle for stickiness |
-
-**Biggest risk:** Execution bandwidth. The market opportunity is validated. The question is whether you can capture it fast enough.
+|---|---|---|---|
+| Solo-developer bandwidth | **High (60%)** | High | Stop building, run pilot |
+| Kopperfield adds MF EV / EVEMS | Medium (40%) | Medium | First-mover advantage in FL; PE seal moat unreachable |
+| AHJs require sealing on workflows we hoped were exempt | Medium (35%) | Medium | Dual-path UX from day one (FS 471.003(2)(h) screening + PE seal workflow) |
+| EV adoption stalls (federal incentives, tariffs) | Medium (30%) | High | Adjacent service-upgrade niche (#3 above) is non-EV; same outputs |
+| Contractors won't adopt SaaS at all | Low (25%) | High | Free tier on-ramp; ROI on first packet = obvious |
+| FlashWorks wakes up and modernizes | Low (15%) | Medium | They're desktop-only on NEC 2017/2020; treat as acquisition target |
 
 ---
 
-## Milestones & KPIs
+## Pilot Plan (Florida)
 
-### Go/No-Go Decision Points
+**Phase 0 — pre-pilot (2 weeks):** pick 2–3 AHJs (Orlando + Tampa Bay + South FL); recruit 10 contractors covering res EVSE / small commercial / multi-family.
 
-| Milestone | Target Date | What It Validates | No-Go Signal |
-|-----------|-------------|-------------------|-------------|
-| First free user engagement | Feb 2026 | Pain is real enough to try | Nobody responds to free offer |
-| First paying customer | Mar 2026 | Someone will give us money | Can't convert free to paid in 60 days |
-| 10 paying customers | May 2026 | Repeatable acquisition | Stuck at 1-3 after 90 days |
-| First contractor closes a job using our calcs | Jun 2026 | Core value prop works | Users calculate but never use output |
-| $5K MRR | Sep 2026 | Business viability | Revenue plateaus below $2K |
+**Phase 1 — pilot (30–45 days):** 20–40 real permit packets through SparkPlan; measure resubmittal rate, reviewer comments per packet, turnaround, contractor time saved, first-pass acceptance %.
 
-### Tracking Metrics
+**Go criteria:**
+- ≥70% first-pass acceptance in ≥2 AHJs, **or**
+- ≥40% reduction in reviewer comments vs contractor baseline, **and**
+- 5+ companies willing to pay during pilot month.
 
-| Metric | Target | How to Measure |
-|--------|--------|----------------|
-| Free → Paid conversion | >5% | Stripe + analytics |
-| Monthly active calculations | 100+ | App analytics |
-| User retention (30-day) | >60% | Cohort analysis |
-| Time saved per project | 1-4 hours | User surveys |
-| NPS score | >40 | In-app survey |
-| Referral rate | >10% | Tracking codes |
+**Phase 2 — moat (60–90 days):** ship FL Permit Mode v1 (FS 471.003(2)(h) exemption screening + AHJ checklist engine for top-4); ship PE seal workflow MVP (review gate + tamper-evident lock + audit trail); publish 3–5 "Passed in X AHJ" case studies.
 
 ---
 
 ## What NOT to Do
 
-1. **Don't build more features before selling.** After the current branch, the product is complete enough. Every hour coding instead of selling is a delay.
-2. **Don't raise prices to $500/mo yet.** Get 50 users at $49/mo first. Premium tiers come after PMF.
-3. **Don't pivot to alternative niches** (commercial fleet, solar+storage) before exhausting multi-family EV.
-4. **Don't write more strategy docs.** The marginal value of more analysis is zero. The marginal value of one customer conversation is enormous.
-5. **Don't over-optimize the funnel.** A/B testing is irrelevant at 0 users. Just get people in.
+1. Don't pitch on EV-mandate compliance in Florida — preempted.
+2. Don't add features before running the pilot. Acceptance evidence > breadth.
+3. Don't auto-stamp PE seals. Workflow only; cryptographic signing must remain under the PE's sole control (FBPE).
+4. Don't expand to a second state until 3+ FL AHJs have repeatable acceptance evidence.
+5. Don't write more strategy docs. Reference the Obsidian Reconciliation Notes and run.
 
 ---
 
 ## Reference Documents
 
 | Document | Location | Purpose |
-|----------|----------|---------|
-| Validation Analysis | [market-research/VALIDATION_ANALYSIS.md](market-research/VALIDATION_ANALYSIS.md) | PMF gaps, pricing tests, interview frameworks |
-| Market Intelligence (Full) | [market-research/MARKET_INTELLIGENCE_FEB_2026.md](market-research/MARKET_INTELLIGENCE_FEB_2026.md) | Detailed market data, competitor pricing, forum quotes, sources |
-| Forum Research | [market-research/FORUM_RESEARCH_FINDINGS.md](market-research/FORUM_RESEARCH_FINDINGS.md) | Raw pain point evidence from contractor forums |
-| Permit Packet Market Analysis | [market-research/PERMIT_PACKET_MARKET_ANALYSIS.md](market-research/PERMIT_PACKET_MARKET_ANALYSIS.md) | Broader permit workflow market sizing |
-| SaaS Growth Strategy | [saas-growth-strategy.md](saas-growth-strategy.md) | Bootstrapping principles, scaling framework |
-| Marketing Materials | [marketing/](marketing/) | Landing pages, case study templates, ad copy |
-| YouTube Research | [youtube-research/](youtube-research/) | SaaS strategy summaries (Becker, Andre) |
-| Distribution Playbook | [DISTRIBUTION_PLAYBOOK.md](DISTRIBUTION_PLAYBOOK.md) | Channel strategy, execution sequence, tracking |
-| Product Roadmap | [../ROADMAP.md](../ROADMAP.md) | Development phases and feature tracking |
+|---|---|---|
+| Obsidian Reconciliation Notes | (private vault) `SparkPlan Analysis/Reconciliation Notes.md` | **Authoritative** — cross-reads Apr/May reports, flags contradictions |
+| Obsidian OAI Market Viability | (private vault) `SparkPlan Analysis/Market Viability Analysis(Deep ResearchOAI).md` | Conditional Go (~68/100), market sizing anchors |
+| Obsidian Competitive Landscape | (private vault) `SparkPlan Analysis/SparkPlan- competitive landscape...md` | Apr 2026 verified competitor matrix |
+| Obsidian FL Pilot Revised | (private vault) `SparkPlan Analysis/FL_PILOT_REVISED_REPORT.md` | Pilot phasing + dual-path workflow (Feb 2026, revised) |
+| Validation Analysis | [market-research/VALIDATION_ANALYSIS.md](market-research/VALIDATION_ANALYSIS.md) | PMF gap tracker |
+| Forum Research | [market-research/FORUM_RESEARCH_FINDINGS.md](market-research/FORUM_RESEARCH_FINDINGS.md) | Raw contractor pain quotes |
+| Distribution Playbook | [DISTRIBUTION_PLAYBOOK.md](DISTRIBUTION_PLAYBOOK.md) | FL-first channel strategy |
+| Marketing Assets | [marketing/](marketing/) | Landing pages, case studies, launch kit |
+| Product Roadmap | [../ROADMAP.md](../ROADMAP.md) | Engineering phases |
 
 ---
 
-## Document Maintenance
+## Maintenance
 
-### Review Cadence
+**Review cadence:** monthly, plus on every milestone hit/miss in the pilot plan.
 
-| Review Type | Frequency | Trigger |
-|-------------|-----------|---------|
-| **Full review** | Monthly | Calendar reminder, 1st of month |
-| **Metrics update** | Bi-weekly | After analyzing Stripe/analytics data |
-| **Competitive check** | Monthly | Check Kopperfield, PowerCalc product pages |
-| **Milestone assessment** | On milestone hit or miss | Go/No-Go table above |
-| **Market event update** | As needed | New NEC code adoption, state mandate, competitor launch |
+**When to re-sync this file with Obsidian:** any time the Reconciliation Notes change, or any time a contradiction in the Obsidian reports gets resolved (Kopperfield NEC 2026 verification, Florida EV figure source-lock, Miami parking ordinance preemption check, FlashWorks acquisition vs compete decision).
 
-### What to Update
-
-- **Market Sizing:** Re-validate TAM/SAM/SOM annually or when new industry data publishes
-- **Competitive Landscape:** Add new entrants, update pricing/feature changes
-- **Customer Validation:** Move assumptions from "NOT VALIDATED" to "Validated" as evidence accumulates
-- **Product Status:** Move items from In Progress → Complete as shipped
-- **Risk Matrix:** Adjust probabilities based on new information
-- **Go-to-Market:** Update tactics based on what's working
-
-### Staleness Indicators
-
-If any of these are true, this document needs immediate attention:
-- Last Updated date is >60 days ago
-- A Go/No-Go milestone has passed without being assessed
-- A new competitor has launched that isn't listed
-- Pricing has changed but isn't reflected here
-- Customer count has changed significantly (10x in either direction)
+**Staleness flags:** Last Updated > 60 days, a Go/No-Go pilot milestone passed without assessment, a new direct competitor launches, or pricing strategy gets locked in (delete the "Pricing — Open Decision" section once decided).
