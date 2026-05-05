@@ -745,6 +745,80 @@ export function getAllPanelAggregatedLoads(
 }
 
 /**
+ * Structurally-compatible subset of project settings used by `buildMultiFamilyContext`.
+ * Kept narrow on purpose so this calculation module does not import frontend types
+ * (per CLAUDE.md: calculation services are pure functions, no UI dependencies).
+ */
+export interface BuildMultiFamilyContextSettings {
+  occupancyType?: 'dwelling' | 'commercial' | 'industrial' | string;
+  residential?: {
+    dwellingType?: string;
+    totalUnits?: number;
+  };
+}
+
+/**
+ * Build the NEC 220.84 multi-family context for a candidate MDP.
+ *
+ * NEC 220.84 (Optional Calculations — Three or More Multifamily Dwelling Units)
+ * applies ONLY at the system aggregate (service) level. This helper enforces the
+ * 4-condition gate so callers can pass the result straight into
+ * `calculateAggregatedLoad` without re-implementing the gate.
+ *
+ * Returns `undefined` (and `calculateAggregatedLoad` falls back to the standard
+ * NEC 220 cascade) when any of these is true:
+ *  - panel is not the MDP (`is_main` !== true)
+ *  - occupancy is not 'dwelling'
+ *  - dwelling type is not 'multi_family'
+ *  - fewer than 3 dwelling units
+ *
+ * EV and house/common-area panels are identified by name match (`includes('ev')`,
+ * `includes('house')`) — see follow-up F1 in the audit doc; eventually replaced
+ * by an explicit `panel_role` discriminator on the panels table.
+ */
+export function buildMultiFamilyContext(
+  panel: Panel | null | undefined,
+  panels: Panel[],
+  circuits: Circuit[],
+  transformers: Transformer[],
+  settings: BuildMultiFamilyContextSettings | null | undefined,
+): MultiFamilyContext | undefined {
+  if (!panel?.is_main) return undefined;
+  if (settings?.occupancyType !== 'dwelling') return undefined;
+  if (settings?.residential?.dwellingType !== 'multi_family') return undefined;
+  const totalUnits = settings?.residential?.totalUnits ?? 0;
+  if (totalUnits < 3) return undefined;
+
+  const downstreamFromMDP = panels.filter(
+    p => p.fed_from_type === 'panel' && p.fed_from === panel.id
+  );
+
+  const evLoadVA = downstreamFromMDP
+    .filter(p => p.name.toLowerCase().includes('ev'))
+    .reduce(
+      (sum, p) =>
+        sum +
+        calculateAggregatedLoad(p.id, panels, circuits, transformers, 'dwelling').totalConnectedVA,
+      0,
+    );
+
+  const housePanelLoadVA = downstreamFromMDP
+    .filter(p => p.name.toLowerCase().includes('house'))
+    .reduce(
+      (sum, p) =>
+        sum +
+        calculateAggregatedLoad(p.id, panels, circuits, transformers, 'dwelling').totalConnectedVA,
+      0,
+    );
+
+  return {
+    dwellingUnits: totalUnits,
+    evLoadVA: evLoadVA > 0 ? evLoadVA : undefined,
+    housePanelLoadVA: housePanelLoadVA > 0 ? housePanelLoadVA : undefined,
+  };
+}
+
+/**
  * Determines which panels are affected when a circuit load changes
  * (All upstream panels need their aggregated loads recalculated)
  */

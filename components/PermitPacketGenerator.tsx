@@ -19,6 +19,7 @@ import { useMeters } from '../hooks/useMeters';
 import { useProfile } from '../hooks/useProfile';
 import { JurisdictionSearchWizard } from './JurisdictionSearchWizard';
 import { calculateMultiFamilyEV, type MultiFamilyEVInput } from '../services/calculations/multiFamilyEV';
+import { buildMultiFamilyContext } from '../services/calculations/upstreamLoadAggregation';
 
 interface PermitPacketGeneratorProps {
   projectId: string;
@@ -111,6 +112,18 @@ export const PermitPacketGenerator: React.FC<PermitPacketGeneratorProps> = ({ pr
         ? getJurisdictionById(currentProject.jurisdiction_id)
         : undefined;
 
+      // NEC 220.84 multifamily context — passes through gate (returns undefined)
+      // for any project that is not a multi-family dwelling with 3+ units, leaving
+      // the PDF on the standard NEC 220 demand-factor cascade.
+      const mdp = panels.find(p => p.is_main);
+      const multiFamilyContext = buildMultiFamilyContext(
+        mdp,
+        panels,
+        circuits,
+        transformers,
+        currentProject.settings,
+      );
+
       const packetData: PermitPacketData = {
         projectId,
         projectName: currentProject.name,
@@ -143,6 +156,8 @@ export const PermitPacketGenerator: React.FC<PermitPacketGeneratorProps> = ({ pr
         // Tier 3: Jurisdiction requirements
         jurisdictionId: currentProject.jurisdiction_id,
         jurisdiction: jurisdiction,
+        // NEC 220.84 multifamily Optional Method context (undefined for non-MF projects)
+        multiFamilyContext,
       };
 
       // Add Multi-Family EV Analysis if enabled
