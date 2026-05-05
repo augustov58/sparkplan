@@ -1244,3 +1244,308 @@ describe('Feeder Load Sync — live-derive from destination panel (C2)', () => {
     });
   });
 });
+
+// ============================================================================
+// PROJECT METADATA VALIDATION — C3 (project address / FL contractor license /
+// permit number must reject placeholders that AHJs reject on intake)
+// ============================================================================
+
+import {
+  projectAddressSchema,
+  flContractorLicenseSchema,
+  permitNumberSchema,
+} from '../lib/validation-schemas';
+
+describe('Project metadata validation (C3)', () => {
+  describe('flContractorLicenseSchema', () => {
+    it('accepts valid FL EC license (Certified Electrical Contractor)', () => {
+      expect(flContractorLicenseSchema.safeParse('EC1234567').success).toBe(true);
+    });
+
+    it('accepts valid FL ER license (Registered Electrical Contractor)', () => {
+      expect(flContractorLicenseSchema.safeParse('ER9876543').success).toBe(true);
+    });
+
+    it('accepts case-insensitive license input', () => {
+      expect(flContractorLicenseSchema.safeParse('ec1234567').success).toBe(true);
+    });
+
+    it('rejects "test" placeholder (the audit-doc symptom)', () => {
+      const result = flContractorLicenseSchema.safeParse('test');
+      expect(result.success).toBe(false);
+      if (!result.success) {
+        expect(result.error.issues[0].message).toMatch(/Format: EC#######/);
+      }
+    });
+
+    it('rejects out-of-state format (e.g., CA C-10 number)', () => {
+      expect(flContractorLicenseSchema.safeParse('C10-123456').success).toBe(false);
+    });
+
+    it('rejects missing-letter-prefix format', () => {
+      expect(flContractorLicenseSchema.safeParse('1234567').success).toBe(false);
+    });
+
+    it('rejects too-short numeric tail', () => {
+      expect(flContractorLicenseSchema.safeParse('EC123456').success).toBe(false);
+    });
+
+    it('rejects empty string', () => {
+      expect(flContractorLicenseSchema.safeParse('').success).toBe(false);
+    });
+  });
+
+  describe('permitNumberSchema', () => {
+    it('accepts undefined (AHJ assigns later)', () => {
+      expect(permitNumberSchema.safeParse(undefined).success).toBe(true);
+    });
+
+    it('accepts empty string (form blank)', () => {
+      expect(permitNumberSchema.safeParse('').success).toBe(true);
+    });
+
+    it('accepts a realistic permit number', () => {
+      expect(permitNumberSchema.safeParse('PER-2024-001234').success).toBe(true);
+    });
+
+    it('rejects 1-3 char permit number (likely a typo)', () => {
+      const result = permitNumberSchema.safeParse('AB');
+      expect(result.success).toBe(false);
+      if (!result.success) {
+        expect(result.error.issues[0].message).toMatch(/at least 4 characters/);
+      }
+    });
+
+    it('rejects "test" placeholder (the audit-doc symptom)', () => {
+      const result = permitNumberSchema.safeParse('test');
+      expect(result.success).toBe(false);
+      if (!result.success) {
+        expect(result.error.issues[0].message).toMatch(/placeholder/);
+      }
+    });
+  });
+
+  describe('projectAddressSchema', () => {
+    it('accepts a realistic FL address', () => {
+      expect(
+        projectAddressSchema.safeParse('123 Main St, Orlando, FL 32801').success,
+      ).toBe(true);
+    });
+
+    it('rejects "TBD" placeholder (the audit-doc symptom)', () => {
+      const result = projectAddressSchema.safeParse('TBD');
+      expect(result.success).toBe(false);
+    });
+
+    it('rejects "test" placeholder', () => {
+      const result = projectAddressSchema.safeParse('test');
+      expect(result.success).toBe(false);
+    });
+
+    it('rejects address with no digits (no street number / no ZIP)', () => {
+      const result = projectAddressSchema.safeParse('Main Street, Orlando, Florida');
+      expect(result.success).toBe(false);
+      if (!result.success) {
+        expect(result.error.issues[0].message).toMatch(/street number or ZIP/);
+      }
+    });
+
+    it('rejects too-short input', () => {
+      expect(projectAddressSchema.safeParse('1 Main').success).toBe(false);
+    });
+
+    it('rejects empty string', () => {
+      expect(projectAddressSchema.safeParse('').success).toBe(false);
+    });
+  });
+});
+
+// ============================================================================
+// AI CHAT TOOL: FEEDER VOLTAGE DROP — LIVE-DERIVE (B-1)
+// ============================================================================
+// Mirrors the C2 fix into the AI assistant path. Pre-fix, when a user asked
+// Spark Copilot "is feeder MDP→EV Sub-Panel compliant?" the tool returned the
+// cached `feeder.voltageDropPercent` column, which had the same staleness bug
+// the PDF had — the AI confidently said "Compliant. 0.00%" on a feeder that
+// was actually wildly undersized. B-1 rewires the tool to call
+// computeFeederLoadVA + calculateFeederSizing live.
+
+import { executeTool, type ToolContext } from '../services/ai/chatTools';
+import type { ProjectContext } from '../services/ai/projectContextBuilder';
+
+describe('AI Chat Tool: calculate_feeder_voltage_drop — live-derive (B-1)', () => {
+  // Same factory shapes as the C2 tests above; rebuilt locally rather than
+  // exported because the helpers are scoped inside that describe block.
+  const makePanelB1 = (overrides: Partial<Panel> & Pick<Panel, 'id' | 'name'>): Panel =>
+    ({
+      bus_rating: 200,
+      voltage: 240,
+      phase: 1,
+      num_spaces: 42,
+      project_id: 'proj-1',
+      is_main: false,
+      fed_from: null,
+      fed_from_type: null,
+      fed_from_transformer_id: null,
+      ...overrides,
+    } as unknown as Panel);
+
+  const makeCircuitB1 = (panelId: string, loadVA: number, idSuffix: string = ''): Circuit =>
+    ({
+      id: `c-${panelId}-${loadVA}-${idSuffix}`,
+      panel_id: panelId,
+      load_watts: loadVA,
+      load_type: 'O',
+      project_id: 'proj-1',
+      circuit_number: 1,
+      pole: 1,
+      breaker_amps: 20,
+      description: 'test',
+    } as unknown as Circuit);
+
+  const makeFeederB1 = (overrides: Partial<Feeder> & Pick<Feeder, 'id' | 'name'>): Feeder =>
+    ({
+      project_id: 'proj-1',
+      source_panel_id: null,
+      source_transformer_id: null,
+      destination_panel_id: null,
+      destination_transformer_id: null,
+      distance_ft: 75,
+      conductor_material: 'Cu',
+      conduit_type: 'PVC',
+      ambient_temperature_c: 30,
+      num_current_carrying: 3,
+      total_load_va: 0,
+      continuous_load_va: 0,
+      noncontinuous_load_va: 0,
+      design_load_va: null,
+      phase_conductor_size: null,
+      voltage_drop_percent: null,
+      ...overrides,
+    } as unknown as Feeder);
+
+  // Build a minimal ProjectContext that contains only the FeederSummary the
+  // tool's findFeeder helper needs to locate the feeder by name.
+  const buildContext = (feederId: string, cachedVdPercent?: number): ProjectContext => ({
+    projectId: 'proj-1',
+    projectName: 'Test',
+    projectType: 'Commercial',
+    serviceVoltage: 240,
+    servicePhase: 1,
+    summary: '',
+    panels: [],
+    circuits: [],
+    feeders: [
+      {
+        id: feederId,
+        name: 'MDP→EV Feeder',
+        sourcePanel: 'MDP',
+        destinationPanel: 'EV Sub-Panel',
+        phaseConductorSize: '14',
+        voltageDropPercent: cachedVdPercent,
+      },
+    ],
+    transformers: [],
+    totalLoad: { connectedVA: 0, demandVA: 0 },
+  });
+
+  it('returns LIVE voltage drop when raw rows are wired through (B-1 fix)', async () => {
+    const mdp = makePanelB1({ id: 'mdp', name: 'MDP', is_main: true, bus_rating: 1000 });
+    const evPanel = makePanelB1({
+      id: 'p-ev',
+      name: 'EV Sub-Panel',
+      fed_from_type: 'panel',
+      fed_from: 'mdp',
+      bus_rating: 400,
+    });
+    const rawPanels = [mdp, evPanel];
+    const rawCircuits = [makeCircuitB1('p-ev', 50_300, 'evems')];
+    const rawTransformers: Transformer[] = [];
+    const rawFeeders = [
+      makeFeederB1({
+        id: 'f-evse',
+        name: 'MDP→EV Feeder',
+        source_panel_id: 'mdp',
+        destination_panel_id: 'p-ev',
+        total_load_va: 0, // stale cache
+      }),
+    ];
+
+    // Cached summary value (10%) is intentionally wrong — must be ignored.
+    const projectContext = buildContext('f-evse', 10);
+
+    const ctx: ToolContext = {
+      projectId: 'proj-1',
+      projectContext,
+      rawPanels,
+      rawCircuits,
+      rawFeeders,
+      rawTransformers,
+    };
+
+    const result = await executeTool(
+      'calculate_feeder_voltage_drop',
+      { feeder_name: 'MDP→EV Feeder' },
+      ctx,
+    );
+
+    expect(result.success).toBe(true);
+    const data = result.data as Record<string, unknown>;
+    expect(data.calculationSource).toBe('live');
+    // Live-derived design current = 50,300 VA / 240 V ≈ 210 A
+    expect(data.designCurrentAmps).toBeGreaterThan(150);
+    expect(data.designCurrentAmps).toBeLessThan(300);
+    // Conductor must NOT be the 14 AWG cached fallback
+    expect(data.conductorSize).not.toBe('14');
+    // Live VD must be a real number, not the cached 10% summary value
+    expect(data.voltageDropPercent).not.toBe(10);
+    expect(data.voltageDropPercent).toBeGreaterThan(0);
+  });
+
+  it('falls back to cached summary when raw rows are not provided (legacy callers)', async () => {
+    const projectContext = buildContext('f-evse', 1.42);
+
+    const ctx: ToolContext = {
+      projectId: 'proj-1',
+      projectContext,
+      // intentionally no rawPanels/rawCircuits/rawFeeders
+    };
+
+    const result = await executeTool(
+      'calculate_feeder_voltage_drop',
+      { feeder_name: 'MDP→EV Feeder' },
+      ctx,
+    );
+
+    expect(result.success).toBe(true);
+    const data = result.data as Record<string, unknown>;
+    expect(data.calculationSource).toBe('cached');
+    expect(data.voltageDropPercent).toBe(1.42);
+    expect(data.compliant).toBe(true);
+  });
+
+  it('REGRESSION: pre-B-1 cached read on stale data would say "Compliant 0.00%"', async () => {
+    // Confirms the broken behavior is reproducible — when the cached column
+    // says voltageDropPercent=0 (the C2 symptom) and raw rows aren't wired
+    // through, the AI returns the bogus value. Live mode is the only escape.
+    const projectContext = buildContext('f-evse', 0);
+
+    const ctxNoRaw: ToolContext = {
+      projectId: 'proj-1',
+      projectContext,
+    };
+
+    const result = await executeTool(
+      'calculate_feeder_voltage_drop',
+      { feeder_name: 'MDP→EV Feeder' },
+      ctxNoRaw,
+    );
+
+    const data = result.data as Record<string, unknown>;
+    expect(data.calculationSource).toBe('cached');
+    expect(data.voltageDropPercent).toBe(0);
+    // The displayed-but-misleading "compliant" — exactly the AI bug B-1 fixes
+    // when the user has stale data and we can't live-derive.
+    expect(data.compliant).toBe(true);
+  });
+});

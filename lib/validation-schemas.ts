@@ -26,6 +26,62 @@ export const supportTicketSchema = z.object({
 export type SupportTicketFormData = z.infer<typeof supportTicketSchema>;
 
 // ============================================
+// Permit-Submittal Metadata Schemas (C3)
+// ============================================
+// AHJs reject permit packets on intake when these fields contain placeholder
+// values like "TBD" or "test". Block at the form layer + at PDF gen time.
+
+const PLACEHOLDER_VALUES = ['tbd', 'test', 'n/a', 'na', 'tba', 'todo', 'xxx', 'unknown'];
+
+/**
+ * Project address — single free-text field validated for plausibility.
+ *
+ * The current data model uses one free-text column (`projects.address`); this
+ * schema rejects obvious placeholders and requires at least one digit so a
+ * street number (or ZIP) is present, without forcing a strict address parser.
+ */
+export const projectAddressSchema = z.string()
+  .min(8, 'Address must include street, city, state, and ZIP')
+  .max(200, 'Address must be less than 200 characters')
+  .refine(
+    (val) => !PLACEHOLDER_VALUES.includes(val.trim().toLowerCase()),
+    'Address cannot be a placeholder (e.g., "TBD", "test")'
+  )
+  .refine(
+    (val) => /\d/.test(val),
+    'Address must include a street number or ZIP code'
+  );
+
+/**
+ * Florida Electrical Contractor license — `EC#######` (Certified) or `ER#######`
+ * (Registered) per FL DBPR. Case-insensitive accept; AHJ submittals normalize
+ * to uppercase.
+ */
+export const flContractorLicenseSchema = z.string()
+  .min(1, 'Contractor license is required')
+  .regex(/^E[CR]\d{7}$/i, 'Format: EC####### or ER####### (FL DBPR)')
+  .refine(
+    (val) => !PLACEHOLDER_VALUES.includes(val.trim().toLowerCase()),
+    'License cannot be a placeholder'
+  );
+
+/**
+ * Permit number — optional (the AHJ assigns it), but if provided must be ≥ 4
+ * chars and not a placeholder. Empty / undefined / null all accepted.
+ */
+export const permitNumberSchema = z.string()
+  .optional()
+  .nullable()
+  .refine(
+    (val) => !val || val.trim().length === 0 || val.trim().length >= 4,
+    'Permit number must be at least 4 characters if provided'
+  )
+  .refine(
+    (val) => !val || !PLACEHOLDER_VALUES.includes(val.trim().toLowerCase()),
+    'Permit number cannot be a placeholder (e.g., "test")'
+  );
+
+// ============================================
 // Project Schemas
 // ============================================
 
@@ -38,9 +94,7 @@ export const projectSchema = z.object({
     errorMap: () => ({ message: 'Please select a valid project type' })
   }),
 
-  address: z.string()
-    .min(1, 'Project address is required')
-    .max(200, 'Address must be less than 200 characters'),
+  address: projectAddressSchema,
 
   serviceVoltage: z.number()
     .int('Voltage must be a whole number')

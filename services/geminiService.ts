@@ -333,6 +333,24 @@ INSTRUCTIONS:
 
 import { getToolDefinitionsForGemini, executeTool, type ToolContext } from './ai/chatTools';
 import { buildProjectContext, formatContextForAI, type ProjectContext } from './ai/projectContextBuilder';
+import type { Database } from '@/lib/database.types';
+import type { Feeder } from '@/types';
+
+type RawPanelRow = Database['public']['Tables']['panels']['Row'];
+type RawCircuitRow = Database['public']['Tables']['circuits']['Row'];
+type RawTransformerRow = Database['public']['Tables']['transformers']['Row'];
+
+/**
+ * Optional raw DB rows for tools that need to compute live (non-cached) values.
+ * The AI prompt always sees the lossy `ProjectContext` summary; tools that need
+ * full row data (e.g., feeder voltage drop) read from this companion bag.
+ */
+export interface AgenticRawData {
+  panels?: RawPanelRow[];
+  circuits?: RawCircuitRow[];
+  feeders?: Feeder[];
+  transformers?: RawTransformerRow[];
+}
 
 interface FunctionCall {
   name: string;
@@ -441,12 +459,17 @@ export const askNecAssistantWithTools = async (
   question: string,
   conversationHistory: string,
   projectContext: ProjectContext,
-  isFirstMessage: boolean = true
+  isFirstMessage: boolean = true,
+  rawData?: AgenticRawData,
 ): Promise<{ response: string; toolUsed?: { name: string; result: unknown } }> => {
   // Build tool context
   const toolContext: ToolContext = {
     projectId: projectContext.projectId,
     projectContext,
+    rawPanels: rawData?.panels,
+    rawCircuits: rawData?.circuits,
+    rawFeeders: rawData?.feeders,
+    rawTransformers: rawData?.transformers,
   };
 
   // Build system instruction with tool awareness
