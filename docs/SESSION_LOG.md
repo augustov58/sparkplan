@@ -3,7 +3,61 @@
 **Purpose**: Tracks recent work for seamless handoff between Claude instances.
 **Maintenance Rule**: Keep only the last 2 sessions. At the start of a new session, delete older entries — git history preserves everything.
 
-**Last Updated**: 2026-04-21
+**Last Updated**: 2026-05-05
+
+---
+
+### Session: 2026-05-04 / 2026-05-05 — AHJ Compliance Audit + C1 + C2 Permit Packet Fixes
+
+**Focus**: Three sequential pieces of work, all driven by reviewing the SparkPlan permit-packet output against real Florida AHJ requirements:
+1. Cleaned up `business/` folder — deleted superseded market-research / boilerplate / YouTube-research notes (13 files), rewrote `STRATEGIC_ANALYSIS.md` and `DISTRIBUTION_PLAYBOOK.md` from a "California / EV-mandate tailwind" framing to "Florida / permit-acceptance" wedge based on the Obsidian May 2026 Reconciliation Notes (Florida §366.94 preempts local EV ordinances; the FL pilot must justify on workflow value, not mandate).
+2. Audited the example permit packet (`example_reports/Permit_Packet_Multifamily_Test_2026-05-05.pdf`, 27 pages) against five FL AHJ checklists (Orlando, Miami-Dade, Pompano Beach, Davie, Hillsborough). Net: would have failed first-pass review at all 5 — produced `docs/AHJ_COMPLIANCE_AUDIT_2026-05-04.md` with 5 Critical, 11 High, 8 Medium findings, organized into a 4-sprint fix sequence.
+3. Fixed C1 (NEC 220.84 multi-family DF not applied to permit packet load-calc page) and C2 (EVSE feeder shown as 14 AWG / 0 A / "Compliant" because cached `feeder.total_load_va` was stale).
+
+**Status**:
+- ✅ Business cleanup + audit doc shipped on `docs/business-cleanup` branch (4 commits, merged inline).
+- ✅ C1 shipped in PR #15 (`9c8941d`), merged to main, visually verified by user on Vercel preview.
+- ✅ C2 shipped on branch `fix/c2-evse-feeder-aggregation` (2 commits, pushed). User verifying on Vercel preview at session end.
+- 138/138 tests pass after C2 (was 123 pre-audit, +15 new). `npm run build` exits 0 in 4.64s.
+
+**Root causes (key insight: both C1 and C2 are PDF-call-site wiring bugs, not calculation engine bugs)**:
+
+- **C1**: `services/calculations/upstreamLoadAggregation.ts` already had a working NEC 220.84 multi-family branch (lines 638–694) that activated when called with a `multiFamilyContext` argument. The in-app MDP "Aggregated Load (NEC 220.40)" tile passed the context correctly (`PanelSchedule.tsx:290`), so it showed the right answer (242 kVA / 1,008 A). But the PDF call site at `services/pdfExport/PermitPacketDocuments.tsx:980` called `calculateAggregatedLoad` without the optional sixth argument — so the PDF fell through to the standard NEC 220 cascade where every `load_type='O'` circuit got dumped into the NEC 220.14 catch-all at 100% (498 kVA / 2,077 A on a 1,000 A service — telling the AHJ the design was *non-compliant* when it actually was).
+- **C2**: The `feeders` table caches `total_load_va` at create time. Auto-population workflows (Multi-Family EV calculator, templates) create feeders before destination panel circuits exist, persisting `total_load_va = 0`. PDF read it verbatim at `VoltageDropDocuments.tsx:283-285`, fed 0 VA into `calculateFeederSizing`, which returned the smallest entry in the ampacity table (14 AWG, NEC 310.16) with vacuous-truth voltage drop (0 A × R × L = 0 V → "Compliant"). NEC 240.4(D) small-conductor enforcement at `services/calculations/conductorSizing.ts:342-365` was already correct — 14 AWG was the right answer for the wrong input.
+
+**Work Done**:
+
+*Commit b6db608 — `docs: business folder cleanup`:* Deleted 13 files (saas-growth-strategy, MARKET_INTELLIGENCE_FEB_2026, PERMIT_PACKET_MARKET_ANALYSIS, all 10 youtube-research notes). Net business/ tree: 9 files (down from 22).
+
+*Commit 92c6c3b — `docs: rewrite strategic docs to FL-first multifamily-EV wedge`:* `STRATEGIC_ANALYSIS.md` and `DISTRIBUTION_PLAYBOOK.md` rewritten — California-first → Florida-first; corrected contractor count anchor (251,789 IBISWorld → 81,046 IEC 2025); ARR calibrated to $50K–$150K Y1 realistic; pricing flagged as Open Decision per Reconciliation Notes; FlashWorks added to competitor matrix; SPAN Kopperfield-incumbency caveat documented.
+
+*Commit b7879d2 — `docs: AHJ compliance audit`:* New `docs/AHJ_COMPLIANCE_AUDIT_2026-05-04.md` with 5 Critical (C1–C5), 11 High (H1–H11), 8 Medium (M1–M8) findings + AHJ-by-AHJ requirement matrix + 4-sprint fix sequence + 10-step verification protocol for C1.
+
+*Commits 47a1365 + 518e05f (PR #15) — C1 fix:* New pure helper `buildMultiFamilyContext(panel, panels, circuits, transformers, settings)` in `upstreamLoadAggregation.ts` — 4-condition gate (MDP, dwelling occupancy, multi_family type, ≥3 units). Both `PanelSchedule.tsx:102-138` (replaced 36-line inline gate) and `permitPacketGenerator.tsx` / `PermitPacketDocuments.tsx` now call the helper. NEC 220.84 table in `multiFamilyEV.ts:33-57` verified row-by-row against NEC 2023 Table 220.84(B) — all 23 rows match; no data changes.
+
+*Commits 3bd6c08 + 518e05f (`fix/c2-evse-feeder-aggregation` branch) — C2 fix:* New helper `computeFeederLoadVA(feeder, panels, circuits, transformers)` in `services/feeder/feederLoadSync.ts` — live-derives `totalDemandVA` (post-NEC 220 cascade per NEC 215.2(A)(1)) from destination panel; falls back to cached for transformer feeders / orphaned panels. Wired into `VoltageDropDocuments.tsx` (renderer accepts optional `circuits` prop), `voltageDropPDF.tsx` (3 gating helpers + `exportVoltageDropReport` accept optional `panels/circuits/transformers`), `permitPacketGenerator.tsx` (passes `data.circuits`), `FeederManager.tsx` (4 gate calls + diagnostic + export handler thread the args). Cached `feeder.total_load_va` column intentionally preserved for the future PE seal snapshot workflow.
+
+**Decisions made**:
+- **Live-derive on read, not sync-and-persist** for C2 — write-on-read invites race conditions when two PDF previews run in parallel; live-derive is idempotent.
+- **Keep cached column** vs. drop it entirely — needed for the future PE seal workflow (C5) where we'll snapshot the as-of-seal-time value.
+- **Use `totalDemandVA`** (post-DF) not `totalConnectedVA` (raw) — NEC 215.2(A)(1) requires demand-load sizing.
+- **Optional new args** on gating helpers — backwards-compatible signature change; legacy callers (test fixtures, AI tools) keep working at the cached behavior, opt-in to live-derive when they thread the args.
+
+**Key Files Touched**:
+- C1: `services/calculations/upstreamLoadAggregation.ts`, `components/PanelSchedule.tsx`, `services/pdfExport/PermitPacketDocuments.tsx`, `services/pdfExport/permitPacketGenerator.tsx`, `components/PermitPacketGenerator.tsx`, `tests/calculations-extended.test.ts`
+- C2: `services/feeder/feederLoadSync.ts`, `services/pdfExport/VoltageDropDocuments.tsx`, `services/pdfExport/voltageDropPDF.tsx`, `services/pdfExport/permitPacketGenerator.tsx`, `components/FeederManager.tsx`, `tests/calculations-extended.test.ts`
+- Docs: `docs/AHJ_COMPLIANCE_AUDIT_2026-05-04.md` (new), `docs/CHANGELOG.md`, `docs/SESSION_LOG.md` (this entry), `business/STRATEGIC_ANALYSIS.md` (rewritten), `business/DISTRIBUTION_PLAYBOOK.md` (rewritten)
+
+**Pending / Follow-ups**:
+- Visual verification of C2 on Vercel preview (in progress at session close).
+- Per-feeder card display in `FeederManager.tsx:1317` still shows cached `feeder.design_load_va`. Intentional (Recalculate button UX), but flagged as a UX question if user prefers live-derive there too.
+- `services/ai/chatTools.ts:293` reads `feeder.voltageDropPercent` directly when the AI answers "is feeder X compliant?" questions. Same staleness as the original C2 bug — AI can give wrong answers. Track as B-finding for follow-up after C5.
+- Audit findings still open: C3 (project metadata validation — TBD/test placeholder fields), C4 (per-EVSE branch math + EVEMS feeder math), C5 (PE seal workflow), all of H1–H11 (cover sheet TOC, revision log, sheet ID convention E-###, FBC + NFPA-70 references, NOC placeholder, HOA letter, site plan, equipment cut sheets, AIC ratings via short-circuit study integration, EVEMS narrative, EVSE labeling page).
+- F-followups (not blocking): F1 EV/house panel name-string-match → typed `panel_role` discriminator; F2 NEC 220.84 table extraction from inline → `data/nec/table-220-84.ts`; F3 legacy "Demand Factor Calculation" tile in MDP UI shows direct circuits — should be hidden on MDP for multi-family or relabeled.
+
+**PRs**:
+- #15 — C1 (merged `9c8941d`)
+- C2 PR — pending on `fix/c2-evse-feeder-aggregation` (https://github.com/augustov58/sparkplan/pull/new/fix/c2-evse-feeder-aggregation)
 
 ---
 
@@ -62,72 +116,4 @@
 
 **Pending / Follow-ups:**
 - None known for this feature. The `num_spaces` field is now the single source of truth across the UI, DB, PDF export, AI tools, and photo importer.
-
----
-
-### Session: 2026-04-20 — Spark Copilot Chatbot Refresh (Rebrand + Harvey-Theme Re-skin + UX Pass)
-
-**Focus**: The floating chatbot in the bottom-right corner still wore the old "NEC Pro" / electric-yellow skin — dark-gray gradient header, yellow bubbles, "NEC Copilot" title, sans-serif, `rounded-lg` — while the rest of the app had already moved to the Harvey-inspired theme (forest green `#2d3b2d` primary, gold accent, cream paper, serif headings, `rounded-xl`). User asked to adapt it to current design and bundle any technical improvements I'd recommend.
-**Status**: ✅ Shipped on branch `fix/chatbot-design-refresh`. `npm run build` clean in 4.4s, `npm test` 124/124 pass. Browser verification deferred to user (see "Not Verified").
-
-**Work Done (all in `App.tsx` `NecAssistant`, plus a small rename sweep):**
-
-*Rebrand — "NEC Copilot" → "Spark Copilot":*
-- `App.tsx` chatbot title + FAB aria/title; `components/Layout.tsx` x2 comments; `docs/AI_CHATBOT_TOOLS.md` heading+body; `PROJECT_SPEC.md` L129.
-- Stale "check the AI Copilot sidebar" strings (the sidebar was removed last sprint but these pointers were never updated) rewritten to "Open Spark Copilot (bottom-right)": `components/Calculators.tsx` (2 sites), `components/SiteVisitManager.tsx`, `components/RFIManager.tsx`, `components/TestAgentButton.tsx`, `components/InspectorMode.tsx`.
-
-*Design re-skin (tokens from `index.css:7-81`, not hardcoded hex):*
-- Header: `bg-gradient-to-r from-gray-900 to-gray-800` → solid `bg-[var(--color-primary)]`, serif title, gold `Sparkles` icon (`--color-accent-300`).
-- Project context badge: yellow-on-black pill → `bg-[var(--color-accent-100)] text-[var(--color-accent-700)]`, uppercase + tighter tracking to match the Harvey `.badge` style.
-- User message bubbles: electric-yellow gradient → `bg-[var(--color-primary)] text-white`.
-- AI avatar: yellow `Bot` → neutral white-ringed `Sparkles` in primary green.
-- Send button: `bg-gray-900` → `bg-[var(--color-primary)]` / `--color-primary-hover`.
-- Input focus: electric-500 ring → primary ring @ 15% alpha, matching the global `input:focus` style in `index.css:241-245`.
-- Corners: `rounded-lg` → `rounded-xl` everywhere (panel, bubbles, errors) to match `.card`.
-- Messages bg: `bg-gray-50` → `bg-[var(--color-paper)]` (#faf9f7).
-- Borders: `border-gray-200` → `border-[var(--color-border)]`.
-- FAB: dark-gray → `bg-[var(--color-primary)]` with gold `Sparkles`. Unread-count badge now uses `--color-accent-500` on white instead of yellow-on-black.
-- `Bot` icon import removed entirely (replaced with `Sparkles` for a consistent brand mark).
-
-*Technical improvements (bundled per user's ask):*
-- **Persist conversation to `localStorage`** keyed by `projectId` (or `'global'` when outside a project). Hydrates on mount, rewrites on every history change, clears the key when history is emptied. Re-hydrates when `projectId` changes (navigating between projects swaps conversations).
-- **Clear button** (`Trash2` in header, disabled when empty) with a `window.confirm` gate.
-- **Stop/abort via generation-id pattern.** Each `handleAsk` assigns a `nanoid` to `generationIdRef`. Clicking Stop nulls the ref; when the Gemini reply returns, the handler checks whether the ref still matches and discards the response otherwise. `askNecAssistantWithTools` doesn't accept an `AbortSignal` today — threading one through would require changes to `services/geminiService.ts` `callGeminiProxyWithTools` + `callGeminiProxyWithToolResult` and the Supabase edge function. Left as a follow-up; this pattern gives the perceived-stop UX without that plumbing.
-- **Error as state, not message.** Previously an "I encountered an error" bubble was pushed into the history; now errors live in a separate `errorMessage` state and render a distinct red-bordered card with a **Retry** button that removes the orphaned last user message from history and re-sends it. Keeps conversation history clean across failures.
-- **Accessibility:** `role="dialog"`, `aria-label="Spark Copilot"`, `aria-live="polite"` + `aria-busy={loading}` on the messages region, **Esc to close** via window keydown, auto-focus on textarea ~120ms after open (animation delay).
-- **`Cmd/Ctrl+K` global toggle.** Listener attached to `window.keydown`; shown as a kbd hint below the input so discoverability doesn't rely on memory.
-- **Textarea instead of input.** Auto-grows up to 120px (~5 lines), `Enter` sends, `Shift+Enter` newline. Placeholder updated to document the shortcut.
-- **Upsell FAB** for users without `ai-copilot` feature. Previous behavior was `return null` (silent). Now a locked FAB with `Lock` badge navigates to `/pricing` on click. Hover tooltip explains the gate.
-- **Dedupe copy button.** The AI bubble had two copy buttons (absolute-positioned in the bubble + inline below the timestamp). Kept the absolute one; deleted the inline duplicate.
-- **Wired `processNecReferences`.** This function was dead code in the original — declared but never invoked, and contained an unused `articleNum` var. Renamed to `linkNecReferences`, removed the unused var, and applied it to `msg.text` before passing to ReactMarkdown. AI responses mentioning "NEC 220.42" or "Article 250" now render as clickable links. Kept (not deleted) per user's request.
-- **Tool-use disclosure.** The purple pill showing `toolUsed.name` is now a button; clicking expands a `<pre>` with `JSON.stringify(result, null, 2).slice(0, 2000)` beneath the message. Helps users trust/debug what the agent actually did.
-- **Timestamp auto-refresh.** Previously `"2m ago"` was computed once and never re-rendered. Added a `setInterval(60_000)` that bumps a throwaway state while the panel is open and non-empty.
-
-*Not modified:*
-- `components/AICopilotSidebar.tsx` — still in the tree but no longer rendered (removed from `Layout.tsx` in a previous sprint). Decided against deletion in this PR to keep scope tight; separate cleanup task.
-- `services/geminiService.ts` — streaming + real `AbortSignal` plumbing is a bigger change that deserves its own PR.
-- `components/Auth/Signup.tsx` + `components/LandingPage.tsx` — still say "AI Copilot" in marketing feature-list copy. Those refer to a feature category, not the chatbot's branded name, so left as-is. Easy to change later if desired.
-
-**Not Verified (flagged for user):**
-- Did **not** run the chatbot in a live browser — the CLI harness has no browser driver hooked up for this session. Build + typecheck + unit tests are all green, but the CLAUDE.md "UI protocol" rule about dev-server + golden-path clicks was not satisfied. Please eyeball:
-  - Open/close FAB animation and color
-  - Header look + all four header icons (clear / maximize / close / + clear gated to disabled when empty)
-  - User-message (green) vs AI-message (white) contrast
-  - `Cmd+K` toggle from anywhere in the app
-  - Error path: disconnect network, ask a question, click Retry
-  - Persistence: refresh page mid-conversation, history should survive
-
-**Key Files Touched:**
-- `App.tsx` — `NecAssistant` component rewritten (L283-688 → ~L283-?); `Bot` import removed, `Trash2 Square RotateCw Lock ChevronDown ChevronRight useRef` added.
-- `components/Layout.tsx` — comment rename
-- `components/Calculators.tsx`, `components/SiteVisitManager.tsx`, `components/RFIManager.tsx`, `components/TestAgentButton.tsx`, `components/InspectorMode.tsx` — stale "AI Copilot sidebar" strings redirected to Spark Copilot
-- `docs/AI_CHATBOT_TOOLS.md`, `PROJECT_SPEC.md` — title rename
-- `docs/SESSION_LOG.md`, `docs/CHANGELOG.md` — this entry
-
-**Commits (branch `fix/chatbot-design-refresh`):** TBD — commit pending user review of the diff.
-
-**Pending:**
-- Open PR.
-- Follow-up PR for streaming responses + real AbortSignal through `services/geminiService.ts`.
-- Optional: delete `components/AICopilotSidebar.tsx` (now unreferenced) in a cleanup PR.
 

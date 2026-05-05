@@ -4,6 +4,28 @@ All notable changes to SparkPlan.
 
 ---
 
+## 2026-05-05: AHJ Compliance Audit — Permit Packet Wiring Fixes (C1 + C2)
+
+**User-Facing Bug Fixes:**
+- **Multifamily permit packet load calc page now applies NEC 220.84 (Optional Method).** Generating a permit packet for a 12-unit multi-family + EVEMS-managed EV project used to dump every load into a single "Other / 100% / NEC 220.14" row at 498 kVA / 2,077 A — telling the AHJ the service was undersized when it actually wasn't. The packet now produces three correctly-attributed demand rows: Multi-Family Dwelling at the 220.84 unit-count factor (41% for 12 units), House Panel / Common Areas at 100%, and EV Charging (EVEMS-managed) at 100% per NEC 625.42. Totals match the in-app MDP "Aggregated Load" tile exactly (≈242 kVA / ≈1,008 A for the audit fixture).
+- **Voltage drop report no longer shows 14 AWG / 0 A / "Compliant" for auto-generated EVSE feeders.** When a feeder was created by the Multi-Family EV calculator before the destination panel's circuits existed, the cached `total_load_va` stayed at 0 forever — the PDF then chose the smallest conductor in the table and reported a vacuously-true 0 % voltage drop. Voltage drop now live-derives feeder loads from the destination panel's current NEC 220 demand, so a 50 kVA EVSE sub-panel feeder sizes correctly without requiring a manual Recalculate click.
+- **"Export Voltage Drop Report" button no longer disabled on projects that have valid feeder data.** The gating logic was checking the same stale cached column the PDF was reading; both now consult the live-derived demand.
+
+**Why this matters for the FL pilot:** Both fixes are prerequisites for showing the packet to a Florida AHJ reviewer (Pompano Beach, Davie, Orlando, Miami-Dade, Hillsborough). The pre-fix output would have failed first-pass review on intake — the load calc table claimed the service was undersized, and the voltage-drop table contained an obvious-to-an-electrician violation (14 AWG to a 400 A panel).
+
+**Technical:**
+- **C1 — `components/PermitPacketGenerator.tsx`, `services/pdfExport/permitPacketGenerator.tsx`, `services/pdfExport/PermitPacketDocuments.tsx`, `services/calculations/upstreamLoadAggregation.ts`, `components/PanelSchedule.tsx`:** the calculation engine's NEC 220.84 branch was already correct (and the in-app MDP tile was hitting it correctly), but the PDF call site at `PermitPacketDocuments.tsx:980` was calling `calculateAggregatedLoad` without the optional `multiFamilyContext` argument — so the PDF fell through to the standard NEC 220 cascade where every `load_type='O'` circuit hit the `220.14` Other-Loads catch-all at 100%. Extracted the gate logic into a new pure helper `buildMultiFamilyContext(panel, panels, circuits, transformers, settings)` in `upstreamLoadAggregation.ts`. Single source of truth for the 4-condition gate (MDP, dwelling occupancy, multi_family type, ≥3 units). Both `PanelSchedule.tsx` and the permit-packet PDF now call the same helper.
+- **C2 — `services/feeder/feederLoadSync.ts`, `services/pdfExport/VoltageDropDocuments.tsx`, `services/pdfExport/voltageDropPDF.tsx`, `components/FeederManager.tsx`:** the `feeders` table caches `total_load_va` at create time, but auto-population (Multi-Family EV calculator, templates) creates feeders before destination panel circuits exist. New `computeFeederLoadVA(feeder, panels, circuits, transformers)` helper live-derives `totalDemandVA` (post-NEC 220 cascade per NEC 215.2(A)(1)) from the destination panel. PDF generators, gating helpers, and the FeederManager UI button-disable logic now consult the helper. Cached column intentionally preserved for the future PE seal snapshot workflow. NEC 240.4(D) small-conductor enforcement was already correct — the 14 AWG result was the right answer for the wrong input.
+- **NEC 220.84 table verification:** All 23 rows of `MULTI_FAMILY_DEMAND_TABLE` in `services/calculations/multiFamilyEV.ts:33-57` confirmed against NEC 2023 Table 220.84(B) — exact match, no data changes needed.
+- **15 new regression tests** in `tests/calculations-extended.test.ts` covering the gate-condition matrix, multi-family branch correctness, the pre-C1 broken behavior, the pre-C2 broken behavior (vacuous-truth voltage drop on 0 A input), commercial-occupancy isolation, transformer-feeder fallback, and end-to-end EVSE-feeder sizing. Total suite: 138/138 pass (was 123 pre-audit). `npm run build` exits 0.
+- **No data-model changes.** Both fixes are call-site wiring; the cached `feeders.total_load_va` column stays in place.
+
+**Audit doc:** [`docs/AHJ_COMPLIANCE_AUDIT_2026-05-04.md`](AHJ_COMPLIANCE_AUDIT_2026-05-04.md). C1 and C2 marked ✅ RESOLVED. Open: C3 (project metadata validation), C4 (per-EVSE / EVEMS branch math), C5 (PE seal workflow).
+
+**PRs:** #15 (C1, merged `9c8941d`), C2 PR pending on branch `fix/c2-evse-feeder-aggregation` (visual verification on Vercel preview before merge).
+
+---
+
 ## 2026-04-21: Panel Photo Upload — OCR Refresh + `num_spaces` Overflow Fixes
 
 **User-Facing Bug Fixes:**

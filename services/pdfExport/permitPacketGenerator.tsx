@@ -250,6 +250,7 @@ export const generatePermitPacket = async (data: PermitPacketData): Promise<void
           feeders={data.feeders}
           panels={data.panels}
           transformers={data.transformers}
+          circuits={data.circuits}
           includeNECReferences={true}
         />
       ),

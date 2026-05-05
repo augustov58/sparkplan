@@ -9,12 +9,32 @@
 
 import { pdf } from '@react-pdf/renderer';
 import { VoltageDropDocument } from './VoltageDropDocuments';
+import { computeFeederLoadVA } from '../feeder/feederLoadSync';
 import type { Database } from '../../lib/database.types';
 
 // Type aliases from database schema
 type Feeder = Database['public']['Tables']['feeders']['Row'];
 type Panel = Database['public']['Tables']['panels']['Row'];
 type Transformer = Database['public']['Tables']['transformers']['Row'];
+type Circuit = Database['public']['Tables']['circuits']['Row'];
+
+/**
+ * Resolve a feeder's load for gating decisions. Mirrors the renderer:
+ * when panels/circuits/transformers are supplied, live-derive via
+ * computeFeederLoadVA; otherwise fall back to the cached value so legacy
+ * callers don't break.
+ */
+function resolveFeederLoadVA(
+  feeder: Feeder,
+  panels?: Panel[],
+  circuits?: Circuit[],
+  transformers?: Transformer[],
+): number {
+  if (panels && circuits && transformers) {
+    return computeFeederLoadVA(feeder, panels, circuits, transformers);
+  }
+  return feeder.total_load_va || 0;
+}
 
 // ============================================================================
 // EXPORT FUNCTION
@@ -53,7 +73,8 @@ export async function exportVoltageDropReport(
   panels: Panel[],
   transformers: Transformer[],
   projectAddress?: string,
-  includeNECReferences: boolean = true
+  includeNECReferences: boolean = true,
+  circuits?: Circuit[]
 ): Promise<void> {
   // Validation
   if (!projectName || projectName.trim() === '') {
@@ -73,6 +94,7 @@ export async function exportVoltageDropReport(
         feeders={feeders}
         panels={panels}
         transformers={transformers}
+        circuits={circuits}
         includeNECReferences={includeNECReferences}
       />
     ).toBlob();
@@ -120,11 +142,18 @@ export async function exportVoltageDropReport(
  * }
  * ```
  */
-export function hasVoltageDropData(feeders: Feeder[]): boolean {
-  return feeders.some(feeder =>
-    (feeder.distance_ft !== null && feeder.distance_ft > 0) &&
-    (feeder.total_load_va !== null && feeder.total_load_va > 0)
-  );
+export function hasVoltageDropData(
+  feeders: Feeder[],
+  panels?: Panel[],
+  circuits?: Circuit[],
+  transformers?: Transformer[],
+): boolean {
+  return feeders.some(feeder => {
+    const hasDistance = feeder.distance_ft !== null && feeder.distance_ft > 0;
+    if (!hasDistance) return false;
+    const liveLoad = resolveFeederLoadVA(feeder, panels, circuits, transformers);
+    return liveLoad > 0;
+  });
 }
 
 /**
@@ -141,16 +170,23 @@ export function hasVoltageDropData(feeders: Feeder[]): boolean {
  * console.log(`${feedersWithData} of ${totalFeeders} feeders have voltage drop data`);
  * ```
  */
-export function getVoltageDropDataCount(feeders: Feeder[]): {
+export function getVoltageDropDataCount(
+  feeders: Feeder[],
+  panels?: Panel[],
+  circuits?: Circuit[],
+  transformers?: Transformer[],
+): {
   totalFeeders: number;
   feedersWithData: number;
   feedersWithoutData: number;
 } {
   const totalFeeders = feeders.length;
-  const feedersWithData = feeders.filter(feeder =>
-    (feeder.distance_ft !== null && feeder.distance_ft > 0) &&
-    (feeder.total_load_va !== null && feeder.total_load_va > 0)
-  ).length;
+  const feedersWithData = feeders.filter(feeder => {
+    const hasDistance = feeder.distance_ft !== null && feeder.distance_ft > 0;
+    if (!hasDistance) return false;
+    const liveLoad = resolveFeederLoadVA(feeder, panels, circuits, transformers);
+    return liveLoad > 0;
+  }).length;
   const feedersWithoutData = totalFeeders - feedersWithData;
 
   return {
@@ -176,7 +212,12 @@ export function getVoltageDropDataCount(feeders: Feeder[]): {
  * }
  * ```
  */
-export function validateFeedersForVoltageDropReport(feeders: Feeder[]): {
+export function validateFeedersForVoltageDropReport(
+  feeders: Feeder[],
+  panels?: Panel[],
+  circuits?: Circuit[],
+  transformers?: Transformer[],
+): {
   isValid: boolean;
   feedersWithIssues: Array<{
     feederName: string;
@@ -189,7 +230,8 @@ export function validateFeedersForVoltageDropReport(feeders: Feeder[]): {
     if (!feeder.distance_ft || feeder.distance_ft <= 0) {
       missingFields.push('distance_ft');
     }
-    if (!feeder.total_load_va || feeder.total_load_va <= 0) {
+    const liveLoad = resolveFeederLoadVA(feeder, panels, circuits, transformers);
+    if (liveLoad <= 0) {
       missingFields.push('total_load_va');
     }
     if (!feeder.phase_conductor_size) {

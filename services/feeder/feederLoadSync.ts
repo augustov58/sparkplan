@@ -13,9 +13,11 @@
 
 import type { Feeder } from '@/types';
 import type { Database } from '@/lib/database.types';
+import { calculateAggregatedLoad } from '@/services/calculations/upstreamLoadAggregation';
 
 type Circuit = Database['public']['Tables']['circuits']['Row'];
 type Panel = Database['public']['Tables']['panels']['Row'];
+type Transformer = Database['public']['Tables']['transformers']['Row'];
 
 export interface FeederLoadStatus {
   feederId: string;
@@ -167,4 +169,47 @@ export function getFeedersAffectedByPanelChange(
   feeders: Feeder[]
 ): Feeder[] {
   return feeders.filter(f => f.destination_panel_id === panelId);
+}
+
+/**
+ * Live-derive a feeder's load VA from its destination panel's aggregated demand.
+ *
+ * Use this in any READ path (PDF generators, gating helpers, UI displays) that needs
+ * up-to-date values rather than the cached snapshot stored in `feeder.total_load_va`.
+ * Writers (FeederManager.handleRecalculateFeeder, etc.) keep persisting the cached
+ * value so future PE-seal workflows can snapshot a "as-of-seal-time" load.
+ *
+ * Returns NEC-220-demand VA (post-cascade), per NEC 215.2(A)(1) which sizes feeders
+ * to "the noncontinuous load + 125% of the continuous load" — and "load" in NEC
+ * means demand load with per-load-type DFs already applied.
+ *
+ * Intentionally does NOT pass `multiFamilyContext` — NEC 220.84 is the system-aggregate
+ * Optional Method that applies only at the MDP service level, never per-feeder.
+ *
+ * Falls back to the cached value when:
+ *  - feeder has no `destination_panel_id` (transformer feeders size from xfmr kVA)
+ *  - destination panel can't be found (data integrity issue, defensive)
+ */
+export function computeFeederLoadVA(
+  feeder: Feeder,
+  panels: Panel[],
+  circuits: Circuit[],
+  transformers: Transformer[],
+): number {
+  if (!feeder.destination_panel_id) {
+    return feeder.total_load_va || 0;
+  }
+  const destPanel = panels.find(p => p.id === feeder.destination_panel_id);
+  if (!destPanel) {
+    return feeder.total_load_va || 0;
+  }
+  const aggregate = calculateAggregatedLoad(
+    feeder.destination_panel_id,
+    panels,
+    circuits,
+    transformers,
+    'commercial',
+    undefined,
+  );
+  return aggregate.totalDemandVA;
 }
