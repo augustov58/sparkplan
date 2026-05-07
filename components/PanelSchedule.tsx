@@ -1595,8 +1595,23 @@ export const PanelSchedule: React.FC<PanelScheduleProps> = ({ project }) => {
                   <span className="text-xl font-bold text-gray-900">{demandResult.totalConnectedLoad_kVA.toFixed(1)} KVA</span>
                 </div>
                 <div className="bg-[#f0f5f0] rounded p-3">
-                  <span className="text-[10px] uppercase text-gray-500 block">Direct Demand Load</span>
-                  <span className="text-xl font-bold text-[#2d3b2d]">{demandResult.totalDemandLoad_kVA.toFixed(1)} KVA</span>
+                  <span className="text-[10px] uppercase text-gray-500 block">
+                    Direct Demand Load
+                    {aggregatedLoad &&
+                      aggregatedLoad.totalDemandVA > 0 &&
+                      aggregatedLoad.totalDemandVA < demandResult.totalDemandLoad_kVA * 1000 - 1 && (
+                        <span className="ml-1 text-amber-700 normal-case">(NEC 625.42 EVEMS)</span>
+                      )}
+                  </span>
+                  <span className="text-xl font-bold text-[#2d3b2d]">
+                    {(aggregatedLoad &&
+                    aggregatedLoad.totalDemandVA > 0 &&
+                    aggregatedLoad.totalDemandVA < demandResult.totalDemandLoad_kVA * 1000 - 1
+                      ? aggregatedLoad.totalDemandVA / 1000
+                      : demandResult.totalDemandLoad_kVA
+                    ).toFixed(1)}{' '}
+                    KVA
+                  </span>
                 </div>
                 
                 {/* Feeder Circuits (if any) */}
@@ -1625,10 +1640,23 @@ export const PanelSchedule: React.FC<PanelScheduleProps> = ({ project }) => {
                 <div className="bg-blue-50 rounded p-3">
                   <span className="text-[10px] uppercase text-gray-500 block">Demand Amps</span>
                   <span className="text-xl font-bold text-blue-600">
-                    {aggregatedLoad && aggregatedLoad.downstreamPanelCount > 0
-                      ? (aggregatedLoad.totalDemandVA / (selectedPanel!.voltage * (selectedPanel!.phase === 3 ? Math.sqrt(3) : 1))).toFixed(1)
-                      : demandResult.demandAmps.toFixed(1)
-                    } A
+                    {(() => {
+                      // Prefer the aggregated demand whenever it's available AND
+                      // either (a) the panel feeds downstream panels (MDP-style)
+                      // or (b) the aggregated demand is smaller than the local
+                      // direct-circuit demand (EVEMS clamp engaged on this panel).
+                      const useAggregated =
+                        aggregatedLoad &&
+                        aggregatedLoad.totalDemandVA > 0 &&
+                        (aggregatedLoad.downstreamPanelCount > 0 ||
+                          aggregatedLoad.totalDemandVA < demandResult.totalDemandLoad_kVA * 1000 - 1);
+                      const voltageDivisor =
+                        selectedPanel!.voltage *
+                        (selectedPanel!.phase === 3 ? Math.sqrt(3) : 1);
+                      return useAggregated
+                        ? (aggregatedLoad!.totalDemandVA / voltageDivisor).toFixed(1)
+                        : demandResult.demandAmps.toFixed(1);
+                    })()} A
                   </span>
                 </div>
                 <div className={`rounded p-3 ${demandResult.percentImbalance > 10 ? 'bg-red-50' : 'bg-green-50'}`}>

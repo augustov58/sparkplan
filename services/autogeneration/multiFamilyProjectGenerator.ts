@@ -635,21 +635,31 @@ function generateEVPanel(
   // NEC 220.57(A) + 625.40: Branch-circuit conductors and per-EVSE branch
   // loads are nameplate (full continuous) regardless of EVEMS. NEC 625.42
   // EVEMS reduction is applied downstream at the feeder/service level via
-  // `calculateAggregatedLoad` clamping demand to panel.main_breaker_amps ×
-  // voltage when an "EVEMS Load Management System" controller circuit is
-  // present on the EV panel. So no per-charger VA override here.
+  // `calculateAggregatedLoad` clamping demand to the explicit setpoint
+  // marker emitted alongside the EV branches.
+  //
+  // The setpoint we pass through is `scenario.powerPerCharger_kW × 1000 ×
+  // numChargers` — the multi-family EV calculator's `withEVEMS` scenario
+  // value (`actualKWPerChargerWithEVEMS × numChargers` from
+  // `services/calculations/multiFamilyEV.ts`). For our 12-charger fixture
+  // with ~48 kVA available capacity, this resolves to ~3.6 kW × 12 ≈ 43 kVA
+  // — the actual managed maximum demand, not the panel breaker capacity
+  // (which is sized to ≥ setpoint and rounded to a standard size).
+  const evemsSetpointVA =
+    useEVEMS && scenario.powerPerCharger_kW
+      ? Math.round(scenario.powerPerCharger_kW * 1000 * chargerCount)
+      : undefined;
+
   const config: CustomEVPanelConfig = {
     chargerType,
     numberOfChargers: chargerCount,
     useEVEMS,
     simultaneousChargers: useEVEMS ? Math.ceil(chargerCount * 0.5) : undefined,
+    evemsSetpointVA,
     includeSpare: true,
     includeLighting: true,
     panelName: 'EV Sub-Panel',
   };
-  // Reference scenario power so the import isn't unused; future EVEMS
-  // setpoint metadata may consume it.
-  void scenario;
 
   const result = generateCustomEVPanel({ projectId, config });
 

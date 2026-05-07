@@ -46,29 +46,53 @@ export interface MultiFamilyContext {
 /**
  * NEC 625.42 — detect whether an EV-bank panel is EVEMS-managed.
  *
- * Heuristic: the panel has a circuit whose description contains "EVEMS Load
- * Management System" — the controller-power circuit emitted by the autogen
- * template (`data/ev-panel-templates.ts`) when `useEVEMS=true`. Eventually
- * replaced by an explicit `panel.is_evems_managed` column (follow-up).
+ * Matches either of the two EVEMS marker descriptions emitted by the autogen
+ * template (`data/ev-panel-templates.ts`):
+ *   - "EVEMS Aggregate Setpoint (NEC 625.42)" — preferred form, carries the
+ *     explicit setpoint in `load_watts`
+ *   - "EVEMS Load Management System" — legacy 500 VA control-power placeholder
+ *     for projects generated before the explicit setpoint marker existed
  */
 function isEVEMSManagedPanel(panelId: string, circuits: Circuit[]): boolean {
-  return circuits.some(
-    c =>
-      c.panel_id === panelId &&
-      c.description?.toLowerCase().includes('evems load management'),
+  return circuits.some(c => c.panel_id === panelId && isEVEMSMarkerCircuit(c));
+}
+
+function isEVEMSMarkerCircuit(circuit: Circuit): boolean {
+  const desc = circuit.description?.toLowerCase() ?? '';
+  return (
+    desc.includes('evems aggregate setpoint') ||
+    desc.includes('evems load management')
   );
 }
 
+function isEVEMSExplicitSetpointMarker(circuit: Circuit): boolean {
+  return circuit.description?.toLowerCase().includes('evems aggregate setpoint') ?? false;
+}
+
 /**
- * NEC 625.42 setpoint VA proxy = panel main breaker × voltage (× √3 for 3Φ).
+ * NEC 625.42 EVEMS setpoint VA — the managed maximum demand the EVEMS
+ * controller will allow across all chargers simultaneously.
  *
- * Per NEC 625.42, an EVEMS allows the FEEDER/SERVICE to be sized to the
- * managed setpoint rather than the sum of full nameplate branch loads. The
- * autogen template sizes the EV panel main breaker to accommodate the
- * EVEMS-managed effective load (`simultaneousChargers × breakerSize` rounded
- * to standard size + spares). We use that as the setpoint proxy here.
+ * Preferred path: read directly from the "EVEMS Aggregate Setpoint" marker
+ * circuit's `load_watts`, which the autogen template emits with the
+ * calculator's exact `scenario.powerPerCharger_kW × numChargers × 1000`. This
+ * is the precise NEC 625.42 setpoint.
+ *
+ * Backward-compat fallback for legacy projects (only the "EVEMS Load
+ * Management System" 500 VA control-power placeholder, no explicit setpoint):
+ * use `panel.main_breaker_amps × voltage` (×√3 for 3Φ) as an upper-bound
+ * proxy. The autogen sizes the panel breaker to ≥ EVEMS setpoint, so this
+ * never under-clamps — but it can over-clamp by ~2x because the breaker is
+ * rounded up to a standard size beyond the actual setpoint.
  */
-function evemsSetpointVA(panel: Panel): number | null {
+function evemsSetpointVA(panel: Panel, circuits: Circuit[]): number | null {
+  const setpointMarker = circuits.find(
+    c => c.panel_id === panel.id && isEVEMSExplicitSetpointMarker(c),
+  );
+  if (setpointMarker?.load_watts && setpointMarker.load_watts > 0) {
+    return setpointMarker.load_watts;
+  }
+
   const amps = panel.main_breaker_amps ?? panel.bus_rating ?? 0;
   const voltage = panel.voltage ?? 0;
   if (amps <= 0 || voltage <= 0) return null;
@@ -166,12 +190,21 @@ function mergeCollectedLoads(a: CollectedLoads, b: CollectedLoads): CollectedLoa
 }
 
 /**
- * Collects all connected loads from a panel's circuits (no demand factors)
+ * Collects all connected loads from a panel's circuits (no demand factors).
+ *
+ * Skips EVEMS marker circuits ("EVEMS Aggregate Setpoint" + legacy "EVEMS
+ * Load Management System") — they exist only to convey EVEMS metadata to
+ * `evemsSetpointVA`/`isEVEMSManagedPanel`, and their `load_watts` values are
+ * not real loads. Counting them here would double-count: the EV branch
+ * circuits carry the actual nameplate load per NEC 220.57(A); the marker
+ * just describes the NEC 625.42 setpoint that clamps feeder demand
+ * downstream.
  */
 function collectCircuitLoads(circuits: Circuit[]): CollectedLoads {
   const loads = createEmptyCollectedLoads();
-  
+
   for (const circuit of circuits) {
+    if (isEVEMSMarkerCircuit(circuit)) continue;
     const va = circuit.load_watts || 0;
     const type = circuit.load_type || 'O';
     
@@ -246,8 +279,12 @@ function collectAllDownstreamLoads(
   // 1. Collect direct circuit loads from this panel
   const panelCircuits = circuits.filter(c => c.panel_id === panelId);
   let totalLoads = collectCircuitLoads(panelCircuits);
-  
-  const directConnected = panelCircuits.reduce((sum, c) => sum + (c.load_watts || 0), 0);
+
+  // EVEMS marker circuits excluded from connected sum (see collectCircuitLoads).
+  const directConnected = panelCircuits.reduce(
+    (sum, c) => (isEVEMSMarkerCircuit(c) ? sum : sum + (c.load_watts || 0)),
+    0,
+  );
   if (directConnected > 0) {
     sourceBreakdown.push({
       sourceId: panelId,
@@ -749,7 +786,7 @@ export function calculateAggregatedLoad(
   // Branch conductors stay at full nameplate (NEC 220.57(A) + 625.40); only
   // the FEEDER serving the EV panel benefits from the EVEMS reduction.
   if (isEVEMSManagedPanel(panelId, circuits)) {
-    const setpointVA = evemsSetpointVA(panel);
+    const setpointVA = evemsSetpointVA(panel, circuits);
     if (setpointVA !== null && totalDemandVA > setpointVA) {
       const preClampVA = totalDemandVA;
       totalDemandVA = setpointVA;

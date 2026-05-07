@@ -1729,11 +1729,11 @@ describe('C4 — Per-EVSE branch row VA (NEC 220.57)', () => {
   });
 
   describe('NEC 625.42 — feeder/service clamp on EVEMS-managed EV panel', () => {
-    // Build an EV sub-panel with 12 branch chargers @ 11,520 VA each (post-C4 fix),
-    // a 500 VA "EVEMS Load Management System" controller circuit (the EVEMS
-    // marker), and a panel main breaker rating that represents the EVEMS
-    // setpoint per NEC 625.42. Verify calculateAggregatedLoad clamps demand
-    // to that setpoint instead of summing full connected nameplate.
+    // Build an EV sub-panel with 12 branch chargers @ 11,520 VA each (post-C4 fix)
+    // and an explicit "EVEMS Aggregate Setpoint (NEC 625.42)" marker circuit
+    // carrying the calculator's exact setpoint VA. Verify calculateAggregatedLoad
+    // (a) clamps totalDemandVA to that setpoint, (b) excludes the marker from
+    // the connected-load sum so it doesn't double-count.
     const makeEVPanel = (mainBreakerAmps: number): Panel =>
       ({
         id: 'p-ev',
@@ -1762,10 +1762,34 @@ describe('C4 — Per-EVSE branch row VA (NEC 220.57)', () => {
         description,
       } as unknown as Circuit);
 
-    it('clamps totalDemandVA to main_breaker_amps × voltage when EVEMS controller circuit is present', () => {
-      // 12× 11,520 VA chargers = 138,240 VA full connected
-      // EVEMS-managed panel sized to 400A main breaker
-      // Expected EVEMS setpoint clamp: 400 × 240 = 96,000 VA
+    it('clamps totalDemandVA to the explicit "EVEMS Aggregate Setpoint" marker (NEC 625.42)', () => {
+      // 12× 11,520 VA chargers = 138,240 VA full nameplate connected
+      // Calculator's setpoint = 47,952 VA (3,996 VA per charger × 12 from
+      // the audit fixture, where availableCapacity ≈ 48 kVA).
+      const evPanel = makeEVPanel(400);
+      const evemsSetpointVA = 47_952;
+      const circuits: Circuit[] = [
+        ...Array.from({ length: 12 }, (_, i) =>
+          makeBranch('p-ev', 11520, `chg-${i}`, `EV Charger #${i + 1} (EVEMS managed)`)
+        ),
+        makeBranch('p-ev', evemsSetpointVA, 'evems-setpoint', 'EVEMS Aggregate Setpoint (NEC 625.42)'),
+      ];
+
+      const result = calculateAggregatedLoad('p-ev', [evPanel], circuits, [], 'dwelling');
+
+      // Connected = sum of branch nameplates only — marker is metadata, NOT
+      // a real load, so it's excluded.
+      expect(result.totalConnectedVA).toBe(12 * 11520);
+      // Demand clamped to the explicit setpoint, not the panel-breaker proxy
+      expect(result.totalDemandVA).toBe(evemsSetpointVA);
+      expect(result.necReferences.some(r => r.includes('625.42'))).toBe(true);
+    });
+
+    it('legacy "EVEMS Load Management System" 500 VA placeholder still triggers clamp via panel-breaker proxy', () => {
+      // Backward compat: projects generated before the explicit setpoint marker
+      // existed only have the 500 VA control-power placeholder. We still detect
+      // them as EVEMS-managed and clamp via panel.main_breaker_amps × voltage
+      // as an upper-bound proxy. 400A × 240V = 96,000 VA.
       const evPanel = makeEVPanel(400);
       const circuits: Circuit[] = [
         ...Array.from({ length: 12 }, (_, i) =>
@@ -1776,14 +1800,14 @@ describe('C4 — Per-EVSE branch row VA (NEC 220.57)', () => {
 
       const result = calculateAggregatedLoad('p-ev', [evPanel], circuits, [], 'dwelling');
 
-      // Connected stays at full nameplate sum (correct per NEC 220.57)
-      expect(result.totalConnectedVA).toBe(12 * 11520 + 500);
-      // Demand is clamped to EVEMS setpoint per NEC 625.42
-      expect(result.totalDemandVA).toBe(400 * 240); // 96,000 VA
+      // Connected: marker excluded → branches only
+      expect(result.totalConnectedVA).toBe(12 * 11520);
+      // Demand: panel-breaker proxy clamp (legacy upper bound)
+      expect(result.totalDemandVA).toBe(400 * 240);
       expect(result.necReferences.some(r => r.includes('625.42'))).toBe(true);
     });
 
-    it('does NOT clamp when no EVEMS controller circuit (non-EVEMS EV panel)', () => {
+    it('does NOT clamp when no EVEMS marker circuit (non-EVEMS EV panel)', () => {
       // Same 4 chargers, but no EVEMS — branches all run simultaneously.
       // Demand should equal connected (NEC 220 cascade with all 'O' = 100%).
       const evPanel = makeEVPanel(300);
@@ -1799,18 +1823,18 @@ describe('C4 — Per-EVSE branch row VA (NEC 220.57)', () => {
     });
 
     it('EVEMS clamp does not apply when totalDemandVA already below setpoint', () => {
-      // 2 chargers = 23,040 VA < 96,000 VA setpoint. No clamp needed.
+      // 2 chargers = 23,040 VA < 47,952 VA setpoint. No clamp needed.
       const evPanel = makeEVPanel(400);
       const circuits: Circuit[] = [
         ...Array.from({ length: 2 }, (_, i) =>
           makeBranch('p-ev', 11520, `chg-${i}`, `EV Charger #${i + 1} (EVEMS managed)`)
         ),
-        makeBranch('p-ev', 500, 'evems-ctrl', 'EVEMS Load Management System'),
+        makeBranch('p-ev', 47_952, 'evems-setpoint', 'EVEMS Aggregate Setpoint (NEC 625.42)'),
       ];
 
       const result = calculateAggregatedLoad('p-ev', [evPanel], circuits, [], 'dwelling');
 
-      expect(result.totalDemandVA).toBe(2 * 11520 + 500);
+      expect(result.totalDemandVA).toBe(2 * 11520);
       // No clamp NEC reference — demand was already below setpoint
       expect(result.necReferences.some(r => r.includes('625.42'))).toBe(false);
     });
@@ -1851,7 +1875,7 @@ describe('C4 — Per-EVSE branch row VA (NEC 220.57)', () => {
         description,
       } as unknown as Circuit);
 
-    it('MDP demand stays correct when EV panel branches are at nameplate + EVEMS clamp at feeder', () => {
+    it('MDP demand stays correct when EV panel branches are at nameplate + explicit EVEMS setpoint', () => {
       const mdp = makePanel({ id: 'mdp', name: 'MDP', is_main: true, bus_rating: 1000, main_breaker_amps: 1000 });
       const housePanel = makePanel({
         id: 'p-house', name: 'House Panel',
@@ -1873,14 +1897,20 @@ describe('C4 — Per-EVSE branch row VA (NEC 220.57)', () => {
 
       const panels: Panel[] = [mdp, housePanel, evPanel, ...unitPanels];
 
+      // Calculator's withEVEMS setpoint for this fixture: 47,952 VA
+      // (≈ availableCapacity × 0.9 = ~48 kW once unit + house demand is
+      // applied to a 1000A 240V service)
+      const evemsSetpointVA = 47_952;
+
       const circuits: Circuit[] = [
         // House panel: 13.8 kVA
         makeCircuit('p-house', 13_800, 'house'),
-        // EV panel: 12× 11,520 VA branches (post-C4) + EVEMS controller
+        // EV panel: 12× 11,520 VA branches (post-C4 nameplate per NEC 220.57(A))
         ...Array.from({ length: 12 }, (_, i) =>
           makeCircuit('p-ev', 11520, `chg-${i}`, `EV Charger #${i + 1} (EVEMS managed)`)
         ),
-        makeCircuit('p-ev', 500, 'evems-ctrl', 'EVEMS Load Management System'),
+        // Explicit setpoint marker (excluded from connected sum, used for clamp)
+        makeCircuit('p-ev', evemsSetpointVA, 'evems-setpoint', 'EVEMS Aggregate Setpoint (NEC 625.42)'),
         // Each unit panel: 36.2 kVA
         ...unitPanels.map(p => makeCircuit(p.id, 36_200, 'unit')),
       ];
@@ -1895,12 +1925,16 @@ describe('C4 — Per-EVSE branch row VA (NEC 220.57)', () => {
 
       // Dwelling demand: 12 × 36,200 × 0.41 = 178,104 VA
       // House @ 100%: 13,800 VA
-      // EV @ EVEMS setpoint (400A × 240V = 96,000 VA, clamped from 138,740 raw)
-      // Total ≈ 178,104 + 13,800 + 96,000 = 287,904 VA
-      // Without the EVEMS clamp this would be ~329,944 VA (15% high — would
-      // recommend a larger service unnecessarily).
-      expect(result.totalDemandVA).toBeGreaterThanOrEqual(287_000);
-      expect(result.totalDemandVA).toBeLessThanOrEqual(289_000);
+      // EV @ EVEMS setpoint: 47,952 VA (clamped from 138,240 raw nameplate sum)
+      // Total ≈ 178,104 + 13,800 + 47,952 = 239,856 VA
+      // Demand amps on 240V service ≈ 999.4 A — fits within the 1000A breaker
+      // (the design is at the service capacity limit, exactly as the multi-family
+      // EV calculator computed when it picked the setpoint).
+      expect(result.totalDemandVA).toBeGreaterThanOrEqual(239_500);
+      expect(result.totalDemandVA).toBeLessThanOrEqual(240_500);
+
+      const demandAmps = result.totalDemandVA / 240;
+      expect(demandAmps).toBeLessThanOrEqual(1000); // fits 1000A panel
     });
   });
 });

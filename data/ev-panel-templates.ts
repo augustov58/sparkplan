@@ -427,10 +427,20 @@ export interface CustomEVPanelConfig {
    * EVEMS was active. That collapsed the NEC 625.42 service-level reduction
    * onto branch circuits in violation of NEC 220.57(A) + 625.40. Branch
    * conductors must always carry full nameplate. Field accepted for callers
-   * but ignored. EVEMS reduction is applied at the feeder/service level via
-   * `calculateAggregatedLoad` clamping `totalDemandVA` to panel main breaker.
+   * but ignored.
    */
   evemsLoadVAPerCharger?: number;
+  /**
+   * NEC 625.42 EVEMS aggregate setpoint VA — the managed maximum demand the
+   * EVEMS controller will allow across all chargers simultaneously. When
+   * provided alongside `useEVEMS=true`, the template emits an "EVEMS
+   * Aggregate Setpoint (NEC 625.42)" marker circuit carrying this value as
+   * its `loadVA`. Downstream, `evemsSetpointVA(panel, circuits)` in
+   * `services/calculations/upstreamLoadAggregation.ts` reads it to clamp
+   * feeder/service demand at exactly the calculator's setpoint instead of
+   * an over-generous `panel.main_breaker × voltage` proxy.
+   */
+  evemsSetpointVA?: number;
   includeSpare: boolean;
   includeLighting: boolean;
   panelName?: string;
@@ -451,6 +461,7 @@ export function generateCustomEVPanel(input: CustomEVPanelInput): ApplyTemplateO
     numberOfChargers,
     useEVEMS,
     simultaneousChargers,
+    evemsSetpointVA,
     includeSpare,
     includeLighting,
     panelName
@@ -571,17 +582,29 @@ export function generateCustomEVPanel(input: CustomEVPanelInput): ApplyTemplateO
   // Set circuitNumber to the next available slot for auxiliary circuits
   circuitNumber = Math.max(leftSlot, rightSlot);
 
-  // Add EVEMS controller circuit if enabled
+  // EVEMS marker circuit. Per NEC 625.42, an EVEMS allows the FEEDER /
+  // SERVICE to be sized to the managed setpoint (not the sum of branch
+  // nameplates). When the caller provides the explicit setpoint, we emit a
+  // metadata-only "EVEMS Aggregate Setpoint" circuit carrying that value as
+  // `loadVA` — the downstream load aggregator (`upstreamLoadAggregation.ts`)
+  // reads it to clamp feeder demand and excludes it from the connected-load
+  // sum so it doesn't double-count as a real load. When no setpoint is
+  // provided, fall back to the legacy 500 VA "EVEMS Load Management System"
+  // control-power placeholder; consumers fall back to a panel-breaker
+  // upper-bound proxy in that case.
   if (useEVEMS) {
+    const hasSetpoint = typeof evemsSetpointVA === 'number' && evemsSetpointVA > 0;
     circuits.push({
       circuitNumber: circuitNumber,
       breakerAmps: 20,
       poles: 2,
       voltage: 240,
-      description: 'EVEMS Load Management System',
+      description: hasSetpoint
+        ? 'EVEMS Aggregate Setpoint (NEC 625.42)'
+        : 'EVEMS Load Management System',
       conductorSize: '12 AWG Cu',
       conductorType: 'THHN',
-      loadVA: 500,
+      loadVA: hasSetpoint ? evemsSetpointVA : 500,
       isEvCharger: false
     });
     circuitNumber += 4;  // 2-pole occupies 2 slots
