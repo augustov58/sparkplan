@@ -13,6 +13,10 @@ import {
 } from './permitPacketTheme';
 import { getCircuitPhase } from '../calculations/demandFactor';
 import {
+  calculateDwellingUnitDemandVA,
+  isDwellingUnitPanel,
+} from '../calculations/residentialLoad';
+import {
   isEVEMSMarkerCircuit,
   findEVEMSSetpointMarker,
 } from '../calculations/upstreamLoadAggregation';
@@ -241,6 +245,18 @@ export const PanelSchedulePages: React.FC<PanelSchedulePDFProps> = ({
     (a, b) => a.circuit_number - b.circuit_number
   );
 
+  // NEC 220.82 Optional Method demand for dwelling unit panels — surfaced
+  // as a separate callout below the Load Summary so AHJ reviewers see the
+  // sized-for demand alongside raw connected. Same pattern as the EVEMS
+  // setpoint callout below.
+  const dwellingCircuitsForCalc = realCircuits.map(c => ({
+    description: c.description,
+    loadWatts: c.load_watts || 0,
+  }));
+  const dwellingUnitDemand = isDwellingUnitPanel(panel.name, dwellingCircuitsForCalc)
+    ? calculateDwellingUnitDemandVA(dwellingCircuitsForCalc)
+    : null;
+
   const phaseBalancing = calculatePhaseBalancing(sortedCircuits, panel.phase);
   const voltage = panel.voltage;
 
@@ -440,6 +456,45 @@ export const PanelSchedulePages: React.FC<PanelSchedulePDFProps> = ({
             )}
           </View>
         </View>
+
+        {/* NEC 220.82 Dwelling Unit demand callout — shows the actual sized-for
+            demand on a per-unit panel so AHJ reviewers don't read raw connected
+            load (e.g. 36 kVA / 150 A) and assume the panel is over-capacity. */}
+        {dwellingUnitDemand && (
+          <View style={styles.summarySection}>
+            <Text style={styles.summaryTitle}>Dwelling Unit Demand (NEC 220.82 Optional Method)</Text>
+            <View style={styles.summaryGrid}>
+              <View style={styles.summaryItem}>
+                <Text style={styles.summaryLabel}>Total Demand</Text>
+                <Text style={styles.summaryValue}>
+                  {(dwellingUnitDemand.totalDemandVA / 1000).toFixed(1)} kVA
+                </Text>
+              </View>
+              <View style={styles.summaryItem}>
+                <Text style={styles.summaryLabel}>Demand Amps</Text>
+                <Text style={styles.summaryValue}>
+                  {(
+                    dwellingUnitDemand.totalDemandVA /
+                    (panel.voltage * (panel.phase === 3 ? Math.sqrt(3) : 1))
+                  ).toFixed(1)}
+                  A
+                </Text>
+              </View>
+              <View style={styles.summaryItem}>
+                <Text style={styles.summaryLabel}>General @ Tiered</Text>
+                <Text style={styles.summaryValue}>
+                  {(dwellingUnitDemand.generalDemandVA / 1000).toFixed(1)} kVA
+                </Text>
+              </View>
+              <View style={styles.summaryItem}>
+                <Text style={styles.summaryLabel}>Climate @ 100%</Text>
+                <Text style={styles.summaryValue}>
+                  {(dwellingUnitDemand.climateDemandVA / 1000).toFixed(1)} kVA
+                </Text>
+              </View>
+            </View>
+          </View>
+        )}
 
         {/* NEC 625.42 EVEMS Setpoint callout — visible to AHJ reviewers */}
         {evemsSetpointMarker && evemsSetpointMarker.load_watts && evemsSetpointMarker.load_watts > 0 && (

@@ -65,6 +65,12 @@ import { generateCustomEVPanel } from '../data/ev-panel-templates';
 // ── Multi-Family Autogen (NEC 220.82 unit panel sizing) ────────────────────
 import { generateBasicMultiFamilyProject } from '../services/autogeneration/multiFamilyProjectGenerator';
 
+// ── Dwelling Unit Demand Display (NEC 220.82 Optional Method) ──────────────
+import {
+  calculateDwellingUnitDemandVA,
+  isDwellingUnitPanel,
+} from '../services/calculations/residentialLoad';
+
 // ── Upstream Load Aggregation (NEC 220.40 + 220.84 Optional Method) ─────────
 import {
   calculateAggregatedLoad,
@@ -1812,6 +1818,51 @@ describe('C4 — Per-EVSE branch row VA (NEC 220.57)', () => {
       for (const unitPanel of result.unitPanels) {
         expect(unitPanel.bus_rating).toBe(100);
       }
+    });
+
+    it('calculateDwellingUnitDemandVA reports NEC 220.82 demand on Unit 101 audit fixture (~22.9 kVA)', () => {
+      // The user's actual Unit 101 Panel (12 kW range, 5.5 kW dryer, 4.5 kW WH,
+      // 5 kW A/C, 0.5 kW disposal, 900 sqft).
+      // Expected NEC 220.82 demand:
+      //   General (excluding A/C): 1.5×4 (kitchens+laundry+bath) + 1.35×2 (lighting)
+      //                          + 12 (range) + 5.5 (dryer) + 4.5 (WH) + 0.5 (disposal)
+      //                          = 6 + 2.7 + 12 + 5.5 + 4.5 + 0.5 = 31.2 kVA
+      //   General demand: 10 + (31.2 − 10) × 0.4 = 18.48 kVA
+      //   + A/C @ 100%: 5.0 kVA
+      //   = 23.48 kVA → ~97.8 A on 240V ← well within a 125 A panel
+      const unit101_circuits = [
+        { description: 'Kitchen Small Appliance #1', loadWatts: 1500 },
+        { description: 'Kitchen Small Appliance #2', loadWatts: 1500 },
+        { description: 'Laundry', loadWatts: 1500 },
+        { description: 'Bathroom(s)', loadWatts: 1500 },
+        { description: 'General Lighting', loadWatts: 1350 },
+        { description: 'General Lighting #2', loadWatts: 1350 },
+        { description: 'Range/Oven', loadWatts: 12000 },
+        { description: 'Clothes Dryer', loadWatts: 5500 },
+        { description: 'A/C Condensing Unit', loadWatts: 5000 },
+        { description: 'Water Heater', loadWatts: 4500 },
+        { description: 'Disposal', loadWatts: 500 },
+      ];
+      const result = calculateDwellingUnitDemandVA(unit101_circuits);
+      expect(result.generalConnectedVA).toBe(31_200);
+      expect(result.generalDemandVA).toBe(18_480);
+      expect(result.climateDemandVA).toBe(5_000);
+      expect(result.totalDemandVA).toBe(23_480);
+      // 23,480 / 240 = 97.8 A — comfortably within a 125 A panel
+      expect(result.totalDemandVA / 240).toBeCloseTo(97.8, 1);
+    });
+
+    it('isDwellingUnitPanel matches Unit panels and rejects MDP / EV / House panels', () => {
+      const unitCircuits = [{ description: 'Kitchen Small Appliance', loadWatts: 1500 }];
+      expect(isDwellingUnitPanel('Unit 101 Panel', unitCircuits)).toBe(true);
+      expect(isDwellingUnitPanel('Unit 110', unitCircuits)).toBe(true);
+      expect(isDwellingUnitPanel('Apt 3B', unitCircuits)).toBe(true);
+      // Wrong shape — no kitchen/range/laundry → not a dwelling unit
+      expect(isDwellingUnitPanel('Unit 5', [{ description: 'Misc.', loadWatts: 100 }])).toBe(false);
+      // Wrong name — even if circuits look dwelling-shaped
+      expect(isDwellingUnitPanel('House Panel', unitCircuits)).toBe(false);
+      expect(isDwellingUnitPanel('EV Sub-Panel', unitCircuits)).toBe(false);
+      expect(isDwellingUnitPanel('Multifamily Test MDP', unitCircuits)).toBe(false);
     });
 
     it('calculatePanelDemand splits 2-pole 240V loads 50/50 across A/B on 1Φ split-phase panel (regression for in-app twin of C6)', () => {

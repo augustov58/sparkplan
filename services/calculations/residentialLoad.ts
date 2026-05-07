@@ -1227,3 +1227,107 @@ export function generateResidentialPanelSchedule(input: SingleFamilyInput): Gene
   return circuits;
 }
 
+// ============================================================================
+// NEC 220.82 OPTIONAL METHOD — per-unit display helper
+// ============================================================================
+
+/** Minimal circuit shape for dwelling-unit demand classification. */
+export interface DwellingCircuitInput {
+  description?: string | null;
+  loadWatts: number;
+}
+
+/**
+ * NEC 220.82 Optional Method demand from a dwelling unit's branch circuits.
+ *
+ * General loads pooled (lighting + small appliance + laundry + nameplate
+ * appliances), tiered demand applied: first 10 kVA @ 100%, remainder @ 40%.
+ * Plus the larger of A/C vs heat at 100% (NEC 220.60 non-coincident).
+ *
+ * Used by panel-summary displays (in-app + PDF) to show a NEC-correct demand
+ * figure on dwelling unit panels — instead of the panel-local "Other @ 100%"
+ * sum that misleadingly reports 150 A on a sized-correctly 125 A panel.
+ *
+ * A/C vs heat vs general detection is by description match. Anything not
+ * matching A/C or heat patterns counts as general (conservative).
+ */
+export function calculateDwellingUnitDemandVA(circuits: DwellingCircuitInput[]): {
+  generalConnectedVA: number;
+  generalDemandVA: number;
+  climateDemandVA: number;
+  totalDemandVA: number;
+} {
+  let generalVA = 0;
+  let acVA = 0;
+  let heatVA = 0;
+
+  for (const c of circuits) {
+    const desc = (c.description ?? '').toLowerCase();
+    const va = c.loadWatts || 0;
+    if (
+      desc.includes('a/c') ||
+      desc.includes('condensing') ||
+      desc.includes('cooling') ||
+      desc.includes('mini-split') ||
+      desc.includes('air condition')
+    ) {
+      acVA += va;
+    } else if (
+      desc.includes('heat pump') ||
+      desc.includes('electric heat') ||
+      desc.includes('strip heat') ||
+      desc.includes('baseboard heat') ||
+      (desc.includes('heat') && !desc.includes('water heater'))
+    ) {
+      heatVA += va;
+    } else {
+      generalVA += va;
+    }
+  }
+
+  const generalDemand =
+    generalVA <= 10_000 ? generalVA : 10_000 + (generalVA - 10_000) * 0.4;
+  const climateDemand = Math.max(acVA, heatVA);
+
+  return {
+    generalConnectedVA: generalVA,
+    generalDemandVA: Math.round(generalDemand),
+    climateDemandVA: Math.round(climateDemand),
+    totalDemandVA: Math.round(generalDemand + climateDemand),
+  };
+}
+
+/**
+ * Heuristic — detect a dwelling unit panel from name + circuit shape.
+ *
+ * True iff the name matches a unit pattern ("Unit 101", "Apt 3B", etc.)
+ * AND the circuits look like a dwelling load (kitchen / range / etc.).
+ * Used by display layers to decide whether to apply NEC 220.82 instead of
+ * the standard panel-local NEC 220 cascade.
+ */
+export function isDwellingUnitPanel(
+  panelName: string,
+  circuits: DwellingCircuitInput[],
+): boolean {
+  const name = panelName.toLowerCase();
+  const looksLikeUnit =
+    /^unit\s*\d+/i.test(panelName) ||
+    /^apt\.?\s*\d+/i.test(panelName) ||
+    /^apartment\s*\d+/i.test(panelName) ||
+    name.includes('unit panel');
+  if (!looksLikeUnit) return false;
+
+  const hasDwellingShape = circuits.some(c => {
+    const d = (c.description ?? '').toLowerCase();
+    return (
+      d.includes('kitchen') ||
+      d.includes('range') ||
+      d.includes('laundry') ||
+      d.includes('dryer') ||
+      d.includes('water heater') ||
+      d.includes('dishwasher')
+    );
+  });
+  return hasDwellingShape;
+}
+

@@ -26,6 +26,10 @@ import {
   findEVEMSSetpointMarker,
   type MultiFamilyContext,
 } from '../services/calculations/upstreamLoadAggregation';
+import {
+  calculateDwellingUnitDemandVA,
+  isDwellingUnitPanel,
+} from '../services/calculations/residentialLoad';
 import type { LoadTypeCode } from '../types';
 
 // Load type options for dropdown
@@ -264,6 +268,24 @@ export const PanelSchedule: React.FC<PanelScheduleProps> = ({ project }) => {
       connectedWithFeeders_kVA: feederTotalVA / 1000,
     };
   }, [selectedPanel, panelCircuits, feederCircuits]);
+
+  // NEC 220.82 Optional Method demand for dwelling unit panels — used by
+  // the panel summary cards in lieu of the panel-local NEC 220.14 sum, which
+  // misleadingly reports raw connected current on a panel that's actually
+  // sized correctly per NEC 220.82 (e.g. 150 A "demand" on a 125 A panel
+  // when the real NEC 220.82 demand is ~95 A).
+  const dwellingUnitDemand = useMemo(() => {
+    if (!selectedPanel) return null;
+    const occupancy = project.settings?.occupancyType;
+    if (occupancy !== 'dwelling') return null;
+    if (selectedPanel.is_main) return null;
+    const dwellingCircuits = panelCircuits.map(c => ({
+      description: c.description,
+      loadWatts: c.load_watts || 0,
+    }));
+    if (!isDwellingUnitPanel(selectedPanel.name, dwellingCircuits)) return null;
+    return calculateDwellingUnitDemandVA(dwellingCircuits);
+  }, [selectedPanel, panelCircuits, project.settings?.occupancyType]);
 
   // Calculate aggregated load including downstream panels
   // Uses occupancyType from project settings for correct demand factor selection
@@ -1613,16 +1635,22 @@ export const PanelSchedule: React.FC<PanelScheduleProps> = ({ project }) => {
                 <div className="bg-[#f0f5f0] rounded p-3">
                   <span className="text-[10px] uppercase text-gray-500 block">
                     Direct Demand Load
-                    {aggregatedLoad &&
+                    {dwellingUnitDemand && (
+                      <span className="ml-1 text-amber-700 normal-case">(NEC 220.82)</span>
+                    )}
+                    {!dwellingUnitDemand &&
+                      aggregatedLoad &&
                       aggregatedLoad.totalDemandVA > 0 &&
                       aggregatedLoad.totalDemandVA < demandResult.totalDemandLoad_kVA * 1000 - 1 && (
                         <span className="ml-1 text-amber-700 normal-case">(NEC 625.42 EVEMS)</span>
                       )}
                   </span>
                   <span className="text-xl font-bold text-[#2d3b2d]">
-                    {(aggregatedLoad &&
-                    aggregatedLoad.totalDemandVA > 0 &&
-                    aggregatedLoad.totalDemandVA < demandResult.totalDemandLoad_kVA * 1000 - 1
+                    {(dwellingUnitDemand
+                      ? dwellingUnitDemand.totalDemandVA / 1000
+                      : aggregatedLoad &&
+                        aggregatedLoad.totalDemandVA > 0 &&
+                        aggregatedLoad.totalDemandVA < demandResult.totalDemandLoad_kVA * 1000 - 1
                       ? aggregatedLoad.totalDemandVA / 1000
                       : demandResult.totalDemandLoad_kVA
                     ).toFixed(1)}{' '}
@@ -1657,18 +1685,22 @@ export const PanelSchedule: React.FC<PanelScheduleProps> = ({ project }) => {
                   <span className="text-[10px] uppercase text-gray-500 block">Demand Amps</span>
                   <span className="text-xl font-bold text-blue-600">
                     {(() => {
-                      // Prefer the aggregated demand whenever it's available AND
-                      // either (a) the panel feeds downstream panels (MDP-style)
-                      // or (b) the aggregated demand is smaller than the local
-                      // direct-circuit demand (EVEMS clamp engaged on this panel).
+                      const voltageDivisor =
+                        selectedPanel!.voltage *
+                        (selectedPanel!.phase === 3 ? Math.sqrt(3) : 1);
+                      // Priority 1: dwelling unit panel — use NEC 220.82 demand
+                      if (dwellingUnitDemand) {
+                        return (dwellingUnitDemand.totalDemandVA / voltageDivisor).toFixed(1);
+                      }
+                      // Priority 2: prefer aggregated demand when available AND
+                      // either (a) panel feeds downstream sub-panels (MDP-style)
+                      // or (b) aggregated demand is smaller than panel-local
+                      // demand (EVEMS clamp engaged on this panel).
                       const useAggregated =
                         aggregatedLoad &&
                         aggregatedLoad.totalDemandVA > 0 &&
                         (aggregatedLoad.downstreamPanelCount > 0 ||
                           aggregatedLoad.totalDemandVA < demandResult.totalDemandLoad_kVA * 1000 - 1);
-                      const voltageDivisor =
-                        selectedPanel!.voltage *
-                        (selectedPanel!.phase === 3 ? Math.sqrt(3) : 1);
                       return useAggregated
                         ? (aggregatedLoad!.totalDemandVA / voltageDivisor).toFixed(1)
                         : demandResult.demandAmps.toFixed(1);
