@@ -508,7 +508,19 @@ const NecAssistant = () => {
                 totalLoad: { connectedVA: 0, demandVA: 0 }
             };
 
-            const result = await askNecAssistantWithTools(q, conversationHistory, context, isFirstMessage);
+            // B-1: pass raw rows so feeder-related tools can live-derive
+            // voltage drop from current circuit data instead of reading the
+            // potentially stale `feeder.voltageDropPercent` cache. Falls back
+            // to summary-only behavior if `hasContext` is false.
+            const result = await askNecAssistantWithTools(
+                q,
+                conversationHistory,
+                context,
+                isFirstMessage,
+                hasContext
+                    ? { panels, circuits, feeders, transformers }
+                    : undefined,
+            );
 
             if (generationIdRef.current !== thisGen) return;
 

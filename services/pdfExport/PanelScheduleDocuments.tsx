@@ -11,6 +11,7 @@ import {
   Footer as BrandFooter,
   themeStyles,
 } from './permitPacketTheme';
+import { getCircuitPhase } from '../calculations/demandFactor';
 
 // Helvetica + Helvetica-Bold are built-in PDF standard fonts in react-pdf —
 // calling Font.register() on them corrupts the font cache and causes
@@ -149,13 +150,27 @@ export const calculatePhaseBalancing = (
   panelPhase: number
 ) => {
   if (panelPhase === 1) {
-    // Single-phase: all circuits on same phase
-    const totalVA = circuits.reduce((sum, c) => sum + (c.load_watts || 0), 0);
-    return {
-      phaseA_VA: totalVA,
-      phaseB_VA: 0,
-      phaseC_VA: 0,
-    };
+    // Split-phase 1Φ-3W (US residential 120/240 V): two opposite-polarity hot
+    // legs A and B. 1-pole circuits sit on whichever leg their slot is wired
+    // to; 2-pole 240 V circuits (range, dryer, A/C, water heater) span BOTH
+    // legs by definition — that's how they get 240 V — so their load is
+    // split 50/50 across A and B for balancing purposes.
+    let phaseA_VA = 0;
+    let phaseB_VA = 0;
+
+    circuits.forEach((c) => {
+      const loadVA = c.load_watts || 0;
+      if (c.pole === 2) {
+        phaseA_VA += loadVA / 2;
+        phaseB_VA += loadVA / 2;
+      } else {
+        const phase = getCircuitPhase(c.circuit_number, 1);
+        if (phase === 'A') phaseA_VA += loadVA;
+        else phaseB_VA += loadVA;
+      }
+    });
+
+    return { phaseA_VA, phaseB_VA, phaseC_VA: 0 };
   }
 
   // Three-phase: distribute by circuit number
@@ -319,8 +334,11 @@ export const PanelSchedulePages: React.FC<PanelSchedulePDFProps> = ({
               const leftCkt = sortedCircuits.find(c => c.circuit_number === leftNum);
               const rightCkt = sortedCircuits.find(c => c.circuit_number === rightNum);
 
-              // Calculate phase for this row
-              const phase = panel.phase === 1 ? 'A' : ['A', 'B', 'C'][(row - 1) % 3];
+              // Phase for this row (left & right slots share the same bus stab,
+              // so one letter labels the row). Split-phase panels alternate A/B
+              // per row; three-phase panels rotate A/B/C — see getCircuitPhase
+              // contract in services/calculations/demandFactor.ts.
+              const phase = getCircuitPhase(leftNum, panel.phase === 3 ? 3 : 1);
               const isAlt = row % 2 === 0;
 
               rows.push(
@@ -523,7 +541,7 @@ export const MultiPanelDocument: React.FC<MultiPanelDocumentProps> = ({
                 const leftCkt = sortedCircuits.find(c => c.circuit_number === leftNum);
                 const rightCkt = sortedCircuits.find(c => c.circuit_number === rightNum);
 
-                const phase = panel.phase === 1 ? 'A' : ['A', 'B', 'C'][(row - 1) % 3];
+                const phase = getCircuitPhase(leftNum, panel.phase === 3 ? 3 : 1);
                 const isAlt = row % 2 === 0;
 
                 rows.push(

@@ -8,10 +8,17 @@
  */
 
 import type { ProjectContext } from './projectContextBuilder';
-import type { ToolResult, ToolResultDisplay } from '@/types';
+import type { ToolResult, ToolResultDisplay, Feeder } from '@/types';
+import type { Database } from '@/lib/database.types';
 import { analyzeChangeImpact, draftRFI, predictInspection } from '../api/pythonBackend';
 import { supabase } from '@/lib/supabase';
 import { notifyDataRefresh } from '@/lib/dataRefreshEvents';
+import { computeFeederLoadVA } from '@/services/feeder/feederLoadSync';
+import { calculateFeederSizing, type FeederCalculationInput } from '@/services/calculations/feederSizing';
+
+type RawPanel = Database['public']['Tables']['panels']['Row'];
+type RawCircuit = Database['public']['Tables']['circuits']['Row'];
+type RawTransformer = Database['public']['Tables']['transformers']['Row'];
 
 // ============================================================================
 // TOOL CONTEXT & TYPES
@@ -21,6 +28,14 @@ export interface ToolContext {
   projectId: string;
   projectContext: ProjectContext;
   userId?: string;
+  // B-1: Raw DB rows for live-derive calculations. ProjectContext is a lossy
+  // summary (no total_load_va, distance_ft, etc.) that's intentionally compact
+  // for AI prompting. Tools that need to compute live values rather than read
+  // cached columns (e.g., feeder voltage drop) consume these instead.
+  rawPanels?: RawPanel[];
+  rawCircuits?: RawCircuit[];
+  rawFeeders?: Feeder[];
+  rawTransformers?: RawTransformer[];
 }
 
 export interface ChatTool {
@@ -290,7 +305,69 @@ Returns the feeder's voltage drop percentage if already calculated in the projec
         };
       }
 
-      const hasVoltageDropData = feeder.voltageDropPercent !== undefined;
+      // B-1: live-derive voltage drop instead of reading the cached
+      // feeder.voltageDropPercent column. Mirrors the C2 PDF fix — the cached
+      // value can be 0 / wrong when the feeder was auto-created before
+      // destination-panel circuits existed, so the AI was confidently telling
+      // users "Compliant. 0.00%" on feeders that were actually sized wrong.
+      const rawFeeder = context.rawFeeders?.find(f => f.id === feeder.id);
+      const haveLiveData =
+        rawFeeder !== undefined &&
+        Array.isArray(context.rawPanels) &&
+        Array.isArray(context.rawCircuits) &&
+        Array.isArray(context.rawTransformers);
+
+      let voltageDropPercent: number | null = null;
+      let compliant: boolean | null = null;
+      let conductorSize = feeder.phaseConductorSize;
+      let liveLoadVA: number | null = null;
+      let designCurrentAmps: number | null = null;
+      let calcWarnings: string[] = [];
+
+      if (haveLiveData && rawFeeder!.destination_panel_id) {
+        const sourcePanel = context.rawPanels!.find(p => p.id === rawFeeder!.source_panel_id);
+        const voltage = sourcePanel?.voltage || 120;
+        const phase = (sourcePanel?.phase || 1) as 1 | 3;
+
+        liveLoadVA = computeFeederLoadVA(
+          rawFeeder!,
+          context.rawPanels!,
+          context.rawCircuits!,
+          context.rawTransformers!,
+        );
+
+        const input: FeederCalculationInput = {
+          source_voltage: voltage,
+          source_phase: phase,
+          destination_voltage: voltage,
+          destination_phase: phase,
+          total_load_va: liveLoadVA,
+          continuous_load_va: liveLoadVA * 0.8,
+          noncontinuous_load_va: liveLoadVA * 0.2,
+          distance_ft: rawFeeder!.distance_ft || 0,
+          conductor_material: (rawFeeder!.conductor_material as 'Cu' | 'Al') || 'Cu',
+          ambient_temperature_c: 30,
+          num_current_carrying: 3,
+          max_voltage_drop_percent: 3.0,
+        };
+
+        const calc = calculateFeederSizing(input);
+        voltageDropPercent = Number.isFinite(calc.voltage_drop_percent)
+          ? Math.round(calc.voltage_drop_percent * 100) / 100
+          : null;
+        compliant = voltageDropPercent !== null ? voltageDropPercent <= 3 : null;
+        conductorSize = calc.phase_conductor_size || conductorSize;
+        designCurrentAmps = Number.isFinite(calc.design_current_amps)
+          ? Math.round(calc.design_current_amps)
+          : null;
+        calcWarnings = Array.isArray(calc.warnings) ? calc.warnings : [];
+      } else if (feeder.voltageDropPercent !== undefined) {
+        // Fallback for transformer-destination feeders, or when raw rows aren't
+        // wired through (e.g., legacy callers). Keeps the answer non-stale-or-
+        // null instead of failing.
+        voltageDropPercent = Math.round(feeder.voltageDropPercent * 100) / 100;
+        compliant = feeder.voltageDropPercent <= 3;
+      }
 
       return {
         success: true,
@@ -299,15 +376,19 @@ Returns the feeder's voltage drop percentage if already calculated in the projec
           sourcePanel: feeder.sourcePanel,
           destinationPanel: feeder.destinationPanel,
           destinationTransformer: feeder.destinationTransformer,
-          conductorSize: feeder.phaseConductorSize,
-          voltageDropPercent: hasVoltageDropData ? Math.round(feeder.voltageDropPercent! * 100) / 100 : null,
-          compliant: hasVoltageDropData ? feeder.voltageDropPercent! <= 3 : null,
+          conductorSize,
+          voltageDropPercent,
+          compliant,
+          designCurrentAmps,
+          liveLoadVA: liveLoadVA !== null ? Math.round(liveLoadVA) : undefined,
+          calculationSource: haveLiveData ? 'live' : 'cached',
+          warnings: calcWarnings.length > 0 ? calcWarnings : undefined,
           necReference: 'NEC 215.2(A)(3) Informational Note No. 2 - Feeder voltage drop ≤3% recommended',
-          note: hasVoltageDropData
-            ? (feeder.voltageDropPercent! <= 3
+          note: voltageDropPercent !== null
+            ? (compliant
               ? 'Voltage drop is within the recommended 3% limit for feeders.'
               : `Voltage drop exceeds 3% recommendation. Consider increasing conductor size.`)
-            : 'Voltage drop has not been calculated for this feeder. Use the Feeder Manager to calculate.',
+            : 'Voltage drop could not be computed. Verify the destination panel exists and has circuits, or recalculate via Feeder Manager.',
         },
       };
     },

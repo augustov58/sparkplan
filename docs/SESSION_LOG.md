@@ -7,6 +7,69 @@
 
 ---
 
+### Session: 2026-05-05 / 2026-05-06 — AHJ Compliance Audit C3 + B-1 + Panel-Phase (bundled)
+
+**Focus**: Fourth session in the AHJ compliance audit Sprint 1. C1 (220.84 multi-family DF) and C2 (live-derive feeder load) were merged earlier; this session shipped the bundled C3 (project-metadata validation) + B-1 (chatTools.ts AI staleness) + a third bug (panel-schedule PDF phase column / balancing) spotted on 2026-05-06 while the user was reviewing the same packet — all three are consumer-side wiring fixes that didn't touch any calculation engine.
+
+**Status**: ✅ All three shipped on branch `fix/c3-b1-bundle`, PR #17 OPEN. 164/164 tests pass (was 138 pre-bundle, +26 new). `npm run build` exits 0 in 4.61s. Pending user visual verification on Vercel preview before merging.
+
+**Direction shift on 2026-05-06**: First C3 implementation hard-blocked PDF generation when fields were placeholder-shaped. User pushed back — contractors legitimately need draft packets with "TBD" for pre-application AHJ walk-ins. C3 was reworked into advisory-only (commit `b69a170`). Saved this preference to memory at `feedback_validation_advisory.md` so future sessions don't reintroduce hard-block validation. B-1 was unaffected.
+
+**Panel-Phase bug spotted by user on 2026-05-06**: While reviewing the regenerated audit packet, user noticed every circuit on the Unit 108 Panel page (240V single-phase split-phase) showed "Phase A" and the load summary had Phase A = total / Phase B = 0 / Phase C = 0. Investigation showed the in-app `components/PanelSchedule.tsx` view was already correct (uses `getCircuitPhase` from `services/calculations/demandFactor.ts`, alternates A/B per row pair) but the PDF at `services/pdfExport/PanelScheduleDocuments.tsx` had reinvented its own broken inline phase logic at line 323/526 (always returned 'A' for single-phase) AND `calculatePhaseBalancing` for `panelPhase === 1` lumped all load to A. Same C1/C2 pattern: correct helper exists, PDF call site bypasses it. Fixed in commit `0c7ee2d`.
+
+**Root causes (consumer-side wiring/validation, not engine bugs — same pattern as C1, C2)**:
+
+- **C3**: `lib/validation-schemas.ts:projectSchema.address` only required `.min(1)`, so `"TBD"` (3 chars) passed. `components/PermitPacketGenerator.tsx:93` checked `contractorLicense.trim().length > 0` — accepting `"test"`. There was no schema for `permitNumber` at all. AHJ-rejection risk slipped past the existing form gates because they tested for emptiness, not validity.
+- **B-1**: `services/ai/chatTools.ts:293` read `feeder.voltageDropPercent` (cached column on the `FeederSummary` exposed via `ProjectContext`). Same staleness pattern as the original C2 bug — the AI gave confident-but-wrong "Compliant. 0.00%" answers on EVSE feeders that were autopopulated before destination panel circuits existed. The `ProjectContext` summary is intentionally lossy (no `total_load_va`, `distance_ft`, etc.), so live-derive needed access to raw rows.
+
+**Work Done**:
+
+*C3 — `lib/validation-schemas.ts`*: Three new exported Zod schemas with a shared `PLACEHOLDER_VALUES` rejection list (`tbd`, `test`, `n/a`, `na`, `tba`, `todo`, `xxx`, `unknown`, case-insensitive):
+- `projectAddressSchema` — `.min(8)`, must contain at least one digit (street # or ZIP), rejects placeholder strings
+- `flContractorLicenseSchema` — `.regex(/^E[CR]\d{7}$/i)` (FL DBPR Certified or Registered), case-insensitive, rejects placeholders
+- `permitNumberSchema` — optional + nullable; if present must be ≥ 4 chars and not a placeholder
+
+The existing `projectSchema.address` now references `projectAddressSchema`.
+
+*C3 — `components/PermitPacketGenerator.tsx`*: Replaced the trivial `hasLicense = contractorLicense.trim().length > 0` with `safeParse` against all three schemas. Added per-input red-border styling + inline error text (license + permit number). Updated `canGenerate` predicate. Added a re-validation pre-flight gate inside `handleGenerate` that short-circuits with a structured "would be rejected at AHJ intake" error before invoking `generatePermitPacket(...)`. The validation warning block now enumerates every failed field with its specific Zod message and points users back to Project Setup for the address (it isn't editable in the packet form).
+
+*B-1 — `services/ai/chatTools.ts`*: Plumbed raw DB rows into `ToolContext` (new optional `rawPanels`, `rawCircuits`, `rawFeeders`, `rawTransformers` arrays). Rewrote the `calculate_feeder_voltage_drop` execute() handler (~70 lines) to:
+1. Find the feeder summary by name/ID (existing `findFeeder` helper, unchanged).
+2. Look up the corresponding raw `Feeder` row by ID in `context.rawFeeders`.
+3. Call `computeFeederLoadVA(rawFeeder, rawPanels, rawCircuits, rawTransformers)` from `services/feeder/feederLoadSync.ts` — the exact same helper the C2 PDF fix uses.
+4. Build a `FeederCalculationInput` (mirroring `services/pdfExport/VoltageDropDocuments.tsx:295-308`) and call `calculateFeederSizing(...)` from `services/calculations/feederSizing.ts`.
+5. Return live values (`voltageDropPercent`, `compliant`, `conductorSize`, `designCurrentAmps`, `liveLoadVA`, `calculationSource: 'live'`, optional warnings).
+6. Fall back to the cached summary value with `calculationSource: 'cached'` when raw rows aren't wired (legacy callers, transformer-destination feeders, or contexts where the user has no project loaded).
+
+*B-1 — `services/geminiService.ts`*: Exported new interface `AgenticRawData { panels?, circuits?, feeders?, transformers? }`. `askNecAssistantWithTools` accepts an optional `rawData?: AgenticRawData` arg that threads into ToolContext.
+
+*B-1 — `App.tsx`*: Single call site (line 511) updated to pass `{ panels, circuits, feeders, transformers }` from existing hook scope when `hasContext` is truthy. Fall-through to `undefined` keeps the AI in summary-only mode for unprojected sessions.
+
+*Tests — `tests/calculations-extended.test.ts`*: 22 new tests:
+- 21 schema acceptance/rejection cases for C3 (FL license format Cert/Reg/case-insensitive/placeholder/out-of-state/short-tail/empty; permit number undefined/empty/realistic/short/placeholder; address realistic/TBD/test/no-digits/short/empty)
+- 3 AI tool tests for B-1 (live-derive proves cached `voltageDropPercent` is ignored when raw rows are wired; cached fallback when raw rows aren't provided; regression test that the pre-B-1 stale-cache behavior is reproducible — exactly the scenario where a user without a loaded project gets the "Compliant 0%" answer they used to get)
+
+**Decisions made**:
+- **Single free-text address field, not split (street/city/state/ZIP)** — DB schema change is invasive. The `.min(8)` + digit-required + placeholder-blocklist combination rejects realistic intake failures without a migration.
+- **Reject FL-only license format at this pilot stage** — the strategic context is FL pilot per `business/STRATEGIC_ANALYSIS.md` rewrite. Non-FL contractors blocked from PDF gen until the license format check is parameterized by jurisdiction (deferred to post-pilot).
+- **Plumb raw rows alongside lossy summary** for B-1 instead of enriching `ProjectContext` — keeps the AI prompt compact (the summary is intentionally lossy for token efficiency); raw rows ride alongside as an opt-in companion bag.
+- **`calculationSource: 'live' | 'cached'` field on the tool result** — explicit so the AI can mention "based on your current project data" vs "from a cached calculation" if it wants to (also makes test assertions easier).
+
+**Key Files Touched**:
+- C3: `lib/validation-schemas.ts`, `components/PermitPacketGenerator.tsx`, `tests/calculations-extended.test.ts`
+- B-1: `services/ai/chatTools.ts`, `services/geminiService.ts`, `App.tsx`, `tests/calculations-extended.test.ts`
+- Docs: `docs/AHJ_COMPLIANCE_AUDIT_2026-05-04.md` (C3 + B-1 marked ✅ RESOLVED, Next Session Brief rewritten for C4), `docs/CHANGELOG.md` (new dated entry above the C1+C2 entry), `docs/SESSION_LOG.md` (this entry; rotated 2026-04-21 entry out per "keep last 2")
+
+**Pending / Follow-ups**:
+- Visual verification on Vercel preview — user should: (a) open project edit, set address to "TBD", then attempt to generate a permit packet → expect block with specific error; (b) open Spark Copilot on the 12-unit MF project, ask "is the MDP→EV Sub-Panel feeder voltage drop compliant?" → expect a real percentage matching the post-C2 PDF, not 0%.
+- Audit findings still open: C4 (per-EVSE branch math + EVEMS feeder math — Next Session Brief now in audit doc), C5 (PE seal workflow), all H- and M-tier findings.
+- C3 enhancement (post-pilot): parameterize `flContractorLicenseSchema` by jurisdiction so non-FL contractors aren't blocked. Currently fine — pilot is FL-only.
+
+**PRs**:
+- `fix/c3-b1-bundle` branch — pending push + PR open + Vercel preview verification.
+
+---
+
 ### Session: 2026-05-04 / 2026-05-05 — AHJ Compliance Audit + C1 + C2 Permit Packet Fixes
 
 **Focus**: Three sequential pieces of work, all driven by reviewing the SparkPlan permit-packet output against real Florida AHJ requirements:
@@ -58,62 +121,4 @@
 **PRs**:
 - #15 — C1 (merged `9c8941d`)
 - C2 PR — pending on `fix/c2-evse-feeder-aggregation` (https://github.com/augustov58/sparkplan/pull/new/fix/c2-evse-feeder-aggregation)
-
----
-
-### Session: 2026-04-21 — Panel Photo Upload: OCR Refresh + `num_spaces` Overflow Fixes
-
-**Focus**: Three sequential user bug reports, all converging on the panel photo upload surface:
-1. Upload itself was failing with an opaque "Edge Function returned a non-2xx status code" error.
-2. After fixing the upload, circuits extracted beyond the panel's slot count were silently orphaned in the database (42-circuit photo into a 30-space MDP wrote 12 invisible rows).
-3. After exposing `num_spaces` in the UI, the user correctly asked whether the same overflow class of bug existed in the manual Add Circuit and AI chat `add_circuit` paths — it did.
-
-**Status**: ✅ All three shipped in PR #12 (`ccbb55b`), merged to main. `npm run build` clean, 124/124 tests pass across three intermediate commits.
-
-**Root causes:**
-1. **OCR failure**: Google sunset `gemini-2.0-flash-exp` (the model the edge function was hardcoded to). Client-side `FunctionsHttpError` swallowed the real response body, masking the `{ error: "model not found" }` payload behind a generic wrapper.
-2. **Silent orphans**: `is_main ? 30 : 42` slot-count inference was baked into 6 call sites in 4 files, and the `handlePhotoImport` handler wrote every extracted row to the DB with no bounds check. `maxCircuits={42}` was also hardcoded on the `<PanelPhotoImporter>` prop regardless of panel.
-3. **Manual + AI overflow**: `isCircuitSlotAvailable` only checked occupancy, not bounds — a 2-pole at slot 41 on a 42-space panel reported "available" because slot 43 wasn't in the occupied set (it didn't exist). `chatTools.add_circuit` used a naive `maxCircuitNum + 1` with no occupancy scan and no num_spaces awareness.
-
-**Work Done:**
-
-*Commit 1 — `1081f02` fix(panel-ocr):*
-- `supabase/functions/gemini-proxy/index.ts` v34: accepts optional `imageMimeType` on request body, falls back to `image/jpeg`. Model: `gemini-2.0-flash-exp` → `gemini-2.5-flash`. Deployed via MCP.
-- `services/panelOcrService.ts`: passes `file.type || 'image/jpeg'` through to the edge function; reads `FunctionsHttpError.context.json()` to surface the real error body.
-- `components/PanelPhotoImporter.tsx`: passes the File's MIME type as the 4th arg to `extractCircuitsFromPhoto`.
-
-*Commit 2 — `70563d5` fix(panels) num_spaces refactor:*
-- Migration `supabase/migrations/20260421_panels_num_spaces.sql`: `ADD COLUMN num_spaces integer` → backfill `is_main ? 30 : 42` → `NOT NULL DEFAULT 42` → `CHECK (num_spaces > 0 AND num_spaces <= 84)`. Applied to prod via MCP (`success: true`).
-- `lib/database.types.ts`: added `num_spaces: number` to Row (required) + `num_spaces?: number` to Insert/Update.
-- `components/OneLineDiagram.tsx`: new `<select>` dropdowns (12/20/24/30/42/54/66/84) in both the create form (~L2665) and the edit form (~L3220). `isMain` toggle auto-defaults to 30/42 but user can override. Wired through `editingPanel`/`newPanel` state, initial reset state, create payload, update payload, and `startEditPanel`. Replaced the legacy inference at line 1295 (available-slots computation).
-- `components/PanelSchedule.tsx`: `totalSlots` derives from `num_spaces`. `maxCircuits={42}` on `<PanelPhotoImporter>` → `maxCircuits={totalSlots}`. `handlePhotoImport` rejects extracted rows whose footprint (`circuit_number + (pole-1)*2`) exceeds `totalSlots`, alerts user with count + skipped numbers.
-- `services/pdfExport/PanelScheduleDocuments.tsx`: both `maxSlots` sites (L311, L515) now read `num_spaces` with fallback.
-- `services/ai/projectContextBuilder.ts`: `PanelSummary` interface gains `numSpaces`; populated from `panel.num_spaces ?? (panel.is_main ? 30 : 42)`.
-- `services/ai/chatTools.ts`: both inference sites (L1257, L1782) replaced via `replace_all`.
-
-*Commit 3 — `67cd0c1` fix(panels): overflow guards:*
-- `components/PanelSchedule.tsx`:
-  - `isCircuitSlotAvailable`: rejects `slotNumber > totalSlots` (and `circuitNumber < 1`), not just occupancy.
-  - `getNextAvailableCircuitNumber`: caps search at `totalSlots`, returns `null` instead of sentinel 101/102.
-  - `startAddCircuit`: alerts and aborts if null.
-  - `handlePoleChange`: clears `circuitNumber` if the new pole count doesn't fit on the current side.
-  - `handleAddCircuit`: alerts and aborts if no slot fits.
-- `services/ai/chatTools.ts` `add_circuit`: replaced naive `maxCircuitNum + 1` with the `canFitCircuit`/bounded-scan pattern from `fill_panel_with_test_loads`. Builds occupancy set with multi-pole expansion, scans 1..totalSlots, returns actionable error when full.
-
-**Key Files Touched:**
-- `supabase/functions/gemini-proxy/index.ts`, `supabase/migrations/20260421_panels_num_spaces.sql`
-- `services/panelOcrService.ts`, `services/ai/chatTools.ts`, `services/ai/projectContextBuilder.ts`, `services/pdfExport/PanelScheduleDocuments.tsx`
-- `components/OneLineDiagram.tsx`, `components/PanelSchedule.tsx`, `components/PanelPhotoImporter.tsx`
-- `lib/database.types.ts`
-- `docs/CHANGELOG.md`, `docs/database-architecture.md`, `docs/SESSION_LOG.md` (this entry)
-
-**Commits (squashed into `ccbb55b` via PR #12):**
-- `1081f02` — fix(panel-ocr): replace sunset gemini-2.0-flash-exp + surface real errors
-- `70563d5` — fix(panels): add num_spaces column + eliminate 30/42 inference
-- `67cd0c1` — fix(panels): bound-check manual + AI add-circuit against num_spaces
-
-**PR:** #12 (merged, branch deleted).
-
-**Pending / Follow-ups:**
-- None known for this feature. The `num_spaces` field is now the single source of truth across the UI, DB, PDF export, AI tools, and photo importer.
 

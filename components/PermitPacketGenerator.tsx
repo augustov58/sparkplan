@@ -20,6 +20,11 @@ import { useProfile } from '../hooks/useProfile';
 import { JurisdictionSearchWizard } from './JurisdictionSearchWizard';
 import { calculateMultiFamilyEV, type MultiFamilyEVInput } from '../services/calculations/multiFamilyEV';
 import { buildMultiFamilyContext } from '../services/calculations/upstreamLoadAggregation';
+import {
+  projectAddressSchema,
+  flContractorLicenseSchema,
+  permitNumberSchema,
+} from '../lib/validation-schemas';
 
 interface PermitPacketGeneratorProps {
   projectId: string;
@@ -87,9 +92,21 @@ export const PermitPacketGenerator: React.FC<PermitPacketGeneratorProps> = ({ pr
 
   const dataLoading = panelsLoading || circuitsLoading || feedersLoading || transformersLoading || groundingLoading;
 
-  // Validation — contractor license + scope of work are both marked required
-  // in the UI (red asterisk). Gate generation on them so the submittal-quality
-  // promise holds (most AHJs reject packets missing either).
+  // C3 (advisory): Surface the AHJ-acceptable shape of these fields as soft
+  // warnings — the contractor decides whether to override. Hard-gating placeholder
+  // values like "TBD" forces fake data into draft packets used for pre-application
+  // walk-ins, which is worse than the AHJ-rejection risk we'd be preventing.
+  const licenseParse = flContractorLicenseSchema.safeParse(contractorLicense);
+  const addressParse = projectAddressSchema.safeParse(currentProject?.address ?? '');
+  const permitParse = permitNumberSchema.safeParse(permitNumber);
+  const licenseAdvisory = !licenseParse.success ? licenseParse.error.issues[0]?.message : undefined;
+  const addressAdvisory = !addressParse.success ? addressParse.error.issues[0]?.message : undefined;
+  const permitAdvisory = !permitParse.success ? permitParse.error.issues[0]?.message : undefined;
+  const hasAnyAdvisory = !!(licenseAdvisory || addressAdvisory || permitAdvisory);
+
+  // Hard gates: these prevent runtime crashes (no panels = empty packet, no
+  // license input at all = key submittal field literally missing). Format
+  // shape is advisory only.
   const hasLicense = contractorLicense.trim().length > 0;
   const hasScope = scopeOfWork.trim().length > 0;
   const canGenerate =
@@ -346,10 +363,10 @@ export const PermitPacketGenerator: React.FC<PermitPacketGeneratorProps> = ({ pr
               type="text"
               value={contractorLicense}
               onChange={(e) => setContractorLicense(e.target.value)}
-              placeholder="e.g., C-10 #123456"
+              placeholder="e.g., EC1234567"
               className="w-full border border-gray-200 rounded px-3 py-2 text-sm focus:border-[#2d3b2d] focus:ring-2 focus:ring-[#2d3b2d]/20/20 outline-none"
             />
-            <p className="text-xs text-gray-500 mt-1">Required by most jurisdictions</p>
+            <p className="text-xs text-gray-500 mt-1">FL DBPR format: EC####### or ER####### (heads-up only — packet still generates)</p>
           </div>
         </div>
 
@@ -620,7 +637,7 @@ export const PermitPacketGenerator: React.FC<PermitPacketGeneratorProps> = ({ pr
         </button>
       </div>
 
-      {/* Validation Warnings */}
+      {/* Hard-gate warnings — block PDF generation */}
       {!canGenerate && !dataLoading && (
         <div className="bg-[#fff8e6] border border-[#c9a227]/40 rounded-lg p-4">
           <div className="flex gap-3">
@@ -632,6 +649,28 @@ export const PermitPacketGenerator: React.FC<PermitPacketGeneratorProps> = ({ pr
                 {!hasLicense && <li>Contractor License is required</li>}
                 {!hasScope && <li>Scope of Work is required</li>}
               </ul>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Advisory warnings — heads-up only, packet still generates */}
+      {canGenerate && hasAnyAdvisory && (
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+          <div className="flex gap-3">
+            <Info className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" />
+            <div className="text-sm text-blue-900">
+              <p className="font-medium mb-1">Heads up — these may cause AHJ intake friction</p>
+              <ul className="list-disc list-inside space-y-1 text-blue-800">
+                {addressAdvisory && (
+                  <li>Project address: {addressAdvisory} (edit in Project Setup)</li>
+                )}
+                {licenseAdvisory && <li>Contractor License: {licenseAdvisory}</li>}
+                {permitAdvisory && <li>Permit Number: {permitAdvisory}</li>}
+              </ul>
+              <p className="text-xs text-blue-700 mt-2">
+                Packet will still generate — these are informational only. Florida AHJs typically reject submittals with placeholder values like "TBD" or "test" on intake.
+              </p>
             </div>
           </div>
         </div>
