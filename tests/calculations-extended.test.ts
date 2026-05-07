@@ -1549,3 +1549,81 @@ describe('AI Chat Tool: calculate_feeder_voltage_drop — live-derive (B-1)', ()
     expect(data.compliant).toBe(true);
   });
 });
+
+// ============================================================================
+// PANEL SCHEDULE PDF — PHASE BALANCING ON SPLIT-PHASE PANELS (PDF-PHASE FIX)
+// ============================================================================
+// Regression test for the report-only bug: every circuit on a 240V single-phase
+// (split-phase 1Φ-3W) panel was rendered as "Phase A" in the PDF. The phase
+// column rendering AND the bottom-of-page phase-balance summary both lumped
+// everything to A, leaving B/C empty. The in-app PanelSchedule.tsx view was
+// already correct (uses getCircuitPhase); the PDF had reinvented its own
+// inline phase logic with `panel.phase === 1 ? 'A' : ...` always returning A.
+//
+// Fixture mirrors the audit packet's "Unit 108 Panel" page exactly:
+// 200 A bus, 240 V single-phase, 11 circuits including 4 multi-pole 240 V loads.
+
+import { calculatePhaseBalancing } from '../services/pdfExport/PanelScheduleDocuments';
+
+describe('Panel schedule PDF — split-phase balancing (PDF-PHASE fix)', () => {
+  // The exact mix from the Unit 108 Panel page in the audit packet.
+  const unit108Circuits = [
+    { id: 'c1', circuit_number: 1, description: 'Kitchen Small Appliance #1', breaker_amps: 20, pole: 1, load_watts: 1500 },
+    { id: 'c2', circuit_number: 2, description: 'Kitchen Small Appliance #2', breaker_amps: 20, pole: 1, load_watts: 1500 },
+    { id: 'c3', circuit_number: 3, description: 'Laundry', breaker_amps: 20, pole: 1, load_watts: 1500 },
+    { id: 'c4', circuit_number: 4, description: 'Bathroom(s)', breaker_amps: 20, pole: 1, load_watts: 1500 },
+    { id: 'c5', circuit_number: 5, description: 'General Lighting', breaker_amps: 15, pole: 1, load_watts: 1350 },
+    { id: 'c6', circuit_number: 6, description: 'General Lighting #2', breaker_amps: 15, pole: 1, load_watts: 1350 },
+    { id: 'c7', circuit_number: 7, description: 'Range/Oven', breaker_amps: 70, pole: 2, load_watts: 12000 },
+    { id: 'c8', circuit_number: 8, description: 'Clothes Dryer', breaker_amps: 30, pole: 2, load_watts: 5500 },
+    { id: 'c11', circuit_number: 11, description: 'A/C Condensing Unit', breaker_amps: 30, pole: 2, load_watts: 5000 },
+    { id: 'c12', circuit_number: 12, description: 'Water Heater', breaker_amps: 25, pole: 2, load_watts: 4500 },
+    { id: 'c15', circuit_number: 15, description: 'Disposal', breaker_amps: 20, pole: 1, load_watts: 500 },
+  ] as unknown as Circuit[];
+
+  it('REGRESSION: split-phase panel must distribute load across both legs (not lump to A)', () => {
+    const result = calculatePhaseBalancing(unit108Circuits, 1);
+
+    // Both legs must carry real load. Pre-fix: phaseB_VA was 0.
+    expect(result.phaseA_VA).toBeGreaterThan(0);
+    expect(result.phaseB_VA).toBeGreaterThan(0);
+    expect(result.phaseC_VA).toBe(0); // no C on split-phase
+
+    // Total preserved across the redistribution.
+    const totalConnected = unit108Circuits.reduce((s, c) => s + (c.load_watts || 0), 0);
+    expect(result.phaseA_VA + result.phaseB_VA).toBe(totalConnected);
+  });
+
+  it('places 1-pole loads on the correct leg per slot position', () => {
+    // Slots 1-2 → A. Slots 3-4 → B. Slots 5-6 → A. Slot 15 → row 8 → B.
+    // 1-pole-only check: drop the 2-pole circuits to isolate the wiring rule.
+    const onePoleOnly = unit108Circuits.filter(c => c.pole === 1);
+    const result = calculatePhaseBalancing(onePoleOnly, 1);
+
+    // Phase A = Kitchen #1 (1500) + Kitchen #2 (1500) + GL (1350) + GL #2 (1350) = 5700
+    // Phase B = Laundry (1500) + Bathroom (1500) + Disposal (500) = 3500
+    expect(result.phaseA_VA).toBe(5700);
+    expect(result.phaseB_VA).toBe(3500);
+  });
+
+  it('splits 2-pole 240V loads 50/50 across both legs (NEC physics: span both stabs)', () => {
+    // Strip the 1-pole circuits to isolate the 2-pole behavior. A 240 V load
+    // by definition draws across both phases — must NOT pile onto one leg.
+    const twoPoleOnly = unit108Circuits.filter(c => c.pole === 2);
+    const total = twoPoleOnly.reduce((s, c) => s + (c.load_watts || 0), 0);
+    const result = calculatePhaseBalancing(twoPoleOnly, 1);
+
+    expect(result.phaseA_VA).toBe(total / 2);
+    expect(result.phaseB_VA).toBe(total / 2);
+  });
+
+  it('produces a reasonably balanced result for the audit panel (max imbalance ≤ 25%)', () => {
+    const result = calculatePhaseBalancing(unit108Circuits, 1);
+    const total = result.phaseA_VA + result.phaseB_VA;
+    const imbalance = Math.abs(result.phaseA_VA - result.phaseB_VA) / total;
+    // The Unit 108 Panel layout produces ~12% imbalance — far short of the
+    // 100% imbalance the broken code reported (everything on A, B at 0).
+    expect(imbalance).toBeLessThan(0.25);
+  });
+});
+
