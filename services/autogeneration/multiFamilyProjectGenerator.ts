@@ -21,6 +21,8 @@ import type { Database } from '@/lib/database.types';
 import type { MultiFamilyEVResult, EVCapacityScenario, CommonAreaLoadItem } from '@/services/calculations/multiFamilyEV';
 import { calculateCommonAreaLoads } from '@/services/calculations/multiFamilyEV';
 import { generateCustomEVPanel, type CustomEVPanelConfig } from '@/data/ev-panel-templates';
+import { calculateSingleFamilyLoad } from '@/services/calculations/residentialLoad';
+import type { ResidentialAppliances } from '@/types';
 
 type PanelInsert = Database['public']['Tables']['panels']['Insert'];
 type CircuitInsert = Database['public']['Tables']['circuits']['Insert'];
@@ -906,10 +908,47 @@ function generateSingleUnitPanel(
     });
   }
 
-  // Size unit panel - dwelling unit panels are typically 100A or 125A
-  const totalLoad = circuits.reduce((sum, c) => sum + c.load_watts, 0);
-  const loadAmps = totalLoad / (voltage === 208 ? 208 : 240);
-  const unitPanelRating = roundUpToStandardSize(Math.ceil(loadAmps * 1.25), [100, 125, 150, 200]);
+  // Size unit panel using NEC 220.82 Optional Method demand × 1.25 (NEC 215.2(A)(1)
+  // continuous-load factor). Pre-fix: this used RAW connected sum × 1.25, which
+  // ignored NEC 220.82's tiered demand factor (first 10 kVA @ 100%, rest @ 40%)
+  // and the NEC 220.60 non-coincident A/C-vs-heat rule, producing 150-200A
+  // panels for typical apartments where NEC says 100A is correct.
+  const unitVoltage = voltage === 208 ? 208 : 240;
+  const appliancesForCalc: ResidentialAppliances = {
+    range: hasElectricCooking
+      ? { enabled: true, kw: applianceConfig?.rangeKW ?? 8, type: 'electric' }
+      : { enabled: false, kw: 0, type: 'gas' },
+    dryer: applianceConfig?.dryerKW
+      ? { enabled: true, kw: applianceConfig.dryerKW, type: 'electric' }
+      : { enabled: false, kw: 0, type: 'gas' },
+    waterHeater: applianceConfig?.waterHeaterKW
+      ? { enabled: true, kw: applianceConfig.waterHeaterKW, type: 'electric' }
+      : { enabled: true, kw: 4.5, type: 'electric' },
+    hvac: {
+      enabled: true,
+      type: hasElectricHeat ? 'heat_pump' : 'ac_only',
+      coolingKw: applianceConfig?.coolingKW ?? 3.5,
+      heatingKw: hasElectricHeat ? (applianceConfig?.heatingKW ?? 5) : 0,
+    },
+    dishwasher: applianceConfig?.dishwasherKW
+      ? { enabled: true, kw: applianceConfig.dishwasherKW }
+      : { enabled: false, kw: 0 },
+    disposal: applianceConfig?.disposalKW
+      ? { enabled: true, kw: applianceConfig.disposalKW }
+      : { enabled: false, kw: 0 },
+  };
+  const necDemand = calculateSingleFamilyLoad({
+    squareFootage: sqFt,
+    smallApplianceCircuits: 2,
+    laundryCircuit: true,
+    appliances: appliancesForCalc,
+    serviceVoltage: unitVoltage,
+  });
+  const demandAmps = necDemand.totalDemandVA / unitVoltage;
+  const unitPanelRating = roundUpToStandardSize(
+    Math.ceil(demandAmps * 1.25),
+    [100, 125, 150, 200],
+  );
 
   const panel: Omit<PanelInsert, 'id'> = {
     project_id: projectId,

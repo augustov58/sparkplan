@@ -435,15 +435,24 @@ export async function addEVInfrastructure(
       for (const epId of evPanelIds) {
         await supabase.from('feeders').delete().eq('destination_panel_id', epId);
       }
-      // Delete EV meters
-      for (const epId of evPanelIds) {
-        await supabase.from('meters').delete().eq('panel_id', epId);
-      }
       // Delete the EV panels themselves
       for (const epId of evPanelIds) {
         await supabase.from('panels').delete().eq('id', epId);
       }
     }
+
+    // Delete ALL existing EV meters in this project — both panel-linked and
+    // orphans (meters with meter_type='ev' but panel_id null because the
+    // panel was deleted some other way). Pre-fix: only meters with panel_id
+    // = <evPanelId> were deleted, so orphans accumulated across re-runs of
+    // this orchestrator and showed up as duplicate "EV Meter" rows on the
+    // meter stack. Multi-family projects only ever have one EV bank, so
+    // delete-all-then-recreate-one is the right semantic.
+    await supabase
+      .from('meters')
+      .delete()
+      .eq('project_id', projectId)
+      .eq('meter_type', 'ev');
 
     // ================================================================
     // Step 4: Create EV Panel + Circuits + Meter

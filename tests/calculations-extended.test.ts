@@ -62,6 +62,9 @@ import {
 // ── EV Panel Templates (NEC 220.57 / 625.42) ───────────────────────────────
 import { generateCustomEVPanel } from '../data/ev-panel-templates';
 
+// ── Multi-Family Autogen (NEC 220.82 unit panel sizing) ────────────────────
+import { generateBasicMultiFamilyProject } from '../services/autogeneration/multiFamilyProjectGenerator';
+
 // ── Upstream Load Aggregation (NEC 220.40 + 220.84 Optional Method) ─────────
 import {
   calculateAggregatedLoad,
@@ -1742,6 +1745,38 @@ describe('C4 — Per-EVSE branch row VA (NEC 220.57)', () => {
         },
       });
       expect(result.panel.bus_rating).toBe(400);
+    });
+
+    it('unit panel sizing uses NEC 220.82 demand × 1.25 (not raw connected × 1.25)', () => {
+      // Typical apartment: 1000 sqft, electric range + A/C + water heater.
+      // Pre-fix: raw connected sum × 1.25 ≈ 130A → 150A panel (oversized).
+      // Post-fix: NEC 220.82 demand × 1.25 ≈ 95A → 100A panel (NEC-correct).
+      // The 220.82 Optional Method puts the first 10 kVA at 100% and the rest
+      // at 40%, then adds the larger of A/C vs heating at 100% per NEC 220.60.
+      const result = generateBasicMultiFamilyProject({
+        projectId: 'proj-unit-sizing',
+        voltage: 240,
+        phase: 1,
+        dwellingUnits: 4,
+        avgUnitSqFt: 1000,
+        serviceAmps: 600,
+        commonAreaLoadVA: 5000,
+        hasElectricCooking: true,
+        hasElectricHeat: false,
+        applianceConfig: {
+          rangeKW: 8,
+          waterHeaterKW: 4.5,
+          coolingKW: 3.5,
+        },
+      });
+
+      expect(result.unitPanels.length).toBeGreaterThan(0);
+      for (const unitPanel of result.unitPanels) {
+        // 100A is the NEC-correct rating for the typical apartment.
+        // Pre-fix this returned 150A or 200A.
+        expect(unitPanel.bus_rating).toBeLessThanOrEqual(125);
+        expect(unitPanel.main_breaker_amps).toBe(unitPanel.bus_rating);
+      }
     });
 
     it('EVEMS marker circuit is detectable + filterable by isEVEMSMarkerCircuit', () => {

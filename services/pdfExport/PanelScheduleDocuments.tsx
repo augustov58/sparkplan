@@ -230,7 +230,14 @@ export const PanelSchedulePages: React.FC<PanelSchedulePDFProps> = ({
   projectAddress,
   datePreppared,
 }) => {
-  const sortedCircuits = [...circuits].sort(
+  // Filter EVEMS metadata marker circuits — they convey the NEC 625.42
+  // setpoint to the load aggregator but aren't physical branches; rendering
+  // them on a "20A 2P" placeholder breaker with a 47 kVA load looks like a
+  // code violation to an AHJ reviewer. The setpoint is shown separately in
+  // its own info block below the Load Summary.
+  const realCircuits = circuits.filter(c => !isEVEMSMarkerCircuit(c));
+  const evemsSetpointMarker = findEVEMSSetpointMarker(panel.id, circuits);
+  const sortedCircuits = [...realCircuits].sort(
     (a, b) => a.circuit_number - b.circuit_number
   );
 
@@ -433,6 +440,31 @@ export const PanelSchedulePages: React.FC<PanelSchedulePDFProps> = ({
             )}
           </View>
         </View>
+
+        {/* NEC 625.42 EVEMS Setpoint callout — visible to AHJ reviewers */}
+        {evemsSetpointMarker && evemsSetpointMarker.load_watts && evemsSetpointMarker.load_watts > 0 && (
+          <View style={styles.summarySection}>
+            <Text style={styles.summaryTitle}>EVEMS Aggregate Setpoint (NEC 625.42)</Text>
+            <View style={styles.summaryGrid}>
+              <View style={styles.summaryItem}>
+                <Text style={styles.summaryLabel}>Setpoint</Text>
+                <Text style={styles.summaryValue}>
+                  {(evemsSetpointMarker.load_watts / 1000).toFixed(1)} kVA
+                </Text>
+              </View>
+              <View style={styles.summaryItem}>
+                <Text style={styles.summaryLabel}>Setpoint Amps</Text>
+                <Text style={styles.summaryValue}>
+                  {(
+                    evemsSetpointMarker.load_watts /
+                    (panel.voltage * (panel.phase === 3 ? Math.sqrt(3) : 1))
+                  ).toFixed(1)}
+                  A
+                </Text>
+              </View>
+            </View>
+          </View>
+        )}
 
         <BrandFooter projectName={projectName} />
       </Page>
