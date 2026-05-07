@@ -632,18 +632,30 @@ function generateEVPanel(
     chargerType = 'DC Fast Charge (150kW)';
   }
 
-  // NEC 625.42: Use scenario's computed per-charger power (accounts for building load + house panel)
-  // Fall back to 50% simultaneous if no scenario power available
-  const evemsLoadVAPerCharger = (useEVEMS && scenario.powerPerCharger_kW)
-    ? Math.round(scenario.powerPerCharger_kW * 1000)
-    : undefined;
+  // NEC 220.57(A) + 625.40: Branch-circuit conductors and per-EVSE branch
+  // loads are nameplate (full continuous) regardless of EVEMS. NEC 625.42
+  // EVEMS reduction is applied downstream at the feeder/service level via
+  // `calculateAggregatedLoad` clamping demand to the explicit setpoint
+  // marker emitted alongside the EV branches.
+  //
+  // The setpoint we pass through is `scenario.powerPerCharger_kW × 1000 ×
+  // numChargers` — the multi-family EV calculator's `withEVEMS` scenario
+  // value (`actualKWPerChargerWithEVEMS × numChargers` from
+  // `services/calculations/multiFamilyEV.ts`). For our 12-charger fixture
+  // with ~48 kVA available capacity, this resolves to ~3.6 kW × 12 ≈ 43 kVA
+  // — the actual managed maximum demand, not the panel breaker capacity
+  // (which is sized to ≥ setpoint and rounded to a standard size).
+  const evemsSetpointVA =
+    useEVEMS && scenario.powerPerCharger_kW
+      ? Math.round(scenario.powerPerCharger_kW * 1000 * chargerCount)
+      : undefined;
 
   const config: CustomEVPanelConfig = {
     chargerType,
     numberOfChargers: chargerCount,
     useEVEMS,
     simultaneousChargers: useEVEMS ? Math.ceil(chargerCount * 0.5) : undefined,
-    evemsLoadVAPerCharger,
+    evemsSetpointVA,
     includeSpare: true,
     includeLighting: true,
     panelName: 'EV Sub-Panel',
@@ -894,10 +906,48 @@ function generateSingleUnitPanel(
     });
   }
 
-  // Size unit panel - dwelling unit panels are typically 100A or 125A
-  const totalLoad = circuits.reduce((sum, c) => sum + c.load_watts, 0);
-  const loadAmps = totalLoad / (voltage === 208 ? 208 : 240);
-  const unitPanelRating = roundUpToStandardSize(Math.ceil(loadAmps * 1.25), [100, 125, 150, 200]);
+  // Size unit panel using NEC 220.82 Optional Method demand × 1.25 (NEC 215.2(A)(1)
+  // continuous-load factor). The existing `calculateSingleFamilyLoad` claims
+  // 220.82 but actually implements the Standard Method (220.40 + individual
+  // demand factors per appliance), which produces a ~30% larger demand value
+  // and consequently oversized panels. Inline the true Optional Method here:
+  //
+  //   General loads = lighting + SA + laundry + nameplate appliances
+  //                   (range, dryer, WH, dishwasher, disposal — NOT A/C or heat)
+  //   General demand = first 10 kVA @ 100%, remainder @ 40%
+  //   + largest of A/C vs heat @ 100% per NEC 220.60 non-coincident
+  //   Total demand × 1.25 → panel ampacity per NEC 215.2(A)(1)
+  //
+  // For our user's typical apartment (12 kW range + 5.5 kW dryer + 4.5 kW WH
+  // + 5 kW A/C + 0.5 kW disposal, 900 sqft):
+  //   General = 2.7 + 3.0 + 1.5 + 12 + 5.5 + 4.5 + 0.5 = 29.7 kVA
+  //   General demand = 10 + (29.7-10)*0.4 = 17.88
+  //   + A/C 5 = 22.88 kVA
+  //   22.88/240 × 1.25 = 119 A → 125 A panel.
+  const unitVoltage = voltage === 208 ? 208 : 240;
+  const necLightingVA = sqFt * 3;
+  const smallApplianceVA = 2 * 1500;
+  const laundryVA = 1500;
+  const rangeVA = hasElectricCooking ? (applianceConfig?.rangeKW ?? 8) * 1000 : 0;
+  const dryerVA = applianceConfig?.dryerKW ? Math.max(applianceConfig.dryerKW * 1000, 5000) : 0;
+  const whVA = (applianceConfig?.waterHeaterKW ?? 4.5) * 1000;
+  const dishwasherVA = (applianceConfig?.dishwasherKW ?? 0) * 1000;
+  const disposalVA = (applianceConfig?.disposalKW ?? 0) * 1000;
+  const generalLoadsVA =
+    necLightingVA + smallApplianceVA + laundryVA +
+    rangeVA + dryerVA + whVA + dishwasherVA + disposalVA;
+  const generalDemandVA = generalLoadsVA <= 10_000
+    ? generalLoadsVA
+    : 10_000 + (generalLoadsVA - 10_000) * 0.4;
+  const acVA = (applianceConfig?.coolingKW ?? 3.5) * 1000;
+  const heatVA = hasElectricHeat ? ((applianceConfig?.heatingKW ?? 5) * 1000) : 0;
+  const climateDemandVA = Math.max(acVA, heatVA);
+  const necOptionalDemandVA = generalDemandVA + climateDemandVA;
+  const demandAmps = necOptionalDemandVA / unitVoltage;
+  const unitPanelRating = roundUpToStandardSize(
+    Math.ceil(demandAmps * 1.25),
+    [100, 125, 150, 200],
+  );
 
   const panel: Omit<PanelInsert, 'id'> = {
     project_id: projectId,

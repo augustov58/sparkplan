@@ -113,17 +113,29 @@ The "Florida Permit Mode" wedge described in `business/STRATEGIC_ANALYSIS.md` is
 - **Visual verification still required:** User opens Spark Copilot, asks "is the MDP→EV Sub-Panel feeder voltage drop compliant?" on the 12-unit MF project — answer should match what the regenerated PDF shows post-C2 (live ~210 A current, real conductor size, real VD%) instead of `0%`.
 - **NEC references:** 215.2(A)(1) feeder ampacity; 215.2(A)(3) Informational Note No. 2 (feeder VD ≤ 3% recommendation); 240.4(D) small-conductor protection
 
-#### **C4 — NEC 625.42 EVEMS sizing math doesn't reconcile**
+#### **C4 — NEC 625.42 EVEMS sizing math doesn't reconcile** ✅ RESOLVED 2026-05-06
 
-- **Symptom:** Page 14 EV sub-panel schedule shows 12 chargers at `3,996 VA` each. EVEMS LMS line item shows `500 VA`.
-- **Expected math:** Each EVSE breaker is 60 A 2P @ 48 A continuous = 11,520 VA connected. NEC 220.57 requires per-EVSE load = `max(7,200 VA, nameplate)`.
-- **What looks wrong:** 3,996 × 12 = 47,952 ≈ what an EVEMS aggregate setpoint might be. Engine appears to be dividing the EVEMS-managed total by 12 and writing that into each branch circuit row. EVEMS load reduction applies to the **feeder/service**, not the **branch circuit conductor sizing**. Branch conductors must still handle continuous 60 A.
-- **CLAUDE.md alignment:** "EVEMS Sizing (NEC 625.42) — Size to setpoint, not full connected load. EVEMS allows service capacity reduction." Correctly applied at feeder; misapplied at branch.
-- **Code locations to inspect:**
-  - `services/calculations/evCharging.ts` (NEC 220.57 per-EVSE)
-  - `services/calculations/evemsLoadManagement.ts` (NEC 625.42 aggregate setpoint)
-  - `components/PanelSchedule.tsx` — what value is rendered into the branch row?
-- **NEC references:** 220.57 (EVSE load), 625.42 (EVEMS), 220.18 (branch-circuit load), 210.19 (continuous 125%)
+- **Symptom (pre-fix):** Page 14 EV sub-panel schedule showed 12 chargers at `3,996 VA` each. `3,996 × 12 = 47,952` ≈ what the EVEMS aggregate setpoint should be — i.e. the EVEMS feeder-level reduction was being collapsed onto branch circuits, where it doesn't belong per NEC 625.40 + 210.19 (branch conductors must handle continuous nameplate regardless of EVEMS).
+- **Reclassified after code verification:** Same consumer-side wiring class as C1, C2, B-1, and C6. The NEC 220.57 per-EVSE engine in `services/calculations/multiFamilyEV.ts:526-532` (`calculatePerEVSELoad(nameplateAmps, voltage)` returns `max(7,200 VA, V × I)`) was already correct. The bug was at autogeneration time: `data/ev-panel-templates.ts:531-535` had a `useEVEMS && evemsLoadVAPerCharger` override that wrote the EVEMS-managed *per-charger share* (e.g. `scenario.powerPerCharger_kW × 1000` — the diversified theoretical-share-of-available-capacity from the multi-family EV calculator) into each branch circuit's `loadVA`, instead of full nameplate. `services/autogeneration/multiFamilyProjectGenerator.ts:637-639` was the call site computing that override value. Net effect: the page-14 PDF wasn't doing any wrong arithmetic — it was correctly displaying what was already wrongly persisted into `circuits.load_watts` at autogen time.
+- **Why the secondary C4 symptom ("EVEMS aggregate row shows 500 VA — way too low") is a misread:** The 500 VA row labelled "EVEMS Load Management System" is the EVEMS controller's own auxiliary control-power circuit (a 240V 20A circuit feeding the EVEMS device itself), not an aggregate-setpoint display. C4 leaves that row at 500 VA — which is correct for what it actually represents. A separate EVEMS-narrative artifact (audit finding **H10**) is what an AHJ reviewer needs for setpoint visibility, and that's a Sprint-2 generator, not a calc fix.
+- **Why simply removing the override would have regressed the C1 multi-family service-sizing fix:** `buildMultiFamilyContext` collected the EV panel's `totalConnectedVA` and used it as `evLoadVA` in the MDP-level NEC 220.84 calc, which is added back at 100% per NEC 625.42 (excluded from the 220.84 dwelling base). With branches at the (broken) EVEMS-shared value, `evLoadVA` was accidentally close to the EVEMS setpoint, so the MDP's service demand happened to come out approximately right by canceling errors. After raising branches to nameplate (the correct NEC 220.57 value), `evLoadVA` would become ~138 kVA instead of ~48 kVA — which would over-recommend the service by ~15%. So C4 also needed an explicit feeder/service-level EVEMS reduction path that doesn't rely on branch-row inflation.
+- **Fix shape (three-pronged, second prong added during user review of in-app panel summary):**
+  1. **Branch row VA = nameplate, always.** `data/ev-panel-templates.ts:531-535` rewritten to `circuitLoadVA = max(7_200, loadVA)` per NEC 220.57(A) — `useEVEMS` no longer affects branch circuit load. The deprecated `evemsLoadVAPerCharger` config field is left in the type for backward-compat but explicitly documented as ignored. `services/autogeneration/multiFamilyProjectGenerator.ts:637-639` no longer computes that override.
+  2. **Explicit EVEMS setpoint marker circuit (NEC 625.42).** When `useEVEMS` is on, the autogen template now emits a metadata-only "EVEMS Aggregate Setpoint (NEC 625.42)" circuit whose `loadVA` carries the calculator's exact setpoint (`scenario.powerPerCharger_kW × 1000 × numChargers`). `services/autogeneration/multiFamilyProjectGenerator.ts:generateEVPanel` computes and threads it through. The load aggregator excludes this circuit from connected-load sums (`collectCircuitLoads` + `directConnected` reducer in `collectAllDownstreamLoads`) — it's a metadata marker, not a real branch load. Legacy projects (those generated before the marker existed, with only the 500 VA "EVEMS Load Management System" placeholder) still get detected as EVEMS-managed and clamped via a panel-breaker upper-bound proxy as a backward-compat fallback.
+  3. **NEC 625.42 EVEMS clamp at the feeder/service level.** `services/calculations/upstreamLoadAggregation.ts` gained `isEVEMSManagedPanel(panelId, circuits)` (matches either the new "Aggregate Setpoint" or legacy "Load Management System" description) and `evemsSetpointVA(panel, circuits)` (reads `load_watts` from the explicit setpoint marker; falls back to `panel.main_breaker_amps × voltage` for legacy projects). `calculateAggregatedLoad` clamps `totalDemandVA` to that setpoint when `totalDemandVA > setpointVA` and pushes a `NEC 625.42 (EVEMS — feeder demand clamped to setpoint)` row into the breakdown. The `MultiFamilyContext` interface gained an `evDemandVA?` field so the MDP-level calc can subtract raw connected EV (`evLoadVA`) from the dwelling base while adding back the EVEMS-clamped demand (`evDemandVA`) at 100% per NEC 625.42 — basis-consistent on both sides of the equation. `buildMultiFamilyContext` populates both fields by reading both `result.totalConnectedVA` and `result.totalDemandVA` from each EV panel.
+- **In-app panel-summary display fix (added during user review):** `components/PanelSchedule.tsx` previously switched to `aggregatedLoad.totalDemandVA` only when the panel had downstream sub-panels (i.e. MDP-style). For an EVEMS-managed leaf panel like the EV Sub-Panel (no downstream panels, just branch chargers), the "Direct Demand Load" / "Demand Amps" cards were rendering raw nameplate-sum values (e.g. 140.5 kVA / 585.6 A on a 400A panel — visibly wrong to the user). The condition is now broader: prefer aggregated demand whenever it's smaller than the direct demand (i.e. a clamp engaged), with a small "(NEC 625.42 EVEMS)" annotation so the AHJ reviewer / contractor knows why. After the explicit setpoint mechanism (prong 2) lands, the EV Sub-Panel summary on the audit fixture shows ~48 kVA / ~200 A (well within the 400A breaker), matching the calculator's intent.
+- **Why detect EVEMS via circuit description rather than a panel column?** Avoids a DB migration. The autogen template is the only producer of EV-bank panels with an EVEMS marker circuit, and it always emits one of the two stable description strings. Future follow-up F4: add an explicit `panel.is_evems_managed` boolean + `panel.evems_setpoint_va` integer when the schema is next touched, then collapse the heuristic.
+- **Why panel.main_breaker_amps × voltage is only a fallback, not the primary mechanism:** The autogen sizes the panel main breaker to `simultaneousChargers × breakerSize` rounded UP to the next standard panel size — so 6 simultaneous × 60A breakers = 360A → 400A panel, while the actual EVEMS setpoint may be ~48 kVA (≈ 200A) when limited by available service capacity. The breaker × voltage gives 96 kVA — over by ~2x. This was the source of the user-reported issue ("MDP shows 1199 A on a 1000 A panel"): with the proxy at 96 kVA, MDP demand totaled 287.9 kVA / 1199 A; with the explicit setpoint at ~48 kVA, MDP demand totals 239.9 kVA / 999 A — fits within the 1000A breaker as the calculator intended. The proxy is preserved only as a backward-compat path for projects generated before the explicit marker existed.
+- **Files modified:**
+  - `data/ev-panel-templates.ts` — branch `loadVA = max(7,200, V × I)`; new `evemsSetpointVA?` field on `CustomEVPanelConfig`; conditional emission of "EVEMS Aggregate Setpoint (NEC 625.42)" marker circuit when setpoint is provided; deprecated `evemsLoadVAPerCharger` field
+  - `services/autogeneration/multiFamilyProjectGenerator.ts` — `generateEVPanel` computes `evemsSetpointVA = scenario.powerPerCharger_kW × 1000 × chargerCount` and threads it through to the template
+  - `services/calculations/upstreamLoadAggregation.ts` — added `isEVEMSManagedPanel`, `isEVEMSMarkerCircuit`, `isEVEMSExplicitSetpointMarker`, `evemsSetpointVA`; `evDemandVA` field on `MultiFamilyContext`; NEC 625.42 clamp inside `calculateAggregatedLoad` (both standard NEC 220 path and 220.84 multi-family path); `collectCircuitLoads` + `directConnected` reducer skip EVEMS marker circuits; `buildMultiFamilyContext` populates both `evLoadVA` and `evDemandVA`
+  - `components/PanelSchedule.tsx` — panel-summary "Direct Demand Load" + "Demand Amps" cards prefer `aggregatedLoad.totalDemandVA` when smaller than local `demandResult.totalDemandLoad_kVA × 1000` (clamp engaged); inline "(NEC 625.42 EVEMS)" annotation when the clamp is active
+  - `tests/calculations-extended.test.ts` — 9 new tests: 4× branch row VA (12-charger EVEMS = 11,520 each, non-EVEMS = 11,520, NEC 220.57 7,200 floor, EVEMS controller stays 500 VA); 4× feeder clamp (clamps to explicit setpoint marker when present, clamps via legacy panel-breaker proxy when only "EVEMS Load Management System" placeholder, no clamp without marker, no clamp when already under setpoint); 1× MDP combined NEC 220.84 + 625.42 — full audit fixture totals 239.9 kVA ≈ 999 A which fits within the 1000A panel
+- **Commercial-impact verification:** Non-EVEMS EV panels (no marker circuit): no clamp applied. Non-EV panels (residential, commercial, industrial): no marker possible. The standard NEC 220 cascade is unchanged for any panel without an EVEMS marker. Confirmed by the `does NOT clamp when no EVEMS marker circuit` test.
+- **Test results:** 173/173 vitest pass (was 164 pre-fix, +9 new). `npm run build` exits 0 in 4.58s.
+- **Visual verification still required:** User must regenerate the example permit packet from the same 12-unit MF + EVEMS project (so the new explicit setpoint marker is emitted into the EV Sub-Panel) and confirm: PDF page 14 shows each EV charger branch circuit at **11,520 VA** (was 3,996 VA); the metadata row now reads **"EVEMS Aggregate Setpoint (NEC 625.42)"** with the calculator's actual setpoint VA (was misleading "EVEMS Load Management System" at 500 VA, which the audit doc itself flagged as too low to be plausible); the in-app EV Sub-Panel summary shows **~48 kVA / ~200 A** Demand Amps (was 140.5 kVA / 585.6 A); the in-app MDP Aggregated Load shows ~239.9 kVA / ~999 A (was 287.9 kVA / 1199.4 A — over the 1000A panel). The MDP→EV Sub-Panel feeder voltage-drop entry on page 8 should now size to ~48 kVA / ~200 A.
+- **NEC references:** 220.57(A) (per-EVSE branch-circuit load = max(7,200 VA, nameplate)); 625.40 (branch conductors at 125% continuous); 625.42 (EVEMS — feeder/service may be sized to managed setpoint); 220.18 (branch-circuit load); 210.19 (branch conductor 125% continuous)
 
 #### **C5 — No PE seal workflow output anywhere in the packet**
 
@@ -235,7 +247,7 @@ EVEMS narrative content requirements (H10):
 
 ## Fix Sequencing
 
-### Sprint 1 — Engine bugs (calculation correctness) — **in progress**
+### Sprint 1 — Engine bugs (calculation correctness) — ✅ **COMPLETE 2026-05-07**
 
 Order: **C1 → C2 → C4 → C3**.
 
@@ -243,10 +255,24 @@ Order: **C1 → C2 → C4 → C3**.
 |---|---|---|---|
 | **C1** | ✅ RESOLVED | 2026-05-04 | PR #15 merged. PDF now applies NEC 220.84 multifamily Optional Method correctly. Visually verified by user on Vercel preview. |
 | **C2** | ✅ RESOLVED | 2026-05-05 | Branch `fix/c2-evse-feeder-aggregation` pushed. PDF voltage drop now live-derives feeder load from destination panel demand. Visual verification on Vercel preview pending. |
-| **C3 + B-1 + C6** | ✅ RESOLVED | 2026-05-05 (initial) / 2026-05-06 (C3 reworked + C6 spotted) | Branch `fix/c3-b1-bundle` / PR #17. (a) New advisory-only Zod schemas (`projectAddressSchema`, `flContractorLicenseSchema`, `permitNumberSchema`) describe AHJ-acceptable shapes; `PermitPacketGenerator` shows a blue heads-up alert when shape doesn't match but does NOT block — contractors keep the right to print drafts with "TBD" for pre-application meetings; (b) chatTools.ts feeder voltage-drop tool now live-derives via `computeFeederLoadVA` + `calculateFeederSizing` instead of reading cached column; (c) C6 panel schedule PDF phase column + balancing fixed (was always lumping to Phase A on split-phase panels). 26 new tests, 164/164 pass. Initial hard-block C3 reverted on 2026-05-06 per user direction. |
-| **C4** | ⏳ Pending | — | Per-EVSE branch circuit math + EVEMS-managed feeder math. Per-EVSE shows ~3,996 VA when NEC 220.57 requires `max(7,200 VA, nameplate)`; EVEMS reduction is being applied at branch-circuit level when it should only apply to feeder/service. **Hypothesis:** likely another consumer-bug-not-engine-bug — `evCharging.ts` and `evemsLoadManagement.ts` are probably correct, but the panel-render layer divides EVEMS aggregate by N rather than calling the per-EVSE function. Verify engine first before assuming a rewrite is needed. |
+| **C3 + B-1 + C6** | ✅ RESOLVED | 2026-05-05 (initial) / 2026-05-06 (C3 reworked + C6 spotted) | Branch `fix/c3-b1-bundle` / PR #17 merged. (a) New advisory-only Zod schemas (`projectAddressSchema`, `flContractorLicenseSchema`, `permitNumberSchema`) describe AHJ-acceptable shapes; `PermitPacketGenerator` shows a blue heads-up alert when shape doesn't match but does NOT block — contractors keep the right to print drafts with "TBD" for pre-application meetings; (b) chatTools.ts feeder voltage-drop tool now live-derives via `computeFeederLoadVA` + `calculateFeederSizing` instead of reading cached column; (c) C6 panel schedule PDF phase column + balancing fixed (was always lumping to Phase A on split-phase panels). 26 new tests, 164/164 pass. Initial hard-block C3 reverted on 2026-05-06 per user direction. |
+| **C4** | ✅ RESOLVED | 2026-05-07 | PR #19 (`fix/c4-evems-branch-circuit-math`, 7 commits). Iteratively refined across user-review cycles. **Final shape:** (1) Branch row `loadVA = max(7,200, V × I)` per NEC 220.57(A); (2) Explicit "EVEMS Aggregate Setpoint (NEC 625.42)" metadata circuit carries the calculator's exact setpoint (`scenario.powerPerCharger_kW × 1000 × chargerCount`); (3) `evemsSetpointVA(panel, circuits)` reads from marker, falls back to panel-breaker proxy for legacy projects; load aggregator skips marker from connected sums; (4) NEC 625.42 clamp inside `calculateAggregatedLoad` on both standard NEC 220 path and 220.84 multi-family path; `MultiFamilyContext.evDemandVA?` keeps basis consistent; (5) EV panel main breaker right-sized to NEC 215.2(A)(1) (setpoint × 1.25 → 300A on the audit fixture, was 400A). **Bonus fixes spotted during C4 review:** (6) **M4** — MDP feeder synthesis on PDF (was empty "No circuits defined"); (7) **F5** — EV meter orphan cleanup in `addEVInfrastructure` orchestrator (catches stale `meter_type='ev'` rows even when their `panel_id` link was nulled by external deletion); (8) **In-app twin of C6** — `calculatePanelDemand` was rotating B→C for 2-pole loads on 1Φ split-phase panels (orphan Phase C bucket, 99.6% imbalance display); (9) **Unit panel sizing** moved from misnamed Standard Method (`calculateSingleFamilyLoad`) to true NEC 220.82 Optional Method inline (200A → 125A on audit fixture); (10) **Unit panel summary demand display** uses NEC 220.82 (was showing 150A on 125A panel — raw connected misread as demand); EV Sub-Panel summary similarly switches to NEC 625.42-clamped demand whenever clamp engaged. 18 new tests across all sub-fixes, 181/181 pass. |
 
-**Insight from the C1 + C2 + C3 + B-1 + C6 fixes:** All five turned out to be consumer-side wiring/validation bugs, not calculation engine bugs. The engine modules (`upstreamLoadAggregation.ts`, `feederSizing.ts`, `conductorSizing.ts`, `demandFactor.ts:getCircuitPhase`) were already correct; the consumers were either feeding them stale data (C1, C2, B-1), letting placeholder data flow through unchecked (C3), or **bypassing the helper entirely and reinventing broken inline logic** (C6 — the PDF had its own `panel.phase === 1 ? 'A' : ...` instead of calling `getCircuitPhase`). **C4 is likely the same pattern** — the per-EVSE math in `evCharging.ts` and the EVEMS sizing in `evemsLoadManagement.ts` are probably correct, but the panel-render layer is computing per-charger circuit values by dividing the EVEMS aggregate setpoint by N rather than calling the per-EVSE function. Worth verifying the engine code first before assuming a calc rewrite is needed (saved ~5 days of estimated work on C1+C2 by checking that first; C3+B-1+C6 followed the same pattern in ~1 working session). **Diagnostic shortcut:** when the in-app view of a value is correct but the PDF disagrees, look at the PDF call site for an inline reimplementation — that's where the bugs keep landing.
+**Insight from Sprint 1 (six findings + four C4-cycle bonus fixes):** All ten turned out to be consumer-side wiring / display / autogen bugs, not calculation engine bugs — confirming the diagnostic-shortcut pattern. The engine modules (`upstreamLoadAggregation.ts`, `feederSizing.ts`, `conductorSizing.ts`, `demandFactor.ts:getCircuitPhase`, `multiFamilyEV.ts:calculatePerEVSELoad`) were all already correct; the consumers were feeding them stale data (C1, C2, B-1), letting placeholder data flow through unchecked (C3), bypassing the helper and reinventing broken inline logic (C6 PDF + the in-app `calculatePanelDemand` twin spotted during C4 review), or — in C4's case — **overriding the engine output with a different value at autogeneration time** before it reached the database. **Three meta-lessons worth carrying into Sprint 2:**
+
+1. **Removing a wrong-but-load-bearing line can regress a previous fix** that depended on its accidental side-effect. The 3,996 VA branch override was wrong, but it was also the channel through which EVEMS reduction reached the MDP service-sizing calc (via `buildMultiFamilyContext.evLoadVA = sum of branch loads`). Fixing C4 cleanly required a parallel new path — an explicit feeder/service-level NEC 625.42 clamp inside `calculateAggregatedLoad` plus an `evDemandVA` field on `MultiFamilyContext`. Worth scanning future fixes for "what previous behavior is this masking?" before deleting.
+
+2. **Same bug pattern can exist in multiple call sites.** C6 fixed the phase-column rotation logic in the PDF panel-schedule (`services/pdfExport/PanelScheduleDocuments.tsx:calculatePhaseBalancing`). The C4 user review surfaced an *identical* bug in the in-app `calculatePanelDemand` (`services/calculations/demandFactor.ts:281`) that had been hiding because nothing in the test suite exercised 2-pole loads on a 1Φ panel through it. When you fix a pattern bug, grep the codebase for the same idiom — it usually exists in at least one more place.
+
+3. **Function header comments lie.** `services/calculations/residentialLoad.ts:calculateSingleFamilyLoad` is documented as "NEC 220.82" but its implementation is the Standard Method (NEC 220.40 + individual demand factors per appliance). C4 commit `0b6ce69` worked around this by inlining the true NEC 220.82 Optional Method in the autogen instead of relying on the misnamed function. Future cleanup follow-up F6: rename `calculateSingleFamilyLoad` → `calculateSingleFamilyLoadStandard`, write a new `calculateSingleFamilyLoadOptional` (220.82) that the autogen + display layer can both call, then unify on it. Track in F-followups, not blocking.
+
+**Bonus findings discovered during C4 user-review cycles** (each captured in the table above as part of the C4 row):
+- **M4 promoted forward** — MDP panel-schedule PDF was empty "No circuits defined" because MDP has no direct circuits, only feeders. Synthesized 14 virtual feeder rows at PDF generation time. Was originally Sprint 4 polish; user spotted it during C4 visual review.
+- **F5 (new follow-up)** — `addEVInfrastructure` orchestrator only deleted EV meters by `panel_id` link. Orphans (meters where the linked panel was deleted some other way, leaving `panel_id = null`) survived re-runs and accumulated as duplicate "EV Meter" rows. Now also deletes by `meter_type='ev'`.
+- **In-app twin of C6** — same 3Φ-rotation-applied-to-1Φ-panel bug as C6 but in `calculatePanelDemand`, surfacing as 99.6% phase imbalance on the unit panel summary.
+- **Unit panel oversizing + summary display misread** — autogen used misnamed `calculateSingleFamilyLoad` (Standard Method) for sizing, producing 200A panels where NEC 220.82 Optional gives 125A. Fixed inline. Separately, panel-summary cards displayed raw connected (36 kVA / 150A) on a sized-correctly panel; new dedicated NEC 220.82 demand callout shows the sized-for value (~23 kVA / ~95A) on both in-app and PDF.
+
+**Diagnostic shortcut, refined:** when in-app view is correct but PDF disagrees, look at the PDF call site or autogeneration; when displayed values look impossible (demand > breaker, imbalance > 100%, "circuit" with breaker too small for the load), look for category-error display bugs; when a calc is right at one layer but wrong at another, look for bypass / inline reimplementation of a shared helper.
 
 C5 (PE seal workflow) is large enough to be its own sprint and is sequenced after the engine is correct — sealing wrong calculations would compound the problem.
 
@@ -298,59 +324,76 @@ Per CLAUDE.md "NEC table data is safety-critical": before changing any 220.84 de
 
 ---
 
-## 🚀 Next Session Brief — C4 (per-EVSE branch math + EVEMS feeder reduction)
+## 🚀 Next Session Brief — Sprint 2 (Permit Mode v1) recommended
 
-**Status as of 2026-05-06:** C1 ✅, C2 ✅, C3 ✅ (advisory), B-1 ✅, C6 ✅ (panel-phase PDF). C3+B-1+C6 are bundled in PR #17 (`fix/c3-b1-bundle`) — open, awaiting user visual verification. Sprint 1 has C4 + C5 left (C5 is a separate sprint per the original sequencing).
+**Status as of 2026-05-07:** Sprint 1 ✅ COMPLETE. All six critical findings (C1, C2, C3, B-1, C6, C4) plus four bonus findings discovered during C4 review (M4 promoted forward, F5 EV-meter dedup, in-app C6 twin, unit-panel sizing + display) are resolved across PR #15, #16, #17, and **PR #19** (the C4 omnibus). 181/181 tests pass; build clean. Test count grew from 123 pre-audit to 181 post-Sprint-1 (+58 regression tests). PR #19 awaiting user visual verification + merge.
 
-**This is the entry point for the next Claude session after a context clear.** All five prior fixes (C1, C2, C3, B-1, C6) followed the same pattern: consumer-side wiring/validation bugs, not engine bugs — and three of them were specifically PDF-rendering call sites bypassing a correct helper. C4 is hypothesized to be the same — verify before assuming a rewrite is needed.
+**Pre-flight (start every Sprint 2 / Sprint 3 session):**
 
-**Before starting C4 — confirm PR #17 is merged.** If still open, either wait for the user's visual verification + merge, or branch off `fix/c3-b1-bundle` so you don't lose those three fixes. After it merges, branch off main as usual.
+1. **Confirm PR #19 has merged**: `git checkout main && git pull --ff-only origin main && git log --oneline -3` should show "Fix C4: …" at top.
+2. **Test baseline**: `npm test` should report 181/181 pass; `npm run build` exits 0.
+3. **Confirm Sprint 1 scoreboard intact**: regenerate the example permit packet (`example_reports/Permit_Packet_Multifamily_Test_<date>.pdf`) from the same 12-unit MF + EVEMS audit fixture and skim:
+   - Page 4 MDP load calc shows three rows: Multi-Family Dwelling 220.84 41% + House 100% + EV 625.42 clamped; total ≈ 240 kVA / 999 A
+   - Page 8 voltage drop has realistic MDP→EV feeder values (no 14 AWG / 0 A row)
+   - Page 13 MDP panel schedule shows 14 synthesized feeder rows (no "No circuits defined")
+   - Page 14 EV Sub-Panel: 12 chargers @ 11,520 VA each, 300 A main breaker, no "EVEMS Aggregate" circuit row, dedicated "EVEMS Aggregate Setpoint (NEC 625.42)" callout below Load Summary showing ~48 kVA
+   - Pages 15+ unit panels: 125 A bus rating, NEC 220.82 demand callout showing ~23 kVA / ~95 A
+   - Pages 11-12 meter stack: 14 meters total (1 House + 12 Units + 1 EV), no orphaned EV duplicates
 
-### Scope
+### Recommended next: Sprint 2 — FL Permit Mode v1 (the moat)
 
-Two intertwined symptoms on the audit packet's page 14 (EV sub-panel schedule):
+The strategic centerpiece per `business/STRATEGIC_ANALYSIS.md`. Bundle these into one PR since they share `services/pdfExport/permitPacketGenerator.tsx` + `components/PermitPacketGenerator.tsx`:
 
-1. **Per-EVSE branch circuit shows ~3,996 VA per charger.** NEC 220.57 requires `max(7,200 VA, nameplate)`. 3,996 looks suspiciously like `(EVEMS aggregate setpoint) / 12 chargers`.
-2. **EVEMS aggregate row shows 500 VA.** Way too low for a 12-unit Level-2 EVSE bank.
+| ID | What | Estimated complexity |
+|---|---|---|
+| **H1** | Cover sheet TOC | Small — one new component |
+| **H2** | Revision log page | Small — one new component + a `revisions[]` array on packet data |
+| **H3** | Sheet ID convention `E-001`, `E-002`, … | Small — replace page numbers on electrical sheets, add to footer/header |
+| **H4** | FBC 8th ed (2023) + NFPA-70 (2020) reference on cover | Tiny — text addition |
+| **M1** | **Jurisdiction Requirements engine** | Medium — new `services/jurisdictionChecklist/` module that walks the packet AST and auto-checks artifacts against AHJ-specific rule sets |
 
-### Hypothesis (verify first)
+**Why Sprint 2 over Sprint 3:** Sprint 2's H1-H4 + M1 are presentation/policy fixes, low risk, immediate user-facing value (the packet starts looking "professional" to AHJs). Sprint 3 (PE seal workflow) is a vertical slice that needs FBPE compliance research, third-party CA integration, and tamper-evident PDF signing — multi-session work, higher risk, but unlocks the Business-tier ($149/mo) feature. **Recommendation:** ship Sprint 2 first to make the packet look ready, then take Sprint 3 as a focused effort.
 
-The calculation engine (`services/calculations/evCharging.ts`, `services/calculations/evemsLoadManagement.ts`) is probably correct. The bug is likely in the panel-render layer:
+**M1 design hint:** The engine is a pure function that takes a `Packet` (the data passed to `permitPacketGenerator.tsx`) and an AHJ rule set, returns `{ ahjName, requirements: [{ name, present, location, severity }], summary: { passing, failing, total } }`. Render the result as the page-12 jurisdiction checklist. Each pilot AHJ has a small JSON rules file in `data/jurisdictions/` (Orlando, Miami-Dade, Pompano Beach, Davie, Hillsborough) — those already exist as references in the codebase; they just need to be turned into machine-readable rule sets. Detection of "is this artifact present?" walks the same `pages` array `permitPacketGenerator.tsx:151` builds. No DB migration needed.
 
-- `components/PanelSchedule.tsx` — what value does it render into per-charger branch rows? If it's dividing the EVEMS aggregate setpoint by N rather than calling the per-EVSE function, that's the bug.
-- The 500 VA EVEMS row is its own separate issue — likely a unit-conversion mistake (kVA → VA) somewhere upstream of the render. Check whether it's reading `evemsResult.setpoint_kva` and forgetting to multiply by 1000.
+### Alternative: Sprint 3 — PE Seal Workflow (C5)
 
-### Pre-flight checklist
+Reference: `FL_PILOT_REVISED_REPORT.md` §3.2 (Obsidian vault). FBPE constraints — cryptographic signature via third-party CA (no scanned-stamp shortcuts), tamper-evident PDF (any modification invalidates signature), audit trail with hash + version + signer identity, "lock → sign → archive" workflow. New module surface: `services/sealing/` + a sealed-packet table in DB. Multi-session sprint. Confirm priority with `business/STRATEGIC_ANALYSIS.md` before committing — it's the #1 moat per the May 2026 rewrite.
 
-1. Sync to main: `git checkout main && git pull --ff-only origin main`. Verify the C3+B-1 PR landed.
-2. New branch: `git checkout -b fix/c4-evems-branch-circuit-math` (or similar).
-3. Confirm test baseline: 160/160 pass, build exit 0.
+### Sprint 4 backlog (polish — defer until Sprint 2 + 3 done)
 
-### Verification-first approach (saved 5 days on C1+C2)
+- M2: NEC compliance summary expanded (215, 220.18, 240.4(D), 625.42, 110.16)
+- M3: Grounding checklist `[X]` vs `[ ]` distinction
+- M5: Collapse 12 byte-identical unit panel pages into "Typical Unit" + roster
+- M6: Riser diagram landscape mode for ≥10 panels
+- M7: Equipment Specs page-break fix (orphan blank page 7)
+- M8: Meter stack page header consistency
 
-1. **Before touching code, write a failing test** that reproduces page 14's wrong values. Set up: 12 EVSE branches @ 60A 2P, EVEMS managed. Expected per-EVSE: 7,200 VA. Expected EVEMS aggregate: realistic (e.g., 60% of full connected). Run the per-EVSE function in isolation — does it return the right value? Run the EVEMS function in isolation — does it return the right value? If both engines pass in isolation, the bug is in the consumer (panel render or panel schedule rendering).
-2. **Trace the data flow into `components/PanelSchedule.tsx`** for an EVSE-bank panel. What does each branch row's load come from? `circuit.load_watts`? A computed value? If it's already wrong in `circuits` table data, the bug is in whatever wrote those values (likely the Multi-Family EV calculator workflow at population time).
+### F-tier follow-ups (tech debt, accumulating; not blocking)
 
-### Files most likely to touch
+- **F1** — Replace EV/house panel name-string-match in `buildMultiFamilyContext` with typed `panel_role` discriminator
+- **F2** — Extract NEC 220.84 table from inline `multiFamilyEV.ts:33-57` to `data/nec/table-220-84.ts`
+- **F3** — Legacy "Demand Factor Calculation" tile in MDP UI shows direct circuits; should be hidden on MDP for multi-family or relabeled
+- **F4** — Replace EVEMS-managed circuit-description heuristic with explicit `panels.is_evems_managed` boolean + `panels.evems_setpoint_va` integer when the schema is next touched
+- **F5** — `addEVInfrastructure` orchestrator hardening: catches orphan `meter_type='ev'` rows now (commit `ea67d7d`), but the same orphan-cleanup pattern may apply to House Panel and Unit Panel meters when those are regenerated. Audit and apply if so.
+- **F6** — Rename `services/calculations/residentialLoad.ts:calculateSingleFamilyLoad` → `calculateSingleFamilyLoadStandard` (it implements NEC 220.40 Standard Method despite header saying 220.82); add proper `calculateSingleFamilyLoadOptional` (NEC 220.82) and unify autogen + display layer on it. Inline NEC 220.82 calc in `multiFamilyProjectGenerator.ts:generateSingleUnitPanel` is a duplicate of what `calculateDwellingUnitDemandVA` does — collapse them once the misnamed function is renamed.
 
-- `services/calculations/evCharging.ts` — `calculatePerEVSELoad` (NEC 220.57)
-- `services/calculations/evemsLoadManagement.ts` — `calculateEVEMSAggregate` (NEC 625.42)
-- `components/PanelSchedule.tsx` — branch row rendering for EVSE circuits
-- `components/MultiFamilyEVCalculator.tsx` — autopopulation of EVSE circuits at calculator-run time
-- `components/PermitPacketGenerator.tsx` — Multi-Family EV section that builds `mfEvInput` (around line 165)
+### Sprint 1 retrospective — what to remember in Sprint 2
 
-### CLAUDE.md NEC reminders
+**Diagnostic shortcut (validated across 10 fixes):** when in-app view is correct but PDF disagrees, look at the PDF call site or autogeneration; when displayed values look impossible (demand > breaker, imbalance > 100%, "circuit" with breaker too small for the load), look for category-error display bugs; when a calc is right at one layer but wrong at another, look for bypass / inline reimplementation of a shared helper. Saved ~10 days of estimated rewrite work across Sprint 1 by checking these hypotheses before opening engine files.
 
-- **NEC 220.57:** Per-EVSE = `max(7,200 VA, nameplate)`. Not a demand factor.
-- **NEC 625.42 (EVEMS):** Sizes the FEEDER/SERVICE to setpoint, not branch circuit. Branch must still handle continuous 60A.
-- **NEC 210.19:** Branch-circuit conductors must handle continuous load × 125%.
+**Architectural patterns established in Sprint 1 worth reusing:**
+- *Live-derive on read, cache for snapshot* (C2): preserve the cached column for future PE seal snapshot, but flow live values through the calc layer at render time.
+- *Helpers exported from calc layer for UI/PDF detection* (C4): `isEVEMSMarkerCircuit`, `findEVEMSSetpointMarker`, `isDwellingUnitPanel`, `calculateDwellingUnitDemandVA` — Sprint 2 patterns will likely follow this same shape (e.g., `isPanelArtifactPresent(packet, requirement)`).
+- *MultiFamilyContext-style basis tracking* (C4): when a calc has connected vs demand on different bases, expose both as fields on the context interface so consumers can subtract one and add back the other consistently.
+- *Synthesize virtual rows at PDF generation time* (M4): for cross-table relationships (feeders ↔ panels, panels ↔ AHJ requirements), synthesize at the consumer instead of forcing the DB to model the relationship.
 
-### Verification protocol when shipping C4
+### NEC reminders that came up across Sprint 1
 
-1. `npm run build` — exit 0.
-2. `npm test` — 160 + new tests, zero failures.
-3. Regenerate the example permit packet. Confirm page 14 now shows:
-   - Per-EVSE branch circuit: 7,200 VA (or actual nameplate if higher)
-   - EVEMS aggregate row: realistic VA value (not 500)
-   - Feeder to EV sub-panel still sized correctly post-EVEMS reduction (was already correct after C2)
-4. Update audit doc, CHANGELOG, SESSION_LOG. Open PR. User visual verification on Vercel preview.
+- **NEC 220.57(A):** Per-EVSE branch-circuit load = `max(7,200 VA, nameplate)`. Not a demand factor. Branch carries this regardless of EVEMS.
+- **NEC 625.40 / 625.42 (EVEMS):** Branch conductors at full continuous nameplate × 1.25 (NEC 625.40); FEEDER/SERVICE may be sized to managed setpoint per NEC 625.42.
+- **NEC 220.82 (single-family Optional):** First 10 kVA general @ 100%, rest @ 40%; + larger of A/C vs heat @ 100% (NEC 220.60 non-coincident). Different from Standard Method.
+- **NEC 220.84 (multi-family Optional, ≥3 units):** Apply table demand factor to dwelling base; non-dwelling (EV, common areas) excluded, added back at 100%.
+- **NEC 215.2(A)(1):** Feeder ampacity ≥ 1.25 × continuous demand. Used to size EV panel main breaker from EVEMS setpoint.
+- **NEC 408 (panelboards):** Panel schedule must show every protective device including feeder breakers — drove M4 (MDP feeder synthesis).
+- **Demand factors are non-cascading:** Apply once per load type to system-wide totals, never chained through panel hierarchy.

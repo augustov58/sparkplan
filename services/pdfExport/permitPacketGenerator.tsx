@@ -23,6 +23,7 @@ import {
   ComplianceSummary
 } from './PermitPacketDocuments';
 import { PanelSchedulePages } from './PanelScheduleDocuments';
+import { calculateAggregatedLoad } from '../calculations/upstreamLoadAggregation';
 import { EquipmentSpecsPages } from './EquipmentSpecsDocuments';
 import { VoltageDropPages } from './VoltageDropDocuments';
 import { JurisdictionRequirementsPages } from './JurisdictionDocuments';
@@ -341,14 +342,111 @@ export const generatePermitPacket = async (data: PermitPacketData): Promise<void
     });
   }
 
+  // Synthesize virtual feeder-circuit rows for panels that feed downstream
+  // sub-panels (e.g. an MDP feeding 14 sub-panels). Without this, the MDP
+  // panel-schedule page renders "No circuits defined" because the MDP has no
+  // direct branch circuits — it has feeders. NEC 408 requires the panel
+  // schedule to show every protective device on the panel, including feeders.
+  // Map projectType to NEC occupancy classification for the load aggregator.
+  // Multi-family projects already pass a `multiFamilyContext` for the MDP
+  // calc; the per-feeder synthesis below uses standard NEC 220 cascade for
+  // each individual sub-panel's load (NEC 220.84 Optional Method applies at
+  // the system aggregate, not at individual feeder sizing).
+  const occupancyType: 'dwelling' | 'commercial' | 'industrial' =
+    data.projectType === 'Residential'
+      ? 'dwelling'
+      : data.projectType === 'Industrial'
+        ? 'industrial'
+        : 'commercial';
+  const synthesizeFeederCircuits = (panel: Panel, existing: Circuit[]): Circuit[] => {
+    const downstreamPanels = data.panels.filter(
+      p => p.fed_from_type === 'panel' && p.fed_from === panel.id,
+    );
+    if (downstreamPanels.length === 0) return [];
+
+    // Slot allocator — alternate left (odd) / right (even), avoiding any slots
+    // already taken by real circuits or by the slots a multi-pole circuit
+    // occupies (a 2-pole at slot N occupies N and N+2; 3-pole occupies
+    // N, N+2, N+4).
+    const occupied = new Set<number>();
+    for (const c of existing) {
+      const span = c.pole === 3 ? 3 : c.pole === 2 ? 2 : 1;
+      for (let i = 0; i < span; i++) {
+        occupied.add(c.circuit_number + i * 2);
+      }
+    }
+
+    let leftSlot = 1;
+    let rightSlot = 2;
+    let useLeft = true;
+    const advanceLeft = (poles: number) => {
+      leftSlot += poles === 3 ? 6 : poles === 2 ? 4 : 2;
+    };
+    const advanceRight = (poles: number) => {
+      rightSlot += poles === 3 ? 6 : poles === 2 ? 4 : 2;
+    };
+    const findFreeSlot = (poles: number): number => {
+      const span = poles === 3 ? 3 : poles === 2 ? 2 : 1;
+      while (true) {
+        const candidate = useLeft ? leftSlot : rightSlot;
+        const slots: number[] = [];
+        for (let i = 0; i < span; i++) slots.push(candidate + i * 2);
+        const free = slots.every(s => !occupied.has(s));
+        if (free) {
+          slots.forEach(s => occupied.add(s));
+          if (useLeft) advanceLeft(poles);
+          else advanceRight(poles);
+          useLeft = !useLeft;
+          return candidate;
+        }
+        if (useLeft) advanceLeft(poles);
+        else advanceRight(poles);
+      }
+    };
+
+    return downstreamPanels.map(dp => {
+      const dpLoad = calculateAggregatedLoad(
+        dp.id,
+        data.panels,
+        data.circuits,
+        data.transformers,
+        occupancyType,
+      );
+      const breakerAmps = dp.feeder_breaker_amps || dp.main_breaker_amps || 100;
+      const pole = (dp.phase === 3 ? 3 : 2) as 1 | 2 | 3;
+      const slot = findFreeSlot(pole);
+      return {
+        id: `synth-feeder-${panel.id}-${dp.id}`,
+        project_id: panel.project_id,
+        panel_id: panel.id,
+        circuit_number: slot,
+        description: `→ PANEL ${dp.name}`,
+        breaker_amps: breakerAmps,
+        pole,
+        load_watts: dpLoad.totalDemandVA,
+        load_type: 'O',
+        conductor_size: null,
+        conductor_type: null,
+        conductor_material: null,
+        feeder_id: null,
+        is_continuous_load: null,
+        notes: 'Synthesized feeder row — represents downstream panel demand (NEC 408)',
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      } as unknown as Circuit;
+    });
+  };
+
   sortedPanels.forEach(panel => {
     const panelCircuits = circuitsByPanel.get(panel.id) || [];
+    const feederRows = synthesizeFeederCircuits(panel, panelCircuits);
+    const allCircuits = [...panelCircuits, ...feederRows];
     pages.push({
       name: `PanelSchedule[${panel.name}]`,
       element: (
         <PanelSchedulePages
           panel={panel}
-          circuits={panelCircuits}
+          circuits={allCircuits}
           projectName={data.projectName}
           projectAddress={data.projectAddress}
         />

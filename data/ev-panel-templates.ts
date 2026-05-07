@@ -422,7 +422,25 @@ export interface CustomEVPanelConfig {
   numberOfChargers: number;
   useEVEMS: boolean;
   simultaneousChargers?: number;  // Required if useEVEMS is true
-  evemsLoadVAPerCharger?: number; // If provided, overrides simultaneousChargers formula for per-circuit load
+  /**
+   * @deprecated Pre-C4 (2026-05-06) this value overrode per-branch loadVA when
+   * EVEMS was active. That collapsed the NEC 625.42 service-level reduction
+   * onto branch circuits in violation of NEC 220.57(A) + 625.40. Branch
+   * conductors must always carry full nameplate. Field accepted for callers
+   * but ignored.
+   */
+  evemsLoadVAPerCharger?: number;
+  /**
+   * NEC 625.42 EVEMS aggregate setpoint VA — the managed maximum demand the
+   * EVEMS controller will allow across all chargers simultaneously. When
+   * provided alongside `useEVEMS=true`, the template emits an "EVEMS
+   * Aggregate Setpoint (NEC 625.42)" marker circuit carrying this value as
+   * its `loadVA`. Downstream, `evemsSetpointVA(panel, circuits)` in
+   * `services/calculations/upstreamLoadAggregation.ts` reads it to clamp
+   * feeder/service demand at exactly the calculator's setpoint instead of
+   * an over-generous `panel.main_breaker × voltage` proxy.
+   */
+  evemsSetpointVA?: number;
   includeSpare: boolean;
   includeLighting: boolean;
   panelName?: string;
@@ -443,7 +461,7 @@ export function generateCustomEVPanel(input: CustomEVPanelInput): ApplyTemplateO
     numberOfChargers,
     useEVEMS,
     simultaneousChargers,
-    evemsLoadVAPerCharger,
+    evemsSetpointVA,
     includeSpare,
     includeLighting,
     panelName
@@ -488,13 +506,29 @@ export function generateCustomEVPanel(input: CustomEVPanelInput): ApplyTemplateO
       break;
   }
 
-  // Calculate total load
+  // Panel rating (amps) per NEC 215.2(A)(1): feeder ampacity ≥ 1.25 ×
+  // continuous demand. Three sizing paths in priority order:
+  //
+  //   1. EVEMS with explicit setpoint (preferred) — the calculator's
+  //      `withEVEMS` scenario gives us the managed maximum simultaneous
+  //      demand. Size feeder ampacity to that × 1.25.
+  //   2. EVEMS without explicit setpoint (legacy) — fall back to the
+  //      `simultaneousChargers × breakerSize` heuristic (this is what
+  //      pre-explicit-setpoint autogen used; preserved for callers that
+  //      don't pass a setpoint).
+  //   3. No EVEMS — full nameplate sum at `numberOfChargers × breakerSize`
+  //      (each branch already at its own 125% per NEC 625.40, so the
+  //      breaker rating itself reflects the continuous-load adjustment).
   const totalChargerLoad = numberOfChargers * breakerSize;
-
-  // Apply EVEMS demand factor if enabled
-  let effectiveLoad = totalChargerLoad;
-  if (useEVEMS && simultaneousChargers) {
+  let effectiveLoad: number;
+  if (useEVEMS && evemsSetpointVA && evemsSetpointVA > 0) {
+    const setpointDivisor = phase === 3 ? Math.sqrt(3) * voltage : voltage;
+    const setpointAmps = evemsSetpointVA / setpointDivisor;
+    effectiveLoad = Math.ceil(setpointAmps * 1.25);
+  } else if (useEVEMS && simultaneousChargers) {
     effectiveLoad = simultaneousChargers * breakerSize;
+  } else {
+    effectiveLoad = totalChargerLoad;
   }
 
   // Add spare and lighting loads
@@ -526,13 +560,12 @@ export function generateCustomEVPanel(input: CustomEVPanelInput): ApplyTemplateO
   const circuits: Omit<Circuit, 'id' | 'created_at' | 'project_id' | 'panel_id'>[] = [];
   let circuitNumber = 1;
 
-  // NEC 625.42: When EVEMS is active, each circuit's demand load is proportional
-  // to the managed setpoint. Breaker/conductor remain at full nameplate for protection.
-  const circuitLoadVA = (useEVEMS && evemsLoadVAPerCharger)
-    ? evemsLoadVAPerCharger
-    : (useEVEMS && simultaneousChargers)
-      ? Math.round(loadVA * simultaneousChargers / numberOfChargers)
-      : loadVA;
+  // NEC 220.57(A): Per-EVSE branch-circuit load = max(7,200 VA, nameplate).
+  // EVEMS reduction (NEC 625.42) applies at the feeder/service level only;
+  // branch conductors must still handle full continuous nameplate per
+  // NEC 625.40 + 210.19. So `circuitLoadVA` is independent of `useEVEMS`.
+  const NEC_220_57_MINIMUM_VA = 7200;
+  const circuitLoadVA = Math.max(NEC_220_57_MINIMUM_VA, loadVA);
 
   // Add EV charger circuits
   // Multi-pole slot formula: 2-pole at slot N occupies N and N+2.
@@ -565,17 +598,29 @@ export function generateCustomEVPanel(input: CustomEVPanelInput): ApplyTemplateO
   // Set circuitNumber to the next available slot for auxiliary circuits
   circuitNumber = Math.max(leftSlot, rightSlot);
 
-  // Add EVEMS controller circuit if enabled
+  // EVEMS marker circuit. Per NEC 625.42, an EVEMS allows the FEEDER /
+  // SERVICE to be sized to the managed setpoint (not the sum of branch
+  // nameplates). When the caller provides the explicit setpoint, we emit a
+  // metadata-only "EVEMS Aggregate Setpoint" circuit carrying that value as
+  // `loadVA` — the downstream load aggregator (`upstreamLoadAggregation.ts`)
+  // reads it to clamp feeder demand and excludes it from the connected-load
+  // sum so it doesn't double-count as a real load. When no setpoint is
+  // provided, fall back to the legacy 500 VA "EVEMS Load Management System"
+  // control-power placeholder; consumers fall back to a panel-breaker
+  // upper-bound proxy in that case.
   if (useEVEMS) {
+    const hasSetpoint = typeof evemsSetpointVA === 'number' && evemsSetpointVA > 0;
     circuits.push({
       circuitNumber: circuitNumber,
       breakerAmps: 20,
       poles: 2,
       voltage: 240,
-      description: 'EVEMS Load Management System',
+      description: hasSetpoint
+        ? 'EVEMS Aggregate Setpoint (NEC 625.42)'
+        : 'EVEMS Load Management System',
       conductorSize: '12 AWG Cu',
       conductorType: 'THHN',
-      loadVA: 500,
+      loadVA: hasSetpoint ? evemsSetpointVA : 500,
       isEvCharger: false
     });
     circuitNumber += 4;  // 2-pole occupies 2 slots

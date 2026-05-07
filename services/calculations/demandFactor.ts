@@ -276,10 +276,19 @@ export function calculatePanelDemand(
     
     // For multi-pole circuits, distribute evenly
     if (circuit.pole === 2) {
-      // 2-pole: split between two phases
-      phaseLoadsMap[circuitPhase].connected += loadVA / 2;
-      const nextPhase = circuitPhase === 'A' ? 'B' : circuitPhase === 'B' ? 'C' : 'A';
-      phaseLoadsMap[nextPhase].connected += loadVA / 2;
+      if (phase === 1) {
+        // 1Φ split-phase (240 V across A↔B): a 2-pole load physically draws
+        // through BOTH legs by definition. Split 50/50 between A and B
+        // regardless of which "phase row" the slot lands on. Same fix
+        // applied to the PDF version in C6.
+        phaseLoadsMap['A'].connected += loadVA / 2;
+        phaseLoadsMap['B'].connected += loadVA / 2;
+      } else {
+        // 3Φ panel: 2-pole load spans two adjacent phases (A↔B, B↔C, C↔A).
+        phaseLoadsMap[circuitPhase].connected += loadVA / 2;
+        const nextPhase = circuitPhase === 'A' ? 'B' : circuitPhase === 'B' ? 'C' : 'A';
+        phaseLoadsMap[nextPhase].connected += loadVA / 2;
+      }
     } else if (circuit.pole === 3) {
       // 3-pole: split evenly across all three
       phaseLoadsMap['A'].connected += loadVA / 3;

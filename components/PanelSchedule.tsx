@@ -19,7 +19,17 @@ import {
   getLoadTypeColor,
   type CircuitLoad 
 } from '../services/calculations/demandFactor';
-import { calculateAggregatedLoad, buildMultiFamilyContext, type MultiFamilyContext } from '../services/calculations/upstreamLoadAggregation';
+import {
+  calculateAggregatedLoad,
+  buildMultiFamilyContext,
+  isEVEMSMarkerCircuit,
+  findEVEMSSetpointMarker,
+  type MultiFamilyContext,
+} from '../services/calculations/upstreamLoadAggregation';
+import {
+  calculateDwellingUnitDemandVA,
+  isDwellingUnitPanel,
+} from '../services/calculations/residentialLoad';
 import type { LoadTypeCode } from '../types';
 
 // Load type options for dropdown
@@ -83,7 +93,17 @@ export const PanelSchedule: React.FC<PanelScheduleProps> = ({ project }) => {
   }, [panels, selectedPanelId]);
 
   const selectedPanel = panels.find(p => p.id === selectedPanelId);
-  const panelCircuits = circuits.filter(c => c.panel_id === selectedPanelId);
+  // Exclude EVEMS metadata marker circuits — they convey the NEC 625.42
+  // setpoint to the load aggregator but aren't real branch circuits, so they
+  // shouldn't render in the panel-schedule table or count toward phase
+  // totals / direct circuits load. The setpoint is surfaced in its own info
+  // card below (via `evemsSetpointMarker`).
+  const panelCircuits = circuits.filter(
+    c => c.panel_id === selectedPanelId && !isEVEMSMarkerCircuit(c),
+  );
+  const evemsSetpointMarker = selectedPanelId
+    ? findEVEMSSetpointMarker(selectedPanelId, circuits)
+    : undefined;
 
   // Find downstream panels fed from this panel
   const downstreamPanels = useMemo(() => {
@@ -248,6 +268,24 @@ export const PanelSchedule: React.FC<PanelScheduleProps> = ({ project }) => {
       connectedWithFeeders_kVA: feederTotalVA / 1000,
     };
   }, [selectedPanel, panelCircuits, feederCircuits]);
+
+  // NEC 220.82 Optional Method demand for dwelling unit panels — used by
+  // the panel summary cards in lieu of the panel-local NEC 220.14 sum, which
+  // misleadingly reports raw connected current on a panel that's actually
+  // sized correctly per NEC 220.82 (e.g. 150 A "demand" on a 125 A panel
+  // when the real NEC 220.82 demand is ~95 A).
+  const dwellingUnitDemand = useMemo(() => {
+    if (!selectedPanel) return null;
+    const occupancy = project.settings?.occupancyType;
+    if (occupancy !== 'dwelling') return null;
+    if (selectedPanel.is_main) return null;
+    const dwellingCircuits = panelCircuits.map(c => ({
+      description: c.description,
+      loadWatts: c.load_watts || 0,
+    }));
+    if (!isDwellingUnitPanel(selectedPanel.name, dwellingCircuits)) return null;
+    return calculateDwellingUnitDemandVA(dwellingCircuits);
+  }, [selectedPanel, panelCircuits, project.settings?.occupancyType]);
 
   // Calculate aggregated load including downstream panels
   // Uses occupancyType from project settings for correct demand factor selection
@@ -1595,8 +1633,29 @@ export const PanelSchedule: React.FC<PanelScheduleProps> = ({ project }) => {
                   <span className="text-xl font-bold text-gray-900">{demandResult.totalConnectedLoad_kVA.toFixed(1)} KVA</span>
                 </div>
                 <div className="bg-[#f0f5f0] rounded p-3">
-                  <span className="text-[10px] uppercase text-gray-500 block">Direct Demand Load</span>
-                  <span className="text-xl font-bold text-[#2d3b2d]">{demandResult.totalDemandLoad_kVA.toFixed(1)} KVA</span>
+                  <span className="text-[10px] uppercase text-gray-500 block">
+                    Direct Demand Load
+                    {dwellingUnitDemand && (
+                      <span className="ml-1 text-amber-700 normal-case">(NEC 220.82)</span>
+                    )}
+                    {!dwellingUnitDemand &&
+                      aggregatedLoad &&
+                      aggregatedLoad.totalDemandVA > 0 &&
+                      aggregatedLoad.totalDemandVA < demandResult.totalDemandLoad_kVA * 1000 - 1 && (
+                        <span className="ml-1 text-amber-700 normal-case">(NEC 625.42 EVEMS)</span>
+                      )}
+                  </span>
+                  <span className="text-xl font-bold text-[#2d3b2d]">
+                    {(dwellingUnitDemand
+                      ? dwellingUnitDemand.totalDemandVA / 1000
+                      : aggregatedLoad &&
+                        aggregatedLoad.totalDemandVA > 0 &&
+                        aggregatedLoad.totalDemandVA < demandResult.totalDemandLoad_kVA * 1000 - 1
+                      ? aggregatedLoad.totalDemandVA / 1000
+                      : demandResult.totalDemandLoad_kVA
+                    ).toFixed(1)}{' '}
+                    KVA
+                  </span>
                 </div>
                 
                 {/* Feeder Circuits (if any) */}
@@ -1625,10 +1684,27 @@ export const PanelSchedule: React.FC<PanelScheduleProps> = ({ project }) => {
                 <div className="bg-blue-50 rounded p-3">
                   <span className="text-[10px] uppercase text-gray-500 block">Demand Amps</span>
                   <span className="text-xl font-bold text-blue-600">
-                    {aggregatedLoad && aggregatedLoad.downstreamPanelCount > 0
-                      ? (aggregatedLoad.totalDemandVA / (selectedPanel!.voltage * (selectedPanel!.phase === 3 ? Math.sqrt(3) : 1))).toFixed(1)
-                      : demandResult.demandAmps.toFixed(1)
-                    } A
+                    {(() => {
+                      const voltageDivisor =
+                        selectedPanel!.voltage *
+                        (selectedPanel!.phase === 3 ? Math.sqrt(3) : 1);
+                      // Priority 1: dwelling unit panel — use NEC 220.82 demand
+                      if (dwellingUnitDemand) {
+                        return (dwellingUnitDemand.totalDemandVA / voltageDivisor).toFixed(1);
+                      }
+                      // Priority 2: prefer aggregated demand when available AND
+                      // either (a) panel feeds downstream sub-panels (MDP-style)
+                      // or (b) aggregated demand is smaller than panel-local
+                      // demand (EVEMS clamp engaged on this panel).
+                      const useAggregated =
+                        aggregatedLoad &&
+                        aggregatedLoad.totalDemandVA > 0 &&
+                        (aggregatedLoad.downstreamPanelCount > 0 ||
+                          aggregatedLoad.totalDemandVA < demandResult.totalDemandLoad_kVA * 1000 - 1);
+                      return useAggregated
+                        ? (aggregatedLoad!.totalDemandVA / voltageDivisor).toFixed(1)
+                        : demandResult.demandAmps.toFixed(1);
+                    })()} A
                   </span>
                 </div>
                 <div className={`rounded p-3 ${demandResult.percentImbalance > 10 ? 'bg-red-50' : 'bg-green-50'}`}>
@@ -1639,6 +1715,38 @@ export const PanelSchedule: React.FC<PanelScheduleProps> = ({ project }) => {
                 </div>
               </div>
             </div>
+
+            {/* NEC 625.42 EVEMS Setpoint Info (when an explicit setpoint marker is present) */}
+            {evemsSetpointMarker && evemsSetpointMarker.load_watts && evemsSetpointMarker.load_watts > 0 && selectedPanel && (
+              <div className="bg-amber-50 border border-amber-300 rounded-lg p-4">
+                <h4 className="font-semibold text-sm text-amber-900 mb-2 flex items-center gap-2">
+                  <Settings className="w-4 h-4" /> EVEMS AGGREGATE SETPOINT (NEC 625.42)
+                </h4>
+                <p className="text-xs text-amber-900/80 mb-3">
+                  EVEMS controller-permitted maximum simultaneous demand for this panel. Branch
+                  conductors stay at full continuous nameplate per NEC 625.40 + 220.57(A); the
+                  feeder serving this panel may be sized to the setpoint per NEC 625.42.
+                </p>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="bg-white/70 rounded p-2">
+                    <span className="text-[10px] uppercase text-amber-800 block">Setpoint</span>
+                    <span className="text-base font-bold text-amber-900">
+                      {(evemsSetpointMarker.load_watts / 1000).toFixed(1)} kVA
+                    </span>
+                  </div>
+                  <div className="bg-white/70 rounded p-2">
+                    <span className="text-[10px] uppercase text-amber-800 block">Setpoint Amps</span>
+                    <span className="text-base font-bold text-amber-900">
+                      {(
+                        evemsSetpointMarker.load_watts /
+                        (selectedPanel.voltage * (selectedPanel.phase === 3 ? Math.sqrt(3) : 1))
+                      ).toFixed(1)}{' '}
+                      A
+                    </span>
+                  </div>
+                </div>
+              </div>
+            )}
 
             {/* Upstream Load Aggregation (when panel has downstream loads) */}
             {aggregatedLoad && aggregatedLoad.downstreamPanelCount > 0 && (

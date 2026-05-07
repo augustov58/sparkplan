@@ -4,6 +4,43 @@ All notable changes to SparkPlan.
 
 ---
 
+## 2026-05-07: AHJ Compliance Audit Sprint 1 — COMPLETE (C4 omnibus PR #19)
+
+Closes the engine-correctness sweep of the permit-packet PDF against five Florida AHJ checklists. Six critical findings (C1, C2, C3, B-1, C6, C4) plus four bonus findings discovered during C4 user-review cycles (M4 promoted forward, F5 EV-meter dedup, in-app C6 twin, unit-panel sizing + display) all resolved. **Every page of the audit packet that does arithmetic now produces the right number.**
+
+**User-Facing Changes (Sprint 1 omnibus, post-PR-#19):**
+
+- **Per-EVSE branch circuits show full NEC 220.57(A) nameplate.** Page 14 of the audit packet was showing 3,996 VA per Level-2 charger branch (the EVEMS-shared per-charger value mistakenly persisted at autogeneration time). Each branch row now shows 11,520 VA (or the NEC 220.57(A) 7,200 VA minimum, whichever is larger), per NEC 625.40 + 210.19 conductor sizing rules.
+- **NEC 625.42 EVEMS reduction applied at the feeder/service level only.** Branch conductors stay at full nameplate; the calculator's exact setpoint flows to the MDP demand calc via a metadata-only "EVEMS Aggregate Setpoint (NEC 625.42)" marker circuit. The MDP demand drops from ~1,199 A (over the 1,000 A breaker, an oversize misread) to ~999 A (sized correctly). The EV Sub-Panel main breaker now sizes to NEC 215.2(A)(1) (setpoint × 1.25 → 300 A on the audit fixture, was 400 A from the legacy heuristic).
+- **EVEMS aggregate setpoint visible to AHJ reviewers.** The metadata row that previously read "EVEMS Load Management System  500 VA" (a placeholder the audit itself flagged as misleadingly low) is now hidden from the panel-schedule circuit table and replaced by a dedicated "EVEMS Aggregate Setpoint (NEC 625.42)" callout below the Load Summary on both the in-app panel summary and the PDF panel-schedule page. AHJ reviewers can verify the setpoint at a glance.
+- **MDP panel-schedule PDF page now shows the 14 feeder breakers** (was empty "No circuits defined"). Synthesized virtual feeder rows at PDF generation time, each labeled `→ PANEL <name>` with the feeder breaker rating + post-NEC-220 demand load. Per NEC 408 panel schedules must show every protective device on the panel including feeders.
+- **Unit panels right-sized to NEC 220.82 Optional Method.** Was 200 A bus rating (Standard Method via misnamed `calculateSingleFamilyLoad`); now 125 A bus rating (Optional Method: first 10 kVA general @ 100%, rest @ 40%, plus larger of A/C-vs-heat at 100%). MDP feeder breakers to each unit panel correspondingly drop from 200 A to 125 A.
+- **Unit panel summary shows NEC 220.82 demand** instead of raw connected sum. Was reporting 150 A "demand" on a 125 A panel (misleading display, not a sizing error); now shows ~95 A with `(NEC 220.82)` annotation. New "Dwelling Unit Demand (NEC 220.82 Optional Method)" callout on the PDF panel-schedule page walks AHJ reviewers through the tiered general + non-coincident climate breakdown.
+- **In-app panel-schedule phase imbalance display fixed for split-phase 1Φ panels.** Was showing 99.6% imbalance (an impossible value) on Unit panels because 2-pole 240 V loads were rotating to a phantom Phase C bucket that's never displayed. Now correctly splits 50/50 across A and B per NEC physics — same fix as C6 (PDF) but in the in-app `calculatePanelDemand` (the user found this twin during C4 review).
+- **Meter stack no longer accumulates orphaned EV meters.** Was showing 4 "EV Meter" rows (1 linked + 3 orphans from prior testing) on a 15-position meter stack reporting `17 used / 15 total`. The `addEVInfrastructure` orchestrator now also deletes by `meter_type='ev'` (not just by `panel_id` link) so orphan meters left behind by external panel deletions get cleaned up on the next regen.
+
+**Why this matters for the FL pilot:** Sprint 1 cleared every calculation-correctness bug in the audit packet. Combined with the C3 advisory permit metadata (placeholder warnings) and B-1 AI live-derive (Spark Copilot no longer gives stale-cache answers on feeder voltage drop), the packet is no longer producing demonstrably wrong arithmetic on any of its calculation-bearing pages. The packet can now be reviewed by an electrical engineer or AHJ without flagging arithmetic errors. Remaining work is presentation (Sprint 2 — Permit Mode v1) and policy (Sprint 3 — PE seal workflow).
+
+**PR #19 commit chain (7 commits):**
+
+| # | Commit | What |
+|---|---|---|
+| 1 | `aa1d3bb` | Branch nameplate per NEC 220.57(A); EVEMS clamp via panel-breaker proxy (over-generous) |
+| 2 | `c85b088` | Replace proxy with explicit "EVEMS Aggregate Setpoint" marker circuit; in-app demand-amps clamp display |
+| 3 | `38f1d25` | Hide marker from in-app PanelSchedule + right-size EV panel breaker per NEC 215.2(A)(1) |
+| 4 | `ea67d7d` | MDP feeder synthesis on PDF (M4); unit panel sizing via misnamed Standard Method; EV meter orphan cleanup (F5); marker filter on PanelSchedulePages PDF render path |
+| 5 | `aa72bdb` | Phase imbalance fix for 2-pole loads on 1Φ split-phase panels (in-app twin of C6) |
+| 6 | `0b6ce69` | True NEC 220.82 Optional Method inline for unit panel sizing (200 A → 125 A) |
+| 7 | `a6f2050` | Display NEC 220.82 demand on dwelling unit panel summaries (in-app + PDF) |
+
+**Test count:** 123 (pre-audit) → 181 (post-Sprint-1, +58 regression tests). All 181 pass. `npm run build` exits 0.
+
+**No DB migrations.** All Sprint 1 fixes are calc/display/autogen-layer changes. Future follow-up F4 + F6 will add `panels.is_evems_managed` + `panels.evems_setpoint_va` columns and rename the misnamed `calculateSingleFamilyLoad` when the schema is next touched.
+
+**Audit doc:** [`docs/AHJ_COMPLIANCE_AUDIT_2026-05-04.md`](AHJ_COMPLIANCE_AUDIT_2026-05-04.md). Sprint 1 marked ✅ COMPLETE. Next session brief at the bottom of the audit doc points at Sprint 2 (FL Permit Mode v1: H1 TOC + H2 revision log + H3 sheet IDs + H4 FBC reference + M1 jurisdiction-checklist engine) or Sprint 3 (C5 PE seal workflow).
+
+---
+
 ## 2026-05-05 / 2026-05-06: AHJ Compliance Audit — Permit Submittal Advisory + AI Live-Derive + PDF Phase Fix (C3 + B-1 + Panel-Phase)
 
 **User-Facing Changes:**

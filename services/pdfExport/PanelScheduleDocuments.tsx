@@ -12,6 +12,14 @@ import {
   themeStyles,
 } from './permitPacketTheme';
 import { getCircuitPhase } from '../calculations/demandFactor';
+import {
+  calculateDwellingUnitDemandVA,
+  isDwellingUnitPanel,
+} from '../calculations/residentialLoad';
+import {
+  isEVEMSMarkerCircuit,
+  findEVEMSSetpointMarker,
+} from '../calculations/upstreamLoadAggregation';
 
 // Helvetica + Helvetica-Bold are built-in PDF standard fonts in react-pdf —
 // calling Font.register() on them corrupts the font cache and causes
@@ -226,9 +234,28 @@ export const PanelSchedulePages: React.FC<PanelSchedulePDFProps> = ({
   projectAddress,
   datePreppared,
 }) => {
-  const sortedCircuits = [...circuits].sort(
+  // Filter EVEMS metadata marker circuits — they convey the NEC 625.42
+  // setpoint to the load aggregator but aren't physical branches; rendering
+  // them on a "20A 2P" placeholder breaker with a 47 kVA load looks like a
+  // code violation to an AHJ reviewer. The setpoint is shown separately in
+  // its own info block below the Load Summary.
+  const realCircuits = circuits.filter(c => !isEVEMSMarkerCircuit(c));
+  const evemsSetpointMarker = findEVEMSSetpointMarker(panel.id, circuits);
+  const sortedCircuits = [...realCircuits].sort(
     (a, b) => a.circuit_number - b.circuit_number
   );
+
+  // NEC 220.82 Optional Method demand for dwelling unit panels — surfaced
+  // as a separate callout below the Load Summary so AHJ reviewers see the
+  // sized-for demand alongside raw connected. Same pattern as the EVEMS
+  // setpoint callout below.
+  const dwellingCircuitsForCalc = realCircuits.map(c => ({
+    description: c.description,
+    loadWatts: c.load_watts || 0,
+  }));
+  const dwellingUnitDemand = isDwellingUnitPanel(panel.name, dwellingCircuitsForCalc)
+    ? calculateDwellingUnitDemandVA(dwellingCircuitsForCalc)
+    : null;
 
   const phaseBalancing = calculatePhaseBalancing(sortedCircuits, panel.phase);
   const voltage = panel.voltage;
@@ -430,6 +457,70 @@ export const PanelSchedulePages: React.FC<PanelSchedulePDFProps> = ({
           </View>
         </View>
 
+        {/* NEC 220.82 Dwelling Unit demand callout — shows the actual sized-for
+            demand on a per-unit panel so AHJ reviewers don't read raw connected
+            load (e.g. 36 kVA / 150 A) and assume the panel is over-capacity. */}
+        {dwellingUnitDemand && (
+          <View style={styles.summarySection}>
+            <Text style={styles.summaryTitle}>Dwelling Unit Demand (NEC 220.82 Optional Method)</Text>
+            <View style={styles.summaryGrid}>
+              <View style={styles.summaryItem}>
+                <Text style={styles.summaryLabel}>Total Demand</Text>
+                <Text style={styles.summaryValue}>
+                  {(dwellingUnitDemand.totalDemandVA / 1000).toFixed(1)} kVA
+                </Text>
+              </View>
+              <View style={styles.summaryItem}>
+                <Text style={styles.summaryLabel}>Demand Amps</Text>
+                <Text style={styles.summaryValue}>
+                  {(
+                    dwellingUnitDemand.totalDemandVA /
+                    (panel.voltage * (panel.phase === 3 ? Math.sqrt(3) : 1))
+                  ).toFixed(1)}
+                  A
+                </Text>
+              </View>
+              <View style={styles.summaryItem}>
+                <Text style={styles.summaryLabel}>General @ Tiered</Text>
+                <Text style={styles.summaryValue}>
+                  {(dwellingUnitDemand.generalDemandVA / 1000).toFixed(1)} kVA
+                </Text>
+              </View>
+              <View style={styles.summaryItem}>
+                <Text style={styles.summaryLabel}>Climate @ 100%</Text>
+                <Text style={styles.summaryValue}>
+                  {(dwellingUnitDemand.climateDemandVA / 1000).toFixed(1)} kVA
+                </Text>
+              </View>
+            </View>
+          </View>
+        )}
+
+        {/* NEC 625.42 EVEMS Setpoint callout — visible to AHJ reviewers */}
+        {evemsSetpointMarker && evemsSetpointMarker.load_watts && evemsSetpointMarker.load_watts > 0 && (
+          <View style={styles.summarySection}>
+            <Text style={styles.summaryTitle}>EVEMS Aggregate Setpoint (NEC 625.42)</Text>
+            <View style={styles.summaryGrid}>
+              <View style={styles.summaryItem}>
+                <Text style={styles.summaryLabel}>Setpoint</Text>
+                <Text style={styles.summaryValue}>
+                  {(evemsSetpointMarker.load_watts / 1000).toFixed(1)} kVA
+                </Text>
+              </View>
+              <View style={styles.summaryItem}>
+                <Text style={styles.summaryLabel}>Setpoint Amps</Text>
+                <Text style={styles.summaryValue}>
+                  {(
+                    evemsSetpointMarker.load_watts /
+                    (panel.voltage * (panel.phase === 3 ? Math.sqrt(3) : 1))
+                  ).toFixed(1)}
+                  A
+                </Text>
+              </View>
+            </View>
+          </View>
+        )}
+
         <BrandFooter projectName={projectName} />
       </Page>
   );
@@ -460,7 +551,13 @@ export const MultiPanelDocument: React.FC<MultiPanelDocumentProps> = ({
 }) => (
   <Document>
     {panels.map((panel) => {
-      const circuits = circuitsByPanel.get(panel.id) || [];
+      const allCircuits = circuitsByPanel.get(panel.id) || [];
+      // Hide EVEMS metadata marker circuits from the schedule. They convey
+      // the NEC 625.42 setpoint to the load aggregator but aren't physical
+      // branches; rendering them on a "20A 2P" placeholder breaker with a
+      // 47 kVA load looks like a code violation to an AHJ reviewer.
+      const circuits = allCircuits.filter(c => !isEVEMSMarkerCircuit(c));
+      const evemsSetpoint = findEVEMSSetpointMarker(panel.id, allCircuits);
       return (
         <Page key={panel.id} size="LETTER" style={themeStyles.page}>
           <BrandBar pageLabel={`PANEL SCHEDULE - ${panel.name}`} />
@@ -641,6 +738,33 @@ export const MultiPanelDocument: React.FC<MultiPanelDocumentProps> = ({
               </View>
             );
           })()}
+
+          {/* NEC 625.42 EVEMS Setpoint callout — replaces the misleading
+              "EVEMS Aggregate Setpoint" row in the circuit table with a
+              clearly-labeled info block AHJ reviewers can read at a glance. */}
+          {evemsSetpoint && evemsSetpoint.load_watts && evemsSetpoint.load_watts > 0 && (
+            <View style={styles.summarySection}>
+              <Text style={styles.summaryTitle}>EVEMS Aggregate Setpoint (NEC 625.42)</Text>
+              <View style={styles.summaryGrid}>
+                <View style={styles.summaryItem}>
+                  <Text style={styles.summaryLabel}>Setpoint</Text>
+                  <Text style={styles.summaryValue}>
+                    {(evemsSetpoint.load_watts / 1000).toFixed(1)} kVA
+                  </Text>
+                </View>
+                <View style={styles.summaryItem}>
+                  <Text style={styles.summaryLabel}>Setpoint Amps</Text>
+                  <Text style={styles.summaryValue}>
+                    {(
+                      evemsSetpoint.load_watts /
+                      (panel.voltage * (panel.phase === 3 ? Math.sqrt(3) : 1))
+                    ).toFixed(1)}
+                    A
+                  </Text>
+                </View>
+              </View>
+            </View>
+          )}
 
           <BrandFooter projectName={projectName} />
         </Page>
