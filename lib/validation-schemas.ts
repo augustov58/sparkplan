@@ -26,10 +26,12 @@ export const supportTicketSchema = z.object({
 export type SupportTicketFormData = z.infer<typeof supportTicketSchema>;
 
 // ============================================
-// Permit-Submittal Metadata Schemas (C3)
+// Permit-Submittal Metadata Schemas (C3 — advisory)
 // ============================================
-// AHJs reject permit packets on intake when these fields contain placeholder
-// values like "TBD" or "test". Block at the form layer + at PDF gen time.
+// These schemas describe what AHJ-acceptable values look like for a permit
+// submittal. They are ADVISORY — callers run safeParse and surface friendly
+// warnings, but do NOT hard-block. A contractor may legitimately want to print
+// a draft packet with "TBD" for a pre-application AHJ meeting.
 
 const PLACEHOLDER_VALUES = ['tbd', 'test', 'n/a', 'na', 'tba', 'todo', 'xxx', 'unknown'];
 
@@ -94,7 +96,12 @@ export const projectSchema = z.object({
     errorMap: () => ({ message: 'Please select a valid project type' })
   }),
 
-  address: projectAddressSchema,
+  // Permissive — placeholders ("TBD", drafts) are allowed at form level.
+  // For AHJ-acceptability checking, see the advisory `projectAddressSchema`
+  // export which callers can opt into for shape validation.
+  address: z.string()
+    .min(1, 'Project address is required')
+    .max(200, 'Address must be less than 200 characters'),
 
   serviceVoltage: z.number()
     .int('Voltage must be a whole number')

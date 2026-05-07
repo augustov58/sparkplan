@@ -20,7 +20,6 @@ import { useProfile } from '../hooks/useProfile';
 import { JurisdictionSearchWizard } from './JurisdictionSearchWizard';
 import { calculateMultiFamilyEV, type MultiFamilyEVInput } from '../services/calculations/multiFamilyEV';
 import { buildMultiFamilyContext } from '../services/calculations/upstreamLoadAggregation';
-import { z } from 'zod';
 import {
   projectAddressSchema,
   flContractorLicenseSchema,
@@ -93,25 +92,27 @@ export const PermitPacketGenerator: React.FC<PermitPacketGeneratorProps> = ({ pr
 
   const dataLoading = panelsLoading || circuitsLoading || feedersLoading || transformersLoading || groundingLoading;
 
-  // C3: Validate permit-submittal metadata up front. AHJs reject on intake when
-  // these fields are missing or contain placeholders ("TBD", "test"), so we gate
-  // PDF generation on them rather than letting the packet print bad data.
+  // C3 (advisory): Surface the AHJ-acceptable shape of these fields as soft
+  // warnings — the contractor decides whether to override. Hard-gating placeholder
+  // values like "TBD" forces fake data into draft packets used for pre-application
+  // walk-ins, which is worse than the AHJ-rejection risk we'd be preventing.
   const licenseParse = flContractorLicenseSchema.safeParse(contractorLicense);
   const addressParse = projectAddressSchema.safeParse(currentProject?.address ?? '');
   const permitParse = permitNumberSchema.safeParse(permitNumber);
-  const licenseError = !licenseParse.success ? licenseParse.error.issues[0]?.message : undefined;
-  const addressError = !addressParse.success ? addressParse.error.issues[0]?.message : undefined;
-  const permitError = !permitParse.success ? permitParse.error.issues[0]?.message : undefined;
-  const hasLicense = licenseParse.success;
-  const hasAddress = addressParse.success;
-  const hasValidPermit = permitParse.success;
+  const licenseAdvisory = !licenseParse.success ? licenseParse.error.issues[0]?.message : undefined;
+  const addressAdvisory = !addressParse.success ? addressParse.error.issues[0]?.message : undefined;
+  const permitAdvisory = !permitParse.success ? permitParse.error.issues[0]?.message : undefined;
+  const hasAnyAdvisory = !!(licenseAdvisory || addressAdvisory || permitAdvisory);
+
+  // Hard gates: these prevent runtime crashes (no panels = empty packet, no
+  // license input at all = key submittal field literally missing). Format
+  // shape is advisory only.
+  const hasLicense = contractorLicense.trim().length > 0;
   const hasScope = scopeOfWork.trim().length > 0;
   const canGenerate =
     !!currentProject &&
     panels.length > 0 &&
     hasLicense &&
-    hasAddress &&
-    hasValidPermit &&
     hasScope &&
     !dataLoading;
 
@@ -121,26 +122,6 @@ export const PermitPacketGenerator: React.FC<PermitPacketGeneratorProps> = ({ pr
     setLoading(true);
     setError(null);
     setSuccess(false);
-
-    // Final pre-flight gate. canGenerate already covers this, but safeParse
-    // again here so an out-of-band caller (or a future re-wire) can't smuggle
-    // placeholder data into the packet.
-    const preflight = [
-      flContractorLicenseSchema.safeParse(contractorLicense),
-      projectAddressSchema.safeParse(currentProject.address ?? ''),
-      permitNumberSchema.safeParse(permitNumber),
-    ];
-    const preflightErrors = preflight
-      .filter((r): r is z.SafeParseError<unknown> => !r.success)
-      .map((r) => r.error.issues[0]?.message)
-      .filter((m): m is string => !!m);
-    if (preflightErrors.length > 0) {
-      setError(
-        `Permit metadata invalid (would be rejected at AHJ intake):\n  • ${preflightErrors.join('\n  • ')}`
-      );
-      setLoading(false);
-      return;
-    }
 
     try {
       // Get jurisdiction data if project has jurisdiction_id
@@ -383,14 +364,9 @@ export const PermitPacketGenerator: React.FC<PermitPacketGeneratorProps> = ({ pr
               value={contractorLicense}
               onChange={(e) => setContractorLicense(e.target.value)}
               placeholder="e.g., EC1234567"
-              aria-invalid={!!licenseError}
-              className={`w-full border rounded px-3 py-2 text-sm focus:ring-2 focus:ring-[#2d3b2d]/20/20 outline-none ${licenseError ? 'border-red-400 focus:border-red-500' : 'border-gray-200 focus:border-[#2d3b2d]'}`}
+              className="w-full border border-gray-200 rounded px-3 py-2 text-sm focus:border-[#2d3b2d] focus:ring-2 focus:ring-[#2d3b2d]/20/20 outline-none"
             />
-            {licenseError ? (
-              <p className="text-xs text-red-600 mt-1">{licenseError}</p>
-            ) : (
-              <p className="text-xs text-gray-500 mt-1">FL DBPR format: EC####### or ER#######</p>
-            )}
+            <p className="text-xs text-gray-500 mt-1">FL DBPR format: EC####### or ER####### (heads-up only — packet still generates)</p>
           </div>
         </div>
 
@@ -405,10 +381,8 @@ export const PermitPacketGenerator: React.FC<PermitPacketGeneratorProps> = ({ pr
               value={permitNumber}
               onChange={(e) => setPermitNumber(e.target.value)}
               placeholder="e.g., PER-2024-001234"
-              aria-invalid={!!permitError}
-              className={`w-full border rounded px-3 py-2 text-sm focus:ring-2 focus:ring-[#2d3b2d]/20/20 outline-none ${permitError ? 'border-red-400 focus:border-red-500' : 'border-gray-200 focus:border-[#2d3b2d]'}`}
+              className="w-full border border-gray-200 rounded px-3 py-2 text-sm focus:border-[#2d3b2d] focus:ring-2 focus:ring-[#2d3b2d]/20/20 outline-none"
             />
-            {permitError && <p className="text-xs text-red-600 mt-1">{permitError}</p>}
           </div>
         </div>
 
@@ -663,7 +637,7 @@ export const PermitPacketGenerator: React.FC<PermitPacketGeneratorProps> = ({ pr
         </button>
       </div>
 
-      {/* Validation Warnings */}
+      {/* Hard-gate warnings — block PDF generation */}
       {!canGenerate && !dataLoading && (
         <div className="bg-[#fff8e6] border border-[#c9a227]/40 rounded-lg p-4">
           <div className="flex gap-3">
@@ -672,15 +646,31 @@ export const PermitPacketGenerator: React.FC<PermitPacketGeneratorProps> = ({ pr
               <p className="font-medium mb-1">Cannot generate permit packet</p>
               <ul className="list-disc list-inside space-y-1">
                 {panels.length === 0 && <li>At least one panel is required</li>}
-                {!hasAddress && (
-                  <li>
-                    Project address invalid: {addressError ?? 'required'} (edit in Project Setup)
-                  </li>
-                )}
-                {!hasLicense && <li>Contractor License invalid: {licenseError ?? 'required'}</li>}
-                {!hasValidPermit && <li>Permit Number invalid: {permitError}</li>}
+                {!hasLicense && <li>Contractor License is required</li>}
                 {!hasScope && <li>Scope of Work is required</li>}
               </ul>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Advisory warnings — heads-up only, packet still generates */}
+      {canGenerate && hasAnyAdvisory && (
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+          <div className="flex gap-3">
+            <Info className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" />
+            <div className="text-sm text-blue-900">
+              <p className="font-medium mb-1">Heads up — these may cause AHJ intake friction</p>
+              <ul className="list-disc list-inside space-y-1 text-blue-800">
+                {addressAdvisory && (
+                  <li>Project address: {addressAdvisory} (edit in Project Setup)</li>
+                )}
+                {licenseAdvisory && <li>Contractor License: {licenseAdvisory}</li>}
+                {permitAdvisory && <li>Permit Number: {permitAdvisory}</li>}
+              </ul>
+              <p className="text-xs text-blue-700 mt-2">
+                Packet will still generate — these are informational only. Florida AHJs typically reject submittals with placeholder values like "TBD" or "test" on intake.
+              </p>
             </div>
           </div>
         </div>
