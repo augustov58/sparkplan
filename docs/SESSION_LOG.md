@@ -7,11 +7,15 @@
 
 ---
 
-### Session: 2026-05-05 — AHJ Compliance Audit C3 + B-1 (bundled)
+### Session: 2026-05-05 / 2026-05-06 — AHJ Compliance Audit C3 + B-1 + Panel-Phase (bundled)
 
-**Focus**: Fourth session in the AHJ compliance audit Sprint 1. C1 (220.84 multi-family DF) and C2 (live-derive feeder load) were merged earlier in the day; this session shipped the bundled C3 (project-metadata validation) + B-1 (chatTools.ts AI staleness) — both flagged as small, low-risk consumer-side fixes that didn't touch any calculation engine.
+**Focus**: Fourth session in the AHJ compliance audit Sprint 1. C1 (220.84 multi-family DF) and C2 (live-derive feeder load) were merged earlier; this session shipped the bundled C3 (project-metadata validation) + B-1 (chatTools.ts AI staleness) + a third bug (panel-schedule PDF phase column / balancing) spotted on 2026-05-06 while the user was reviewing the same packet — all three are consumer-side wiring fixes that didn't touch any calculation engine.
 
-**Status**: ✅ Both shipped on branch `fix/c3-b1-bundle`. 160/160 tests pass (was 138 pre-bundle, +22 new). `npm run build` exits 0 in 4.69s. Pending user visual verification on Vercel preview before merging.
+**Status**: ✅ All three shipped on branch `fix/c3-b1-bundle`, PR #17 OPEN. 164/164 tests pass (was 138 pre-bundle, +26 new). `npm run build` exits 0 in 4.61s. Pending user visual verification on Vercel preview before merging.
+
+**Direction shift on 2026-05-06**: First C3 implementation hard-blocked PDF generation when fields were placeholder-shaped. User pushed back — contractors legitimately need draft packets with "TBD" for pre-application AHJ walk-ins. C3 was reworked into advisory-only (commit `b69a170`). Saved this preference to memory at `feedback_validation_advisory.md` so future sessions don't reintroduce hard-block validation. B-1 was unaffected.
+
+**Panel-Phase bug spotted by user on 2026-05-06**: While reviewing the regenerated audit packet, user noticed every circuit on the Unit 108 Panel page (240V single-phase split-phase) showed "Phase A" and the load summary had Phase A = total / Phase B = 0 / Phase C = 0. Investigation showed the in-app `components/PanelSchedule.tsx` view was already correct (uses `getCircuitPhase` from `services/calculations/demandFactor.ts`, alternates A/B per row pair) but the PDF at `services/pdfExport/PanelScheduleDocuments.tsx` had reinvented its own broken inline phase logic at line 323/526 (always returned 'A' for single-phase) AND `calculatePhaseBalancing` for `panelPhase === 1` lumped all load to A. Same C1/C2 pattern: correct helper exists, PDF call site bypasses it. Fixed in commit `0c7ee2d`.
 
 **Root causes (consumer-side wiring/validation, not engine bugs — same pattern as C1, C2)**:
 
