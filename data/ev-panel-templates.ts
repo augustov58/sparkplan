@@ -422,7 +422,15 @@ export interface CustomEVPanelConfig {
   numberOfChargers: number;
   useEVEMS: boolean;
   simultaneousChargers?: number;  // Required if useEVEMS is true
-  evemsLoadVAPerCharger?: number; // If provided, overrides simultaneousChargers formula for per-circuit load
+  /**
+   * @deprecated Pre-C4 (2026-05-06) this value overrode per-branch loadVA when
+   * EVEMS was active. That collapsed the NEC 625.42 service-level reduction
+   * onto branch circuits in violation of NEC 220.57(A) + 625.40. Branch
+   * conductors must always carry full nameplate. Field accepted for callers
+   * but ignored. EVEMS reduction is applied at the feeder/service level via
+   * `calculateAggregatedLoad` clamping `totalDemandVA` to panel main breaker.
+   */
+  evemsLoadVAPerCharger?: number;
   includeSpare: boolean;
   includeLighting: boolean;
   panelName?: string;
@@ -443,7 +451,6 @@ export function generateCustomEVPanel(input: CustomEVPanelInput): ApplyTemplateO
     numberOfChargers,
     useEVEMS,
     simultaneousChargers,
-    evemsLoadVAPerCharger,
     includeSpare,
     includeLighting,
     panelName
@@ -526,13 +533,12 @@ export function generateCustomEVPanel(input: CustomEVPanelInput): ApplyTemplateO
   const circuits: Omit<Circuit, 'id' | 'created_at' | 'project_id' | 'panel_id'>[] = [];
   let circuitNumber = 1;
 
-  // NEC 625.42: When EVEMS is active, each circuit's demand load is proportional
-  // to the managed setpoint. Breaker/conductor remain at full nameplate for protection.
-  const circuitLoadVA = (useEVEMS && evemsLoadVAPerCharger)
-    ? evemsLoadVAPerCharger
-    : (useEVEMS && simultaneousChargers)
-      ? Math.round(loadVA * simultaneousChargers / numberOfChargers)
-      : loadVA;
+  // NEC 220.57(A): Per-EVSE branch-circuit load = max(7,200 VA, nameplate).
+  // EVEMS reduction (NEC 625.42) applies at the feeder/service level only;
+  // branch conductors must still handle full continuous nameplate per
+  // NEC 625.40 + 210.19. So `circuitLoadVA` is independent of `useEVEMS`.
+  const NEC_220_57_MINIMUM_VA = 7200;
+  const circuitLoadVA = Math.max(NEC_220_57_MINIMUM_VA, loadVA);
 
   // Add EV charger circuits
   // Multi-pole slot formula: 2-pole at slot N occupies N and N+2.

@@ -632,22 +632,24 @@ function generateEVPanel(
     chargerType = 'DC Fast Charge (150kW)';
   }
 
-  // NEC 625.42: Use scenario's computed per-charger power (accounts for building load + house panel)
-  // Fall back to 50% simultaneous if no scenario power available
-  const evemsLoadVAPerCharger = (useEVEMS && scenario.powerPerCharger_kW)
-    ? Math.round(scenario.powerPerCharger_kW * 1000)
-    : undefined;
-
+  // NEC 220.57(A) + 625.40: Branch-circuit conductors and per-EVSE branch
+  // loads are nameplate (full continuous) regardless of EVEMS. NEC 625.42
+  // EVEMS reduction is applied downstream at the feeder/service level via
+  // `calculateAggregatedLoad` clamping demand to panel.main_breaker_amps ×
+  // voltage when an "EVEMS Load Management System" controller circuit is
+  // present on the EV panel. So no per-charger VA override here.
   const config: CustomEVPanelConfig = {
     chargerType,
     numberOfChargers: chargerCount,
     useEVEMS,
     simultaneousChargers: useEVEMS ? Math.ceil(chargerCount * 0.5) : undefined,
-    evemsLoadVAPerCharger,
     includeSpare: true,
     includeLighting: true,
     panelName: 'EV Sub-Panel',
   };
+  // Reference scenario power so the import isn't unused; future EVEMS
+  // setpoint metadata may consume it.
+  void scenario;
 
   const result = generateCustomEVPanel({ projectId, config });
 

@@ -31,10 +31,48 @@ type OccupancyType = 'dwelling' | 'commercial' | 'industrial';
 /** Context for NEC 220.84 Optional Calculation — Multi-Family Dwellings (3+ units) */
 export interface MultiFamilyContext {
   dwellingUnits: number;
-  /** EV panel load (VA) — excluded from 220.84 base, added at EVEMS-managed value */
+  /** EV panel raw connected VA — subtracted from dwelling base before applying 220.84 demand factor */
   evLoadVA?: number;
   /** House/common area panel load (VA) — excluded from 220.84 base, added at connected value */
   housePanelLoadVA?: number;
+  /**
+   * EV panel post-NEC-625.42 demand VA — added back to MDP demand at 100%
+   * (EVEMS-clamped on EVEMS-managed panels, raw connected otherwise).
+   * If undefined, falls back to `evLoadVA` (preserves pre-C4 behavior).
+   */
+  evDemandVA?: number;
+}
+
+/**
+ * NEC 625.42 — detect whether an EV-bank panel is EVEMS-managed.
+ *
+ * Heuristic: the panel has a circuit whose description contains "EVEMS Load
+ * Management System" — the controller-power circuit emitted by the autogen
+ * template (`data/ev-panel-templates.ts`) when `useEVEMS=true`. Eventually
+ * replaced by an explicit `panel.is_evems_managed` column (follow-up).
+ */
+function isEVEMSManagedPanel(panelId: string, circuits: Circuit[]): boolean {
+  return circuits.some(
+    c =>
+      c.panel_id === panelId &&
+      c.description?.toLowerCase().includes('evems load management'),
+  );
+}
+
+/**
+ * NEC 625.42 setpoint VA proxy = panel main breaker × voltage (× √3 for 3Φ).
+ *
+ * Per NEC 625.42, an EVEMS allows the FEEDER/SERVICE to be sized to the
+ * managed setpoint rather than the sum of full nameplate branch loads. The
+ * autogen template sizes the EV panel main breaker to accommodate the
+ * EVEMS-managed effective load (`simultaneousChargers × breakerSize` rounded
+ * to standard size + spares). We use that as the setpoint proxy here.
+ */
+function evemsSetpointVA(panel: Panel): number | null {
+  const amps = panel.main_breaker_amps ?? panel.bus_rating ?? 0;
+  const voltage = panel.voltage ?? 0;
+  if (amps <= 0 || voltage <= 0) return null;
+  return panel.phase === 3 ? Math.sqrt(3) * amps * voltage : amps * voltage;
 }
 
 /**
@@ -640,13 +678,18 @@ export function calculateAggregatedLoad(
     const demandFactor = getMultiFamilyDemandFactor(multiFamilyContext.dwellingUnits);
 
     // NEC 220.84 covers dwelling unit loads only — EV and house/common area loads
-    // are excluded from the demand factor base and added separately at full value
+    // are excluded from the demand factor base and added separately at full value.
+    // After C4: branch rows are at full nameplate (NEC 220.57(A)), so the EV
+    // *connected* contribution to `totalConnectedVA` is the raw nameplate sum.
+    // `evDemandVA` carries the post-NEC-625.42 EVEMS-clamped value (added back
+    // at 100%); falls back to `evLoadVA` when no separate clamp was needed.
     const evLoadVA = multiFamilyContext.evLoadVA || 0;
+    const evDemandVA = multiFamilyContext.evDemandVA ?? evLoadVA;
     const housePanelLoadVA = multiFamilyContext.housePanelLoadVA || 0;
-    const nonDwellingVA = evLoadVA + housePanelLoadVA;
-    const dwellingConnectedVA = totalConnectedVA - nonDwellingVA;
+    const nonDwellingConnectedVA = evLoadVA + housePanelLoadVA;
+    const dwellingConnectedVA = totalConnectedVA - nonDwellingConnectedVA;
     const dwellingDemandVA = Math.round(dwellingConnectedVA * demandFactor);
-    const totalDemandVA = dwellingDemandVA + nonDwellingVA;
+    const totalDemandVA = dwellingDemandVA + housePanelLoadVA + evDemandVA;
 
     const demandBreakdown: DemandCalculation[] = [{
       loadType: `Multi-Family Dwelling (${multiFamilyContext.dwellingUnits} units)`,
@@ -668,12 +711,15 @@ export function calculateAggregatedLoad(
     }
 
     if (evLoadVA > 0) {
+      const evClamped = evDemandVA < evLoadVA;
       demandBreakdown.push({
-        loadType: 'EV Charging (EVEMS managed)',
+        loadType: evClamped ? 'EV Charging (NEC 625.42 EVEMS-clamped)' : 'EV Charging (EVEMS managed)',
         connectedVA: evLoadVA,
-        demandVA: evLoadVA,
-        demandFactor: 1.0,
-        necReference: 'NEC 625.42 (EVEMS — excluded from 220.84)',
+        demandVA: evDemandVA,
+        demandFactor: evLoadVA > 0 ? evDemandVA / evLoadVA : 1.0,
+        necReference: evClamped
+          ? 'NEC 625.42 (EVEMS — feeder demand clamped to setpoint)'
+          : 'NEC 625.42 (EVEMS — excluded from 220.84)',
       });
       necRefs.push('NEC 625.42 (EVEMS Load)');
     }
@@ -694,8 +740,30 @@ export function calculateAggregatedLoad(
   }
 
   // PHASE 2: Apply standard NEC 220 demand factors to system-wide totals
-  const { demandBreakdown, totalDemandVA, necReferences } = applyDemandFactors(loads, occupancyType);
-  
+  const phase2 = applyDemandFactors(loads, occupancyType);
+  let { totalDemandVA } = phase2;
+  const { demandBreakdown } = phase2;
+  const necReferences = [...phase2.necReferences];
+
+  // NEC 625.42 — EVEMS-managed EV bank panel: clamp feeder demand to setpoint.
+  // Branch conductors stay at full nameplate (NEC 220.57(A) + 625.40); only
+  // the FEEDER serving the EV panel benefits from the EVEMS reduction.
+  if (isEVEMSManagedPanel(panelId, circuits)) {
+    const setpointVA = evemsSetpointVA(panel);
+    if (setpointVA !== null && totalDemandVA > setpointVA) {
+      const preClampVA = totalDemandVA;
+      totalDemandVA = setpointVA;
+      necReferences.push('NEC 625.42 (EVEMS — feeder demand clamped to setpoint)');
+      demandBreakdown.push({
+        loadType: 'EVEMS feeder reduction',
+        connectedVA: preClampVA,
+        demandVA: setpointVA,
+        demandFactor: preClampVA > 0 ? setpointVA / preClampVA : 1.0,
+        necReference: 'NEC 625.42 (EVEMS — branch conductors at nameplate; feeder at setpoint)',
+      });
+    }
+  }
+
   return {
     panelId,
     panelName: panel.name,
@@ -793,14 +861,18 @@ export function buildMultiFamilyContext(
     p => p.fed_from_type === 'panel' && p.fed_from === panel.id
   );
 
-  const evLoadVA = downstreamFromMDP
-    .filter(p => p.name.toLowerCase().includes('ev'))
-    .reduce(
-      (sum, p) =>
-        sum +
-        calculateAggregatedLoad(p.id, panels, circuits, transformers, 'dwelling').totalConnectedVA,
-      0,
-    );
+  // EV panel contributions split into two values:
+  //   - evLoadVA: raw connected sum (subtracted from dwelling base before 220.84 demand)
+  //   - evDemandVA: post-NEC-625.42 demand (added back at 100%; EVEMS-clamped
+  //     for EVEMS-managed panels via the clamp inside calculateAggregatedLoad)
+  const evPanels = downstreamFromMDP.filter(p => p.name.toLowerCase().includes('ev'));
+  let evLoadVA = 0;
+  let evDemandVA = 0;
+  for (const p of evPanels) {
+    const result = calculateAggregatedLoad(p.id, panels, circuits, transformers, 'dwelling');
+    evLoadVA += result.totalConnectedVA;
+    evDemandVA += result.totalDemandVA;
+  }
 
   const housePanelLoadVA = downstreamFromMDP
     .filter(p => p.name.toLowerCase().includes('house'))
@@ -814,6 +886,7 @@ export function buildMultiFamilyContext(
   return {
     dwellingUnits: totalUnits,
     evLoadVA: evLoadVA > 0 ? evLoadVA : undefined,
+    evDemandVA: evLoadVA > 0 && evDemandVA !== evLoadVA ? evDemandVA : undefined,
     housePanelLoadVA: housePanelLoadVA > 0 ? housePanelLoadVA : undefined,
   };
 }

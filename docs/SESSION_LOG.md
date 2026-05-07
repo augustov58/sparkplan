@@ -3,7 +3,65 @@
 **Purpose**: Tracks recent work for seamless handoff between Claude instances.
 **Maintenance Rule**: Keep only the last 2 sessions. At the start of a new session, delete older entries — git history preserves everything.
 
-**Last Updated**: 2026-05-05
+**Last Updated**: 2026-05-06
+
+---
+
+### Session: 2026-05-06 — AHJ Compliance Audit C4 (per-EVSE branch math + EVEMS feeder reduction)
+
+**Focus**: Fifth and final session in the AHJ compliance audit Sprint 1. C1, C2, C3, B-1, and C6 were already merged across PRs #15, #16, #17. This session shipped C4 — the per-EVSE branch circuit math + the NEC 625.42 EVEMS feeder/service reduction. With C4 done, every page of the audit-packet that does arithmetic now produces the right number; remaining audit work is presentation/policy (Sprint 2 H-tier and Sprint 3 PE seal).
+
+**Status**: ✅ C4 shipped on branch `fix/c4-evems-branch-circuit-math`. 172/172 tests pass (was 164 pre-C4, +8 new). `npm run build` exits 0 in 4.64s. Pending user visual verification on Vercel preview before merging.
+
+**Verification-first paid off again**: Per the audit doc's "Diagnostic shortcut" — when in-app view is correct but the PDF disagrees, the bug is at autogeneration or the PDF call site, not the engine. Confirmed by reading `services/calculations/multiFamilyEV.ts:526-532` *before* opening any other file: `calculatePerEVSELoad(nameplateAmps, voltage)` correctly returns `max(7,200, V × I)` per NEC 220.57(A). The actual bug was at `data/ev-panel-templates.ts:531-535` where a `useEVEMS && evemsLoadVAPerCharger` ternary persisted the EVEMS-managed per-charger setpoint share into branch circuits, in violation of NEC 625.40 + 210.19 (branch conductors must handle full continuous nameplate regardless of EVEMS). Saved ~3 days of estimated rewrite work on the engine modules.
+
+**New retrospective wrinkle (added to Insight section of audit doc)**: Removing a wrong-but-load-bearing line can regress a previous fix that depended on its accidental side-effect. The 3,996 VA branch override was wrong for what an AHJ reviewer sees on page 14, but it was *also* the channel through which EVEMS reduction reached the MDP NEC 220.84 service-sizing calc — `buildMultiFamilyContext.evLoadVA = sum of EV branch loads`. With branches inflated-down to ~48 kVA total, the MDP service sizing came out approximately right by canceling errors. Raising branches to nameplate (138 kVA total) would have over-recommended the service by ~15% if the C1 path stayed unchanged. So C4 needed a parallel new path: an explicit feeder/service-level NEC 625.42 clamp inside `calculateAggregatedLoad`, plus an `evDemandVA` field on `MultiFamilyContext` so the dwelling-base subtraction (raw connected) and the EV add-back (clamped) use consistent bases.
+
+**Root cause (consumer-side wiring at autogen time, not engine bug — same pattern as C1, C2, C3, B-1, C6)**:
+
+- **C4 — `data/ev-panel-templates.ts:531-535`**: `circuitLoadVA = (useEVEMS && evemsLoadVAPerCharger) ? evemsLoadVAPerCharger : (useEVEMS && simultaneousChargers) ? Math.round(loadVA × simultaneousChargers / numberOfChargers) : loadVA`. The `evemsLoadVAPerCharger` value flowed in from `services/autogeneration/multiFamilyProjectGenerator.ts:637-639` as `Math.round(scenario.powerPerCharger_kW × 1000)` — that's the diversified theoretical-share-of-available-capacity computed by the multi-family EV calculator's EVEMS scheduler. Persisting that into `circuits.load_watts` is wrong on two levels: (1) NEC 220.57(A) requires the branch-circuit load to be `max(7,200 VA, nameplate)`; (2) NEC 625.40 requires branch conductors to handle full continuous nameplate regardless of EVEMS. The page-14 PDF was correctly displaying what was already wrongly persisted.
+
+**Work Done**:
+
+*C4 — `data/ev-panel-templates.ts`*: `circuitLoadVA = Math.max(7_200, loadVA)` per NEC 220.57(A), unconditionally. The `evemsLoadVAPerCharger` config field is left in `CustomEVPanelConfig` for backward compatibility but explicitly documented as `@deprecated`/ignored. The unused destructure was removed. Comment updated to call out NEC 625.42 belongs at feeder/service, not branch.
+
+*C4 — `services/autogeneration/multiFamilyProjectGenerator.ts`*: `generateEVPanel` no longer computes `evemsLoadVAPerCharger`. `scenario.powerPerCharger_kW` is no longer used to override branch loads. Comment block updated to point to the new clamp inside `calculateAggregatedLoad`.
+
+*C4 — `services/calculations/upstreamLoadAggregation.ts`*: Two new file-private helpers:
+- `isEVEMSManagedPanel(panelId, circuits)` — heuristic detection: returns `true` iff the panel has a circuit whose description contains "EVEMS Load Management System" (the controller-power circuit emitted by the autogen template at `data/ev-panel-templates.ts:575`).
+- `evemsSetpointVA(panel)` — returns `panel.main_breaker_amps × voltage`, with √3 multiplier for 3Φ panels. Approximates the NEC 625.42 setpoint based on the autogen-set main breaker rating (which is computed from `simultaneousChargers × breakerSize` rounded to standard panel size).
+
+`calculateAggregatedLoad` now applies the clamp in TWO places:
+1. **Standard NEC 220 path** (Phase 2): after `applyDemandFactors` returns, if the panel is EVEMS-managed and `totalDemandVA > setpointVA`, clamp `totalDemandVA = setpointVA`, push a `NEC 625.42 (EVEMS — feeder demand clamped to setpoint)` row into the breakdown.
+2. **NEC 220.84 multi-family path**: `MultiFamilyContext` gained an optional `evDemandVA?` field. The MDP-level demand math now subtracts raw connected EV (`evLoadVA`) from the dwelling base before applying the 220.84 demand factor, then adds back the post-clamp `evDemandVA` (or `evLoadVA` as fallback) at 100% per NEC 625.42. This keeps the basis consistent on both sides of the equation. The breakdown row label flips between "EV Charging (NEC 625.42 EVEMS-clamped)" and "EV Charging (EVEMS managed)" depending on whether the clamp engaged.
+
+`buildMultiFamilyContext` now populates both `evLoadVA` (raw) and `evDemandVA` (post-clamp) by reading both `result.totalConnectedVA` and `result.totalDemandVA` from each downstream EV panel. `evDemandVA` is omitted (`undefined`) when it equals `evLoadVA` — preserves pre-C4 behavior for non-EVEMS panels.
+
+*Tests — `tests/calculations-extended.test.ts`*: 8 new regression tests in a new `C4 — Per-EVSE branch row VA (NEC 220.57)` describe block:
+- 4× branch row VA: 12-charger EVEMS case → expect 11,520 VA per row (was 3,996 — exactly the audit page-14 bug); non-EVEMS path → already 11,520 (pinned, no regression); NEC 220.57 7,200 VA floor proof (24A @ 240V = 5,760 nameplate gets bumped to 7,200); EVEMS controller "EVEMS Load Management System" row stays at 500 VA (it's the controller's auxiliary control-power, not an aggregate display).
+- 3× feeder/service clamp: clamps `totalDemandVA` from 138,740 → 96,000 when EVEMS-managed + over setpoint; no clamp when no controller circuit; no clamp when already under setpoint.
+- 1× MDP combined NEC 220.84 + 625.42: full audit fixture (12 dwelling units + house + EVEMS-managed EV @ 12 chargers); expects total demand 287–289 kVA (without the new clamp this would be ~330 kVA, ~15% high).
+
+**Decisions made**:
+- **Detect EVEMS via circuit description, not a panel column** — avoids a DB migration. The autogen template is the only producer of EV-bank panels with an EVEMS controller circuit, and the description string is stable. Future follow-up F4: add explicit `panel.is_evems_managed` boolean + `panel.evems_setpoint_va` integer when the schema is next touched.
+- **Use `panel.main_breaker_amps × voltage` as the EVEMS setpoint proxy** — the autogen sizes the EV panel main breaker to the EVEMS-managed effective load (`simultaneousChargers × breakerSize` rounded up to standard size). It's the persisted artifact of the calculator's EVEMS decision. Approximation error vs. exact setpoint is bounded by the standard-size rounding (e.g. 360A → 400A panel = ~10% over) and is always upper-bound, so service sizing is never under-recommended.
+- **Apply the clamp inside `calculateAggregatedLoad`, not at each consumer** — single source of truth. Both `computeFeederLoadVA` (for the MDP→EV feeder voltage drop / sizing) and `buildMultiFamilyContext` (for the MDP service-level NEC 220.84 calc) flow through `calculateAggregatedLoad`, so applying the clamp once there gives both call paths the right answer.
+- **`evDemandVA` undefined when it equals `evLoadVA`** — preserves the pre-C4 `MultiFamilyContext` shape for the (overwhelmingly common) non-EVEMS case. No regression risk on the existing C1 multi-family tests; verified by 132 of the 172 tests passing unchanged.
+- **Keep `evemsLoadVAPerCharger` field deprecated, not removed** — backward compatibility for any external caller of `generateCustomEVPanel`. The field is now ignored; documented in the type definition.
+
+**Key Files Touched**:
+- C4 calc: `data/ev-panel-templates.ts`, `services/autogeneration/multiFamilyProjectGenerator.ts`, `services/calculations/upstreamLoadAggregation.ts`
+- Tests: `tests/calculations-extended.test.ts`
+- Docs: `docs/AHJ_COMPLIANCE_AUDIT_2026-05-04.md` (C4 marked ✅ RESOLVED, Insight section updated with the new "load-bearing-wrong-line" wrinkle, Next Session Brief rewritten for C5 / Sprint 2), `docs/CHANGELOG.md` (new dated entry above the C3+B-1+C6 entry), `docs/SESSION_LOG.md` (this entry; rotated 2026-05-04/05 entry out per "keep last 2")
+
+**Pending / Follow-ups**:
+- **Visual verification on Vercel preview**: user should regenerate the example permit packet from the same 12-unit MF + EVEMS project. Page 14 should show: each EV charger branch row at **11,520 VA** (was 3,996), conductor 6 AWG / breaker 60A unchanged, "EVEMS Load Management System" row still at 500 VA. Page 4 MDP demand should still be ~240–290 kVA (combined 220.84 + 625.42 math). Page 8 MDP→EV Sub-Panel feeder voltage drop sized to ~96 kVA / ~400 A (was correct after C2; should remain correct after C4).
+- Audit findings still open: C5 (PE seal workflow — separate sprint), all H-tier and M-tier findings (Sprint 2 = FL Permit Mode v1: TOC, sheet IDs, jurisdiction-checklist engine, FBC/NFPA-70 references, conditional NOC/HOA/site-plan pages, EVEMS narrative).
+- **F4 follow-up**: replace the EVEMS-managed circuit-description heuristic with an explicit `panels.is_evems_managed` + `panels.evems_setpoint_va` columns when the schema is next touched (no DB migration needed for C4 itself).
+- **Sprint 1 retrospective insight to bake into CLAUDE.md**: Six consecutive audit fixes turned out to be consumer-side wiring bugs, not engine bugs. The diagnostic-shortcut heuristic ("when the in-app view is correct but the PDF disagrees, look at the PDF call site or autogeneration") is now a strong pattern. Worth promoting to a top-level "Codebase Pitfalls" entry in CLAUDE.md so the heuristic is the first thing future sessions check.
+
+**PRs**:
+- `fix/c4-evems-branch-circuit-math` branch — pending push + PR open + Vercel preview verification.
 
 ---
 
@@ -11,7 +69,7 @@
 
 **Focus**: Fourth session in the AHJ compliance audit Sprint 1. C1 (220.84 multi-family DF) and C2 (live-derive feeder load) were merged earlier; this session shipped the bundled C3 (project-metadata validation) + B-1 (chatTools.ts AI staleness) + a third bug (panel-schedule PDF phase column / balancing) spotted on 2026-05-06 while the user was reviewing the same packet — all three are consumer-side wiring fixes that didn't touch any calculation engine.
 
-**Status**: ✅ All three shipped on branch `fix/c3-b1-bundle`, PR #17 OPEN. 164/164 tests pass (was 138 pre-bundle, +26 new). `npm run build` exits 0 in 4.61s. Pending user visual verification on Vercel preview before merging.
+**Status**: ✅ All three shipped on branch `fix/c3-b1-bundle`, PR #17 merged on 2026-05-07. 164/164 tests pass (was 138 pre-bundle, +26 new). `npm run build` exits 0 in 4.61s.
 
 **Direction shift on 2026-05-06**: First C3 implementation hard-blocked PDF generation when fields were placeholder-shaped. User pushed back — contractors legitimately need draft packets with "TBD" for pre-application AHJ walk-ins. C3 was reworked into advisory-only (commit `b69a170`). Saved this preference to memory at `feedback_validation_advisory.md` so future sessions don't reintroduce hard-block validation. B-1 was unaffected.
 
@@ -29,96 +87,20 @@
 - `flContractorLicenseSchema` — `.regex(/^E[CR]\d{7}$/i)` (FL DBPR Certified or Registered), case-insensitive, rejects placeholders
 - `permitNumberSchema` — optional + nullable; if present must be ≥ 4 chars and not a placeholder
 
-The existing `projectSchema.address` now references `projectAddressSchema`.
+The existing `projectSchema.address` left at its original permissive `.min(1).max(200)` — schemas are advisory-only.
 
-*C3 — `components/PermitPacketGenerator.tsx`*: Replaced the trivial `hasLicense = contractorLicense.trim().length > 0` with `safeParse` against all three schemas. Added per-input red-border styling + inline error text (license + permit number). Updated `canGenerate` predicate. Added a re-validation pre-flight gate inside `handleGenerate` that short-circuits with a structured "would be rejected at AHJ intake" error before invoking `generatePermitPacket(...)`. The validation warning block now enumerates every failed field with its specific Zod message and points users back to Project Setup for the address (it isn't editable in the packet form).
+*C3 — `components/PermitPacketGenerator.tsx`*: `safeParse` against all three schemas drives a blue informational alert ("Heads up — these may cause AHJ intake friction") that explicitly notes "Packet will still generate — these are informational only." Hard gating preserved only for cases that would break PDF gen (no panels, no contractor-license input at all, no scope of work). The Generate button stays enabled.
 
-*B-1 — `services/ai/chatTools.ts`*: Plumbed raw DB rows into `ToolContext` (new optional `rawPanels`, `rawCircuits`, `rawFeeders`, `rawTransformers` arrays). Rewrote the `calculate_feeder_voltage_drop` execute() handler (~70 lines) to:
-1. Find the feeder summary by name/ID (existing `findFeeder` helper, unchanged).
-2. Look up the corresponding raw `Feeder` row by ID in `context.rawFeeders`.
-3. Call `computeFeederLoadVA(rawFeeder, rawPanels, rawCircuits, rawTransformers)` from `services/feeder/feederLoadSync.ts` — the exact same helper the C2 PDF fix uses.
-4. Build a `FeederCalculationInput` (mirroring `services/pdfExport/VoltageDropDocuments.tsx:295-308`) and call `calculateFeederSizing(...)` from `services/calculations/feederSizing.ts`.
-5. Return live values (`voltageDropPercent`, `compliant`, `conductorSize`, `designCurrentAmps`, `liveLoadVA`, `calculationSource: 'live'`, optional warnings).
-6. Fall back to the cached summary value with `calculationSource: 'cached'` when raw rows aren't wired (legacy callers, transformer-destination feeders, or contexts where the user has no project loaded).
+*B-1 — `services/ai/chatTools.ts`, `services/geminiService.ts`, `App.tsx`*: Plumbed raw DB rows alongside the lossy `ProjectContext` summary. `ToolContext` gained optional `rawPanels`, `rawCircuits`, `rawFeeders`, `rawTransformers`. `askNecAssistantWithTools` accepts an optional `AgenticRawData` arg. The `calculate_feeder_voltage_drop` tool now calls `computeFeederLoadVA` + `calculateFeederSizing` live and returns `{ voltageDropPercent, compliant, conductorSize, designCurrentAmps, liveLoadVA, calculationSource: 'live' | 'cached' }`. Falls back to cached when raw rows aren't wired.
 
-*B-1 — `services/geminiService.ts`*: Exported new interface `AgenticRawData { panels?, circuits?, feeders?, transformers? }`. `askNecAssistantWithTools` accepts an optional `rawData?: AgenticRawData` arg that threads into ToolContext.
-
-*B-1 — `App.tsx`*: Single call site (line 511) updated to pass `{ panels, circuits, feeders, transformers }` from existing hook scope when `hasContext` is truthy. Fall-through to `undefined` keeps the AI in summary-only mode for unprojected sessions.
-
-*Tests — `tests/calculations-extended.test.ts`*: 22 new tests:
-- 21 schema acceptance/rejection cases for C3 (FL license format Cert/Reg/case-insensitive/placeholder/out-of-state/short-tail/empty; permit number undefined/empty/realistic/short/placeholder; address realistic/TBD/test/no-digits/short/empty)
-- 3 AI tool tests for B-1 (live-derive proves cached `voltageDropPercent` is ignored when raw rows are wired; cached fallback when raw rows aren't provided; regression test that the pre-B-1 stale-cache behavior is reproducible — exactly the scenario where a user without a loaded project gets the "Compliant 0%" answer they used to get)
-
-**Decisions made**:
-- **Single free-text address field, not split (street/city/state/ZIP)** — DB schema change is invasive. The `.min(8)` + digit-required + placeholder-blocklist combination rejects realistic intake failures without a migration.
-- **Reject FL-only license format at this pilot stage** — the strategic context is FL pilot per `business/STRATEGIC_ANALYSIS.md` rewrite. Non-FL contractors blocked from PDF gen until the license format check is parameterized by jurisdiction (deferred to post-pilot).
-- **Plumb raw rows alongside lossy summary** for B-1 instead of enriching `ProjectContext` — keeps the AI prompt compact (the summary is intentionally lossy for token efficiency); raw rows ride alongside as an opt-in companion bag.
-- **`calculationSource: 'live' | 'cached'` field on the tool result** — explicit so the AI can mention "based on your current project data" vs "from a cached calculation" if it wants to (also makes test assertions easier).
+*Panel-Phase — `services/pdfExport/PanelScheduleDocuments.tsx`*: Replaced inline `panel.phase === 1 ? 'A' : ['A','B','C'][(row-1) % 3]` at 2 render paths (full + lightweight) with `getCircuitPhase(leftNum, panel.phase === 3 ? 3 : 1)`. Rewrote `calculatePhaseBalancing(panelPhase=1)` to (a) place 1-pole loads on whichever leg `getCircuitPhase` says, and (b) split 2-pole 240V loads 50/50 across both legs (mirrors the existing 3-phase 2-pole logic and matches NEC physics).
 
 **Key Files Touched**:
-- C3: `lib/validation-schemas.ts`, `components/PermitPacketGenerator.tsx`, `tests/calculations-extended.test.ts`
-- B-1: `services/ai/chatTools.ts`, `services/geminiService.ts`, `App.tsx`, `tests/calculations-extended.test.ts`
-- Docs: `docs/AHJ_COMPLIANCE_AUDIT_2026-05-04.md` (C3 + B-1 marked ✅ RESOLVED, Next Session Brief rewritten for C4), `docs/CHANGELOG.md` (new dated entry above the C1+C2 entry), `docs/SESSION_LOG.md` (this entry; rotated 2026-04-21 entry out per "keep last 2")
-
-**Pending / Follow-ups**:
-- Visual verification on Vercel preview — user should: (a) open project edit, set address to "TBD", then attempt to generate a permit packet → expect block with specific error; (b) open Spark Copilot on the 12-unit MF project, ask "is the MDP→EV Sub-Panel feeder voltage drop compliant?" → expect a real percentage matching the post-C2 PDF, not 0%.
-- Audit findings still open: C4 (per-EVSE branch math + EVEMS feeder math — Next Session Brief now in audit doc), C5 (PE seal workflow), all H- and M-tier findings.
-- C3 enhancement (post-pilot): parameterize `flContractorLicenseSchema` by jurisdiction so non-FL contractors aren't blocked. Currently fine — pilot is FL-only.
+- C3: `lib/validation-schemas.ts`, `components/PermitPacketGenerator.tsx`
+- B-1: `services/ai/chatTools.ts`, `services/geminiService.ts`, `App.tsx`
+- Panel-Phase: `services/pdfExport/PanelScheduleDocuments.tsx`
+- Tests: `tests/calculations-extended.test.ts` (26 new tests)
+- Docs: `docs/AHJ_COMPLIANCE_AUDIT_2026-05-04.md`, `docs/CHANGELOG.md`, `docs/SESSION_LOG.md`
 
 **PRs**:
-- `fix/c3-b1-bundle` branch — pending push + PR open + Vercel preview verification.
-
----
-
-### Session: 2026-05-04 / 2026-05-05 — AHJ Compliance Audit + C1 + C2 Permit Packet Fixes
-
-**Focus**: Three sequential pieces of work, all driven by reviewing the SparkPlan permit-packet output against real Florida AHJ requirements:
-1. Cleaned up `business/` folder — deleted superseded market-research / boilerplate / YouTube-research notes (13 files), rewrote `STRATEGIC_ANALYSIS.md` and `DISTRIBUTION_PLAYBOOK.md` from a "California / EV-mandate tailwind" framing to "Florida / permit-acceptance" wedge based on the Obsidian May 2026 Reconciliation Notes (Florida §366.94 preempts local EV ordinances; the FL pilot must justify on workflow value, not mandate).
-2. Audited the example permit packet (`example_reports/Permit_Packet_Multifamily_Test_2026-05-05.pdf`, 27 pages) against five FL AHJ checklists (Orlando, Miami-Dade, Pompano Beach, Davie, Hillsborough). Net: would have failed first-pass review at all 5 — produced `docs/AHJ_COMPLIANCE_AUDIT_2026-05-04.md` with 5 Critical, 11 High, 8 Medium findings, organized into a 4-sprint fix sequence.
-3. Fixed C1 (NEC 220.84 multi-family DF not applied to permit packet load-calc page) and C2 (EVSE feeder shown as 14 AWG / 0 A / "Compliant" because cached `feeder.total_load_va` was stale).
-
-**Status**:
-- ✅ Business cleanup + audit doc shipped on `docs/business-cleanup` branch (4 commits, merged inline).
-- ✅ C1 shipped in PR #15 (`9c8941d`), merged to main, visually verified by user on Vercel preview.
-- ✅ C2 shipped on branch `fix/c2-evse-feeder-aggregation` (2 commits, pushed). User verifying on Vercel preview at session end.
-- 138/138 tests pass after C2 (was 123 pre-audit, +15 new). `npm run build` exits 0 in 4.64s.
-
-**Root causes (key insight: both C1 and C2 are PDF-call-site wiring bugs, not calculation engine bugs)**:
-
-- **C1**: `services/calculations/upstreamLoadAggregation.ts` already had a working NEC 220.84 multi-family branch (lines 638–694) that activated when called with a `multiFamilyContext` argument. The in-app MDP "Aggregated Load (NEC 220.40)" tile passed the context correctly (`PanelSchedule.tsx:290`), so it showed the right answer (242 kVA / 1,008 A). But the PDF call site at `services/pdfExport/PermitPacketDocuments.tsx:980` called `calculateAggregatedLoad` without the optional sixth argument — so the PDF fell through to the standard NEC 220 cascade where every `load_type='O'` circuit got dumped into the NEC 220.14 catch-all at 100% (498 kVA / 2,077 A on a 1,000 A service — telling the AHJ the design was *non-compliant* when it actually was).
-- **C2**: The `feeders` table caches `total_load_va` at create time. Auto-population workflows (Multi-Family EV calculator, templates) create feeders before destination panel circuits exist, persisting `total_load_va = 0`. PDF read it verbatim at `VoltageDropDocuments.tsx:283-285`, fed 0 VA into `calculateFeederSizing`, which returned the smallest entry in the ampacity table (14 AWG, NEC 310.16) with vacuous-truth voltage drop (0 A × R × L = 0 V → "Compliant"). NEC 240.4(D) small-conductor enforcement at `services/calculations/conductorSizing.ts:342-365` was already correct — 14 AWG was the right answer for the wrong input.
-
-**Work Done**:
-
-*Commit b6db608 — `docs: business folder cleanup`:* Deleted 13 files (saas-growth-strategy, MARKET_INTELLIGENCE_FEB_2026, PERMIT_PACKET_MARKET_ANALYSIS, all 10 youtube-research notes). Net business/ tree: 9 files (down from 22).
-
-*Commit 92c6c3b — `docs: rewrite strategic docs to FL-first multifamily-EV wedge`:* `STRATEGIC_ANALYSIS.md` and `DISTRIBUTION_PLAYBOOK.md` rewritten — California-first → Florida-first; corrected contractor count anchor (251,789 IBISWorld → 81,046 IEC 2025); ARR calibrated to $50K–$150K Y1 realistic; pricing flagged as Open Decision per Reconciliation Notes; FlashWorks added to competitor matrix; SPAN Kopperfield-incumbency caveat documented.
-
-*Commit b7879d2 — `docs: AHJ compliance audit`:* New `docs/AHJ_COMPLIANCE_AUDIT_2026-05-04.md` with 5 Critical (C1–C5), 11 High (H1–H11), 8 Medium (M1–M8) findings + AHJ-by-AHJ requirement matrix + 4-sprint fix sequence + 10-step verification protocol for C1.
-
-*Commits 47a1365 + 518e05f (PR #15) — C1 fix:* New pure helper `buildMultiFamilyContext(panel, panels, circuits, transformers, settings)` in `upstreamLoadAggregation.ts` — 4-condition gate (MDP, dwelling occupancy, multi_family type, ≥3 units). Both `PanelSchedule.tsx:102-138` (replaced 36-line inline gate) and `permitPacketGenerator.tsx` / `PermitPacketDocuments.tsx` now call the helper. NEC 220.84 table in `multiFamilyEV.ts:33-57` verified row-by-row against NEC 2023 Table 220.84(B) — all 23 rows match; no data changes.
-
-*Commits 3bd6c08 + 518e05f (`fix/c2-evse-feeder-aggregation` branch) — C2 fix:* New helper `computeFeederLoadVA(feeder, panels, circuits, transformers)` in `services/feeder/feederLoadSync.ts` — live-derives `totalDemandVA` (post-NEC 220 cascade per NEC 215.2(A)(1)) from destination panel; falls back to cached for transformer feeders / orphaned panels. Wired into `VoltageDropDocuments.tsx` (renderer accepts optional `circuits` prop), `voltageDropPDF.tsx` (3 gating helpers + `exportVoltageDropReport` accept optional `panels/circuits/transformers`), `permitPacketGenerator.tsx` (passes `data.circuits`), `FeederManager.tsx` (4 gate calls + diagnostic + export handler thread the args). Cached `feeder.total_load_va` column intentionally preserved for the future PE seal snapshot workflow.
-
-**Decisions made**:
-- **Live-derive on read, not sync-and-persist** for C2 — write-on-read invites race conditions when two PDF previews run in parallel; live-derive is idempotent.
-- **Keep cached column** vs. drop it entirely — needed for the future PE seal workflow (C5) where we'll snapshot the as-of-seal-time value.
-- **Use `totalDemandVA`** (post-DF) not `totalConnectedVA` (raw) — NEC 215.2(A)(1) requires demand-load sizing.
-- **Optional new args** on gating helpers — backwards-compatible signature change; legacy callers (test fixtures, AI tools) keep working at the cached behavior, opt-in to live-derive when they thread the args.
-
-**Key Files Touched**:
-- C1: `services/calculations/upstreamLoadAggregation.ts`, `components/PanelSchedule.tsx`, `services/pdfExport/PermitPacketDocuments.tsx`, `services/pdfExport/permitPacketGenerator.tsx`, `components/PermitPacketGenerator.tsx`, `tests/calculations-extended.test.ts`
-- C2: `services/feeder/feederLoadSync.ts`, `services/pdfExport/VoltageDropDocuments.tsx`, `services/pdfExport/voltageDropPDF.tsx`, `services/pdfExport/permitPacketGenerator.tsx`, `components/FeederManager.tsx`, `tests/calculations-extended.test.ts`
-- Docs: `docs/AHJ_COMPLIANCE_AUDIT_2026-05-04.md` (new), `docs/CHANGELOG.md`, `docs/SESSION_LOG.md` (this entry), `business/STRATEGIC_ANALYSIS.md` (rewritten), `business/DISTRIBUTION_PLAYBOOK.md` (rewritten)
-
-**Pending / Follow-ups**:
-- Visual verification of C2 on Vercel preview (in progress at session close).
-- Per-feeder card display in `FeederManager.tsx:1317` still shows cached `feeder.design_load_va`. Intentional (Recalculate button UX), but flagged as a UX question if user prefers live-derive there too.
-- `services/ai/chatTools.ts:293` reads `feeder.voltageDropPercent` directly when the AI answers "is feeder X compliant?" questions. Same staleness as the original C2 bug — AI can give wrong answers. Track as B-finding for follow-up after C5.
-- Audit findings still open: C3 (project metadata validation — TBD/test placeholder fields), C4 (per-EVSE branch math + EVEMS feeder math), C5 (PE seal workflow), all of H1–H11 (cover sheet TOC, revision log, sheet ID convention E-###, FBC + NFPA-70 references, NOC placeholder, HOA letter, site plan, equipment cut sheets, AIC ratings via short-circuit study integration, EVEMS narrative, EVSE labeling page).
-- F-followups (not blocking): F1 EV/house panel name-string-match → typed `panel_role` discriminator; F2 NEC 220.84 table extraction from inline → `data/nec/table-220-84.ts`; F3 legacy "Demand Factor Calculation" tile in MDP UI shows direct circuits — should be hidden on MDP for multi-family or relabeled.
-
-**PRs**:
-- #15 — C1 (merged `9c8941d`)
-- C2 PR — pending on `fix/c2-evse-feeder-aggregation` (https://github.com/augustov58/sparkplan/pull/new/fix/c2-evse-feeder-aggregation)
-
+- #17 — C3 + B-1 + C6 (merged 2026-05-07).
