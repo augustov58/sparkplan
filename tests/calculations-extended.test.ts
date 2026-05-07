@@ -1779,6 +1779,46 @@ describe('C4 — Per-EVSE branch row VA (NEC 220.57)', () => {
       }
     });
 
+    it('calculatePanelDemand splits 2-pole 240V loads 50/50 across A/B on 1Φ split-phase panel (regression for in-app twin of C6)', () => {
+      // Reproduces the audit-fixture Unit 110 panel where the in-app PanelSchedule
+      // showed Phase A=5.7, Phase B=17.0, Phase Imbalance 99.6% — broken because
+      // 2-pole loads on slots that land on Phase B were rotating B→C (3Φ rule)
+      // and the C bucket was orphaned (never displayed on a 1Φ panel). Same bug
+      // pattern as C6 (PDF version) — fix mirrors the C6 fix.
+      const audit_unit110_loads: CircuitLoad[] = [
+        // 1-pole circuits — alternate A/A/B/B/A/A by row pair
+        { id: 'k1', description: 'Kitchen #1', loadWatts: 1500, loadType: 'O', pole: 1, circuitNumber: 1 },
+        { id: 'k2', description: 'Kitchen #2', loadWatts: 1500, loadType: 'O', pole: 1, circuitNumber: 2 },
+        { id: 'l',  description: 'Laundry',    loadWatts: 1500, loadType: 'O', pole: 1, circuitNumber: 3 },
+        { id: 'b',  description: 'Bathroom',   loadWatts: 1500, loadType: 'O', pole: 1, circuitNumber: 4 },
+        { id: 'gl1', description: 'GL #1',     loadWatts: 1350, loadType: 'O', pole: 1, circuitNumber: 5 },
+        { id: 'gl2', description: 'GL #2',     loadWatts: 1350, loadType: 'O', pole: 1, circuitNumber: 6 },
+        // 2-pole 240V loads — must split 50/50 across A and B
+        { id: 'r',  description: 'Range',         loadWatts: 12000, loadType: 'O', pole: 2, circuitNumber: 7 },
+        { id: 'd',  description: 'Dryer',         loadWatts: 5500, loadType: 'O', pole: 2, circuitNumber: 8 },
+        { id: 'ac', description: 'A/C',           loadWatts: 5000, loadType: 'O', pole: 2, circuitNumber: 11 },
+        { id: 'wh', description: 'Water Heater',  loadWatts: 4500, loadType: 'O', pole: 2, circuitNumber: 12 },
+        // 1-pole on slot 15 (lands on Phase B per row-pair rule)
+        { id: 'dp', description: 'Disposal',   loadWatts: 500,  loadType: 'O', pole: 1, circuitNumber: 15 },
+      ];
+
+      const result = calculatePanelDemand(audit_unit110_loads, 240, 1);
+
+      // Phase A 1-pole: K1 + K2 + GL1 + GL2 = 5,700 VA
+      // Phase B 1-pole: Laundry + Bath + Disposal = 3,500 VA
+      // 2-pole loads (range + dryer + AC + WH) split 50/50: 27,000/2 = 13,500 each
+      // Total Phase A = 5,700 + 13,500 = 19,200 VA = 19.2 kVA
+      // Total Phase B = 3,500 + 13,500 = 17,000 VA = 17.0 kVA
+      const phaseA = result.phaseLoads.find(p => p.phase === 'A');
+      const phaseB = result.phaseLoads.find(p => p.phase === 'B');
+      expect(phaseA?.connectedLoad_kVA).toBeCloseTo(19.2, 1);
+      expect(phaseB?.connectedLoad_kVA).toBeCloseTo(17.0, 1);
+
+      // Phase imbalance: (19.2 - 17.0) / ((19.2+17.0)/2) × 100 ≈ 12.2%
+      // Pre-fix: showed 99.6% (because B got 17.0 + 13.5 phantom-C orphaning)
+      expect(result.percentImbalance).toBeLessThan(15);
+    });
+
     it('EVEMS marker circuit is detectable + filterable by isEVEMSMarkerCircuit', () => {
       // Verify the marker circuit emitted alongside the charger branches is
       // detected by the helper that the UI/PDF use to filter it from regular
