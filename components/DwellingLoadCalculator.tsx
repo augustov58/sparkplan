@@ -6,7 +6,6 @@
  */
 
 import React, { useState, useEffect, useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
 import {
   Home,
   Zap,
@@ -28,7 +27,6 @@ import {
   Users,
   Cable,
   Building2,
-  ArrowRight,
   Info,
   Loader
 } from 'lucide-react';
@@ -99,7 +97,6 @@ export const DwellingLoadCalculator: React.FC<DwellingLoadCalculatorProps> = ({
   updateProject 
 }) => {
   // Hooks
-  const navigate = useNavigate();
   const { panels, createPanel, updatePanel } = usePanels(project.id);
   const mainPanel = panels.find(p => p.is_main);
   const { circuits, createCircuit, deleteCircuitsByPanel } = useCircuits(project.id);
@@ -646,7 +643,7 @@ export const DwellingLoadCalculator: React.FC<DwellingLoadCalculatorProps> = ({
               </h4>
               <p className="text-xs text-blue-700 mt-1">
                 Generate a complete project with meter stack, unit panels, and house panel.
-                {' '}If you also need EV charging infrastructure, use the MF EV Calculator instead.
+                {' '}After generating, you can add EV charging infrastructure from the MF EV Calculator in Tools &amp; Calculators.
               </p>
 
               {/* Existing panels warning */}
@@ -711,13 +708,6 @@ export const DwellingLoadCalculator: React.FC<DwellingLoadCalculatorProps> = ({
                   >
                     <Zap className="w-3.5 h-3.5" />
                     Generate Multi-Family Project
-                  </button>
-                  <button
-                    onClick={() => navigate('/tools?tab=multi-family-ev')}
-                    className="inline-flex items-center gap-1.5 px-3 py-1.5 text-blue-600 text-xs font-medium hover:text-blue-800 transition-colors"
-                  >
-                    <ArrowRight className="w-3.5 h-3.5" />
-                    Open MF EV Calculator (with EV)
                   </button>
                   <button
                     onClick={() => setShowMFRedirect(false)}
