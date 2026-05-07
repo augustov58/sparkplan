@@ -1747,14 +1747,54 @@ describe('C4 — Per-EVSE branch row VA (NEC 220.57)', () => {
       expect(result.panel.bus_rating).toBe(400);
     });
 
-    it('unit panel sizing uses NEC 220.82 demand × 1.25 (not raw connected × 1.25)', () => {
-      // Typical apartment: 1000 sqft, electric range + A/C + water heater.
-      // Pre-fix: raw connected sum × 1.25 ≈ 130A → 150A panel (oversized).
-      // Post-fix: NEC 220.82 demand × 1.25 ≈ 95A → 100A panel (NEC-correct).
-      // The 220.82 Optional Method puts the first 10 kVA at 100% and the rest
-      // at 40%, then adds the larger of A/C vs heating at 100% per NEC 220.60.
+    it('unit panel sizing uses NEC 220.82 Optional Method demand × 1.25', () => {
+      // Audit fixture (user's actual Dwelling Load Calculator config):
+      // 12 units × 900 sqft, 12 kW range, 5.5 kW dryer, 4.5 kW WH,
+      // 5 kW A/C only, 0.5 kW disposal.
+      //
+      // NEC 220.82 Optional Method for one unit:
+      //   General loads: 2.7 + 3.0 + 1.5 + 12 + 5.5 + 4.5 + 0.5 = 29.7 kVA
+      //   General demand: 10 + (29.7 − 10) × 0.4 = 17.88 kVA
+      //   + A/C @ 100%: 5.0 kVA   → total demand 22.88 kVA
+      //   22.88 / 240 = 95.3 A continuous × 1.25 = 119 A
+      //   → next standard from [100, 125, 150, 200] = 125 A panel.
+      //
+      // Pre-fix (Standard Method via misnamed calculateSingleFamilyLoad):
+      //   General + Range@9.6kVA + Dryer@5.5 + WH@4.5 + A/C@5 + Disposal@0.5 = ~30 kVA
+      //   30/240 × 1.25 = 154 A → 200 A panel (oversized by one standard size).
       const result = generateBasicMultiFamilyProject({
         projectId: 'proj-unit-sizing',
+        voltage: 240,
+        phase: 1,
+        dwellingUnits: 12,
+        avgUnitSqFt: 900,
+        serviceAmps: 1000,
+        commonAreaLoadVA: 15000,
+        hasElectricCooking: true,
+        hasElectricHeat: false,
+        applianceConfig: {
+          rangeKW: 12,
+          dryerKW: 5.5,
+          waterHeaterKW: 4.5,
+          coolingKW: 5,
+          disposalKW: 0.5,
+        },
+      });
+
+      expect(result.unitPanels.length).toBeGreaterThan(0);
+      for (const unitPanel of result.unitPanels) {
+        expect(unitPanel.bus_rating).toBe(125);
+        expect(unitPanel.main_breaker_amps).toBe(125);
+      }
+    });
+
+    it('unit panel sizing for smaller appliance config still lands at 100A', () => {
+      // Lighter spec — 1000 sqft + 8 kW range + no dryer + 4.5 WH + 3.5 A/C.
+      // General: 3.0 + 3.0 + 1.5 + 8 + 4.5 = 20.0 kVA
+      // General demand: 10 + 10 × 0.4 = 14.0
+      // + A/C 3.5 = 17.5 kVA → 73 A × 1.25 = 91 A → 100 A panel.
+      const result = generateBasicMultiFamilyProject({
+        projectId: 'proj-unit-sizing-small',
         voltage: 240,
         phase: 1,
         dwellingUnits: 4,
@@ -1769,13 +1809,8 @@ describe('C4 — Per-EVSE branch row VA (NEC 220.57)', () => {
           coolingKW: 3.5,
         },
       });
-
-      expect(result.unitPanels.length).toBeGreaterThan(0);
       for (const unitPanel of result.unitPanels) {
-        // 100A is the NEC-correct rating for the typical apartment.
-        // Pre-fix this returned 150A or 200A.
-        expect(unitPanel.bus_rating).toBeLessThanOrEqual(125);
-        expect(unitPanel.main_breaker_amps).toBe(unitPanel.bus_rating);
+        expect(unitPanel.bus_rating).toBe(100);
       }
     });
 
