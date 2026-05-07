@@ -506,13 +506,29 @@ export function generateCustomEVPanel(input: CustomEVPanelInput): ApplyTemplateO
       break;
   }
 
-  // Calculate total load
+  // Panel rating (amps) per NEC 215.2(A)(1): feeder ampacity ≥ 1.25 ×
+  // continuous demand. Three sizing paths in priority order:
+  //
+  //   1. EVEMS with explicit setpoint (preferred) — the calculator's
+  //      `withEVEMS` scenario gives us the managed maximum simultaneous
+  //      demand. Size feeder ampacity to that × 1.25.
+  //   2. EVEMS without explicit setpoint (legacy) — fall back to the
+  //      `simultaneousChargers × breakerSize` heuristic (this is what
+  //      pre-explicit-setpoint autogen used; preserved for callers that
+  //      don't pass a setpoint).
+  //   3. No EVEMS — full nameplate sum at `numberOfChargers × breakerSize`
+  //      (each branch already at its own 125% per NEC 625.40, so the
+  //      breaker rating itself reflects the continuous-load adjustment).
   const totalChargerLoad = numberOfChargers * breakerSize;
-
-  // Apply EVEMS demand factor if enabled
-  let effectiveLoad = totalChargerLoad;
-  if (useEVEMS && simultaneousChargers) {
+  let effectiveLoad: number;
+  if (useEVEMS && evemsSetpointVA && evemsSetpointVA > 0) {
+    const setpointDivisor = phase === 3 ? Math.sqrt(3) * voltage : voltage;
+    const setpointAmps = evemsSetpointVA / setpointDivisor;
+    effectiveLoad = Math.ceil(setpointAmps * 1.25);
+  } else if (useEVEMS && simultaneousChargers) {
     effectiveLoad = simultaneousChargers * breakerSize;
+  } else {
+    effectiveLoad = totalChargerLoad;
   }
 
   // Add spare and lighting loads

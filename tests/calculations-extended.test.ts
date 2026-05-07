@@ -1705,6 +1705,69 @@ describe('C4 — Per-EVSE branch row VA (NEC 220.57)', () => {
       expect(evCharger24ABranchVA).toBe(7200);
     });
 
+    it('panel rating sizes to NEC 625.42 setpoint × 1.25 when explicit setpoint provided', () => {
+      // 12-charger fixture with 47,952 VA setpoint (audit case):
+      // 47,952 / 240 = 199.8A continuous × 1.25 = 249.75A
+      // + spare (20A) + lighting (20A) = 289.75A → 300A standard size.
+      // Pre-fix (simultaneousChargers heuristic): 6 × 60 = 360A + 40 = 400A.
+      const result = generateCustomEVPanel({
+        projectId: 'proj-c4-rating',
+        config: {
+          chargerType: 'Level 2 (48A)',
+          numberOfChargers: 12,
+          useEVEMS: true,
+          simultaneousChargers: 6,
+          evemsSetpointVA: 47_952,
+          includeSpare: true,
+          includeLighting: true,
+        },
+      });
+      expect(result.panel.bus_rating).toBe(300);
+      expect(result.panel.main_breaker_amps).toBe(300);
+    });
+
+    it('panel rating falls back to simultaneousChargers heuristic when no setpoint provided', () => {
+      // Same 12-charger fixture without an explicit setpoint — should use the
+      // legacy autogen heuristic (6 × 60A = 360A + 40A = 400A standard).
+      // Preserves backward-compat for any caller that skips the setpoint.
+      const result = generateCustomEVPanel({
+        projectId: 'proj-c4-rating-legacy',
+        config: {
+          chargerType: 'Level 2 (48A)',
+          numberOfChargers: 12,
+          useEVEMS: true,
+          simultaneousChargers: 6,
+          includeSpare: true,
+          includeLighting: true,
+        },
+      });
+      expect(result.panel.bus_rating).toBe(400);
+    });
+
+    it('EVEMS marker circuit is detectable + filterable by isEVEMSMarkerCircuit', () => {
+      // Verify the marker circuit emitted alongside the charger branches is
+      // detected by the helper that the UI/PDF use to filter it from regular
+      // panel-schedule tables. Without this filter, a 47.94 kVA "20A 2P"
+      // row would render in the panel schedule and look like a code violation.
+      const result = generateCustomEVPanel({
+        projectId: 'proj-c4-marker',
+        config: {
+          chargerType: 'Level 2 (48A)',
+          numberOfChargers: 12,
+          useEVEMS: true,
+          simultaneousChargers: 6,
+          evemsSetpointVA: 47_952,
+          includeSpare: true,
+          includeLighting: true,
+        },
+      });
+      const marker = result.circuits.find(c =>
+        c.description?.toLowerCase().includes('evems aggregate setpoint')
+      );
+      expect(marker).toBeDefined();
+      expect(marker?.loadVA).toBe(47_952);
+    });
+
     it('EVEMS controller circuit (control power) stays at 500 VA — separate from charger branches', () => {
       // The "EVEMS Load Management System" 500 VA row is the controller's own
       // 240V auxiliary power, not the EVEMS aggregate setpoint. C4 must not

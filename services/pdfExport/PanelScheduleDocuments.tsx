@@ -12,6 +12,10 @@ import {
   themeStyles,
 } from './permitPacketTheme';
 import { getCircuitPhase } from '../calculations/demandFactor';
+import {
+  isEVEMSMarkerCircuit,
+  findEVEMSSetpointMarker,
+} from '../calculations/upstreamLoadAggregation';
 
 // Helvetica + Helvetica-Bold are built-in PDF standard fonts in react-pdf —
 // calling Font.register() on them corrupts the font cache and causes
@@ -460,7 +464,13 @@ export const MultiPanelDocument: React.FC<MultiPanelDocumentProps> = ({
 }) => (
   <Document>
     {panels.map((panel) => {
-      const circuits = circuitsByPanel.get(panel.id) || [];
+      const allCircuits = circuitsByPanel.get(panel.id) || [];
+      // Hide EVEMS metadata marker circuits from the schedule. They convey
+      // the NEC 625.42 setpoint to the load aggregator but aren't physical
+      // branches; rendering them on a "20A 2P" placeholder breaker with a
+      // 47 kVA load looks like a code violation to an AHJ reviewer.
+      const circuits = allCircuits.filter(c => !isEVEMSMarkerCircuit(c));
+      const evemsSetpoint = findEVEMSSetpointMarker(panel.id, allCircuits);
       return (
         <Page key={panel.id} size="LETTER" style={themeStyles.page}>
           <BrandBar pageLabel={`PANEL SCHEDULE - ${panel.name}`} />
@@ -641,6 +651,33 @@ export const MultiPanelDocument: React.FC<MultiPanelDocumentProps> = ({
               </View>
             );
           })()}
+
+          {/* NEC 625.42 EVEMS Setpoint callout — replaces the misleading
+              "EVEMS Aggregate Setpoint" row in the circuit table with a
+              clearly-labeled info block AHJ reviewers can read at a glance. */}
+          {evemsSetpoint && evemsSetpoint.load_watts && evemsSetpoint.load_watts > 0 && (
+            <View style={styles.summarySection}>
+              <Text style={styles.summaryTitle}>EVEMS Aggregate Setpoint (NEC 625.42)</Text>
+              <View style={styles.summaryGrid}>
+                <View style={styles.summaryItem}>
+                  <Text style={styles.summaryLabel}>Setpoint</Text>
+                  <Text style={styles.summaryValue}>
+                    {(evemsSetpoint.load_watts / 1000).toFixed(1)} kVA
+                  </Text>
+                </View>
+                <View style={styles.summaryItem}>
+                  <Text style={styles.summaryLabel}>Setpoint Amps</Text>
+                  <Text style={styles.summaryValue}>
+                    {(
+                      evemsSetpoint.load_watts /
+                      (panel.voltage * (panel.phase === 3 ? Math.sqrt(3) : 1))
+                    ).toFixed(1)}
+                    A
+                  </Text>
+                </View>
+              </View>
+            </View>
+          )}
 
           <BrandFooter projectName={projectName} />
         </Page>

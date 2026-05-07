@@ -19,7 +19,13 @@ import {
   getLoadTypeColor,
   type CircuitLoad 
 } from '../services/calculations/demandFactor';
-import { calculateAggregatedLoad, buildMultiFamilyContext, type MultiFamilyContext } from '../services/calculations/upstreamLoadAggregation';
+import {
+  calculateAggregatedLoad,
+  buildMultiFamilyContext,
+  isEVEMSMarkerCircuit,
+  findEVEMSSetpointMarker,
+  type MultiFamilyContext,
+} from '../services/calculations/upstreamLoadAggregation';
 import type { LoadTypeCode } from '../types';
 
 // Load type options for dropdown
@@ -83,7 +89,17 @@ export const PanelSchedule: React.FC<PanelScheduleProps> = ({ project }) => {
   }, [panels, selectedPanelId]);
 
   const selectedPanel = panels.find(p => p.id === selectedPanelId);
-  const panelCircuits = circuits.filter(c => c.panel_id === selectedPanelId);
+  // Exclude EVEMS metadata marker circuits — they convey the NEC 625.42
+  // setpoint to the load aggregator but aren't real branch circuits, so they
+  // shouldn't render in the panel-schedule table or count toward phase
+  // totals / direct circuits load. The setpoint is surfaced in its own info
+  // card below (via `evemsSetpointMarker`).
+  const panelCircuits = circuits.filter(
+    c => c.panel_id === selectedPanelId && !isEVEMSMarkerCircuit(c),
+  );
+  const evemsSetpointMarker = selectedPanelId
+    ? findEVEMSSetpointMarker(selectedPanelId, circuits)
+    : undefined;
 
   // Find downstream panels fed from this panel
   const downstreamPanels = useMemo(() => {
@@ -1667,6 +1683,38 @@ export const PanelSchedule: React.FC<PanelScheduleProps> = ({ project }) => {
                 </div>
               </div>
             </div>
+
+            {/* NEC 625.42 EVEMS Setpoint Info (when an explicit setpoint marker is present) */}
+            {evemsSetpointMarker && evemsSetpointMarker.load_watts && evemsSetpointMarker.load_watts > 0 && selectedPanel && (
+              <div className="bg-amber-50 border border-amber-300 rounded-lg p-4">
+                <h4 className="font-semibold text-sm text-amber-900 mb-2 flex items-center gap-2">
+                  <Settings className="w-4 h-4" /> EVEMS AGGREGATE SETPOINT (NEC 625.42)
+                </h4>
+                <p className="text-xs text-amber-900/80 mb-3">
+                  EVEMS controller-permitted maximum simultaneous demand for this panel. Branch
+                  conductors stay at full continuous nameplate per NEC 625.40 + 220.57(A); the
+                  feeder serving this panel may be sized to the setpoint per NEC 625.42.
+                </p>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="bg-white/70 rounded p-2">
+                    <span className="text-[10px] uppercase text-amber-800 block">Setpoint</span>
+                    <span className="text-base font-bold text-amber-900">
+                      {(evemsSetpointMarker.load_watts / 1000).toFixed(1)} kVA
+                    </span>
+                  </div>
+                  <div className="bg-white/70 rounded p-2">
+                    <span className="text-[10px] uppercase text-amber-800 block">Setpoint Amps</span>
+                    <span className="text-base font-bold text-amber-900">
+                      {(
+                        evemsSetpointMarker.load_watts /
+                        (selectedPanel.voltage * (selectedPanel.phase === 3 ? Math.sqrt(3) : 1))
+                      ).toFixed(1)}{' '}
+                      A
+                    </span>
+                  </div>
+                </div>
+              </div>
+            )}
 
             {/* Upstream Load Aggregation (when panel has downstream loads) */}
             {aggregatedLoad && aggregatedLoad.downstreamPanelCount > 0 && (

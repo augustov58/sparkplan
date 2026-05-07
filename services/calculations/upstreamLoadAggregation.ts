@@ -53,11 +53,18 @@ export interface MultiFamilyContext {
  *   - "EVEMS Load Management System" — legacy 500 VA control-power placeholder
  *     for projects generated before the explicit setpoint marker existed
  */
-function isEVEMSManagedPanel(panelId: string, circuits: Circuit[]): boolean {
+export function isEVEMSManagedPanel(panelId: string, circuits: Circuit[]): boolean {
   return circuits.some(c => c.panel_id === panelId && isEVEMSMarkerCircuit(c));
 }
 
-function isEVEMSMarkerCircuit(circuit: Circuit): boolean {
+/**
+ * True if this circuit is an EVEMS metadata marker (either form). UI / PDF
+ * renderers should filter these out of regular panel-schedule tables — they
+ * exist only to convey EVEMS metadata to the load aggregator and shouldn't
+ * be drawn as physical branch circuits (e.g. a 47 kVA aggregate-setpoint
+ * marker on a "20A 2P" placeholder breaker is misleading to AHJ reviewers).
+ */
+export function isEVEMSMarkerCircuit(circuit: Circuit): boolean {
   const desc = circuit.description?.toLowerCase() ?? '';
   return (
     desc.includes('evems aggregate setpoint') ||
@@ -67,6 +74,17 @@ function isEVEMSMarkerCircuit(circuit: Circuit): boolean {
 
 function isEVEMSExplicitSetpointMarker(circuit: Circuit): boolean {
   return circuit.description?.toLowerCase().includes('evems aggregate setpoint') ?? false;
+}
+
+/**
+ * Locate the explicit EVEMS Aggregate Setpoint marker circuit on the panel
+ * (if present) — used by UI/PDF callouts to show the NEC 625.42 setpoint
+ * prominently in its own info card instead of in the regular circuit table.
+ */
+export function findEVEMSSetpointMarker(panelId: string, circuits: Circuit[]): Circuit | undefined {
+  return circuits.find(
+    c => c.panel_id === panelId && isEVEMSExplicitSetpointMarker(c),
+  );
 }
 
 /**
