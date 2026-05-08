@@ -173,7 +173,18 @@ interface CoverPageProps {
   serviceType?: 'overhead' | 'underground';
   meterLocation?: string;
   serviceConductorRouting?: string;
+  // Sprint 2A C7 / H4: applicable codes
+  necEdition?: '2020' | '2023';
+  codeReferences?: string[];
 }
+
+// FL pilot AHJs adopt NFPA-70 2020 via FBC 8th ed. NEC 220.84 demand-factor
+// table values match across both editions (see services/calculations/multiFamilyEV.ts:25).
+const DEFAULT_NEC_EDITION: '2020' | '2023' = '2020';
+const DEFAULT_CODE_REFERENCES = [
+  'NFPA-70 (NEC) 2020',
+  'Florida Building Code 8th Edition (2023)',
+];
 
 export const CoverPage: React.FC<CoverPageProps> = ({
   projectName,
@@ -189,6 +200,8 @@ export const CoverPage: React.FC<CoverPageProps> = ({
   serviceType,
   meterLocation,
   serviceConductorRouting,
+  necEdition = DEFAULT_NEC_EDITION,
+  codeReferences = DEFAULT_CODE_REFERENCES,
 }) => (
   <Page size="LETTER" style={themeStyles.page}>
     <BrandBar pageLabel="PERMIT APPLICATION" />
@@ -196,7 +209,7 @@ export const CoverPage: React.FC<CoverPageProps> = ({
     <View style={themeStyles.titleBlock}>
       <Text style={themeStyles.docTitle}>Electrical Permit Application</Text>
       <Text style={themeStyles.docSubtitle}>
-        NEC 2023 Compliant Design Package
+        {`NEC ${necEdition} Compliant Design Package`}
       </Text>
     </View>
 
@@ -250,8 +263,18 @@ export const CoverPage: React.FC<CoverPageProps> = ({
       </View>
       <View style={themeStyles.projectCell}>
         <Text style={themeStyles.projectLabel}>NEC Edition</Text>
-        <Text style={themeStyles.projectValue}>NEC 2023</Text>
+        <Text style={themeStyles.projectValue}>{`NEC ${necEdition}`}</Text>
       </View>
+    </View>
+
+    <Text style={themeStyles.sectionTitle}>APPLICABLE CODES</Text>
+    <View style={themeStyles.projectGrid}>
+      {codeReferences.map((code, idx) => (
+        <View key={idx} style={themeStyles.projectCellWide}>
+          <Text style={themeStyles.projectLabel}>{`Code ${idx + 1}`}</Text>
+          <Text style={themeStyles.projectValue}>{code}</Text>
+        </View>
+      ))}
     </View>
 
     {scopeOfWork && (
@@ -1205,6 +1228,7 @@ interface ComplianceSummaryProps {
   feeders: Feeder[];
   projectName: string;
   hasGrounding?: boolean;
+  necEdition?: '2020' | '2023';
 }
 
 export const ComplianceSummary: React.FC<ComplianceSummaryProps> = ({
@@ -1213,6 +1237,7 @@ export const ComplianceSummary: React.FC<ComplianceSummaryProps> = ({
   feeders,
   projectName,
   hasGrounding = false,
+  necEdition = DEFAULT_NEC_EDITION,
 }) => {
   const mainPanel = panels.find(p => p.is_main);
   const totalCircuits = circuits.length;
@@ -1277,7 +1302,7 @@ export const ComplianceSummary: React.FC<ComplianceSummaryProps> = ({
       <View style={themeStyles.titleBlock}>
         <Text style={themeStyles.docTitle}>NEC Compliance Summary</Text>
         <Text style={themeStyles.docSubtitle}>
-          NEC 2023 design review checklist
+          {`NEC ${necEdition} design review checklist`}
         </Text>
       </View>
 
@@ -1297,7 +1322,7 @@ export const ComplianceSummary: React.FC<ComplianceSummaryProps> = ({
         </View>
         <View style={themeStyles.projectCell}>
           <Text style={themeStyles.projectLabel}>NEC Edition</Text>
-          <Text style={themeStyles.projectValue}>2023</Text>
+          <Text style={themeStyles.projectValue}>{necEdition}</Text>
         </View>
       </View>
 
@@ -1344,7 +1369,7 @@ export const ComplianceSummary: React.FC<ComplianceSummaryProps> = ({
           IMPORTANT NOTES
         </Text>
         <Text style={themeStyles.noteText}>
-          {`\u2022 This summary is based on the design data provided. Field verification is required.\n\u2022 All calculations comply with NEC 2023.\n\u2022 Final approval is subject to local building code requirements and inspector review.\n\u2022 For detailed compliance analysis, use the Inspector Mode AI feature.`}
+          {`\u2022 This summary is based on the design data provided. Field verification is required.\n\u2022 All calculations comply with NEC ${necEdition}.\n\u2022 Final approval is subject to local building code requirements and inspector review.\n\u2022 For detailed compliance analysis, use the Inspector Mode AI feature.`}
         </Text>
       </View>
 

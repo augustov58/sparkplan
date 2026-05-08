@@ -84,6 +84,18 @@ export interface PermitPacketData {
    * the standard NEC 220 cascade.
    */
   multiFamilyContext?: MultiFamilyContext;
+  /**
+   * Sprint 2A C7: NEC edition stamped on cover sheet + compliance summary.
+   * Defaults to '2020' for the FL pilot AHJs (FBC 8th ed adopts NFPA-70 2020).
+   * NEC 220.84 demand-factor table values are unchanged between 2020 and 2023.
+   */
+  necEdition?: '2020' | '2023';
+  /**
+   * Sprint 2A H4: applicable model codes shown in the cover-sheet
+   * "APPLICABLE CODES" section. Defaults to FL pilot stack
+   * (NFPA-70 2020 + FBC 8th ed 2023). Override per AHJ when other codes apply.
+   */
+  codeReferences?: string[];
 }
 
 const downloadBlob = (blob: Blob, fileName: string): void => {
@@ -167,6 +179,8 @@ export const generatePermitPacket = async (data: PermitPacketData): Promise<void
         serviceType={data.serviceType}
         meterLocation={data.meterLocation}
         serviceConductorRouting={data.serviceConductorRouting}
+        necEdition={data.necEdition}
+        codeReferences={data.codeReferences}
       />
     ),
   });
@@ -224,6 +238,7 @@ export const generatePermitPacket = async (data: PermitPacketData): Promise<void
         feeders={data.feeders}
         projectName={data.projectName}
         hasGrounding={data.hasGrounding}
+        necEdition={data.necEdition}
       />
     ),
   });
@@ -537,6 +552,8 @@ export const generateLightweightPermitPacket = async (data: PermitPacketData): P
           servicePhase={data.servicePhase}
           preparedBy={data.preparedBy}
           permitNumber={data.permitNumber}
+          necEdition={data.necEdition}
+          codeReferences={data.codeReferences}
         />
         <EquipmentSchedule
           panels={data.panels}
@@ -560,6 +577,7 @@ export const generateLightweightPermitPacket = async (data: PermitPacketData): P
           feeders={data.feeders}
           projectName={data.projectName}
           hasGrounding={data.hasGrounding}
+          necEdition={data.necEdition}
         />
       </Document>
     );
