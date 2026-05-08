@@ -3,7 +3,64 @@
 **Purpose**: Tracks recent work for seamless handoff between Claude instances.
 **Maintenance Rule**: Keep only the last 2 sessions. At the start of a new session, delete older entries — git history preserves everything.
 
-**Last Updated**: 2026-05-07
+**Last Updated**: 2026-05-08
+
+---
+
+### Session: 2026-05-07 / 2026-05-08 — AHJ Compliance Audit Sprint 2 scope refinement (PR #21)
+
+**Focus**: Post-Sprint-1 audit doc strategic re-scoping. No code changes — pure documentation update. Two-day session that (1) cross-walked the City of Orlando "EV Charging Station Permit Checklist" line-by-line against the audit doc's compliance matrix (which had been sourced from `business/STRATEGIC_ANALYSIS.md` bullets, not from official AHJ checklists), (2) read the Obsidian `SparkPlan Analysis/` strategy reports (FL_PILOT_REVISED, Reconciliation Notes, Market Viability Analysis) and reconciled the audit's Sprint 2/3 plan against them, (3) settled the Canvas-vs-Generator decision (NO canvas in v1 — see audit doc), and (4) reframed Sprint 3 as PE-as-a-service architecture per user direction (Augusto IS the PE, not BYO-cert).
+
+**Status**: ✅ Audit doc updated + committed + pushed; PR #21 awaiting user review + merge. Tests/build unaffected (181/181 still passing — doc-only change).
+
+**New findings added to the audit doc**:
+- **C7** — Hardcoded NEC 2023 reference; FL AHJs require NEC 2020 (FBC 8th ed). Single-line fix but systemic rejection vector.
+- **C8** — Per-sheet contractor signature block missing (Orlando item #1 explicitly requires contractor name+address+license signed on ALL drawings).
+- **H12** — General Notes page with NEC 2020 compliance note (Orlando item #2).
+- **H13** — Voltage drop general note (3% feeder / 3% branch / 5% combined per Orlando item #3).
+- **H14** — NEC 220.87 conditions narrative when service-upgrade engaged.
+- **H15** — EVSE specs UL-2202 + UL-2594 callouts (Orlando item #7).
+- **H16** — Fire stopping schedule for fire-rated penetrations (Orlando item #8) — upload artifact.
+- **H17** — FS 471.003(2)(h) contractor-exemption screening engine (must-have per FL_PILOT_REVISED §3.1).
+- **F7** — Acceptance evidence capture (FL_PILOT_REVISED §7 #2 moat compounder).
+
+**Compliance matrix forked**:
+- Legacy strategic-bullets matrix annotated with sourcing caveat (only Orlando validated against official checklist).
+- Orlando line-by-line matrix added, forked by service-modification type (existing-service vs new-service paths).
+- Sprint 2C parallel research task added: source Miami-Dade / Pompano / Davie / Hillsborough official checklists.
+
+**Sprint 2 decomposition (replaces single-bundle Sprint 2)**:
+- **Sprint 2A** (no new deps, ~4–6 days): C7 + C8 + H1–H4 + H9 partial + H10 + H11 + H12–H15 + H17 + M3 + M6. All in `permitPacketGenerator.tsx` + adjacent.
+- **Sprint 2B** (1–2 weeks): pdf-lib + Supabase Storage + `project_attachments` table + upload UI + title-sheet generator + AHJ manifest scaffold (Orlando first). Closes H6, H7, H8, H16.
+- **Sprint 2C** (1 week + research): per-AHJ manifests (all 5 FL AHJs) + checklist engine M1.
+
+**Canvas-vs-Generator decision**: NO canvas in v1. User-uploaded marked-up artifacts (Bluebeam, Adobe, Kopperfield, etc.) splice in via Sprint 2B title-sheet engine. Trigger condition for revisiting: pilot-contractor demand-pull on "I want to add callouts to your auto-generated one-line."
+
+**Sprint 3 PE-as-a-service architecture (user direction 2026-05-07)**: Augusto Valbuena is the PE — not BYO-cert. Centralized cert held server-side; PAdES signing applied to electrical-engineering sheet range only (not site plan / cut sheets / fire stopping — those remain contractor-signed). Capacity model: ~20–40 reviews/week, Business tier ($149/mo) includes 1–2 sealed packets/month, per-seal upcharge $99–299 beyond. **Pricing strategy decision flagged as Sprint 3 launch blocker** per Reconciliation Notes #1 (Feb $249–599 vs April $29/$49/$149 unresolved).
+
+**Decisions made**:
+- **Edit audit doc in-place rather than creating new docs** (per user preference): preserves Sprint 1 retrospective lineage; everything additive in same file.
+- **Keep legacy compliance matrix + add Orlando line-by-line below** (vs replace): preserves provenance of what was sourced from strategic bullets vs the official checklist.
+- **Multi-PE forward path baked into Sprint 3 schema** (`pe_users` table + `pe_seals.pe_user_id` reference) even though only Augusto exists today: row insert + role grant to add second PE later, not a refactor.
+- **Project-scoped memory entry** for "Augusto IS the PE" (`user_role_pe.md`): foundational fact that affects all future Sprint 3 / pricing / PE-workflow discussions; project-scoped (not global) because it's tied to SparkPlan's business model.
+
+**Key Files Touched**:
+- Docs: `docs/AHJ_COMPLIANCE_AUDIT_2026-05-04.md` (272 insertions, 46 deletions; doc grew from ~400 to 625 lines), `docs/SESSION_LOG.md` (this entry; rotated 2026-05-05/06 entry out per "keep last 2").
+- Memory: `~/.claude/projects/-home-augusto-projects-sparkplan/memory/user_role_pe.md` (new project-scoped memory: Augusto IS the PE; PE-as-service architecture); `MEMORY.md` index updated with pointer.
+
+**Pending / Follow-ups**:
+- **PR #21 user merge**. User explicitly asked to "review and merge."
+- **Pricing strategy decision** ($149/mo vs $499/mo) needs settlement before Sprint 3 launches (NOT before Sprint 2A — 2A can proceed regardless).
+- **Sprint 2C research**: source official EV permit checklists from Miami-Dade / Pompano / Davie / Hillsborough; stash in `docs/ahj-source-checklists/`. ~½–1 day per AHJ.
+- **Sprint 2A start** (post-PR #21 merge): suggested first commit is C7 + H4 + LOW edition stamp (NEC edition selector defaulting to 2020 for FL, dynamic cover subtitle, FBC 8th ed + NFPA-70 2020 reference). Smallest, lowest-risk slice — verifies test fixture still passes after a settings-driven render change before touching more invasive items.
+- **F4 + F6** still open from Sprint 1 (no DB migration yet; do together when DB next touched).
+
+**PRs**:
+- #19 — C4 omnibus (merged 2026-05-07 05:41 UTC).
+- #20 — Dwelling MF EV button removal (merged 2026-05-07; orthogonal to audit work).
+- **#21 — Audit doc Sprint 2 expansion** (open, awaiting merge; doc-only change, 1 file changed, +272/-46).
+
+**Strategy-doc context for future sessions**: Obsidian `SparkPlan Analysis/` files at `/home/augusto/Obsidian Notes/Projects/Sparkplan/SparkPlan Analysis/` are the canonical strategy source — particularly `FL_PILOT_REVISED_REPORT.md` §3.1 (Florida Permit Mode v1), §3.2 (Seal Workflow Mode), §5 (revenue/capacity), §7 (high-impact improvements ranked), and `Reconciliation Notes.md` (cross-report contradictions, especially pricing). Read these when scoping new sprints or when business-model questions arise.
 
 ---
 
@@ -63,30 +120,6 @@
 - #15 — C1 (merged earlier sessions)
 - #16 — C2 (merged earlier sessions)
 - #17 — C3 + B-1 + C6 (merged 2026-05-07 03:00 UTC)
-- **#19 — C4 omnibus** (open, awaiting merge)
-
----
-
-### Session: 2026-05-05 / 2026-05-06 — AHJ Compliance Audit C3 + B-1 + Panel-Phase (bundled, PR #17 merged)
-
-**Focus**: Fourth audit-Sprint-1 session. C1 + C2 already merged earlier. This session shipped the C3 (project-metadata advisory validation) + B-1 (chatTools.ts AI staleness) + C6 (panel-schedule PDF phase column) bundle — all three are consumer-side wiring fixes that didn't touch any calculation engine.
-
-**Status**: ✅ All three shipped on `fix/c3-b1-bundle`, PR #17 merged 2026-05-07. 164/164 tests pass (was 138 pre-bundle, +26 new).
-
-**Direction shift on 2026-05-06**: First C3 implementation hard-blocked PDF generation when fields were placeholder-shaped. User pushed back — contractors legitimately need draft packets with "TBD" for pre-application AHJ walk-ins. C3 was reworked into advisory-only. Saved this preference to memory at `feedback_validation_advisory.md` so future sessions don't reintroduce hard-block validation.
-
-**Panel-Phase bug spotted by user on 2026-05-06**: While reviewing the regenerated audit packet, user noticed every circuit on the Unit 108 Panel page (240V single-phase split-phase) showed "Phase A". Investigation: in-app `components/PanelSchedule.tsx` was correct (uses `getCircuitPhase` from `services/calculations/demandFactor.ts`); PDF at `services/pdfExport/PanelScheduleDocuments.tsx` had reinvented its own broken inline phase logic. Same C1/C2 pattern: correct helper exists, PDF call site bypasses it. Fixed.
-
-**Root causes (consumer-side wiring/validation, not engine bugs — same pattern as C1, C2)**:
-- **C3**: `lib/validation-schemas.ts:projectSchema.address` only required `.min(1)`, so `"TBD"` (3 chars) passed. `components/PermitPacketGenerator.tsx:93` checked `contractorLicense.trim().length > 0` — accepting `"test"`. AHJ-rejection risk slipped past existing form gates.
-- **B-1**: `services/ai/chatTools.ts:293` read `feeder.voltageDropPercent` (cached column on the lossy `FeederSummary`). Same staleness pattern as the original C2 bug.
-- **C6**: `services/pdfExport/PanelScheduleDocuments.tsx` had inline `panel.phase === 1 ? 'A' : ['A','B','C'][(row-1) % 3]` instead of calling `getCircuitPhase`.
-
-**Work Done**:
-- C3: Three new exported Zod schemas (`projectAddressSchema`, `flContractorLicenseSchema`, `permitNumberSchema`) with `PLACEHOLDER_VALUES` rejection list; advisory-only blue alert in `PermitPacketGenerator.tsx`, never blocks generation.
-- B-1: Plumbed raw DB rows alongside lossy `ProjectContext` summary; rewired `calculate_feeder_voltage_drop` AI tool to call `computeFeederLoadVA` + `calculateFeederSizing` live.
-- C6: Replaced inline phase expression with `getCircuitPhase(leftNum, panel.phase === 3 ? 3 : 1)` at both render paths; rewrote `calculatePhaseBalancing` for `panelPhase === 1` to split 2-pole loads 50/50.
-
-**PRs**: #17 (merged 2026-05-07).
-
-**Note for future sessions**: a SECOND copy of the same `calculatePhaseBalancing` 1Φ-bug pattern existed in `services/calculations/demandFactor.ts:calculatePanelDemand` (the in-app function); it was discovered during C4 review and fixed in commit `aa72bdb` of PR #19. When fixing a pattern bug, grep the codebase for the same idiom — Sprint 1 confirmed it usually exists in at least one more place.
+- **#19 — C4 omnibus** (merged 2026-05-07 05:41 UTC)
+- **#20 — Dwelling MF EV button removal** (merged 2026-05-07; orthogonal to audit work)
+- **#21 — Audit doc Sprint 2 expansion** (open, awaiting merge — see latest session entry above)
