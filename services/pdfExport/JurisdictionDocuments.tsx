@@ -108,11 +108,16 @@ const styles = StyleSheet.create({
 interface JurisdictionRequirementsDocumentProps {
   jurisdiction: Jurisdiction;
   projectName: string;
+  // Sprint 2A C8: per-sheet contractor signature block
+  contractorName?: string;
+  contractorLicense?: string;
 }
 
 export const JurisdictionRequirementsPages: React.FC<JurisdictionRequirementsDocumentProps> = ({
   jurisdiction,
   projectName,
+  contractorName,
+  contractorLicense,
 }) => {
   return (
     <Page size="LETTER" orientation="portrait" style={themeStyles.page}>
@@ -205,7 +210,11 @@ export const JurisdictionRequirementsPages: React.FC<JurisdictionRequirementsDoc
           </View>
         )}
 
-        <BrandFooter projectName={projectName} />
+        <BrandFooter
+          projectName={projectName}
+          contractorName={contractorName}
+          contractorLicense={contractorLicense}
+        />
       </Page>
   );
 };

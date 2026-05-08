@@ -224,6 +224,9 @@ interface PanelSchedulePDFProps {
   projectName: string;
   projectAddress?: string;
   datePreppared?: string;
+  // Sprint 2A C8: per-sheet contractor signature block
+  contractorName?: string;
+  contractorLicense?: string;
 }
 
 // Main PDF Component for single panel — page-level fragment for embedding.
@@ -233,6 +236,8 @@ export const PanelSchedulePages: React.FC<PanelSchedulePDFProps> = ({
   projectName,
   projectAddress,
   datePreppared,
+  contractorName,
+  contractorLicense,
 }) => {
   // Filter EVEMS metadata marker circuits — they convey the NEC 625.42
   // setpoint to the load aggregator but aren't physical branches; rendering
@@ -521,7 +526,11 @@ export const PanelSchedulePages: React.FC<PanelSchedulePDFProps> = ({
           </View>
         )}
 
-        <BrandFooter projectName={projectName} />
+        <BrandFooter
+          projectName={projectName}
+          contractorName={contractorName}
+          contractorLicense={contractorLicense}
+        />
       </Page>
   );
 };
@@ -541,13 +550,18 @@ interface MultiPanelDocumentProps {
   circuitsByPanel: Map<string, Circuit[]>;
   projectName: string;
   projectAddress?: string;
+  // Sprint 2A C8: per-sheet contractor signature block
+  contractorName?: string;
+  contractorLicense?: string;
 }
 
 export const MultiPanelDocument: React.FC<MultiPanelDocumentProps> = ({
   panels,
   circuitsByPanel,
   projectName,
-  projectAddress
+  projectAddress,
+  contractorName,
+  contractorLicense,
 }) => (
   <Document>
     {panels.map((panel) => {
@@ -766,7 +780,11 @@ export const MultiPanelDocument: React.FC<MultiPanelDocumentProps> = ({
             </View>
           )}
 
-          <BrandFooter projectName={projectName} />
+          <BrandFooter
+            projectName={projectName}
+            contractorName={contractorName}
+            contractorLicense={contractorLicense}
+          />
         </Page>
       );
     })}

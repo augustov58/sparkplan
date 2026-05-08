@@ -191,6 +191,9 @@ interface CalcProps {
   projectName: string;
   projectAddress?: string;
   panelName?: string;
+  // Sprint 2A C8: per-sheet contractor signature block
+  contractorName?: string;
+  contractorLicense?: string;
 }
 
 export const ShortCircuitCalculationPages: React.FC<CalcProps> = ({
@@ -198,6 +201,8 @@ export const ShortCircuitCalculationPages: React.FC<CalcProps> = ({
   projectName,
   projectAddress,
   panelName,
+  contractorName,
+  contractorLicense,
 }) => {
   const results = calculation.results as unknown as ShortCircuitResult;
 
@@ -369,7 +374,11 @@ export const ShortCircuitCalculationPages: React.FC<CalcProps> = ({
           </View>
         )}
 
-        <BrandFooter projectName={projectName} />
+        <BrandFooter
+          projectName={projectName}
+          contractorName={contractorName}
+          contractorLicense={contractorLicense}
+        />
       </Page>
   );
 };
@@ -385,6 +394,9 @@ interface SystemReportProps {
   projectName: string;
   projectAddress: string;
   panels?: any[];
+  // Sprint 2A C8: per-sheet contractor signature block
+  contractorName?: string;
+  contractorLicense?: string;
 }
 
 export const ShortCircuitSystemReport: React.FC<SystemReportProps> = ({
@@ -392,6 +404,8 @@ export const ShortCircuitSystemReport: React.FC<SystemReportProps> = ({
   projectName,
   projectAddress,
   panels,
+  contractorName,
+  contractorLicense,
 }) => {
   return (
     <Document>
@@ -409,7 +423,11 @@ export const ShortCircuitSystemReport: React.FC<SystemReportProps> = ({
             {calculations.length} Calculation{calculations.length !== 1 ? 's' : ''}
           </Text>
         </View>
-        <BrandFooter projectName={projectName} />
+        <BrandFooter
+          projectName={projectName}
+          contractorName={contractorName}
+          contractorLicense={contractorLicense}
+        />
       </Page>
 
       {/* Individual Calculation Pages */}
@@ -518,7 +536,11 @@ export const ShortCircuitSystemReport: React.FC<SystemReportProps> = ({
               </View>
             )}
 
-            <BrandFooter projectName={projectName} />
+            <BrandFooter
+              projectName={projectName}
+              contractorName={contractorName}
+              contractorLicense={contractorLicense}
+            />
           </Page>
         );
       })}

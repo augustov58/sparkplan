@@ -43,7 +43,8 @@ export const themeStyles = StyleSheet.create({
   page: {
     paddingTop: 28,
     paddingHorizontal: 32,
-    paddingBottom: 44, // room for footer
+    // room for ContractorBlock (~28pt) + Footer (~26pt) at the bottom of every sheet
+    paddingBottom: 78,
     fontSize: 9.5,
     fontFamily: 'Helvetica',
     color: '#111827',
@@ -326,6 +327,50 @@ export const themeStyles = StyleSheet.create({
     fontSize: 7,
     color: '#9ca3af',
   },
+
+  // --- Per-sheet contractor signature block (Sprint 2A C8) ---
+  // Sits above the brand/page footer. Required by every Florida AHJ on every
+  // electrical sheet — without this, intake reviewers reject the packet
+  // before reaching technical review.
+  contractorBlock: {
+    position: 'absolute',
+    bottom: 36,
+    left: 32,
+    right: 32,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    borderTopWidth: 1,
+    borderTopColor: '#1f2937',
+    paddingTop: 3,
+    paddingBottom: 1,
+  },
+  contractorCol: {
+    flexDirection: 'column',
+    flex: 1,
+  },
+  contractorColRight: {
+    flexDirection: 'column',
+    flex: 1,
+    alignItems: 'flex-end',
+  },
+  contractorLabel: {
+    fontSize: 6,
+    color: '#6b7280',
+    textTransform: 'uppercase',
+    letterSpacing: 0.4,
+  },
+  contractorValue: {
+    fontSize: 8,
+    fontFamily: 'Helvetica-Bold',
+    color: '#111827',
+  },
+  contractorSigLine: {
+    borderBottomWidth: 0.75,
+    borderBottomColor: '#111827',
+    width: 110,
+    height: 10,
+    marginTop: 2,
+  },
 });
 
 // ==================== COMPONENTS ====================
@@ -348,17 +393,66 @@ export const BrandBar: React.FC<BrandBarProps> = ({ pageLabel }) => (
 interface FooterProps {
   /** Left-column: project name (so packets from different jobs are distinguishable). */
   projectName: string;
+  /**
+   * Sprint 2A C8: per-sheet contractor signature block. When either field is
+   * provided the Footer renders a fixed signature/date row above the brand
+   * footer. Required on every electrical sheet to prevent intake rejection.
+   */
+  contractorName?: string;
+  contractorLicense?: string;
 }
 
-export const Footer: React.FC<FooterProps> = ({ projectName }) => (
-  <View style={themeStyles.footer} fixed>
-    <Text style={themeStyles.footerText}>
-      SparkPlan {'\u2022'} {projectName}
-    </Text>
-    <Text
-      style={themeStyles.footerText}
-      render={({ pageNumber, totalPages }) => `Page ${pageNumber} of ${totalPages}`}
+export const Footer: React.FC<FooterProps> = ({
+  projectName,
+  contractorName,
+  contractorLicense,
+}) => (
+  <>
+    <ContractorBlock
+      contractorName={contractorName}
+      contractorLicense={contractorLicense}
     />
-    <Text style={themeStyles.footerText}>Generated {todayStr()}</Text>
+    <View style={themeStyles.footer} fixed>
+      <Text style={themeStyles.footerText}>
+        SparkPlan {'\u2022'} {projectName}
+      </Text>
+      <Text
+        style={themeStyles.footerText}
+        render={({ pageNumber, totalPages }) => `Page ${pageNumber} of ${totalPages}`}
+      />
+      <Text style={themeStyles.footerText}>Generated {todayStr()}</Text>
+    </View>
+  </>
+);
+
+interface ContractorBlockProps {
+  contractorName?: string;
+  contractorLicense?: string;
+}
+
+/**
+ * Per-sheet contractor signature block. Renders fixed above the page footer
+ * on every electrical sheet (NEC 2020 + Florida AHJ submittal convention).
+ *
+ * The signature line is always rendered \u2014 even when contractor metadata is
+ * missing \u2014 so the AHJ has a place to wet-sign and the packet doesn't fail
+ * intake on a "missing signature block" rejection.
+ */
+export const ContractorBlock: React.FC<ContractorBlockProps> = ({
+  contractorName,
+  contractorLicense,
+}) => (
+  <View style={themeStyles.contractorBlock} fixed>
+    <View style={themeStyles.contractorCol}>
+      <Text style={themeStyles.contractorLabel}>Contractor</Text>
+      <Text style={themeStyles.contractorValue}>{contractorName || '\u2014'}</Text>
+      <Text style={themeStyles.contractorLabel}>
+        {contractorLicense ? `License #: ${contractorLicense}` : 'License #: \u2014'}
+      </Text>
+    </View>
+    <View style={themeStyles.contractorColRight}>
+      <Text style={themeStyles.contractorLabel}>Signature / Date</Text>
+      <View style={themeStyles.contractorSigLine} />
+    </View>
   </View>
 );

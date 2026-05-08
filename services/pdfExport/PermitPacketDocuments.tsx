@@ -312,7 +312,11 @@ export const CoverPage: React.FC<CoverPageProps> = ({
       </>
     )}
 
-    <BrandFooter projectName={projectName} />
+    <BrandFooter
+      projectName={projectName}
+      contractorName={preparedBy}
+      contractorLicense={contractorLicense}
+    />
   </Page>
 );
 
@@ -325,6 +329,9 @@ interface EquipmentScheduleProps {
   transformers: Transformer[];
   feeders: Feeder[];
   projectName: string;
+  // Sprint 2A C8: per-sheet contractor signature block
+  contractorName?: string;
+  contractorLicense?: string;
 }
 
 export const EquipmentSchedule: React.FC<EquipmentScheduleProps> = ({
@@ -332,6 +339,8 @@ export const EquipmentSchedule: React.FC<EquipmentScheduleProps> = ({
   transformers,
   feeders,
   projectName,
+  contractorName,
+  contractorLicense,
 }) => {
   const mainPanel = panels.find(p => p.is_main);
   const subPanels = panels.filter(p => !p.is_main);
@@ -488,7 +497,11 @@ export const EquipmentSchedule: React.FC<EquipmentScheduleProps> = ({
         </>
       )}
 
-      <BrandFooter projectName={projectName} />
+      <BrandFooter
+        projectName={projectName}
+        contractorName={contractorName}
+        contractorLicense={contractorLicense}
+      />
     </Page>
   );
 };
@@ -833,6 +846,9 @@ interface RiserDiagramProps {
   projectName: string;
   serviceVoltage: number;
   servicePhase: number;
+  // Sprint 2A C8: per-sheet contractor signature block
+  contractorName?: string;
+  contractorLicense?: string;
 }
 
 export const RiserDiagram: React.FC<RiserDiagramProps> = ({
@@ -844,6 +860,8 @@ export const RiserDiagram: React.FC<RiserDiagramProps> = ({
   projectName,
   serviceVoltage,
   servicePhase,
+  contractorName,
+  contractorLicense,
 }) => {
   const tree = buildRiserTree(
     panels,
@@ -950,7 +968,11 @@ export const RiserDiagram: React.FC<RiserDiagramProps> = ({
         Feeder labels show conductor size + design load in kVA
       </Text>
 
-      <BrandFooter projectName={projectName} />
+      <BrandFooter
+        projectName={projectName}
+        contractorName={contractorName}
+        contractorLicense={contractorLicense}
+      />
     </Page>
   );
 };
@@ -978,6 +1000,9 @@ interface LoadSummaryProps {
    * that is not a multi-family dwelling with 3+ units.
    */
   multiFamilyContext?: MultiFamilyContext;
+  // Sprint 2A C8: per-sheet contractor signature block
+  contractorName?: string;
+  contractorLicense?: string;
 }
 
 export const LoadCalculationSummary: React.FC<LoadSummaryProps> = ({
@@ -989,6 +1014,8 @@ export const LoadCalculationSummary: React.FC<LoadSummaryProps> = ({
   servicePhase,
   projectType,
   multiFamilyContext,
+  contractorName,
+  contractorLicense,
 }) => {
   const mdp = panels.find(p => p.is_main);
   const occupancy = mapProjectTypeToOccupancy(projectType);
@@ -1213,7 +1240,11 @@ export const LoadCalculationSummary: React.FC<LoadSummaryProps> = ({
         </View>
       )}
 
-      <BrandFooter projectName={projectName} />
+      <BrandFooter
+        projectName={projectName}
+        contractorName={contractorName}
+        contractorLicense={contractorLicense}
+      />
     </Page>
   );
 };
@@ -1229,6 +1260,9 @@ interface ComplianceSummaryProps {
   projectName: string;
   hasGrounding?: boolean;
   necEdition?: '2020' | '2023';
+  // Sprint 2A C8: per-sheet contractor signature block
+  contractorName?: string;
+  contractorLicense?: string;
 }
 
 export const ComplianceSummary: React.FC<ComplianceSummaryProps> = ({
@@ -1238,6 +1272,8 @@ export const ComplianceSummary: React.FC<ComplianceSummaryProps> = ({
   projectName,
   hasGrounding = false,
   necEdition = DEFAULT_NEC_EDITION,
+  contractorName,
+  contractorLicense,
 }) => {
   const mainPanel = panels.find(p => p.is_main);
   const totalCircuits = circuits.length;
@@ -1373,7 +1409,11 @@ export const ComplianceSummary: React.FC<ComplianceSummaryProps> = ({
         </Text>
       </View>
 
-      <BrandFooter projectName={projectName} />
+      <BrandFooter
+        projectName={projectName}
+        contractorName={contractorName}
+        contractorLicense={contractorLicense}
+      />
     </Page>
   );
 };

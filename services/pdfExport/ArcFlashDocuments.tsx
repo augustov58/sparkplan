@@ -141,6 +141,9 @@ interface ArcFlashDocumentProps {
     clearingTime: number;
     result: ArcFlashResult;
   };
+  // Sprint 2A C8: per-sheet contractor signature block
+  contractorName?: string;
+  contractorLicense?: string;
 }
 
 export const ArcFlashPages: React.FC<ArcFlashDocumentProps> = ({
@@ -148,6 +151,8 @@ export const ArcFlashPages: React.FC<ArcFlashDocumentProps> = ({
   projectAddress,
   equipmentName,
   arcFlashData,
+  contractorName,
+  contractorLicense,
 }) => {
   const { result } = arcFlashData;
   const formatNumber = (value: number | undefined, digits: number, fallback = 'N/A') =>
@@ -317,7 +322,11 @@ export const ArcFlashPages: React.FC<ArcFlashDocumentProps> = ({
           </Text>
         </View>
 
-        <BrandFooter projectName={projectName} />
+        <BrandFooter
+          projectName={projectName}
+          contractorName={contractorName}
+          contractorLicense={contractorLicense}
+        />
       </Page>
   );
 };

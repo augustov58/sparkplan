@@ -211,6 +211,9 @@ export interface VoltageDropDocumentProps {
    */
   circuits?: Circuit[];
   includeNECReferences?: boolean;
+  // Sprint 2A C8: per-sheet contractor signature block
+  contractorName?: string;
+  contractorLicense?: string;
 }
 
 interface FeederVoltageDropData {
@@ -584,6 +587,8 @@ export const VoltageDropPages: React.FC<VoltageDropDocumentProps> = ({
   transformers,
   circuits,
   includeNECReferences = true,
+  contractorName,
+  contractorLicense,
 }) => {
   // Calculate voltage drop for all feeders. Pass circuits so each feeder's
   // load is live-derived from the destination panel's demand (C2) instead of
@@ -608,7 +613,11 @@ export const VoltageDropPages: React.FC<VoltageDropDocumentProps> = ({
 
       {includeNECReferences && <NECReferencesSection />}
 
-      <BrandFooter projectName={projectName} />
+      <BrandFooter
+        projectName={projectName}
+        contractorName={contractorName}
+        contractorLicense={contractorLicense}
+      />
     </Page>
   );
 };
