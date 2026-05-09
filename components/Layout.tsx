@@ -54,6 +54,7 @@ interface SidebarItemProps {
   isExpanded?: boolean;
   onToggle?: () => void;
   onNavigate?: () => void;
+  beta?: boolean;
 }
 
 interface SidebarSectionProps {
@@ -77,7 +78,8 @@ const SidebarItem: React.FC<SidebarItemProps> = ({
   hasChildren = false,
   isExpanded = false,
   onToggle,
-  onNavigate
+  onNavigate,
+  beta = false
 }) => {
   const navigate = useNavigate();
 
@@ -113,6 +115,11 @@ const SidebarItem: React.FC<SidebarItemProps> = ({
       <span className={`${nested ? 'text-xs' : 'text-sm'} font-medium flex-1 ${active ? 'text-[#1a1a1a]' : 'text-[#666] group-hover:text-[#1a1a1a]'}`}>
         {label}
       </span>
+      {beta && (
+        <span className="text-[10px] uppercase tracking-wider bg-[#fef3c7] text-[#92400e] border border-[#fde68a] px-1.5 py-0.5 rounded font-semibold">
+          beta
+        </span>
+      )}
       {hasChildren && (
         isExpanded ?
           <ChevronDown className="w-4 h-4 text-[#888]" /> :
@@ -188,13 +195,24 @@ export const Layout: React.FC<LayoutProps> = ({ children, title, showBack, onSig
     {
       title: 'PROJECT MANAGEMENT',
       items: [
-        { label: 'Inspection & Issues', icon: AlertOctagon, path: `/project/${projectId}/issues`, show: true },
-        { label: 'RFI Tracking', icon: MessageSquare, path: `/project/${projectId}/rfis`, show: true },
-        { label: 'Site Visits', icon: MapPin, path: `/project/${projectId}/site-visits`, show: true },
+        // Contractor pain-point betas (validated via market research:
+        // estimating + permit lifecycle + T&M billing are top 3 unmet needs
+        // for $1M-$10M small electrical shops). Stub pages collect demand
+        // signal via feature_interest table before we invest in builds.
+        { label: 'Estimating', icon: Calculator, path: `/project/${projectId}/estimating`, show: true, beta: true },
+        // Permits absorbs the "Inspection & Issues" lifecycle — permit
+        // submission → AHJ review → approval → inspection → corrections.
+        // Existing /issues route preserved (Phase 1 will merge UI into a tab).
+        { label: 'Permits', icon: AlertOctagon, path: `/project/${projectId}/permits`, show: true, beta: true },
+        { label: 'T&M Billing', icon: CreditCard, path: `/project/${projectId}/billing`, show: true, beta: true },
         { label: 'Calendar', icon: Calendar, path: `/project/${projectId}/calendar`, show: true },
         { label: 'AI Inspector & Activity', icon: Shield, path: `/project/${projectId}/inspector`, show: true },
         { label: 'Pre-Inspection Check', icon: CheckSquare, path: `/project/${projectId}/check`, show: true },
         { label: 'Permit Packet', icon: FileText, path: `/project/${projectId}/permit-packet`, show: true },
+        // Removed from sidebar (routes preserved for direct-link compatibility):
+        //   - Inspection & Issues  (engineer-flavored — rolling into Permits)
+        //   - RFI Tracking         (chatbot draft_rfi tool covers the value)
+        //   - Site Visits          (engineer-flavored — contractors don't log "visits")
         // COMING SOON: Utility Interconnection (Phase 2 - EV Niche)
         // { label: 'Utility Interconnection', icon: Plug, path: `/project/${projectId}/utility-interconnection`, show: true },
       ]
@@ -281,6 +299,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, title, showBack, onSig
                           active={location.pathname === item.path}
                           hasChildren={!!item.nested}
                           isExpanded={expandedSections[item.label]}
+                          beta={(item as any).beta}
                           onToggle={() => setExpandedSections(prev => ({
                             ...prev,
                             [item.label]: !prev[item.label]

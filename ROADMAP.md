@@ -1,8 +1,31 @@
 # SparkPlan - Roadmap
 
-## Current Phase: 3.4 (AHJ Compliance Audit Sprint 2A) - IN PROGRESS (May 2026)
+## Current Phase: 3.5 (Contractor Pivot — Sidebar Betas + Chatbot Restoration) - IN PROGRESS (May 2026)
 
 ## Latest Completed Phase: 3.3 (AHJ Compliance Audit Sprint 1) - May 2026
+## Active Sprint: 3.4 (AHJ Compliance Audit Sprint 2A) - 2 PRs merged, 3 still planned
+
+---
+
+## Phase 3.5: Contractor Pivot — Sidebar Betas + Chatbot Restoration - IN PROGRESS (May 2026)
+
+Three-PR cluster spawned by verifying PR #25 (riser SE label + cumulative VD on diagrams/PDFs/FeederManager). Verification surfaced two follow-up gaps and one strategic UX issue.
+
+| PR | Status | Closes |
+|---|---|---|
+| **#26** (open) | 🟡 PUSHED 2026-05-09 | Chatbot teaches the AI about cumulative voltage drop (VD+), service-entrance feeders, NEC 215.2(A)(1) IN No. 2 + 210.19(A)(1) IN No. 4 thresholds. New `calculate_cumulative_voltage_drop` tool. `calculate_feeder_voltage_drop` augmented. All 3 system-instruction builders updated. |
+| **#28** (open) | 🟡 PUSHED 2026-05-09 | Restores chatbot write-tool functionality. Root cause: PR #13 (2026-04-24 security audit) added the `requiresConfirmation` server-side gate without shipping the matching UI. 5 write tools (`add_circuit`, `add_panel`, `fill_panel_with_test_loads`, `empty_panel`, `fill_with_spares`) unreachable for ~2 weeks. Fix: Apply / Cancel card UI + `bypassConfirmation` option + skip second Gemini round-trip on Apply. |
+| **This PR** (open) | 🟡 PUSHED 2026-05-09 | Sidebar contractor pivot. Drops Site Visits + RFI Tracking (engineer-flavored). Adds 3 (beta) stubs: Estimating, Permits, T&M Billing. New `feature_interest` table captures demand notes. Permits absorbs the inspection lifecycle conceptually (Phase 1 next session merges Issues UI as a tab). |
+
+**Strategic context for Phase 3.5**: SparkPlan started as a calc/design tool (engineer territory), and engineer vocabulary leaked into the contractor-facing sidebar as PM features were added. Validated against external market research showing the top 3 unmet pain points for $1M-$10M small electrical shops: estimating + job costing (CRITICAL), permit + inspection lifecycle (HIGH), T&M billing (HIGH). Existing tools are either enterprise-priced (IntelliBid, Trimble Accubid) or wrong-shape for commercial T&M (Jobber, Housecall Pro). SparkPlan's electrical-specific data model (panels, circuits, feeders, transformers) is the differentiator — but only if the sidebar reflects what contractors actually do.
+
+**Demand-discovery strategy**: betas ship as stub pages with feature description + "Tell us what you'd want from this" CTA. Each click inserts a row into `feature_interest`. Highest-signal beta gets prioritized for actual sprint work. Cheap demand validation (~150 LOC, 1 small migration) before committing build effort.
+
+**Test count (after Phase 3.5):** 208/208 pass (was 198 post-Sprint-2A, +10 across Phase 3.5 PRs — no new tests this session, all changes covered by existing E2E + unit suites).
+
+**Migrations required:** `20260509_feature_interest.sql` — additive; needs to be applied to Supabase before stub pages can record clicks.
+
+**Phase 1 follow-up (next session)**: relocate existing `Inspection & Issues` UI into the Permits stub page as a tab; redirect `/issues` → `/permits?tab=issues`; delete the "until then, open Inspection & Issues directly →" forward-link.
 
 ---
 

@@ -26,6 +26,9 @@ const ShortCircuitResults = lazy(() => import('./components/ShortCircuitResults'
 const RFIManager = lazy(() => import('./components/RFIManager').then(m => ({ default: m.RFIManager })));
 const SiteVisitManager = lazy(() => import('./components/SiteVisitManager').then(m => ({ default: m.SiteVisitManager })));
 const CalendarView = lazy(() => import('./components/CalendarView').then(m => ({ default: m.CalendarView })));
+const EstimatingStub = lazy(() => import('./components/EstimatingStub').then(m => ({ default: m.EstimatingStub })));
+const PermitsStub = lazy(() => import('./components/PermitsStub').then(m => ({ default: m.PermitsStub })));
+const TmBillingStub = lazy(() => import('./components/TmBillingStub').then(m => ({ default: m.TmBillingStub })));
 const AgentActivityLog = lazy(() => import('./components/AgentActivityLog').then(m => ({ default: m.AgentActivityLog })));
 const UtilityInterconnectionForm = lazy(() => import('./components/UtilityInterconnectionForm').then(m => ({ default: m.UtilityInterconnectionForm })));
 const PricingPage = lazy(() => import('./components/PricingPage').then(m => ({ default: m.PricingPage })));
@@ -198,6 +201,27 @@ const ProjectWrapper = ({ projects, updateProject, deleteProject, onSignOut }: {
                                 <CalendarView project={project} />
                             </Suspense>
                         </FeatureGate>
+                    </FeatureErrorBoundary>
+                } />
+                <Route path="/estimating" element={
+                    <FeatureErrorBoundary>
+                        <Suspense fallback={<LoadingSpinner />}>
+                            <EstimatingStub projectId={project.id} />
+                        </Suspense>
+                    </FeatureErrorBoundary>
+                } />
+                <Route path="/permits" element={
+                    <FeatureErrorBoundary>
+                        <Suspense fallback={<LoadingSpinner />}>
+                            <PermitsStub projectId={project.id} />
+                        </Suspense>
+                    </FeatureErrorBoundary>
+                } />
+                <Route path="/billing" element={
+                    <FeatureErrorBoundary>
+                        <Suspense fallback={<LoadingSpinner />}>
+                            <TmBillingStub projectId={project.id} />
+                        </Suspense>
                     </FeatureErrorBoundary>
                 } />
                 <Route path="/check" element={

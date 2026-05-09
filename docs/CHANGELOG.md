@@ -4,6 +4,51 @@ All notable changes to SparkPlan.
 
 ---
 
+## 2026-05-09: Sidebar contractor pivot + 3 beta stubs (this PR)
+
+Reorganizes the project-management sidebar to fit the contractor persona (the actual buyer per CLAUDE.md) instead of the engineer persona that had crept into the labels. Validated against external market research the user pulled showing the top 3 unmet pain points for $1M-$10M small electrical shops: estimating + job costing (CRITICAL), permit + inspection lifecycle (HIGH), T&M billing (HIGH).
+
+**User-Facing Changes:**
+
+- **Three new sidebar entries, all (beta)**: `Estimating`, `Permits`, `T&M Billing`. Each renders a stub page with feature description, "Coming this quarter" status, and a "Tell us what you'd want from this" feedback CTA. One-line notes get inserted into a new `feature_interest` table — clicks-per-feature serve as a demand signal to prioritize which beta to build first.
+- **Permits absorbs the inspection/issues lifecycle conceptually** (permit submission → AHJ review → approval → inspection → corrections → reinspect → closed). The stub's forward-link points to the existing `Inspection & Issues` page until Phase 1 (next session) merges that UI in as a `?tab=issues` tab.
+- **Removed from sidebar (routes preserved server-side for direct-link compatibility)**: `Inspection & Issues`, `RFI Tracking`, `Site Visits`. Engineer-flavored, not contractor-flavored — contractors don't author inspection findings (inspectors do; contractors close them), don't log "site visits" as discrete events (they're on site every day), and route RFIs through Procore/email rather than a standalone tracker. The chatbot's `draft_rfi` tool covers the AI-drafted-RFI value prop without a dedicated page. No 404s on bookmarks: the routes still resolve.
+- **`(beta)` chip rendering** added to `SidebarItem` — small amber pill rendered to the right of the label. Generic; any future sidebar entry passing `beta: true` gets the chip for free.
+
+**Why this matters**: SparkPlan started as a calc/design tool (engineer territory). As "project management" features were added, engineer-vocabulary leaked into the contractor-facing sidebar — sidebar making a positioning claim the rest of the product wasn't honoring. The pivot validates demand cheaply (3 stub pages, ~150 LOC + 1 migration) before committing sprint time to any of the three pain-point builds. Whichever beta gets the most clicks gets prioritized.
+
+**Technical:**
+
+- New `components/BetaFeatureStub.tsx` — shared stub component. Takes icon, title, `featureKey`, description, optional `comingWhen`, optional `forwardLink` to an existing page being absorbed. Renders the feedback textarea (max 2000 chars, count display, disabled-while-empty submit), submits to `feature_interest` table, shows confirmation state. RLS scopes inserts to `auth.uid() = user_id`.
+- New thin wrappers: `EstimatingStub.tsx`, `PermitsStub.tsx`, `TmBillingStub.tsx`. Each is ~10 lines, just supplying icon/title/description/featureKey to `BetaFeatureStub`. Lazy-loaded via `React.lazy()` per the codebase convention.
+- `components/Layout.tsx` — `SidebarItemProps` extended with `beta?: boolean`. New beta chip rendering between label and chevron. `PROJECT MANAGEMENT` items array rewritten: drop 3, add 3 new with `beta: true`. Render call threads `beta={(item as any).beta}` through.
+- `App.tsx` — three new project-scoped routes (`/estimating`, `/permits`, `/billing`) wrapped in `FeatureErrorBoundary` + `Suspense`. No `FeatureGate` because betas are open to all tiers during the demand-discovery phase.
+- New migration `supabase/migrations/20260509_feature_interest.sql` — `feature_interest` table with `id` UUID PK, `user_id` FK to `auth.users`, `feature_name` TEXT (CHECK constrained to known beta keys), `note` TEXT (max 2000), optional `project_id`, `created_at`. Two indexes (per-user, per-feature). RLS: SELECT/INSERT scoped to row owner. No app-level admin policy — roadmap queries run via Supabase Studio under service-role.
+
+---
+
+## 2026-05-09: Chatbot VD+ awareness + confirmation gate fix (PRs #26, #28, open)
+
+Two follow-ups spawned by verifying the merged PR #25 (riser SE label + cumulative VD).
+
+**PR #26 — Chatbot VD+ awareness:**
+
+- **AI now sees cumulative voltage drop (VD+)** for every feeder in the passive context summary, with `[SERVICE ENTRANCE]` tag, asterisk-flagged transformer-crossing chains, and parallel-set count when > 1.
+- **New `calculate_cumulative_voltage_drop` tool** (panel-keyed) — answers "what's the total VD at panel L1?" with the full chain breakdown (per-segment list, voltage segment source, NEC compliance vs the 5% combined limit).
+- **Augmented `calculate_feeder_voltage_drop` tool** — result now includes `cumulativeVoltageDropPercent`, `crossesTransformer`, `setsInParallel`, `isServiceEntrance`, `cumulativeNote`.
+- **Three system-instruction builders updated** (basic, memory-aware, agentic) — VD+ resets at transformer secondaries, NEC 215.2(A)(1) IN No. 2 (≤3% feeder), NEC 210.19(A)(1) IN No. 4 (≤5% combined feeder + branch), `[SERVICE ENTRANCE]` feeder convention.
+
+**PR #28 — Confirmation card UI restoration (broken since #13):**
+
+- **Fixes regression introduced in PR #13 (2026-04-24).** That security/correctness audit added a server-side `requiresConfirmation` gate in `executeTool` but never shipped the UI half. Five write tools (`add_circuit`, `add_panel`, `fill_panel_with_test_loads`, `empty_panel`, `fill_with_spares`) have been completely unreachable for ~2 weeks — the chatbot was stuck in an infinite "I cannot directly modify..." loop even after the user typed "yes."
+- **`executeTool` gains `bypassConfirmation` option.** Gate fires only when bypass is false (default). UI calls back with `bypassConfirmation: true` after user clicks Apply.
+- **`askNecAssistantWithTools` short-circuits on confirmation results** — returns structured `pendingAction: { toolName, params }` to the UI without round-tripping Gemini. (The round-trip was the bug amplifier: Gemini paraphrased the gate's "not executed" message into a flat refusal, hiding that an Apply button was intended.)
+- **New `applyConfirmedAction` export** runs the tool with bypass=true and synthesizes a brief result message locally, skipping Gemini entirely on the second leg for fast click→feedback.
+- **`App.tsx` Apply / Cancel buttons** render inline beneath any AI message with a `pendingAction`. Apply calls `applyConfirmedAction`, appends a "Done — ..." follow-up, disables the buttons. Cancel marks resolved with an "Action cancelled." italic note. Existing `notifyDataRefresh` calls inside each write tool's `execute()` already refresh the UI post-apply.
+- **Generic, not per-tool**: any future write tool with `requiresConfirmation: true` automatically gets the Apply card for free.
+
+---
+
 ## 2026-05-09: AHJ Compliance Audit Sprint 2A — Document Structure (PR #23, open)
 
 Closes audit findings **H1, H2, H3** (TOC + revision log + sheet IDs) plus a sheet-ID styling and panel-schedule overflow fix found during user visual review. Open against `main`, mergeable CLEAN.
