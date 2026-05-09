@@ -4,7 +4,17 @@ All notable changes to SparkPlan.
 
 ---
 
-## 2026-05-09: Sidebar contractor pivot + 3 beta stubs (PR #29, open)
+## 2026-05-09: Permits Beta v1 — Phase 1 implementation plan (PR #30, planning doc only)
+
+Self-contained planning artifact for the next implementation cycle. **No code, no schema, no behavior change** — just a 623-line markdown plan in `docs/plans/permits-implementation.md` written for handoff to a fresh Claude context after `/clear`.
+
+The plan covers Phase 1 of the Permits feature (the highest-leverage of the three contractor-pivot betas from PR #29's demand-discovery): tabbed page (Overview / Permits / Inspections / Issues), `permits` + `permit_inspections` tables with RLS, status-transition state machine, expiration warnings, redirect of `/issues` → `/permits?tab=issues`, integration of existing `IssuesLog` UI as the Issues tab.
+
+Phases 2-4 (AHJ contact integration, scheduling, AI tools, portal scraping) are referenced for context but explicitly deferred. See ROADMAP Phase 3.6.
+
+---
+
+## 2026-05-09: Sidebar contractor pivot + 3 beta stubs (PR #29, MERGED)
 
 Reorganizes the project-management sidebar to fit the contractor persona (the actual buyer per CLAUDE.md) instead of the engineer persona that had crept into the labels. Validated against external market research the user pulled showing the top 3 unmet pain points for $1M-$10M small electrical shops: estimating + job costing (CRITICAL), permit + inspection lifecycle (HIGH), T&M billing (HIGH).
 
