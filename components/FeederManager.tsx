@@ -814,7 +814,15 @@ export const FeederManager: React.FC<FeederManagerProps> = ({
                   type="button"
                   onClick={() => {
                     setSourceType('service');
-                    setFormData({ ...formData, source_panel_id: null, source_transformer_id: null });
+                    setDestinationType('panel');
+                    const mdp = panels.find(p => p.is_main);
+                    setFormData({
+                      ...formData,
+                      source_panel_id: null,
+                      source_transformer_id: null,
+                      destination_panel_id: mdp?.id ?? null,
+                      destination_transformer_id: null,
+                    });
                   }}
                   className={`flex-1 py-2 px-4 rounded-md text-sm font-medium transition-colors ${
                     sourceType === 'service'
@@ -870,47 +878,65 @@ export const FeederManager: React.FC<FeederManagerProps> = ({
               )}
             </div>
 
-            {/* Destination Type Toggle */}
-            <div>
-              <label className="block text-xs font-semibold text-gray-500 mb-1 uppercase tracking-wider">
-                Destination Type
-              </label>
-              <div className="flex gap-2">
-                <button
-                  onClick={() => {
-                    setDestinationType('panel');
-                    setFormData({ ...formData, destination_transformer_id: null });
-                  }}
-                  className={`flex-1 py-2 px-4 rounded-md text-sm font-medium transition-colors ${
-                    destinationType === 'panel'
-                      ? 'bg-[#2d3b2d] text-white'
-                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                  }`}
-                >
-                  Panel
-                </button>
-                <button
-                  onClick={() => {
-                    setDestinationType('transformer');
-                    setFormData({ ...formData, destination_panel_id: null });
-                  }}
-                  className={`flex-1 py-2 px-4 rounded-md text-sm font-medium transition-colors ${
-                    destinationType === 'transformer'
-                      ? 'bg-[#2d3b2d] text-white'
-                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                  }`}
-                >
-                  Transformer
-                </button>
+            {/* Destination Type Toggle — hidden in Service mode (forced to MDP) */}
+            {sourceType !== 'service' && (
+              <div>
+                <label className="block text-xs font-semibold text-gray-500 mb-1 uppercase tracking-wider">
+                  Destination Type
+                </label>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => {
+                      setDestinationType('panel');
+                      setFormData({ ...formData, destination_transformer_id: null });
+                    }}
+                    className={`flex-1 py-2 px-4 rounded-md text-sm font-medium transition-colors ${
+                      destinationType === 'panel'
+                        ? 'bg-[#2d3b2d] text-white'
+                        : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                    }`}
+                  >
+                    Panel
+                  </button>
+                  <button
+                    onClick={() => {
+                      setDestinationType('transformer');
+                      setFormData({ ...formData, destination_panel_id: null });
+                    }}
+                    className={`flex-1 py-2 px-4 rounded-md text-sm font-medium transition-colors ${
+                      destinationType === 'transformer'
+                        ? 'bg-[#2d3b2d] text-white'
+                        : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                    }`}
+                  >
+                    Transformer
+                  </button>
+                </div>
               </div>
-            </div>
+            )}
 
             {/* Destination Selection */}
             <div>
               <label className="block text-xs font-semibold text-gray-500 mb-1 uppercase tracking-wider">
-                {destinationType === 'panel' ? 'Destination Panel' : 'Destination Transformer'}
+                {sourceType === 'service'
+                  ? 'Destination (Main Distribution Panel)'
+                  : destinationType === 'panel' ? 'Destination Panel' : 'Destination Transformer'}
               </label>
-              {destinationType === 'panel' ? (
+              {sourceType === 'service' ? (() => {
+                const mdp = panels.find(p => p.is_main);
+                if (!mdp) {
+                  return (
+                    <div className="px-3 py-2 bg-red-50 border border-red-300 rounded-md text-xs text-red-900 leading-relaxed">
+                      <strong>No MDP found.</strong> Create a panel marked <em>main</em> before defining the service entrance.
+                    </div>
+                  );
+                }
+                return (
+                  <div className="px-3 py-2 bg-amber-50 border border-amber-300 rounded-md text-xs text-amber-900 leading-relaxed">
+                    <strong>{mdp.name}</strong> — {mdp.voltage}V {mdp.phase}φ, {mdp.bus_rating}A bus. Service entrance always terminates at the main panel.
+                  </div>
+                );
+              })() : destinationType === 'panel' ? (
                 <>
                   <select
                     value={formData.destination_panel_id || ''}
