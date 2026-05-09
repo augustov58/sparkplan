@@ -7,15 +7,24 @@
 
 ---
 
-### Session: 2026-05-09 — Chatbot VD+ awareness + confirmation gate fix + sidebar contractor pivot (3 PRs)
+### Session: 2026-05-09 — Chatbot VD+ awareness + confirmation gate fix + Inspector accuracy + sidebar contractor pivot (4 PRs)
 
-**Focus**: Verifying merged PR #25 (cumulative VD + service-entrance feeders) and three follow-up fixes spawned by the verification: (1) extend the chatbot to know about VD+, SE feeders, and the new utility-source columns (PR #26); (2) trace and fix a write-tool regression in the chatbot that's been broken since PR #13 (PR #28); (3) reorganize the project-management sidebar to match the contractor persona instead of the engineer persona, gated behind beta stubs to validate demand before sprint-cost (this PR).
+**Focus**: Started by verifying merged PR #25 (cumulative VD + service-entrance feeders). Verification spawned three follow-up PRs (#26, #28, #29). Mid-session, the platform owner also surfaced three Inspector accuracy issues during PE review which landed as PR #27. Total: 4 PRs, 3 merged today + 1 still open.
 
 **Status**:
-- ✅ **PR #25** verified — service-entrance label + cumulative VD on one-line + PDF + FeederManager. Build clean (4.82s). 208/208 tests pass. Migration `20260508_riser_service_entrance_and_cumulative_vd.sql` already applied to Supabase.
-- 🟡 **PR #26** open — chatbot context + tools + system instructions teach the AI about VD+ semantics, NEC 215.2(A)(1) IN No. 2 / 210.19(A)(1) IN No. 4 thresholds (3% feeder / 5% combined), SE feeder convention, parallel sets. New `calculate_cumulative_voltage_drop` panel-keyed tool. `calculate_feeder_voltage_drop` augmented with cumulative + crossesTransformer + isServiceEntrance.
-- 🟡 **PR #28** open — restores write-tool functionality. Root cause traced to commit `3490c68` (PR #13, 2026-04-24 security/correctness audit) which added the `requiresConfirmation` server-side gate without shipping the matching UI. Five write tools (`add_circuit`, `add_panel`, `fill_panel_with_test_loads`, `empty_panel`, `fill_with_spares`) have been completely unreachable for ~2 weeks. Fix: `executeTool` gains `bypassConfirmation` option, `askNecAssistantWithTools` short-circuits on confirmation results without round-tripping Gemini, new `applyConfirmedAction` export, App.tsx renders Apply/Cancel inline.
-- 🟡 **This PR** — sidebar reorganization. Drops Site Visits + RFI Tracking from the Project Management section (engineer-flavored, not contractor-flavored). Replaces with three (beta) stubs based on validated market research (small electrical shops $1M-$10M): Estimating, Permits (absorbs the inspection/issues lifecycle), T&M Billing. New `feature_interest` table captures one-line demand notes from each stub's "Tell us" CTA. Existing routes (`/issues`, `/rfis`, `/site-visits`) preserved server-side for direct-link compatibility — Phase 1 (next session) will merge the Issues UI into the Permits page as a tab and redirect the old route.
+- ✅ **PR #25** verified — service-entrance label + cumulative VD on one-line + PDF + FeederManager. Migration `20260508_riser_service_entrance_and_cumulative_vd.sql` already applied to Supabase.
+- ✅ **PR #26** MERGED 13:25 UTC — chatbot context + tools + system instructions teach the AI about VD+ semantics, NEC 215.2(A)(1) IN No. 2 / 210.19(A)(1) IN No. 4 thresholds (3% feeder / 5% combined), SE feeder convention, parallel sets. New `calculate_cumulative_voltage_drop` panel-keyed tool. `calculate_feeder_voltage_drop` augmented with cumulative + crossesTransformer + isServiceEntrance.
+- ✅ **PR #27** MERGED 13:35 UTC — Inspector accuracy fixes (3 issues) + slot visibility on the panel header. Branch `fix/inspector-panel-cap-and-branch-conductor`. Details below.
+- ✅ **PR #28** MERGED 14:07 UTC — restores chatbot write-tool functionality. Root cause traced to commit `3490c68` (PR #13, 2026-04-24 security/correctness audit) which added the `requiresConfirmation` server-side gate without shipping the matching UI. Five write tools (`add_circuit`, `add_panel`, `fill_panel_with_test_loads`, `empty_panel`, `fill_with_spares`) had been completely unreachable for ~2 weeks. Fix: `executeTool` gains `bypassConfirmation` option, `askNecAssistantWithTools` short-circuits on confirmation results without round-tripping Gemini, new `applyConfirmedAction` export, App.tsx renders Apply/Cancel inline.
+- 🟡 **PR #29** open — sidebar contractor pivot. Drops Site Visits + RFI Tracking from the Project Management section (engineer-flavored). Adds three (beta) stubs based on validated market research (small electrical shops $1M-$10M): Estimating, Permits (absorbs the inspection/issues lifecycle), T&M Billing. New `feature_interest` table captures one-line demand notes from each stub's "Tell us" CTA. Existing routes (`/issues`, `/rfis`, `/site-visits`) preserved server-side for direct-link compatibility — Phase 1 (next session) will merge the Issues UI into the Permits page as a tab and redirect the old route.
+
+**PR #27 Inspector fixes (detail)**:
+
+1. **AI Inspector hard-coded panel cap at 42 poles**. `services/inspection/inspectorMode.ts:checkPanelMaxPoles` ignored each panel's `num_spaces`. A 24-space panel at 28 poles still passed inspection. Fix: read `panel.num_spaces` with same `panel.is_main ? 30 : 42` fallback used elsewhere; cite NEC 110.3(B) instead of the long-deleted NEC 408.36.
+2. **Inspector flagged branch-circuit conductor sizing on placeholder data**. NEC 240.4(D) audit ran against `circuit.conductor_size` which is a defaulted `"12 AWG"` placeholder. Every 30A+ circuit got a false "12 AWG on 30A breaker" critical issue. Fix: deleted `checkConductorProtection` from the inspector. NEC 240.4(D) still correctly enforced inside `services/calculations/conductorSizing.ts` + `breakerSizing.ts` where real feeder data drives it.
+3. **Breaker-vs-load check was receptacle-only and assumed 120V**. Lighting / EV / dryer / 2-pole 240V / 3-phase circuits got no audit. Fix: `checkCircuitLoading` runs on every circuit and derives capacity from pole count + panel voltage·phase (1P/1Φ=120V, 1P/3Φ=LtoL/√3, 2P=LtoL, 3P=LtoL×√3). Critical >100%, warning >80% per NEC 210.20(A).
+4. **Slot cap was invisible until users bumped into it.** Added 5th "Slots" stat card to panel header (`<polesUsed> / <totalSlots>` with amber/red tone at >90% / >100%).
+5. **Bulk Circuit Creator skipped slot cap.** Pre-create cap added using same multi-pole formula as manual-add path.
 
 **Decisions made**:
 
@@ -44,10 +53,11 @@
 
 **PRs**:
 
-- **#25** (merged) — riser SE label + cumulative VD on diagram/PDF/FeederManager
-- **#26** (open) — chatbot VD+ awareness + new cumulative tool
-- **#28** (open) — confirmation card UI restoration (broken since #13)
-- **This PR** — sidebar contractor pivot + 3 beta stubs + `feature_interest` migration
+- **#25** (merged 04:53 UTC) — riser SE label + cumulative VD on diagram/PDF/FeederManager
+- **#26** (merged 13:25 UTC) — chatbot VD+ awareness + new cumulative tool
+- **#27** (merged 13:35 UTC) — Inspector accuracy + slot visibility (5 fixes)
+- **#28** (merged 14:07 UTC) — confirmation card UI restoration (broken since #13)
+- **#29** (open) — sidebar contractor pivot + 3 beta stubs + `feature_interest` migration
 
 ---
 
@@ -148,4 +158,3 @@ Persistence: each toggle change calls `updateProject({...currentProject, setting
 ---
 
 <!-- Earlier session 2026-05-06 / 2026-05-07 (Sprint 1 close-out / C4 omnibus) rotated out per "keep last 2 sessions" rule. Git history preserves the entry. -->
-

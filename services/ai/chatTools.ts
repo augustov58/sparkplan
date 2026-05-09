@@ -15,6 +15,11 @@ import { supabase } from '@/lib/supabase';
 import { notifyDataRefresh } from '@/lib/dataRefreshEvents';
 import { computeFeederLoadVA } from '@/services/feeder/feederLoadSync';
 import { calculateFeederSizing, type FeederCalculationInput } from '@/services/calculations/feederSizing';
+import {
+  calculateAllCumulativeVoltageDrops,
+  calculateCumulativeForFeeder,
+  calculateCumulativeVoltageDrop,
+} from '@/services/calculations/cumulativeVoltageDrop';
 
 type RawPanel = Database['public']['Tables']['panels']['Row'];
 type RawCircuit = Database['public']['Tables']['circuits']['Row'];
@@ -369,26 +374,149 @@ Returns the feeder's voltage drop percentage if already calculated in the projec
         compliant = feeder.voltageDropPercent <= 3;
       }
 
+      // Cumulative VD (VD+) — sums VD% within the same voltage segment from
+      // the nearest source (service or transformer secondary). Computed from
+      // the cached chain when raw rows are wired through; otherwise reused
+      // from the projectContext summary.
+      let cumulativeVoltageDropPercent: number | undefined;
+      let crossesTransformer: boolean | undefined;
+      if (
+        Array.isArray(context.rawFeeders) &&
+        Array.isArray(context.rawPanels) &&
+        Array.isArray(context.rawTransformers) &&
+        context.rawFeeders.find(f => f.id === feeder.id)
+      ) {
+        const rf = context.rawFeeders.find(f => f.id === feeder.id)!;
+        const map = calculateAllCumulativeVoltageDrops(
+          context.rawPanels,
+          context.rawFeeders as any,
+          context.rawTransformers,
+        );
+        const cum = calculateCumulativeForFeeder(rf as any, map);
+        if (cum) {
+          cumulativeVoltageDropPercent = cum.cumulativePercent;
+          crossesTransformer = cum.crossesTransformer;
+        }
+      } else {
+        cumulativeVoltageDropPercent = feeder.cumulativeVoltageDropPercent;
+        crossesTransformer = feeder.crossesTransformer;
+      }
+
+      const cumulativeCompliant =
+        cumulativeVoltageDropPercent !== undefined
+          ? cumulativeVoltageDropPercent <= 5
+          : null;
+
       return {
         success: true,
         data: {
           feederName: feeder.name,
+          isServiceEntrance: feeder.isServiceEntrance || false,
           sourcePanel: feeder.sourcePanel,
           destinationPanel: feeder.destinationPanel,
           destinationTransformer: feeder.destinationTransformer,
           conductorSize,
           voltageDropPercent,
           compliant,
+          cumulativeVoltageDropPercent,
+          cumulativeCompliant,
+          crossesTransformer,
+          setsInParallel: feeder.setsInParallel,
           designCurrentAmps,
           liveLoadVA: liveLoadVA !== null ? Math.round(liveLoadVA) : undefined,
           calculationSource: haveLiveData ? 'live' : 'cached',
           warnings: calcWarnings.length > 0 ? calcWarnings : undefined,
-          necReference: 'NEC 215.2(A)(3) Informational Note No. 2 - Feeder voltage drop ≤3% recommended',
+          necReference:
+            'NEC 215.2(A)(1) IN No. 2 — feeder VD ≤3%; combined feeder + branch ≤5% (NEC 210.19(A)(1) IN No. 4)',
           note: voltageDropPercent !== null
             ? (compliant
               ? 'Voltage drop is within the recommended 3% limit for feeders.'
               : `Voltage drop exceeds 3% recommendation. Consider increasing conductor size.`)
             : 'Voltage drop could not be computed. Verify the destination panel exists and has circuits, or recalculate via Feeder Manager.',
+          cumulativeNote:
+            cumulativeVoltageDropPercent !== undefined
+              ? (crossesTransformer
+                  ? `Cumulative ${cumulativeVoltageDropPercent.toFixed(2)}% (within current voltage segment only — chain crosses a transformer; NEC has no defined cross-transformer summation).`
+                  : `Cumulative ${cumulativeVoltageDropPercent.toFixed(2)}%${cumulativeCompliant ? ' — within 5% combined feeder+branch recommendation.' : ' — exceeds 5% combined limit.'}`)
+              : undefined,
+        },
+      };
+    },
+  },
+
+  // -------------------------------------------------------------------------
+  // CUMULATIVE VOLTAGE DROP (panel-keyed)
+  // -------------------------------------------------------------------------
+  {
+    name: 'calculate_cumulative_voltage_drop',
+    description: `Get cumulative voltage drop (VD+) at a panel — the sum of feeder VD% from the nearest voltage source (service entrance or transformer secondary) down to the target panel. Cumulative resets at each transformer because adding percentages across a voltage change is mathematically meaningless. Use this to answer "what's the total voltage drop at panel X?" or "is panel L1 within the 5% NEC IN limit?". NEC 215.2(A)(1) IN No. 2 / 210.19(A)(1) IN No. 4 — combined feeder + branch ≤5%.`,
+    parameters: {
+      type: 'object',
+      properties: {
+        panel_name: { type: 'string', description: 'Name of the target panel (e.g., "L1", "H1", "MDP")' },
+        panel_id: { type: 'string', description: 'Panel UUID (alternative to panel_name)' },
+      },
+    },
+    execute: async (params, context) => {
+      const { panel_name, panel_id } = params as { panel_name?: string; panel_id?: string };
+
+      if (
+        !Array.isArray(context.rawPanels) ||
+        !Array.isArray(context.rawFeeders) ||
+        !Array.isArray(context.rawTransformers)
+      ) {
+        return {
+          success: false,
+          error: 'Live panel/feeder/transformer rows not available — cumulative VD requires raw project data.',
+        };
+      }
+
+      let panel = panel_id
+        ? context.rawPanels.find(p => p.id === panel_id)
+        : undefined;
+      if (!panel && panel_name) {
+        panel = context.rawPanels.find(
+          p => p.name.toLowerCase() === panel_name.toLowerCase(),
+        );
+      }
+      if (!panel) {
+        const available = context.rawPanels.map(p => p.name).join(', ');
+        return {
+          success: false,
+          error: `Panel not found. Available: ${available || 'none'}`,
+        };
+      }
+
+      const result = calculateCumulativeVoltageDrop(
+        panel.id,
+        context.rawPanels,
+        context.rawFeeders as any,
+        context.rawTransformers,
+      );
+
+      const compliant = result.cumulativePercent <= 5;
+      return {
+        success: true,
+        data: {
+          panelName: panel.name,
+          cumulativeVoltageDropPercent: result.cumulativePercent,
+          segmentCount: result.segmentCount,
+          crossesTransformer: result.crossesTransformer,
+          voltageSegmentSourceLabel: result.voltageSegmentSourceLabel,
+          voltageSegmentBaseV: result.voltageSegmentBaseV,
+          compliant,
+          perSegment: result.perSegment.map(s => ({
+            feederName: s.feederName,
+            sourceLabel: s.sourceLabel,
+            destinationLabel: s.destinationLabel,
+            runPercent: s.runPercent,
+            isMissingData: s.isMissingData,
+          })),
+          warnings: result.warnings.length > 0 ? result.warnings : undefined,
+          necReferences: result.necReferences,
+          note: compliant
+            ? `Cumulative VD ${result.cumulativePercent.toFixed(2)}% at '${panel.name}' is within the recommended 5% combined feeder+branch limit.`
+            : `Cumulative VD ${result.cumulativePercent.toFixed(2)}% at '${panel.name}' exceeds the 5% combined limit. Upsize an upstream feeder.`,
         },
       };
     },
@@ -2018,19 +2146,24 @@ export function getTool(name: string): ChatTool | undefined {
 }
 
 /**
- * Execute a tool by name
+ * Execute a tool by name.
+ *
+ * Write tools (requiresConfirmation: true) return a confirmation request
+ * instead of executing — the UI must render an Apply/Cancel card and call
+ * back with `bypassConfirmation: true` once the user clicks Apply.
  */
 export async function executeTool(
   name: string,
   params: Record<string, unknown>,
-  context: ToolContext
+  context: ToolContext,
+  options: { bypassConfirmation?: boolean } = {},
 ): Promise<ToolResult> {
   const tool = getTool(name);
   if (!tool) {
     return { success: false, error: `Unknown tool: ${name}` };
   }
 
-  if (tool.requiresConfirmation) {
+  if (tool.requiresConfirmation && !options.bypassConfirmation) {
     return {
       success: true,
       data: {

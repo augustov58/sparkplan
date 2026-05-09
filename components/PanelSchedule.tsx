@@ -1115,7 +1115,7 @@ export const PanelSchedule: React.FC<PanelScheduleProps> = ({ project }) => {
 
       {/* Panel Header Info */}
       <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 p-4 bg-gray-50 border-b border-gray-200">
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-4 p-4 bg-gray-50 border-b border-gray-200">
           <div>
             <span className="text-[10px] uppercase text-gray-500 font-semibold">Main Breaker</span>
             <div className="text-sm font-bold">{selectedPanel.main_breaker_amps || 'MLO'} A</div>
@@ -1132,6 +1132,26 @@ export const PanelSchedule: React.FC<PanelScheduleProps> = ({ project }) => {
             <span className="text-[10px] uppercase text-gray-500 font-semibold">Phase / Wire</span>
             <div className="text-sm font-bold">{selectedPanel.phase}Φ / {selectedPanel.phase === 3 ? 4 : 3}W</div>
           </div>
+          {(() => {
+            // Show "<used> / <capacity>" so the user always sees the slot
+            // limit. Multi-pole breakers count their full pole count toward use.
+            const polesUsed = panelCircuits.reduce((sum, c) => sum + (c.pole || 1), 0);
+            const utilizationPct = totalSlots > 0 ? (polesUsed / totalSlots) * 100 : 0;
+            const tone =
+              polesUsed > totalSlots
+                ? 'text-red-600'
+                : utilizationPct > 90
+                ? 'text-amber-600'
+                : 'text-gray-900';
+            return (
+              <div>
+                <span className="text-[10px] uppercase text-gray-500 font-semibold">Slots</span>
+                <div className={`text-sm font-bold ${tone}`}>
+                  {polesUsed} / {totalSlots}
+                </div>
+              </div>
+            );
+          })()}
         </div>
 
         {/* Actions */}
