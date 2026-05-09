@@ -12,31 +12,6 @@ export type Database = {
   __InternalSupabase: {
     PostgrestVersion: "13.0.5"
   }
-  graphql_public: {
-    Tables: {
-      [_ in never]: never
-    }
-    Views: {
-      [_ in never]: never
-    }
-    Functions: {
-      graphql: {
-        Args: {
-          extensions?: Json
-          operationName?: string
-          query?: string
-          variables?: Json
-        }
-        Returns: Json
-      }
-    }
-    Enums: {
-      [_ in never]: never
-    }
-    CompositeTypes: {
-      [_ in never]: never
-    }
-  }
   public: {
     Tables: {
       agent_actions: {
@@ -362,6 +337,224 @@ export type Database = {
           },
         ]
       }
+      estimate_line_items: {
+        Row: {
+          assembly_key: string | null
+          category: string
+          created_at: string
+          description: string
+          estimate_id: string
+          id: string
+          line_total: number
+          markup_overridden: boolean
+          notes: string | null
+          position: number
+          quantity: number
+          source_id: string | null
+          source_kind: string | null
+          taxable: boolean
+          unit: string | null
+          unit_cost: number
+          unit_price: number
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          assembly_key?: string | null
+          category: string
+          created_at?: string
+          description: string
+          estimate_id: string
+          id?: string
+          line_total?: number
+          markup_overridden?: boolean
+          notes?: string | null
+          position?: number
+          quantity?: number
+          source_id?: string | null
+          source_kind?: string | null
+          taxable?: boolean
+          unit?: string | null
+          unit_cost?: number
+          unit_price?: number
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          assembly_key?: string | null
+          category?: string
+          created_at?: string
+          description?: string
+          estimate_id?: string
+          id?: string
+          line_total?: number
+          markup_overridden?: boolean
+          notes?: string | null
+          position?: number
+          quantity?: number
+          source_id?: string | null
+          source_kind?: string | null
+          taxable?: boolean
+          unit?: string | null
+          unit_cost?: number
+          unit_price?: number
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "estimate_line_items_estimate_id_fkey"
+            columns: ["estimate_id"]
+            isOneToOne: false
+            referencedRelation: "estimates"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      estimates: {
+        Row: {
+          bid_pdf_generated_at: string | null
+          bid_pdf_url: string | null
+          created_at: string
+          customer_address: string | null
+          customer_email: string | null
+          customer_name: string | null
+          decided_at: string | null
+          estimate_number: string | null
+          exclusions: string | null
+          expires_at: string | null
+          id: string
+          internal_notes: string | null
+          markup_amount: number
+          markup_pct: number
+          name: string
+          outcome_reason: string | null
+          parent_estimate_id: string | null
+          payment_terms: string | null
+          project_id: string
+          revision: number
+          scope_summary: string | null
+          status: string
+          submitted_at: string | null
+          subtotal_labor: number
+          subtotal_materials: number
+          subtotal_other: number
+          tax_amount: number
+          tax_pct: number
+          total: number
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          bid_pdf_generated_at?: string | null
+          bid_pdf_url?: string | null
+          created_at?: string
+          customer_address?: string | null
+          customer_email?: string | null
+          customer_name?: string | null
+          decided_at?: string | null
+          estimate_number?: string | null
+          exclusions?: string | null
+          expires_at?: string | null
+          id?: string
+          internal_notes?: string | null
+          markup_amount?: number
+          markup_pct?: number
+          name: string
+          outcome_reason?: string | null
+          parent_estimate_id?: string | null
+          payment_terms?: string | null
+          project_id: string
+          revision?: number
+          scope_summary?: string | null
+          status?: string
+          submitted_at?: string | null
+          subtotal_labor?: number
+          subtotal_materials?: number
+          subtotal_other?: number
+          tax_amount?: number
+          tax_pct?: number
+          total?: number
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          bid_pdf_generated_at?: string | null
+          bid_pdf_url?: string | null
+          created_at?: string
+          customer_address?: string | null
+          customer_email?: string | null
+          customer_name?: string | null
+          decided_at?: string | null
+          estimate_number?: string | null
+          exclusions?: string | null
+          expires_at?: string | null
+          id?: string
+          internal_notes?: string | null
+          markup_amount?: number
+          markup_pct?: number
+          name?: string
+          outcome_reason?: string | null
+          parent_estimate_id?: string | null
+          payment_terms?: string | null
+          project_id?: string
+          revision?: number
+          scope_summary?: string | null
+          status?: string
+          submitted_at?: string | null
+          subtotal_labor?: number
+          subtotal_materials?: number
+          subtotal_other?: number
+          tax_amount?: number
+          tax_pct?: number
+          total?: number
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "estimates_parent_estimate_id_fkey"
+            columns: ["parent_estimate_id"]
+            isOneToOne: false
+            referencedRelation: "estimates"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "estimates_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      feature_interest: {
+        Row: {
+          created_at: string
+          feature_name: string
+          id: string
+          note: string | null
+          project_id: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          feature_name: string
+          id?: string
+          note?: string | null
+          project_id?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          feature_name?: string
+          id?: string
+          note?: string | null
+          project_id?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       feeders: {
         Row: {
           ambient_temperature_c: number | null
@@ -471,6 +664,13 @@ export type Database = {
             columns: ["source_panel_id"]
             isOneToOne: false
             referencedRelation: "panels"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "feeders_source_transformer_id_fkey"
+            columns: ["source_transformer_id"]
+            isOneToOne: false
+            referencedRelation: "transformers"
             referencedColumns: ["id"]
           },
         ]
@@ -625,6 +825,110 @@ export type Database = {
           },
         ]
       }
+      invoices: {
+        Row: {
+          balance_due: number
+          created_at: string
+          customer_address: string | null
+          customer_email: string | null
+          customer_name: string | null
+          customer_po_number: string | null
+          description: string | null
+          due_date: string | null
+          id: string
+          internal_notes: string | null
+          invoice_date: string
+          invoice_number: string
+          invoice_pdf_generated_at: string | null
+          invoice_pdf_url: string | null
+          notes: string | null
+          paid_amount: number
+          paid_at: string | null
+          period_end: string
+          period_start: string
+          project_id: string
+          sent_at: string | null
+          status: string
+          subtotal: number
+          subtotal_labor: number
+          subtotal_materials: number
+          tax_amount: number
+          total: number
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          balance_due?: number
+          created_at?: string
+          customer_address?: string | null
+          customer_email?: string | null
+          customer_name?: string | null
+          customer_po_number?: string | null
+          description?: string | null
+          due_date?: string | null
+          id?: string
+          internal_notes?: string | null
+          invoice_date?: string
+          invoice_number: string
+          invoice_pdf_generated_at?: string | null
+          invoice_pdf_url?: string | null
+          notes?: string | null
+          paid_amount?: number
+          paid_at?: string | null
+          period_end: string
+          period_start: string
+          project_id: string
+          sent_at?: string | null
+          status?: string
+          subtotal?: number
+          subtotal_labor?: number
+          subtotal_materials?: number
+          tax_amount?: number
+          total?: number
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          balance_due?: number
+          created_at?: string
+          customer_address?: string | null
+          customer_email?: string | null
+          customer_name?: string | null
+          customer_po_number?: string | null
+          description?: string | null
+          due_date?: string | null
+          id?: string
+          internal_notes?: string | null
+          invoice_date?: string
+          invoice_number?: string
+          invoice_pdf_generated_at?: string | null
+          invoice_pdf_url?: string | null
+          notes?: string | null
+          paid_amount?: number
+          paid_at?: string | null
+          period_end?: string
+          period_start?: string
+          project_id?: string
+          sent_at?: string | null
+          status?: string
+          subtotal?: number
+          subtotal_labor?: number
+          subtotal_materials?: number
+          tax_amount?: number
+          total?: number
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "invoices_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       issues: {
         Row: {
           article: string
@@ -676,20 +980,83 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: "issues_project_id_fkey"
-            columns: ["project_id"]
-            isOneToOne: false
-            referencedRelation: "projects"
-            referencedColumns: ["id"]
-          },
-          {
             foreignKeyName: "issues_permit_inspection_id_fkey"
             columns: ["permit_inspection_id"]
             isOneToOne: false
             referencedRelation: "permit_inspections"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "issues_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
         ]
+      }
+      jurisdictions: {
+        Row: {
+          ahj_name: string | null
+          ahj_website: string | null
+          city: string
+          county: string | null
+          created_at: string
+          data_source: string | null
+          estimated_review_days: number | null
+          id: string
+          is_active: boolean | null
+          jurisdiction_name: string
+          last_verified_date: string | null
+          nec_edition: string | null
+          notes: string | null
+          required_calculations: string[] | null
+          required_documents: string[] | null
+          source_url: string | null
+          state: string
+          updated_at: string
+        }
+        Insert: {
+          ahj_name?: string | null
+          ahj_website?: string | null
+          city: string
+          county?: string | null
+          created_at?: string
+          data_source?: string | null
+          estimated_review_days?: number | null
+          id?: string
+          is_active?: boolean | null
+          jurisdiction_name: string
+          last_verified_date?: string | null
+          nec_edition?: string | null
+          notes?: string | null
+          required_calculations?: string[] | null
+          required_documents?: string[] | null
+          source_url?: string | null
+          state: string
+          updated_at?: string
+        }
+        Update: {
+          ahj_name?: string | null
+          ahj_website?: string | null
+          city?: string
+          county?: string | null
+          created_at?: string
+          data_source?: string | null
+          estimated_review_days?: number | null
+          id?: string
+          is_active?: boolean | null
+          jurisdiction_name?: string
+          last_verified_date?: string | null
+          nec_edition?: string | null
+          notes?: string | null
+          required_calculations?: string[] | null
+          required_documents?: string[] | null
+          source_url?: string | null
+          state?: string
+          updated_at?: string
+        }
+        Relationships: []
       }
       loads: {
         Row: {
@@ -732,51 +1099,135 @@ export type Database = {
           },
         ]
       }
-      meter_stacks: {
+      material_entries: {
         Row: {
+          billing_amount: number
+          billing_unit_price: number
+          cost_amount: number
+          cost_code: string | null
+          created_at: string
+          description: string
           id: string
+          installed_date: string
+          invoice_id: string | null
+          invoice_unit_cost: number
+          markup_pct: number
           project_id: string
-          name: string
-          location: string | null
-          bus_rating_amps: number
-          voltage: number
-          phase: number
-          num_meter_positions: number
-          ct_ratio: string | null
-          manufacturer: string | null
-          model_number: string | null
-          created_at: string | null
-          updated_at: string | null
+          quantity: number
+          receipt_url: string | null
+          supplier_invoice_number: string | null
+          supplier_name: string | null
+          taxable: boolean
+          unit: string | null
+          updated_at: string
+          user_id: string
         }
         Insert: {
+          billing_amount?: number
+          billing_unit_price: number
+          cost_amount?: number
+          cost_code?: string | null
+          created_at?: string
+          description: string
           id?: string
+          installed_date: string
+          invoice_id?: string | null
+          invoice_unit_cost: number
+          markup_pct?: number
           project_id: string
-          name?: string
-          location?: string | null
-          bus_rating_amps?: number
-          voltage?: number
-          phase?: number
-          num_meter_positions?: number
-          ct_ratio?: string | null
-          manufacturer?: string | null
-          model_number?: string | null
-          created_at?: string | null
-          updated_at?: string | null
+          quantity?: number
+          receipt_url?: string | null
+          supplier_invoice_number?: string | null
+          supplier_name?: string | null
+          taxable?: boolean
+          unit?: string | null
+          updated_at?: string
+          user_id: string
         }
         Update: {
+          billing_amount?: number
+          billing_unit_price?: number
+          cost_amount?: number
+          cost_code?: string | null
+          created_at?: string
+          description?: string
           id?: string
+          installed_date?: string
+          invoice_id?: string | null
+          invoice_unit_cost?: number
+          markup_pct?: number
           project_id?: string
-          name?: string
-          location?: string | null
+          quantity?: number
+          receipt_url?: string | null
+          supplier_invoice_number?: string | null
+          supplier_name?: string | null
+          taxable?: boolean
+          unit?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "material_entries_invoice_id_fkey"
+            columns: ["invoice_id"]
+            isOneToOne: false
+            referencedRelation: "invoices"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "material_entries_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      meter_stacks: {
+        Row: {
+          bus_rating_amps: number
+          created_at: string | null
+          ct_ratio: string | null
+          id: string
+          location: string | null
+          manufacturer: string | null
+          model_number: string | null
+          name: string
+          num_meter_positions: number
+          phase: number
+          project_id: string
+          updated_at: string | null
+          voltage: number
+        }
+        Insert: {
           bus_rating_amps?: number
-          voltage?: number
-          phase?: number
-          num_meter_positions?: number
+          created_at?: string | null
           ct_ratio?: string | null
+          id?: string
+          location?: string | null
           manufacturer?: string | null
           model_number?: string | null
-          created_at?: string | null
+          name?: string
+          num_meter_positions?: number
+          phase?: number
+          project_id: string
           updated_at?: string | null
+          voltage?: number
+        }
+        Update: {
+          bus_rating_amps?: number
+          created_at?: string | null
+          ct_ratio?: string | null
+          id?: string
+          location?: string | null
+          manufacturer?: string | null
+          model_number?: string | null
+          name?: string
+          num_meter_positions?: number
+          phase?: number
+          project_id?: string
+          updated_at?: string | null
+          voltage?: number
         }
         Relationships: [
           {
@@ -790,49 +1241,42 @@ export type Database = {
       }
       meters: {
         Row: {
-          id: string
-          project_id: string
-          meter_stack_id: string
-          name: string
-          meter_type: string
-          position_number: number | null
-          panel_id: string | null
           breaker_amps: number | null
           created_at: string | null
+          id: string
+          meter_stack_id: string
+          meter_type: string
+          name: string
+          panel_id: string | null
+          position_number: number | null
+          project_id: string
           updated_at: string | null
         }
         Insert: {
-          id?: string
-          project_id: string
-          meter_stack_id: string
-          name: string
-          meter_type?: string
-          position_number?: number | null
-          panel_id?: string | null
           breaker_amps?: number | null
           created_at?: string | null
+          id?: string
+          meter_stack_id: string
+          meter_type?: string
+          name: string
+          panel_id?: string | null
+          position_number?: number | null
+          project_id: string
           updated_at?: string | null
         }
         Update: {
-          id?: string
-          project_id?: string
-          meter_stack_id?: string
-          name?: string
-          meter_type?: string
-          position_number?: number | null
-          panel_id?: string | null
           breaker_amps?: number | null
           created_at?: string | null
+          id?: string
+          meter_stack_id?: string
+          meter_type?: string
+          name?: string
+          panel_id?: string | null
+          position_number?: number | null
+          project_id?: string
           updated_at?: string | null
         }
         Relationships: [
-          {
-            foreignKeyName: "meters_project_id_fkey"
-            columns: ["project_id"]
-            isOneToOne: false
-            referencedRelation: "projects"
-            referencedColumns: ["id"]
-          },
           {
             foreignKeyName: "meters_meter_stack_id_fkey"
             columns: ["meter_stack_id"]
@@ -847,6 +1291,13 @@ export type Database = {
             referencedRelation: "panels"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "meters_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
         ]
       }
       panels: {
@@ -855,10 +1306,10 @@ export type Database = {
           bus_rating: number
           created_at: string | null
           fed_from: string | null
-          fed_from_transformer_id: string | null
-          fed_from_type: string | null
           fed_from_circuit_number: number | null
           fed_from_meter_stack_id: string | null
+          fed_from_transformer_id: string | null
+          fed_from_type: string | null
           feeder_breaker_amps: number | null
           feeder_conductor_size: string | null
           feeder_conduit: string | null
@@ -885,10 +1336,10 @@ export type Database = {
           bus_rating: number
           created_at?: string | null
           fed_from?: string | null
-          fed_from_transformer_id?: string | null
-          fed_from_type?: string | null
           fed_from_circuit_number?: number | null
           fed_from_meter_stack_id?: string | null
+          fed_from_transformer_id?: string | null
+          fed_from_type?: string | null
           feeder_breaker_amps?: number | null
           feeder_conductor_size?: string | null
           feeder_conduit?: string | null
@@ -915,10 +1366,10 @@ export type Database = {
           bus_rating?: number
           created_at?: string | null
           fed_from?: string | null
-          fed_from_transformer_id?: string | null
-          fed_from_type?: string | null
           fed_from_circuit_number?: number | null
           fed_from_meter_stack_id?: string | null
+          fed_from_transformer_id?: string | null
+          fed_from_type?: string | null
           feeder_breaker_amps?: number | null
           feeder_conductor_size?: string | null
           feeder_conduit?: string | null
@@ -949,17 +1400,17 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "panels_fed_from_transformer_id_fkey"
-            columns: ["fed_from_transformer_id"]
-            isOneToOne: false
-            referencedRelation: "transformers"
-            referencedColumns: ["id"]
-          },
-          {
             foreignKeyName: "panels_fed_from_meter_stack_id_fkey"
             columns: ["fed_from_meter_stack_id"]
             isOneToOne: false
             referencedRelation: "meter_stacks"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "panels_fed_from_transformer_id_fkey"
+            columns: ["fed_from_transformer_id"]
+            isOneToOne: false
+            referencedRelation: "transformers"
             referencedColumns: ["id"]
           },
           {
@@ -974,6 +1425,129 @@ export type Database = {
             columns: ["supplied_by_feeder_id"]
             isOneToOne: false
             referencedRelation: "feeders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      payments: {
+        Row: {
+          amount: number
+          created_at: string
+          id: string
+          invoice_id: string
+          notes: string | null
+          payment_date: string
+          payment_method: string | null
+          reference: string | null
+          user_id: string
+        }
+        Insert: {
+          amount: number
+          created_at?: string
+          id?: string
+          invoice_id: string
+          notes?: string | null
+          payment_date?: string
+          payment_method?: string | null
+          reference?: string | null
+          user_id: string
+        }
+        Update: {
+          amount?: number
+          created_at?: string
+          id?: string
+          invoice_id?: string
+          notes?: string | null
+          payment_date?: string
+          payment_method?: string | null
+          reference?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "payments_invoice_id_fkey"
+            columns: ["invoice_id"]
+            isOneToOne: false
+            referencedRelation: "invoices"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      permit_inspections: {
+        Row: {
+          created_at: string
+          description: string | null
+          id: string
+          inspection_type: string
+          inspector_name: string | null
+          parent_inspection_id: string | null
+          performed_at: string | null
+          permit_id: string
+          project_id: string
+          result_notes: string | null
+          scheduled_date: string | null
+          scheduled_window: string | null
+          sequence: number
+          status: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          inspection_type: string
+          inspector_name?: string | null
+          parent_inspection_id?: string | null
+          performed_at?: string | null
+          permit_id: string
+          project_id: string
+          result_notes?: string | null
+          scheduled_date?: string | null
+          scheduled_window?: string | null
+          sequence?: number
+          status?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          inspection_type?: string
+          inspector_name?: string | null
+          parent_inspection_id?: string | null
+          performed_at?: string | null
+          permit_id?: string
+          project_id?: string
+          result_notes?: string | null
+          scheduled_date?: string | null
+          scheduled_window?: string | null
+          sequence?: number
+          status?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "permit_inspections_parent_inspection_id_fkey"
+            columns: ["parent_inspection_id"]
+            isOneToOne: false
+            referencedRelation: "permit_inspections"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "permit_inspections_permit_id_fkey"
+            columns: ["permit_id"]
+            isOneToOne: false
+            referencedRelation: "permits"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "permit_inspections_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
             referencedColumns: ["id"]
           },
         ]
@@ -1070,85 +1644,6 @@ export type Database = {
           },
         ]
       }
-      permit_inspections: {
-        Row: {
-          created_at: string
-          description: string | null
-          id: string
-          inspection_type: string
-          inspector_name: string | null
-          parent_inspection_id: string | null
-          performed_at: string | null
-          permit_id: string
-          project_id: string
-          result_notes: string | null
-          scheduled_date: string | null
-          scheduled_window: string | null
-          sequence: number
-          status: string
-          updated_at: string
-          user_id: string
-        }
-        Insert: {
-          created_at?: string
-          description?: string | null
-          id?: string
-          inspection_type: string
-          inspector_name?: string | null
-          parent_inspection_id?: string | null
-          performed_at?: string | null
-          permit_id: string
-          project_id: string
-          result_notes?: string | null
-          scheduled_date?: string | null
-          scheduled_window?: string | null
-          sequence?: number
-          status?: string
-          updated_at?: string
-          user_id: string
-        }
-        Update: {
-          created_at?: string
-          description?: string | null
-          id?: string
-          inspection_type?: string
-          inspector_name?: string | null
-          parent_inspection_id?: string | null
-          performed_at?: string | null
-          permit_id?: string
-          project_id?: string
-          result_notes?: string | null
-          scheduled_date?: string | null
-          scheduled_window?: string | null
-          sequence?: number
-          status?: string
-          updated_at?: string
-          user_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "permit_inspections_permit_id_fkey"
-            columns: ["permit_id"]
-            isOneToOne: false
-            referencedRelation: "permits"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "permit_inspections_parent_inspection_id_fkey"
-            columns: ["parent_inspection_id"]
-            isOneToOne: false
-            referencedRelation: "permit_inspections"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "permit_inspections_project_id_fkey"
-            columns: ["project_id"]
-            isOneToOne: false
-            referencedRelation: "projects"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       profiles: {
         Row: {
           company_name: string | null
@@ -1178,6 +1673,68 @@ export type Database = {
           updated_at?: string | null
         }
         Relationships: []
+      }
+      project_billing_settings: {
+        Row: {
+          created_at: string
+          customer_address: string | null
+          customer_email: string | null
+          customer_name: string | null
+          customer_po_number: string | null
+          default_billable_rate: number | null
+          default_cost_rate: number | null
+          default_material_markup_pct: number
+          invoice_prefix: string | null
+          next_invoice_number: number
+          payment_terms_days: number
+          project_id: string
+          tax_pct: number
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          customer_address?: string | null
+          customer_email?: string | null
+          customer_name?: string | null
+          customer_po_number?: string | null
+          default_billable_rate?: number | null
+          default_cost_rate?: number | null
+          default_material_markup_pct?: number
+          invoice_prefix?: string | null
+          next_invoice_number?: number
+          payment_terms_days?: number
+          project_id: string
+          tax_pct?: number
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          customer_address?: string | null
+          customer_email?: string | null
+          customer_name?: string | null
+          customer_po_number?: string | null
+          default_billable_rate?: number | null
+          default_cost_rate?: number | null
+          default_material_markup_pct?: number
+          invoice_prefix?: string | null
+          next_invoice_number?: number
+          payment_terms_days?: number
+          project_id?: string
+          tax_pct?: number
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "project_billing_settings_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: true
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       project_photos: {
         Row: {
@@ -1246,6 +1803,7 @@ export type Database = {
           address: string
           created_at: string | null
           id: string
+          jurisdiction_id: string | null
           name: string
           nec_edition: string
           progress: number | null
@@ -1265,6 +1823,7 @@ export type Database = {
           address: string
           created_at?: string | null
           id?: string
+          jurisdiction_id?: string | null
           name: string
           nec_edition: string
           progress?: number | null
@@ -1284,6 +1843,7 @@ export type Database = {
           address?: string
           created_at?: string | null
           id?: string
+          jurisdiction_id?: string | null
           name?: string
           nec_edition?: string
           progress?: number | null
@@ -1298,6 +1858,94 @@ export type Database = {
           utility_available_fault_current_a?: number | null
           utility_transformer_impedance_pct?: number | null
           utility_transformer_kva?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "projects_jurisdiction_id_fkey"
+            columns: ["jurisdiction_id"]
+            isOneToOne: false
+            referencedRelation: "jurisdictions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      promo_code_redemptions: {
+        Row: {
+          id: string
+          previous_plan: string | null
+          previous_status: string | null
+          promo_code_id: string | null
+          redeemed_at: string | null
+          user_id: string | null
+        }
+        Insert: {
+          id?: string
+          previous_plan?: string | null
+          previous_status?: string | null
+          promo_code_id?: string | null
+          redeemed_at?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          id?: string
+          previous_plan?: string | null
+          previous_status?: string | null
+          promo_code_id?: string | null
+          redeemed_at?: string | null
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "promo_code_redemptions_promo_code_id_fkey"
+            columns: ["promo_code_id"]
+            isOneToOne: false
+            referencedRelation: "promo_codes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      promo_codes: {
+        Row: {
+          code: string
+          created_at: string | null
+          created_by: string | null
+          description: string | null
+          duration_days: number | null
+          expires_at: string | null
+          id: string
+          is_active: boolean | null
+          max_uses: number | null
+          plan: string | null
+          updated_at: string | null
+          uses_count: number | null
+        }
+        Insert: {
+          code: string
+          created_at?: string | null
+          created_by?: string | null
+          description?: string | null
+          duration_days?: number | null
+          expires_at?: string | null
+          id?: string
+          is_active?: boolean | null
+          max_uses?: number | null
+          plan?: string | null
+          updated_at?: string | null
+          uses_count?: number | null
+        }
+        Update: {
+          code?: string
+          created_at?: string | null
+          created_by?: string | null
+          description?: string | null
+          duration_days?: number | null
+          expires_at?: string | null
+          id?: string
+          is_active?: boolean | null
+          max_uses?: number | null
+          plan?: string | null
+          updated_at?: string | null
+          uses_count?: number | null
         }
         Relationships: []
       }
@@ -1548,10 +2196,94 @@ export type Database = {
           },
         ]
       }
+      subscriptions: {
+        Row: {
+          cancel_at_period_end: boolean | null
+          canceled_at: string | null
+          created_at: string | null
+          current_period_end: string | null
+          current_period_start: string | null
+          id: string
+          permits_used_this_month: number | null
+          plan: string
+          projects_count: number | null
+          status: string
+          stripe_customer_id: string | null
+          stripe_price_id: string | null
+          stripe_subscription_id: string | null
+          trial_end: string | null
+          trial_start: string | null
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          cancel_at_period_end?: boolean | null
+          canceled_at?: string | null
+          created_at?: string | null
+          current_period_end?: string | null
+          current_period_start?: string | null
+          id?: string
+          permits_used_this_month?: number | null
+          plan?: string
+          projects_count?: number | null
+          status?: string
+          stripe_customer_id?: string | null
+          stripe_price_id?: string | null
+          stripe_subscription_id?: string | null
+          trial_end?: string | null
+          trial_start?: string | null
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          cancel_at_period_end?: boolean | null
+          canceled_at?: string | null
+          created_at?: string | null
+          current_period_end?: string | null
+          current_period_start?: string | null
+          id?: string
+          permits_used_this_month?: number | null
+          plan?: string
+          projects_count?: number | null
+          status?: string
+          stripe_customer_id?: string | null
+          stripe_price_id?: string | null
+          stripe_subscription_id?: string | null
+          trial_end?: string | null
+          trial_start?: string | null
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
+      support_gmail_sync_state: {
+        Row: {
+          id: number
+          last_error: string | null
+          last_history_id: string | null
+          last_synced_at: string | null
+          updated_at: string
+        }
+        Insert: {
+          id?: number
+          last_error?: string | null
+          last_history_id?: string | null
+          last_synced_at?: string | null
+          updated_at?: string
+        }
+        Update: {
+          id?: number
+          last_error?: string | null
+          last_history_id?: string | null
+          last_synced_at?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       support_replies: {
         Row: {
-          attachment_urls: string[]
-          created_at: string
+          attachment_urls: string[] | null
+          created_at: string | null
           id: string
           is_admin: boolean
           message: string
@@ -1559,8 +2291,8 @@ export type Database = {
           user_id: string
         }
         Insert: {
-          attachment_urls?: string[]
-          created_at?: string
+          attachment_urls?: string[] | null
+          created_at?: string | null
           id?: string
           is_admin?: boolean
           message: string
@@ -1568,8 +2300,8 @@ export type Database = {
           user_id: string
         }
         Update: {
-          attachment_urls?: string[]
-          created_at?: string
+          attachment_urls?: string[] | null
+          created_at?: string | null
           id?: string
           is_admin?: boolean
           message?: string
@@ -1585,60 +2317,6 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
-      }
-      support_tickets: {
-        Row: {
-          attachment_urls: string[]
-          browser_info: string | null
-          category: string
-          created_at: string
-          id: string
-          message: string
-          page_url: string | null
-          plan_tier: string | null
-          priority: string
-          status: string
-          subject: string
-          updated_at: string
-          user_email: string
-          user_id: string
-          user_last_seen_at: string | null
-        }
-        Insert: {
-          attachment_urls?: string[]
-          browser_info?: string | null
-          category: string
-          created_at?: string
-          id?: string
-          message: string
-          page_url?: string | null
-          plan_tier?: string | null
-          priority?: string
-          status?: string
-          subject: string
-          updated_at?: string
-          user_email: string
-          user_id: string
-          user_last_seen_at?: string | null
-        }
-        Update: {
-          attachment_urls?: string[]
-          browser_info?: string | null
-          category?: string
-          created_at?: string
-          id?: string
-          message?: string
-          page_url?: string | null
-          plan_tier?: string | null
-          priority?: string
-          status?: string
-          subject?: string
-          updated_at?: string
-          user_email?: string
-          user_id?: string
-          user_last_seen_at?: string | null
-        }
-        Relationships: []
       }
       support_ticket_events: {
         Row: {
@@ -1738,29 +2416,128 @@ export type Database = {
           },
         ]
       }
-      support_gmail_sync_state: {
+      support_tickets: {
         Row: {
-          id: number
-          last_error: string | null
-          last_history_id: string | null
-          last_synced_at: string | null
-          updated_at: string
+          attachment_urls: string[] | null
+          browser_info: string | null
+          category: string
+          created_at: string | null
+          id: string
+          message: string
+          page_url: string | null
+          plan_tier: string | null
+          priority: string
+          status: string
+          subject: string
+          updated_at: string | null
+          user_email: string
+          user_id: string
+          user_last_seen_at: string | null
         }
         Insert: {
-          id?: number
-          last_error?: string | null
-          last_history_id?: string | null
-          last_synced_at?: string | null
-          updated_at?: string
+          attachment_urls?: string[] | null
+          browser_info?: string | null
+          category: string
+          created_at?: string | null
+          id?: string
+          message: string
+          page_url?: string | null
+          plan_tier?: string | null
+          priority?: string
+          status?: string
+          subject: string
+          updated_at?: string | null
+          user_email: string
+          user_id: string
+          user_last_seen_at?: string | null
         }
         Update: {
-          id?: number
-          last_error?: string | null
-          last_history_id?: string | null
-          last_synced_at?: string | null
-          updated_at?: string
+          attachment_urls?: string[] | null
+          browser_info?: string | null
+          category?: string
+          created_at?: string | null
+          id?: string
+          message?: string
+          page_url?: string | null
+          plan_tier?: string | null
+          priority?: string
+          status?: string
+          subject?: string
+          updated_at?: string | null
+          user_email?: string
+          user_id?: string
+          user_last_seen_at?: string | null
         }
         Relationships: []
+      }
+      time_entries: {
+        Row: {
+          billable_amount: number
+          billable_rate: number
+          cost_amount: number | null
+          cost_code: string | null
+          cost_rate: number | null
+          created_at: string
+          description: string | null
+          hours: number
+          id: string
+          invoice_id: string | null
+          project_id: string
+          updated_at: string
+          user_id: string
+          work_date: string
+          worker_name: string
+        }
+        Insert: {
+          billable_amount?: number
+          billable_rate: number
+          cost_amount?: number | null
+          cost_code?: string | null
+          cost_rate?: number | null
+          created_at?: string
+          description?: string | null
+          hours: number
+          id?: string
+          invoice_id?: string | null
+          project_id: string
+          updated_at?: string
+          user_id: string
+          work_date: string
+          worker_name: string
+        }
+        Update: {
+          billable_amount?: number
+          billable_rate?: number
+          cost_amount?: number | null
+          cost_code?: string | null
+          cost_rate?: number | null
+          created_at?: string
+          description?: string | null
+          hours?: number
+          id?: string
+          invoice_id?: string | null
+          project_id?: string
+          updated_at?: string
+          user_id?: string
+          work_date?: string
+          worker_name?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "time_entries_invoice_id_fkey"
+            columns: ["invoice_id"]
+            isOneToOne: false
+            referencedRelation: "invoices"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "time_entries_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       transformers: {
         Row: {
@@ -1879,8 +2656,49 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      admin_confirm_user: { Args: { target_email: string }; Returns: Json }
+      admin_create_user: {
+        Args: { user_email: string; user_password: string; user_plan?: string }
+        Returns: Json
+      }
+      admin_delete_user: { Args: { target_email: string }; Returns: Json }
+      admin_search_users: { Args: { search_email: string }; Returns: Json }
+      admin_set_user_plan: {
+        Args: { new_plan: string; target_email: string }
+        Returns: Json
+      }
       cleanup_expired_agent_data: { Args: never; Returns: undefined }
+      generate_invoice_atomic: {
+        Args: {
+          p_customer_address: string
+          p_customer_email: string
+          p_customer_name: string
+          p_customer_po_number: string
+          p_description: string
+          p_due_date: string
+          p_invoice_date: string
+          p_invoice_number: string
+          p_mark_sent: boolean
+          p_material_entry_ids: string[]
+          p_notes: string
+          p_period_end: string
+          p_period_start: string
+          p_project_id: string
+          p_subtotal: number
+          p_subtotal_labor: number
+          p_subtotal_materials: number
+          p_tax_amount: number
+          p_time_entry_ids: string[]
+          p_total: number
+        }
+        Returns: string
+      }
       generate_rfi_number: { Args: { p_project_id: string }; Returns: string }
+      redeem_promo_code: {
+        Args: { p_code: string; p_user_id: string }
+        Returns: Json
+      }
+      reset_monthly_permits: { Args: never; Returns: undefined }
     }
     Enums: {
       [_ in never]: never
@@ -2009,9 +2827,6 @@ export type CompositeTypes<
     : never
 
 export const Constants = {
-  graphql_public: {
-    Enums: {},
-  },
   public: {
     Enums: {},
   },
