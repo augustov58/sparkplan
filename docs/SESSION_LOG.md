@@ -3,7 +3,103 @@
 **Purpose**: Tracks recent work for seamless handoff between Claude instances.
 **Maintenance Rule**: Keep only the last 2 sessions. At the start of a new session, delete older entries — git history preserves everything.
 
-**Last Updated**: 2026-05-07
+**Last Updated**: 2026-05-09
+
+---
+
+### Session: 2026-05-08 / 2026-05-09 — AHJ Compliance Audit Sprint 2A (commits 1–4 across two PRs)
+
+**Focus**: Long multi-day session executing the Sprint 2A plan from the audit doc. Closes systemic intake-rejection vectors that affect every Florida AHJ — not engine bugs, just packet form-factor and content gaps. Work split into themed PRs (Strategy C — see "Decisions" below).
+
+**Status**:
+- ✅ **PR 1** merged to `main` as `92126eb` — Sprint 2A commits 1, 2, 3 (C7+H4, C8+M8, H12+H13)
+- 🟡 **PR #23** open against `main` — Sprint 2A commit 4a + 4b + bug-fix follow-up (H1+H2+H3 sections + sheet IDs + TOC + revision log + UI toggle panel + DB persistence + sheet ID `E-` prefix + visibility pill + 42-circuit panel overflow fix)
+- ⏳ **Pending** — Sprint 2A commits 5–12 (H14, H9+H15, H10, H11, M3, M6, H17, schema additions). Audit doc plans 3 more themed PRs (PR 3 content, PR 4 diagrams, PR 5 engine + schema).
+
+198/198 tests pass on PR #23 branch. `npm run build` exits 0. PR #23 mergeable status: CLEAN against `main`.
+
+---
+
+#### PR 1 — `92126eb` (merged) — Per-sheet polish + content gaps
+
+Three sub-commits:
+
+1. **C7 + H4** (`e17d5a4`) — NEC edition selector. Replaced hardcoded "NEC 2023" with packet-level `necEdition` prop (default '2020' for FL pilot AHJs — FBC 8th ed adopts NFPA-70 2020). Added APPLICABLE CODES section to cover sheet driven by optional `codeReferences` array. NEC 220.84 demand-factor table values verified valid for both 2020 and 2023 (already declared in `services/calculations/multiFamilyEV.ts:25`).
+
+2. **C8 + M8** (`026470c`) — Per-sheet `<ContractorBlock>` signature footer. Required by every Florida AHJ on every electrical sheet — without it, intake reviewers reject before reaching technical review. Implementation: shared `BrandFooter` (in `permitPacketTheme.tsx`) now renders a fixed signature/date row above the brand footer when `contractorName`/`contractorLicense` props are provided. The signature line renders even when contractor metadata is missing so the AHJ has a place to wet-sign. M8 fix bundled here: `MeterStackSchedulePDF.tsx` previously used a private style sheet — now wraps each Page with shared `themeStyles.page` + `BrandBar` + `BrandFooter` (which carries the C8 contractor block automatically).
+
+3. **H12 + H13** (`500031e`) — Dedicated General Notes page (sheet 2 of the packet). Driven from optional `generalNotes` string array on `PermitPacketData`. Default 8-item FL pilot stack covers NEC 2020 + FBC 8th ed compliance, voltage-drop convention 3% branch / 3% feeder / 5% combined, conductor sizing references, grounding & bonding refs, NRTL listing requirement, EVSE/EVEMS refs, working-space requirement, and available-fault-current verification. Sprint 2C will replace the stub with per-AHJ manifest content.
+
+---
+
+#### PR #23 — `feat/sprint-2a-part-2-sections` (open, 3 commits) — Sections + sheet IDs + TOC + revision log
+
+**Commit 4a** (`ed4fdb8`) — Backend restructure. The largest single commit of Sprint 2A so far.
+
+Replaced the imperative `pages.push({ name, element })` chain with a declarative `builders: PageBuilder[]` list. Each builder declares `kind`, `band`, `pageCount`, `tocTitles`, and a `render(sheetIds, tocEntries)` function. The build pipeline:
+
+1. Push every potential page-builder, gated by both data presence (existing) and `sections` config (new). Cover is hard-required (no gate). ComplianceSummary + PanelSchedules are toggleable but the UI warns when off.
+2. Walk builders allocating sheet IDs via per-band counters.
+3. Walk again collecting TOC entries (cover + TOC itself excluded).
+4. Render each builder with its allocated sheet IDs and the populated `tocEntries` array.
+
+New `services/pdfExport/packetSections.ts` foundation: `PacketSections` type + `DEFAULT_SECTIONS` (all-on default), `resolveSections` helper, 7 `SheetBand` constants (000-099 / 100-199 / 200-299 / 300-399 / 400-499 / 500-599 / 600-699), `newBandCounters` + `nextSheetId` per-band sequential allocator. Toggling a section off compresses numbering within its band — no gaps.
+
+New PDF components: `TableOfContentsPage` (auto-populated from rendered sections, lists sheet ID + title), `RevisionLogPage` (auto-populates default "Rev 0 / [today] / Initial submittal / [contractor]" row when `revisions` is omitted; subsequent revisions append).
+
+Theme additions: `BrandBar` and `BrandFooter` accept optional `sheetId` — render "Sheet [id] · Page X of Y" instead of bare "Page X of Y".
+
+Multi-page component split (Option A): `MultiFamilyEVPages` accepts `sheetIds: [string, string, string]`; `MeterStackScheduleDocument` accepts `sheetIds: string[]` aligned to `meterStacks`. Generator declares `pageCount: 3` for MFEV and `pageCount: stacks.length` for meter stack so each physical page in the merged PDF gets its own unique sheet ID.
+
+Sheet ID prop threaded through all 9 page components: CoverPage, GeneralNotesPage, EquipmentSchedule, RiserDiagram, LoadCalculationSummary, ComplianceSummary, EquipmentSpecsPages, VoltageDropPages, JurisdictionRequirementsPages, ShortCircuitCalculationPages, ArcFlashPages, GroundingPlanPages, PanelSchedulePages.
+
+**Commit 4b** (`df919e0`) — Frontend toggle panel + projects.settings persistence.
+
+Added Configure Sections panel between Project Summary and Jurisdiction Requirements cards in `components/PermitPacketGenerator.tsx`. 16 toggleable sections grouped into 6 categories. Cover is shown as a non-toggleable indicator. "Reset to defaults" link clears the override. Each toggle shows section purpose + band info.
+
+Auto-disable predicates grey out toggles with tooltips when underlying data is missing (Voltage Drop / no feeders, Short Circuit / no calcs, Arc Flash / not yet wired, Grounding / no grounding system, Meter Stack / no stacks, Multi-Family EV / requires the input checkbox above, Jurisdiction / no jurisdiction selected).
+
+Off-warning amber banners surface above the grid when sections most AHJs require are toggled off (Compliance Summary, Panel Schedules).
+
+Persistence: each toggle change calls `updateProject({...currentProject, settings: {...settings, sectionPreferences: updated}})`. ProjectSettings extended with `sectionPreferences?: Record<string, boolean>` (typed as `Record<string, boolean>` instead of `Partial<PacketSections>` to avoid a circular import from PDF service into `types.ts`; packet generator narrows at the boundary). Stored in existing `projects.settings` JSONB column — no migration.
+
+**Commit `8769736`** — Bug-fix follow-up (3 issues found during user visual review):
+
+1. Sheet IDs now prefix with `E-` (was bare numeric like "305"; now "E-305" — standard plan-set discipline prefix).
+2. Sheet IDs render as a high-visibility yellow pill in BrandBar and a bordered cream badge in BrandFooter (was inline text, blending into dark bar).
+3. 42-circuit panel schedules were overflowing onto a second page (with the same sheet ID, breaking the uniqueness invariant). Three-layer fix: `themeStyles.page.paddingBottom` reduced 78pt → 64pt (over-provisioned in commit 2); panel summary card layout tightened (padding/margins/font sizes); `wrap={false}` on both summary cards so react-pdf moves the entire card to the next page rather than splitting it mid-content.
+
+**Decisions made**:
+
+- **Strategy C — themed PRs.** Splitting Sprint 2A's 12 commits into 4 themed PRs instead of 12 individual ones. PR 1 = "per-sheet polish + content gaps" (commits 1-3); PR #23 = "document structure + user control" (commits 4a + 4b + bugfix); PR 3 (next) = "engineering content additions" (commits 5-8 — H14, H9+H15, H10, H11); PR 4 = "diagrams" (commits 9-10 — M3, M6); PR 5 = "engine + schema" (commits 11-12 — H17, settings JSON additions). Saved this preference because it's now the project's de facto Sprint 2A workflow.
+- **Hard-required pages**: Cover only. ComplianceSummary + PanelSchedules toggleable but with off-warning banners ("Most AHJs reject without this").
+- **Sheet ID scheme**: numeric category bands with `E-` discipline prefix. Front matter 001-099, calculations 100-199, diagrams 200-299, panels 300-399, multi-family 400-499, compliance 500-599, specialty 600-699 (reserved for EVEMS narrative + EVSE labeling in commits 7-8).
+- **Default revision-log row**: Auto-populated `Rev 0 / [today's date] / Initial submittal / [Contractor name]` for first submittals. Avoids shipping with a blank page.
+- **Sections persistence in `projects.settings`** (not localStorage). Round-trips through existing JSONB column, no DB migration. Per-project preferences survive page reloads.
+- **Sections config locking is Sprint 3 territory.** Sheet ID stability across revisions matters for AHJ comment letters citing specific sheet IDs. Documented as a Sprint 3 concern (PE seal workflow will lock the sections snapshot at submittal time).
+- **`wrap={false}` on cohesive PDF cards**. Once react-pdf's auto-pagination kicks in, fixed elements (BrandBar, BrandFooter) re-render on each overflow page with the same sheet ID — breaks uniqueness. Defensive pattern: any logical card the reader expects together gets `wrap={false}` so react-pdf relocates the whole card on overflow rather than splitting it.
+
+**Key files touched**:
+- New: `services/pdfExport/packetSections.ts` (sections config + sheet ID utilities)
+- Generator restructure: `services/pdfExport/permitPacketGenerator.tsx` (~512 lines new, ~172 deleted)
+- Cross-cutting: 9 PDF page modules touched for sheetId prop threading + contractor footer prop threading
+- Theme: `services/pdfExport/permitPacketTheme.tsx` (BrandBar pill, BrandFooter badge, contractorBlock, paddingBottom tightening)
+- UI: `components/PermitPacketGenerator.tsx` (toggle panel + persistence; +330 LOC)
+- Types: `types.ts` (`ProjectSettings.sectionPreferences?`)
+- Tests: `tests/contractorBlockPdf.test.ts`, `tests/generalNotesPdf.test.ts`, `tests/packetSections.test.ts`, `tests/tocRevisionLogPdf.test.ts` (+ updates to `tests/coverPagePdf.test.ts`)
+
+**Pending / Follow-ups**:
+
+- **PR #23 user merge.** Awaiting browser verification of the toggle panel + sheet ID rendering + 42-circuit overflow fix.
+- **Sprint 2A continuation** — commits 5-12 across 3 more themed PRs:
+  - **PR 3** (next): commit 5 H14 (NEC 220.87 conditions narrative), commit 6 H9+H15 (AIC labels on one-line + UL-2202/UL-2594 fields on EVSE specs + new "Available Fault Current Calculation" page when service-modification-type === 'new-service'), commit 7 H10 (EVEMS operational narrative), commit 8 H11 (EVSE labeling page per NEC 625.43)
+  - **PR 4**: commit 9 M3 (project-specific grounding detail with GEC sizing per NEC 250.66 / 250.122), commit 10 M6 (riser diagram landscape mode for ≥10 panels OR pagination)
+  - **PR 5**: commit 11 H17 (FS 471.003(2)(h) contractor-exemption screening engine — pure function in `services/permitMode/exemptionScreening.ts` returning `{ lane, reason, ahjOverride? }`), commit 12 schema additions to `projects.settings` (service_modification_type enum, scope_flags JSON, estimated_value_usd)
+- **PR base bug** — Claude Code's UI created PR #23 with base set to `fix/c2-evse-feeder-aggregation` (a Sprint 1 branch) instead of `main`. Manually retargeted via `gh api PATCH /repos/.../pulls/23 -f base=main`. If this recurs, check repo default-branch settings.
+
+**PRs**:
+- **PR 1** — Sprint 2A commits 1-3 (merged to main as squash commit `92126eb`)
+- **PR #23** — Sprint 2A commit 4a + 4b + bugfix (open, base now correctly `main`, mergeable CLEAN)
 
 ---
 
@@ -64,29 +160,3 @@
 - #16 — C2 (merged earlier sessions)
 - #17 — C3 + B-1 + C6 (merged 2026-05-07 03:00 UTC)
 - **#19 — C4 omnibus** (open, awaiting merge)
-
----
-
-### Session: 2026-05-05 / 2026-05-06 — AHJ Compliance Audit C3 + B-1 + Panel-Phase (bundled, PR #17 merged)
-
-**Focus**: Fourth audit-Sprint-1 session. C1 + C2 already merged earlier. This session shipped the C3 (project-metadata advisory validation) + B-1 (chatTools.ts AI staleness) + C6 (panel-schedule PDF phase column) bundle — all three are consumer-side wiring fixes that didn't touch any calculation engine.
-
-**Status**: ✅ All three shipped on `fix/c3-b1-bundle`, PR #17 merged 2026-05-07. 164/164 tests pass (was 138 pre-bundle, +26 new).
-
-**Direction shift on 2026-05-06**: First C3 implementation hard-blocked PDF generation when fields were placeholder-shaped. User pushed back — contractors legitimately need draft packets with "TBD" for pre-application AHJ walk-ins. C3 was reworked into advisory-only. Saved this preference to memory at `feedback_validation_advisory.md` so future sessions don't reintroduce hard-block validation.
-
-**Panel-Phase bug spotted by user on 2026-05-06**: While reviewing the regenerated audit packet, user noticed every circuit on the Unit 108 Panel page (240V single-phase split-phase) showed "Phase A". Investigation: in-app `components/PanelSchedule.tsx` was correct (uses `getCircuitPhase` from `services/calculations/demandFactor.ts`); PDF at `services/pdfExport/PanelScheduleDocuments.tsx` had reinvented its own broken inline phase logic. Same C1/C2 pattern: correct helper exists, PDF call site bypasses it. Fixed.
-
-**Root causes (consumer-side wiring/validation, not engine bugs — same pattern as C1, C2)**:
-- **C3**: `lib/validation-schemas.ts:projectSchema.address` only required `.min(1)`, so `"TBD"` (3 chars) passed. `components/PermitPacketGenerator.tsx:93` checked `contractorLicense.trim().length > 0` — accepting `"test"`. AHJ-rejection risk slipped past existing form gates.
-- **B-1**: `services/ai/chatTools.ts:293` read `feeder.voltageDropPercent` (cached column on the lossy `FeederSummary`). Same staleness pattern as the original C2 bug.
-- **C6**: `services/pdfExport/PanelScheduleDocuments.tsx` had inline `panel.phase === 1 ? 'A' : ['A','B','C'][(row-1) % 3]` instead of calling `getCircuitPhase`.
-
-**Work Done**:
-- C3: Three new exported Zod schemas (`projectAddressSchema`, `flContractorLicenseSchema`, `permitNumberSchema`) with `PLACEHOLDER_VALUES` rejection list; advisory-only blue alert in `PermitPacketGenerator.tsx`, never blocks generation.
-- B-1: Plumbed raw DB rows alongside lossy `ProjectContext` summary; rewired `calculate_feeder_voltage_drop` AI tool to call `computeFeederLoadVA` + `calculateFeederSizing` live.
-- C6: Replaced inline phase expression with `getCircuitPhase(leftNum, panel.phase === 3 ? 3 : 1)` at both render paths; rewrote `calculatePhaseBalancing` for `panelPhase === 1` to split 2-pole loads 50/50.
-
-**PRs**: #17 (merged 2026-05-07).
-
-**Note for future sessions**: a SECOND copy of the same `calculatePhaseBalancing` 1Φ-bug pattern existed in `services/calculations/demandFactor.ts:calculatePanelDemand` (the in-app function); it was discovered during C4 review and fixed in commit `aa72bdb` of PR #19. When fixing a pattern bug, grep the codebase for the same idiom — Sprint 1 confirmed it usually exists in at least one more place.

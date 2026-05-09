@@ -1,6 +1,45 @@
 # SparkPlan - Roadmap
 
+## Current Phase: 3.4 (AHJ Compliance Audit Sprint 2A) - IN PROGRESS (May 2026)
+
 ## Latest Completed Phase: 3.3 (AHJ Compliance Audit Sprint 1) - May 2026
+
+---
+
+## Phase 3.4: AHJ Compliance Audit Sprint 2A - IN PROGRESS (May 2026)
+
+Form-factor and content-gap sweep on top of Sprint 1's engine-correctness fixes. Closes systemic intake-rejection vectors that affect every Florida AHJ — packet identification (cover edition stamp), per-sheet contractor signature, navigation (TOC, revision log, sheet IDs), and required content pages (general notes, EVEMS narrative, EVSE labeling, grounding detail, AIC labels). Work split into themed PRs ("Strategy C" — by category boundary, not per-commit).
+
+| PR | Status | Closes |
+|---|---|---|
+| **PR 1** (merged `92126eb`) | ✅ MERGED 2026-05-08 | C7 (NEC edition selector), H4 (FBC + NFPA-70 reference), C8 (per-sheet contractor block), M8 (meter stack theme parity), H12 (general notes page), H13 (3/3/5 voltage drop convention), LOW (edition-stamp polish) |
+| **PR #23** (open, mergeable CLEAN) | 🟡 PUSHED 2026-05-09 | H1 (cover TOC), H2 (revision log page), H3 (sheet IDs with `E-` prefix and category bands) — plus section toggle UI + projects.settings persistence + sheet ID styling fix + 42-circuit panel schedule overflow fix |
+| **PR 3** (planned) | ⏳ PENDING | H14 (NEC 220.87 conditions narrative), H9+H15 (AIC labels on one-line + UL-2202/UL-2594 fields on EVSE specs + new "Available Fault Current Calculation" page when service-modification-type === 'new-service'), H10 (EVEMS operational narrative), H11 (EVSE labeling page per NEC 625.43) |
+| **PR 4** (planned) | ⏳ PENDING | M3 (project-specific grounding detail with GEC sizing per NEC 250.66 / 250.122), M6 (riser diagram landscape mode for ≥10 panels OR pagination) |
+| **PR 5** (planned) | ⏳ PENDING | H17 (FS 471.003(2)(h) contractor-exemption screening engine — pure function returning `{ lane, reason, ahjOverride? }`), schema additions to `projects.settings` (service_modification_type, scope_flags, estimated_value_usd) |
+
+**Net packet structure (post-Sprint-2A target):**
+
+| Sheet ID | What | Source |
+|---|---|---|
+| `E-001` | Cover sheet (NEC 2020 + FBC 8th ed stamp, applicable codes section) | C7 + H4 (PR 1) |
+| `E-002` | Table of Contents (auto-populated from rendered sections) | H1 (PR #23) |
+| `E-003` | Revision Log (auto Rev 0 row on first submittal) | H2 (PR #23) |
+| `E-004` | General Notes (8-item FL pilot stack default, AHJ-manifest-driven in 2C) | H12 + H13 (PR 1) |
+| `E-101+` | Engineering calculations (load calc, voltage drop, short circuit, arc flash, 220.87 narrative, AIC) | H14 + H9 (PR 3) |
+| `E-201+` | Diagrams & equipment (riser, equipment schedule/specs, grounding detail with GEC sizing) | M3 + M6 (PR 4) |
+| `E-301+` | Panel schedules (one per panel; 42-circuit + Load Summary + Dwelling Unit Demand on a single sheet) | C6 (Sprint 1) + 42-ckt fix (PR #23) |
+| `E-401+` | Multi-family scope (meter stack 1-per-stack, MFEV 3-per-analysis) | M8 (PR 1) + multi-page split (PR #23) |
+| `E-501+` | Compliance & AHJ (NEC 2020 compliance summary, jurisdiction requirements) | C7 (PR 1) |
+| `E-601+` | Specialty (EVEMS operational narrative, EVSE labeling per NEC 625.43) | H10 + H11 (PR 3) |
+
+**Per-sheet footer on every electrical sheet:** Contractor name + License # block on the left, Signature / Date line on the right (C8). Sheet ID badge in footer center, paired with page number (H3).
+
+**Section toggles + persistence (PR #23):** Contractors choose which sections to include before generating. 16 toggles grouped into 6 categories. Cover always-on. Off-warning amber banners for ComplianceSummary + PanelSchedules. Auto-disable predicates with tooltips for missing-data sections. Preferences persist per-project to `projects.settings.section_preferences`.
+
+**Test count (after PR #23):** 198/198 pass (was 181 post-Sprint-1, +17 across the two PRs). No DB migrations required.
+
+**Audit doc:** [`docs/AHJ_COMPLIANCE_AUDIT_2026-05-04.md`](docs/AHJ_COMPLIANCE_AUDIT_2026-05-04.md).
 
 ---
 
