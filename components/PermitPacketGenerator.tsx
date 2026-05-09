@@ -25,7 +25,7 @@ import { useMeters } from '../hooks/useMeters';
 import { useProfile } from '../hooks/useProfile';
 import { JurisdictionSearchWizard } from './JurisdictionSearchWizard';
 import { calculateMultiFamilyEV, type MultiFamilyEVInput } from '../services/calculations/multiFamilyEV';
-import { buildMultiFamilyContext } from '../services/calculations/upstreamLoadAggregation';
+import { buildMultiFamilyContext, isEVEMSManagedPanel } from '../services/calculations/upstreamLoadAggregation';
 import {
   projectAddressSchema,
   flContractorLicenseSchema,
@@ -166,6 +166,12 @@ const SECTION_TOGGLE_CONFIG: SectionToggleConfig[] = [
     key: 'jurisdiction',
     label: 'Jurisdiction Requirements',
     description: 'Per-AHJ checklist (requires a jurisdiction selected above)',
+    group: 'Compliance & AHJ',
+  },
+  {
+    key: 'evemsNarrative',
+    label: 'EVEMS Operational Narrative',
+    description: 'NEC 625.42 — device, setpoint, monitoring, failure mode, NEC 750 tamper protection',
     group: 'Compliance & AHJ',
   },
 ];
@@ -328,6 +334,10 @@ export const PermitPacketGenerator: React.FC<PermitPacketGeneratorProps> = ({ pr
         return !currentProject?.jurisdiction_id
           ? 'No jurisdiction selected for this project'
           : undefined;
+      case 'evemsNarrative':
+        return panels.some(p => isEVEMSManagedPanel(p.id, circuits))
+          ? undefined
+          : 'No EVEMS-managed panels detected (NEC 625.42 narrative is only required when an EV bank uses energy management)';
       default:
         return undefined;
     }

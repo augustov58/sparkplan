@@ -2251,3 +2251,183 @@ export const AvailableFaultCurrentPage: React.FC<AvailableFaultCurrentPageProps>
   );
 };
 
+// ============================================================================
+// EVEMS OPERATIONAL NARRATIVE (Sprint 2A H10)
+// ============================================================================
+// Required by every FL AHJ that reviews NEC 625.42 designs. The narrative
+// explains how the Energy Management System (EVMS / EMS) clamps the EV bank's
+// aggregate demand to the declared setpoint so reviewers can trust the
+// service-level demand reduction credit. Without this page, AHJs see a
+// reduced feeder calc with no explanation of how the load is actually
+// controlled — and reject the design defensively.
+//
+// Renders one detail block per EVEMS-managed panel, sourcing the setpoint
+// from the explicit "EVEMS Aggregate Setpoint (NEC 625.42)" marker circuit
+// (preferred) or falling back to `panel.main_breaker_amps × voltage` for
+// legacy projects.
+
+export interface EVEMSNarrativePanelEntry {
+  panelId: string;
+  panelName: string;
+  /** EVEMS setpoint VA from the explicit marker circuit (preferred). */
+  setpointVA: number | null;
+  /** True when setpointVA came from the marker; false for legacy proxy. */
+  hasExplicitMarker: boolean;
+  /** Panel main breaker rating (informational; bounds the proxy fallback). */
+  mainBreakerAmps: number | null;
+  /** Panel voltage (V). */
+  voltage: number;
+  /** Panel phase (1 or 3). */
+  phase: 1 | 3;
+  /** Optional contractor-supplied EVEMS device manufacturer + model. */
+  deviceManufacturerModel?: string;
+}
+
+interface EVEMSNarrativePageProps {
+  projectName: string;
+  panels: EVEMSNarrativePanelEntry[];
+  contractorName?: string;
+  contractorLicense?: string;
+  sheetId?: string;
+}
+
+const fmtKVA = (va: number | null): string => {
+  if (va === null || !Number.isFinite(va)) return '—';
+  return `${(va / 1000).toFixed(2)} kVA`;
+};
+
+const fmtAmpsFromVA = (va: number | null, voltage: number, phase: 1 | 3): string => {
+  if (va === null || !Number.isFinite(va) || voltage <= 0) return '—';
+  const denom = phase === 3 ? voltage * 1.732 : voltage;
+  return `${(va / denom).toFixed(0)} A`;
+};
+
+export const EVEMSNarrativePage: React.FC<EVEMSNarrativePageProps> = ({
+  projectName,
+  panels,
+  contractorName,
+  contractorLicense,
+  sheetId,
+}) => (
+  <Page size="LETTER" style={themeStyles.page}>
+    <BrandBar pageLabel="EVEMS NARRATIVE" sheetId={sheetId} />
+
+    <View style={themeStyles.titleBlock}>
+      <Text style={themeStyles.docTitle}>EVEMS Operational Narrative</Text>
+      <Text style={themeStyles.docSubtitle}>
+        {`${projectName} • NEC 625.42 — Energy Management System for EV Charging`}
+      </Text>
+    </View>
+
+    {/* Top-level summary table — one row per EVEMS-managed panel */}
+    <View style={themeStyles.table} wrap={false}>
+      <View style={themeStyles.tableHeaderRow}>
+        <Text style={[themeStyles.th, { width: '30%' }]}>Panel</Text>
+        <Text style={[themeStyles.th, { width: '20%' }]}>Setpoint (kVA)</Text>
+        <Text style={[themeStyles.th, { width: '20%' }]}>Setpoint (A)</Text>
+        <Text style={[themeStyles.th, { width: '15%' }]}>Service</Text>
+        <Text style={[themeStyles.th, { width: '15%' }]}>Source</Text>
+      </View>
+      {panels.map((p, idx) => (
+        <View
+          key={p.panelId}
+          style={idx % 2 === 0 ? themeStyles.tableRow : themeStyles.tableRowAlt}
+          wrap={false}
+        >
+          <Text style={[themeStyles.td, { width: '30%', fontFamily: 'Helvetica-Bold' }]}>{p.panelName}</Text>
+          <Text style={[themeStyles.td, { width: '20%' }]}>{fmtKVA(p.setpointVA)}</Text>
+          <Text style={[themeStyles.td, { width: '20%' }]}>{fmtAmpsFromVA(p.setpointVA, p.voltage, p.phase)}</Text>
+          <Text style={[themeStyles.td, { width: '15%' }]}>{`${p.voltage}V ${phaseLabel(p.phase)}`}</Text>
+          <Text style={[themeStyles.td, { width: '15%', fontSize: 7 }]}>
+            {p.hasExplicitMarker ? 'declared' : 'estimated'}
+          </Text>
+        </View>
+      ))}
+    </View>
+
+    {/* Per-panel detail blocks — six required narrative elements per AHJ */}
+    {panels.map((p) => (
+      <View key={`detail-${p.panelId}`} wrap={false} style={{ marginTop: 8 }}>
+        <Text style={themeStyles.sectionTitle}>{`${p.panelName.toUpperCase()} — EVEMS DETAILS`}</Text>
+
+        <View style={{ marginBottom: 4 }}>
+          <Text style={themeStyles.subSectionTitle}>1. Device</Text>
+          <Text style={{ fontSize: 8.5, color: '#374151', lineHeight: 1.4 }}>
+            {p.deviceManufacturerModel
+              ? `${p.deviceManufacturerModel}. UL 916 listed Energy Management System (or NRTL equivalent).`
+              : 'Manufacturer/model to be specified on contractor-supplied EVEMS cut sheet. Device shall be listed to UL 916 (Energy Management Equipment) or equivalent NRTL standard.'}
+          </Text>
+        </View>
+
+        <View style={{ marginBottom: 4 }}>
+          <Text style={themeStyles.subSectionTitle}>2. Maximum Aggregate Setpoint (NEC 625.42)</Text>
+          <Text style={{ fontSize: 8.5, color: '#374151', lineHeight: 1.4 }}>
+            {p.setpointVA !== null
+              ? `Setpoint = ${fmtKVA(p.setpointVA)} (${fmtAmpsFromVA(p.setpointVA, p.voltage, p.phase)} at ${p.voltage}V ${phaseLabel(p.phase)}). ${p.hasExplicitMarker ? 'Declared via the project autogeneration EVEMS marker circuit; verified against contractor-supplied EVEMS configuration.' : `Estimated from panel main-breaker rating (${p.mainBreakerAmps ?? '?'}A) — actual setpoint shall be field-verified and documented before energization.`}`
+              : 'Setpoint not yet recorded for this panel. Required before AHJ submittal.'}
+          </Text>
+        </View>
+
+        <View style={{ marginBottom: 4 }}>
+          <Text style={themeStyles.subSectionTitle}>3. Service Main / Sub-Feed Monitoring Points</Text>
+          <Text style={{ fontSize: 8.5, color: '#374151', lineHeight: 1.4 }}>
+            EVEMS shall monitor the upstream feeder serving this EV panel via current transformers (CTs)
+            installed at the feeder's source. Where multiple downstream EV panels share a single upstream
+            point, the EVEMS shall aggregate readings and clamp combined demand to the declared setpoint.
+          </Text>
+        </View>
+
+        <View style={{ marginBottom: 4 }}>
+          <Text style={themeStyles.subSectionTitle}>4. Failure Mode (Signal Loss / Power Loss)</Text>
+          <Text style={{ fontSize: 8.5, color: '#374151', lineHeight: 1.4 }}>
+            On loss of monitoring signal or EVEMS controller power, the system shall fail to its lowest
+            permitted setpoint — typically by curtailing or disconnecting controlled charging branches.
+            EV chargers shall not exceed branch-circuit nameplate ratings under any failure condition
+            (NEC 625.42 + 625.40). Reset requires manual contractor action or controller power cycle.
+          </Text>
+        </View>
+
+        <View style={{ marginBottom: 4 }}>
+          <Text style={themeStyles.subSectionTitle}>5. Tamper Protection (NEC 750)</Text>
+          <Text style={{ fontSize: 8.5, color: '#374151', lineHeight: 1.4 }}>
+            EVEMS controller and CT enclosures shall be physically secured (locking enclosures, sealed
+            wireways) and configuration shall be password-protected at the device level. Setpoint
+            changes shall be logged. Field setpoint adjustments outside of the declared maximum require
+            an updated permit submittal per NEC 625.42.
+          </Text>
+        </View>
+
+        <View style={{ marginBottom: 4 }}>
+          <Text style={themeStyles.subSectionTitle}>6. NEC 625.42 Compliance Statement</Text>
+          <Text style={{ fontSize: 8.5, color: '#374151', lineHeight: 1.4 }}>
+            Branch conductors and overcurrent protection are sized to full continuous nameplate × 125%
+            per NEC 625.40 / 210.19. The feeder and service-side conductors are sized to the declared
+            EVEMS setpoint per NEC 625.42, allowing service capacity reuse for new EV loads without a
+            full service upgrade. Field commissioning shall verify the setpoint against this narrative
+            before energization.
+          </Text>
+        </View>
+      </View>
+    ))}
+
+    <View style={themeStyles.noteBox} wrap={false}>
+      <Text style={{ fontSize: 9, fontFamily: 'Helvetica-Bold', marginBottom: 2, color: '#1e3a8a' }}>
+        SCOPE OF THIS NARRATIVE
+      </Text>
+      <Text style={themeStyles.noteText}>
+        This page documents the EVEMS design intent for AHJ review. The contractor shall supply
+        manufacturer cut sheets for the EVEMS controller, CTs, and any associated hardware as part of
+        equipment specifications. Field commissioning records (setpoint configuration, CT secondary
+        polarity, failure-mode test) shall be provided to the AHJ on inspection per NEC 625.42.
+      </Text>
+    </View>
+
+    <BrandFooter
+      projectName={projectName}
+      contractorName={contractorName}
+      contractorLicense={contractorLicense}
+      sheetId={sheetId}
+    />
+  </Page>
+);
+

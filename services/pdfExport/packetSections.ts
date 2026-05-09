@@ -51,6 +51,9 @@ export interface PacketSections {
   // Compliance & AHJ (compliance summary toggleable but warn)
   complianceSummary: boolean;
   jurisdiction: boolean;
+
+  // Specialty / scope-specific (band 600) — auto-disabled when not applicable
+  evemsNarrative: boolean;          // Sprint 2A H10 — NEC 625.42 EVEMS operational narrative
 }
 
 export const DEFAULT_SECTIONS: PacketSections = {
@@ -72,6 +75,7 @@ export const DEFAULT_SECTIONS: PacketSections = {
   multiFamilyEV: true,
   complianceSummary: true,
   jurisdiction: true,
+  evemsNarrative: true,
 };
 
 /** Resolve a partial override against the defaults. */

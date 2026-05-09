@@ -26,13 +26,19 @@ import {
   RevisionLogPage,
   NEC22087NarrativePage,
   AvailableFaultCurrentPage,
+  EVEMSNarrativePage,
   type TocEntry,
   type RevisionEntry,
   type NEC22087NarrativeData,
   type AvailableFaultCurrentInput,
+  type EVEMSNarrativePanelEntry,
 } from './PermitPacketDocuments';
 import { PanelSchedulePages } from './PanelScheduleDocuments';
-import { calculateAggregatedLoad } from '../calculations/upstreamLoadAggregation';
+import {
+  calculateAggregatedLoad,
+  isEVEMSManagedPanel,
+  findEVEMSSetpointMarker,
+} from '../calculations/upstreamLoadAggregation';
 import { EquipmentSpecsPages } from './EquipmentSpecsDocuments';
 import { VoltageDropPages } from './VoltageDropDocuments';
 import { JurisdictionRequirementsPages } from './JurisdictionDocuments';
@@ -53,6 +59,7 @@ import {
   BAND_PANELS,
   BAND_MULTIFAMILY,
   BAND_COMPLIANCE,
+  BAND_SPECIALTY,
 } from './packetSections';
 
 export interface PermitPacketData {
@@ -255,7 +262,8 @@ export const generatePermitPacket = async (data: PermitPacketData): Promise<void
     | 'meterStack'
     | 'multiFamilyEV'
     | 'complianceSummary'
-    | 'jurisdiction';
+    | 'jurisdiction'
+    | 'evemsNarrative';
 
   interface PageBuilder {
     name: string;
@@ -688,6 +696,52 @@ export const generatePermitPacket = async (data: PermitPacketData): Promise<void
         />
       ),
     });
+  }
+
+  // ---- Specialty / scope-specific (band 600) ----
+  // Sprint 2A H10: EVEMS operational narrative — only renders when at least
+  // one EVEMS-managed panel is detected. Setpoint pulled from explicit marker
+  // circuit (preferred); legacy projects without the marker get a "estimated"
+  // breaker × voltage proxy with the source flag exposed in the output.
+  if (sections.evemsNarrative) {
+    const evemsPanels: EVEMSNarrativePanelEntry[] = sortedPanels
+      .filter(p => isEVEMSManagedPanel(p.id, data.circuits))
+      .map(p => {
+        const marker = findEVEMSSetpointMarker(p.id, data.circuits);
+        const explicitSetpointVA = marker?.load_watts ?? null;
+        const phaseAsLit: 1 | 3 = p.phase === 3 ? 3 : 1;
+        // Proxy fallback: panel main breaker × voltage. Bounds the setpoint
+        // from above for legacy projects that pre-date the marker circuit.
+        const proxyVA = p.main_breaker_amps && p.voltage
+          ? p.main_breaker_amps * p.voltage * (phaseAsLit === 3 ? 1.732 : 1)
+          : null;
+        return {
+          panelId: p.id,
+          panelName: p.name,
+          setpointVA: explicitSetpointVA && explicitSetpointVA > 0 ? explicitSetpointVA : proxyVA,
+          hasExplicitMarker: !!(explicitSetpointVA && explicitSetpointVA > 0),
+          mainBreakerAmps: p.main_breaker_amps ?? null,
+          voltage: p.voltage,
+          phase: phaseAsLit,
+        };
+      });
+    if (evemsPanels.length > 0) {
+      builders.push({
+        name: 'EVEMSNarrative',
+        kind: 'evemsNarrative',
+        band: BAND_SPECIALTY,
+        pageCount: 1,
+        tocTitles: ['EVEMS Operational Narrative (NEC 625.42)'],
+        render: (sheetIds) => (
+          <EVEMSNarrativePage
+            projectName={data.projectName}
+            panels={evemsPanels}
+            {...contractor}
+            sheetId={sheetIds[0]}
+          />
+        ),
+      });
+    }
   }
 
   // Synthesize virtual feeder-circuit rows for panels that feed downstream
