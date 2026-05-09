@@ -398,7 +398,7 @@ export const ProjectSetup: React.FC<ProjectSetupProps> = ({ project, updateProje
                 placeholder="e.g. 22000"
                 min={0}
               />
-              <p className="text-xs text-[#888] mt-1">Utility-supplied (RMS symmetrical)</p>
+              <p className="text-xs text-[#888] mt-1">Utility-supplied (RMS symmetrical). Leave blank for infinite-bus (transformer-limited fault current — IEEE 141 §4.4).</p>
             </div>
 
             <div>
@@ -411,7 +411,7 @@ export const ProjectSetup: React.FC<ProjectSetupProps> = ({ project, updateProje
                 placeholder="optional"
                 min={0}
               />
-              <p className="text-xs text-[#888] mt-1">Estimated when blank</p>
+              <p className="text-xs text-[#888] mt-1">Estimated from service amps when blank</p>
             </div>
 
             <div>
@@ -426,8 +426,14 @@ export const ProjectSetup: React.FC<ProjectSetupProps> = ({ project, updateProje
                 min={0}
                 max={99}
               />
-              <p className="text-xs text-[#888] mt-1">Typical defaults applied when blank</p>
+              <p className="text-xs text-[#888] mt-1">Typical: 1.5–5.75% by size. Defaults applied when blank.</p>
             </div>
+          </div>
+
+          <div className="mt-4 p-3 bg-[#f8f6f2] border border-[#e8e6e3] rounded-md">
+            <p className="text-xs text-[#666] leading-relaxed">
+              <strong className="text-[#1a1a1a]">No utility data?</strong> Leave Available Fault Current blank — the calculator will assume an infinite primary bus and limit fault current by the utility transformer alone. This is the standard early-design approach (IEEE 141 §4.4, IEEE 242) and is accepted by most AHJs. Replace with the utility's actual AFC letter once you have it, especially when claiming series-rated combinations.
+            </p>
           </div>
 
           <p className="text-xs text-[#888] mt-4 leading-relaxed">
