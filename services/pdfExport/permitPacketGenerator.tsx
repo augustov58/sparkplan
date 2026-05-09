@@ -17,10 +17,11 @@ type MeterStack = Database['public']['Tables']['meter_stacks']['Row'];
 type MeterDB = Database['public']['Tables']['meters']['Row'];
 import {
   CoverPage,
+  GeneralNotesPage,
   EquipmentSchedule,
   RiserDiagram,
   LoadCalculationSummary,
-  ComplianceSummary
+  ComplianceSummary,
 } from './PermitPacketDocuments';
 import { PanelSchedulePages } from './PanelScheduleDocuments';
 import { calculateAggregatedLoad } from '../calculations/upstreamLoadAggregation';
@@ -104,6 +105,12 @@ export interface PermitPacketData {
    * different from the signing contractor (PE-stamped commercial work).
    */
   contractorName?: string;
+  /**
+   * Sprint 2A H12 + H13: numbered general-notes list shown on the dedicated
+   * General Notes page. Defaults to the FL pilot stack (NEC 2020 + 3/3/5
+   * voltage drop). Sprint 2C will override this from per-AHJ manifests.
+   */
+  generalNotes?: string[];
 }
 
 const downloadBlob = (blob: Blob, fileName: string): void => {
@@ -198,6 +205,17 @@ export const generatePermitPacket = async (data: PermitPacketData): Promise<void
         serviceConductorRouting={data.serviceConductorRouting}
         necEdition={data.necEdition}
         codeReferences={data.codeReferences}
+      />
+    ),
+  });
+
+  pages.push({
+    name: 'GeneralNotes',
+    element: (
+      <GeneralNotesPage
+        projectName={data.projectName}
+        generalNotes={data.generalNotes}
+        {...contractor}
       />
     ),
   });

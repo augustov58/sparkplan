@@ -321,6 +321,98 @@ export const CoverPage: React.FC<CoverPageProps> = ({
 );
 
 // ============================================================================
+// GENERAL NOTES (Sprint 2A H12 + H13)
+// ============================================================================
+// Numbered general-notes page driven from an optional `generalNotes` array on
+// the packet data. Defaults to the FL pilot stack (NEC 2020 compliance + the
+// 3% / 3% / 5% voltage-drop convention required by Orlando + most FL AHJs).
+// Sprint 2C will replace the defaults with per-AHJ manifest content.
+
+const DEFAULT_GENERAL_NOTES: string[] = [
+  'All electrical work shall comply with NFPA-70 (NEC) 2020, Florida Building Code 8th Edition (2023), local AHJ amendments, and all applicable utility provider requirements.',
+  'Voltage drop shall not exceed 3% on branch circuits and 3% on feeders, with combined drop not exceeding 5% per NEC 210.19(A) Informational Note 4 and NEC 215.2(A)(1) Informational Note 2.',
+  'All conductor sizing, ampacity, and protection shall be per NEC Article 310, Article 215 (feeders), Article 240 (overcurrent protection), and Chapter 9 Tables 8 and 9 (impedance method).',
+  'Grounding electrode conductor and equipment grounding conductor sizing per NEC Article 250, Tables 250.66 and 250.122. Bonding per NEC 250.92 / 250.94 as applicable.',
+  'Equipment shall be listed and labeled by an OSHA-recognized NRTL (UL or equivalent). Field-installed listed-by-NRTL equipment shall comply with manufacturer instructions per NEC 110.3(B).',
+  'All EVSE installations shall comply with NEC Article 625, including 625.42 load management for energy-management-system-controlled installations and 625.43 disconnect / labeling requirements.',
+  'Working space and dedicated electrical space shall be maintained per NEC 110.26 and 110.27. Access shall not be obstructed by storage, equipment, or finishes.',
+  'Where existing service is reused, available short-circuit current shall be verified at every panel and overcurrent protective device per NEC 110.10. All new equipment AIC ratings shall meet or exceed available fault current.',
+];
+
+interface GeneralNotesPageProps {
+  projectName: string;
+  generalNotes?: string[];
+  contractorName?: string;
+  contractorLicense?: string;
+}
+
+export const GeneralNotesPage: React.FC<GeneralNotesPageProps> = ({
+  projectName,
+  generalNotes = DEFAULT_GENERAL_NOTES,
+  contractorName,
+  contractorLicense,
+}) => (
+  <Page size="LETTER" style={themeStyles.page}>
+    <BrandBar pageLabel="GENERAL NOTES" />
+
+    <View style={themeStyles.titleBlock}>
+      <Text style={themeStyles.docTitle}>General Notes</Text>
+      <Text style={themeStyles.docSubtitle}>{projectName}</Text>
+    </View>
+
+    <Text style={themeStyles.sectionTitle}>NOTES APPLICABLE TO ALL ELECTRICAL SHEETS</Text>
+
+    <View style={{ marginTop: 4 }}>
+      {generalNotes.map((note, idx) => (
+        <View
+          key={idx}
+          style={{ flexDirection: 'row', marginBottom: 5 }}
+          wrap={false}
+        >
+          <Text
+            style={{
+              fontSize: 8.5,
+              fontFamily: 'Helvetica-Bold',
+              width: 18,
+              color: '#1f2937',
+            }}
+          >
+            {idx + 1}.
+          </Text>
+          <Text style={{ fontSize: 8.5, lineHeight: 1.4, flex: 1, color: '#111827' }}>
+            {note}
+          </Text>
+        </View>
+      ))}
+    </View>
+
+    <View style={[themeStyles.noteBox, { marginTop: 10 }]}>
+      <Text
+        style={{
+          fontSize: 9,
+          fontFamily: 'Helvetica-Bold',
+          marginBottom: 3,
+          color: '#1e3a8a',
+        }}
+      >
+        AHJ-SPECIFIC NOTES
+      </Text>
+      <Text style={themeStyles.noteText}>
+        Additional jurisdiction-specific notes from the AHJ manifest will appear
+        here when this packet is bound to a specific AHJ. Contact the local
+        building department for current submittal requirements.
+      </Text>
+    </View>
+
+    <BrandFooter
+      projectName={projectName}
+      contractorName={contractorName}
+      contractorLicense={contractorLicense}
+    />
+  </Page>
+);
+
+// ============================================================================
 // EQUIPMENT SCHEDULE
 // ============================================================================
 
