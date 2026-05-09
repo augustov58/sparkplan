@@ -1,7 +1,7 @@
 # Database Architecture
 ## SparkPlan Application
 
-**Last Updated**: 2026-04-21
+**Last Updated**: 2026-05-09
 **Database**: Supabase PostgreSQL 15
 **Schema Version**: 2.2
 **Location**: `/supabase/schema.sql` and migration files
@@ -686,6 +686,57 @@ CREATE TABLE public.feature_interest (
 - **CHECK on `feature_name`** — keeps the table from drifting into a generic "feedback bucket". When we add a fourth beta, the migration must explicitly include it; unknown values fail loudly at insert time.
 - **No FK on `project_id`** — intentional. Users may submit interest from outside any project (e.g., from a marketing landing page in the future). Treated as a soft hint, not a foreign key.
 - **No PII beyond the user's own free-text note** — the textarea is sized at 2000 chars and prompts for use-case detail, not contact info. Account email is implicit via `user_id`.
+
+---
+
+### `estimates` + `estimate_line_items` Tables (Phase 3.7 — Estimating Beta v1)
+
+Migration: `20260511_estimates_and_line_items.sql`. Tier-gated to Business/Enterprise (`FEATURE_TIERS.estimating`).
+
+**`estimates`** — bid header. One row per estimate; multiple per project (initial / revision 2 / etc.).
+
+```
+id                       UUID PK
+project_id               FK -> projects(id), CASCADE
+user_id                  FK -> auth.users(id), CASCADE
+name                     TEXT (e.g. "Initial bid")
+estimate_number          TEXT, nullable (auto-assignable on submit)
+revision                 INT, default 1, increments on clone-as-revision
+status                   TEXT, CHECK in ('draft','submitted','accepted','rejected','expired','cancelled')
+submitted_at, decided_at, expires_at  TIMESTAMPTZ
+customer_name, customer_email, customer_address  TEXT
+subtotal_materials, subtotal_labor, subtotal_other  NUMERIC(12,2)
+markup_pct, markup_amount, tax_pct, tax_amount, total  NUMERIC
+scope_summary, exclusions, payment_terms, internal_notes  TEXT
+bid_pdf_url, bid_pdf_generated_at  (Phase-1 stub; Phase 4 wires storage)
+outcome_reason  TEXT
+parent_estimate_id  FK -> estimates(id), SET NULL  (lineage for revisions)
+```
+
+Indexes: `(project_id, created_at DESC)`, `(status, expires_at) WHERE status='submitted'`, `(user_id)`. RLS: 4 standard `auth.uid() = user_id` policies. Realtime publication enabled.
+
+**`estimate_line_items`** — detail rows.
+
+```
+id, estimate_id (FK CASCADE), user_id
+position INT (display order)
+category TEXT, CHECK in ('material','labor','equipment','subcontract','other')
+description, quantity, unit, unit_cost, unit_price, line_total
+source_kind TEXT, CHECK in ('panel','feeder','circuit','transformer','manual','assembly')
+source_id UUID  (SOFT FK — no DB constraint; auto-takeoff lineage)
+assembly_key TEXT  (Phase 2)
+taxable BOOLEAN, markup_overridden BOOLEAN
+notes TEXT
+```
+
+Indexes: `(estimate_id, position)`, `(estimate_id, category)`, `(user_id)`. RLS: 4 standard policies. Realtime enabled.
+
+**Design decisions** (per plan §5):
+- **Soft FK on `source_id`** — no DB constraint. If the user deletes a panel after the estimate exists, the line item keeps the orphaned `source_id` and the estimate stays intact. Revisions are explicit (clone-as-revision) so audit trail isn't lost.
+- **Denormalized totals on `estimates`** — recomputed on save. UI computes from line items via `services/estimating/estimateMath.ts`; the row is a sort/filter cache.
+- **Tax applied to taxable basis BEFORE markup** — doesn't tax the markup itself. Codified in `computeEstimateTotals`.
+- **Per-project material catalog** — Phase 1 has no `materials` table; the user edits per-line in each estimate. Phase 2 adds a global catalog.
+- **Lineage via `parent_estimate_id`** — soft (SET NULL) so deleting the parent doesn't orphan the revision.
 
 ---
 
