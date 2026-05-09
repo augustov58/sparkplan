@@ -436,6 +436,142 @@ export const feederSchema = z.object({
 export type FeederFormData = z.infer<typeof feederSchema>;
 
 // ============================================
+// Estimate Schemas (advisory — see plan §5)
+// ============================================
+//
+// Validation is advisory, not blocking. The contractor may want to save a
+// draft estimate with placeholder customer fields. Every field below is
+// optional or has a soft refine; the form surfaces warnings without gating
+// `Save Draft`. Submission is the only place that should hard-block, and
+// even then we just refuse to flip status to 'submitted' — the data persists.
+
+export const ESTIMATE_STATUSES = [
+  'draft',
+  'submitted',
+  'accepted',
+  'rejected',
+  'expired',
+  'cancelled',
+] as const;
+
+export const LINE_ITEM_CATEGORIES = [
+  'material',
+  'labor',
+  'equipment',
+  'subcontract',
+  'other',
+] as const;
+
+export const LINE_ITEM_SOURCE_KINDS = [
+  'panel',
+  'feeder',
+  'circuit',
+  'transformer',
+  'manual',
+  'assembly',
+] as const;
+
+export const estimateSchema = z.object({
+  name: z.string()
+    .min(1, 'Name is required')
+    .max(120, 'Name must be less than 120 characters'),
+
+  estimate_number: z.string()
+    .max(40, 'Estimate number must be less than 40 characters')
+    .optional()
+    .nullable(),
+
+  status: z.enum(ESTIMATE_STATUSES).default('draft'),
+
+  customer_name: z.string()
+    .max(200, 'Customer name must be less than 200 characters')
+    .optional()
+    .nullable(),
+
+  customer_email: z.string()
+    .email('Invalid email')
+    .or(z.literal(''))
+    .optional()
+    .nullable(),
+
+  customer_address: z.string()
+    .max(400, 'Address must be less than 400 characters')
+    .optional()
+    .nullable(),
+
+  markup_pct: z.number()
+    .min(0, 'Markup cannot be negative')
+    .max(100, 'Markup must be between 0 and 100')
+    .default(25),
+
+  tax_pct: z.number()
+    .min(0, 'Tax cannot be negative')
+    .max(100, 'Tax must be between 0 and 100')
+    .default(0),
+
+  expires_at: z.string().datetime().optional().nullable(),
+
+  scope_summary: z.string()
+    .max(4000, 'Scope must be less than 4,000 characters')
+    .optional()
+    .nullable(),
+
+  exclusions: z.string()
+    .max(4000, 'Exclusions must be less than 4,000 characters')
+    .optional()
+    .nullable(),
+
+  payment_terms: z.string()
+    .max(400, 'Payment terms must be less than 400 characters')
+    .optional()
+    .nullable(),
+
+  internal_notes: z.string()
+    .max(4000, 'Notes must be less than 4,000 characters')
+    .optional()
+    .nullable(),
+});
+
+export type EstimateFormData = z.infer<typeof estimateSchema>;
+
+export const estimateLineItemSchema = z.object({
+  category: z.enum(LINE_ITEM_CATEGORIES),
+
+  description: z.string()
+    .min(1, 'Description is required')
+    .max(400, 'Description must be less than 400 characters'),
+
+  quantity: z.number()
+    .min(0, 'Quantity cannot be negative'),
+
+  unit: z.string()
+    .max(20, 'Unit must be less than 20 characters')
+    .optional()
+    .nullable(),
+
+  unit_cost: z.number()
+    .min(0, 'Unit cost cannot be negative')
+    .default(0),
+
+  unit_price: z.number()
+    .min(0, 'Unit price cannot be negative')
+    .default(0),
+
+  taxable: z.boolean().default(true),
+
+  source_kind: z.enum(LINE_ITEM_SOURCE_KINDS).optional().nullable(),
+  source_id: z.string().uuid().optional().nullable(),
+  assembly_key: z.string().optional().nullable(),
+
+  notes: z.string()
+    .max(1000, 'Notes must be less than 1,000 characters')
+    .optional()
+    .nullable(),
+});
+
+export type EstimateLineItemFormData = z.infer<typeof estimateLineItemSchema>;
+
+// ============================================
 // Permit Schemas (Phase 1 Permits Beta)
 // ============================================
 // Per the project's "validation is advisory, not blocking" preference,

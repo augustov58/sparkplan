@@ -1,9 +1,33 @@
 # SparkPlan - Roadmap
 
-## Current Phase: 3.6 (Permits Beta v1) - PHASE 1 IMPLEMENTED (May 2026)
+## Current Phase: 3.7 (Estimating Beta v1) - IN PROGRESS (May 2026)
 
 ## Latest Completed Phase: 3.5 (Contractor Pivot — Sidebar Betas + Chatbot Restoration) - May 2026
 ## Active Sprint: 3.4 (AHJ Compliance Audit Sprint 2A) - 2 PRs merged, 3 still planned
+
+---
+
+## Phase 3.7: Estimating Beta v1 - IN PROGRESS (May 2026)
+
+Second contractor-pivot beta. Implements Phase 1 of the Estimating feature
+in parallel with Phase 3.6 Permits. The differentiator: SparkPlan reads the
+existing project model (panels, feeders, circuits, transformers) and emits
+an editable takeoff. Every other estimating tool (IntelliBid, Accubid)
+starts from a blank takeoff; SparkPlan starts from a project that already
+knows what's in it.
+
+| Phase | Scope | Status |
+|---|---|---|
+| **Phase 1 (MVP)** | `estimates` + `estimate_line_items` tables with RLS. Pure-function math (subtotals, markup, tax). Status state machine. Auto-takeoff from project. 5-tab UI (Overview / Takeoff / Materials / Labor / Bid Output). Bid PDF via `@react-pdf/renderer`. Clone-as-revision flow. | 🟡 Implementation (branch `feat/estimating-beta-v1`) |
+| **Phase 2** | Pre-built assemblies (200A service upgrade, kitchen remodel, EV install). Per-category markup. Sales-tax tables per US zip. Custom user assemblies. | ⏳ Pending |
+| **Phase 3** | AI-assisted takeoff — chatbot tools `generate_estimate_from_project`, `add_assembly`, `tune_markup`. Auto-suggest assemblies based on project shape. | ⏳ Pending |
+| **Phase 4** | External price feeds (Lowe's Pro / Home Depot / Graybar). Live price snapshots. Revision diff visualization. DocuSign integration. | ⏳ Pending |
+
+**Implementation handoff doc**: [`docs/plans/estimating-implementation.md`](docs/plans/estimating-implementation.md).
+
+**Tier gating**: Already done in Phase 3.5 (PR #29). `estimating` is in `FEATURE_TIERS` as `['business', 'enterprise']`. Trial users get access automatically.
+
+**Migration**: `20260511_estimates_and_line_items.sql` (additive). User must apply via Supabase SQL Editor before pulling the branch into a working dev environment.
 
 ---
 

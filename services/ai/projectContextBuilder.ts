@@ -35,6 +35,20 @@ export interface ProjectContext {
     connectedVA: number;
     demandVA: number;
   };
+  /**
+   * Lightweight estimating summary. Phase-1 surface area only — count and
+   * the most-recent estimate's status / total. Phase 3 will replace this
+   * with full estimate detail when chatbot tools land.
+   */
+  estimating?: {
+    count: number;
+    mostRecent?: {
+      name: string;
+      status: string;
+      revision: number;
+      total: number;
+    };
+  };
 }
 
 interface PanelSummary {
@@ -117,6 +131,19 @@ export function buildProjectContext(
       useEVEMS?: boolean;
     };
   },
+  /**
+   * Optional Phase-1 estimating summary. Caller passes the rows from
+   * useEstimates(); we extract count + most-recent. Plan: only the count and
+   * top-of-list status are surfaced today; Phase 3 will expand when chatbot
+   * tools (`generate_estimate_from_project`, etc.) need full detail.
+   */
+  estimates?: Array<{
+    name: string;
+    status: string;
+    revision: number;
+    total: number;
+    created_at: string;
+  }>,
   // Phase 1 Permits Beta: surface counts so the AI knows whether to suggest
   // checking the Permits tab. Phase 3 will add full per-permit detail.
   permits?: Permit[],
@@ -364,6 +391,26 @@ ${feeders.length > 0 ? `Feeders: ${feeders.length}` : ''}
 ${transformers.length > 0 ? `Transformers: ${transformers.length}` : ''}${permitsText}${multiFamilyText}${hierarchyText}
   `.trim();
 
+  // ---- Estimating summary (Phase 1: count + most-recent only) ----
+  let estimatingSummary: ProjectContext['estimating'];
+  if (estimates && estimates.length > 0) {
+    const sortedByDate = [...estimates].sort(
+      (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+    );
+    const top = sortedByDate[0];
+    estimatingSummary = {
+      count: estimates.length,
+      mostRecent: {
+        name: top.name,
+        status: top.status,
+        revision: top.revision,
+        total: top.total,
+      },
+    };
+  } else if (estimates) {
+    estimatingSummary = { count: 0 };
+  }
+
   return {
     projectId,
     projectName,
@@ -379,6 +426,7 @@ ${transformers.length > 0 ? `Transformers: ${transformers.length}` : ''}${permit
       connectedVA: totalConnectedVA,
       demandVA: totalDemandVA,
     },
+    estimating: estimatingSummary,
   };
 }
 
@@ -464,6 +512,20 @@ export function formatContextForAI(context: ProjectContext): string {
       if (xfmr.fedFromPanel) prompt += `, fed from ${xfmr.fedFromPanel}`;
       prompt += `\n`;
     });
+    prompt += `\n`;
+  }
+
+  // Add estimating summary (Phase 1 surface)
+  if (context.estimating) {
+    prompt += `ESTIMATING:\n`;
+    if (context.estimating.count === 0) {
+      prompt += `- No estimates yet for this project.\n`;
+    } else if (context.estimating.mostRecent) {
+      const r = context.estimating.mostRecent;
+      prompt += `- ${context.estimating.count} estimate(s); most recent: "${r.name}" (rev ${r.revision}, ${r.status}, $${r.total.toFixed(2)})\n`;
+    } else {
+      prompt += `- ${context.estimating.count} estimate(s)\n`;
+    }
     prompt += `\n`;
   }
 
