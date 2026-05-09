@@ -1817,6 +1817,154 @@ export type Database = {
           },
         ]
       }
+      invoices: {
+        Row: {
+          id: string
+          project_id: string
+          user_id: string
+          invoice_number: string
+          description: string | null
+          period_start: string
+          period_end: string
+          invoice_date: string
+          due_date: string | null
+          status: string
+          sent_at: string | null
+          paid_at: string | null
+          subtotal_labor: number
+          subtotal_materials: number
+          subtotal: number
+          tax_amount: number
+          total: number
+          paid_amount: number
+          balance_due: number
+          customer_name: string | null
+          customer_email: string | null
+          customer_address: string | null
+          customer_po_number: string | null
+          notes: string | null
+          internal_notes: string | null
+          invoice_pdf_url: string | null
+          invoice_pdf_generated_at: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          project_id: string
+          user_id: string
+          invoice_number: string
+          description?: string | null
+          period_start: string
+          period_end: string
+          invoice_date?: string
+          due_date?: string | null
+          status?: string
+          sent_at?: string | null
+          paid_at?: string | null
+          subtotal_labor?: number
+          subtotal_materials?: number
+          subtotal?: number
+          tax_amount?: number
+          total?: number
+          paid_amount?: number
+          balance_due?: number
+          customer_name?: string | null
+          customer_email?: string | null
+          customer_address?: string | null
+          customer_po_number?: string | null
+          notes?: string | null
+          internal_notes?: string | null
+          invoice_pdf_url?: string | null
+          invoice_pdf_generated_at?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          project_id?: string
+          user_id?: string
+          invoice_number?: string
+          description?: string | null
+          period_start?: string
+          period_end?: string
+          invoice_date?: string
+          due_date?: string | null
+          status?: string
+          sent_at?: string | null
+          paid_at?: string | null
+          subtotal_labor?: number
+          subtotal_materials?: number
+          subtotal?: number
+          tax_amount?: number
+          total?: number
+          paid_amount?: number
+          balance_due?: number
+          customer_name?: string | null
+          customer_email?: string | null
+          customer_address?: string | null
+          customer_po_number?: string | null
+          notes?: string | null
+          internal_notes?: string | null
+          invoice_pdf_url?: string | null
+          invoice_pdf_generated_at?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "invoices_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      payments: {
+        Row: {
+          id: string
+          invoice_id: string
+          user_id: string
+          amount: number
+          payment_date: string
+          payment_method: string | null
+          reference: string | null
+          notes: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          invoice_id: string
+          user_id: string
+          amount: number
+          payment_date?: string
+          payment_method?: string | null
+          reference?: string | null
+          notes?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          invoice_id?: string
+          user_id?: string
+          amount?: number
+          payment_date?: string
+          payment_method?: string | null
+          reference?: string | null
+          notes?: string | null
+          created_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "payments_invoice_id_fkey"
+            columns: ["invoice_id"]
+            isOneToOne: false
+            referencedRelation: "invoices"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       material_entries: {
         Row: {
           id: string
@@ -1901,6 +2049,31 @@ export type Database = {
     Functions: {
       cleanup_expired_agent_data: { Args: never; Returns: undefined }
       generate_rfi_number: { Args: { p_project_id: string }; Returns: string }
+      generate_invoice_atomic: {
+        Args: {
+          p_project_id: string
+          p_period_start: string
+          p_period_end: string
+          p_invoice_number: string
+          p_invoice_date: string
+          p_due_date: string | null
+          p_subtotal_labor: number
+          p_subtotal_materials: number
+          p_subtotal: number
+          p_tax_amount: number
+          p_total: number
+          p_customer_name: string | null
+          p_customer_email: string | null
+          p_customer_address: string | null
+          p_customer_po_number: string | null
+          p_description: string | null
+          p_notes: string | null
+          p_time_entry_ids: string[]
+          p_material_entry_ids: string[]
+          p_mark_sent: boolean
+        }
+        Returns: string
+      }
     }
     Enums: {
       [_ in never]: never
