@@ -101,8 +101,12 @@ export const FeederManager: React.FC<FeederManagerProps> = ({
     let sourceName = '';
     let destName = '';
 
-    // Get source name
-    if (formData.source_panel_id) {
+    // Get source name. Service mode has no source row — the utility is implicit,
+    // so we synthesize the name 'Utility' to give the auto-namer something to
+    // pair with the destination MDP.
+    if (sourceType === 'service') {
+      sourceName = 'Utility';
+    } else if (formData.source_panel_id) {
       const sourcePanel = panels.find(p => p.id === formData.source_panel_id);
       sourceName = sourcePanel?.name || '';
     } else if (formData.source_transformer_id) {
@@ -119,11 +123,12 @@ export const FeederManager: React.FC<FeederManagerProps> = ({
       destName = destTransformer?.name || '';
     }
 
-    // Auto-generate name if both source and destination are selected
+    // Auto-generate name if both source and destination are resolvable
     if (sourceName && destName) {
       setFormData(prev => ({ ...prev, name: `${sourceName} → ${destName}` }));
     }
   }, [
+    sourceType,
     formData.source_panel_id,
     formData.source_transformer_id,
     formData.destination_panel_id,
