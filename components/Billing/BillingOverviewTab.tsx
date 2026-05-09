@@ -12,10 +12,11 @@
  */
 
 import React, { useMemo } from 'react';
-import { Clock, Package, TrendingUp, AlertTriangle } from 'lucide-react';
+import { Clock, Package, TrendingUp, AlertTriangle, FileText } from 'lucide-react';
 import { AmountDisplay } from './AmountDisplay';
 import { useTimeEntries } from '@/hooks/useTimeEntries';
 import { useMaterialEntries } from '@/hooks/useMaterialEntries';
+import { useInvoices } from '@/hooks/useInvoices';
 import {
   sumTimeEntries,
   sumMaterialEntries,
@@ -32,6 +33,7 @@ interface BillingOverviewTabProps {
 export const BillingOverviewTab: React.FC<BillingOverviewTabProps> = ({ projectId }) => {
   const { timeEntries, loading: timeLoading } = useTimeEntries(projectId);
   const { materialEntries, loading: matLoading } = useMaterialEntries(projectId);
+  const { invoices, loading: invLoading } = useInvoices(projectId);
 
   const timeAgg = useMemo(() => sumTimeEntries(timeEntries), [timeEntries]);
   const matAgg = useMemo(() => sumMaterialEntries(materialEntries), [materialEntries]);
@@ -42,6 +44,13 @@ export const BillingOverviewTab: React.FC<BillingOverviewTabProps> = ({ projectI
   const unbilledTimeAgg = sumTimeEntries(unbilledTime);
   const unbilledMatAgg = sumMaterialEntries(unbilledMat);
   const unbilledTotal = unbilledTimeAgg.billable + unbilledMatAgg.billing;
+
+  // Invoice rollup: skip cancelled when reporting paid/outstanding
+  const liveInvoices = invoices.filter((i) => i.status !== 'cancelled');
+  const totalInvoiced = liveInvoices.reduce((acc, i) => acc + i.total, 0);
+  const totalPaid = liveInvoices.reduce((acc, i) => acc + i.paid_amount, 0);
+  const totalOutstanding = liveInvoices.reduce((acc, i) => acc + i.balance_due, 0);
+  const overdueCount = liveInvoices.filter((i) => i.status === 'overdue').length;
 
   type ActivityRow = { date: string; type: 'time' | 'material'; label: string; amount: number };
   const recent: ActivityRow[] = [
@@ -61,24 +70,48 @@ export const BillingOverviewTab: React.FC<BillingOverviewTabProps> = ({ projectI
     .sort((a, b) => b.date.localeCompare(a.date))
     .slice(0, 8);
 
-  const loading = timeLoading || matLoading;
+  const loading = timeLoading || matLoading || invLoading;
 
   return (
     <div className="space-y-6">
       {/* Top KPI cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         <KpiCard
-          label="Billable to date"
-          value={formatUSD(profit.revenue)}
-          icon={<TrendingUp className="w-4 h-4 text-[#666]" />}
+          label="Invoiced"
+          value={formatUSD(totalInvoiced)}
+          icon={<FileText className="w-4 h-4 text-[#666]" />}
+          subline={`${liveInvoices.length} ${liveInvoices.length === 1 ? 'invoice' : 'invoices'}`}
+          loading={loading}
+        />
+        <KpiCard
+          label="Paid"
+          value={formatUSD(totalPaid)}
+          accent={totalPaid > 0 ? 'green' : 'neutral'}
+          loading={loading}
+        />
+        <KpiCard
+          label="Outstanding"
+          value={formatUSD(totalOutstanding)}
+          accent={overdueCount > 0 ? 'red' : totalOutstanding > 0 ? 'amber' : 'neutral'}
+          subline={overdueCount > 0 ? `${overdueCount} overdue` : undefined}
+          icon={<AlertTriangle className="w-4 h-4 text-[#666]" />}
           loading={loading}
         />
         <KpiCard
           label="Unbilled"
           value={formatUSD(unbilledTotal)}
           accent={unbilledTotal > 0 ? 'amber' : 'neutral'}
-          icon={<AlertTriangle className="w-4 h-4 text-[#666]" />}
           subline={`${unbilledTime.length} time + ${unbilledMat.length} material`}
+          loading={loading}
+        />
+      </div>
+
+      {/* Profit row */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+        <KpiCard
+          label="Billable (logged)"
+          value={formatUSD(profit.revenue)}
+          icon={<TrendingUp className="w-4 h-4 text-[#666]" />}
           loading={loading}
         />
         <KpiCard
