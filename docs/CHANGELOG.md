@@ -4,6 +4,82 @@ All notable changes to SparkPlan.
 
 ---
 
+## 2026-05-09: AHJ Compliance Audit Sprint 2A — Document Structure (PR #23, open)
+
+Closes audit findings **H1, H2, H3** (TOC + revision log + sheet IDs) plus a sheet-ID styling and panel-schedule overflow fix found during user visual review. Open against `main`, mergeable CLEAN.
+
+**User-Facing Changes:**
+
+- **Section toggle panel before generating a packet.** New "Configure Sections" card on the Permit Packet Generator screen lets contractors choose which sections to include before hitting Generate. 16 toggleable sections grouped by category (Document Meta, Engineering, Diagrams & Equipment, Multi-Family, Compliance & AHJ, Panels). Cover sheet is always-on and shown as a non-toggleable indicator. Off-warning amber banners appear when the contractor toggles off sections most AHJs require (Compliance Summary, Panel Schedules — "Most AHJs reject without this"). Auto-disable predicates grey out toggles when the underlying data isn't present (e.g., "Voltage Drop" disabled with tooltip when no feeders are defined). Preferences persist per-project to `projects.settings.section_preferences` and survive page reloads.
+
+- **Sheet IDs on every electrical sheet.** Every sheet of the packet now displays a stable plan-set sheet ID (e.g., `E-001` cover, `E-002` TOC, `E-101` load calc, `E-301` MDP panel schedule) in two places: a high-visibility yellow pill in the brand bar at the top, and a bordered cream badge in the footer paired with the page number. AHJ comment letters cite sheet IDs, not page numbers — a sheet ID stays stable across submittal rounds even when sections shift around it.
+
+- **Sheet IDs use category-banded numbering.** 001-099 = front matter (cover, TOC, revision log, general notes), 100-199 = engineering calculations, 200-299 = diagrams & equipment, 300-399 = panel schedules (one per panel), 400-499 = multi-family scope, 500-599 = compliance & AHJ, 600-699 = specialty (reserved for upcoming EVEMS narrative + EVSE labeling pages). An AHJ reviewer sees "fix item on E-302" and immediately knows it's a panel schedule, not a calculation page. Same effect as letter prefixes (E-300s / M-200s) without prefix complexity.
+
+- **Toggling a section off compresses sheet ID numbering within its band — no gaps.** If you toggle off the Table of Contents for a slimmer packet, the Revision Log moves from `E-003` to `E-002` and General Notes from `E-004` to `E-003`. The TOC entries (when included) auto-update to match.
+
+- **New Table of Contents page (sheet `E-002`).** Auto-populated from the rendered section list. Lists every other sheet in the packet by sheet ID + title. Stable across revisions even if page numbers shift.
+
+- **New Revision Log page (sheet `E-003`).** Tabular revision history. First submittals auto-populate "Rev 0 / [today's date] / Initial submittal / [Contractor name]" — the page never ships blank. Subsequent revisions append new rows. Required by every Florida pilot AHJ as the audit trail of plan changes.
+
+- **42-circuit panel schedules no longer overflow to a second page.** A regression introduced by the per-sheet contractor signature block (Sprint 2A commit 2 added 34pt of bottom padding) was tipping 42-circuit panels into auto-overflow. Three-layer fix: page bottom padding tightened from 78pt to 64pt (the original 78 was over-provisioned for the contractor block + footer); panel summary card layout tightened (margins + padding + font sizes); `wrap={false}` added to the Load Summary and Dwelling Unit Demand cards so react-pdf moves the entire card to the next page rather than splitting it mid-content. Net: 42-circuit panel + Load Summary + Dwelling Unit Demand all fit on one sheet.
+
+**Why this matters for the FL pilot:** Sheet IDs + TOC + Revision Log are intake-critical for every Florida AHJ — without them the packet gets rejected at the front desk before reaching technical review. The section toggle panel addresses real contractor workflow: they sometimes need a slimmer packet for pre-application AHJ walk-ins (no schedules, no jurisdiction page) and previously had to generate the full packet and tell reviewers to ignore certain pages.
+
+**Technical:**
+
+- **New `services/pdfExport/packetSections.ts`**: `PacketSections` type + `DEFAULT_SECTIONS` (all-on default), `resolveSections` partial-override helper, `SheetBand` constants for the 7 numeric category bands, `newBandCounters` + `nextSheetId` per-band sequential allocator, `formatSheetId` for tests. Sheet ID prefix is `E-` (electrical discipline).
+- **Generator restructure (`services/pdfExport/permitPacketGenerator.tsx`)**: Replaced the imperative `pages.push({...})` chain with a declarative `builders: PageBuilder[]` list. Each builder declares `kind`, `band`, `pageCount`, `tocTitles`, and a `render(sheetIds, tocEntries)` function. Build pipeline: push every potential builder gated by both data presence (existing) and `sections` config (new); walk allocating sheet IDs per band; walk again collecting TOC entries; render each builder with its allocated IDs and the populated `tocEntries`. Cover is hard-required (no gate). ComplianceSummary + PanelSchedules toggleable but UI warns when off.
+- **Multi-page component split (Option A)**: `MultiFamilyEVPages` accepts `sheetIds: [string, string, string]` (3 internal pages); `MeterStackScheduleDocument` accepts `sheetIds: string[]` aligned to `meterStacks`. Generator declares `pageCount: 3` for MFEV and `pageCount: stacks.length` for meter stack so each physical page in the merged PDF gets its own unique sheet ID.
+- **Sheet ID prop threaded through all 9 page components**: CoverPage, GeneralNotesPage, EquipmentSchedule, RiserDiagram, LoadCalculationSummary, ComplianceSummary, EquipmentSpecsPages, VoltageDropPages, JurisdictionRequirementsPages, ShortCircuitCalculationPages, ArcFlashPages, GroundingPlanPages, PanelSchedulePages. Each forwards to BrandBar + BrandFooter.
+- **Theme additions (`services/pdfExport/permitPacketTheme.tsx`)**: `BrandBar` accepts optional `sheetId` — renders yellow `BRAND_YELLOW` pill with `BRAND_DARK` bold text on the right side of the dark brand bar. `BrandFooter` accepts optional `sheetId` — renders cream `#fef3c7` badge with thin border paired with the page number. `themeStyles.page.paddingBottom` reduced 78pt → 64pt.
+- **New PDF components (`services/pdfExport/PermitPacketDocuments.tsx`)**: `TableOfContentsPage` renders the entries grid + a note that sheet IDs are stable across revisions. `RevisionLogPage` auto-populates a default Rev 0 row when `revisions` is omitted.
+- **UI (`components/PermitPacketGenerator.tsx`)**: New "Configure Sections" panel between Project Summary and Jurisdiction Requirements cards. 16 toggleable sections grouped into 6 categories. Cover shown as non-toggleable. Off-warning banners for ComplianceSummary + PanelSchedules. Auto-disable predicates with tooltips for missing-data sections. "Reset to defaults" link clears the override.
+- **Persistence**: `ProjectSettings.sectionPreferences?: Record<string, boolean>` (typed loosely to avoid circular import from PDF service into `types.ts`; packet generator narrows at the boundary). Stored in existing `projects.settings` JSONB column — **no DB migration**. Each toggle change calls `updateProject(...)` with the merged settings.
+- **Layout fix for 42-circuit panel overflow (`services/pdfExport/PanelScheduleDocuments.tsx`)**: `summarySection` margins/padding tightened (marginTop 15→8pt, padding 10→6pt), `summaryTitle` fontSize 11→9.5pt + marginBottom 8→4pt, `summaryValue` fontSize 12→10.5pt, `summaryLabel` fontSize 8→7pt. `wrap={false}` added to both summary card Views so react-pdf relocates the whole card on overflow rather than splitting mid-content.
+
+**Tests:** 198/198 passing (was 187 + 11 new across `tests/packetSections.test.ts` and `tests/tocRevisionLogPdf.test.ts`). Build clean.
+
+**No DB migration required.** All changes round-trip through the existing `projects.settings` JSON column.
+
+**Audit doc:** [`docs/AHJ_COMPLIANCE_AUDIT_2026-05-04.md`](AHJ_COMPLIANCE_AUDIT_2026-05-04.md). H1, H2, H3 marked ✅ RESOLVED in PR #23. Open Sprint 2A: H14, H9+H15, H10, H11, M3, M6, H17, schema additions (3 themed PRs remaining).
+
+**PRs**: #23 (open against `main`, mergeable CLEAN). Originally created with the wrong base (`fix/c2-evse-feeder-aggregation`); manually retargeted to `main` via REST API after `gh pr edit` failed on a Projects-classic deprecation warning.
+
+---
+
+## 2026-05-08: AHJ Compliance Audit Sprint 2A — Per-Sheet Polish + Content Gaps (PR 1, merged `92126eb`)
+
+Closes audit findings **C7, H4, C8, M8, H12, H13** plus the LOW edition-stamp polish item. Three sub-commits squashed onto main.
+
+**User-Facing Changes:**
+
+- **NEC edition is now a packet-level setting (default 2020 for FL pilot AHJs).** Cover sheet subtitle and Compliance Summary now read "NEC 2020 Compliant Design Package" by default — was hardcoded "NEC 2023" everywhere. The Florida Building Code 8th Edition (2023) adopts NFPA-70 2020, so the FL pilot AHJs (Orlando, Miami-Dade, Pompano Beach, Davie, Hillsborough) all reference NEC 2020. Override via `data.necEdition = '2023'` for jurisdictions on the newer cycle. NEC 220.84 demand-factor table values are unchanged between 2020 and 2023, so calc engine outputs remain valid for either selector.
+
+- **New "Applicable Codes" section on the cover sheet.** Lists the codes the design conforms to: NFPA-70 (NEC) 2020 + Florida Building Code 8th Edition (2023) by default. Driven from a `codeReferences` string array — Sprint 2C will inject per-AHJ overrides from the manifest.
+
+- **Per-sheet contractor signature block on every electrical sheet.** Required by every Florida pilot AHJ — without it, intake reviewers reject the packet before reaching technical review. Renders fixed above the brand footer on every sheet showing Contractor name + License # on the left and a Signature / Date line on the right. The signature line draws even when contractor metadata is missing so the AHJ has a place to wet-sign.
+
+- **Meter Stack Schedule page now matches the rest of the packet visually.** Was previously using a private style sheet with a different header/footer — read as a visual outlier. Now wraps each meter stack page with the shared brand bar + brand footer, including the new contractor signature block automatically.
+
+- **New "General Notes" page (sheet 2 of the packet).** Eight numbered notes covering NEC 2020 + FBC 8th ed compliance, voltage-drop convention 3% branch / 3% feeder / 5% combined per NEC 210.19(A) IN 4 + 215.2(A)(1) IN 2, conductor sizing references, grounding & bonding (NEC 250.66 / 250.122 / 250.92), NRTL listing requirement (NEC 110.3(B)), EVSE / EVEMS references (NEC 625.42, 625.43), working space (NEC 110.26 / 110.27), and available fault current verification (NEC 110.10). Configurable via `generalNotes` array — Sprint 2C replaces with per-AHJ manifest content.
+
+**Why this matters for the FL pilot:** These three commits close the most systemic intake-rejection vectors that affect every Florida AHJ — wrong NEC edition stamped on the cover, missing contractor signature block on every sheet, missing general notes page. Combined with PR #23 (sheet IDs, TOC, revision log), the form-factor side of Sprint 2A is largely complete.
+
+**Technical:**
+
+- **C7 + H4** (`services/pdfExport/PermitPacketDocuments.tsx` + `services/pdfExport/permitPacketGenerator.tsx`): `PermitPacketData` extended with `necEdition?: '2020' | '2023'` (default `'2020'`) and `codeReferences?: string[]` (default `['NFPA-70 (NEC) 2020', 'Florida Building Code 8th Edition (2023)']`). CoverPage and ComplianceSummary components accept the props and replace hardcoded "NEC 2023" strings. Both `generatePermitPacket` and `generateLightweightPermitPacket` pipe the props through.
+- **C8 + M8** (`services/pdfExport/permitPacketTheme.tsx` + 9 page-component files): Shared `Footer` (BrandFooter) extended with optional `contractorName` + `contractorLicense` props. When provided, renders a fixed `<ContractorBlock>` above the brand footer with Contractor / License # cell on the left and a Signature / Date line on the right. `themeStyles.page.paddingBottom` raised 44pt → 78pt to make room (later tightened to 64pt in PR #23 after the 42-circuit overflow regression). All 9 PDF page modules accept the props and forward to BrandFooter. Generator threads a single `contractor = { contractorName: data.contractorName ?? data.preparedBy, contractorLicense: data.contractorLicense }` props bag into every page invocation. M8 fix bundled here: `MeterStackSchedulePDF.tsx` previously used a private style sheet — now wraps each Page with shared `themeStyles.page` + `BrandBar` (with `pageLabel="METER STACK SCHEDULE"`) + shared `BrandFooter` (which carries the C8 contractor block automatically). Local styles kept for table/specs detail rendering only.
+- **H12 + H13** (`services/pdfExport/PermitPacketDocuments.tsx`): New `GeneralNotesPage` component renders a numbered notes list. Default `DEFAULT_GENERAL_NOTES` 8-item FL pilot stack defined at the top of the component. `PermitPacketData` extended with `generalNotes?: string[]`. Generator inserts the page right after CoverPage, before EquipmentSchedule.
+- **5 new tests** in `tests/coverPagePdf.test.ts`, `tests/contractorBlockPdf.test.ts`, `tests/generalNotesPdf.test.ts` covering: NEC edition prop renders correctly with both default ('2020') and override ('2023') + custom code-reference arrays; BrandFooter renders ContractorBlock when contractor info is provided AND when omitted (signature line still drawn); MeterStackSchedule renders under shared theme; GeneralNotesPage renders default FL pilot notes AND custom AHJ override notes. Total suite: 187/187 pass (was 181 pre-Sprint-2A).
+- **No data-model changes.** All Sprint 2A PR-1 fixes are PDF-layer additions to existing components.
+
+**Audit doc:** [`docs/AHJ_COMPLIANCE_AUDIT_2026-05-04.md`](AHJ_COMPLIANCE_AUDIT_2026-05-04.md). C7, H4, C8, M8, H12, H13 marked ✅ RESOLVED. Sprint 2A continues with PR #23 (H1, H2, H3 — sections + sheet IDs + TOC + revision log).
+
+**PRs**: PR 1 (merged to `main` as squash commit `92126eb` on 2026-05-08).
+
+---
+
 ## 2026-05-07: AHJ Compliance Audit Sprint 1 — COMPLETE (C4 omnibus PR #19)
 
 Closes the engine-correctness sweep of the permit-packet PDF against five Florida AHJ checklists. Six critical findings (C1, C2, C3, B-1, C6, C4) plus four bonus findings discovered during C4 user-review cycles (M4 promoted forward, F5 EV-meter dedup, in-app C6 twin, unit-panel sizing + display) all resolved. **Every page of the audit packet that does arithmetic now produces the right number.**
