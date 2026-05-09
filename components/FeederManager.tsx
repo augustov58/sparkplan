@@ -846,8 +846,13 @@ export const FeederManager: React.FC<FeederManagerProps> = ({
                   : 'Source'}
               </label>
               {sourceType === 'service' ? (
-                <div className="px-3 py-2 bg-amber-50 border border-amber-300 rounded-md text-xs text-amber-900 leading-relaxed">
-                  <strong>Utility (point of service)</strong> — this run represents the conductors from the utility transformer to the MDP. Destination must be the main panel.
+                <div className="px-3 py-2 bg-amber-50 border border-amber-300 rounded-md text-xs text-amber-900 leading-relaxed space-y-1">
+                  <p>
+                    <strong>Utility (point of service)</strong> — this run represents the conductors from the utility transformer to the MDP. Destination must be the main panel.
+                  </p>
+                  <p>
+                    Utility-transformer kVA, %Z, and available fault current are configured under <strong>Project Settings → Service Entrance (Utility Source)</strong> — they apply to fault-current math, not to this conductor sizing form.
+                  </p>
                 </div>
               ) : sourceType === 'panel' ? (
                 <select
@@ -1210,7 +1215,9 @@ export const FeederManager: React.FC<FeederManagerProps> = ({
               onClick={() => handleCalculateFeeder(formData)}
               disabled={
                 !formData.name ||
-                (!formData.source_panel_id && !formData.source_transformer_id) ||
+                // Source: panel/transformer mode requires a source ID; Service mode
+                // intentionally has null sources (utility is implicit) so it's exempt.
+                (sourceType !== 'service' && !formData.source_panel_id && !formData.source_transformer_id) ||
                 (!formData.destination_panel_id && !formData.destination_transformer_id) ||
                 !!connectivityError
               }
