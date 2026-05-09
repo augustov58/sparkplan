@@ -22,6 +22,10 @@ import {
   RiserDiagram,
   LoadCalculationSummary,
   ComplianceSummary,
+  TableOfContentsPage,
+  RevisionLogPage,
+  type TocEntry,
+  type RevisionEntry,
 } from './PermitPacketDocuments';
 import { PanelSchedulePages } from './PanelScheduleDocuments';
 import { calculateAggregatedLoad } from '../calculations/upstreamLoadAggregation';
@@ -33,6 +37,19 @@ import { ArcFlashPages } from './ArcFlashDocuments';
 import { GroundingPlanPages } from './GroundingPlanDocuments';
 import { MultiFamilyEVPages } from './MultiFamilyEVDocuments';
 import { MeterStackScheduleDocument } from './MeterStackSchedulePDF';
+import {
+  type PacketSections,
+  type SheetBand,
+  resolveSections,
+  newBandCounters,
+  nextSheetId,
+  BAND_FRONT_MATTER,
+  BAND_CALCULATIONS,
+  BAND_DIAGRAMS,
+  BAND_PANELS,
+  BAND_MULTIFAMILY,
+  BAND_COMPLIANCE,
+} from './packetSections';
 
 export interface PermitPacketData {
   projectId: string;
@@ -111,6 +128,19 @@ export interface PermitPacketData {
    * voltage drop). Sprint 2C will override this from per-AHJ manifests.
    */
   generalNotes?: string[];
+  /**
+   * Sprint 2A H1+H2+H3: per-section toggles. Cover is hard-required and
+   * always rendered. ComplianceSummary + PanelSchedules are toggleable but
+   * the UI layer should warn when off. Defaults to all-on
+   * (`DEFAULT_SECTIONS` from `./packetSections`).
+   */
+  sections?: Partial<PacketSections>;
+  /**
+   * Sprint 2A H2: revision log entries. When omitted or empty, the Revision
+   * Log page auto-populates a single "Rev 0 / [today] / Initial submittal"
+   * row using `contractorName ?? preparedBy` as the issuer.
+   */
+  revisions?: RevisionEntry[];
 }
 
 const downloadBlob = (blob: Blob, fileName: string): void => {
@@ -183,13 +213,55 @@ export const generatePermitPacket = async (data: PermitPacketData): Promise<void
     contractorLicense: data.contractorLicense,
   };
 
-  // Build labeled Page list. Each entry is ONE top-level <Page> in the Document.
-  // Keep names unique and descriptive so bisect output is actionable.
-  const pages: Array<{ name: string; element: React.ReactElement }> = [];
+  // Sprint 2A H1+H2+H3: resolve section toggles. Cover is always-on (not in
+  // the config). Default is all-on.
+  const sections = resolveSections(data.sections);
 
-  pages.push({
+  // ============================================================================
+  // PAGE BUILDERS — declarative description of every page that COULD render.
+  // Each builder is filtered against the section config, then walked twice:
+  // once to allocate category-banded sheet IDs, once to render the elements
+  // with both the assigned sheet IDs and the populated TOC entries.
+  // ============================================================================
+
+  type PageKind =
+    | 'cover'
+    | 'tableOfContents'
+    | 'revisionLog'
+    | 'generalNotes'
+    | 'loadCalculation'
+    | 'voltageDrop'
+    | 'shortCircuit'
+    | 'arcFlash'
+    | 'riserDiagram'
+    | 'equipmentSchedule'
+    | 'equipmentSpecs'
+    | 'grounding'
+    | 'panelSchedule'
+    | 'meterStack'
+    | 'multiFamilyEV'
+    | 'complianceSummary'
+    | 'jurisdiction';
+
+  interface PageBuilder {
+    name: string;
+    kind: PageKind;
+    band?: SheetBand;
+    pageCount: number;
+    tocTitles: string[];
+    render: (sheetIds: string[], tocEntries: TocEntry[]) => React.ReactElement;
+  }
+
+  const builders: PageBuilder[] = [];
+
+  // ---- Front matter (band 000) ----
+  builders.push({
     name: 'CoverPage',
-    element: (
+    kind: 'cover',
+    band: BAND_FRONT_MATTER,
+    pageCount: 1,
+    tocTitles: ['Permit Application Cover Sheet'],
+    render: (sheetIds) => (
       <CoverPage
         projectName={data.projectName}
         projectAddress={data.projectAddress}
@@ -205,101 +277,98 @@ export const generatePermitPacket = async (data: PermitPacketData): Promise<void
         serviceConductorRouting={data.serviceConductorRouting}
         necEdition={data.necEdition}
         codeReferences={data.codeReferences}
+        sheetId={sheetIds[0]}
       />
     ),
   });
 
-  pages.push({
-    name: 'GeneralNotes',
-    element: (
-      <GeneralNotesPage
-        projectName={data.projectName}
-        generalNotes={data.generalNotes}
-        {...contractor}
-      />
-    ),
-  });
+  if (sections.tableOfContents) {
+    builders.push({
+      name: 'TableOfContents',
+      kind: 'tableOfContents',
+      band: BAND_FRONT_MATTER,
+      pageCount: 1,
+      tocTitles: ['Table of Contents'],
+      render: (sheetIds, tocEntries) => (
+        <TableOfContentsPage
+          projectName={data.projectName}
+          entries={tocEntries}
+          {...contractor}
+          sheetId={sheetIds[0]}
+        />
+      ),
+    });
+  }
 
-  pages.push({
-    name: 'EquipmentSchedule',
-    element: (
-      <EquipmentSchedule
-        panels={data.panels}
-        transformers={data.transformers}
-        feeders={data.feeders}
-        projectName={data.projectName}
-        {...contractor}
-      />
-    ),
-  });
+  if (sections.revisionLog) {
+    builders.push({
+      name: 'RevisionLog',
+      kind: 'revisionLog',
+      band: BAND_FRONT_MATTER,
+      pageCount: 1,
+      tocTitles: ['Revision Log'],
+      render: (sheetIds) => (
+        <RevisionLogPage
+          projectName={data.projectName}
+          revisions={data.revisions}
+          {...contractor}
+          sheetId={sheetIds[0]}
+        />
+      ),
+    });
+  }
 
-  pages.push({
-    name: 'RiserDiagram',
-    element: (
-      <RiserDiagram
-        panels={data.panels}
-        transformers={data.transformers}
-        feeders={data.feeders}
-        meterStacks={data.meterStacks}
-        meters={data.meters}
-        projectName={data.projectName}
-        serviceVoltage={data.serviceVoltage}
-        servicePhase={data.servicePhase}
-        {...contractor}
-      />
-    ),
-  });
+  if (sections.generalNotes) {
+    builders.push({
+      name: 'GeneralNotes',
+      kind: 'generalNotes',
+      band: BAND_FRONT_MATTER,
+      pageCount: 1,
+      tocTitles: ['General Notes'],
+      render: (sheetIds) => (
+        <GeneralNotesPage
+          projectName={data.projectName}
+          generalNotes={data.generalNotes}
+          {...contractor}
+          sheetId={sheetIds[0]}
+        />
+      ),
+    });
+  }
 
-  pages.push({
-    name: 'LoadCalculationSummary',
-    element: (
-      <LoadCalculationSummary
-        panels={data.panels}
-        circuits={data.circuits}
-        transformers={data.transformers}
-        projectName={data.projectName}
-        serviceVoltage={data.serviceVoltage}
-        servicePhase={data.servicePhase}
-        projectType={data.projectType}
-        multiFamilyContext={data.multiFamilyContext}
-        {...contractor}
-      />
-    ),
-  });
+  // ---- Engineering calculations (band 100) ----
+  if (sections.loadCalculation) {
+    builders.push({
+      name: 'LoadCalculationSummary',
+      kind: 'loadCalculation',
+      band: BAND_CALCULATIONS,
+      pageCount: 1,
+      tocTitles: ['Load Calculation Summary'],
+      render: (sheetIds) => (
+        <LoadCalculationSummary
+          panels={data.panels}
+          circuits={data.circuits}
+          transformers={data.transformers}
+          projectName={data.projectName}
+          serviceVoltage={data.serviceVoltage}
+          servicePhase={data.servicePhase}
+          projectType={data.projectType}
+          multiFamilyContext={data.multiFamilyContext}
+          {...contractor}
+          sheetId={sheetIds[0]}
+        />
+      ),
+    });
+  }
 
-  pages.push({
-    name: 'ComplianceSummary',
-    element: (
-      <ComplianceSummary
-        panels={data.panels}
-        circuits={data.circuits}
-        feeders={data.feeders}
-        projectName={data.projectName}
-        hasGrounding={data.hasGrounding}
-        necEdition={data.necEdition}
-        {...contractor}
-      />
-    ),
-  });
-
-  pages.push({
-    name: 'EquipmentSpecs',
-    element: (
-      <EquipmentSpecsPages
-        projectName={data.projectName}
-        projectAddress={data.projectAddress}
-        panels={data.panels}
-        transformers={data.transformers}
-        includeNECReferences={true}
-        {...contractor}
-      />
-    ),
-  });
-
-  if (data.feeders && data.feeders.length > 0) {
-    pages.push({
+  if (sections.voltageDrop && data.feeders && data.feeders.length > 0) {
+    builders.push({
       name: 'VoltageDrop',
-      element: (
+      kind: 'voltageDrop',
+      band: BAND_CALCULATIONS,
+      pageCount: 1,
+      tocTitles: ['Voltage Drop Analysis'],
+      render: (sheetIds) => (
         <VoltageDropPages
           projectName={data.projectName}
           projectAddress={data.projectAddress}
@@ -309,96 +378,228 @@ export const generatePermitPacket = async (data: PermitPacketData): Promise<void
           circuits={data.circuits}
           includeNECReferences={true}
           {...contractor}
+          sheetId={sheetIds[0]}
         />
       ),
     });
   }
 
-  if (data.shortCircuitCalculations && data.shortCircuitCalculations.length > 0) {
+  if (sections.shortCircuit && data.shortCircuitCalculations && data.shortCircuitCalculations.length > 0) {
     data.shortCircuitCalculations.forEach((calc, idx) => {
-      pages.push({
+      builders.push({
         name: `ShortCircuit[${idx}:${calc.panel_name ?? calc.calculation_type ?? calc.id ?? '?'}]`,
-        element: (
+        kind: 'shortCircuit',
+        band: BAND_CALCULATIONS,
+        pageCount: 1,
+        tocTitles: [`Short Circuit Analysis — ${calc.panel_name ?? calc.calculation_type ?? 'System'}`],
+        render: (sheetIds) => (
           <ShortCircuitCalculationPages
             calculation={calc}
             projectName={data.projectName}
             projectAddress={data.projectAddress}
             panelName={calc.calculation_type === 'panel' ? calc.panel_name : undefined}
             {...contractor}
+            sheetId={sheetIds[0]}
           />
         ),
       });
     });
   }
 
-  if (data.arcFlashData) {
-    pages.push({
+  if (sections.arcFlash && data.arcFlashData) {
+    const arcData = data.arcFlashData;
+    builders.push({
       name: 'ArcFlash',
-      element: (
+      kind: 'arcFlash',
+      band: BAND_CALCULATIONS,
+      pageCount: 1,
+      tocTitles: ['Arc Flash Analysis'],
+      render: (sheetIds) => (
         <ArcFlashPages
           projectName={data.projectName}
           projectAddress={data.projectAddress}
-          equipmentName={data.arcFlashData.equipmentName}
-          arcFlashData={data.arcFlashData}
+          equipmentName={arcData.equipmentName}
+          arcFlashData={arcData}
           {...contractor}
+          sheetId={sheetIds[0]}
         />
       ),
     });
   }
 
-  if (data.groundingSystem) {
-    pages.push({
+  // ---- Diagrams & equipment (band 200) ----
+  if (sections.riserDiagram) {
+    builders.push({
+      name: 'RiserDiagram',
+      kind: 'riserDiagram',
+      band: BAND_DIAGRAMS,
+      pageCount: 1,
+      tocTitles: ['Riser Diagram'],
+      render: (sheetIds) => (
+        <RiserDiagram
+          panels={data.panels}
+          transformers={data.transformers}
+          feeders={data.feeders}
+          meterStacks={data.meterStacks}
+          meters={data.meters}
+          projectName={data.projectName}
+          serviceVoltage={data.serviceVoltage}
+          servicePhase={data.servicePhase}
+          {...contractor}
+          sheetId={sheetIds[0]}
+        />
+      ),
+    });
+  }
+
+  if (sections.equipmentSchedule) {
+    builders.push({
+      name: 'EquipmentSchedule',
+      kind: 'equipmentSchedule',
+      band: BAND_DIAGRAMS,
+      pageCount: 1,
+      tocTitles: ['Equipment Schedule'],
+      render: (sheetIds) => (
+        <EquipmentSchedule
+          panels={data.panels}
+          transformers={data.transformers}
+          feeders={data.feeders}
+          projectName={data.projectName}
+          {...contractor}
+          sheetId={sheetIds[0]}
+        />
+      ),
+    });
+  }
+
+  if (sections.equipmentSpecs) {
+    builders.push({
+      name: 'EquipmentSpecs',
+      kind: 'equipmentSpecs',
+      band: BAND_DIAGRAMS,
+      pageCount: 1,
+      tocTitles: ['Equipment Specifications'],
+      render: (sheetIds) => (
+        <EquipmentSpecsPages
+          projectName={data.projectName}
+          projectAddress={data.projectAddress}
+          panels={data.panels}
+          transformers={data.transformers}
+          includeNECReferences={true}
+          {...contractor}
+          sheetId={sheetIds[0]}
+        />
+      ),
+    });
+  }
+
+  if (sections.grounding && data.groundingSystem) {
+    const groundingDetail = data.groundingSystem;
+    builders.push({
       name: 'GroundingPlan',
-      element: (
+      kind: 'grounding',
+      band: BAND_DIAGRAMS,
+      pageCount: 1,
+      tocTitles: ['Grounding Plan'],
+      render: (sheetIds) => (
         <GroundingPlanPages
           projectName={data.projectName}
           projectAddress={data.projectAddress}
-          grounding={data.groundingSystem}
+          grounding={groundingDetail}
           serviceAmperage={sortedPanels.find(p => p.is_main)?.bus_rating || data.serviceVoltage}
           conductorMaterial="Cu"
           {...contractor}
+          sheetId={sheetIds[0]}
         />
       ),
     });
   }
 
-  if (data.meterStacks && data.meterStacks.length > 0 && data.meters) {
-    pages.push({
+  // ---- Multi-family scope (band 400) ----
+  if (sections.meterStack && data.meterStacks && data.meterStacks.length > 0 && data.meters) {
+    const stacks = data.meterStacks;
+    const meters = data.meters;
+    const panels = data.panels;
+    builders.push({
       name: 'MeterStackSchedule',
-      element: (
+      kind: 'meterStack',
+      band: BAND_MULTIFAMILY,
+      pageCount: stacks.length,
+      tocTitles: stacks.map((s, i) => `Meter Stack Schedule — ${s.name ?? `Stack ${i + 1}`}`),
+      render: (sheetIds) => (
         <MeterStackScheduleDocument
           projectName={data.projectName}
           projectAddress={data.projectAddress}
-          meterStacks={data.meterStacks}
-          meters={data.meters}
-          panels={data.panels}
+          meterStacks={stacks}
+          meters={meters}
+          panels={panels}
           {...contractor}
+          sheetIds={sheetIds}
         />
       ),
     });
   }
 
-  if (data.multiFamilyEVAnalysis) {
-    pages.push({
+  if (sections.multiFamilyEV && data.multiFamilyEVAnalysis) {
+    const mfevData = data.multiFamilyEVAnalysis;
+    builders.push({
       name: 'MultiFamilyEV',
-      element: (
+      kind: 'multiFamilyEV',
+      band: BAND_MULTIFAMILY,
+      pageCount: 3,
+      tocTitles: [
+        'Multi-Family EV Readiness — System Overview',
+        'Multi-Family EV Readiness — Capacity Scenarios',
+        'Multi-Family EV Readiness — Compliance & Load Breakdown',
+      ],
+      render: (sheetIds) => (
         <MultiFamilyEVPages
-          result={data.multiFamilyEVAnalysis.result}
-          buildingName={data.multiFamilyEVAnalysis.buildingName || data.projectName}
+          result={mfevData.result}
+          buildingName={mfevData.buildingName || data.projectName}
           {...contractor}
+          sheetIds={sheetIds as [string, string, string]}
         />
       ),
     });
   }
 
-  if (data.jurisdiction) {
-    pages.push({
+  // ---- Compliance & AHJ (band 500) ----
+  if (sections.complianceSummary) {
+    builders.push({
+      name: 'ComplianceSummary',
+      kind: 'complianceSummary',
+      band: BAND_COMPLIANCE,
+      pageCount: 1,
+      tocTitles: ['NEC Compliance Summary'],
+      render: (sheetIds) => (
+        <ComplianceSummary
+          panels={data.panels}
+          circuits={data.circuits}
+          feeders={data.feeders}
+          projectName={data.projectName}
+          hasGrounding={data.hasGrounding}
+          necEdition={data.necEdition}
+          {...contractor}
+          sheetId={sheetIds[0]}
+        />
+      ),
+    });
+  }
+
+  if (sections.jurisdiction && data.jurisdiction) {
+    const jurisdiction = data.jurisdiction;
+    builders.push({
       name: 'JurisdictionRequirements',
-      element: (
+      kind: 'jurisdiction',
+      band: BAND_COMPLIANCE,
+      pageCount: 1,
+      tocTitles: ['Jurisdiction Requirements Checklist'],
+      render: (sheetIds) => (
         <JurisdictionRequirementsPages
-          jurisdiction={data.jurisdiction}
+          jurisdiction={jurisdiction}
           projectName={data.projectName}
           {...contractor}
+          sheetId={sheetIds[0]}
         />
       ),
     });
@@ -499,25 +700,70 @@ export const generatePermitPacket = async (data: PermitPacketData): Promise<void
     });
   };
 
-  sortedPanels.forEach(panel => {
-    const panelCircuits = circuitsByPanel.get(panel.id) || [];
-    const feederRows = synthesizeFeederCircuits(panel, panelCircuits);
-    const allCircuits = [...panelCircuits, ...feederRows];
-    pages.push({
-      name: `PanelSchedule[${panel.name}]`,
-      element: (
-        <PanelSchedulePages
-          panel={panel}
-          circuits={allCircuits}
-          projectName={data.projectName}
-          projectAddress={data.projectAddress}
-          {...contractor}
-        />
-      ),
+  // ---- Panel schedules (band 300) — one builder per panel ----
+  if (sections.panelSchedules) {
+    sortedPanels.forEach((panel) => {
+      const panelCircuits = circuitsByPanel.get(panel.id) || [];
+      const feederRows = synthesizeFeederCircuits(panel, panelCircuits);
+      const allCircuits = [...panelCircuits, ...feederRows];
+      builders.push({
+        name: `PanelSchedule[${panel.name}]`,
+        kind: 'panelSchedule',
+        band: BAND_PANELS,
+        pageCount: 1,
+        tocTitles: [`Panel Schedule — ${panel.name}`],
+        render: (sheetIds) => (
+          <PanelSchedulePages
+            panel={panel}
+            circuits={allCircuits}
+            projectName={data.projectName}
+            projectAddress={data.projectAddress}
+            {...contractor}
+            sheetId={sheetIds[0]}
+          />
+        ),
+      });
+    });
+  }
+
+  // ============================================================================
+  // SHEET ID ALLOCATION + TOC ASSEMBLY
+  // ============================================================================
+  // Walk the filtered builder list once to allocate banded sheet IDs (uses
+  // per-band counters so each category numbers from its base independently),
+  // then walk again to populate TOC entries from the assigned IDs. The cover
+  // and TOC entries themselves are excluded from the TOC list — they're
+  // implicit. Finally, render each builder into its React element with the
+  // allocated sheet IDs and the populated TOC entries injected.
+
+  const counters = newBandCounters();
+  const allocatedIds: string[][] = builders.map((b) => {
+    if (b.band === undefined) return [];
+    const ids: string[] = [];
+    for (let i = 0; i < b.pageCount; i++) {
+      ids.push(nextSheetId(counters, b.band));
+    }
+    return ids;
+  });
+
+  const tocEntries: TocEntry[] = [];
+  builders.forEach((b, i) => {
+    if (b.kind === 'cover' || b.kind === 'tableOfContents') return;
+    allocatedIds[i].forEach((sheetId, j) => {
+      tocEntries.push({
+        sheetId,
+        title: b.tocTitles[j] ?? b.name,
+      });
     });
   });
 
+  const pages: Array<{ name: string; element: React.ReactElement }> = builders.map((b, i) => ({
+    name: b.name,
+    element: b.render(allocatedIds[i], tocEntries),
+  }));
+
   console.log('[permit-packet] pages assembled:', pages.length, pages.map(p => p.name));
+  console.log('[permit-packet] sheet IDs:', builders.map((b, i) => `${b.name} → ${allocatedIds[i].join(', ') || '(none)'}`));
 
   const fileName = `Permit_Packet_${data.projectName.replace(/[^a-z0-9]/gi, '_')}_${new Date().toISOString().split('T')[0]}.pdf`;
 

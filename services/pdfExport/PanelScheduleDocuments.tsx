@@ -227,6 +227,8 @@ interface PanelSchedulePDFProps {
   // Sprint 2A C8: per-sheet contractor signature block
   contractorName?: string;
   contractorLicense?: string;
+  // Sprint 2A H3: per-sheet ID
+  sheetId?: string;
 }
 
 // Main PDF Component for single panel — page-level fragment for embedding.
@@ -238,6 +240,7 @@ export const PanelSchedulePages: React.FC<PanelSchedulePDFProps> = ({
   datePreppared,
   contractorName,
   contractorLicense,
+  sheetId,
 }) => {
   // Filter EVEMS metadata marker circuits — they convey the NEC 625.42
   // setpoint to the load aggregator but aren't physical branches; rendering
@@ -286,7 +289,7 @@ export const PanelSchedulePages: React.FC<PanelSchedulePDFProps> = ({
 
   return (
     <Page size="LETTER" style={themeStyles.page}>
-      <BrandBar pageLabel={`PANEL SCHEDULE - ${panel.name}`} />
+      <BrandBar pageLabel={`PANEL SCHEDULE - ${panel.name}`} sheetId={sheetId} />
       <View style={themeStyles.titleBlock}>
         <Text style={themeStyles.docTitle}>Panel Schedule</Text>
         <Text style={themeStyles.docSubtitle}>
@@ -530,6 +533,7 @@ export const PanelSchedulePages: React.FC<PanelSchedulePDFProps> = ({
           projectName={projectName}
           contractorName={contractorName}
           contractorLicense={contractorLicense}
+          sheetId={sheetId}
         />
       </Page>
   );

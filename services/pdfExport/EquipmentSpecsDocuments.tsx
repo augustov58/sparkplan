@@ -68,6 +68,8 @@ interface EquipmentSpecsDocumentProps {
   // Sprint 2A C8: per-sheet contractor signature block
   contractorName?: string;
   contractorLicense?: string;
+  // Sprint 2A H3: per-sheet ID (e.g., '203')
+  sheetId?: string;
 }
 
 // ============================================================================
@@ -371,6 +373,7 @@ export const EquipmentSpecsPages: React.FC<EquipmentSpecsDocumentProps> = ({
   includeNECReferences = true,
   contractorName,
   contractorLicense,
+  sheetId,
 }) => {
   const currentDate = new Date().toLocaleDateString('en-US', {
     year: 'numeric',
@@ -380,7 +383,7 @@ export const EquipmentSpecsPages: React.FC<EquipmentSpecsDocumentProps> = ({
 
   return (
     <Page size="LETTER" orientation="landscape" style={themeStyles.page}>
-      <BrandBar pageLabel="EQUIPMENT SPECIFICATIONS" />
+      <BrandBar pageLabel="EQUIPMENT SPECIFICATIONS" sheetId={sheetId} />
       <View style={themeStyles.titleBlock}>
         <Text style={themeStyles.docTitle}>Equipment Specifications</Text>
         <Text style={themeStyles.docSubtitle}>
@@ -403,6 +406,7 @@ export const EquipmentSpecsPages: React.FC<EquipmentSpecsDocumentProps> = ({
         projectName={projectName}
         contractorName={contractorName}
         contractorLicense={contractorLicense}
+        sheetId={sheetId}
       />
     </Page>
   );

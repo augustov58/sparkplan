@@ -378,15 +378,23 @@ export const themeStyles = StyleSheet.create({
 interface BrandBarProps {
   /** Right-aligned page label, e.g., "PERMIT APPLICATION" or "VOLTAGE DROP". */
   pageLabel: string;
+  /**
+   * Sprint 2A H3: per-sheet ID rendered after the page label, e.g., "301".
+   * Cover is conventionally `001`. Pass `undefined` for pages without a
+   * sheet ID (none today, but kept optional for future flexibility).
+   */
+  sheetId?: string;
 }
 
-export const BrandBar: React.FC<BrandBarProps> = ({ pageLabel }) => (
+export const BrandBar: React.FC<BrandBarProps> = ({ pageLabel, sheetId }) => (
   <View style={themeStyles.brandBar} fixed>
     <View style={themeStyles.brandBarLeft}>
       <View style={themeStyles.brandBolt} />
       <Text style={themeStyles.brandName}>SPARKPLAN</Text>
     </View>
-    <Text style={themeStyles.brandBarRight}>{pageLabel}</Text>
+    <Text style={themeStyles.brandBarRight}>
+      {sheetId ? `${pageLabel}  •  Sheet ${sheetId}` : pageLabel}
+    </Text>
   </View>
 );
 
@@ -400,12 +408,19 @@ interface FooterProps {
    */
   contractorName?: string;
   contractorLicense?: string;
+  /**
+   * Sprint 2A H3: per-sheet ID. When provided, the center column shows
+   * "Sheet [sheetId]  \u2022  Page X of Y" instead of the bare "Page X of Y" \u2014
+   * AHJ comment letters cite sheet IDs, not raw page numbers.
+   */
+  sheetId?: string;
 }
 
 export const Footer: React.FC<FooterProps> = ({
   projectName,
   contractorName,
   contractorLicense,
+  sheetId,
 }) => (
   <>
     <ContractorBlock
@@ -418,7 +433,11 @@ export const Footer: React.FC<FooterProps> = ({
       </Text>
       <Text
         style={themeStyles.footerText}
-        render={({ pageNumber, totalPages }) => `Page ${pageNumber} of ${totalPages}`}
+        render={({ pageNumber, totalPages }) =>
+          sheetId
+            ? `Sheet ${sheetId}  \u2022  Page ${pageNumber} of ${totalPages}`
+            : `Page ${pageNumber} of ${totalPages}`
+        }
       />
       <Text style={themeStyles.footerText}>Generated {todayStr()}</Text>
     </View>
