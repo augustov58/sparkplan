@@ -217,6 +217,11 @@ export interface Project {
   // but we prefer using settings object
   serviceVoltage: number;
   servicePhase: 1 | 3;
+  // Service-entrance / utility source (used by riser VD + SC on UTIL→MDP segment)
+  serviceAmps?: number | null;                    // Falls back to MDP main breaker when null
+  utilityAvailableFaultCurrentA?: number | null;  // Utility-supplied; required for SC at point of service
+  utilityTransformerKva?: number | null;          // Optional override; estimateUtilityTransformer() fills gaps
+  utilityTransformerImpedancePct?: number | null; // Optional override
   // Jurisdiction Requirements (Tier 3 Permit Packet)
   jurisdiction_id?: string;  // FK to jurisdictions table
 }
@@ -289,6 +294,8 @@ export interface Feeder {
   conduit_type?: string;
   ambient_temperature_c: number;
   num_current_carrying: number;
+  is_service_entrance: boolean; // TRUE for the synthetic UTIL→MDP run; sources are NULL
+  sets_in_parallel: number;     // Parallel conductor sets per phase (>=1)
 
   // Calculated results (cached for display)
   total_load_va?: number;

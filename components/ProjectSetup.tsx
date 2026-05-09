@@ -70,6 +70,21 @@ export const ProjectSetup: React.FC<ProjectSetupProps> = ({ project, updateProje
     debouncedUpdate(updated);
   };
 
+  // Top-level Project field updates (used for service-entrance utility-source fields).
+  // Distinct from handleSettingChange because these are real columns on `projects`,
+  // not values inside the JSONB `settings` blob.
+  const handleProjectFieldChange = <K extends keyof Project>(field: K, value: Project[K]) => {
+    const updated = { ...localProject, [field]: value };
+    debouncedUpdate(updated);
+  };
+
+  const parseOptionalNumber = (raw: string): number | null => {
+    const trimmed = raw.trim();
+    if (trimmed === '') return null;
+    const n = Number(trimmed);
+    return Number.isFinite(n) ? n : null;
+  };
+
   // Handle system type selection (voltage + phase together)
   const handleSystemTypeChange = async (systemType: string) => {
     const systemConfigs: Record<string, { voltage: number; phase: 1 | 3 }> = {
@@ -348,6 +363,82 @@ export const ProjectSetup: React.FC<ProjectSetupProps> = ({ project, updateProje
                </div>
             </div>
           </div>
+        </div>
+
+        {/* Service Entrance / Utility Source — drives riser VD + SC labels on UTIL→MDP segment */}
+        <div className="bg-white border border-[#e8e6e3] rounded-lg p-6 shadow-sm md:col-span-2">
+          <h3 className="text-lg font-medium text-[#1a1a1a] mb-2 flex items-center gap-2">
+            <Zap className="w-5 h-5 text-[#2d3b2d]" /> Service Entrance (Utility Source)
+          </h3>
+          <p className="text-xs text-[#888] mb-5 leading-relaxed">
+            Used to label the UTIL→MDP segment on the riser diagram and compute available fault current at the service. All fields optional — fault-current calc falls back to a typical utility transformer estimate when blank.
+          </p>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div>
+              <label className="block text-xs font-semibold text-[#888] uppercase mb-1">Service Ampacity</label>
+              <input
+                type="number"
+                value={localProject.serviceAmps ?? ''}
+                onChange={e => handleProjectFieldChange('serviceAmps', parseOptionalNumber(e.target.value))}
+                className="w-full border-[#e8e6e3] rounded-md text-sm font-mono"
+                placeholder="e.g. 400"
+                min={0}
+              />
+              <p className="text-xs text-[#888] mt-1">Falls back to MDP main breaker when blank</p>
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-[#888] uppercase mb-1">Available Fault Current (A)</label>
+              <input
+                type="number"
+                value={localProject.utilityAvailableFaultCurrentA ?? ''}
+                onChange={e => handleProjectFieldChange('utilityAvailableFaultCurrentA', parseOptionalNumber(e.target.value))}
+                className="w-full border-[#e8e6e3] rounded-md text-sm font-mono"
+                placeholder="e.g. 22000"
+                min={0}
+              />
+              <p className="text-xs text-[#888] mt-1">Utility-supplied (RMS symmetrical). Leave blank for infinite-bus (transformer-limited fault current — IEEE 141 §4.4).</p>
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-[#888] uppercase mb-1">Utility Transformer (kVA)</label>
+              <input
+                type="number"
+                value={localProject.utilityTransformerKva ?? ''}
+                onChange={e => handleProjectFieldChange('utilityTransformerKva', parseOptionalNumber(e.target.value))}
+                className="w-full border-[#e8e6e3] rounded-md text-sm font-mono"
+                placeholder="optional"
+                min={0}
+              />
+              <p className="text-xs text-[#888] mt-1">Estimated from service amps when blank</p>
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-[#888] uppercase mb-1">Transformer %Z</label>
+              <input
+                type="number"
+                step="0.01"
+                value={localProject.utilityTransformerImpedancePct ?? ''}
+                onChange={e => handleProjectFieldChange('utilityTransformerImpedancePct', parseOptionalNumber(e.target.value))}
+                className="w-full border-[#e8e6e3] rounded-md text-sm font-mono"
+                placeholder="e.g. 5.75"
+                min={0}
+                max={99}
+              />
+              <p className="text-xs text-[#888] mt-1">Typical: 1.5–5.75% by size. Defaults applied when blank.</p>
+            </div>
+          </div>
+
+          <div className="mt-4 p-3 bg-[#f8f6f2] border border-[#e8e6e3] rounded-md">
+            <p className="text-xs text-[#666] leading-relaxed">
+              <strong className="text-[#1a1a1a]">No utility data?</strong> Leave Available Fault Current blank — the calculator will assume an infinite primary bus and limit fault current by the utility transformer alone. This is the standard early-design approach (IEEE 141 §4.4, IEEE 242) and is accepted by most AHJs. Replace with the utility's actual AFC letter once you have it, especially when claiming series-rated combinations.
+            </p>
+          </div>
+
+          <p className="text-xs text-[#888] mt-4 leading-relaxed">
+            <strong className="text-[#1a1a1a]">Service conductors</strong> (size, length, material, conduit, sets in parallel) are configured in the Feeder Manager — create a feeder marked "Service Entrance" with the MDP as its destination.
+          </p>
         </div>
 
         {/* Residential Settings - Only shown for Residential projects */}

@@ -11,8 +11,12 @@ import {
   sizeConductor,
   sizeBreaker,
   calculateVoltageDropAC,
-  calculateFeederSizing
+  calculateFeederSizing,
+  calculateCumulativeVoltageDrop,
+  calculateAllCumulativeVoltageDrops,
+  calculateCumulativeForFeeder
 } from '../services/calculations';
+import type { Database } from '../lib/database.types';
 import { calculateEgcSize } from '../services/calculations/conductorSizing';
 import { getEgcSize } from '../data/nec/table-250-122';
 import { calculateProportionalEgcSize } from '../data/nec/conductor-properties';
@@ -733,5 +737,393 @@ describe('Feeder Sizing (NEC Article 215)', () => {
       expect(result.egc_size).toBeDefined();
       // Aluminum conductors are typically larger for same ampacity
     });
+  });
+});
+
+// ============================================================================
+// Cumulative Voltage Drop (chain walker, reset-at-transformer)
+// ============================================================================
+
+type Panel = Database['public']['Tables']['panels']['Row'];
+type Feeder = Database['public']['Tables']['feeders']['Row'];
+type Transformer = Database['public']['Tables']['transformers']['Row'];
+
+const PROJECT_ID = '00000000-0000-0000-0000-000000000001';
+
+function makePanel(overrides: Partial<Panel> & Pick<Panel, 'id' | 'name'>): Panel {
+  return {
+    aic_rating: null,
+    bus_rating: 200,
+    created_at: null,
+    fed_from: null,
+    fed_from_circuit_number: null,
+    fed_from_meter_stack_id: null,
+    fed_from_transformer_id: null,
+    fed_from_type: null,
+    feeder_breaker_amps: null,
+    feeder_conductor_size: null,
+    feeder_conduit: null,
+    feeder_length: null,
+    is_main: false,
+    location: null,
+    main_breaker_amps: null,
+    manufacturer: null,
+    model_number: null,
+    nema_enclosure_type: null,
+    notes: null,
+    num_spaces: 42,
+    phase: 1,
+    project_id: PROJECT_ID,
+    series_rating: null,
+    supplied_by_feeder_id: null,
+    ul_listing: null,
+    voltage: 240,
+    ...overrides,
+  };
+}
+
+function makeFeeder(overrides: Partial<Feeder> & Pick<Feeder, 'id' | 'name'>): Feeder {
+  return {
+    ambient_temperature_c: 30,
+    conductor_material: 'Cu',
+    conduit_size: null,
+    conduit_type: 'PVC',
+    continuous_load_va: null,
+    created_at: null,
+    design_load_va: null,
+    destination_panel_id: null,
+    destination_transformer_id: null,
+    distance_ft: 50,
+    egc_size: null,
+    is_service_entrance: false,
+    neutral_conductor_size: null,
+    noncontinuous_load_va: null,
+    num_current_carrying: 3,
+    phase_conductor_size: null,
+    project_id: PROJECT_ID,
+    sets_in_parallel: 1,
+    source_panel_id: null,
+    source_transformer_id: null,
+    total_load_va: null,
+    updated_at: null,
+    voltage_drop_percent: null,
+    ...overrides,
+  };
+}
+
+describe('Cumulative Voltage Drop (riser chain walker)', () => {
+  it('single segment: service-entrance feeder feeding the MDP', () => {
+    const mdp = makePanel({ id: 'p-mdp', name: 'MDP', is_main: true });
+    const seFeeder = makeFeeder({
+      id: 'f-se',
+      name: 'Service Entrance',
+      is_service_entrance: true,
+      destination_panel_id: 'p-mdp',
+      voltage_drop_percent: 0.6,
+    });
+
+    const result = calculateCumulativeVoltageDrop('p-mdp', [mdp], [seFeeder], []);
+
+    expect(result.segmentCount).toBe(1);
+    expect(result.cumulativePercent).toBe(0.6);
+    expect(result.crossesTransformer).toBe(false);
+    expect(result.voltageSegmentSourceLabel).toBe('Service');
+    expect(result.perSegment[0]?.runPercent).toBe(0.6);
+  });
+
+  it('three-hop chain: Service → MDP → Panel-H → Panel-L sums all three', () => {
+    const mdp = makePanel({ id: 'p-mdp', name: 'MDP', is_main: true });
+    const ph = makePanel({ id: 'p-h', name: 'Panel-H' });
+    const pl = makePanel({ id: 'p-l', name: 'Panel-L' });
+    const feeders: Feeder[] = [
+      makeFeeder({
+        id: 'f-se',
+        name: 'SE',
+        is_service_entrance: true,
+        destination_panel_id: 'p-mdp',
+        voltage_drop_percent: 0.6,
+      }),
+      makeFeeder({
+        id: 'f-mdp-h',
+        name: 'MDP→H',
+        source_panel_id: 'p-mdp',
+        destination_panel_id: 'p-h',
+        voltage_drop_percent: 1.2,
+      }),
+      makeFeeder({
+        id: 'f-h-l',
+        name: 'H→L',
+        source_panel_id: 'p-h',
+        destination_panel_id: 'p-l',
+        voltage_drop_percent: 1.0,
+      }),
+    ];
+
+    const result = calculateCumulativeVoltageDrop('p-l', [mdp, ph, pl], feeders, []);
+
+    expect(result.segmentCount).toBe(3);
+    expect(result.cumulativePercent).toBe(2.8); // 0.6 + 1.2 + 1.0
+    expect(result.crossesTransformer).toBe(false);
+    expect(result.perSegment.map((s) => s.feederId)).toEqual([
+      'f-se',
+      'f-mdp-h',
+      'f-h-l',
+    ]);
+  });
+
+  it('reset-at-transformer: chain stops at transformer, only counts segments below it', () => {
+    const mdp = makePanel({ id: 'p-mdp', name: 'MDP', is_main: true, voltage: 480 });
+    const ph = makePanel({ id: 'p-h', name: 'Panel-H', voltage: 208 });
+    const pl = makePanel({ id: 'p-l', name: 'Panel-L', voltage: 208 });
+    // Minimal mock — only `id` and `name` are read by the calc service.
+    const xfmr = {
+      id: 't-1',
+      name: 'XFMR-1',
+      project_id: PROJECT_ID,
+      kva_rating: 75,
+      primary_voltage: 480,
+      secondary_voltage: 208,
+      primary_phase: 3,
+      secondary_phase: 3,
+      primary_breaker_amps: 100,
+      impedance_percent: 5.75,
+    } as unknown as Transformer;
+    const feeders: Feeder[] = [
+      makeFeeder({
+        id: 'f-se',
+        name: 'SE',
+        is_service_entrance: true,
+        destination_panel_id: 'p-mdp',
+        voltage_drop_percent: 0.5,
+      }),
+      // Source-from-transformer feeder lands at Panel-H (208V segment)
+      makeFeeder({
+        id: 'f-x-h',
+        name: 'XFMR→H',
+        source_transformer_id: 't-1',
+        destination_panel_id: 'p-h',
+        voltage_drop_percent: 1.5,
+      }),
+      makeFeeder({
+        id: 'f-h-l',
+        name: 'H→L',
+        source_panel_id: 'p-h',
+        destination_panel_id: 'p-l',
+        voltage_drop_percent: 0.8,
+      }),
+    ];
+
+    const result = calculateCumulativeVoltageDrop(
+      'p-l',
+      [mdp, ph, pl],
+      feeders,
+      [xfmr],
+    );
+
+    // Reset rule: only segments below the transformer count
+    expect(result.segmentCount).toBe(2);
+    expect(result.cumulativePercent).toBe(2.3); // 1.5 + 0.8 (NOT including 0.5 above the xfmr)
+    expect(result.crossesTransformer).toBe(true);
+    expect(result.perSegment[0]?.sourceLabel).toBe('XFMR-1 secondary');
+    expect(result.warnings.some((w) => w.includes('crosses a transformer'))).toBe(
+      true,
+    );
+  });
+
+  it('missing cached VD: emits warning, contributes 0 for that segment', () => {
+    const mdp = makePanel({ id: 'p-mdp', name: 'MDP', is_main: true });
+    const ph = makePanel({ id: 'p-h', name: 'Panel-H' });
+    const feeders: Feeder[] = [
+      makeFeeder({
+        id: 'f-se',
+        name: 'SE',
+        is_service_entrance: true,
+        destination_panel_id: 'p-mdp',
+        voltage_drop_percent: 0.5,
+      }),
+      makeFeeder({
+        id: 'f-mdp-h',
+        name: 'MDP→H',
+        source_panel_id: 'p-mdp',
+        destination_panel_id: 'p-h',
+        voltage_drop_percent: null, // not yet calculated
+      }),
+    ];
+
+    const result = calculateCumulativeVoltageDrop('p-h', [mdp, ph], feeders, []);
+
+    expect(result.cumulativePercent).toBe(0.5); // 0.5 + 0 (missing)
+    expect(result.breakdown.incompleteSegments).toBe(1);
+    expect(result.warnings.some((w) => w.includes('missing cached'))).toBe(true);
+  });
+
+  it('cycle guard: feeders forming a loop break the walk safely', () => {
+    const a = makePanel({ id: 'p-a', name: 'A' });
+    const b = makePanel({ id: 'p-b', name: 'B' });
+    // A is fed by B, B is fed by A — should NOT infinite-loop
+    const feeders: Feeder[] = [
+      makeFeeder({
+        id: 'f-b-a',
+        name: 'B→A',
+        source_panel_id: 'p-b',
+        destination_panel_id: 'p-a',
+        voltage_drop_percent: 1.0,
+      }),
+      makeFeeder({
+        id: 'f-a-b',
+        name: 'A→B',
+        source_panel_id: 'p-a',
+        destination_panel_id: 'p-b',
+        voltage_drop_percent: 1.0,
+      }),
+    ];
+
+    const result = calculateCumulativeVoltageDrop('p-a', [a, b], feeders, []);
+
+    expect(result.segmentCount).toBeLessThanOrEqual(2);
+    expect(result.warnings.some((w) => w.toLowerCase().includes('cycle'))).toBe(
+      true,
+    );
+  });
+
+  it('5% threshold: chain summing > 5% emits CRITICAL warning', () => {
+    const mdp = makePanel({ id: 'p-mdp', name: 'MDP', is_main: true });
+    const ph = makePanel({ id: 'p-h', name: 'Panel-H' });
+    const feeders: Feeder[] = [
+      makeFeeder({
+        id: 'f-se',
+        name: 'SE',
+        is_service_entrance: true,
+        destination_panel_id: 'p-mdp',
+        voltage_drop_percent: 2.5,
+      }),
+      makeFeeder({
+        id: 'f-mdp-h',
+        name: 'MDP→H',
+        source_panel_id: 'p-mdp',
+        destination_panel_id: 'p-h',
+        voltage_drop_percent: 3.0,
+      }),
+    ];
+
+    const result = calculateCumulativeVoltageDrop('p-h', [mdp, ph], feeders, []);
+
+    expect(result.cumulativePercent).toBe(5.5);
+    expect(
+      result.warnings.some((w) => w.startsWith('CRITICAL') && w.includes('5%')),
+    ).toBe(true);
+  });
+
+  it('bulk calc: returns one entry per panel', () => {
+    const mdp = makePanel({ id: 'p-mdp', name: 'MDP', is_main: true });
+    const ph = makePanel({ id: 'p-h', name: 'Panel-H' });
+    const feeders: Feeder[] = [
+      makeFeeder({
+        id: 'f-se',
+        name: 'SE',
+        is_service_entrance: true,
+        destination_panel_id: 'p-mdp',
+        voltage_drop_percent: 0.5,
+      }),
+      makeFeeder({
+        id: 'f-mdp-h',
+        name: 'MDP→H',
+        source_panel_id: 'p-mdp',
+        destination_panel_id: 'p-h',
+        voltage_drop_percent: 1.5,
+      }),
+    ];
+
+    const all = calculateAllCumulativeVoltageDrops([mdp, ph], feeders, []);
+
+    expect(all.size).toBe(2);
+    expect(all.get('p-mdp')?.cumulativePercent).toBe(0.5);
+    expect(all.get('p-h')?.cumulativePercent).toBe(2.0);
+  });
+
+  it('per-feeder cumulative: panel→transformer feeder includes source panel cumulative + its own VD', () => {
+    const mdp = makePanel({ id: 'p-mdp', name: 'MDP', is_main: true, voltage: 480 });
+    const ph = makePanel({ id: 'p-h', name: 'H1', voltage: 480 });
+    const feeders: Feeder[] = [
+      makeFeeder({
+        id: 'f-se',
+        name: 'SE',
+        is_service_entrance: true,
+        destination_panel_id: 'p-mdp',
+        voltage_drop_percent: 0.30,
+      }),
+      makeFeeder({
+        id: 'f-mdp-h',
+        name: 'MDP→H1',
+        source_panel_id: 'p-mdp',
+        destination_panel_id: 'p-h',
+        voltage_drop_percent: 0.46,
+      }),
+      // Panel→transformer-primary feeder. Walker doesn't key transformers, so
+      // before the per-feeder helper this would have shown no VD+ at all.
+      makeFeeder({
+        id: 'f-h-xfmr',
+        name: 'H1→XFMR-L1',
+        source_panel_id: 'p-h',
+        destination_panel_id: null,
+        destination_transformer_id: 't-xfmr-l1',
+        voltage_drop_percent: 0.42,
+      }),
+    ];
+
+    const panelMap = calculateAllCumulativeVoltageDrops([mdp, ph], feeders, []);
+    const xfmrFeeder = feeders.find(f => f.id === 'f-h-xfmr')!;
+    const cum = calculateCumulativeForFeeder(xfmrFeeder, panelMap);
+
+    // H1 panel cumulative = 0.30 + 0.46 = 0.76. Then this feeder adds 0.42.
+    expect(cum).not.toBeNull();
+    expect(cum!.cumulativePercent).toBe(1.18);
+    expect(cum!.crossesTransformer).toBe(false);
+  });
+
+  it('per-feeder cumulative: transformer→transformer cascade resets and flags asterisk', () => {
+    const mdp = makePanel({ id: 'p-mdp', name: 'MDP', is_main: true });
+    const cascadeFeeder = makeFeeder({
+      id: 'f-cascade',
+      name: 'XFMR-1 secondary → XFMR-2 primary',
+      source_panel_id: null,
+      source_transformer_id: 't-1',
+      destination_panel_id: null,
+      destination_transformer_id: 't-2',
+      voltage_drop_percent: 0.5,
+    });
+    const panelMap = calculateAllCumulativeVoltageDrops([mdp], [cascadeFeeder], []);
+    const cum = calculateCumulativeForFeeder(cascadeFeeder, panelMap);
+
+    expect(cum).not.toBeNull();
+    expect(cum!.cumulativePercent).toBe(0.5); // restart at upstream secondary
+    expect(cum!.crossesTransformer).toBe(true); // VD+* label
+  });
+
+  it('per-feeder cumulative: panel-destination feeder reuses panel walker result', () => {
+    const mdp = makePanel({ id: 'p-mdp', name: 'MDP', is_main: true });
+    const ph = makePanel({ id: 'p-h', name: 'H' });
+    const feeders: Feeder[] = [
+      makeFeeder({
+        id: 'f-se',
+        name: 'SE',
+        is_service_entrance: true,
+        destination_panel_id: 'p-mdp',
+        voltage_drop_percent: 0.5,
+      }),
+      makeFeeder({
+        id: 'f-mdp-h',
+        name: 'MDP→H',
+        source_panel_id: 'p-mdp',
+        destination_panel_id: 'p-h',
+        voltage_drop_percent: 1.5,
+      }),
+    ];
+
+    const panelMap = calculateAllCumulativeVoltageDrops([mdp, ph], feeders, []);
+    const cum = calculateCumulativeForFeeder(feeders[1]!, panelMap);
+
+    expect(cum).not.toBeNull();
+    expect(cum!.cumulativePercent).toBe(2.0); // walker already includes this feeder
   });
 });

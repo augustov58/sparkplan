@@ -21,6 +21,8 @@ import { validateFeederForm, showValidationErrors } from '../lib/validation-util
 import { validateFeederConnectivityEnhanced, getValidFeederDestinations, getValidPanelDestinationsFromTransformer } from '../services/validation/panelConnectivityValidation';
 import { checkFeederLoadStatus, getStaleFeedersList } from '../services/feeder/feederLoadSync';
 import { calculateAggregatedLoad } from '../services/calculations/upstreamLoadAggregation';
+import { useCumulativeVoltageDrop } from '../hooks/useCumulativeVoltageDrop';
+import { calculateCumulativeForFeeder } from '../services/calculations/cumulativeVoltageDrop';
 import { exportVoltageDropReport, hasVoltageDropData } from '../services/pdfExport/voltageDropPDF';
 import { computeFeederLoadVA } from '../services/feeder/feederLoadSync';
 import type { Feeder, FeederCalculationResult } from '../types';
@@ -43,6 +45,10 @@ export const FeederManager: React.FC<FeederManagerProps> = ({
   const { transformers } = useTransformers(projectId);
   const { circuits } = useCircuits(projectId);
 
+  // Cumulative VD per panel — used to annotate each feeder card with the
+  // chain-total at the destination panel (the one this run lands on).
+  const cumulativeVdMap = useCumulativeVoltageDrop(panels, feeders, transformers);
+
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [formData, setFormData] = useState<Partial<Feeder>>({
@@ -57,7 +63,7 @@ export const FeederManager: React.FC<FeederManagerProps> = ({
     ambient_temperature_c: 30,
     num_current_carrying: 4
   });
-  const [sourceType, setSourceType] = useState<'panel' | 'transformer'>('panel'); // NEW: Source type toggle
+  const [sourceType, setSourceType] = useState<'panel' | 'transformer' | 'service'>('panel'); // 'service' = synthetic UTIL→MDP feeder (is_service_entrance)
   const [destinationType, setDestinationType] = useState<'panel' | 'transformer'>('panel');
   const [connectivityError, setConnectivityError] = useState<string | null>(null);
   const [showStaleWarning, setShowStaleWarning] = useState(true);
@@ -96,8 +102,12 @@ export const FeederManager: React.FC<FeederManagerProps> = ({
     let sourceName = '';
     let destName = '';
 
-    // Get source name
-    if (formData.source_panel_id) {
+    // Get source name. Service mode has no source row — the utility is implicit,
+    // so we synthesize the name 'Utility' to give the auto-namer something to
+    // pair with the destination MDP.
+    if (sourceType === 'service') {
+      sourceName = 'Utility';
+    } else if (formData.source_panel_id) {
       const sourcePanel = panels.find(p => p.id === formData.source_panel_id);
       sourceName = sourcePanel?.name || '';
     } else if (formData.source_transformer_id) {
@@ -114,11 +124,12 @@ export const FeederManager: React.FC<FeederManagerProps> = ({
       destName = destTransformer?.name || '';
     }
 
-    // Auto-generate name if both source and destination are selected
+    // Auto-generate name if both source and destination are resolvable
     if (sourceName && destName) {
       setFormData(prev => ({ ...prev, name: `${sourceName} → ${destName}` }));
     }
   }, [
+    sourceType,
     formData.source_panel_id,
     formData.source_transformer_id,
     formData.destination_panel_id,
@@ -319,6 +330,80 @@ export const FeederManager: React.FC<FeederManagerProps> = ({
 
   // Calculate feeder and update database
   const handleCalculateFeeder = async (feeder: Partial<Feeder>) => {
+    // Service-entrance feeders take a self-contained calc path. The standard
+    // pipeline below assumes a source panel/transformer to derive voltage and
+    // phase; SE has neither (the utility is implicit). We synthesize the inputs
+    // using the MDP — service-entrance conductors run from utility secondary
+    // to the MDP, so source voltage = destination voltage = MDP voltage.
+    if (sourceType === 'service') {
+      if (!feeder.destination_panel_id) {
+        showValidationErrors({ destination_panel_id: 'Service entrance must terminate at the MDP (a panel).' });
+        return;
+      }
+      const mdp = panels.find(p => p.id === feeder.destination_panel_id);
+      if (!mdp) {
+        showValidationErrors({ destination_panel_id: 'MDP not found in this project.' });
+        return;
+      }
+
+      const voltage = mdp.voltage;
+      const phase = (mdp.phase || 1) as 1 | 3;
+
+      // Sizing basis: 'capacity' uses MDP main breaker / bus rating × voltage,
+      // 'load' uses aggregated downstream load on the MDP. Mirrors the
+      // panel-feeder logic at lines ~422-460 below, just resolved against MDP.
+      let loads: { totalVA: number; continuousVA: number; noncontinuousVA: number };
+      if (sizingBasis === 'capacity') {
+        const amps = mdp.main_breaker_amps || mdp.bus_rating || 0;
+        const capacityVA = phase === 3 ? amps * voltage * Math.sqrt(3) : amps * voltage;
+        loads = { totalVA: capacityVA, continuousVA: 0, noncontinuousVA: capacityVA };
+      } else {
+        loads = calculatePanelLoads(mdp.id);
+      }
+
+      const result = calculateFeederSizing({
+        source_voltage: voltage,
+        source_phase: phase,
+        destination_voltage: voltage,
+        destination_phase: phase,
+        total_load_va: loads.totalVA,
+        continuous_load_va: loads.continuousVA,
+        noncontinuous_load_va: loads.noncontinuousVA,
+        distance_ft: feeder.distance_ft || 0,
+        conductor_material: (feeder.conductor_material as 'Cu' | 'Al') || 'Cu',
+        ambient_temperature_c: feeder.ambient_temperature_c || 30,
+        num_current_carrying: feeder.num_current_carrying || 3,
+        max_voltage_drop_percent: 3,
+      });
+
+      const seFeeder: Partial<Feeder> = {
+        ...feeder,
+        is_service_entrance: true,
+        sets_in_parallel: feeder.sets_in_parallel ?? 1,
+        source_panel_id: null,
+        source_transformer_id: null,
+        project_id: projectId,
+        total_load_va: loads.totalVA,
+        continuous_load_va: loads.continuousVA,
+        noncontinuous_load_va: loads.noncontinuousVA,
+        design_load_va: result.design_load_va,
+        phase_conductor_size: result.phase_conductor_size,
+        neutral_conductor_size: result.neutral_conductor_size,
+        egc_size: result.egc_size,
+        conduit_size: result.recommended_conduit_size,
+        voltage_drop_percent: result.voltage_drop_percent,
+      };
+      if (editingId) {
+        await updateFeeder(editingId, seFeeder);
+        setEditingId(null);
+      } else {
+        await createFeeder(seFeeder as Omit<Feeder, 'id' | 'created_at' | 'updated_at'>);
+        setShowCreateForm(false);
+        resetForm();
+      }
+      return;
+    }
+
     // Validate form data - ensure at least one source (panel OR transformer)
     const validation = validateFeederForm({
       name: feeder.name || '',
@@ -525,7 +610,9 @@ export const FeederManager: React.FC<FeederManagerProps> = ({
         neutral_conductor_size: result.neutral_conductor_size,
         egc_size: egcSize, // Use corrected EGC size based on panel OCPD per NEC 250.122
         conduit_size: result.recommended_conduit_size,
-        voltage_drop_percent: result.voltage_drop_percent
+        voltage_drop_percent: result.voltage_drop_percent,
+        is_service_entrance: false, // service-entrance path returned earlier
+        sets_in_parallel: feeder.sets_in_parallel ?? 1,
       };
 
       if (editingId) {
@@ -563,7 +650,13 @@ export const FeederManager: React.FC<FeederManagerProps> = ({
 
   const handleEdit = (feeder: Feeder) => {
     setFormData(feeder);
-    setSourceType(feeder.source_panel_id ? 'panel' : 'transformer');
+    setSourceType(
+      feeder.is_service_entrance
+        ? 'service'
+        : feeder.source_panel_id
+        ? 'panel'
+        : 'transformer'
+    );
     setDestinationType(feeder.destination_panel_id ? 'panel' : 'transformer');
     setEditingId(feeder.id);
     setShowCreateForm(false);
@@ -770,15 +863,51 @@ export const FeederManager: React.FC<FeederManagerProps> = ({
                 >
                   Transformer
                 </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSourceType('service');
+                    setDestinationType('panel');
+                    const mdp = panels.find(p => p.is_main);
+                    setFormData({
+                      ...formData,
+                      source_panel_id: null,
+                      source_transformer_id: null,
+                      destination_panel_id: mdp?.id ?? null,
+                      destination_transformer_id: null,
+                    });
+                  }}
+                  className={`flex-1 py-2 px-4 rounded-md text-sm font-medium transition-colors ${
+                    sourceType === 'service'
+                      ? 'bg-[#2d3b2d] text-white'
+                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                  }`}
+                  title="Synthetic UTIL→MDP run; one allowed per project"
+                >
+                  Service
+                </button>
               </div>
             </div>
 
             {/* Source Selection */}
             <div>
               <label className="block text-xs font-semibold text-gray-500 mb-1 uppercase tracking-wider">
-                {sourceType === 'panel' ? 'Source Panel' : 'Source Transformer'}
+                {sourceType === 'panel'
+                  ? 'Source Panel'
+                  : sourceType === 'transformer'
+                  ? 'Source Transformer'
+                  : 'Source'}
               </label>
-              {sourceType === 'panel' ? (
+              {sourceType === 'service' ? (
+                <div className="px-3 py-2 bg-amber-50 border border-amber-300 rounded-md text-xs text-amber-900 leading-relaxed space-y-1">
+                  <p>
+                    <strong>Utility (point of service)</strong> — this run represents the conductors from the utility transformer to the MDP. Destination must be the main panel.
+                  </p>
+                  <p>
+                    Utility-transformer kVA, %Z, and available fault current are configured under <strong>Project Settings → Service Entrance (Utility Source)</strong> — they apply to fault-current math, not to this conductor sizing form.
+                  </p>
+                </div>
+              ) : sourceType === 'panel' ? (
                 <select
                   value={formData.source_panel_id || ''}
                   onChange={e => setFormData({ ...formData, source_panel_id: e.target.value || null })}
@@ -807,47 +936,65 @@ export const FeederManager: React.FC<FeederManagerProps> = ({
               )}
             </div>
 
-            {/* Destination Type Toggle */}
-            <div>
-              <label className="block text-xs font-semibold text-gray-500 mb-1 uppercase tracking-wider">
-                Destination Type
-              </label>
-              <div className="flex gap-2">
-                <button
-                  onClick={() => {
-                    setDestinationType('panel');
-                    setFormData({ ...formData, destination_transformer_id: null });
-                  }}
-                  className={`flex-1 py-2 px-4 rounded-md text-sm font-medium transition-colors ${
-                    destinationType === 'panel'
-                      ? 'bg-[#2d3b2d] text-white'
-                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                  }`}
-                >
-                  Panel
-                </button>
-                <button
-                  onClick={() => {
-                    setDestinationType('transformer');
-                    setFormData({ ...formData, destination_panel_id: null });
-                  }}
-                  className={`flex-1 py-2 px-4 rounded-md text-sm font-medium transition-colors ${
-                    destinationType === 'transformer'
-                      ? 'bg-[#2d3b2d] text-white'
-                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                  }`}
-                >
-                  Transformer
-                </button>
+            {/* Destination Type Toggle — hidden in Service mode (forced to MDP) */}
+            {sourceType !== 'service' && (
+              <div>
+                <label className="block text-xs font-semibold text-gray-500 mb-1 uppercase tracking-wider">
+                  Destination Type
+                </label>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => {
+                      setDestinationType('panel');
+                      setFormData({ ...formData, destination_transformer_id: null });
+                    }}
+                    className={`flex-1 py-2 px-4 rounded-md text-sm font-medium transition-colors ${
+                      destinationType === 'panel'
+                        ? 'bg-[#2d3b2d] text-white'
+                        : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                    }`}
+                  >
+                    Panel
+                  </button>
+                  <button
+                    onClick={() => {
+                      setDestinationType('transformer');
+                      setFormData({ ...formData, destination_panel_id: null });
+                    }}
+                    className={`flex-1 py-2 px-4 rounded-md text-sm font-medium transition-colors ${
+                      destinationType === 'transformer'
+                        ? 'bg-[#2d3b2d] text-white'
+                        : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                    }`}
+                  >
+                    Transformer
+                  </button>
+                </div>
               </div>
-            </div>
+            )}
 
             {/* Destination Selection */}
             <div>
               <label className="block text-xs font-semibold text-gray-500 mb-1 uppercase tracking-wider">
-                {destinationType === 'panel' ? 'Destination Panel' : 'Destination Transformer'}
+                {sourceType === 'service'
+                  ? 'Destination (Main Distribution Panel)'
+                  : destinationType === 'panel' ? 'Destination Panel' : 'Destination Transformer'}
               </label>
-              {destinationType === 'panel' ? (
+              {sourceType === 'service' ? (() => {
+                const mdp = panels.find(p => p.is_main);
+                if (!mdp) {
+                  return (
+                    <div className="px-3 py-2 bg-red-50 border border-red-300 rounded-md text-xs text-red-900 leading-relaxed">
+                      <strong>No MDP found.</strong> Create a panel marked <em>main</em> before defining the service entrance.
+                    </div>
+                  );
+                }
+                return (
+                  <div className="px-3 py-2 bg-amber-50 border border-amber-300 rounded-md text-xs text-amber-900 leading-relaxed">
+                    <strong>{mdp.name}</strong> — {mdp.voltage}V {mdp.phase}φ, {mdp.bus_rating}A bus. Service entrance always terminates at the main panel.
+                  </div>
+                );
+              })() : destinationType === 'panel' ? (
                 <>
                   <select
                     value={formData.destination_panel_id || ''}
@@ -1121,7 +1268,9 @@ export const FeederManager: React.FC<FeederManagerProps> = ({
               onClick={() => handleCalculateFeeder(formData)}
               disabled={
                 !formData.name ||
-                (!formData.source_panel_id && !formData.source_transformer_id) ||
+                // Source: panel/transformer mode requires a source ID; Service mode
+                // intentionally has null sources (utility is implicit) so it's exempt.
+                (sourceType !== 'service' && !formData.source_panel_id && !formData.source_transformer_id) ||
                 (!formData.destination_panel_id && !formData.destination_transformer_id) ||
                 !!connectivityError
               }
@@ -1159,6 +1308,9 @@ export const FeederManager: React.FC<FeederManagerProps> = ({
         <div className="space-y-4">
           {feeders.map(feeder => {
             const staleStatus = checkFeederLoadStatus(feeder, circuits, panels, 5);
+            // Per-feeder cumulative — handles both panel-destination and
+            // transformer-primary destination feeders correctly.
+            const cum = calculateCumulativeForFeeder(feeder, cumulativeVdMap);
             return (
               <FeederCard
                 key={feeder.id}
@@ -1170,6 +1322,8 @@ export const FeederManager: React.FC<FeederManagerProps> = ({
                 onRecalculate={handleRecalculateFeeder}
                 isEditing={editingId === feeder.id}
                 staleStatus={staleStatus}
+                cumulativeVdPercent={cum?.cumulativePercent ?? null}
+                cumulativeCrossesTransformer={cum?.crossesTransformer ?? false}
               />
             );
           })}
@@ -1195,6 +1349,8 @@ interface FeederCardProps {
     loadDifferencePercent: number;
     message: string;
   };
+  cumulativeVdPercent: number | null;          // chain total at destination panel
+  cumulativeCrossesTransformer: boolean;       // true → label as 'VD+*' to flag the reset boundary
 }
 
 const FeederCard: React.FC<FeederCardProps> = ({
@@ -1205,7 +1361,9 @@ const FeederCard: React.FC<FeederCardProps> = ({
   onDelete,
   onRecalculate,
   isEditing,
-  staleStatus
+  staleStatus,
+  cumulativeVdPercent,
+  cumulativeCrossesTransformer
 }) => {
   // Safety check: ensure panels and transformers are arrays (defensive programming)
   const panelsArray = Array.isArray(panels) ? panels : [];
@@ -1337,6 +1495,17 @@ const FeederCard: React.FC<FeederCardProps> = ({
             <span className={`font-medium ${vdCompliant ? 'text-green-900' : 'text-red-900'}`}>
               VD: {feeder.voltage_drop_percent.toFixed(2)}%
             </span>
+            {cumulativeVdPercent != null && cumulativeVdPercent > 0 && (() => {
+              const cumOver5 = cumulativeVdPercent > 5;
+              const cumOver3 = cumulativeVdPercent > 3;
+              const cumColor = cumOver5 ? 'text-red-700' : cumOver3 ? 'text-amber-700' : 'text-green-700';
+              const label = cumulativeCrossesTransformer ? 'VD+*' : 'VD+';
+              return (
+                <span className={`font-medium ${cumColor}`} title={cumulativeCrossesTransformer ? 'Cumulative resets at transformer; this total spans only the current voltage segment.' : 'Cumulative VD from service to this panel.'}>
+                  • {label}: {cumulativeVdPercent.toFixed(2)}%
+                </span>
+              );
+            })()}
           </div>
           <span className={vdCompliant ? 'text-green-600' : 'text-red-600'}>
             {vdCompliant ? '≤3% OK' : '>3% High'}

@@ -376,13 +376,16 @@ export type Database = {
           distance_ft: number
           egc_size: string | null
           id: string
+          is_service_entrance: boolean
           name: string
           neutral_conductor_size: string | null
           noncontinuous_load_va: number | null
           num_current_carrying: number | null
           phase_conductor_size: string | null
           project_id: string
+          sets_in_parallel: number
           source_panel_id: string | null
+          source_transformer_id: string | null
           total_load_va: number | null
           updated_at: string | null
           voltage_drop_percent: number | null
@@ -400,13 +403,16 @@ export type Database = {
           distance_ft: number
           egc_size?: string | null
           id?: string
+          is_service_entrance?: boolean
           name: string
           neutral_conductor_size?: string | null
           noncontinuous_load_va?: number | null
           num_current_carrying?: number | null
           phase_conductor_size?: string | null
           project_id: string
+          sets_in_parallel?: number
           source_panel_id?: string | null
+          source_transformer_id?: string | null
           total_load_va?: number | null
           updated_at?: string | null
           voltage_drop_percent?: number | null
@@ -424,13 +430,16 @@ export type Database = {
           distance_ft?: number
           egc_size?: string | null
           id?: string
+          is_service_entrance?: boolean
           name?: string
           neutral_conductor_size?: string | null
           noncontinuous_load_va?: number | null
           num_current_carrying?: number | null
           phase_conductor_size?: string | null
           project_id?: string
+          sets_in_parallel?: number
           source_panel_id?: string | null
+          source_transformer_id?: string | null
           total_load_va?: number | null
           updated_at?: string | null
           voltage_drop_percent?: number | null
@@ -1059,6 +1068,7 @@ export type Database = {
           name: string
           nec_edition: string
           progress: number | null
+          service_amps: number | null
           service_phase: number
           service_voltage: number
           settings: Json
@@ -1066,6 +1076,9 @@ export type Database = {
           type: string
           updated_at: string | null
           user_id: string
+          utility_available_fault_current_a: number | null
+          utility_transformer_impedance_pct: number | null
+          utility_transformer_kva: number | null
         }
         Insert: {
           address: string
@@ -1074,6 +1087,7 @@ export type Database = {
           name: string
           nec_edition: string
           progress?: number | null
+          service_amps?: number | null
           service_phase: number
           service_voltage: number
           settings?: Json
@@ -1081,6 +1095,9 @@ export type Database = {
           type: string
           updated_at?: string | null
           user_id: string
+          utility_available_fault_current_a?: number | null
+          utility_transformer_impedance_pct?: number | null
+          utility_transformer_kva?: number | null
         }
         Update: {
           address?: string
@@ -1089,6 +1106,7 @@ export type Database = {
           name?: string
           nec_edition?: string
           progress?: number | null
+          service_amps?: number | null
           service_phase?: number
           service_voltage?: number
           settings?: Json
@@ -1096,6 +1114,9 @@ export type Database = {
           type?: string
           updated_at?: string | null
           user_id?: string
+          utility_available_fault_current_a?: number | null
+          utility_transformer_impedance_pct?: number | null
+          utility_transformer_kva?: number | null
         }
         Relationships: []
       }
