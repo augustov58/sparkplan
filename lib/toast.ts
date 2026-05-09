@@ -220,6 +220,49 @@ export const toastMessages = {
     replyError: 'Failed to send reply',
   },
 
+  // T&M Billing — time entries
+  timeEntry: {
+    created: 'Time entry logged',
+    updated: 'Time entry updated',
+    deleted: 'Time entry removed',
+    error: 'Failed to save time entry',
+    deleteError: 'Failed to delete time entry',
+  },
+
+  // T&M Billing — material entries
+  materialEntry: {
+    created: 'Material entry logged',
+    updated: 'Material entry updated',
+    deleted: 'Material entry removed',
+    error: 'Failed to save material entry',
+    deleteError: 'Failed to delete material entry',
+  },
+
+  // T&M Billing — project billing settings (singleton per project)
+  billingSettings: {
+    saved: 'Billing settings saved',
+    error: 'Failed to save billing settings',
+  },
+
+  // T&M Billing — invoices (Phase 1b)
+  invoice: {
+    created: 'Invoice generated',
+    updated: 'Invoice updated',
+    deleted: 'Invoice deleted',
+    sent: 'Invoice marked as sent',
+    cancelled: 'Invoice cancelled',
+    error: 'Failed to update invoice',
+    deleteError: 'Failed to delete invoice',
+  },
+
+  // T&M Billing — payments (Phase 1b)
+  payment: {
+    created: 'Payment recorded',
+    updated: 'Payment updated',
+    deleted: 'Payment removed',
+    error: 'Failed to save payment',
+  },
+
   // Generic
   saved: 'Changes saved',
   copied: 'Copied to clipboard',

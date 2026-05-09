@@ -16,6 +16,12 @@ type RefreshEventType =
   | 'estimate_line_items'
   | 'permits'
   | 'permit_inspections'
+  // T&M Billing (Phase 1a — time/materials/settings; Phase 1b adds invoices/payments)
+  | 'time_entries'
+  | 'material_entries'
+  | 'project_billing_settings'
+  | 'invoices'
+  | 'payments'
   | 'all';
 type RefreshCallback = () => void;
 

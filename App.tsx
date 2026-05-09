@@ -27,7 +27,7 @@ const SiteVisitManager = lazy(() => import('./components/SiteVisitManager').then
 const CalendarView = lazy(() => import('./components/CalendarView').then(m => ({ default: m.CalendarView })));
 const EstimatingPage = lazy(() => import('./components/Estimating/EstimatingPage').then(m => ({ default: m.EstimatingPage })));
 const PermitsPage = lazy(() => import('./components/Permits/PermitsPage').then(m => ({ default: m.PermitsPage })));
-const TmBillingStub = lazy(() => import('./components/TmBillingStub').then(m => ({ default: m.TmBillingStub })));
+const BillingPage = lazy(() => import('./components/Billing/BillingPage').then(m => ({ default: m.BillingPage })));
 const AgentActivityLog = lazy(() => import('./components/AgentActivityLog').then(m => ({ default: m.AgentActivityLog })));
 const UtilityInterconnectionForm = lazy(() => import('./components/UtilityInterconnectionForm').then(m => ({ default: m.UtilityInterconnectionForm })));
 const PricingPage = lazy(() => import('./components/PricingPage').then(m => ({ default: m.PricingPage })));
@@ -222,7 +222,7 @@ const ProjectWrapper = ({ projects, updateProject, deleteProject, onSignOut }: {
                     <FeatureErrorBoundary>
                         <FeatureGate feature="tm-billing" message="Time & materials billing with phases, change orders, and AIA pay applications for commercial electrical subcontractors. Available on the Business plan — preview free during your trial.">
                             <Suspense fallback={<LoadingSpinner />}>
-                                <TmBillingStub projectId={project.id} />
+                                <BillingPage projectId={project.id} />
                             </Suspense>
                         </FeatureGate>
                     </FeatureErrorBoundary>
