@@ -25,9 +25,11 @@ import {
   TableOfContentsPage,
   RevisionLogPage,
   NEC22087NarrativePage,
+  AvailableFaultCurrentPage,
   type TocEntry,
   type RevisionEntry,
   type NEC22087NarrativeData,
+  type AvailableFaultCurrentInput,
 } from './PermitPacketDocuments';
 import { PanelSchedulePages } from './PanelScheduleDocuments';
 import { calculateAggregatedLoad } from '../calculations/upstreamLoadAggregation';
@@ -241,6 +243,7 @@ export const generatePermitPacket = async (data: PermitPacketData): Promise<void
     | 'generalNotes'
     | 'loadCalculation'
     | 'nec22087Narrative'
+    | 'availableFaultCurrent'
     | 'voltageDrop'
     | 'shortCircuit'
     | 'arcFlash'
@@ -419,6 +422,52 @@ export const generatePermitPacket = async (data: PermitPacketData): Promise<void
     });
   }
 
+  // Sprint 2A H9: Available Fault Current Calculation page — required by
+  // Orlando new-service path. Selects the service-level entry from the
+  // shortCircuitCalculations array (calculation_type === 'service'). When
+  // no service-level entry exists, the section toggle auto-disables in the
+  // UI and the builder is not pushed.
+  if (sections.availableFaultCurrent && data.shortCircuitCalculations) {
+    const serviceCalc = data.shortCircuitCalculations.find(
+      c => c.calculation_type === 'service',
+    );
+    if (serviceCalc) {
+      const input: AvailableFaultCurrentInput = {
+        serviceAmps: serviceCalc.service_amps,
+        serviceVoltage: serviceCalc.service_voltage,
+        servicePhase: serviceCalc.service_phase,
+        sourceFaultCurrent: serviceCalc.source_fault_current,
+        transformerKVA: serviceCalc.transformer_kva,
+        transformerImpedance: serviceCalc.transformer_impedance,
+        serviceConductorSize: serviceCalc.service_conductor_size,
+        serviceConductorMaterial: serviceCalc.service_conductor_material,
+        serviceConductorLength: serviceCalc.service_conductor_length,
+        // The `results` column is typed `Json` in the DB; the IEEE-141 engine
+        // writes a structured block whose shape lines up with
+        // ShortCircuitResultsBlock. Cast through `unknown` so the typecheck
+        // doesn't over-constrain consumers of the raw Json column.
+        results: (serviceCalc.results as unknown as AvailableFaultCurrentInput['results']) ?? null,
+        notes: serviceCalc.notes,
+      };
+      builders.push({
+        name: 'AvailableFaultCurrent',
+        kind: 'availableFaultCurrent',
+        band: BAND_CALCULATIONS,
+        pageCount: 1,
+        tocTitles: ['Available Fault Current — Service Main'],
+        render: (sheetIds) => (
+          <AvailableFaultCurrentPage
+            projectName={data.projectName}
+            projectAddress={data.projectAddress}
+            input={input}
+            {...contractor}
+            sheetId={sheetIds[0]}
+          />
+        ),
+      });
+    }
+  }
+
   if (sections.shortCircuit && data.shortCircuitCalculations && data.shortCircuitCalculations.length > 0) {
     data.shortCircuitCalculations.forEach((calc, idx) => {
       builders.push({
@@ -520,6 +569,7 @@ export const generatePermitPacket = async (data: PermitPacketData): Promise<void
           projectAddress={data.projectAddress}
           panels={data.panels}
           transformers={data.transformers}
+          circuits={data.circuits}
           includeNECReferences={true}
           {...contractor}
           sheetId={sheetIds[0]}

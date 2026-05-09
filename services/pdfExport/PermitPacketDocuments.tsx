@@ -2005,3 +2005,249 @@ export const NEC22087NarrativePage: React.FC<NEC22087NarrativePageProps> = ({
   );
 };
 
+// ============================================================================
+// AVAILABLE FAULT CURRENT CALCULATION (Sprint 2A H9)
+// ============================================================================
+// Required by Orlando's "EV Charging Station Permit Checklist" item #5
+// (new-service path): "arc fault current calculation, showing the available
+// fault current at the service main breaker(s)." Drives the AIC sizing per
+// NEC 110.9 + NEC 110.10 — equipment AIC must meet or exceed the available
+// fault current at every point in the system.
+//
+// Pulls values from a service-level entry in `data.shortCircuitCalculations`
+// (calculation_type === 'service'). When no service-level calc exists the
+// section toggle auto-disables in the UI; the page is never rendered with
+// missing values.
+//
+// Distinct from the existing per-panel ShortCircuitPages — this page is the
+// service-main summary AHJs cite. The per-panel sheets remain for downstream
+// equipment AIC verification.
+
+interface ShortCircuitResultsBlock {
+  faultCurrent?: number;
+  requiredAIC?: number;
+  details?: {
+    sourceFaultCurrent?: number;
+    conductorImpedance?: number;
+    totalImpedance?: number;
+    faultCurrentAtPoint?: number;
+    safetyFactor?: number;
+  };
+  compliance?: {
+    compliant?: boolean;
+    necArticle?: string;
+    message?: string;
+  };
+}
+
+export interface AvailableFaultCurrentInput {
+  /** Service ampacity rating (A). */
+  serviceAmps: number | null;
+  /** Service voltage (V) — typically 240 (1Φ) or 208/480 (3Φ). */
+  serviceVoltage: number | null;
+  /** Service phase: 1 or 3. */
+  servicePhase: number | null;
+  /** Source utility-side fault current (A) — from utility coordination data. */
+  sourceFaultCurrent: number | null;
+  /** Utility transformer rating (kVA) used as the source assumption. */
+  transformerKVA: number | null;
+  /** Transformer impedance (% Z). */
+  transformerImpedance: number | null;
+  /** Service conductor size (e.g., "500 kcmil"). */
+  serviceConductorSize: string | null;
+  /** Service conductor material ('Cu' or 'Al'). */
+  serviceConductorMaterial: string | null;
+  /** Service conductor length (ft). */
+  serviceConductorLength: number | null;
+  /** Calculated short-circuit result block from `services/calculations/shortCircuit.ts`. */
+  results: ShortCircuitResultsBlock | null;
+  /** Free-text notes from the calc (utility data source, assumptions). */
+  notes?: string | null;
+}
+
+interface AvailableFaultCurrentPageProps {
+  projectName: string;
+  projectAddress?: string;
+  input: AvailableFaultCurrentInput;
+  contractorName?: string;
+  contractorLicense?: string;
+  sheetId?: string;
+}
+
+const fmtAmps = (a: number | undefined | null): string => {
+  if (a === undefined || a === null || !Number.isFinite(a)) return '—';
+  if (a >= 1000) return `${(a / 1000).toFixed(2)} kA`;
+  return `${Math.round(a).toLocaleString()} A`;
+};
+
+export const AvailableFaultCurrentPage: React.FC<AvailableFaultCurrentPageProps> = ({
+  projectName,
+  projectAddress,
+  input,
+  contractorName,
+  contractorLicense,
+  sheetId,
+}) => {
+  const r = input.results ?? {};
+  const calculatedFaultA = r.faultCurrent ?? r.details?.faultCurrentAtPoint ?? null;
+  const requiredAIC = r.requiredAIC ?? null;
+  const sourceFaultA = input.sourceFaultCurrent ?? r.details?.sourceFaultCurrent ?? null;
+  const compliant = r.compliance?.compliant ?? null;
+
+  return (
+    <Page size="LETTER" style={themeStyles.page}>
+      <BrandBar pageLabel="AVAILABLE FAULT CURRENT" sheetId={sheetId} />
+
+      <View style={themeStyles.titleBlock}>
+        <Text style={themeStyles.docTitle}>Available Fault Current Calculation</Text>
+        <Text style={themeStyles.docSubtitle}>
+          {`${projectName}${projectAddress ? ` • ${projectAddress}` : ''} • Service Main • IEEE 141 / NEC 110.9, 110.10`}
+        </Text>
+      </View>
+
+      {/* Headline cards: input, output, AIC */}
+      <View style={themeStyles.summaryRow}>
+        <View style={themeStyles.summaryCard}>
+          <Text style={themeStyles.summaryLabel}>Service Rating</Text>
+          <Text style={themeStyles.summaryValue}>
+            {input.serviceAmps ?? '—'}
+            <Text style={themeStyles.summaryUnit}>A</Text>
+          </Text>
+          <Text style={themeStyles.summarySub}>
+            {`${input.serviceVoltage ?? '—'}V ${input.servicePhase ? phaseLabel(input.servicePhase) : ''}`}
+          </Text>
+        </View>
+        <View style={themeStyles.summaryCard}>
+          <Text style={themeStyles.summaryLabel}>Source Fault Current</Text>
+          <Text style={themeStyles.summaryValue}>{fmtAmps(sourceFaultA)}</Text>
+          <Text style={themeStyles.summarySub}>at utility transformer secondary</Text>
+        </View>
+        <View style={themeStyles.summaryCardHighlight}>
+          <Text style={themeStyles.summaryLabel}>Available at Service Main</Text>
+          <Text style={themeStyles.summaryValue}>{fmtAmps(calculatedFaultA)}</Text>
+          <Text style={themeStyles.summarySub}>after service-conductor impedance</Text>
+        </View>
+        <View style={themeStyles.summaryCard}>
+          <Text style={themeStyles.summaryLabel}>Min Required AIC</Text>
+          <Text style={themeStyles.summaryValue}>
+            {requiredAIC ?? '—'}
+            <Text style={themeStyles.summaryUnit}>kA</Text>
+          </Text>
+          <Text style={themeStyles.summarySub}>NEC 110.9 / 110.10</Text>
+        </View>
+      </View>
+
+      {/* Source / utility-side assumptions */}
+      <View wrap={false}>
+        <Text style={themeStyles.sectionTitle}>SOURCE ASSUMPTIONS</Text>
+        <View style={themeStyles.projectGrid}>
+          <View style={themeStyles.projectCell}>
+            <Text style={themeStyles.projectLabel}>Utility Transformer</Text>
+            <Text style={themeStyles.projectValue}>
+              {input.transformerKVA ? `${input.transformerKVA} kVA` : '— estimated —'}
+            </Text>
+          </View>
+          <View style={themeStyles.projectCell}>
+            <Text style={themeStyles.projectLabel}>Transformer Impedance</Text>
+            <Text style={themeStyles.projectValue}>
+              {input.transformerImpedance ? `${input.transformerImpedance}% Z` : '—'}
+            </Text>
+          </View>
+          <View style={themeStyles.projectCell}>
+            <Text style={themeStyles.projectLabel}>Service Conductor</Text>
+            <Text style={themeStyles.projectValue}>
+              {input.serviceConductorSize
+                ? `${input.serviceConductorSize}${input.serviceConductorMaterial ? ` ${input.serviceConductorMaterial}` : ''}`
+                : '—'}
+            </Text>
+          </View>
+          <View style={themeStyles.projectCell}>
+            <Text style={themeStyles.projectLabel}>Conductor Length</Text>
+            <Text style={themeStyles.projectValue}>
+              {input.serviceConductorLength ? `${input.serviceConductorLength} ft` : '—'}
+            </Text>
+          </View>
+        </View>
+      </View>
+
+      {/* Calculation derivation */}
+      <View wrap={false}>
+        <Text style={themeStyles.sectionTitle}>CALCULATION DERIVATION (IEEE 141)</Text>
+        <View style={themeStyles.table}>
+          <View style={themeStyles.tableHeaderRow}>
+            <Text style={[themeStyles.th, { width: '50%' }]}>Component</Text>
+            <Text style={[themeStyles.th, { width: '50%' }]}>Value</Text>
+          </View>
+          <View style={themeStyles.tableRow}>
+            <Text style={[themeStyles.td, { width: '50%' }]}>Source fault current (utility transformer secondary)</Text>
+            <Text style={[themeStyles.td, { width: '50%' }]}>{fmtAmps(sourceFaultA)}</Text>
+          </View>
+          {r.details?.conductorImpedance !== undefined && r.details.conductorImpedance !== null && (
+            <View style={themeStyles.tableRowAlt}>
+              <Text style={[themeStyles.td, { width: '50%' }]}>Service-conductor impedance to main</Text>
+              <Text style={[themeStyles.td, { width: '50%' }]}>{r.details.conductorImpedance.toFixed(4)} ohms</Text>
+            </View>
+          )}
+          {r.details?.totalImpedance !== undefined && r.details.totalImpedance !== null && (
+            <View style={themeStyles.tableRow}>
+              <Text style={[themeStyles.td, { width: '50%' }]}>Total impedance to fault point</Text>
+              <Text style={[themeStyles.td, { width: '50%' }]}>{r.details.totalImpedance.toFixed(4)} ohms</Text>
+            </View>
+          )}
+          <View style={themeStyles.tableRowAlt}>
+            <Text style={[themeStyles.td, { width: '50%', fontFamily: 'Helvetica-Bold' }]}>Available fault current at service main</Text>
+            <Text style={[themeStyles.td, { width: '50%', fontFamily: 'Helvetica-Bold' }]}>{fmtAmps(calculatedFaultA)}</Text>
+          </View>
+          {r.details?.safetyFactor !== undefined && r.details.safetyFactor !== null && (
+            <View style={themeStyles.tableRow}>
+              <Text style={[themeStyles.td, { width: '50%' }]}>Safety factor applied</Text>
+              <Text style={[themeStyles.td, { width: '50%' }]}>{r.details.safetyFactor}x</Text>
+            </View>
+          )}
+          <View style={themeStyles.tableRowAlt}>
+            <Text style={[themeStyles.td, { width: '50%', fontFamily: 'Helvetica-Bold' }]}>Minimum required AIC rating</Text>
+            <Text style={[themeStyles.td, { width: '50%', fontFamily: 'Helvetica-Bold' }]}>
+              {requiredAIC !== null && requiredAIC !== undefined ? `${requiredAIC} kA` : '—'}
+            </Text>
+          </View>
+        </View>
+      </View>
+
+      {/* Verdict */}
+      <View
+        style={compliant === false ? themeStyles.warningBox : themeStyles.noteBox}
+        wrap={false}
+      >
+        <Text
+          style={{
+            fontSize: 9,
+            fontFamily: 'Helvetica-Bold',
+            marginBottom: 2,
+            color: compliant === false ? '#78350f' : '#1e3a8a',
+          }}
+        >
+          NEC 110.9 + 110.10 — INTERRUPTING RATING
+        </Text>
+        <Text style={compliant === false ? themeStyles.warningText : themeStyles.noteText}>
+          {compliant === false
+            ? `Equipment AIC ratings on the Equipment Specs sheet must equal or exceed the available fault current at every connection point. One or more devices in this packet do NOT meet that threshold and must be upsized or series-rated per NEC 240.86.`
+            : `All equipment installed under this permit shall have an interrupting rating equal to or greater than the available fault current at its line-side terminals (NEC 110.9). Equipment AIC ratings shown on the Equipment Specs sheet are confirmed against the value above.`}
+        </Text>
+      </View>
+
+      {input.notes && (
+        <View style={themeStyles.noteBox}>
+          <Text style={{ fontSize: 8.5, color: '#1e3a8a' }}>{`Notes: ${input.notes}`}</Text>
+        </View>
+      )}
+
+      <BrandFooter
+        projectName={projectName}
+        contractorName={contractorName}
+        contractorLicense={contractorLicense}
+        sheetId={sheetId}
+      />
+    </Page>
+  );
+};
+

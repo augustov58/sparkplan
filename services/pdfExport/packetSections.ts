@@ -30,6 +30,7 @@ export interface PacketSections {
   // Engineering content
   loadCalculation: boolean;
   nec22087Narrative: boolean;       // Sprint 2A H14 — existing-service NEC 220.87 conditions
+  availableFaultCurrent: boolean;   // Sprint 2A H9 — service-main available fault current calc
   voltageDrop: boolean;
   shortCircuit: boolean;
   arcFlash: boolean;
@@ -58,6 +59,7 @@ export const DEFAULT_SECTIONS: PacketSections = {
   revisionLog: true,
   loadCalculation: true,
   nec22087Narrative: true,
+  availableFaultCurrent: true,
   voltageDrop: true,
   shortCircuit: true,
   arcFlash: true,

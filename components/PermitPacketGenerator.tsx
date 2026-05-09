@@ -89,6 +89,12 @@ const SECTION_TOGGLE_CONFIG: SectionToggleConfig[] = [
     group: 'Engineering',
   },
   {
+    key: 'availableFaultCurrent',
+    label: 'Available Fault Current Calculation',
+    description: 'Service-main fault current (IEEE 141) — required by Orlando new-service path',
+    group: 'Engineering',
+  },
+  {
     key: 'voltageDrop',
     label: 'Voltage Drop Analysis',
     description: 'Per-feeder voltage drop per NEC Chapter 9 Table 9',
@@ -295,6 +301,10 @@ export const PermitPacketGenerator: React.FC<PermitPacketGeneratorProps> = ({ pr
         return (shortCircuitCalculations?.length ?? 0) === 0
           ? 'No short circuit calculations recorded'
           : undefined;
+      case 'availableFaultCurrent':
+        return (shortCircuitCalculations?.some(c => c.calculation_type === 'service') ?? false)
+          ? undefined
+          : 'No service-main short-circuit calculation recorded — run a service-level calc to enable';
       case 'arcFlash':
         // Arc flash data is not currently surfaced from a hook; the generator
         // only renders an Arc Flash page when `data.arcFlashData` is set,
