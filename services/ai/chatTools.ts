@@ -2018,19 +2018,24 @@ export function getTool(name: string): ChatTool | undefined {
 }
 
 /**
- * Execute a tool by name
+ * Execute a tool by name.
+ *
+ * Write tools (requiresConfirmation: true) return a confirmation request
+ * instead of executing — the UI must render an Apply/Cancel card and call
+ * back with `bypassConfirmation: true` once the user clicks Apply.
  */
 export async function executeTool(
   name: string,
   params: Record<string, unknown>,
-  context: ToolContext
+  context: ToolContext,
+  options: { bypassConfirmation?: boolean } = {},
 ): Promise<ToolResult> {
   const tool = getTool(name);
   if (!tool) {
     return { success: false, error: `Unknown tool: ${name}` };
   }
 
-  if (tool.requiresConfirmation) {
+  if (tool.requiresConfirmation && !options.bypassConfirmation) {
     return {
       success: true,
       data: {

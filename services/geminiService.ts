@@ -455,13 +455,22 @@ async function callGeminiProxyWithToolResult(
  * @param isFirstMessage - Whether this is the first message
  * @returns AI response string (after executing any necessary tools)
  */
+export interface AssistantResponse {
+  response: string;
+  toolUsed?: { name: string; result: unknown };
+  pendingAction?: {
+    toolName: string;
+    params: Record<string, unknown>;
+  };
+}
+
 export const askNecAssistantWithTools = async (
   question: string,
   conversationHistory: string,
   projectContext: ProjectContext,
   isFirstMessage: boolean = true,
   rawData?: AgenticRawData,
-): Promise<{ response: string; toolUsed?: { name: string; result: unknown } }> => {
+): Promise<AssistantResponse> => {
   // Build tool context
   const toolContext: ToolContext = {
     projectId: projectContext.projectId,
@@ -496,6 +505,20 @@ export const askNecAssistantWithTools = async (
     // Execute the tool
     const toolResult = await executeTool(name, args, toolContext);
 
+    // Write tool that needs explicit user click — short-circuit and surface a
+    // pendingAction to the UI. We deliberately do NOT round-trip Gemini here:
+    // the LLM tends to paraphrase the gate's "I cannot..." message into a
+    // refusal even after the user already typed "yes, do it", which is the
+    // confusing UX bug this branch fixes. The UI renders Apply/Cancel.
+    if (toolResult.success && (toolResult.data as any)?.requiresConfirmation) {
+      return {
+        response:
+          `Ready to ${name.replace(/_/g, ' ')}. Click **Apply** to proceed or **Cancel** to abort.`,
+        toolUsed: { name, result: toolResult },
+        pendingAction: { toolName: name, params: args },
+      };
+    }
+
     // Send tool result back to Gemini for natural language response
     const finalResponse = await callGeminiProxyWithToolResult(
       question,
@@ -512,6 +535,52 @@ export const askNecAssistantWithTools = async (
 
   // Direct response (no tool needed)
   return { response: initialResponse.response || "No response generated." };
+};
+
+/**
+ * Apply a previously gated write action after the user clicks the Apply button.
+ * Bypasses the requiresConfirmation gate and skips the Gemini round-trip — we
+ * synthesize a brief result message locally to keep the click-to-feedback loop
+ * fast (and to avoid the LLM's habit of refusing actions it just authorized).
+ */
+export const applyConfirmedAction = async (
+  toolName: string,
+  params: Record<string, unknown>,
+  projectContext: ProjectContext,
+  rawData?: AgenticRawData,
+): Promise<AssistantResponse> => {
+  const toolContext: ToolContext = {
+    projectId: projectContext.projectId,
+    projectContext,
+    rawPanels: rawData?.panels,
+    rawCircuits: rawData?.circuits,
+    rawFeeders: rawData?.feeders,
+    rawTransformers: rawData?.transformers,
+  };
+
+  const result = await executeTool(toolName, params, toolContext, {
+    bypassConfirmation: true,
+  });
+
+  const verb = toolName.replace(/_/g, ' ');
+  if (!result.success) {
+    return {
+      response: `Failed to ${verb}: ${result.error || 'unknown error'}`,
+      toolUsed: { name: toolName, result },
+    };
+  }
+
+  // Many tools include a human-readable summary on success; surface it.
+  const data: any = result.data ?? {};
+  const summary =
+    data.message ||
+    data.summary ||
+    data.description ||
+    `Completed ${verb}.`;
+  return {
+    response: `Done — ${summary}`,
+    toolUsed: { name: toolName, result },
+  };
 };
 
 /**
