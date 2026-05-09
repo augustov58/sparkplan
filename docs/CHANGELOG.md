@@ -4,13 +4,18 @@ All notable changes to SparkPlan.
 
 ---
 
-## 2026-05-09: Permits Beta v1 — Phase 1 implementation plan (PR #30, planning doc only)
+## 2026-05-09: All three contractor-beta implementation plans (PR #30, planning docs only)
 
-Self-contained planning artifact for the next implementation cycle. **No code, no schema, no behavior change** — just a 623-line markdown plan in `docs/plans/permits-implementation.md` written for handoff to a fresh Claude context after `/clear`.
+Self-contained planning artifacts for the three Phase-1 implementations behind the contractor-pivot beta sidebar entries shipped in PR #29. **No code, no schema, no behavior change** — three markdown plans + an index, written for handoff to a fresh Claude context after `/clear`.
 
-The plan covers Phase 1 of the Permits feature (the highest-leverage of the three contractor-pivot betas from PR #29's demand-discovery): tabbed page (Overview / Permits / Inspections / Issues), `permits` + `permit_inspections` tables with RLS, status-transition state machine, expiration warnings, redirect of `/issues` → `/permits?tab=issues`, integration of existing `IssuesLog` UI as the Issues tab.
+| Plan | LOC estimate | Pain rank | Phase |
+|---|---|---|---|
+| [`docs/plans/permits-implementation.md`](../docs/plans/permits-implementation.md) | ~1,800 | #2 (HIGH) | 3.6 |
+| [`docs/plans/estimating-implementation.md`](../docs/plans/estimating-implementation.md) | ~3,300 | #1 (CRITICAL) | 3.7 |
+| [`docs/plans/tm-billing-implementation.md`](../docs/plans/tm-billing-implementation.md) | ~4,900 | #3 (HIGH) | 3.8 |
+| [`docs/plans/README.md`](../docs/plans/README.md) | — | — | Index + shared conventions |
 
-Phases 2-4 (AHJ contact integration, scheduling, AI tools, portal scraping) are referenced for context but explicitly deferred. See ROADMAP Phase 3.6.
+Each plan covers Phase 1 (MVP) only. Phases 2-4 per feature are referenced for context but explicitly deferred. Recommended implementation order: **Permits → Estimating → T&M Billing** (smallest-scope first; ships faster, informs the others, lowest financial-precision risk early in the cadence).
 
 ---
 

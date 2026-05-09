@@ -1,28 +1,29 @@
 # SparkPlan - Roadmap
 
-## Current Phase: 3.6 (Permits Beta v1) - PLANNING (May 2026)
+## Current Phase: 3.6 / 3.7 / 3.8 (Contractor Beta Implementations) - PLANNING (May 2026)
 
 ## Latest Completed Phase: 3.5 (Contractor Pivot — Sidebar Betas + Chatbot Restoration) - May 2026
 ## Active Sprint: 3.4 (AHJ Compliance Audit Sprint 2A) - 2 PRs merged, 3 still planned
 
 ---
 
-## Phase 3.6: Permits Beta v1 - PLANNING (May 2026)
+## Phase 3.6 / 3.7 / 3.8: Contractor Beta Implementations - PLANNING (May 2026)
 
-First contractor-pivot beta selected for actual implementation. Phase 3.5's demand-discovery stubs identified Permits as the highest-leverage entry point because it absorbs the existing `Inspection & Issues` page (already built in Phase 0) and adds a permit-submission lifecycle on top — fastest path from beta stub to a real shipped feature.
+Phase 3.5's demand-discovery stubs (Estimating / Permits / T&M Billing) are now backed by detailed implementation plans. Each plan is a self-contained handoff doc designed for fresh-Claude context after `/clear`.
 
-| Phase | Scope | Status |
-|---|---|---|
-| **Phase 1 (MVP)** | Tabbed Permits page (Overview / Permits / Inspections / Issues). New `permits` + `permit_inspections` tables. Permit + inspection CRUD with status-transition state machine. Existing `IssuesLog` UI relocated as Issues tab. Redirect `/issues` → `/permits?tab=issues`. Manual permit-status updates. | 📋 Planned (PR #30 — handoff doc) |
-| **Phase 2** | AHJ contact integration (auto-populate from FL pilot AHJ database). Inspection scheduling via existing `CalendarView`. Expiration warnings (banner ≤30 days). Corrections-to-issue linkage in UI. | ⏳ Pending |
-| **Phase 3** | AI assistance — chatbot tools `update_permit_status`, `schedule_inspection`, `summarize_corrections`. Auto-link generated permit packets to permits. Email notifications for status changes. | ⏳ Pending |
-| **Phase 4** | AHJ portal scraping per-AHJ (Orange County, Miami-Dade, Pompano Beach). Automated status syncing. | ⏳ Pending |
+| Phase | Feature | Pain rank | Plan | LOC | Status |
+|---|---|---|---|---|---|
+| **3.6** | **Permits** | #2 (HIGH) | [`docs/plans/permits-implementation.md`](docs/plans/permits-implementation.md) | ~1,800 | 📋 Planned — recommended FIRST (smallest scope, absorbs `IssuesLog`) |
+| **3.7** | **Estimating** | **#1 (CRITICAL)** | [`docs/plans/estimating-implementation.md`](docs/plans/estimating-implementation.md) | ~3,300 | 📋 Planned — auto-takeoff from project model is the differentiator vs IntelliBid/Accubid |
+| **3.8** | **T&M Billing** | #3 (HIGH) | [`docs/plans/tm-billing-implementation.md`](docs/plans/tm-billing-implementation.md) | ~4,900 | 📋 Planned — biggest scope; consider Phase 1a + 1b split |
 
-**Implementation handoff doc**: [`docs/plans/permits-implementation.md`](docs/plans/permits-implementation.md) — 623-line self-contained plan written for handoff to a fresh Claude context after `/clear`. Includes: phase split, full data model with RLS + indexes, file tree, ASCII UI mockups, status-transition state machine, expiration thresholds, validation schemas, test plan, file-by-file implementation order, 9 decisions to confirm, 10 out-of-scope items, 16-point Definition of Done.
+**Plans index + shared conventions**: [`docs/plans/README.md`](docs/plans/README.md). Tier gating is already done across all three (PR #29 — `'permits'`, `'estimating'`, `'tm-billing'` in `FEATURE_TIERS` as `['business', 'enterprise']`; trial users covered via `effectivePlan`).
 
-**Tier gating**: Already done in Phase 3.5 (PR #29). `permits` is in `FEATURE_TIERS` as `['business', 'enterprise']`. Trial users get access automatically via `effectivePlan` when `status === 'trialing'`. No tier work needed during implementation.
+**Recommended implementation order**: Permits → Estimating → T&M Billing.
 
-**Estimated PR size**: ~1,800 LOC across 3-4 commits for Phase 1.
+**Why not pain-rank order**: Permits absorbs already-built code (`IssuesLog`), has the smallest data model (2 tables), and ships in the smallest PR (~1,800 LOC). Faster to ship = faster to learn. T&M Billing has financial-precision risk + 5 new tables — that's the worst spot to be early in the cadence.
+
+Each plan covers Phase 1 (MVP) only. Phases 2-4 (per-feature) are referenced for context but explicitly deferred.
 
 ---
 

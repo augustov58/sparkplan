@@ -17,7 +17,12 @@
 - ✅ **PR #27** MERGED 13:35 UTC — Inspector accuracy fixes (3 issues) + slot visibility on the panel header. Branch `fix/inspector-panel-cap-and-branch-conductor`. Details below.
 - ✅ **PR #28** MERGED 14:07 UTC — restores chatbot write-tool functionality. Root cause traced to commit `3490c68` (PR #13, 2026-04-24 security/correctness audit) which added the `requiresConfirmation` server-side gate without shipping the matching UI. Five write tools (`add_circuit`, `add_panel`, `fill_panel_with_test_loads`, `empty_panel`, `fill_with_spares`) had been completely unreachable for ~2 weeks. Fix: `executeTool` gains `bypassConfirmation` option, `askNecAssistantWithTools` short-circuits on confirmation results without round-tripping Gemini, new `applyConfirmedAction` export, App.tsx renders Apply/Cancel inline.
 - ✅ **PR #29** MERGED 2026-05-09 — sidebar contractor pivot. Dropped Site Visits + RFI Tracking from the Project Management section (engineer-flavored). Added three (beta) stubs based on validated market research (small electrical shops $1M-$10M): Estimating, Permits (absorbs the inspection/issues lifecycle), T&M Billing. **All three gated to Business + Enterprise** (commit `0c4a742` after initial review — restored Pro/Business pricing distinction; trial users get access automatically via `effectivePlan`). New `feature_interest` table captures one-line demand notes. Existing routes (`/issues`, `/rfis`, `/site-visits`) preserved server-side for direct-link compatibility.
-- 🟡 **PR #30** open — Permits implementation plan handoff doc. 623-line self-contained markdown plan at `docs/plans/permits-implementation.md` for the next session's build of Permits Beta v1. Phase 1 only (MVP); Phases 2-4 referenced but deferred. Includes data model, file tree, status-transition state machine, expiration thresholds, validation schemas, test plan, file-by-file implementation order. Hand-off prompt: *"Implement the Permits feature per `docs/plans/permits-implementation.md`. Phase 1 only. Branch off main."*
+- 🟡 **PR #30** open — All three contractor-beta implementation plans. Self-contained markdown handoff docs (one per beta) plus an index. Each is written for fresh-Claude context after `/clear`. Phase 1 (MVP) only; Phases 2-4 per feature referenced but deferred.
+  - `docs/plans/permits-implementation.md` (~1,800 LOC, Phase 3.6) — recommended FIRST
+  - `docs/plans/estimating-implementation.md` (~3,300 LOC, Phase 3.7) — top user-pain ranking
+  - `docs/plans/tm-billing-implementation.md` (~4,900 LOC, Phase 3.8) — biggest scope; consider 1a + 1b split
+  - `docs/plans/README.md` — index + shared conventions across all three
+  - Hand-off prompt: *"Implement the **<feature>** feature per `docs/plans/<feature>-implementation.md`. Phase 1 only. Branch off main as `feat/<feature>-beta-v1`."*
 
 **PR #27 Inspector fixes (detail)**:
 
@@ -59,9 +64,9 @@
 - **#27** (merged 13:35 UTC) — Inspector accuracy + slot visibility (5 fixes)
 - **#28** (merged 14:07 UTC) — confirmation card UI restoration (broken since #13)
 - **#29** (merged) — sidebar contractor pivot + 3 beta stubs + `feature_interest` migration + Business+ tier gating
-- **#30** (open) — Permits implementation plan handoff doc (`docs/plans/permits-implementation.md`)
+- **#30** (open) — All three contractor-beta implementation plans (`docs/plans/permits|estimating|tm-billing-implementation.md` + `README.md`)
 
-**Next phase**: Phase 3.6 — Permits Beta v1 build. Plan doc complete; awaits a fresh-context implementation session per the handoff prompt.
+**Next phase**: Phase 3.6 — Permits Beta v1 build (recommended first). Plans for all three are complete; each awaits a fresh-context implementation session per the handoff prompts.
 
 ---
 
