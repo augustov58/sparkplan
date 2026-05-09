@@ -768,7 +768,7 @@ export const OneLineDiagram: React.FC<OneLineDiagramProps> = ({ project, updateP
       if (cum && cum.cumulativePercent > 0) {
         const cumPct = cum.cumulativePercent;
         const cumColor = cumPct > 5 ? '#DC2626' : cumPct > 3 ? '#D97706' : '#059669';
-        const label = cum.crossesTransformer ? `Cum* ${cumPct.toFixed(2)}%` : `Cum ${cumPct.toFixed(2)}%`;
+        const label = cum.crossesTransformer ? `VD+* ${cumPct.toFixed(2)}%` : `VD+ ${cumPct.toFixed(2)}%`;
         lines.push({ text: label, fontSize: 6.5, color: cumColor, bold: true });
       }
     }

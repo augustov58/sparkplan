@@ -652,7 +652,7 @@ const buildPanelSubtree = (
   const baseLine3 = panel.main_breaker_amps ? `${panel.main_breaker_amps}A Main` : 'MLO';
   const cum = cumulativeVd?.get(panel.id);
   const line3 = typeof cum === 'number' && cum > 0
-    ? `${baseLine3} \u2022 \u03a3 ${cum.toFixed(2)}%`  // \u03a3 = cumulative VD from voltage source
+    ? `${baseLine3} \u2022 VD+ ${cum.toFixed(2)}%`  // VD+ = cumulative voltage drop from voltage source (resets at transformers)
     : baseLine3;
 
   const node: RiserNode = {

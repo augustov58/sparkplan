@@ -102,7 +102,7 @@ const styles = StyleSheet.create({
   col5: { width: '9%' },  // Current
   col6: { width: '8%' },  // VD Volts
   col7: { width: '9%' },  // VD %
-  col8: { width: '9%' },  // Cum VD %  ← new (chain total at destination)
+  col8: { width: '9%' },  // VD+ %  ← new (chain total at destination)
   col9: { width: '19%' }, // Compliance
   cellCenter: {
     textAlign: 'center',
@@ -224,7 +224,7 @@ interface FeederVoltageDropData {
   toName: string;
   calculation: FeederCalculationResult;
   cumulativeVdPercent: number | null;          // chain total at destination panel (null for transformer destinations)
-  cumulativeCrossesTransformer: boolean;        // flag a 'Cum*' label when chain hits a reset boundary
+  cumulativeCrossesTransformer: boolean;        // flag a 'VD+*' label when chain hits a reset boundary
 }
 
 // ============================================================================
@@ -485,7 +485,7 @@ const VoltageDropTable: React.FC<{ feederData: FeederVoltageDropData[] }> = ({ f
         <Text style={[styles.col5, styles.cellCenter]}>Current</Text>
         <Text style={[styles.col6, styles.cellCenter]}>VD (V)</Text>
         <Text style={[styles.col7, styles.cellCenter]}>VD (%)</Text>
-        <Text style={[styles.col8, styles.cellCenter]}>Cum (%)</Text>
+        <Text style={[styles.col8, styles.cellCenter]}>VD+ (%)</Text>
         <Text style={[styles.col9, styles.cellCenter]}>Compliance</Text>
       </View>
 

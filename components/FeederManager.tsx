@@ -1264,7 +1264,7 @@ interface FeederCardProps {
     message: string;
   };
   cumulativeVdPercent: number | null;          // chain total at destination panel
-  cumulativeCrossesTransformer: boolean;       // true → label as 'Cum*' to flag the reset boundary
+  cumulativeCrossesTransformer: boolean;       // true → label as 'VD+*' to flag the reset boundary
 }
 
 const FeederCard: React.FC<FeederCardProps> = ({
@@ -1413,7 +1413,7 @@ const FeederCard: React.FC<FeederCardProps> = ({
               const cumOver5 = cumulativeVdPercent > 5;
               const cumOver3 = cumulativeVdPercent > 3;
               const cumColor = cumOver5 ? 'text-red-700' : cumOver3 ? 'text-amber-700' : 'text-green-700';
-              const label = cumulativeCrossesTransformer ? 'Cum*' : 'Cum';
+              const label = cumulativeCrossesTransformer ? 'VD+*' : 'VD+';
               return (
                 <span className={`font-medium ${cumColor}`} title={cumulativeCrossesTransformer ? 'Cumulative resets at transformer; this total spans only the current voltage segment.' : 'Cumulative VD from service to this panel.'}>
                   • {label}: {cumulativeVdPercent.toFixed(2)}%
