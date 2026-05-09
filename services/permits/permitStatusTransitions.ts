@@ -26,6 +26,39 @@ export const PERMIT_STATUSES = [
 
 export type PermitStatus = (typeof PERMIT_STATUSES)[number];
 
+export const PERMIT_TYPES = [
+  'electrical',
+  'evse',
+  'low_voltage',
+  'service_upgrade',
+  'other',
+] as const;
+
+export type PermitType = (typeof PERMIT_TYPES)[number];
+
+export const INSPECTION_TYPES = [
+  'rough_in',
+  'underground',
+  'service',
+  'final',
+  'temporary',
+  'reinspection',
+  'other',
+] as const;
+
+export type InspectionType = (typeof INSPECTION_TYPES)[number];
+
+export const INSPECTION_STATUSES = [
+  'scheduled',
+  'passed',
+  'failed',
+  'conditional_pass',
+  'cancelled',
+  'no_show',
+] as const;
+
+export type InspectionStatus = (typeof INSPECTION_STATUSES)[number];
+
 const TRANSITIONS: Record<PermitStatus, PermitStatus[]> = {
   draft: ['submitted', 'cancelled'],
   submitted: ['in_review', 'returned', 'approved', 'cancelled'],
