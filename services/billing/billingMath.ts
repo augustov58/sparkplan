@@ -193,6 +193,33 @@ export function computeTaxAmount(taxableSubtotal: number, taxPct: number): numbe
 }
 
 // ---------------------------------------------------------------------------
+// Invoice / payment math (Phase 1b)
+// ---------------------------------------------------------------------------
+
+export type Payment = Database['public']['Tables']['payments']['Row'];
+
+/**
+ * Sum of payments. Safe against null/NaN amounts. Result rounded to cents.
+ */
+export function sumPayments(payments: ReadonlyArray<Pick<Payment, 'amount'>>): number {
+  let total = 0;
+  for (const p of payments) total += safeNum(p.amount);
+  return roundCurrency(total);
+}
+
+/**
+ * Balance due = invoice.total - sum(payments). Floored at 0 (no negative
+ * balance shown to users; refunds are Phase 4).
+ */
+export function computeBalanceDue(
+  invoiceTotal: number,
+  payments: ReadonlyArray<Pick<Payment, 'amount'>>,
+): number {
+  const paid = sumPayments(payments);
+  return roundCurrency(Math.max(0, safeNum(invoiceTotal) - paid));
+}
+
+// ---------------------------------------------------------------------------
 // Profit / margin (overview surface)
 // ---------------------------------------------------------------------------
 

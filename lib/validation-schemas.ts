@@ -532,6 +532,39 @@ export const projectBillingSettingsSchema = z.object({
 export type ProjectBillingSettingsFormData = z.infer<typeof projectBillingSettingsSchema>;
 
 // ============================================
+// T&M Billing — Phase 1b (invoices + payments)
+// ============================================
+
+export const generateInvoiceSchema = z.object({
+  period_start: z.string().regex(ISO_DATE, 'Date must be YYYY-MM-DD'),
+  period_end: z.string().regex(ISO_DATE, 'Date must be YYYY-MM-DD'),
+  invoice_number: z.string()
+    .min(1, 'Invoice number is required')
+    .max(50, 'Invoice number must be under 50 characters'),
+  invoice_date: z.string().regex(ISO_DATE),
+  due_date: z.string().regex(ISO_DATE).optional().nullable(),
+  description: z.string().max(300).optional().nullable(),
+  notes: z.string().max(2000).optional().nullable(),
+  mark_sent: z.boolean(),
+}).refine(
+  (data) => data.period_end >= data.period_start,
+  { message: 'Period end must be on or after period start', path: ['period_end'] },
+);
+export type GenerateInvoiceFormData = z.infer<typeof generateInvoiceSchema>;
+
+const PAYMENT_METHODS = ['check', 'ach', 'wire', 'cash', 'other'] as const;
+export const paymentSchema = z.object({
+  amount: z.number()
+    .positive('Amount must be greater than 0')
+    .max(10_000_000, 'Amount unrealistically large'),
+  payment_date: z.string().regex(ISO_DATE, 'Date must be YYYY-MM-DD'),
+  payment_method: z.enum(PAYMENT_METHODS).optional().nullable(),
+  reference: z.string().max(100, 'Reference must be under 100 characters').optional().nullable(),
+  notes: z.string().max(1000).optional().nullable(),
+});
+export type PaymentFormData = z.infer<typeof paymentSchema>;
+
+// ============================================
 // Estimate Schemas (advisory — see plan §5)
 // ============================================
 //

@@ -837,6 +837,120 @@ Indexes: `(estimate_id, position)`, `(estimate_id, category)`, `(user_id)`. RLS:
 
 ---
 
+### `project_billing_settings` / `time_entries` / `material_entries` / `invoices` / `payments` Tables (Phase 3.8 — T&M Billing Beta v1)
+
+Migrations: `20260512_tm_billing_phase1a.sql` (settings + time + material entries) and `20260513_tm_billing_phase1b.sql` (invoices + payments + FK retrofit + RPC + trigger). Both applied via Supabase MCP. Tier-gated to Business/Enterprise (`FEATURE_TIERS.tm-billing`).
+
+**`project_billing_settings`** — singleton-per-project rate / customer config. Drives invoice generation defaults.
+
+```
+project_id               UUID PK, FK -> projects(id), CASCADE
+user_id                  FK -> auth.users(id), CASCADE
+default_billable_rate    NUMERIC(8,2), nullable
+default_cost_rate        NUMERIC(8,2), nullable (small shops not always tracking)
+default_material_markup_pct  NUMERIC(5,2), default 20.00, CHECK 0-200
+tax_pct                  NUMERIC(5,2), default 0, CHECK 0-100
+payment_terms_days       INT, default 30, CHECK 0-365
+invoice_prefix           TEXT, nullable
+next_invoice_number      INT, default 1, CHECK > 0
+customer_name, customer_email, customer_address, customer_po_number  TEXT (snapshot)
+created_at, updated_at  TIMESTAMPTZ
+```
+
+Trigger: `update_billing_updated_at()` (shared across all 5 T&M tables — per-table convention; the project does not ship a global `set_updated_at()`).
+
+**`time_entries`** — daily labor log. One row per (worker, day, cost code). Rates snapshotted at entry time; back-dated rate changes don't mutate already-logged history.
+
+```
+id, project_id (CASCADE), user_id (CASCADE)
+worker_name TEXT NOT NULL
+work_date DATE NOT NULL
+hours NUMERIC(6,2) NOT NULL, CHECK > 0 AND <= 24
+description TEXT, cost_code TEXT (free-text in Phase 1; lookup table = Phase 2)
+billable_rate NUMERIC(8,2) NOT NULL, CHECK >= 0
+cost_rate NUMERIC(8,2), nullable, CHECK >= 0
+billable_amount, cost_amount  NUMERIC(12,2), denormalized
+invoice_id UUID, FK -> invoices(id) ON DELETE SET NULL  (added in 1b migration)
+```
+
+Indexes: `(project_id, work_date DESC)`, partial `(project_id) WHERE invoice_id IS NULL` for unbilled queries, `(invoice_id) WHERE invoice_id IS NOT NULL`. Standard RLS.
+
+**`material_entries`** — installed materials per line. Markup capped at 200% (matches DB CHECK and form validation).
+
+```
+id, project_id (CASCADE), user_id (CASCADE)
+installed_date DATE NOT NULL
+description TEXT NOT NULL, cost_code TEXT
+quantity NUMERIC(12,3) NOT NULL, CHECK > 0
+unit TEXT
+invoice_unit_cost NUMERIC(10,4) NOT NULL  (supplier cost)
+markup_pct NUMERIC(5,2), default 20.00, CHECK 0-200
+billing_unit_price NUMERIC(10,4) NOT NULL  (computed; what customer sees)
+taxable BOOLEAN, default TRUE
+billing_amount, cost_amount  NUMERIC(12,2), denormalized
+receipt_url TEXT, supplier_name TEXT, supplier_invoice_number TEXT
+invoice_id UUID, FK -> invoices(id) ON DELETE SET NULL  (added in 1b migration)
+```
+
+Indexes mirror `time_entries`: by project+date, partial unbilled, by invoice. Standard RLS.
+
+**`invoices`** — invoice header. Customer info snapshotted at issuance (changes to `project_billing_settings.customer_*` after the fact don't mutate already-issued invoices).
+
+```
+id, project_id (CASCADE), user_id (CASCADE)
+invoice_number TEXT NOT NULL, UNIQUE(user_id, invoice_number)
+description TEXT
+period_start, period_end DATE NOT NULL  (CHECK end >= start)
+invoice_date DATE NOT NULL DEFAULT CURRENT_DATE
+due_date DATE
+status TEXT NOT NULL DEFAULT 'draft'
+       CHECK in ('draft','sent','partial_paid','paid','overdue','cancelled')
+sent_at, paid_at  TIMESTAMPTZ
+subtotal_labor, subtotal_materials, subtotal, tax_amount, total
+paid_amount, balance_due
+       all NUMERIC(12,2), nonneg
+       CHECK paid_amount <= total + 0.01  (a $0.01 floating-point grace)
+customer_name, customer_email, customer_address, customer_po_number  (frozen snapshot)
+notes, internal_notes TEXT
+invoice_pdf_url, invoice_pdf_generated_at
+```
+
+Indexes: unique `(user_id, invoice_number)` (per-user sequencing matches industry convention — contractor's invoices are sequential across all jobs), `(project_id, invoice_date DESC)`, partial `(status, due_date) WHERE status IN ('sent','partial_paid')` for overdue queries. Standard RLS.
+
+**`payments`** — manual payment records (Phase 4 will add Stripe payment-intent integration).
+
+```
+id, invoice_id (CASCADE), user_id (CASCADE)
+amount NUMERIC(12,2) NOT NULL, CHECK > 0
+payment_date DATE NOT NULL DEFAULT CURRENT_DATE
+payment_method TEXT, CHECK in ('check','ach','wire','cash','other')
+reference TEXT (check #, transaction ID)
+notes TEXT
+created_at TIMESTAMPTZ
+```
+
+Index `(invoice_id, payment_date DESC)`. Standard RLS.
+
+**Server-side helpers**:
+
+- **Trigger `sync_invoice_paid_totals()`** — fires AFTER INSERT/UPDATE/DELETE on `payments`, recomputes parent invoice's `paid_amount` (= sum of payments) + `balance_due` (= total − paid_amount), and auto-flips status:
+  - `new_paid >= total - 0.01` → status = `paid`, `paid_at = NOW()`
+  - `new_paid > 0` → status = `partial_paid` (unless already `overdue`, which is preserved)
+  - `new_paid == 0` → status reverts from `paid` to `sent` (handles payment deletions)
+  - Status auto-transitions only fire when invoice is in a *payable* state (`sent`, `partial_paid`, `paid`, `overdue`). Drafts and cancelled invoices stay put even if payments are recorded against them.
+
+- **RPC `generate_invoice_atomic(...)`** — `SECURITY DEFINER`. Single-transaction flow: insert the invoice row, link the picked unbilled time/material entries to it (`UPDATE WHERE id = ANY(...) AND invoice_id IS NULL`), bump `next_invoice_number` on `project_billing_settings`. Authorized via explicit `auth.uid()` check + per-row `WHERE user_id = v_user` predicates. Granted to `authenticated`. Caller computes subtotals client-side via `services/billing/billingMath.ts` and passes them in; the function does no math, only atomic writes.
+
+**Design decisions**:
+
+- **No `invoice_line_items` table.** Time and material entries link directly to invoices via their `invoice_id` columns. Saves a join + denormalization at the cost of needing two SELECTs to render an invoice's lines (one for time, one for materials). Acceptable; invoices typically have <100 entries.
+- **Money precision**: NUMERIC(12,2) in DB; plain `number` in TS; explicit half-up rounding via `roundCurrency` at output boundaries (epsilon-bumped to defeat the IEEE-754 `Math.round(1.005*100) === 100` trap). `paid_amount <= total + 0.01` CHECK gives a $0.01 grace for any path that bypasses the helper.
+- **Per-table trigger function** (`update_billing_updated_at`) instead of a global helper. Matches existing project convention; every prior migration defines its own per-table trigger function.
+- **Atomic invoice generation via RPC, not multi-statement client logic.** Two failure modes the RPC prevents: (a) invoice row created but line entries not linked, leaving an empty invoice with stranded unbilled rows; (b) line entries linked but invoice insert failed, stranding rows pointing at a non-existent invoice. The RPC's transaction boundary closes both gaps.
+- **Stripe is Phase 4, not Phase 1.** Manual payments (check / ACH / wire / cash / other) cover the immediate contractor workflow. Stripe integration adds payment-intent creation, webhook handling, and refunds — too much surface area for Phase 1.
+
+---
+
 ## Table Relationships
 
 ### Cascading Delete Behavior
