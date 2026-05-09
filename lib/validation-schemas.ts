@@ -434,3 +434,100 @@ export const feederSchema = z.object({
 );
 
 export type FeederFormData = z.infer<typeof feederSchema>;
+
+// ============================================
+// T&M Billing — Phase 1a (advisory; never hard-block drafts)
+// ============================================
+// Per CLAUDE.md "validation advisory not blocking": these schemas constrain
+// form input shape but downstream save logic should treat parse failures as
+// warnings, not gates, when the user is saving an explicit draft.
+
+const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
+
+/**
+ * Time entry form schema. Hours capped at 24 (single-day max). Rates non-negative.
+ * `cost_rate` left optional — small shops may not track payroll cost in v1.
+ */
+export const timeEntrySchema = z.object({
+  worker_name: z.string()
+    .min(1, 'Worker name is required')
+    .max(120, 'Worker name must be less than 120 characters'),
+
+  work_date: z.string()
+    .regex(ISO_DATE, 'Date must be YYYY-MM-DD'),
+
+  hours: z.number()
+    .positive('Hours must be greater than 0')
+    .max(24, 'Hours cannot exceed 24 per entry'),
+
+  description: z.string().max(500, 'Description must be under 500 characters').optional().nullable(),
+
+  cost_code: z.string().max(50, 'Cost code must be under 50 characters').optional().nullable(),
+
+  billable_rate: z.number()
+    .nonnegative('Billable rate cannot be negative')
+    .max(10000, 'Billable rate must be under $10,000/hr'),
+
+  cost_rate: z.number()
+    .nonnegative('Cost rate cannot be negative')
+    .max(10000, 'Cost rate must be under $10,000/hr')
+    .optional()
+    .nullable(),
+});
+export type TimeEntryFormData = z.infer<typeof timeEntrySchema>;
+
+/**
+ * Material entry form schema. Markup capped at 200% (sane upper bound; the
+ * DB CHECK enforces the same range). Quantities and prices non-negative.
+ */
+export const materialEntrySchema = z.object({
+  installed_date: z.string()
+    .regex(ISO_DATE, 'Date must be YYYY-MM-DD'),
+
+  description: z.string()
+    .min(1, 'Description is required')
+    .max(300, 'Description must be under 300 characters'),
+
+  cost_code: z.string().max(50).optional().nullable(),
+
+  quantity: z.number()
+    .positive('Quantity must be greater than 0')
+    .max(1_000_000, 'Quantity unrealistically large'),
+
+  unit: z.string().max(20).optional().nullable(),
+
+  invoice_unit_cost: z.number()
+    .nonnegative('Invoice unit cost cannot be negative')
+    .max(1_000_000, 'Invoice unit cost unrealistically large'),
+
+  markup_pct: z.number()
+    .min(0, 'Markup cannot be negative')
+    .max(200, 'Markup cannot exceed 200%'),
+
+  taxable: z.boolean(),
+
+  supplier_name: z.string().max(200).optional().nullable(),
+  supplier_invoice_number: z.string().max(100).optional().nullable(),
+  receipt_url: z.string().max(2000).optional().nullable(),
+});
+export type MaterialEntryFormData = z.infer<typeof materialEntrySchema>;
+
+/**
+ * Project billing settings form schema (singleton per project).
+ * All rate / markup / tax fields permissive — saving partial drafts allowed.
+ */
+export const projectBillingSettingsSchema = z.object({
+  default_billable_rate: z.number().nonnegative().max(10000).optional().nullable(),
+  default_cost_rate: z.number().nonnegative().max(10000).optional().nullable(),
+  default_material_markup_pct: z.number().min(0).max(200),
+  tax_pct: z.number().min(0).max(100),
+  payment_terms_days: z.number().int().min(0).max(365),
+  invoice_prefix: z.string().max(20).optional().nullable(),
+  next_invoice_number: z.number().int().positive().max(999_999),
+  customer_name: z.string().max(200).optional().nullable(),
+  customer_email: z.string().email('Invalid email').max(200).or(z.literal('')).optional().nullable(),
+  customer_address: z.string().max(500).optional().nullable(),
+  customer_po_number: z.string().max(100).optional().nullable(),
+});
+export type ProjectBillingSettingsFormData = z.infer<typeof projectBillingSettingsSchema>;
+
