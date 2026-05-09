@@ -658,6 +658,37 @@ INSERT INTO support_gmail_sync_state (id) VALUES (1) ON CONFLICT DO NOTHING;
 
 ---
 
+#### `feature_interest` — Beta Demand Signal (Added Phase 3.5, May 2026)
+
+```sql
+CREATE TABLE public.feature_interest (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  feature_name TEXT NOT NULL,                  -- 'estimating' | 'permits' | 'tm_billing'
+  note TEXT,                                    -- ≤ 2000 chars
+  project_id UUID,                              -- optional context
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+
+  CONSTRAINT feature_interest_feature_name_known
+    CHECK (feature_name IN ('estimating', 'permits', 'tm_billing')),
+  CONSTRAINT feature_interest_note_length
+    CHECK (note IS NULL OR char_length(note) <= 2000)
+);
+```
+
+**Purpose**: Demand-discovery table for the three contractor-pivot beta sidebar items (Estimating, Permits, T&M Billing). Each "Tell us what you'd want from this feature" submission inserts one row. Clicks-per-feature drives roadmap prioritization before sprint-cost is committed to any single build.
+
+**RLS**: SELECT and INSERT scoped to row owner (`auth.uid() = user_id`). No app-level admin policy — roadmap analytics queries run via Supabase Studio under service-role.
+
+**Indexes**: `(user_id)` for own-history reads; `(feature_name, created_at DESC)` for "newest interest signals per feature" admin queries.
+
+**Design Decisions**:
+- **CHECK on `feature_name`** — keeps the table from drifting into a generic "feedback bucket". When we add a fourth beta, the migration must explicitly include it; unknown values fail loudly at insert time.
+- **No FK on `project_id`** — intentional. Users may submit interest from outside any project (e.g., from a marketing landing page in the future). Treated as a soft hint, not a foreign key.
+- **No PII beyond the user's own free-text note** — the textarea is sized at 2000 chars and prompts for use-case detail, not contact info. Account email is implicit via `user_id`.
+
+---
+
 ## Table Relationships
 
 ### Cascading Delete Behavior

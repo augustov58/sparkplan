@@ -26,6 +26,9 @@ const ShortCircuitResults = lazy(() => import('./components/ShortCircuitResults'
 const RFIManager = lazy(() => import('./components/RFIManager').then(m => ({ default: m.RFIManager })));
 const SiteVisitManager = lazy(() => import('./components/SiteVisitManager').then(m => ({ default: m.SiteVisitManager })));
 const CalendarView = lazy(() => import('./components/CalendarView').then(m => ({ default: m.CalendarView })));
+const EstimatingStub = lazy(() => import('./components/EstimatingStub').then(m => ({ default: m.EstimatingStub })));
+const PermitsStub = lazy(() => import('./components/PermitsStub').then(m => ({ default: m.PermitsStub })));
+const TmBillingStub = lazy(() => import('./components/TmBillingStub').then(m => ({ default: m.TmBillingStub })));
 const AgentActivityLog = lazy(() => import('./components/AgentActivityLog').then(m => ({ default: m.AgentActivityLog })));
 const UtilityInterconnectionForm = lazy(() => import('./components/UtilityInterconnectionForm').then(m => ({ default: m.UtilityInterconnectionForm })));
 const PricingPage = lazy(() => import('./components/PricingPage').then(m => ({ default: m.PricingPage })));
@@ -196,6 +199,33 @@ const ProjectWrapper = ({ projects, updateProject, deleteProject, onSignOut }: {
                         <FeatureGate feature="project-calendar" message="Track project milestones, inspections, and deadlines with the Project Calendar. Available in Business plan.">
                             <Suspense fallback={<LoadingSpinner />}>
                                 <CalendarView project={project} />
+                            </Suspense>
+                        </FeatureGate>
+                    </FeatureErrorBoundary>
+                } />
+                <Route path="/estimating" element={
+                    <FeatureErrorBoundary>
+                        <FeatureGate feature="estimating" message="Generate electrical takeoffs and bid pricing tied to your panel/circuit model. Available on the Business plan — preview free during your trial.">
+                            <Suspense fallback={<LoadingSpinner />}>
+                                <EstimatingStub projectId={project.id} />
+                            </Suspense>
+                        </FeatureGate>
+                    </FeatureErrorBoundary>
+                } />
+                <Route path="/permits" element={
+                    <FeatureErrorBoundary>
+                        <FeatureGate feature="permits" message="Track the full permit + inspection lifecycle: submission, AHJ review, approval, inspection scheduling, results, corrections. Available on the Business plan — preview free during your trial.">
+                            <Suspense fallback={<LoadingSpinner />}>
+                                <PermitsStub projectId={project.id} />
+                            </Suspense>
+                        </FeatureGate>
+                    </FeatureErrorBoundary>
+                } />
+                <Route path="/billing" element={
+                    <FeatureErrorBoundary>
+                        <FeatureGate feature="tm-billing" message="Time & materials billing with phases, change orders, and AIA pay applications for commercial electrical subcontractors. Available on the Business plan — preview free during your trial.">
+                            <Suspense fallback={<LoadingSpinner />}>
+                                <TmBillingStub projectId={project.id} />
                             </Suspense>
                         </FeatureGate>
                     </FeatureErrorBoundary>

@@ -7,45 +7,57 @@
 
 ---
 
-### Session: 2026-05-09 — Project Management Inspector accuracy + slot visibility (PR open)
+### Session: 2026-05-09 — Chatbot VD+ awareness + confirmation gate fix + Inspector accuracy + sidebar contractor pivot (4 PRs)
 
-**Focus**: Quick-turn fixes to the project-management surface (panel schedule + AI Inspector) flagged by the platform owner during PE review of the Inspector. Three discovered issues bundled into one PR; not part of the AHJ Sprint 2A track.
+**Focus**: Started by verifying merged PR #25 (cumulative VD + service-entrance feeders). Verification spawned three follow-up PRs (#26, #28, #29). Mid-session, the platform owner also surfaced three Inspector accuracy issues during PE review which landed as PR #27. Total: 4 PRs, 3 merged today + 1 still open.
 
-**Status**: ✅ Branch `fix/inspector-panel-cap-and-branch-conductor` pushed; PR open against `main`. 208/208 tests pass. `npm run build` exits 0 in 4.8s.
+**Status**:
+- ✅ **PR #25** verified — service-entrance label + cumulative VD on one-line + PDF + FeederManager. Migration `20260508_riser_service_entrance_and_cumulative_vd.sql` already applied to Supabase.
+- ✅ **PR #26** MERGED 13:25 UTC — chatbot context + tools + system instructions teach the AI about VD+ semantics, NEC 215.2(A)(1) IN No. 2 / 210.19(A)(1) IN No. 4 thresholds (3% feeder / 5% combined), SE feeder convention, parallel sets. New `calculate_cumulative_voltage_drop` panel-keyed tool. `calculate_feeder_voltage_drop` augmented with cumulative + crossesTransformer + isServiceEntrance.
+- ✅ **PR #27** MERGED 13:35 UTC — Inspector accuracy fixes (3 issues) + slot visibility on the panel header. Branch `fix/inspector-panel-cap-and-branch-conductor`. Details below.
+- ✅ **PR #28** MERGED 14:07 UTC — restores chatbot write-tool functionality. Root cause traced to commit `3490c68` (PR #13, 2026-04-24 security/correctness audit) which added the `requiresConfirmation` server-side gate without shipping the matching UI. Five write tools (`add_circuit`, `add_panel`, `fill_panel_with_test_loads`, `empty_panel`, `fill_with_spares`) had been completely unreachable for ~2 weeks. Fix: `executeTool` gains `bypassConfirmation` option, `askNecAssistantWithTools` short-circuits on confirmation results without round-tripping Gemini, new `applyConfirmedAction` export, App.tsx renders Apply/Cancel inline.
+- 🟡 **PR #29** open — sidebar contractor pivot. Drops Site Visits + RFI Tracking from the Project Management section (engineer-flavored). Adds three (beta) stubs based on validated market research (small electrical shops $1M-$10M): Estimating, Permits (absorbs the inspection/issues lifecycle), T&M Billing. New `feature_interest` table captures one-line demand notes from each stub's "Tell us" CTA. Existing routes (`/issues`, `/rfis`, `/site-visits`) preserved server-side for direct-link compatibility — Phase 1 (next session) will merge the Issues UI into the Permits page as a tab and redirect the old route.
 
-**Issues fixed**:
+**PR #27 Inspector fixes (detail)**:
 
-1. **AI Inspector hard-coded panel cap at 42 poles**. `services/inspection/inspectorMode.ts:checkPanelMaxPoles` ignored each panel's `num_spaces` (settable to 12/20/24/30/42/54/66/84 at panel creation). A 24-space panel at 28 poles still passed inspection. Fix: read `panel.num_spaces` with same `panel.is_main ? 30 : 42` fallback used elsewhere; cite NEC 110.3(B) (use equipment per its listing) instead of the long-deleted NEC 408.36.
-
-2. **AI Inspector flagged branch-circuit conductor sizing on placeholder data**. Inspector ran NEC 240.4(D) audit against `circuit.conductor_size`, but that field is a defaulted `"12 AWG"` placeholder (set in `BulkCircuitCreator.tsx:56` and `PanelSchedule.tsx:81`) — users never enter real branch-circuit conductor data because SparkPlan only sizes feeders. So every 30A+ circuit got a false "12 AWG on 30A breaker" critical issue. Fix: deleted `checkConductorProtection` + `CONDUCTOR_PROTECTION_LIMITS` from the inspector. NEC 240.4(D) is still correctly enforced in `services/calculations/conductorSizing.ts` + `breakerSizing.ts` where real feeder data drives it.
-
-3. **AI Inspector breaker-vs-load check was receptacle-only and assumed 120V**. `checkReceptacleLoading` fired only on `load_type === 'R'` and used a hard-coded `breakerAmps × 120` capacity — so lighting / EV / dryer / 2-pole 240V / 3-phase circuits got no audit, and 240V loads would have been falsely flagged at 2× utilization if the type filter didn't skip them first. Fix: `checkCircuitLoading(circuit, panel)` runs on every circuit and derives capacity from pole count + panel voltage·phase: 1-pole on 1Φ split-phase = 120V (LtoL/2); 1-pole on 3Φ = LtoL/√3; 2-pole = LtoL; 3-pole = LtoL × √3. Critical >100%, warning >80% (NEC 210.20(A) continuous-load rule).
-
-4. **Slot cap was invisible until the user bumped into it.** Panel header showed Main Breaker / Voltage / Bus Rating / Phase·Wire — but no slot count. Users only saw the limit in error alerts ("This 30-space panel has no room…"). Fix: added 5th "Slots" stat card in `PanelSchedule.tsx` showing `<polesUsed> / <totalSlots>` with amber/red tone at >90% / >100%.
-
-5. **Bulk Circuit Creator skipped the slot cap.** `OneLineDiagram.tsx:handleBulkCreateCircuits` validated multi-pole conflicts but not slot-overflow — Circuit 50 in a 30-space panel was silently persisted as an orphan. Fix: pre-create cap using same multi-pole formula (`lastSlot = circuit_number + (pole - 1) * 2`) as the manual-add and import paths.
+1. **AI Inspector hard-coded panel cap at 42 poles**. `services/inspection/inspectorMode.ts:checkPanelMaxPoles` ignored each panel's `num_spaces`. A 24-space panel at 28 poles still passed inspection. Fix: read `panel.num_spaces` with same `panel.is_main ? 30 : 42` fallback used elsewhere; cite NEC 110.3(B) instead of the long-deleted NEC 408.36.
+2. **Inspector flagged branch-circuit conductor sizing on placeholder data**. NEC 240.4(D) audit ran against `circuit.conductor_size` which is a defaulted `"12 AWG"` placeholder. Every 30A+ circuit got a false "12 AWG on 30A breaker" critical issue. Fix: deleted `checkConductorProtection` from the inspector. NEC 240.4(D) still correctly enforced inside `services/calculations/conductorSizing.ts` + `breakerSizing.ts` where real feeder data drives it.
+3. **Breaker-vs-load check was receptacle-only and assumed 120V**. Lighting / EV / dryer / 2-pole 240V / 3-phase circuits got no audit. Fix: `checkCircuitLoading` runs on every circuit and derives capacity from pole count + panel voltage·phase (1P/1Φ=120V, 1P/3Φ=LtoL/√3, 2P=LtoL, 3P=LtoL×√3). Critical >100%, warning >80% per NEC 210.20(A).
+4. **Slot cap was invisible until users bumped into it.** Added 5th "Slots" stat card to panel header (`<polesUsed> / <totalSlots>` with amber/red tone at >90% / >100%).
+5. **Bulk Circuit Creator skipped slot cap.** Pre-create cap added using same multi-pole formula as manual-add path.
 
 **Decisions made**:
 
-- **NEC 110.3(B) over NEC 408.36 for the panel-cap citation.** NEC 408.36's hard 42-OCPD cap was deleted in NEC 2008 — the limit is now whatever each panel is UL-listed for, and `panels.num_spaces` IS that listed capacity. NEC 110.3(B) ("use equipment per its listing") is the modern citation.
-- **Pole count, not circuit count, for the Slots indicator.** A 2-pole breaker is one circuit row but two slots. Using poles makes the in-UI indicator agree with the inspector audit (also pole-based), so the user never sees "Slots: 15/30" while the inspector says "Panel exceeds 30-slot capacity at 32 poles."
-- **Removed branch-circuit conductor audit entirely rather than gating it on real data.** SparkPlan deliberately doesn't ask for branch conductor sizing — it's not in the value prop. Auditing a field we don't ask the user to fill produced noise. Safer to remove the audit; the same NEC rule still fires correctly inside the feeder/conductor sizing tools where real user data drives it.
-- **Generalized circuit-loading check to all load types.** Today every circuit has `load_watts` + `breaker_amps` + `pole` regardless of `load_type`, so a uniform check is both more useful and simpler. The receptacle-only audit was a leftover from an earlier per-outlet model.
+- **Skip the second Gemini round-trip on the Apply path.** The original `askNecAssistantWithTools` flow always sent the tool result back to Gemini for paraphrasing. That's what amplified the #13 regression — Gemini paraphrased the gate's "I cannot..." message into a flat refusal, making the "Apply button missing" bug invisible. PR #28's `applyConfirmedAction` synthesizes the "Done — ..." follow-up locally from each tool's `data.message` field. Faster (one LLM call instead of two), cheaper, and the LLM can no longer refuse what the user just authorized.
+- **Generic Apply card, not per-tool.** The plumbing inspects `result.data.requiresConfirmation` rather than switching on tool name. Any future write tool with `requiresConfirmation: true` automatically gets Apply/Cancel UI for free.
+- **Two-PR split for the sidebar pivot.** This PR ships the sidebar reshuffle + 3 stub pages only; Phase 1 (follow-up PR) actually relocates the existing Inspection & Issues UI into the Permits page as a tab. Rationale: the merge work is sunk cost if no contractor clicks "Permits" in the first 2 weeks of beta. Phase 0 buys demand signal cheaply.
+- **Sidebar names: short forms (`Estimating`, `Permits`, `T&M Billing`).** Sidebar is for navigation, not explanation. Page itself tells the longer story. User confirmed.
+- **`feature_interest` table is its own thing**, not piggybacking on `support_tickets`. Append-only, RLS-scoped to row owner, no admin policy at the DB layer (server-side queries via Supabase Studio cover prioritization). CHECK constraint on `feature_name IN ('estimating', 'permits', 'tm_billing')` so unknown betas can't be silently inserted.
+- **Engineer-flavored items removed from sidebar but routes kept alive.** No 404s on bookmarks. Drop them only — don't unbuild them yet — in case the persona analysis is wrong.
+
+**Why the sidebar pivot now**: validated against external market research the user pulled — the top 3 unmet pain points for small electrical shops ($1M-$10M annual revenue) are estimating + job costing (CRITICAL), permit + inspection lifecycle (HIGH), and T&M billing (HIGH). Existing tools like IntelliBid, Trimble Accubid, Knowify, Jobber are either enterprise-priced, desktop-only, or shaped wrong for commercial T&M. SparkPlan can credibly enter at $99-$199/month with electrical-specific assemblies tied to its existing panel/circuit/feeder model — but only if the sidebar reflects contractor workflow, which it didn't.
+
+**Insight worth carrying forward**: PR #13's break (write-tool confirmation gate without UI) is a textbook example of bundling unrelated security fixes — JWT log redaction, RLS-bypass via service role, Stripe price-ID hardening, and the chatbot gate all rode in one PR. The gate compiled, tests passed (the gate code was correct), and the missing UI counterpart slipped through review because attention was on the security items. **Lesson**: when a "security audit" PR introduces a new user-facing gate (confirmation, modal, banner, second-factor), the same PR must include the UI that satisfies it. The two halves are inseparable; CI cannot catch the gap.
 
 **Key Files Touched**:
 
-- `services/inspection/inspectorMode.ts` — rule changes (see Issues 1, 2, 3 above)
-- `components/PanelSchedule.tsx` — Slots stat card
-- `components/OneLineDiagram.tsx` — bulk-create slot cap
-- `docs/CHANGELOG.md` + `docs/SESSION_LOG.md` — this entry
+- PR #26: `services/ai/projectContextBuilder.ts`, `services/ai/chatTools.ts`, `services/geminiService.ts` (3 files, +193/-7)
+- PR #28: `App.tsx`, `services/ai/chatTools.ts`, `services/geminiService.ts` (3 files, +156/-6)
+- This PR: `components/Layout.tsx`, `App.tsx`, `components/BetaFeatureStub.tsx` (new), `components/EstimatingStub.tsx` (new), `components/PermitsStub.tsx` (new), `components/TmBillingStub.tsx` (new), `supabase/migrations/20260509_feature_interest.sql` (new)
 
 **Pending / Follow-ups**:
 
-- **`IssueCategory = 'conductor'` is now unused** by any inspector rule. Left in the type to minimize blast — `CategoryBadge` in `InspectorMode.tsx` and the IssuesLog PDF section reference the labels record. One-line cleanup if desired.
-- **AHJ Sprint 2A continuation** — PR 3, 4, 5 of the AHJ Compliance Audit (commits 5-12) still pending per the prior session's plan.
-- **F4 + F6 (from earlier session)** — `panels.is_evems_managed` + `panels.evems_setpoint_va` columns AND rename of `calculateSingleFamilyLoad`. No-migration items, do when DB next touched.
+- **Apply migration `20260509_feature_interest.sql` to Supabase** before the stub pages can record clicks. (Like PR #25's migration: code ships first, schema applied separately.)
+- **Phase 1 (next session)**: relocate Inspection & Issues UI into Permits page as a `?tab=issues` tab. Redirect `/project/:id/issues` → `/project/:id/permits?tab=issues`. Delete the "until then, open Inspection & Issues directly →" forward-link from the Permits stub.
+- **Track click-through and `feature_interest` insert rates per beta** for the next 2-3 weeks. Highest-signal feature gets prioritized for actual build work.
 
-**PRs**: open against `main`, branch `fix/inspector-panel-cap-and-branch-conductor`.
+**PRs**:
+
+- **#25** (merged 04:53 UTC) — riser SE label + cumulative VD on diagram/PDF/FeederManager
+- **#26** (merged 13:25 UTC) — chatbot VD+ awareness + new cumulative tool
+- **#27** (merged 13:35 UTC) — Inspector accuracy + slot visibility (5 fixes)
+- **#28** (merged 14:07 UTC) — confirmation card UI restoration (broken since #13)
+- **#29** (open) — sidebar contractor pivot + 3 beta stubs + `feature_interest` migration
 
 ---
 
@@ -142,3 +154,7 @@ Persistence: each toggle change calls `updateProject({...currentProject, setting
 **PRs**:
 - **PR 1** — Sprint 2A commits 1-3 (merged to main as squash commit `92126eb`)
 - **PR #23** — Sprint 2A commit 4a + 4b + bugfix (open, base now correctly `main`, mergeable CLEAN)
+
+---
+
+<!-- Earlier session 2026-05-06 / 2026-05-07 (Sprint 1 close-out / C4 omnibus) rotated out per "keep last 2 sessions" rule. Git history preserves the entry. -->

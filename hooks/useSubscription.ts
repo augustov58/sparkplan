@@ -138,6 +138,12 @@ export const FEATURE_ACCESS: Record<string, SubscriptionPlan[]> = {
   'project-calendar': ['business', 'enterprise'],
   'issues-log': ['business', 'enterprise'],
   'pm-suite': ['business', 'enterprise'],
+  // Contractor pivot betas — Phase 3.5 (May 2026). Gated to Business+ to
+  // match the sibling PM features above; trial users get them automatically
+  // via effectivePlan when status === 'trialing'.
+  'estimating': ['business', 'enterprise'],
+  'permits': ['business', 'enterprise'],
+  'tm-billing': ['business', 'enterprise'],
 
   // Advanced calculations
   'arc-flash': ['business', 'enterprise'],
