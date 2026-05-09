@@ -111,6 +111,8 @@ interface JurisdictionRequirementsDocumentProps {
   // Sprint 2A C8: per-sheet contractor signature block
   contractorName?: string;
   contractorLicense?: string;
+  // Sprint 2A H3: per-sheet ID
+  sheetId?: string;
 }
 
 export const JurisdictionRequirementsPages: React.FC<JurisdictionRequirementsDocumentProps> = ({
@@ -118,10 +120,11 @@ export const JurisdictionRequirementsPages: React.FC<JurisdictionRequirementsDoc
   projectName,
   contractorName,
   contractorLicense,
+  sheetId,
 }) => {
   return (
     <Page size="LETTER" orientation="portrait" style={themeStyles.page}>
-        <BrandBar pageLabel="JURISDICTION REQUIREMENTS" />
+        <BrandBar pageLabel="JURISDICTION REQUIREMENTS" sheetId={sheetId} />
         <View style={themeStyles.titleBlock}>
           <Text style={themeStyles.docTitle}>Jurisdiction Requirements Checklist</Text>
           <Text style={themeStyles.docSubtitle}>{projectName}</Text>
@@ -214,6 +217,7 @@ export const JurisdictionRequirementsPages: React.FC<JurisdictionRequirementsDoc
           projectName={projectName}
           contractorName={contractorName}
           contractorLicense={contractorLicense}
+          sheetId={sheetId}
         />
       </Page>
   );

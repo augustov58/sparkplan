@@ -4,8 +4,13 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import { FileText, Download, Loader2, AlertCircle, CheckCircle, Info, Building2 } from 'lucide-react';
+import { FileText, Download, Loader2, AlertCircle, CheckCircle, Info, Building2, AlertTriangle, ListChecks } from 'lucide-react';
 import { generatePermitPacket, generateLightweightPermitPacket, type PermitPacketData } from '../services/pdfExport/permitPacketGenerator';
+import {
+  DEFAULT_SECTIONS,
+  resolveSections,
+  type PacketSections,
+} from '../services/pdfExport/packetSections';
 import { usePanels } from '../hooks/usePanels';
 import { useCircuits } from '../hooks/useCircuits';
 import { useFeeders } from '../hooks/useFeeders';
@@ -30,6 +35,128 @@ interface PermitPacketGeneratorProps {
   projectId: string;
 }
 
+// ============================================================================
+// SECTION TOGGLE PANEL CONFIG
+// ============================================================================
+// Source of truth for the "Configure Sections" UI grid. Each row maps a
+// PacketSections key to its display label, group, optional warning text
+// (shown when toggled OFF — for sections most AHJs require), and a function
+// that decides whether the toggle should be auto-disabled because the
+// underlying data is missing.
+
+interface SectionToggleConfig {
+  key: keyof PacketSections;
+  label: string;
+  description: string;
+  group: 'Document Meta' | 'Engineering' | 'Diagrams & Equipment' | 'Multi-Family' | 'Compliance & AHJ' | 'Panels';
+  /**
+   * Banner shown when the section is toggled OFF. Use for sections that
+   * most AHJs reject without (Compliance Summary, Panel Schedules).
+   */
+  offWarning?: string;
+}
+
+const SECTION_TOGGLE_CONFIG: SectionToggleConfig[] = [
+  {
+    key: 'tableOfContents',
+    label: 'Table of Contents',
+    description: 'Sheet 002 — index of all sheets in the packet',
+    group: 'Document Meta',
+  },
+  {
+    key: 'revisionLog',
+    label: 'Revision Log',
+    description: 'Audit trail of plan revisions; auto-populates Rev 0 on first submittal',
+    group: 'Document Meta',
+  },
+  {
+    key: 'generalNotes',
+    label: 'General Notes',
+    description: 'Numbered notes covering NEC compliance, voltage drop convention, grounding',
+    group: 'Document Meta',
+  },
+  {
+    key: 'loadCalculation',
+    label: 'Load Calculation Summary',
+    description: 'NEC 220 demand factor breakdown for the MDP',
+    group: 'Engineering',
+  },
+  {
+    key: 'voltageDrop',
+    label: 'Voltage Drop Analysis',
+    description: 'Per-feeder voltage drop per NEC Chapter 9 Table 9',
+    group: 'Engineering',
+  },
+  {
+    key: 'shortCircuit',
+    label: 'Short Circuit Analysis',
+    description: 'Available fault current at each panel (IEEE 141)',
+    group: 'Engineering',
+  },
+  {
+    key: 'arcFlash',
+    label: 'Arc Flash Analysis',
+    description: 'Incident energy + PPE category per NFPA 70E',
+    group: 'Engineering',
+  },
+  {
+    key: 'riserDiagram',
+    label: 'Riser Diagram',
+    description: 'One-line/system hierarchy diagram',
+    group: 'Diagrams & Equipment',
+  },
+  {
+    key: 'equipmentSchedule',
+    label: 'Equipment Schedule',
+    description: 'Tabular list of all panels, transformers, feeders',
+    group: 'Diagrams & Equipment',
+  },
+  {
+    key: 'equipmentSpecs',
+    label: 'Equipment Specifications',
+    description: 'Detailed spec sheets per panel + transformer',
+    group: 'Diagrams & Equipment',
+  },
+  {
+    key: 'grounding',
+    label: 'Grounding Plan',
+    description: 'GEC sizing + bonding details per NEC 250',
+    group: 'Diagrams & Equipment',
+  },
+  {
+    key: 'meterStack',
+    label: 'Meter Stack Schedule',
+    description: 'CT cabinet + meter positions (multi-family)',
+    group: 'Multi-Family',
+  },
+  {
+    key: 'multiFamilyEV',
+    label: 'Multi-Family EV Analysis',
+    description: '3-page NEC 220.84 + 220.57 + 625.42 readiness analysis',
+    group: 'Multi-Family',
+  },
+  {
+    key: 'panelSchedules',
+    label: 'Panel Schedules',
+    description: 'One sheet per panel (NEC 408 requires these for permit submittal)',
+    group: 'Panels',
+    offWarning: 'NEC 408 requires panel schedules for most permit submittals. Most AHJs will reject the packet without them.',
+  },
+  {
+    key: 'complianceSummary',
+    label: 'NEC Compliance Summary',
+    description: 'Engineering attestation that the design meets NEC requirements',
+    group: 'Compliance & AHJ',
+    offWarning: 'Some AHJs reject packets without an engineering compliance summary. Toggle off only if you are providing your own attestation.',
+  },
+  {
+    key: 'jurisdiction',
+    label: 'Jurisdiction Requirements',
+    description: 'Per-AHJ checklist (requires a jurisdiction selected above)',
+    group: 'Compliance & AHJ',
+  },
+];
+
 export const PermitPacketGenerator: React.FC<PermitPacketGeneratorProps> = ({ projectId }) => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -51,8 +178,13 @@ export const PermitPacketGenerator: React.FC<PermitPacketGeneratorProps> = ({ pr
   const [mfEvChargerLevel, setMfEvChargerLevel] = useState<'level1' | 'level2'>('level2');
   const [mfEvBuildingName, setMfEvBuildingName] = useState('');
 
+  // Sprint 2A H1+H2+H3: per-section toggles for the packet generator. Initialized
+  // from `projects.settings.sectionPreferences` (when present); otherwise falls
+  // back to all-on. Auto-persists to the project on every toggle change.
+  const [sectionPrefs, setSectionPrefs] = useState<Partial<PacketSections>>({});
+
   // Fetch project data - hooks must be called unconditionally
-  const { projects } = useProjects();
+  const { projects, updateProject } = useProjects();
   const currentProject = projectId ? projects.find(p => p.id === projectId) : undefined;
   const { panels, loading: panelsLoading } = usePanels(projectId || '');
   const { circuits, loading: circuitsLoading } = useCircuits(projectId || '');
@@ -77,6 +209,16 @@ export const PermitPacketGenerator: React.FC<PermitPacketGeneratorProps> = ({ pr
       setContractorLicense(profile.license_number);
     }
   }, [profile?.license_number]);
+
+  // Hydrate section preferences from project settings whenever the project
+  // changes. The DB stores a partial — keys absent here fall back to
+  // DEFAULT_SECTIONS at packet-generation time.
+  useEffect(() => {
+    const stored = currentProject?.settings?.sectionPreferences as
+      | Partial<PacketSections>
+      | undefined;
+    setSectionPrefs(stored ?? {});
+  }, [currentProject?.id, currentProject?.settings?.sectionPreferences]);
 
   // Early return if no projectId
   if (!projectId) {
@@ -115,6 +257,90 @@ export const PermitPacketGenerator: React.FC<PermitPacketGeneratorProps> = ({ pr
     hasLicense &&
     hasScope &&
     !dataLoading;
+
+  // Sprint 2A H1+H2+H3: section toggle helpers.
+  // Resolves the effective on/off state by merging current preferences with
+  // DEFAULT_SECTIONS (all-on). UI controls render from the resolved value.
+  const effectiveSections = resolveSections(sectionPrefs);
+
+  // Auto-disable predicate: returns a reason string when the toggle should
+  // be greyed out because the underlying data isn't present (or, for
+  // multiFamilyEV, the input checkbox above isn't enabled).
+  const sectionDisabledReason = (key: keyof PacketSections): string | undefined => {
+    switch (key) {
+      case 'voltageDrop':
+        return feeders.length === 0
+          ? 'No feeders defined on this project'
+          : undefined;
+      case 'shortCircuit':
+        return (shortCircuitCalculations?.length ?? 0) === 0
+          ? 'No short circuit calculations recorded'
+          : undefined;
+      case 'arcFlash':
+        // Arc flash data is not currently surfaced from a hook; the generator
+        // only renders an Arc Flash page when `data.arcFlashData` is set,
+        // which the UI doesn't populate yet.
+        return 'Arc flash analysis is not yet integrated into the packet flow';
+      case 'grounding':
+        return !grounding ? 'No grounding system recorded' : undefined;
+      case 'meterStack':
+        return meterStacks.length === 0
+          ? 'No meter stacks defined (multi-family only)'
+          : undefined;
+      case 'multiFamilyEV':
+        return !includeMultiFamilyEV
+          ? 'Enable Multi-Family EV inputs above to include this analysis'
+          : undefined;
+      case 'jurisdiction':
+        return !currentProject?.jurisdiction_id
+          ? 'No jurisdiction selected for this project'
+          : undefined;
+      default:
+        return undefined;
+    }
+  };
+
+  // Persist a single toggle change to projects.settings.sectionPreferences.
+  // Optimistic update happens locally in setSectionPrefs; the underlying
+  // updateProject hook handles its own optimistic update + rollback.
+  const handleToggleSection = async (key: keyof PacketSections, next: boolean) => {
+    const updated = { ...sectionPrefs, [key]: next };
+    setSectionPrefs(updated);
+    if (!currentProject) return;
+    await updateProject({
+      ...currentProject,
+      settings: {
+        ...currentProject.settings,
+        sectionPreferences: updated,
+      },
+    });
+  };
+
+  const handleResetSections = async () => {
+    setSectionPrefs({});
+    if (!currentProject) return;
+    await updateProject({
+      ...currentProject,
+      settings: {
+        ...currentProject.settings,
+        sectionPreferences: undefined,
+      },
+    });
+  };
+
+  // Group toggle configs for the rendered grid.
+  const toggleGroups = SECTION_TOGGLE_CONFIG.reduce<Record<string, SectionToggleConfig[]>>(
+    (acc, cfg) => {
+      (acc[cfg.group] ||= []).push(cfg);
+      return acc;
+    },
+    {},
+  );
+
+  // Sections that are toggled off AND have an offWarning to show.
+  const activeOffWarnings = SECTION_TOGGLE_CONFIG.filter(
+    (c) => c.offWarning && effectiveSections[c.key] === false,
+  );
 
   const handleGenerate = async () => {
     if (!canGenerate || !currentProject) return;
@@ -175,6 +401,8 @@ export const PermitPacketGenerator: React.FC<PermitPacketGeneratorProps> = ({ pr
         jurisdiction: jurisdiction,
         // NEC 220.84 multifamily Optional Method context (undefined for non-MF projects)
         multiFamilyContext,
+        // Sprint 2A H1+H2+H3: per-section toggles. Empty object = use defaults.
+        sections: sectionPrefs,
       };
 
       // Add Multi-Family EV Analysis if enabled
@@ -285,6 +513,104 @@ export const PermitPacketGenerator: React.FC<PermitPacketGeneratorProps> = ({ pr
             <p className="text-xs text-gray-500 mb-1">Circuits</p>
             <p className="font-medium">{circuits.length}</p>
           </div>
+        </div>
+      </div>
+
+      {/* Sprint 2A H1+H2+H3: Section Toggle Panel */}
+      <div className="bg-white border border-gray-200 rounded-lg p-6 space-y-4">
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <h3 className="font-bold text-gray-900 flex items-center gap-2">
+              <ListChecks className="w-5 h-5 text-[#2d3b2d]" />
+              Configure Sections
+            </h3>
+            <p className="text-sm text-gray-600 mt-1">
+              Choose which sections to include in this packet. Cover sheet is
+              always included. Sheet IDs renumber automatically when you toggle
+              a section off.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={handleResetSections}
+            className="text-sm text-[#2d3b2d] hover:text-[#1f291f] underline whitespace-nowrap"
+          >
+            Reset to defaults
+          </button>
+        </div>
+
+        {/* Cover sheet is always-on; show as a non-toggleable indicator */}
+        <div className="bg-gray-50 border border-gray-200 rounded-md p-3 flex items-center gap-3">
+          <CheckCircle className="w-4 h-4 text-[#2d3b2d] flex-shrink-0" />
+          <div className="text-sm">
+            <span className="font-medium text-gray-900">Cover Sheet</span>
+            <span className="text-gray-500 ml-2">
+              Always included (sheet 001) — required for AHJ identification
+            </span>
+          </div>
+        </div>
+
+        {/* Off-warning banners (shown above the grid so they're visible) */}
+        {activeOffWarnings.length > 0 && (
+          <div className="space-y-2">
+            {activeOffWarnings.map((c) => (
+              <div
+                key={c.key}
+                className="bg-amber-50 border border-amber-300 rounded-md p-3 flex items-start gap-3"
+              >
+                <AlertTriangle className="w-4 h-4 text-amber-700 flex-shrink-0 mt-0.5" />
+                <div className="text-sm text-amber-900">
+                  <span className="font-medium">{c.label} is off — </span>
+                  {c.offWarning}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Grouped checkbox grid */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {Object.entries(toggleGroups).map(([groupName, items]) => (
+            <div key={groupName} className="border border-gray-200 rounded-md p-3 space-y-2">
+              <p className="text-xs uppercase tracking-wider font-medium text-gray-500 mb-2">
+                {groupName}
+              </p>
+              {items.map((cfg) => {
+                const disabledReason = sectionDisabledReason(cfg.key);
+                const isChecked = effectiveSections[cfg.key];
+                const hasOffWarning = !!cfg.offWarning && isChecked === false;
+                return (
+                  <label
+                    key={cfg.key}
+                    className={`flex items-start gap-2 ${
+                      disabledReason ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'
+                    }`}
+                    title={disabledReason}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={isChecked}
+                      disabled={!!disabledReason}
+                      onChange={(e) => handleToggleSection(cfg.key, e.target.checked)}
+                      className="mt-1 text-[#2d3b2d] focus:ring-[#2d3b2d]/20 rounded"
+                    />
+                    <div className="text-sm flex-1">
+                      <span
+                        className={`font-medium ${
+                          hasOffWarning ? 'text-amber-900' : 'text-gray-900'
+                        }`}
+                      >
+                        {cfg.label}
+                      </span>
+                      <p className="text-xs text-gray-500">
+                        {disabledReason ?? cfg.description}
+                      </p>
+                    </div>
+                  </label>
+                );
+              })}
+            </div>
+          ))}
         </div>
       </div>
 

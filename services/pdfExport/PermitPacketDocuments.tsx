@@ -176,6 +176,8 @@ interface CoverPageProps {
   // Sprint 2A C7 / H4: applicable codes
   necEdition?: '2020' | '2023';
   codeReferences?: string[];
+  // Sprint 2A H3: per-sheet ID (cover is conventionally '001')
+  sheetId?: string;
 }
 
 // FL pilot AHJs adopt NFPA-70 2020 via FBC 8th ed. NEC 220.84 demand-factor
@@ -202,9 +204,10 @@ export const CoverPage: React.FC<CoverPageProps> = ({
   serviceConductorRouting,
   necEdition = DEFAULT_NEC_EDITION,
   codeReferences = DEFAULT_CODE_REFERENCES,
+  sheetId,
 }) => (
   <Page size="LETTER" style={themeStyles.page}>
-    <BrandBar pageLabel="PERMIT APPLICATION" />
+    <BrandBar pageLabel="PERMIT APPLICATION" sheetId={sheetId} />
 
     <View style={themeStyles.titleBlock}>
       <Text style={themeStyles.docTitle}>Electrical Permit Application</Text>
@@ -316,6 +319,7 @@ export const CoverPage: React.FC<CoverPageProps> = ({
       projectName={projectName}
       contractorName={preparedBy}
       contractorLicense={contractorLicense}
+      sheetId={sheetId}
     />
   </Page>
 );
@@ -344,6 +348,7 @@ interface GeneralNotesPageProps {
   generalNotes?: string[];
   contractorName?: string;
   contractorLicense?: string;
+  sheetId?: string;
 }
 
 export const GeneralNotesPage: React.FC<GeneralNotesPageProps> = ({
@@ -351,9 +356,10 @@ export const GeneralNotesPage: React.FC<GeneralNotesPageProps> = ({
   generalNotes = DEFAULT_GENERAL_NOTES,
   contractorName,
   contractorLicense,
+  sheetId,
 }) => (
   <Page size="LETTER" style={themeStyles.page}>
-    <BrandBar pageLabel="GENERAL NOTES" />
+    <BrandBar pageLabel="GENERAL NOTES" sheetId={sheetId} />
 
     <View style={themeStyles.titleBlock}>
       <Text style={themeStyles.docTitle}>General Notes</Text>
@@ -408,9 +414,181 @@ export const GeneralNotesPage: React.FC<GeneralNotesPageProps> = ({
       projectName={projectName}
       contractorName={contractorName}
       contractorLicense={contractorLicense}
+      sheetId={sheetId}
     />
   </Page>
 );
+
+// ============================================================================
+// TABLE OF CONTENTS (Sprint 2A H1)
+// ============================================================================
+// Renders right after the cover page. Lists every sheet that follows, with
+// its sheet ID and title. Driven entirely from `entries`, which the generator
+// builds AFTER assigning sheet IDs to the filtered page list.
+
+export interface TocEntry {
+  sheetId: string;
+  title: string;
+  /** Optional band label for grouping (e.g., "Calculations"). */
+  band?: string;
+}
+
+interface TableOfContentsPageProps {
+  projectName: string;
+  entries: TocEntry[];
+  contractorName?: string;
+  contractorLicense?: string;
+  sheetId?: string;
+}
+
+export const TableOfContentsPage: React.FC<TableOfContentsPageProps> = ({
+  projectName,
+  entries,
+  contractorName,
+  contractorLicense,
+  sheetId,
+}) => (
+  <Page size="LETTER" style={themeStyles.page}>
+    <BrandBar pageLabel="TABLE OF CONTENTS" sheetId={sheetId} />
+
+    <View style={themeStyles.titleBlock}>
+      <Text style={themeStyles.docTitle}>Table of Contents</Text>
+      <Text style={themeStyles.docSubtitle}>{projectName}</Text>
+    </View>
+
+    <View style={themeStyles.table}>
+      <View style={themeStyles.tableHeaderRow}>
+        <Text style={[themeStyles.th, { width: '15%' }]}>Sheet</Text>
+        <Text style={[themeStyles.th, { width: '85%' }]}>Title</Text>
+      </View>
+      {entries.map((entry, idx) => (
+        <View
+          key={`${entry.sheetId}-${idx}`}
+          style={idx % 2 === 0 ? themeStyles.tableRow : themeStyles.tableRowAlt}
+          wrap={false}
+        >
+          <Text style={[themeStyles.td, { width: '15%', fontFamily: 'Helvetica-Bold' }]}>
+            {entry.sheetId}
+          </Text>
+          <Text style={[themeStyles.td, { width: '85%' }]}>{entry.title}</Text>
+        </View>
+      ))}
+    </View>
+
+    <View style={[themeStyles.noteBox, { marginTop: 8 }]}>
+      <Text style={themeStyles.noteText}>
+        Sheet IDs are stable across revisions. AHJ comments referencing a
+        specific sheet ID continue to identify the same content even when
+        page numbers shift.
+      </Text>
+    </View>
+
+    <BrandFooter
+      projectName={projectName}
+      contractorName={contractorName}
+      contractorLicense={contractorLicense}
+      sheetId={sheetId}
+    />
+  </Page>
+);
+
+// ============================================================================
+// REVISION LOG (Sprint 2A H2)
+// ============================================================================
+// AHJ-required audit trail of plan revisions. First submittal auto-populates
+// "Rev 0" with today's date and the contractor name. Subsequent revisions
+// append rows. Sheet ID stability across revisions is a Sprint 3 concern
+// (PE seal workflow will lock the sections config at submittal).
+
+export interface RevisionEntry {
+  rev: string;        // 'Rev 0', 'Rev 1', etc.
+  date: string;       // ISO yyyy-mm-dd or human-readable
+  description: string;
+  by?: string;        // contractor / engineer who issued the revision
+}
+
+interface RevisionLogPageProps {
+  projectName: string;
+  revisions?: RevisionEntry[];
+  contractorName?: string;
+  contractorLicense?: string;
+  sheetId?: string;
+}
+
+const todayIso = (): string => new Date().toISOString().split('T')[0];
+
+export const RevisionLogPage: React.FC<RevisionLogPageProps> = ({
+  projectName,
+  revisions,
+  contractorName,
+  contractorLicense,
+  sheetId,
+}) => {
+  // Auto-populate Rev 0 if no revisions supplied. Default first row keeps the
+  // page from looking accidentally blank on a fresh submittal — the AHJ still
+  // sees a valid revision history with today's date and the contractor name.
+  const effectiveRevisions: RevisionEntry[] =
+    revisions && revisions.length > 0
+      ? revisions
+      : [
+          {
+            rev: 'Rev 0',
+            date: todayIso(),
+            description: 'Initial submittal',
+            by: contractorName || 'Contractor',
+          },
+        ];
+
+  return (
+    <Page size="LETTER" style={themeStyles.page}>
+      <BrandBar pageLabel="REVISION LOG" sheetId={sheetId} />
+
+      <View style={themeStyles.titleBlock}>
+        <Text style={themeStyles.docTitle}>Revision Log</Text>
+        <Text style={themeStyles.docSubtitle}>{projectName}</Text>
+      </View>
+
+      <View style={themeStyles.table}>
+        <View style={themeStyles.tableHeaderRow}>
+          <Text style={[themeStyles.th, { width: '12%' }]}>Rev</Text>
+          <Text style={[themeStyles.th, { width: '18%' }]}>Date</Text>
+          <Text style={[themeStyles.th, { width: '50%' }]}>Description</Text>
+          <Text style={[themeStyles.th, { width: '20%' }]}>By</Text>
+        </View>
+        {effectiveRevisions.map((entry, idx) => (
+          <View
+            key={`${entry.rev}-${idx}`}
+            style={idx % 2 === 0 ? themeStyles.tableRow : themeStyles.tableRowAlt}
+            wrap={false}
+          >
+            <Text style={[themeStyles.td, { width: '12%', fontFamily: 'Helvetica-Bold' }]}>
+              {entry.rev}
+            </Text>
+            <Text style={[themeStyles.td, { width: '18%' }]}>{entry.date}</Text>
+            <Text style={[themeStyles.td, { width: '50%' }]}>{entry.description}</Text>
+            <Text style={[themeStyles.td, { width: '20%' }]}>{entry.by ?? ''}</Text>
+          </View>
+        ))}
+      </View>
+
+      <View style={[themeStyles.noteBox, { marginTop: 8 }]}>
+        <Text style={themeStyles.noteText}>
+          Revisions are appended to this log on every resubmittal. The
+          contractor and design engineer of record certify that all changes
+          listed here have been documented and reflected throughout the
+          packet.
+        </Text>
+      </View>
+
+      <BrandFooter
+        projectName={projectName}
+        contractorName={contractorName}
+        contractorLicense={contractorLicense}
+        sheetId={sheetId}
+      />
+    </Page>
+  );
+};
 
 // ============================================================================
 // EQUIPMENT SCHEDULE
@@ -424,6 +602,8 @@ interface EquipmentScheduleProps {
   // Sprint 2A C8: per-sheet contractor signature block
   contractorName?: string;
   contractorLicense?: string;
+  // Sprint 2A H3: per-sheet ID
+  sheetId?: string;
 }
 
 export const EquipmentSchedule: React.FC<EquipmentScheduleProps> = ({
@@ -433,6 +613,7 @@ export const EquipmentSchedule: React.FC<EquipmentScheduleProps> = ({
   projectName,
   contractorName,
   contractorLicense,
+  sheetId,
 }) => {
   const mainPanel = panels.find(p => p.is_main);
   const subPanels = panels.filter(p => !p.is_main);
@@ -442,7 +623,7 @@ export const EquipmentSchedule: React.FC<EquipmentScheduleProps> = ({
 
   return (
     <Page size="LETTER" style={themeStyles.page}>
-      <BrandBar pageLabel="EQUIPMENT SCHEDULE" />
+      <BrandBar pageLabel="EQUIPMENT SCHEDULE" sheetId={sheetId} />
 
       <View style={themeStyles.titleBlock}>
         <Text style={themeStyles.docTitle}>Equipment Schedule</Text>
@@ -593,6 +774,7 @@ export const EquipmentSchedule: React.FC<EquipmentScheduleProps> = ({
         projectName={projectName}
         contractorName={contractorName}
         contractorLicense={contractorLicense}
+        sheetId={sheetId}
       />
     </Page>
   );
@@ -941,6 +1123,8 @@ interface RiserDiagramProps {
   // Sprint 2A C8: per-sheet contractor signature block
   contractorName?: string;
   contractorLicense?: string;
+  // Sprint 2A H3: per-sheet ID
+  sheetId?: string;
 }
 
 export const RiserDiagram: React.FC<RiserDiagramProps> = ({
@@ -954,6 +1138,7 @@ export const RiserDiagram: React.FC<RiserDiagramProps> = ({
   servicePhase,
   contractorName,
   contractorLicense,
+  sheetId,
 }) => {
   const tree = buildRiserTree(
     panels,
@@ -993,7 +1178,7 @@ export const RiserDiagram: React.FC<RiserDiagramProps> = ({
 
   return (
     <Page size="LETTER" orientation="landscape" style={themeStyles.page}>
-      <BrandBar pageLabel="RISER DIAGRAM" />
+      <BrandBar pageLabel="RISER DIAGRAM" sheetId={sheetId} />
 
       <View style={themeStyles.titleBlock}>
         <Text style={themeStyles.docTitle}>Riser Diagram</Text>
@@ -1064,6 +1249,7 @@ export const RiserDiagram: React.FC<RiserDiagramProps> = ({
         projectName={projectName}
         contractorName={contractorName}
         contractorLicense={contractorLicense}
+        sheetId={sheetId}
       />
     </Page>
   );
@@ -1095,6 +1281,8 @@ interface LoadSummaryProps {
   // Sprint 2A C8: per-sheet contractor signature block
   contractorName?: string;
   contractorLicense?: string;
+  // Sprint 2A H3: per-sheet ID
+  sheetId?: string;
 }
 
 export const LoadCalculationSummary: React.FC<LoadSummaryProps> = ({
@@ -1108,6 +1296,7 @@ export const LoadCalculationSummary: React.FC<LoadSummaryProps> = ({
   multiFamilyContext,
   contractorName,
   contractorLicense,
+  sheetId,
 }) => {
   const mdp = panels.find(p => p.is_main);
   const occupancy = mapProjectTypeToOccupancy(projectType);
@@ -1149,7 +1338,7 @@ export const LoadCalculationSummary: React.FC<LoadSummaryProps> = ({
 
   return (
     <Page size="LETTER" style={themeStyles.page}>
-      <BrandBar pageLabel="LOAD CALCULATION" />
+      <BrandBar pageLabel="LOAD CALCULATION" sheetId={sheetId} />
 
       <View style={themeStyles.titleBlock}>
         <Text style={themeStyles.docTitle}>Load Calculation Summary</Text>
@@ -1336,6 +1525,7 @@ export const LoadCalculationSummary: React.FC<LoadSummaryProps> = ({
         projectName={projectName}
         contractorName={contractorName}
         contractorLicense={contractorLicense}
+        sheetId={sheetId}
       />
     </Page>
   );
@@ -1355,6 +1545,8 @@ interface ComplianceSummaryProps {
   // Sprint 2A C8: per-sheet contractor signature block
   contractorName?: string;
   contractorLicense?: string;
+  // Sprint 2A H3: per-sheet ID
+  sheetId?: string;
 }
 
 export const ComplianceSummary: React.FC<ComplianceSummaryProps> = ({
@@ -1366,6 +1558,7 @@ export const ComplianceSummary: React.FC<ComplianceSummaryProps> = ({
   necEdition = DEFAULT_NEC_EDITION,
   contractorName,
   contractorLicense,
+  sheetId,
 }) => {
   const mainPanel = panels.find(p => p.is_main);
   const totalCircuits = circuits.length;
@@ -1425,7 +1618,7 @@ export const ComplianceSummary: React.FC<ComplianceSummaryProps> = ({
 
   return (
     <Page size="LETTER" style={themeStyles.page}>
-      <BrandBar pageLabel="COMPLIANCE SUMMARY" />
+      <BrandBar pageLabel="COMPLIANCE SUMMARY" sheetId={sheetId} />
 
       <View style={themeStyles.titleBlock}>
         <Text style={themeStyles.docTitle}>NEC Compliance Summary</Text>
@@ -1505,6 +1698,7 @@ export const ComplianceSummary: React.FC<ComplianceSummaryProps> = ({
         projectName={projectName}
         contractorName={contractorName}
         contractorLicense={contractorLicense}
+        sheetId={sheetId}
       />
     </Page>
   );

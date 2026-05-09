@@ -110,17 +110,22 @@ export const styles = StyleSheet.create({
   colRightLoad: { width: '7%', fontSize: 7, textAlign: 'left' },
   colRightDescription: { width: '18%', fontSize: 7 },
   colRightCkt: { width: '5%', fontSize: 8, textAlign: 'center' },
+  // Sprint 2A H1+H2+H3 follow-up: tightened to recover vertical space lost
+  // to the C8 contractor block + sheet ID footer. 42-circuit panels were
+  // pushing the Load Summary + Dwelling Unit Demand sections past the page
+  // bottom; this layout fits both summary cards on one page for any panel
+  // size up through 42 circuits.
   summarySection: {
-    marginTop: 15,
-    padding: 10,
+    marginTop: 8,
+    padding: 6,
     borderWidth: 1,
     borderColor: '#000',
     borderStyle: 'solid',
   },
   summaryTitle: {
-    fontSize: 11,
+    fontSize: 9.5,
     fontFamily: 'Helvetica-Bold',
-    marginBottom: 8,
+    marginBottom: 4,
   },
   summaryGrid: {
     flexDirection: 'row',
@@ -130,11 +135,11 @@ export const styles = StyleSheet.create({
     alignItems: 'center',
   },
   summaryLabel: {
-    fontSize: 8,
-    marginBottom: 2,
+    fontSize: 7,
+    marginBottom: 1,
   },
   summaryValue: {
-    fontSize: 12,
+    fontSize: 10.5,
     fontFamily: 'Helvetica-Bold',
   },
   footer: {
@@ -227,6 +232,8 @@ interface PanelSchedulePDFProps {
   // Sprint 2A C8: per-sheet contractor signature block
   contractorName?: string;
   contractorLicense?: string;
+  // Sprint 2A H3: per-sheet ID
+  sheetId?: string;
 }
 
 // Main PDF Component for single panel — page-level fragment for embedding.
@@ -238,6 +245,7 @@ export const PanelSchedulePages: React.FC<PanelSchedulePDFProps> = ({
   datePreppared,
   contractorName,
   contractorLicense,
+  sheetId,
 }) => {
   // Filter EVEMS metadata marker circuits — they convey the NEC 625.42
   // setpoint to the load aggregator but aren't physical branches; rendering
@@ -286,7 +294,7 @@ export const PanelSchedulePages: React.FC<PanelSchedulePDFProps> = ({
 
   return (
     <Page size="LETTER" style={themeStyles.page}>
-      <BrandBar pageLabel={`PANEL SCHEDULE - ${panel.name}`} />
+      <BrandBar pageLabel={`PANEL SCHEDULE - ${panel.name}`} sheetId={sheetId} />
       <View style={themeStyles.titleBlock}>
         <Text style={themeStyles.docTitle}>Panel Schedule</Text>
         <Text style={themeStyles.docSubtitle}>
@@ -411,8 +419,10 @@ export const PanelSchedulePages: React.FC<PanelSchedulePDFProps> = ({
           )}
         </View>
 
-        {/* Phase Balancing Summary */}
-        <View style={styles.summarySection}>
+        {/* Phase Balancing Summary — wrap={false} keeps the entire card on
+            one page; with the contractor block + sheet ID footer reducing
+            the content area, react-pdf otherwise splits this card mid-content. */}
+        <View style={styles.summarySection} wrap={false}>
           <Text style={styles.summaryTitle}>Load Summary & Phase Balance</Text>
 
           <View style={styles.summaryGrid}>
@@ -466,7 +476,7 @@ export const PanelSchedulePages: React.FC<PanelSchedulePDFProps> = ({
             demand on a per-unit panel so AHJ reviewers don't read raw connected
             load (e.g. 36 kVA / 150 A) and assume the panel is over-capacity. */}
         {dwellingUnitDemand && (
-          <View style={styles.summarySection}>
+          <View style={styles.summarySection} wrap={false}>
             <Text style={styles.summaryTitle}>Dwelling Unit Demand (NEC 220.82 Optional Method)</Text>
             <View style={styles.summaryGrid}>
               <View style={styles.summaryItem}>
@@ -530,6 +540,7 @@ export const PanelSchedulePages: React.FC<PanelSchedulePDFProps> = ({
           projectName={projectName}
           contractorName={contractorName}
           contractorLicense={contractorLicense}
+          sheetId={sheetId}
         />
       </Page>
   );

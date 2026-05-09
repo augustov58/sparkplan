@@ -156,6 +156,8 @@ interface GroundingPlanDocumentProps {
   // Sprint 2A C8: per-sheet contractor signature block
   contractorName?: string;
   contractorLicense?: string;
+  // Sprint 2A H3: per-sheet ID
+  sheetId?: string;
 }
 
 export const GroundingPlanPages: React.FC<GroundingPlanDocumentProps> = ({
@@ -166,13 +168,14 @@ export const GroundingPlanPages: React.FC<GroundingPlanDocumentProps> = ({
   conductorMaterial,
   contractorName,
   contractorLicense,
+  sheetId,
 }) => {
   // Determine compliance status
   const isCompliant = grounding.electrodes && grounding.electrodes.length > 0 && grounding.gec_size;
 
   return (
     <Page size="LETTER" style={themeStyles.page}>
-        <BrandBar pageLabel="GROUNDING PLAN" />
+        <BrandBar pageLabel="GROUNDING PLAN" sheetId={sheetId} />
         <View style={themeStyles.titleBlock}>
           <Text style={themeStyles.docTitle}>Grounding Electrode System Plan</Text>
           <Text style={themeStyles.docSubtitle}>
@@ -392,6 +395,7 @@ export const GroundingPlanPages: React.FC<GroundingPlanDocumentProps> = ({
           projectName={projectName}
           contractorName={contractorName}
           contractorLicense={contractorLicense}
+          sheetId={sheetId}
         />
       </Page>
   );

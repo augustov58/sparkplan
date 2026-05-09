@@ -116,6 +116,12 @@ interface MeterStackScheduleProps {
   // Sprint 2A C8: per-sheet contractor signature block
   contractorName?: string;
   contractorLicense?: string;
+  /**
+   * Sprint 2A H3: per-sheet IDs aligned to meterStacks. sheetIds[i] becomes
+   * the sheet ID for stack[i]. When omitted or shorter than meterStacks,
+   * missing entries render without a sheet ID.
+   */
+  sheetIds?: string[];
 }
 
 function getMeterTypeLabel(type: string): string {
@@ -136,6 +142,7 @@ export const MeterStackScheduleDocument: React.FC<MeterStackScheduleProps> = ({
   panels,
   contractorName,
   contractorLicense,
+  sheetIds,
 }) => {
   const currentDate = new Date().toLocaleDateString('en-US', {
     year: 'numeric',
@@ -145,14 +152,16 @@ export const MeterStackScheduleDocument: React.FC<MeterStackScheduleProps> = ({
 
   return (
     <>
-      {meterStacks.map((meterStack) => {
+      {meterStacks.map((meterStack, idx) => {
         const stackMeters = meters
           .filter(m => m.meter_stack_id === meterStack.id)
           .sort((a, b) => (a.position_number || 0) - (b.position_number || 0));
 
+        const stackSheetId = sheetIds?.[idx];
+
         return (
           <Page key={meterStack.id} size="LETTER" style={themeStyles.page}>
-            <BrandBar pageLabel="METER STACK SCHEDULE" />
+            <BrandBar pageLabel="METER STACK SCHEDULE" sheetId={stackSheetId} />
 
             {/* Header */}
             <View style={themeStyles.titleBlock}>
@@ -269,6 +278,7 @@ export const MeterStackScheduleDocument: React.FC<MeterStackScheduleProps> = ({
               projectName={projectName}
               contractorName={contractorName}
               contractorLicense={contractorLicense}
+              sheetId={stackSheetId}
             />
           </Page>
         );

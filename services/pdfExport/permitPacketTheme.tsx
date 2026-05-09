@@ -43,8 +43,11 @@ export const themeStyles = StyleSheet.create({
   page: {
     paddingTop: 28,
     paddingHorizontal: 32,
-    // room for ContractorBlock (~28pt) + Footer (~26pt) at the bottom of every sheet
-    paddingBottom: 78,
+    // Room for ContractorBlock (~22pt incl. sig line) + Footer (~12pt) at the
+    // bottom of every sheet. Originally provisioned at 78pt which was generous
+    // and caused 42-circuit panel schedules to overflow; tightened to 64pt
+    // after measuring actual block heights.
+    paddingBottom: 64,
     fontSize: 9.5,
     fontFamily: 'Helvetica',
     color: '#111827',
@@ -64,6 +67,11 @@ export const themeStyles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
   },
+  brandBarRightGroup: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
   brandBolt: {
     width: 11,
     height: 11,
@@ -79,6 +87,37 @@ export const themeStyles = StyleSheet.create({
   brandBarRight: {
     color: '#cfd8cf',
     fontSize: 8,
+  },
+  // --- Sheet ID pill (Sprint 2A H3 — high-visibility plan-set sheet identifier) ---
+  // AHJ comment letters cite sheet IDs; the pill makes them scan-readable
+  // from across a desk. Yellow on dark background mirrors the brand bolt.
+  sheetIdPill: {
+    backgroundColor: BRAND_YELLOW,
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+    borderRadius: 3,
+  },
+  sheetIdPillText: {
+    color: BRAND_DARK,
+    fontSize: 9,
+    fontFamily: 'Helvetica-Bold',
+    letterSpacing: 0.8,
+  },
+  // --- Sheet ID badge in footer (smaller, paired with page number) ---
+  sheetIdFooterBadge: {
+    backgroundColor: '#fef3c7',
+    borderWidth: 0.75,
+    borderColor: BRAND_DARK,
+    paddingHorizontal: 5,
+    paddingVertical: 1,
+    borderRadius: 2,
+    marginRight: 4,
+  },
+  sheetIdFooterBadgeText: {
+    color: BRAND_DARK,
+    fontSize: 7,
+    fontFamily: 'Helvetica-Bold',
+    letterSpacing: 0.4,
   },
 
   // --- Document title block ---
@@ -378,15 +417,28 @@ export const themeStyles = StyleSheet.create({
 interface BrandBarProps {
   /** Right-aligned page label, e.g., "PERMIT APPLICATION" or "VOLTAGE DROP". */
   pageLabel: string;
+  /**
+   * Sprint 2A H3: per-sheet ID rendered after the page label, e.g., "301".
+   * Cover is conventionally `001`. Pass `undefined` for pages without a
+   * sheet ID (none today, but kept optional for future flexibility).
+   */
+  sheetId?: string;
 }
 
-export const BrandBar: React.FC<BrandBarProps> = ({ pageLabel }) => (
+export const BrandBar: React.FC<BrandBarProps> = ({ pageLabel, sheetId }) => (
   <View style={themeStyles.brandBar} fixed>
     <View style={themeStyles.brandBarLeft}>
       <View style={themeStyles.brandBolt} />
       <Text style={themeStyles.brandName}>SPARKPLAN</Text>
     </View>
-    <Text style={themeStyles.brandBarRight}>{pageLabel}</Text>
+    <View style={themeStyles.brandBarRightGroup}>
+      <Text style={themeStyles.brandBarRight}>{pageLabel}</Text>
+      {sheetId ? (
+        <View style={themeStyles.sheetIdPill}>
+          <Text style={themeStyles.sheetIdPillText}>{sheetId}</Text>
+        </View>
+      ) : null}
+    </View>
   </View>
 );
 
@@ -400,12 +452,19 @@ interface FooterProps {
    */
   contractorName?: string;
   contractorLicense?: string;
+  /**
+   * Sprint 2A H3: per-sheet ID. When provided, the center column shows
+   * "Sheet [sheetId]  \u2022  Page X of Y" instead of the bare "Page X of Y" \u2014
+   * AHJ comment letters cite sheet IDs, not raw page numbers.
+   */
+  sheetId?: string;
 }
 
 export const Footer: React.FC<FooterProps> = ({
   projectName,
   contractorName,
   contractorLicense,
+  sheetId,
 }) => (
   <>
     <ContractorBlock
@@ -416,10 +475,19 @@ export const Footer: React.FC<FooterProps> = ({
       <Text style={themeStyles.footerText}>
         SparkPlan {'\u2022'} {projectName}
       </Text>
-      <Text
-        style={themeStyles.footerText}
-        render={({ pageNumber, totalPages }) => `Page ${pageNumber} of ${totalPages}`}
-      />
+      <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+        {sheetId ? (
+          <View style={themeStyles.sheetIdFooterBadge}>
+            <Text style={themeStyles.sheetIdFooterBadgeText}>{sheetId}</Text>
+          </View>
+        ) : null}
+        <Text
+          style={themeStyles.footerText}
+          render={({ pageNumber, totalPages }) =>
+            `Page ${pageNumber} of ${totalPages}`
+          }
+        />
+      </View>
       <Text style={themeStyles.footerText}>Generated {todayStr()}</Text>
     </View>
   </>

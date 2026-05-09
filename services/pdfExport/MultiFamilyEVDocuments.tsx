@@ -252,11 +252,23 @@ interface MultiFamilyEVDocumentProps {
   // Sprint 2A C8: per-sheet contractor signature block
   contractorName?: string;
   contractorLicense?: string;
+  /**
+   * Sprint 2A H3: per-sheet IDs. Array of 3 strings, one per internal page
+   * (page 1 = system overview, page 2 = panel breakdown, page 3 = compliance
+   * narrative). When omitted, no sheet IDs render — kept optional so the
+   * standalone document export (outside the permit packet) still works.
+   */
+  sheetIds?: [string, string, string];
 }
 
 /**
  * Single Multi-Family EV Analysis — page-level fragment.
  * Use when embedding inside a parent <Document>.
+ *
+ * Renders 3 internal pages. Sprint 2A: each internal page gets its own
+ * sheet ID via the `sheetIds` array (a 3-tuple). The generator pushes
+ * 3 separate entries in the page list — but the component itself still
+ * emits all 3 in one call so the existing structure stays intact.
  */
 export const MultiFamilyEVPages: React.FC<MultiFamilyEVDocumentProps> = ({
   result,
@@ -265,6 +277,7 @@ export const MultiFamilyEVPages: React.FC<MultiFamilyEVDocumentProps> = ({
   preparedFor,
   contractorName,
   contractorLicense,
+  sheetIds,
 }) => {
   const currentDate = new Date().toLocaleDateString('en-US', {
     year: 'numeric',
@@ -275,7 +288,7 @@ export const MultiFamilyEVPages: React.FC<MultiFamilyEVDocumentProps> = ({
   return (
     <>
       <Page size="LETTER" style={themeStyles.page}>
-        <BrandBar pageLabel="MULTI-FAMILY EV READINESS" />
+        <BrandBar pageLabel="MULTI-FAMILY EV READINESS" sheetId={sheetIds?.[0]} />
         <View style={themeStyles.titleBlock}>
           <Text style={themeStyles.docTitle}>Multi-Family EV Readiness Analysis</Text>
           <Text style={themeStyles.docSubtitle}>
@@ -368,12 +381,13 @@ export const MultiFamilyEVPages: React.FC<MultiFamilyEVDocumentProps> = ({
           projectName={buildingName || 'Building Analysis'}
           contractorName={contractorName}
           contractorLicense={contractorLicense}
+          sheetId={sheetIds?.[0]}
         />
       </Page>
 
       {/* Page 2: Scenarios & Cost Comparison */}
       <Page size="LETTER" style={themeStyles.page}>
-        <BrandBar pageLabel="MULTI-FAMILY EV READINESS" />
+        <BrandBar pageLabel="MULTI-FAMILY EV READINESS" sheetId={sheetIds?.[1]} />
         <View style={themeStyles.titleBlock}>
           <Text style={themeStyles.docTitle}>EV Capacity Scenarios</Text>
           <Text style={themeStyles.docSubtitle}>{buildingName || 'Building Analysis'}</Text>
@@ -549,12 +563,13 @@ export const MultiFamilyEVPages: React.FC<MultiFamilyEVDocumentProps> = ({
           projectName={buildingName || 'Building Analysis'}
           contractorName={contractorName}
           contractorLicense={contractorLicense}
+          sheetId={sheetIds?.[1]}
         />
       </Page>
 
       {/* Page 3: Compliance & Load Breakdown */}
       <Page size="LETTER" style={themeStyles.page}>
-        <BrandBar pageLabel="MULTI-FAMILY EV READINESS" />
+        <BrandBar pageLabel="MULTI-FAMILY EV READINESS" sheetId={sheetIds?.[2]} />
         <View style={themeStyles.titleBlock}>
           <Text style={themeStyles.docTitle}>Compliance & Load Breakdown</Text>
           <Text style={themeStyles.docSubtitle}>{buildingName || 'Building Analysis'}</Text>
@@ -707,6 +722,7 @@ export const MultiFamilyEVPages: React.FC<MultiFamilyEVDocumentProps> = ({
           projectName={buildingName || 'Building Analysis'}
           contractorName={contractorName}
           contractorLicense={contractorLicense}
+          sheetId={sheetIds?.[2]}
         />
       </Page>
     </>

@@ -194,6 +194,8 @@ interface CalcProps {
   // Sprint 2A C8: per-sheet contractor signature block
   contractorName?: string;
   contractorLicense?: string;
+  // Sprint 2A H3: per-sheet ID
+  sheetId?: string;
 }
 
 export const ShortCircuitCalculationPages: React.FC<CalcProps> = ({
@@ -203,12 +205,13 @@ export const ShortCircuitCalculationPages: React.FC<CalcProps> = ({
   panelName,
   contractorName,
   contractorLicense,
+  sheetId,
 }) => {
   const results = calculation.results as unknown as ShortCircuitResult;
 
   return (
     <Page size="LETTER" style={themeStyles.page}>
-        <BrandBar pageLabel="SHORT CIRCUIT ANALYSIS" />
+        <BrandBar pageLabel="SHORT CIRCUIT ANALYSIS" sheetId={sheetId} />
         <View style={themeStyles.titleBlock}>
           <Text style={themeStyles.docTitle}>Short Circuit Calculation Report</Text>
           <Text style={themeStyles.docSubtitle}>
@@ -378,6 +381,7 @@ export const ShortCircuitCalculationPages: React.FC<CalcProps> = ({
           projectName={projectName}
           contractorName={contractorName}
           contractorLicense={contractorLicense}
+          sheetId={sheetId}
         />
       </Page>
   );

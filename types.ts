@@ -179,9 +179,24 @@ export interface ProjectSettings {
   temperatureRating: 60 | 75 | 90;
   utilityProvider?: string;
   permitNumber?: string;
-  
+
   // Residential-specific settings (only used when occupancyType === 'dwelling')
   residential?: ResidentialSettings;
+
+  /**
+   * Sprint 2A H1+H2+H3: per-section toggles for the permit packet generator.
+   * Stored as a partial of the full `PacketSections` shape — keys absent from
+   * this object fall back to `DEFAULT_SECTIONS` (all-on) at packet-generation
+   * time. Cover sheet is always-on and not represented here. Persists to the
+   * `projects.settings` JSON column so the contractor's per-project toggle
+   * preferences survive page reloads.
+   *
+   * Type intentionally shaped as `Record<string, boolean>` rather than
+   * `Partial<PacketSections>` to avoid a circular import from
+   * `services/pdfExport/packetSections.ts` into `types.ts`. The packet
+   * generator narrows to `Partial<PacketSections>` at the boundary.
+   */
+  sectionPreferences?: Record<string, boolean>;
 }
 
 export interface Project {

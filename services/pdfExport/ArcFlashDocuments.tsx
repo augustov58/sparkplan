@@ -144,6 +144,8 @@ interface ArcFlashDocumentProps {
   // Sprint 2A C8: per-sheet contractor signature block
   contractorName?: string;
   contractorLicense?: string;
+  // Sprint 2A H3: per-sheet ID
+  sheetId?: string;
 }
 
 export const ArcFlashPages: React.FC<ArcFlashDocumentProps> = ({
@@ -153,6 +155,7 @@ export const ArcFlashPages: React.FC<ArcFlashDocumentProps> = ({
   arcFlashData,
   contractorName,
   contractorLicense,
+  sheetId,
 }) => {
   const { result } = arcFlashData;
   const formatNumber = (value: number | undefined, digits: number, fallback = 'N/A') =>
@@ -200,7 +203,7 @@ export const ArcFlashPages: React.FC<ArcFlashDocumentProps> = ({
 
   return (
     <Page size="LETTER" style={themeStyles.page}>
-        <BrandBar pageLabel="ARC FLASH ANALYSIS" />
+        <BrandBar pageLabel="ARC FLASH ANALYSIS" sheetId={sheetId} />
         <View style={themeStyles.titleBlock}>
           <Text style={themeStyles.docTitle}>Arc Flash Hazard Analysis</Text>
           <Text style={themeStyles.docSubtitle}>
@@ -326,6 +329,7 @@ export const ArcFlashPages: React.FC<ArcFlashDocumentProps> = ({
           projectName={projectName}
           contractorName={contractorName}
           contractorLicense={contractorLicense}
+          sheetId={sheetId}
         />
       </Page>
   );
