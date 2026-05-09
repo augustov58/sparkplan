@@ -7,13 +7,17 @@
  * @module services/inspection/inspectorMode
  * 
  * Key NEC Articles Covered:
- * - NEC 210 - Branch Circuits
+ * - NEC 110.3(B) - Equipment used per its listing (panel slot capacity)
+ * - NEC 210 - Branch Circuits (loading, 3-pole-in-1-phase)
  * - NEC 215 - Feeders
  * - NEC 220 - Branch-Circuit, Feeder, and Service Load Calculations
- * - NEC 240 - Overcurrent Protection
  * - NEC 250 - Grounding and Bonding
  * - NEC 408 - Switchboards, Switchgear, and Panelboards
- * - NEC 430 - Motors
+ *
+ * NOTE: SparkPlan does not size individual branch-circuit conductors
+ * (we size feeders only). Branch-circuit NEC 240.4(D) auditing is
+ * intentionally NOT performed here — it is enforced where it belongs,
+ * inside the feeder/conductor sizing tools (services/calculations/conductorSizing.ts).
  */
 
 import type { Database } from '@/lib/database.types';
@@ -94,19 +98,6 @@ export interface ProjectInspectionData {
 // ============================================================================
 // CONSTANTS - NEC TABLES
 // ============================================================================
-
-/**
- * NEC 240.4(D) - Small Conductor Protection Limits
- * Maximum overcurrent protection for small conductors
- */
-const CONDUCTOR_PROTECTION_LIMITS: Record<string, { maxAmps: number; material: 'Cu' | 'Al' }> = {
-  '14 AWG Cu': { maxAmps: 15, material: 'Cu' },
-  '12 AWG Cu': { maxAmps: 20, material: 'Cu' },
-  '10 AWG Cu': { maxAmps: 30, material: 'Cu' },
-  '14 AWG Al': { maxAmps: 15, material: 'Al' },
-  '12 AWG Al': { maxAmps: 15, material: 'Al' },
-  '10 AWG Al': { maxAmps: 25, material: 'Al' },
-};
 
 /**
  * NEC Table 250.122 - EGC Sizing
@@ -207,46 +198,52 @@ function countPanelPoles(panelId: string, circuits: Circuit[]): number {
 // ============================================================================
 
 /**
- * NEC 408.36 - Panel Maximum Poles
- * Maximum of 42 overcurrent devices (excluding main)
+ * Panel Slot Capacity Check (NEC 110.3(B))
+ *
+ * Modern panelboards must be used within the slot count they are listed for.
+ * (NEC 408.36's hard 42-OCPD cap was deleted in NEC 2008 — the limit is now
+ * the panel's UL listing, captured per-panel in `panels.num_spaces`.)
+ *
+ * Fallback mirrors the legacy default used in PanelSchedule.tsx and
+ * OneLineDiagram.tsx for any panel row that predates the column.
  */
 function checkPanelMaxPoles(panel: Panel, circuits: Circuit[]): InspectionIssue | null {
   const polesUsed = countPanelPoles(panel.id, circuits);
-  const MAX_POLES = 42;
-  
-  if (polesUsed > MAX_POLES) {
+  const slotCapacity = panel.num_spaces ?? (panel.is_main ? 30 : 42);
+
+  if (polesUsed > slotCapacity) {
     return {
       id: generateId(),
       category: 'panel',
       severity: 'critical',
-      necArticle: 'NEC 408.36',
-      title: 'Panel Exceeds Maximum Overcurrent Devices',
-      description: `Panel ${panel.name} has ${polesUsed} poles installed, exceeding the maximum of ${MAX_POLES} overcurrent devices permitted per NEC 408.36.`,
+      necArticle: 'NEC 110.3(B)',
+      title: 'Panel Exceeds Listed Slot Capacity',
+      description: `Panel ${panel.name} has ${polesUsed} poles installed in a ${slotCapacity}-space enclosure. Equipment must be used within its listed capacity per NEC 110.3(B).`,
       location: panel.name,
-      currentValue: polesUsed,
-      requiredValue: MAX_POLES,
-      recommendation: `Consider upgrading to a larger panel (e.g., 400A with 84 spaces) or splitting loads between multiple panels.`,
+      currentValue: `${polesUsed} poles`,
+      requiredValue: `≤ ${slotCapacity} poles`,
+      recommendation: `Remove circuits or upgrade to a larger panel. Consider redistributing loads to a sub-panel.`,
       autoFixable: false,
     };
   }
-  
+
   // Warning if approaching limit
-  if (polesUsed > MAX_POLES * 0.9) {
+  if (polesUsed > slotCapacity * 0.9) {
     return {
       id: generateId(),
       category: 'panel',
       severity: 'warning',
-      necArticle: 'NEC 408.36',
-      title: 'Panel Near Maximum Capacity',
-      description: `Panel ${panel.name} is using ${polesUsed} of ${MAX_POLES} available poles (${Math.round(polesUsed / MAX_POLES * 100)}%).`,
+      necArticle: 'NEC 110.3(B)',
+      title: 'Panel Near Slot Capacity',
+      description: `Panel ${panel.name} is using ${polesUsed} of ${slotCapacity} available slots (${Math.round((polesUsed / slotCapacity) * 100)}%).`,
       location: panel.name,
-      currentValue: polesUsed,
-      requiredValue: MAX_POLES,
+      currentValue: `${polesUsed} poles`,
+      requiredValue: `≤ ${slotCapacity} poles`,
       recommendation: `Plan for future expansion. Consider upgrading panel if additional circuits are anticipated.`,
       autoFixable: false,
     };
   }
-  
+
   return null;
 }
 
@@ -311,42 +308,6 @@ function checkPanelBusLoading(
 }
 
 /**
- * NEC 240.4(D) - Small Conductor Protection
- * Check that conductors are protected by appropriate OCPD
- */
-function checkConductorProtection(circuit: Circuit, panelName: string): InspectionIssue | null {
-  const conductor = circuit.conductor_size;
-  const breakerAmps = circuit.breaker_amps;
-  
-  // Check if conductor is in protection limits table
-  const limitKey = Object.keys(CONDUCTOR_PROTECTION_LIMITS).find(k => 
-    conductor.includes(k.split(' ')[0]) && 
-    (conductor.toLowerCase().includes('cu') || !conductor.toLowerCase().includes('al'))
-  );
-  
-  if (limitKey) {
-    const limit = CONDUCTOR_PROTECTION_LIMITS[limitKey];
-    if (limit && breakerAmps > limit.maxAmps) {
-      return {
-        id: generateId(),
-        category: 'conductor',
-        severity: 'critical',
-        necArticle: 'NEC 240.4(D)',
-        title: 'Conductor Overcurrent Protection Exceeded',
-        description: `Circuit ${circuit.circuit_number} (${circuit.description}) uses ${conductor} conductor on ${breakerAmps}A breaker. NEC 240.4(D) limits this conductor to ${limit.maxAmps}A protection.`,
-        location: `${panelName}, Circuit ${circuit.circuit_number}`,
-        currentValue: `${breakerAmps}A breaker`,
-        requiredValue: `≤ ${limit.maxAmps}A`,
-        recommendation: `Reduce breaker to ${limit.maxAmps}A or upsize conductor to accommodate ${breakerAmps}A protection.`,
-        autoFixable: false,
-      };
-    }
-  }
-  
-  return null;
-}
-
-/**
  * NEC 250.122 - EGC Sizing
  * Equipment grounding conductor must be sized per OCPD
  */
@@ -386,40 +347,86 @@ function checkEgcSizing(circuit: Circuit, panelName: string): InspectionIssue | 
 }
 
 /**
- * Receptacle Circuit VA/Outlet Check
- * Standard assumption is 180VA per general-purpose receptacle
+ * NEC 210.20(A) - Branch Circuit Overcurrent Protection vs Load
+ *
+ * SparkPlan does not size individual branch-circuit conductors, but it DOES
+ * audit that the user's chosen breaker amps can handle the user's chosen
+ * load_watts at the appropriate circuit voltage. The voltage seen by the
+ * circuit depends on pole count and panel phase:
+ *   - 1-pole on a 1Φ panel:        line-to-neutral (e.g., 120V from 120/240V)
+ *   - 2-pole on a 1Φ panel:        line-to-line   (e.g., 240V from 120/240V)
+ *   - 1-pole on a 3Φ panel:        line-to-neutral (e.g., 120V from 208Y/120, 277V from 480Y/277)
+ *   - 2-pole on a 3Φ panel:        line-to-line   (e.g., 208V from 208Y/120, 480V from 480Y/277)
+ *   - 3-pole on a 3Φ panel:        full 3-phase capacity = breaker × VLL × √3
+ *
+ * Severity:
+ *   - critical: load exceeds breaker capacity outright (breaker would trip).
+ *   - warning:  load exceeds 80% of breaker (NEC 210.20(A) continuous-load rule:
+ *               OCPD must be ≥ 125% × continuous load, i.e. continuous load ≤ 80%).
  */
-function checkReceptacleLoading(circuit: Circuit, panelName: string): InspectionIssue | null {
-  // Only check receptacle circuits
-  if (circuit.load_type !== 'R') return null;
-  
-  const loadWatts = circuit.load_watts;
-  const breakerAmps = circuit.breaker_amps;
-  
-  // Calculate maximum VA for circuit
-  const maxVA = breakerAmps * 120; // Assuming 120V receptacle circuit
-  
-  // Estimate outlets (180VA per outlet assumption)
-  const estimatedOutlets = Math.ceil(loadWatts / 180);
-  const vaPerOutlet = estimatedOutlets > 0 ? loadWatts / estimatedOutlets : 0;
-  
-  // If load exceeds circuit capacity
-  if (loadWatts > maxVA * 0.8) { // 80% loading rule
+function checkCircuitLoading(circuit: Circuit, panel: Panel): InspectionIssue | null {
+  const loadVA = circuit.load_watts ?? 0;
+  const breakerAmps = circuit.breaker_amps ?? 0;
+  if (loadVA <= 0 || breakerAmps <= 0) return null;
+
+  const lineToLine = panel.voltage;
+  const lineToNeutral =
+    panel.phase === 3
+      ? lineToLine / Math.sqrt(3)
+      : lineToLine === 120
+      ? 120 // 120V-only panel (no neutral split)
+      : lineToLine / 2; // 120/240V split-phase
+
+  let circuitVoltage: number;
+  let breakerVA: number;
+  if (circuit.pole === 1) {
+    circuitVoltage = lineToNeutral;
+    breakerVA = breakerAmps * lineToNeutral;
+  } else if (circuit.pole === 2) {
+    circuitVoltage = lineToLine;
+    breakerVA = breakerAmps * lineToLine;
+  } else {
+    // 3-pole 3-phase
+    circuitVoltage = lineToLine;
+    breakerVA = breakerAmps * lineToLine * Math.sqrt(3);
+  }
+
+  const utilizationPct = (loadVA / breakerVA) * 100;
+  const desc = circuit.description || `Circuit ${circuit.circuit_number}`;
+  const location = `${panel.name}, Circuit ${circuit.circuit_number}`;
+
+  if (utilizationPct > 100) {
     return {
       id: generateId(),
-      category: 'circuit',
-      severity: 'warning',
-      necArticle: 'NEC 210.21(B)',
-      title: 'Receptacle Circuit High Loading',
-      description: `Circuit ${circuit.circuit_number} (${circuit.description}) has ${loadWatts}VA load on ${breakerAmps}A circuit (${Math.round(loadWatts / maxVA * 100)}% utilized).`,
-      location: `${panelName}, Circuit ${circuit.circuit_number}`,
-      currentValue: `${loadWatts}VA`,
-      requiredValue: `≤ ${Math.round(maxVA * 0.8)}VA (80%)`,
-      recommendation: `Consider splitting loads between multiple circuits or reducing outlet count.`,
+      category: 'protection',
+      severity: 'critical',
+      necArticle: 'NEC 210.20(A)',
+      title: 'Circuit Overloaded — Breaker Undersized',
+      description: `Circuit ${circuit.circuit_number} (${desc}) carries ${loadVA} VA on a ${breakerAmps}A / ${Math.round(circuitVoltage)}V ${circuit.pole}-pole breaker (capacity ${Math.round(breakerVA)} VA, ${Math.round(utilizationPct)}% utilized). Load exceeds breaker rating.`,
+      location,
+      currentValue: `${loadVA} VA on ${breakerAmps}A`,
+      requiredValue: `≤ ${Math.round(breakerVA)} VA (or upsize breaker)`,
+      recommendation: `Upsize the breaker to handle the load, or split the load across multiple circuits.`,
       autoFixable: false,
     };
   }
-  
+
+  if (utilizationPct > 80) {
+    return {
+      id: generateId(),
+      category: 'protection',
+      severity: 'warning',
+      necArticle: 'NEC 210.20(A)',
+      title: 'Circuit Loading Exceeds 80% of Breaker',
+      description: `Circuit ${circuit.circuit_number} (${desc}) is at ${Math.round(utilizationPct)}% of the ${breakerAmps}A / ${Math.round(circuitVoltage)}V breaker. NEC 210.20(A) requires OCPD ≥ 125% of continuous load (i.e., continuous load ≤ 80%).`,
+      location,
+      currentValue: `${Math.round(utilizationPct)}%`,
+      requiredValue: '≤ 80%',
+      recommendation: `If this load is continuous (3+ hours), upsize the breaker so the load is ≤ 80% of its rating.`,
+      autoFixable: false,
+    };
+  }
+
   return null;
 }
 
@@ -760,20 +767,22 @@ export function runInspection(data: ProjectInspectionData): InspectionResult {
   // ============================================================
   
   data.panels.forEach(panel => {
-    // NEC 408.36 - Max poles
+    // NEC 110.3(B) - Panel slot capacity (per UL listing / panels.num_spaces)
     const maxPolesIssue = checkPanelMaxPoles(panel, data.circuits);
     if (maxPolesIssue) {
       issues.push(maxPolesIssue);
-      necArticlesReferenced.add('NEC 408.36');
+      necArticlesReferenced.add('NEC 110.3(B)');
     } else {
+      const slotCapacity = panel.num_spaces ?? (panel.is_main ? 30 : 42);
+      const polesUsed = countPanelPoles(panel.id, data.circuits);
       passedChecks.push({
         id: generateId(),
         category: 'panel',
-        necArticle: 'NEC 408.36',
-        description: `Panel ${panel.name}: Pole count within limits`,
+        necArticle: 'NEC 110.3(B)',
+        description: `Panel ${panel.name}: ${polesUsed} of ${slotCapacity} slots used (within listed capacity)`,
         passed: true,
       });
-      necArticlesReferenced.add('NEC 408.36');
+      necArticlesReferenced.add('NEC 110.3(B)');
     }
     
     // Bus loading check
@@ -851,25 +860,22 @@ export function runInspection(data: ProjectInspectionData): InspectionResult {
   // CIRCUIT CHECKS
   // ============================================================
   
+  // NOTE: SparkPlan does not size individual branch-circuit conductors —
+  // we only size feeders. So branch-circuit conductor sizing (NEC 240.4(D))
+  // and branch-circuit EGC sizing (NEC 250.122) are intentionally NOT audited
+  // here. Both rules are enforced inside the feeder/conductor sizing tools.
+  //
+  // What we DO audit at the circuit level: that the breaker (the OCPD the
+  // user picked) is rated for the load (the load_watts the user entered).
+  // This is independent of conductor sizing — it's pure NEC 210.20(A).
   data.circuits.forEach(circuit => {
     const panel = data.panels.find(p => p.id === circuit.panel_id);
-    const panelName = panel?.name || 'Unknown Panel';
+    if (!panel) return;
 
-    // Conductor protection
-    const conductorIssue = checkConductorProtection(circuit, panelName);
-    if (conductorIssue) {
-      issues.push(conductorIssue);
-      necArticlesReferenced.add('NEC 240.4(D)');
-    }
-
-    // NOTE: EGC sizing is NOT checked at circuit level - we don't track EGC for branch circuits
-    // EGC is only specified on feeders, which are checked in the FEEDER CHECKS section below
-
-    // Receptacle loading
-    const receptacleIssue = checkReceptacleLoading(circuit, panelName);
-    if (receptacleIssue) {
-      issues.push(receptacleIssue);
-      necArticlesReferenced.add('NEC 210.21(B)');
+    const loadingIssue = checkCircuitLoading(circuit, panel);
+    if (loadingIssue) {
+      issues.push(loadingIssue);
+      necArticlesReferenced.add('NEC 210.20(A)');
     }
   });
   
