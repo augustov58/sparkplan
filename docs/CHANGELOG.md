@@ -4,6 +4,37 @@ All notable changes to SparkPlan.
 
 ---
 
+## 2026-05-09: Estimating Beta v1 — Phase 1 implementation (branch `feat/estimating-beta-v1`)
+
+Replaces the `EstimatingStub` page (PR #29 demand-discovery) with a real estimating module. Phase 1 of the Estimating feature per `docs/plans/estimating-implementation.md`.
+
+**User-facing changes:**
+
+- **`/estimating` route now functional.** Tabbed page (Overview / Takeoff / Materials / Labor / Bid Output) replaces the demand-discovery stub.
+- **Estimate list view + create flow.** Each project supports multiple estimates (initial bid, revisions). Status pills (`draft` / `submitted` / `accepted` / `rejected` / `expired` / `cancelled`).
+- **Auto-takeoff from project — the differentiator.** When the user creates an estimate with the "Auto-populate" checkbox, SparkPlan walks panels (MDP first, then sub-panels), transformers, feeders (phase + neutral + EGC + conduit + labor), and branch circuits (grouped per panel + bundled labor) and emits seed line items with starter pricing. The contractor edits anything in the takeoff.
+- **Bid PDF generation** via `@react-pdf/renderer`. Cover (customer block, totals card, scope), detailed line items grouped by category with subtotals, terms (exclusions, payment terms, validity), dual signature lines. Reuses BrandBar / Footer from the permit-packet theme.
+- **Clone-as-revision** — creates a new estimate with `revision = parent + 1` and copies line items. Prior revisions stay as-is for audit trail.
+- **Status transitions** enforced via state machine. Submitting auto-sets `submitted_at` + 30-day `expires_at`; accept/reject sets `decided_at`.
+
+**Why this matters**: External market research ranked estimating + job costing as the **#1 CRITICAL** unmet pain point for $1M-$10M small electrical shops. IntelliBid is $3,000+ perpetual + desktop-only; Accubid is enterprise-priced. Nothing modern and affordable starts from an existing electrical model. SparkPlan's auto-takeoff is unique to its data model.
+
+**Technical:**
+
+- New migration `supabase/migrations/20260511_estimates_and_line_items.sql` (additive; not yet applied — user runs it). Tables: `estimates` (header, denormalized totals, lineage via `parent_estimate_id`), `estimate_line_items` (detail with soft FK `source_id`). Full RLS, indexes, realtime publication.
+- New pure-function services in `services/estimating/`: `estimateMath.ts`, `estimateStatusTransitions.ts`, `defaultPricing.ts`, `autoTakeoffFromProject.ts`, `estimatePdfGenerator.tsx`. All follow CLAUDE.md calculation rules — no DB / hooks / side effects, never throw, return result with warnings.
+- New hooks `useEstimates` + `useEstimateLineItems`. `useEstimateLineItems.bulkInsert` is a single round-trip insert used by auto-takeoff.
+- New UI in `components/Estimating/`: `EstimatingPage`, `EstimatesListView`, `EstimateDetailView` (with `?tab=` URL persistence), `EstimateOverviewTab`, `LineItemsTab`, `EstimateLineItemRow`, `BidOutputTab`, `EstimateStatusPill`.
+- `App.tsx` — replaces `EstimatingStub` lazy import with `EstimatingPage`. FeatureGate + Suspense unchanged.
+- `services/ai/projectContextBuilder.ts` — `buildProjectContext` accepts an optional `estimates` array; `formatContextForAI` surfaces count + most-recent. Phase 3 will expand this.
+- `lib/database.types.ts` — extended manually with new Row/Insert/Update shapes.
+- `lib/dataRefreshEvents.ts`, `lib/toast.ts`, `lib/validation-schemas.ts` — extended with estimating event keys, toast messages, and Zod schemas (advisory).
+- `components/EstimatingStub.tsx` — deleted.
+
+**Tests**: 34 new in `tests/estimating/`. Suite at 129 passing (was 95). Build clean (5s).
+
+---
+
 ## 2026-05-09: Permits Beta v1 — Phase 1 implementation (in PR, branch `feat/permits-beta-v1`)
 
 Replaces the PR #29 `PermitsStub` with the real Permits feature. The new tabbed page lives at `/project/:id/permits` and provides the full submission → inspection lifecycle entrypoint for contractors.

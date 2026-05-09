@@ -181,6 +181,32 @@ export const toastMessages = {
     error: 'Failed to save profile',
   },
 
+  // Estimates
+  estimate: {
+    created: 'Estimate created',
+    updated: 'Estimate updated',
+    deleted: 'Estimate deleted',
+    cloned: 'Revision created from estimate',
+    statusChanged: 'Estimate status updated',
+    pdfGenerated: 'Bid PDF generated',
+    pdfError: 'Failed to generate bid PDF',
+    error: 'Failed to update estimate',
+    deleteError: 'Failed to delete estimate',
+    autoTakeoff: (count: number) =>
+      count === 0
+        ? 'No source rows yet — add panels or feeders to your project for auto-takeoff'
+        : `Auto-takeoff added ${count} line item${count === 1 ? '' : 's'} from project`,
+  },
+
+  // Estimate line items
+  estimateLineItem: {
+    created: 'Line item added',
+    updated: 'Line item updated',
+    deleted: 'Line item removed',
+    bulkCreated: (count: number) => `${count} line items added`,
+    error: 'Failed to update line item',
+  },
+
   // Support Tickets
   supportTicket: {
     created: "Support ticket submitted! We'll get back to you soon.",
