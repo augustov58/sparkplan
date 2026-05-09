@@ -1730,3 +1730,860 @@ export const ComplianceSummary: React.FC<ComplianceSummaryProps> = ({
   );
 };
 
+// ============================================================================
+// NEC 220.87 EXISTING-SERVICE NARRATIVE (Sprint 2A H14)
+// ============================================================================
+// Required by Orlando's "EV Charging Station Permit Checklist" existing-service
+// path. Renders the structured 3-condition checklist mandated by NEC 220.87 so
+// AHJ intake reviewers can confirm: (1) maximum demand data is available for a
+// 1-year period, (2) max demand x 125% + new load <= ampacity, (3) OCPD per
+// NEC 240.4 + service overload protection per NEC 230.90. Contractor signs off
+// on the conditions; the page itself is the audit trail the AHJ reviews.
+//
+// Driven by an opt-in `nec22087Narrative` data block on PermitPacketData. The
+// section toggle auto-disables in the UI when no data block is provided.
+
+/**
+ * Method by which the existing maximum demand was determined. Mirrors
+ * `ExistingLoadDeterminationMethod` from `types.ts` but kept narrow to the
+ * three NEC 220.87-recognized methods that produce a citation; "manual" is
+ * accepted but flagged in the page as informational only (AHJs typically
+ * require billing data or a load study, not a hand-entered value).
+ */
+export type NEC22087Method = 'utility_bill' | 'load_study' | 'calculated' | 'manual';
+
+export interface NEC22087NarrativeData {
+  /** How the existing maximum demand was determined (drives Condition 1 wording). */
+  method: NEC22087Method;
+  /** Free-text citation: "FPL utility billing, account #12345-67, Sept 2024 - Aug 2025". */
+  dataSourceCitation: string;
+  /** ISO yyyy-mm-dd; start of the 12-month observation window. */
+  dateRangeFrom: string;
+  /** ISO yyyy-mm-dd; end of the 12-month observation window. */
+  dateRangeTo: string;
+  /** Maximum demand observed during the window, in kVA (per NEC 220.87 input). */
+  maxDemandKVA: number;
+  /** Sum of proposed new loads being added (e.g., new EVSE bank), in kVA. */
+  proposedNewLoadKVA: number;
+  /** Existing service ampacity rating (the number stamped on the meter / main). */
+  serviceCapacityAmps: number;
+  /** Service voltage in volts (typically 120/240 single-phase or 208/480 3-phase). */
+  serviceVoltage: number;
+  /** Service phase: 1-phase or 3-phase. */
+  servicePhase: 1 | 3;
+  /** Free-text confirmation of NEC 240.4 OCPD compliance (e.g., "Existing 200A main breaker"). */
+  ocpdNotes?: string;
+  /** Free-text confirmation of NEC 230.90 service overload protection. */
+  serviceOverloadNotes?: string;
+}
+
+interface NEC22087NarrativePageProps {
+  projectName: string;
+  data: NEC22087NarrativeData;
+  contractorName?: string;
+  contractorLicense?: string;
+  sheetId?: string;
+}
+
+const METHOD_LABEL: Record<NEC22087Method, string> = {
+  utility_bill: 'Utility billing data \u2014 12-month peak demand',
+  load_study: 'Recording load study \u2014 30-day at 15-minute intervals',
+  calculated: 'Calculated from existing panel schedule \u2014 NEC 220.82/220.84 demand factors',
+  manual: 'Manual entry (informational only \u2014 AHJ may require source documentation)',
+};
+
+const METHOD_NEC_REF: Record<NEC22087Method, string> = {
+  utility_bill: 'NEC 220.87 Method 1 \u2014 actual maximum demand',
+  load_study: 'NEC 220.87 Method 1 \u2014 actual maximum demand (load study)',
+  calculated: 'NEC 220.87 Method 2 \u2014 calculated using NEC 220.82/220.84',
+  manual: 'NEC 220.87 \u2014 method unspecified',
+};
+
+const serviceCapacityKVA = (amps: number, volts: number, phase: 1 | 3): number => {
+  if (phase === 3) return (amps * volts * 1.732) / 1000;
+  return (amps * volts) / 1000;
+};
+
+export const NEC22087NarrativePage: React.FC<NEC22087NarrativePageProps> = ({
+  projectName,
+  data,
+  contractorName,
+  contractorLicense,
+  sheetId,
+}) => {
+  const capacityKVA = serviceCapacityKVA(
+    data.serviceCapacityAmps,
+    data.serviceVoltage,
+    data.servicePhase,
+  );
+  // NEC 220.87: measured methods (utility bill / load study) use the value
+  // directly; calculated/manual methods apply the 125% safety multiplier.
+  const isMeasured = data.method === 'utility_bill' || data.method === 'load_study';
+  const adjustedExisting = isMeasured ? data.maxDemandKVA : data.maxDemandKVA * 1.25;
+  const totalFutureDemand = adjustedExisting + data.proposedNewLoadKVA;
+  const utilizationPct = capacityKVA > 0 ? (totalFutureDemand / capacityKVA) * 100 : 0;
+  const isCompliant = totalFutureDemand <= capacityKVA;
+
+  return (
+    <Page size="LETTER" style={themeStyles.page}>
+      <BrandBar pageLabel="NEC 220.87 NARRATIVE" sheetId={sheetId} />
+
+      <View style={themeStyles.titleBlock}>
+        <Text style={themeStyles.docTitle}>Existing Service Capacity Verification</Text>
+        <Text style={themeStyles.docSubtitle}>
+          {`${projectName} \u2022 NEC 220.87 \u2014 Determining Existing Loads`}
+        </Text>
+      </View>
+
+      <View style={themeStyles.summaryRow}>
+        <View style={themeStyles.summaryCard}>
+          <Text style={themeStyles.summaryLabel}>Service Capacity</Text>
+          <Text style={themeStyles.summaryValue}>
+            {data.serviceCapacityAmps}
+            <Text style={themeStyles.summaryUnit}>A</Text>
+          </Text>
+          <Text style={themeStyles.summarySub}>
+            {`${data.serviceVoltage}V ${phaseLabel(data.servicePhase)} \u2022 ${capacityKVA.toFixed(1)} kVA`}
+          </Text>
+        </View>
+        <View style={themeStyles.summaryCard}>
+          <Text style={themeStyles.summaryLabel}>Existing Max Demand</Text>
+          <Text style={themeStyles.summaryValue}>
+            {data.maxDemandKVA.toFixed(1)}
+            <Text style={themeStyles.summaryUnit}>kVA</Text>
+          </Text>
+          <Text style={themeStyles.summarySub}>
+            {isMeasured ? 'measured (no 125% mult.)' : 'calculated x 1.25'}
+          </Text>
+        </View>
+        <View style={themeStyles.summaryCard}>
+          <Text style={themeStyles.summaryLabel}>Proposed New Load</Text>
+          <Text style={themeStyles.summaryValue}>
+            {data.proposedNewLoadKVA.toFixed(1)}
+            <Text style={themeStyles.summaryUnit}>kVA</Text>
+          </Text>
+          <Text style={themeStyles.summarySub}>added to existing</Text>
+        </View>
+        <View style={isCompliant ? themeStyles.summaryCardHighlight : themeStyles.summaryCard}>
+          <Text style={themeStyles.summaryLabel}>Total Future Demand</Text>
+          <Text style={themeStyles.summaryValue}>
+            {totalFutureDemand.toFixed(1)}
+            <Text style={themeStyles.summaryUnit}>kVA</Text>
+          </Text>
+          <Text style={themeStyles.summarySub}>{`${utilizationPct.toFixed(1)}% utilization`}</Text>
+        </View>
+      </View>
+
+      <View wrap={false}>
+        <Text style={themeStyles.sectionTitle}>CONDITIONS PER NEC 220.87</Text>
+
+        <View style={{ flexDirection: 'row', marginTop: 4, marginBottom: 6 }}>
+          <Text style={{ fontSize: 9, fontFamily: 'Helvetica-Bold', width: 18, color: '#1f2937' }}>1.</Text>
+          <View style={{ flex: 1 }}>
+            <Text
+              style={{
+                fontSize: 9,
+                fontFamily: 'Helvetica-Bold',
+                color: '#111827',
+                marginBottom: 1,
+              }}
+            >
+              Maximum demand data is available for a 1-year period (NEC 220.87(1))
+            </Text>
+            <Text style={{ fontSize: 8.5, color: '#374151', lineHeight: 1.4 }}>
+              {`Method: ${METHOD_LABEL[data.method]}. ${METHOD_NEC_REF[data.method]}.`}
+            </Text>
+            <Text
+              style={{ fontSize: 8.5, color: '#374151', lineHeight: 1.4, marginTop: 1 }}
+            >
+              {`Observation window: ${data.dateRangeFrom} to ${data.dateRangeTo}.`}
+            </Text>
+            <Text
+              style={{
+                fontSize: 8.5,
+                color: '#1e3a8a',
+                lineHeight: 1.4,
+                marginTop: 1,
+                fontFamily: 'Helvetica-Bold',
+              }}
+            >
+              {`Source: ${data.dataSourceCitation || '\u2014 NOT PROVIDED \u2014'}`}
+            </Text>
+          </View>
+        </View>
+
+        <View style={{ flexDirection: 'row', marginBottom: 6 }}>
+          <Text style={{ fontSize: 9, fontFamily: 'Helvetica-Bold', width: 18, color: '#1f2937' }}>2.</Text>
+          <View style={{ flex: 1 }}>
+            <Text
+              style={{
+                fontSize: 9,
+                fontFamily: 'Helvetica-Bold',
+                color: '#111827',
+                marginBottom: 1,
+              }}
+            >
+              Maximum demand at 125% plus the new load does not exceed the ampacity (NEC 220.87(2))
+            </Text>
+            <Text style={{ fontSize: 8.5, color: '#374151', lineHeight: 1.4 }}>
+              {isMeasured
+                ? `${data.maxDemandKVA.toFixed(2)} kVA (measured \u2014 no 125% multiplier per NEC 220.87) + ${data.proposedNewLoadKVA.toFixed(2)} kVA (new) = ${totalFutureDemand.toFixed(2)} kVA`
+                : `${data.maxDemandKVA.toFixed(2)} kVA x 1.25 = ${adjustedExisting.toFixed(2)} kVA (adjusted) + ${data.proposedNewLoadKVA.toFixed(2)} kVA (new) = ${totalFutureDemand.toFixed(2)} kVA`}
+            </Text>
+            <Text style={{ fontSize: 8.5, color: '#374151', lineHeight: 1.4, marginTop: 1 }}>
+              {`Service ampacity: ${data.serviceCapacityAmps}A x ${data.serviceVoltage}V${data.servicePhase === 3 ? ' x sqrt(3)' : ''} = ${capacityKVA.toFixed(2)} kVA`}
+            </Text>
+            <Text
+              style={{
+                fontSize: 8.5,
+                color: isCompliant ? '#15803d' : '#b91c1c',
+                lineHeight: 1.4,
+                marginTop: 1,
+                fontFamily: 'Helvetica-Bold',
+              }}
+            >
+              {isCompliant
+                ? `[OK] ${totalFutureDemand.toFixed(2)} kVA <= ${capacityKVA.toFixed(2)} kVA  (${utilizationPct.toFixed(1)}% utilization)`
+                : `[FAIL] ${totalFutureDemand.toFixed(2)} kVA EXCEEDS ${capacityKVA.toFixed(2)} kVA  (${utilizationPct.toFixed(1)}% utilization \u2014 SERVICE UPGRADE REQUIRED)`}
+            </Text>
+          </View>
+        </View>
+
+        <View style={{ flexDirection: 'row', marginBottom: 4 }}>
+          <Text style={{ fontSize: 9, fontFamily: 'Helvetica-Bold', width: 18, color: '#1f2937' }}>3.</Text>
+          <View style={{ flex: 1 }}>
+            <Text
+              style={{
+                fontSize: 9,
+                fontFamily: 'Helvetica-Bold',
+                color: '#111827',
+                marginBottom: 1,
+              }}
+            >
+              Feeder OCPD per NEC 240.4 and service overload per NEC 230.90 (NEC 220.87(3))
+            </Text>
+            <Text style={{ fontSize: 8.5, color: '#374151', lineHeight: 1.4 }}>
+              {`OCPD (NEC 240.4): ${data.ocpdNotes || 'Existing service main breaker confirmed; sized per NEC 240.4(B) for the conductors it protects.'}`}
+            </Text>
+            <Text style={{ fontSize: 8.5, color: '#374151', lineHeight: 1.4, marginTop: 1 }}>
+              {`Overload (NEC 230.90): ${data.serviceOverloadNotes || 'Existing service overload protection in place; rating not exceeded by the new load.'}`}
+            </Text>
+          </View>
+        </View>
+      </View>
+
+      <View
+        style={isCompliant ? themeStyles.noteBox : themeStyles.warningBox}
+        wrap={false}
+      >
+        <Text
+          style={{
+            fontSize: 9,
+            fontFamily: 'Helvetica-Bold',
+            marginBottom: 2,
+            color: isCompliant ? '#1e3a8a' : '#78350f',
+          }}
+        >
+          {isCompliant
+            ? 'EXISTING SERVICE ADEQUATE PER NEC 220.87'
+            : 'EXISTING SERVICE INADEQUATE \u2014 UPGRADE REQUIRED'}
+        </Text>
+        <Text style={isCompliant ? themeStyles.noteText : themeStyles.warningText}>
+          {isCompliant
+            ? `Per NEC 220.87, the existing ${data.serviceCapacityAmps}A service has sufficient capacity for the proposed new load. Contractor's signature on this sheet attests that the three conditions above are verified.`
+            : `The proposed new load combined with the existing maximum demand exceeds the ${data.serviceCapacityAmps}A service ampacity. NEC 220.87 cannot be claimed; a service upgrade or load management (NEC 750 / NEC 625.42) is required.`}
+        </Text>
+      </View>
+
+      <BrandFooter
+        projectName={projectName}
+        contractorName={contractorName}
+        contractorLicense={contractorLicense}
+        sheetId={sheetId}
+      />
+    </Page>
+  );
+};
+
+// ============================================================================
+// AVAILABLE FAULT CURRENT CALCULATION (Sprint 2A H9)
+// ============================================================================
+// Required by Orlando's "EV Charging Station Permit Checklist" item #5
+// (new-service path): "arc fault current calculation, showing the available
+// fault current at the service main breaker(s)." Drives the AIC sizing per
+// NEC 110.9 + NEC 110.10 — equipment AIC must meet or exceed the available
+// fault current at every point in the system.
+//
+// Pulls values from a service-level entry in `data.shortCircuitCalculations`
+// (calculation_type === 'service'). When no service-level calc exists the
+// section toggle auto-disables in the UI; the page is never rendered with
+// missing values.
+//
+// Distinct from the existing per-panel ShortCircuitPages — this page is the
+// service-main summary AHJs cite. The per-panel sheets remain for downstream
+// equipment AIC verification.
+
+interface ShortCircuitResultsBlock {
+  faultCurrent?: number;
+  requiredAIC?: number;
+  details?: {
+    sourceFaultCurrent?: number;
+    conductorImpedance?: number;
+    totalImpedance?: number;
+    faultCurrentAtPoint?: number;
+    safetyFactor?: number;
+  };
+  compliance?: {
+    compliant?: boolean;
+    necArticle?: string;
+    message?: string;
+  };
+}
+
+export interface AvailableFaultCurrentInput {
+  /** Service ampacity rating (A). */
+  serviceAmps: number | null;
+  /** Service voltage (V) — typically 240 (1Φ) or 208/480 (3Φ). */
+  serviceVoltage: number | null;
+  /** Service phase: 1 or 3. */
+  servicePhase: number | null;
+  /** Source utility-side fault current (A) — from utility coordination data. */
+  sourceFaultCurrent: number | null;
+  /** Utility transformer rating (kVA) used as the source assumption. */
+  transformerKVA: number | null;
+  /** Transformer impedance (% Z). */
+  transformerImpedance: number | null;
+  /** Service conductor size (e.g., "500 kcmil"). */
+  serviceConductorSize: string | null;
+  /** Service conductor material ('Cu' or 'Al'). */
+  serviceConductorMaterial: string | null;
+  /** Service conductor length (ft). */
+  serviceConductorLength: number | null;
+  /** Calculated short-circuit result block from `services/calculations/shortCircuit.ts`. */
+  results: ShortCircuitResultsBlock | null;
+  /** Free-text notes from the calc (utility data source, assumptions). */
+  notes?: string | null;
+}
+
+interface AvailableFaultCurrentPageProps {
+  projectName: string;
+  projectAddress?: string;
+  input: AvailableFaultCurrentInput;
+  contractorName?: string;
+  contractorLicense?: string;
+  sheetId?: string;
+}
+
+const fmtAmps = (a: number | undefined | null): string => {
+  if (a === undefined || a === null || !Number.isFinite(a)) return '—';
+  if (a >= 1000) return `${(a / 1000).toFixed(2)} kA`;
+  return `${Math.round(a).toLocaleString()} A`;
+};
+
+export const AvailableFaultCurrentPage: React.FC<AvailableFaultCurrentPageProps> = ({
+  projectName,
+  projectAddress,
+  input,
+  contractorName,
+  contractorLicense,
+  sheetId,
+}) => {
+  const r = input.results ?? {};
+  const calculatedFaultA = r.faultCurrent ?? r.details?.faultCurrentAtPoint ?? null;
+  const requiredAIC = r.requiredAIC ?? null;
+  const sourceFaultA = input.sourceFaultCurrent ?? r.details?.sourceFaultCurrent ?? null;
+  const compliant = r.compliance?.compliant ?? null;
+
+  return (
+    <Page size="LETTER" style={themeStyles.page}>
+      <BrandBar pageLabel="AVAILABLE FAULT CURRENT" sheetId={sheetId} />
+
+      <View style={themeStyles.titleBlock}>
+        <Text style={themeStyles.docTitle}>Available Fault Current Calculation</Text>
+        <Text style={themeStyles.docSubtitle}>
+          {`${projectName}${projectAddress ? ` • ${projectAddress}` : ''} • Service Main • IEEE 141 / NEC 110.9, 110.10`}
+        </Text>
+      </View>
+
+      {/* Headline cards: input, output, AIC */}
+      <View style={themeStyles.summaryRow}>
+        <View style={themeStyles.summaryCard}>
+          <Text style={themeStyles.summaryLabel}>Service Rating</Text>
+          <Text style={themeStyles.summaryValue}>
+            {input.serviceAmps ?? '—'}
+            <Text style={themeStyles.summaryUnit}>A</Text>
+          </Text>
+          <Text style={themeStyles.summarySub}>
+            {`${input.serviceVoltage ?? '—'}V ${input.servicePhase ? phaseLabel(input.servicePhase) : ''}`}
+          </Text>
+        </View>
+        <View style={themeStyles.summaryCard}>
+          <Text style={themeStyles.summaryLabel}>Source Fault Current</Text>
+          <Text style={themeStyles.summaryValue}>{fmtAmps(sourceFaultA)}</Text>
+          <Text style={themeStyles.summarySub}>at utility transformer secondary</Text>
+        </View>
+        <View style={themeStyles.summaryCardHighlight}>
+          <Text style={themeStyles.summaryLabel}>Available at Service Main</Text>
+          <Text style={themeStyles.summaryValue}>{fmtAmps(calculatedFaultA)}</Text>
+          <Text style={themeStyles.summarySub}>after service-conductor impedance</Text>
+        </View>
+        <View style={themeStyles.summaryCard}>
+          <Text style={themeStyles.summaryLabel}>Min Required AIC</Text>
+          <Text style={themeStyles.summaryValue}>
+            {requiredAIC ?? '—'}
+            <Text style={themeStyles.summaryUnit}>kA</Text>
+          </Text>
+          <Text style={themeStyles.summarySub}>NEC 110.9 / 110.10</Text>
+        </View>
+      </View>
+
+      {/* Source / utility-side assumptions */}
+      <View wrap={false}>
+        <Text style={themeStyles.sectionTitle}>SOURCE ASSUMPTIONS</Text>
+        <View style={themeStyles.projectGrid}>
+          <View style={themeStyles.projectCell}>
+            <Text style={themeStyles.projectLabel}>Utility Transformer</Text>
+            <Text style={themeStyles.projectValue}>
+              {input.transformerKVA ? `${input.transformerKVA} kVA` : '— estimated —'}
+            </Text>
+          </View>
+          <View style={themeStyles.projectCell}>
+            <Text style={themeStyles.projectLabel}>Transformer Impedance</Text>
+            <Text style={themeStyles.projectValue}>
+              {input.transformerImpedance ? `${input.transformerImpedance}% Z` : '—'}
+            </Text>
+          </View>
+          <View style={themeStyles.projectCell}>
+            <Text style={themeStyles.projectLabel}>Service Conductor</Text>
+            <Text style={themeStyles.projectValue}>
+              {input.serviceConductorSize
+                ? `${input.serviceConductorSize}${input.serviceConductorMaterial ? ` ${input.serviceConductorMaterial}` : ''}`
+                : '—'}
+            </Text>
+          </View>
+          <View style={themeStyles.projectCell}>
+            <Text style={themeStyles.projectLabel}>Conductor Length</Text>
+            <Text style={themeStyles.projectValue}>
+              {input.serviceConductorLength ? `${input.serviceConductorLength} ft` : '—'}
+            </Text>
+          </View>
+        </View>
+      </View>
+
+      {/* Calculation derivation */}
+      <View wrap={false}>
+        <Text style={themeStyles.sectionTitle}>CALCULATION DERIVATION (IEEE 141)</Text>
+        <View style={themeStyles.table}>
+          <View style={themeStyles.tableHeaderRow}>
+            <Text style={[themeStyles.th, { width: '50%' }]}>Component</Text>
+            <Text style={[themeStyles.th, { width: '50%' }]}>Value</Text>
+          </View>
+          <View style={themeStyles.tableRow}>
+            <Text style={[themeStyles.td, { width: '50%' }]}>Source fault current (utility transformer secondary)</Text>
+            <Text style={[themeStyles.td, { width: '50%' }]}>{fmtAmps(sourceFaultA)}</Text>
+          </View>
+          {r.details?.conductorImpedance !== undefined && r.details.conductorImpedance !== null && (
+            <View style={themeStyles.tableRowAlt}>
+              <Text style={[themeStyles.td, { width: '50%' }]}>Service-conductor impedance to main</Text>
+              <Text style={[themeStyles.td, { width: '50%' }]}>{r.details.conductorImpedance.toFixed(4)} ohms</Text>
+            </View>
+          )}
+          {r.details?.totalImpedance !== undefined && r.details.totalImpedance !== null && (
+            <View style={themeStyles.tableRow}>
+              <Text style={[themeStyles.td, { width: '50%' }]}>Total impedance to fault point</Text>
+              <Text style={[themeStyles.td, { width: '50%' }]}>{r.details.totalImpedance.toFixed(4)} ohms</Text>
+            </View>
+          )}
+          <View style={themeStyles.tableRowAlt}>
+            <Text style={[themeStyles.td, { width: '50%', fontFamily: 'Helvetica-Bold' }]}>Available fault current at service main</Text>
+            <Text style={[themeStyles.td, { width: '50%', fontFamily: 'Helvetica-Bold' }]}>{fmtAmps(calculatedFaultA)}</Text>
+          </View>
+          {r.details?.safetyFactor !== undefined && r.details.safetyFactor !== null && (
+            <View style={themeStyles.tableRow}>
+              <Text style={[themeStyles.td, { width: '50%' }]}>Safety factor applied</Text>
+              <Text style={[themeStyles.td, { width: '50%' }]}>{r.details.safetyFactor}x</Text>
+            </View>
+          )}
+          <View style={themeStyles.tableRowAlt}>
+            <Text style={[themeStyles.td, { width: '50%', fontFamily: 'Helvetica-Bold' }]}>Minimum required AIC rating</Text>
+            <Text style={[themeStyles.td, { width: '50%', fontFamily: 'Helvetica-Bold' }]}>
+              {requiredAIC !== null && requiredAIC !== undefined ? `${requiredAIC} kA` : '—'}
+            </Text>
+          </View>
+        </View>
+      </View>
+
+      {/* Verdict */}
+      <View
+        style={compliant === false ? themeStyles.warningBox : themeStyles.noteBox}
+        wrap={false}
+      >
+        <Text
+          style={{
+            fontSize: 9,
+            fontFamily: 'Helvetica-Bold',
+            marginBottom: 2,
+            color: compliant === false ? '#78350f' : '#1e3a8a',
+          }}
+        >
+          NEC 110.9 + 110.10 — INTERRUPTING RATING
+        </Text>
+        <Text style={compliant === false ? themeStyles.warningText : themeStyles.noteText}>
+          {compliant === false
+            ? `Equipment AIC ratings on the Equipment Specs sheet must equal or exceed the available fault current at every connection point. One or more devices in this packet do NOT meet that threshold and must be upsized or series-rated per NEC 240.86.`
+            : `All equipment installed under this permit shall have an interrupting rating equal to or greater than the available fault current at its line-side terminals (NEC 110.9). Equipment AIC ratings shown on the Equipment Specs sheet are confirmed against the value above.`}
+        </Text>
+      </View>
+
+      {input.notes && (
+        <View style={themeStyles.noteBox}>
+          <Text style={{ fontSize: 8.5, color: '#1e3a8a' }}>{`Notes: ${input.notes}`}</Text>
+        </View>
+      )}
+
+      <BrandFooter
+        projectName={projectName}
+        contractorName={contractorName}
+        contractorLicense={contractorLicense}
+        sheetId={sheetId}
+      />
+    </Page>
+  );
+};
+
+// ============================================================================
+// EVEMS OPERATIONAL NARRATIVE (Sprint 2A H10)
+// ============================================================================
+// Required by every FL AHJ that reviews NEC 625.42 designs. The narrative
+// explains how the Energy Management System (EVMS / EMS) clamps the EV bank's
+// aggregate demand to the declared setpoint so reviewers can trust the
+// service-level demand reduction credit. Without this page, AHJs see a
+// reduced feeder calc with no explanation of how the load is actually
+// controlled — and reject the design defensively.
+//
+// Renders one detail block per EVEMS-managed panel, sourcing the setpoint
+// from the explicit "EVEMS Aggregate Setpoint (NEC 625.42)" marker circuit
+// (preferred) or falling back to `panel.main_breaker_amps × voltage` for
+// legacy projects.
+
+export interface EVEMSNarrativePanelEntry {
+  panelId: string;
+  panelName: string;
+  /** EVEMS setpoint VA from the explicit marker circuit (preferred). */
+  setpointVA: number | null;
+  /** True when setpointVA came from the marker; false for legacy proxy. */
+  hasExplicitMarker: boolean;
+  /** Panel main breaker rating (informational; bounds the proxy fallback). */
+  mainBreakerAmps: number | null;
+  /** Panel voltage (V). */
+  voltage: number;
+  /** Panel phase (1 or 3). */
+  phase: 1 | 3;
+  /** Optional contractor-supplied EVEMS device manufacturer + model. */
+  deviceManufacturerModel?: string;
+}
+
+interface EVEMSNarrativePageProps {
+  projectName: string;
+  panels: EVEMSNarrativePanelEntry[];
+  contractorName?: string;
+  contractorLicense?: string;
+  sheetId?: string;
+}
+
+const fmtKVA = (va: number | null): string => {
+  if (va === null || !Number.isFinite(va)) return '—';
+  return `${(va / 1000).toFixed(2)} kVA`;
+};
+
+const fmtAmpsFromVA = (va: number | null, voltage: number, phase: 1 | 3): string => {
+  if (va === null || !Number.isFinite(va) || voltage <= 0) return '—';
+  const denom = phase === 3 ? voltage * 1.732 : voltage;
+  return `${(va / denom).toFixed(0)} A`;
+};
+
+export const EVEMSNarrativePage: React.FC<EVEMSNarrativePageProps> = ({
+  projectName,
+  panels,
+  contractorName,
+  contractorLicense,
+  sheetId,
+}) => (
+  <Page size="LETTER" style={themeStyles.page}>
+    <BrandBar pageLabel="EVEMS NARRATIVE" sheetId={sheetId} />
+
+    <View style={themeStyles.titleBlock}>
+      <Text style={themeStyles.docTitle}>EVEMS Operational Narrative</Text>
+      <Text style={themeStyles.docSubtitle}>
+        {`${projectName} • NEC 625.42 — Energy Management System for EV Charging`}
+      </Text>
+    </View>
+
+    {/* Top-level summary table — one row per EVEMS-managed panel */}
+    <View style={themeStyles.table} wrap={false}>
+      <View style={themeStyles.tableHeaderRow}>
+        <Text style={[themeStyles.th, { width: '30%' }]}>Panel</Text>
+        <Text style={[themeStyles.th, { width: '20%' }]}>Setpoint (kVA)</Text>
+        <Text style={[themeStyles.th, { width: '20%' }]}>Setpoint (A)</Text>
+        <Text style={[themeStyles.th, { width: '15%' }]}>Service</Text>
+        <Text style={[themeStyles.th, { width: '15%' }]}>Source</Text>
+      </View>
+      {panels.map((p, idx) => (
+        <View
+          key={p.panelId}
+          style={idx % 2 === 0 ? themeStyles.tableRow : themeStyles.tableRowAlt}
+          wrap={false}
+        >
+          <Text style={[themeStyles.td, { width: '30%', fontFamily: 'Helvetica-Bold' }]}>{p.panelName}</Text>
+          <Text style={[themeStyles.td, { width: '20%' }]}>{fmtKVA(p.setpointVA)}</Text>
+          <Text style={[themeStyles.td, { width: '20%' }]}>{fmtAmpsFromVA(p.setpointVA, p.voltage, p.phase)}</Text>
+          <Text style={[themeStyles.td, { width: '15%' }]}>{`${p.voltage}V ${phaseLabel(p.phase)}`}</Text>
+          <Text style={[themeStyles.td, { width: '15%', fontSize: 7 }]}>
+            {p.hasExplicitMarker ? 'declared' : 'estimated'}
+          </Text>
+        </View>
+      ))}
+    </View>
+
+    {/* Per-panel detail blocks — six required narrative elements per AHJ */}
+    {panels.map((p) => (
+      <View key={`detail-${p.panelId}`} wrap={false} style={{ marginTop: 8 }}>
+        <Text style={themeStyles.sectionTitle}>{`${p.panelName.toUpperCase()} — EVEMS DETAILS`}</Text>
+
+        <View style={{ marginBottom: 4 }}>
+          <Text style={themeStyles.subSectionTitle}>1. Device</Text>
+          <Text style={{ fontSize: 8.5, color: '#374151', lineHeight: 1.4 }}>
+            {p.deviceManufacturerModel
+              ? `${p.deviceManufacturerModel}. UL 916 listed Energy Management System (or NRTL equivalent).`
+              : 'Manufacturer/model to be specified on contractor-supplied EVEMS cut sheet. Device shall be listed to UL 916 (Energy Management Equipment) or equivalent NRTL standard.'}
+          </Text>
+        </View>
+
+        <View style={{ marginBottom: 4 }}>
+          <Text style={themeStyles.subSectionTitle}>2. Maximum Aggregate Setpoint (NEC 625.42)</Text>
+          <Text style={{ fontSize: 8.5, color: '#374151', lineHeight: 1.4 }}>
+            {p.setpointVA !== null
+              ? `Setpoint = ${fmtKVA(p.setpointVA)} (${fmtAmpsFromVA(p.setpointVA, p.voltage, p.phase)} at ${p.voltage}V ${phaseLabel(p.phase)}). ${p.hasExplicitMarker ? 'Declared via the project autogeneration EVEMS marker circuit; verified against contractor-supplied EVEMS configuration.' : `Estimated from panel main-breaker rating (${p.mainBreakerAmps ?? '?'}A) — actual setpoint shall be field-verified and documented before energization.`}`
+              : 'Setpoint not yet recorded for this panel. Required before AHJ submittal.'}
+          </Text>
+        </View>
+
+        <View style={{ marginBottom: 4 }}>
+          <Text style={themeStyles.subSectionTitle}>3. Service Main / Sub-Feed Monitoring Points</Text>
+          <Text style={{ fontSize: 8.5, color: '#374151', lineHeight: 1.4 }}>
+            EVEMS shall monitor the upstream feeder serving this EV panel via current transformers (CTs)
+            installed at the feeder's source. Where multiple downstream EV panels share a single upstream
+            point, the EVEMS shall aggregate readings and clamp combined demand to the declared setpoint.
+          </Text>
+        </View>
+
+        <View style={{ marginBottom: 4 }}>
+          <Text style={themeStyles.subSectionTitle}>4. Failure Mode (Signal Loss / Power Loss)</Text>
+          <Text style={{ fontSize: 8.5, color: '#374151', lineHeight: 1.4 }}>
+            On loss of monitoring signal or EVEMS controller power, the system shall fail to its lowest
+            permitted setpoint — typically by curtailing or disconnecting controlled charging branches.
+            EV chargers shall not exceed branch-circuit nameplate ratings under any failure condition
+            (NEC 625.42 + 625.40). Reset requires manual contractor action or controller power cycle.
+          </Text>
+        </View>
+
+        <View style={{ marginBottom: 4 }}>
+          <Text style={themeStyles.subSectionTitle}>5. Tamper Protection (NEC 750)</Text>
+          <Text style={{ fontSize: 8.5, color: '#374151', lineHeight: 1.4 }}>
+            EVEMS controller and CT enclosures shall be physically secured (locking enclosures, sealed
+            wireways) and configuration shall be password-protected at the device level. Setpoint
+            changes shall be logged. Field setpoint adjustments outside of the declared maximum require
+            an updated permit submittal per NEC 625.42.
+          </Text>
+        </View>
+
+        <View style={{ marginBottom: 4 }}>
+          <Text style={themeStyles.subSectionTitle}>6. NEC 625.42 Compliance Statement</Text>
+          <Text style={{ fontSize: 8.5, color: '#374151', lineHeight: 1.4 }}>
+            Branch conductors and overcurrent protection are sized to full continuous nameplate × 125%
+            per NEC 625.40 / 210.19. The feeder and service-side conductors are sized to the declared
+            EVEMS setpoint per NEC 625.42, allowing service capacity reuse for new EV loads without a
+            full service upgrade. Field commissioning shall verify the setpoint against this narrative
+            before energization.
+          </Text>
+        </View>
+      </View>
+    ))}
+
+    <View style={themeStyles.noteBox} wrap={false}>
+      <Text style={{ fontSize: 9, fontFamily: 'Helvetica-Bold', marginBottom: 2, color: '#1e3a8a' }}>
+        SCOPE OF THIS NARRATIVE
+      </Text>
+      <Text style={themeStyles.noteText}>
+        This page documents the EVEMS design intent for AHJ review. The contractor shall supply
+        manufacturer cut sheets for the EVEMS controller, CTs, and any associated hardware as part of
+        equipment specifications. Field commissioning records (setpoint configuration, CT secondary
+        polarity, failure-mode test) shall be provided to the AHJ on inspection per NEC 625.42.
+      </Text>
+    </View>
+
+    <BrandFooter
+      projectName={projectName}
+      contractorName={contractorName}
+      contractorLicense={contractorLicense}
+      sheetId={sheetId}
+    />
+  </Page>
+);
+
+// ============================================================================
+// EVSE LABELING (Sprint 2A H11 — NEC 625.43, NEC 110.21, NEC 110.22)
+// ============================================================================
+// Required by every FL AHJ. NEC 625.43 mandates disconnect labels at every
+// EVSE installation; NEC 110.21 requires the equipment to be identified by
+// manufacturer; NEC 110.22 requires each disconnect to be marked with its
+// purpose. This page is the contractor's reference for what labels must be
+// applied in the field — the actual label application happens on inspection,
+// but the AHJ wants the contractor to have signed off that they understand
+// the requirements before energization.
+//
+// Renders one row per detected EV-bank panel with the required label text.
+// Adds an emergency-shutoff section that's flagged as commercial-only (Davie
+// + commercial scopes). Bottom signature line for contractor attestation.
+
+export interface EVSELabelingPanelEntry {
+  panelId: string;
+  panelName: string;
+  /** Number of EV charging branch circuits on this panel (informational). */
+  chargerCircuitCount: number;
+  /** Optional EVSE location text — "Parking garage level B-2", etc. */
+  location?: string;
+}
+
+interface EVSELabelingPageProps {
+  projectName: string;
+  panels: EVSELabelingPanelEntry[];
+  /** When true, also renders the commercial emergency-shutoff section. */
+  isCommercial: boolean;
+  contractorName?: string;
+  contractorLicense?: string;
+  sheetId?: string;
+}
+
+export const EVSELabelingPage: React.FC<EVSELabelingPageProps> = ({
+  projectName,
+  panels,
+  isCommercial,
+  contractorName,
+  contractorLicense,
+  sheetId,
+}) => (
+  <Page size="LETTER" style={themeStyles.page}>
+    <BrandBar pageLabel="EVSE LABELING" sheetId={sheetId} />
+
+    <View style={themeStyles.titleBlock}>
+      <Text style={themeStyles.docTitle}>EVSE Labeling &amp; Disconnect Requirements</Text>
+      <Text style={themeStyles.docSubtitle}>
+        {`${projectName} • NEC 625.43, 110.21, 110.22 — Field labeling reference`}
+      </Text>
+    </View>
+
+    <View style={themeStyles.noteBox}>
+      <Text style={{ fontSize: 9, fontFamily: 'Helvetica-Bold', marginBottom: 2, color: '#1e3a8a' }}>
+        SCOPE OF THIS SHEET
+      </Text>
+      <Text style={themeStyles.noteText}>
+        Contractor shall apply the labels documented below to all EVSE branch
+        circuits, disconnects, and panel directories prior to energization.
+        Field-applied labels shall be permanent (engraved phenolic, embossed,
+        or weatherproof printed adhesive — not handwritten). AHJ inspector
+        will verify labels are applied per this reference at final inspection.
+      </Text>
+    </View>
+
+    <View wrap={false}>
+      <Text style={themeStyles.sectionTitle}>EVSE PANEL DISCONNECT LABELS (NEC 625.43)</Text>
+      <View style={themeStyles.table}>
+        <View style={themeStyles.tableHeaderRow}>
+          <Text style={[themeStyles.th, { width: '25%' }]}>Panel</Text>
+          <Text style={[themeStyles.th, { width: '15%' }]}>Branches</Text>
+          <Text style={[themeStyles.th, { width: '60%' }]}>Required Label Text</Text>
+        </View>
+        {panels.map((p, idx) => (
+          <View
+            key={p.panelId}
+            style={idx % 2 === 0 ? themeStyles.tableRow : themeStyles.tableRowAlt}
+            wrap={false}
+          >
+            <Text style={[themeStyles.td, { width: '25%', fontFamily: 'Helvetica-Bold' }]}>
+              {p.panelName}
+            </Text>
+            <Text style={[themeStyles.td, { width: '15%' }]}>{p.chargerCircuitCount}</Text>
+            <Text style={[themeStyles.td, { width: '60%', fontSize: 7 }]}>
+              {`"EV CHARGING — ${p.panelName.toUpperCase()}${p.location ? `, ${p.location.toUpperCase()}` : ''} — DO NOT OPERATE WHILE LOADED" — applied to panel deadfront and to each EVSE disconnect cover.`}
+            </Text>
+          </View>
+        ))}
+      </View>
+    </View>
+
+    <View wrap={false}>
+      <Text style={themeStyles.sectionTitle}>REQUIRED LABEL CONTENT — APPLIES TO EACH EVSE</Text>
+      {[
+        'Manufacturer name and EVSE model number (NEC 110.21).',
+        'Circuit source and OCPD identifier (e.g., "Fed from EV Sub-Panel, breaker #5") (NEC 408.4 + 110.22).',
+        'Voltage and ampacity ratings on the disconnect cover (NEC 110.22).',
+        'Disconnect within sight of the EVSE OR a lockable disconnect within sight, lockable in the OFF position only (NEC 625.43 + 110.25).',
+        'Required arc-flash hazard / shock hazard warning per NEC 110.16 — applied to panels rated 1200A+ or where calculations indicate Cat 2+ exposure.',
+        'Available fault current marking (kA) at the service-side equipment (NEC 110.24) — coordinate with the Available Fault Current sheet.',
+      ].map((line, idx) => (
+        <View key={idx} style={{ flexDirection: 'row', marginBottom: 3 }}>
+          <Text style={{ fontSize: 9, fontFamily: 'Helvetica-Bold', width: 18, color: '#1f2937' }}>
+            {`${idx + 1}.`}
+          </Text>
+          <Text style={{ fontSize: 8.5, color: '#374151', lineHeight: 1.4, flex: 1 }}>
+            {line}
+          </Text>
+        </View>
+      ))}
+    </View>
+
+    <View wrap={false}>
+      <Text style={themeStyles.sectionTitle}>BREAKER / DISCONNECT LOCKING</Text>
+      <Text style={themeStyles.proseBlock}>
+        Each EV branch circuit breaker shall be capable of being locked in the OFF position. Locking
+        means shall remain in place whether or not the lock is installed (per NEC 110.25 / 625.43).
+        Where the breaker itself is not lockable, a UL-listed lockoff accessory shall be installed.
+      </Text>
+    </View>
+
+    {isCommercial && (
+      <View wrap={false}>
+        <Text style={themeStyles.sectionTitle}>EMERGENCY SHUTOFF — COMMERCIAL EVSE INSTALLATIONS</Text>
+        <Text style={themeStyles.proseBlock}>
+          Commercial EVSE installations (Davie commercial scope, Knox-box-required jurisdictions)
+          shall include an emergency-shutoff means accessible to first responders. Mount in a
+          location pre-coordinated with the local fire marshal — typically near the main entrance
+          of the parking facility or at the building service entrance. Label clearly: "EV CHARGING
+          — EMERGENCY SHUTOFF". The shutoff shall be a single-action device that disconnects all
+          EVSE-feeding circuits.
+        </Text>
+      </View>
+    )}
+
+    <View style={themeStyles.warningBox} wrap={false}>
+      <Text style={{ fontSize: 9, fontFamily: 'Helvetica-Bold', marginBottom: 2, color: '#78350f' }}>
+        CONTRACTOR ATTESTATION
+      </Text>
+      <Text style={themeStyles.warningText}>
+        By signing this sheet, the contractor confirms that all field-applied labels per the
+        requirements above will be installed before energization, and that the AHJ inspector
+        will verify them at final inspection. Failure to install required labels is grounds for
+        rejection of the inspection.
+      </Text>
+    </View>
+
+    <BrandFooter
+      projectName={projectName}
+      contractorName={contractorName}
+      contractorLicense={contractorLicense}
+      sheetId={sheetId}
+    />
+  </Page>
+);
+
