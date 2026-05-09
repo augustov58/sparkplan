@@ -329,14 +329,52 @@ export const FeederManager: React.FC<FeederManagerProps> = ({
 
   // Calculate feeder and update database
   const handleCalculateFeeder = async (feeder: Partial<Feeder>) => {
-    // Service-entrance feeders bypass auto-sizing: utility coordination drives
-    // the conductor specs (often dictated by the utility), not load calc. We
-    // save whatever the user typed and let the riser pick it up.
+    // Service-entrance feeders take a self-contained calc path. The standard
+    // pipeline below assumes a source panel/transformer to derive voltage and
+    // phase; SE has neither (the utility is implicit). We synthesize the inputs
+    // using the MDP — service-entrance conductors run from utility secondary
+    // to the MDP, so source voltage = destination voltage = MDP voltage.
     if (sourceType === 'service') {
       if (!feeder.destination_panel_id) {
         showValidationErrors({ destination_panel_id: 'Service entrance must terminate at the MDP (a panel).' });
         return;
       }
+      const mdp = panels.find(p => p.id === feeder.destination_panel_id);
+      if (!mdp) {
+        showValidationErrors({ destination_panel_id: 'MDP not found in this project.' });
+        return;
+      }
+
+      const voltage = mdp.voltage;
+      const phase = (mdp.phase || 1) as 1 | 3;
+
+      // Sizing basis: 'capacity' uses MDP main breaker / bus rating × voltage,
+      // 'load' uses aggregated downstream load on the MDP. Mirrors the
+      // panel-feeder logic at lines ~422-460 below, just resolved against MDP.
+      let loads: { totalVA: number; continuousVA: number; noncontinuousVA: number };
+      if (sizingBasis === 'capacity') {
+        const amps = mdp.main_breaker_amps || mdp.bus_rating || 0;
+        const capacityVA = phase === 3 ? amps * voltage * Math.sqrt(3) : amps * voltage;
+        loads = { totalVA: capacityVA, continuousVA: 0, noncontinuousVA: capacityVA };
+      } else {
+        loads = calculatePanelLoads(mdp.id);
+      }
+
+      const result = calculateFeederSizing({
+        source_voltage: voltage,
+        source_phase: phase,
+        destination_voltage: voltage,
+        destination_phase: phase,
+        total_load_va: loads.totalVA,
+        continuous_load_va: loads.continuousVA,
+        noncontinuous_load_va: loads.noncontinuousVA,
+        distance_ft: feeder.distance_ft || 0,
+        conductor_material: (feeder.conductor_material as 'Cu' | 'Al') || 'Cu',
+        ambient_temperature_c: feeder.ambient_temperature_c || 30,
+        num_current_carrying: feeder.num_current_carrying || 3,
+        max_voltage_drop_percent: 3,
+      });
+
       const seFeeder: Partial<Feeder> = {
         ...feeder,
         is_service_entrance: true,
@@ -344,6 +382,15 @@ export const FeederManager: React.FC<FeederManagerProps> = ({
         source_panel_id: null,
         source_transformer_id: null,
         project_id: projectId,
+        total_load_va: loads.totalVA,
+        continuous_load_va: loads.continuousVA,
+        noncontinuous_load_va: loads.noncontinuousVA,
+        design_load_va: result.design_load_va,
+        phase_conductor_size: result.phase_conductor_size,
+        neutral_conductor_size: result.neutral_conductor_size,
+        egc_size: result.egc_size,
+        conduit_size: result.recommended_conduit_size,
+        voltage_drop_percent: result.voltage_drop_percent,
       };
       if (editingId) {
         await updateFeeder(editingId, seFeeder);
