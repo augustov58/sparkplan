@@ -634,6 +634,7 @@ export type Database = {
           id: string
           location: string | null
           notes: string | null
+          permit_inspection_id: string | null
           photo_url: string | null
           project_id: string
           severity: string
@@ -649,6 +650,7 @@ export type Database = {
           id?: string
           location?: string | null
           notes?: string | null
+          permit_inspection_id?: string | null
           photo_url?: string | null
           project_id: string
           severity: string
@@ -664,6 +666,7 @@ export type Database = {
           id?: string
           location?: string | null
           notes?: string | null
+          permit_inspection_id?: string | null
           photo_url?: string | null
           project_id?: string
           severity?: string
@@ -677,6 +680,13 @@ export type Database = {
             columns: ["project_id"]
             isOneToOne: false
             referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "issues_permit_inspection_id_fkey"
+            columns: ["permit_inspection_id"]
+            isOneToOne: false
+            referencedRelation: "permit_inspections"
             referencedColumns: ["id"]
           },
         ]
@@ -964,6 +974,177 @@ export type Database = {
             columns: ["supplied_by_feeder_id"]
             isOneToOne: false
             referencedRelation: "feeders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      permits: {
+        Row: {
+          ahj_contact_email: string | null
+          ahj_contact_name: string | null
+          ahj_contact_phone: string | null
+          ahj_jurisdiction: string
+          approved_at: string | null
+          closed_at: string | null
+          conditions: Json
+          created_at: string
+          description: string | null
+          expires_at: string | null
+          fee_amount: number | null
+          fee_paid_at: string | null
+          fee_receipt_url: string | null
+          id: string
+          notes: string | null
+          packet_generated_at: string | null
+          packet_url: string | null
+          permit_number: string | null
+          permit_type: string
+          plan_review_id: string | null
+          project_id: string
+          status: string
+          submitted_at: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          ahj_contact_email?: string | null
+          ahj_contact_name?: string | null
+          ahj_contact_phone?: string | null
+          ahj_jurisdiction: string
+          approved_at?: string | null
+          closed_at?: string | null
+          conditions?: Json
+          created_at?: string
+          description?: string | null
+          expires_at?: string | null
+          fee_amount?: number | null
+          fee_paid_at?: string | null
+          fee_receipt_url?: string | null
+          id?: string
+          notes?: string | null
+          packet_generated_at?: string | null
+          packet_url?: string | null
+          permit_number?: string | null
+          permit_type?: string
+          plan_review_id?: string | null
+          project_id: string
+          status?: string
+          submitted_at?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          ahj_contact_email?: string | null
+          ahj_contact_name?: string | null
+          ahj_contact_phone?: string | null
+          ahj_jurisdiction?: string
+          approved_at?: string | null
+          closed_at?: string | null
+          conditions?: Json
+          created_at?: string
+          description?: string | null
+          expires_at?: string | null
+          fee_amount?: number | null
+          fee_paid_at?: string | null
+          fee_receipt_url?: string | null
+          id?: string
+          notes?: string | null
+          packet_generated_at?: string | null
+          packet_url?: string | null
+          permit_number?: string | null
+          permit_type?: string
+          plan_review_id?: string | null
+          project_id?: string
+          status?: string
+          submitted_at?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "permits_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      permit_inspections: {
+        Row: {
+          created_at: string
+          description: string | null
+          id: string
+          inspection_type: string
+          inspector_name: string | null
+          parent_inspection_id: string | null
+          performed_at: string | null
+          permit_id: string
+          project_id: string
+          result_notes: string | null
+          scheduled_date: string | null
+          scheduled_window: string | null
+          sequence: number
+          status: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          inspection_type: string
+          inspector_name?: string | null
+          parent_inspection_id?: string | null
+          performed_at?: string | null
+          permit_id: string
+          project_id: string
+          result_notes?: string | null
+          scheduled_date?: string | null
+          scheduled_window?: string | null
+          sequence?: number
+          status?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          inspection_type?: string
+          inspector_name?: string | null
+          parent_inspection_id?: string | null
+          performed_at?: string | null
+          permit_id?: string
+          project_id?: string
+          result_notes?: string | null
+          scheduled_date?: string | null
+          scheduled_window?: string | null
+          sequence?: number
+          status?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "permit_inspections_permit_id_fkey"
+            columns: ["permit_id"]
+            isOneToOne: false
+            referencedRelation: "permits"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "permit_inspections_parent_inspection_id_fkey"
+            columns: ["parent_inspection_id"]
+            isOneToOne: false
+            referencedRelation: "permit_inspections"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "permit_inspections_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
             referencedColumns: ["id"]
           },
         ]
