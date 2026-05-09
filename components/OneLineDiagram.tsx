@@ -1633,6 +1633,29 @@ export const OneLineDiagram: React.FC<OneLineDiagramProps> = ({ project, updateP
         }
       }
 
+      // Cap circuit numbers at the panel's listed slot count (panels.num_spaces).
+      // Same fallback used in PanelSchedule.tsx for legacy rows without the column.
+      if (targetPanel) {
+        const slotCapacity = targetPanel.num_spaces ?? (targetPanel.is_main ? 30 : 42);
+        const overCap = bulkCircuits.filter(c => {
+          // A pole-N breaker at slot S occupies S, S+2, ..., S+2*(N-1)
+          const lastSlot = c.circuit_number + (c.pole - 1) * 2;
+          return c.circuit_number > slotCapacity || lastSlot > slotCapacity;
+        });
+        if (overCap.length > 0) {
+          const overList = overCap
+            .map(c => `Circuit ${c.circuit_number} (${c.pole}P) "${c.description}"`)
+            .join('\n');
+          alert(
+            `❌ Circuit Numbers Exceed Panel Capacity\n\n` +
+            `Panel "${targetPanel.name}" is listed for ${slotCapacity} slots.\n` +
+            `The following entries fall outside that range:\n\n${overList}\n\n` +
+            `Renumber these circuits to fit within slots 1–${slotCapacity}, or increase the panel's number of spaces.`
+          );
+          return;
+        }
+      }
+
       // Validate all circuits for multi-pole conflicts BEFORE creating any
       const conflicts = [];
       for (const circuit of bulkCircuits) {

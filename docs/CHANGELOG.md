@@ -4,6 +4,34 @@ All notable changes to SparkPlan.
 
 ---
 
+## 2026-05-09: Project Management — AI Inspector accuracy + panel slot visibility (PR open)
+
+Fixes three issues in the project-management surface (panel schedule + AI Inspector) flagged by the platform owner during PE review.
+
+**User-Facing Changes:**
+
+- **Panel slot count is now visible in the PanelSchedule header.** The metadata strip (Main Breaker / Voltage / Bus Rating / Phase·Wire) now includes a 5th "Slots" stat showing `<used> / <capacity>` (e.g., `28 / 30`). The "used" number counts **poles**, not circuit rows — so a 2-pole breaker counts as 2, matching what the inspector audits. Tone is gray when fine, amber >90%, red >100%. The slot cap was already settable per panel at creation (12/20/24/30/42/54/66/84 spaces, persisted in `panels.num_spaces`); previously the only way the user learned the cap was by hitting an overflow alert.
+
+- **AI Inspector caps poles using each panel's listed slot count, not a hard-coded 42.** `checkPanelMaxPoles` was hard-coded to 42 (the long-deleted NEC 408.36 rule). It now reads `panel.num_spaces` per panel (same `panel.is_main ? 30 : 42` fallback used elsewhere) and cites NEC 110.3(B) — *use equipment per its listing*. Critical when over capacity, warning at >90%.
+
+- **AI Inspector no longer flags individual branch-circuit conductor sizing.** SparkPlan does not size individual branch-circuit conductors (only feeders), so the previous NEC 240.4(D) audit on `circuit.conductor_size` was reading defaulted "12 AWG" placeholder data and producing noise — every 30A circuit was being flagged as "12 AWG on 30A — violation." Removed `checkConductorProtection` and the `CONDUCTOR_PROTECTION_LIMITS` table from the inspector. NEC 240.4(D) is still enforced (correctly) inside the *feeder* sizing tools at `services/calculations/conductorSizing.ts` and `breakerSizing.ts` where real user data drives the check.
+
+- **AI Inspector audits breaker-vs-load on every circuit (not just receptacles) at the correct voltage.** Replaced `checkReceptacleLoading` (which fired only on `load_type === 'R'` and assumed 120V) with `checkCircuitLoading`. Runs on every circuit; capacity is derived from line-to-neutral for 1-pole, line-to-line for 2-pole, and 3-phase (× √3) for 3-pole. Critical at >100%, warning at >80% (NEC 210.20(A) continuous-load rule). Concrete impact: a 6 kVA water heater on a 30A 2-pole breaker is now correctly rated at 30A × 240V = 7.2 kVA capacity (83% utilized — passes), not 30A × 120V = 3.6 kVA (which would have been a false critical at 167%).
+
+- **Bulk Circuit Creator refuses circuit numbers beyond the panel's listed slot count.** `OneLineDiagram.tsx:handleBulkCreateCircuits` previously only validated multi-pole conflicts; a Circuit 50 entry into a 30-space panel was silently created as an orphan row. The cap now uses the same multi-pole formula (`lastSlot = circuit_number + (pole - 1) * 2`) as the manual-add and import paths.
+
+**Technical:**
+
+- `services/inspection/inspectorMode.ts`: `checkPanelMaxPoles` now reads `panel.num_spaces`. `checkConductorProtection` + `CONDUCTOR_PROTECTION_LIMITS` deleted. `checkReceptacleLoading` replaced by `checkCircuitLoading(circuit, panel)` which receives the full panel for voltage derivation. NEC articles referenced updated: 408.36 → 110.3(B); 210.21(B) → 210.20(A); 240.4(D) removed from this surface (still cited correctly in feeder calc).
+- `components/PanelSchedule.tsx`: header grid widened from `md:grid-cols-4` to `md:grid-cols-5`. New "Slots" cell counts poles via `panelCircuits.reduce((sum, c) => sum + (c.pole || 1), 0)`.
+- `components/OneLineDiagram.tsx:handleBulkCreateCircuits`: pre-create cap rejecting any entry where `circuit_number + (pole - 1) * 2 > targetPanel.num_spaces`.
+
+**Tests:** 208/208 passing (no test changes — rule signature change only). `npm run build` exits 0 in 4.8s.
+
+**No DB migration required.** All changes use the existing `panels.num_spaces` column.
+
+---
+
 ## 2026-05-09: AHJ Compliance Audit Sprint 2A — Document Structure (PR #23, open)
 
 Closes audit findings **H1, H2, H3** (TOC + revision log + sheet IDs) plus a sheet-ID styling and panel-schedule overflow fix found during user visual review. Open against `main`, mergeable CLEAN.
