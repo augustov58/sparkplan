@@ -17,14 +17,14 @@ describe('TableOfContentsPage (Sprint 2A H1)', () => {
       React.createElement(TableOfContentsPage, {
         projectName: 'TOC Test',
         entries: [
-          { sheetId: '002', title: 'Revision Log' },
-          { sheetId: '003', title: 'General Notes' },
-          { sheetId: '101', title: 'Load Calculation Summary' },
-          { sheetId: '301', title: 'Panel Schedule — MDP' },
+          { sheetId: 'E-002', title: 'Revision Log' },
+          { sheetId: 'E-003', title: 'General Notes' },
+          { sheetId: 'E-101', title: 'Load Calculation Summary' },
+          { sheetId: 'E-301', title: 'Panel Schedule — MDP' },
         ],
         contractorName: 'Test EC',
         contractorLicense: 'EC0001234',
-        sheetId: '001',
+        sheetId: 'E-001',
       }),
     );
     const blob = await pdf(doc).toBlob();

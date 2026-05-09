@@ -99,18 +99,21 @@ export function newBandCounters(): BandCounters {
   return { 0: 0, 100: 0, 200: 0, 300: 0, 400: 0, 500: 0, 600: 0 };
 }
 
+/** Discipline prefix on every sheet ID — `E-` denotes electrical (standard plan-set convention). */
+export const SHEET_ID_PREFIX = 'E-';
+
 /**
  * Allocate the next sheet ID in a band. Caller mutates the counter map in place.
- * Returns a 3-digit zero-padded string (e.g., '001', '301', '405').
+ * Returns a discipline-prefixed string (e.g., 'E-001', 'E-301', 'E-405').
  */
 export function nextSheetId(counters: BandCounters, band: SheetBand): string {
   counters[band] += 1;
-  return String(band + counters[band]).padStart(3, '0');
+  return `${SHEET_ID_PREFIX}${String(band + counters[band]).padStart(3, '0')}`;
 }
 
 /**
  * Format a sheet ID directly without mutating a counter — useful in tests.
  */
 export function formatSheetId(band: SheetBand, slot: number): string {
-  return String(band + slot).padStart(3, '0');
+  return `${SHEET_ID_PREFIX}${String(band + slot).padStart(3, '0')}`;
 }
