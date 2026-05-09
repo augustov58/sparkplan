@@ -26,7 +26,7 @@ const ShortCircuitResults = lazy(() => import('./components/ShortCircuitResults'
 const RFIManager = lazy(() => import('./components/RFIManager').then(m => ({ default: m.RFIManager })));
 const SiteVisitManager = lazy(() => import('./components/SiteVisitManager').then(m => ({ default: m.SiteVisitManager })));
 const CalendarView = lazy(() => import('./components/CalendarView').then(m => ({ default: m.CalendarView })));
-const EstimatingStub = lazy(() => import('./components/EstimatingStub').then(m => ({ default: m.EstimatingStub })));
+const EstimatingPage = lazy(() => import('./components/Estimating/EstimatingPage').then(m => ({ default: m.EstimatingPage })));
 const PermitsStub = lazy(() => import('./components/PermitsStub').then(m => ({ default: m.PermitsStub })));
 const TmBillingStub = lazy(() => import('./components/TmBillingStub').then(m => ({ default: m.TmBillingStub })));
 const AgentActivityLog = lazy(() => import('./components/AgentActivityLog').then(m => ({ default: m.AgentActivityLog })));
@@ -207,7 +207,7 @@ const ProjectWrapper = ({ projects, updateProject, deleteProject, onSignOut }: {
                     <FeatureErrorBoundary>
                         <FeatureGate feature="estimating" message="Generate electrical takeoffs and bid pricing tied to your panel/circuit model. Available on the Business plan — preview free during your trial.">
                             <Suspense fallback={<LoadingSpinner />}>
-                                <EstimatingStub projectId={project.id} />
+                                <EstimatingPage project={project} />
                             </Suspense>
                         </FeatureGate>
                     </FeatureErrorBoundary>
