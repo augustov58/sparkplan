@@ -110,6 +110,27 @@ export const toastMessages = {
     error: 'Failed to update site visit',
   },
 
+  // Permits
+  permit: {
+    created: 'Permit created',
+    updated: 'Permit updated',
+    deleted: 'Permit removed',
+    statusAdvanced: 'Permit status updated',
+    error: 'Failed to update permit',
+    deleteError: 'Failed to delete permit',
+  },
+
+  // Permit Inspections
+  inspection: {
+    created: 'Inspection scheduled',
+    updated: 'Inspection updated',
+    deleted: 'Inspection removed',
+    passed: 'Inspection marked passed',
+    failed: 'Inspection marked failed',
+    error: 'Failed to update inspection',
+    deleteError: 'Failed to delete inspection',
+  },
+
   // Calendar
   calendar: {
     created: 'Event added to calendar',
