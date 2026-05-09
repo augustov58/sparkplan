@@ -33,7 +33,7 @@ const AdminPanel = lazy(() => import('./components/AdminPanel').then(m => ({ def
 const UserProfile = lazy(() => import('./components/UserProfile').then(m => ({ default: m.UserProfile })));
 // EVPanelTemplates moved to Calculators component
 import { Project, ProjectStatus, ProjectType } from './types';
-import { askNecAssistantWithTools } from './services/geminiService';
+import { askNecAssistantWithTools, applyConfirmedAction } from './services/geminiService';
 import { buildProjectContext, formatContextForAI, type ProjectContext } from './services/ai/projectContextBuilder';
 import { buildConversationHistory } from './services/ai/conversationBuilder';
 import { usePanels } from './hooks/usePanels';
@@ -278,6 +278,11 @@ interface Message {
         name: string;
         result: unknown;
     };
+    pendingAction?: {
+        toolName: string;
+        params: Record<string, unknown>;
+    };
+    actionResolved?: 'applied' | 'cancelled';
 }
 
 const COPILOT_STORAGE_PREFIX = 'sparkplan.copilot.history';
@@ -528,7 +533,8 @@ const NecAssistant = () => {
                 role: 'ai',
                 text: result.response || 'Sorry, I could not retrieve that information.',
                 timestamp: new Date(),
-                toolUsed: result.toolUsed
+                toolUsed: result.toolUsed,
+                pendingAction: result.pendingAction,
             };
             setHistory(prev => [...prev, aiMessage]);
         } catch (error: any) {
@@ -549,6 +555,55 @@ const NecAssistant = () => {
         setHistory(prev => prev.filter((_, i) => !(i === prev.length - 1 && prev[i].role === 'user')));
         setErrorMessage(null);
         handleAsk(lastUser.text);
+    };
+
+    const handleApplyAction = async (msgIdx: number) => {
+        const msg = history[msgIdx];
+        if (!msg?.pendingAction || msg.actionResolved) return;
+
+        const ctx: ProjectContext = projectContext || {
+            projectId: '',
+            projectName: 'General',
+            projectType: 'Commercial',
+            serviceVoltage: 480,
+            servicePhase: 3,
+            summary: 'No project selected',
+            panels: [],
+            circuits: [],
+            feeders: [],
+            transformers: [],
+            totalLoad: { connectedVA: 0, demandVA: 0 },
+        };
+
+        // Mark resolved up-front to disable buttons during async call
+        setHistory(prev => prev.map((m, i) => i === msgIdx ? { ...m, actionResolved: 'applied' } : m));
+        setLoading(true);
+        try {
+            const result = await applyConfirmedAction(
+                msg.pendingAction.toolName,
+                msg.pendingAction.params,
+                ctx,
+                hasContext ? { panels, circuits, feeders, transformers } : undefined,
+            );
+            const resultMessage: Message = {
+                role: 'ai',
+                text: result.response,
+                timestamp: new Date(),
+                toolUsed: result.toolUsed,
+            };
+            setHistory(prev => [...prev, resultMessage]);
+        } catch (error: any) {
+            console.error('Apply action error:', error);
+            setErrorMessage(error?.message || 'Action failed.');
+            // Revert resolved state so user can retry
+            setHistory(prev => prev.map((m, i) => i === msgIdx ? { ...m, actionResolved: undefined } : m));
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleCancelAction = (msgIdx: number) => {
+        setHistory(prev => prev.map((m, i) => i === msgIdx ? { ...m, actionResolved: 'cancelled' } : m));
     };
 
     return (
@@ -722,6 +777,27 @@ const NecAssistant = () => {
                                         <pre className="mt-1 max-w-full overflow-x-auto text-[10px] bg-white border border-[var(--color-border)] rounded p-2 text-[var(--color-muted)] font-mono">
                                             {JSON.stringify(msg.toolUsed.result, null, 2).slice(0, 2000)}
                                         </pre>
+                                    )}
+                                    {msg.pendingAction && !msg.actionResolved && (
+                                        <div className="mt-2 flex items-center gap-2">
+                                            <button
+                                                onClick={() => handleApplyAction(idx)}
+                                                disabled={loading}
+                                                className="text-xs bg-[var(--color-accent-500)] hover:bg-[var(--color-accent-600)] disabled:opacity-50 text-white px-3 py-1.5 rounded-md font-medium transition-colors"
+                                            >
+                                                Apply
+                                            </button>
+                                            <button
+                                                onClick={() => handleCancelAction(idx)}
+                                                disabled={loading}
+                                                className="text-xs bg-white hover:bg-[var(--color-border-light)] disabled:opacity-50 border border-[var(--color-border)] text-[var(--color-ink)] px-3 py-1.5 rounded-md font-medium transition-colors"
+                                            >
+                                                Cancel
+                                            </button>
+                                        </div>
+                                    )}
+                                    {msg.actionResolved === 'cancelled' && (
+                                        <p className="mt-2 text-xs text-[var(--color-muted)] italic">Action cancelled.</p>
                                     )}
                                 </div>
                                 {msg.role === 'user' && (
