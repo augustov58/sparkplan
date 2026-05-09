@@ -362,6 +362,197 @@ export type Database = {
           },
         ]
       }
+      estimates: {
+        Row: {
+          id: string
+          project_id: string
+          user_id: string
+          name: string
+          estimate_number: string | null
+          revision: number
+          status: string
+          submitted_at: string | null
+          decided_at: string | null
+          expires_at: string | null
+          customer_name: string | null
+          customer_email: string | null
+          customer_address: string | null
+          subtotal_materials: number
+          subtotal_labor: number
+          subtotal_other: number
+          markup_pct: number
+          markup_amount: number
+          tax_pct: number
+          tax_amount: number
+          total: number
+          scope_summary: string | null
+          exclusions: string | null
+          payment_terms: string | null
+          internal_notes: string | null
+          bid_pdf_url: string | null
+          bid_pdf_generated_at: string | null
+          outcome_reason: string | null
+          parent_estimate_id: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          project_id: string
+          user_id: string
+          name: string
+          estimate_number?: string | null
+          revision?: number
+          status?: string
+          submitted_at?: string | null
+          decided_at?: string | null
+          expires_at?: string | null
+          customer_name?: string | null
+          customer_email?: string | null
+          customer_address?: string | null
+          subtotal_materials?: number
+          subtotal_labor?: number
+          subtotal_other?: number
+          markup_pct?: number
+          markup_amount?: number
+          tax_pct?: number
+          tax_amount?: number
+          total?: number
+          scope_summary?: string | null
+          exclusions?: string | null
+          payment_terms?: string | null
+          internal_notes?: string | null
+          bid_pdf_url?: string | null
+          bid_pdf_generated_at?: string | null
+          outcome_reason?: string | null
+          parent_estimate_id?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          project_id?: string
+          user_id?: string
+          name?: string
+          estimate_number?: string | null
+          revision?: number
+          status?: string
+          submitted_at?: string | null
+          decided_at?: string | null
+          expires_at?: string | null
+          customer_name?: string | null
+          customer_email?: string | null
+          customer_address?: string | null
+          subtotal_materials?: number
+          subtotal_labor?: number
+          subtotal_other?: number
+          markup_pct?: number
+          markup_amount?: number
+          tax_pct?: number
+          tax_amount?: number
+          total?: number
+          scope_summary?: string | null
+          exclusions?: string | null
+          payment_terms?: string | null
+          internal_notes?: string | null
+          bid_pdf_url?: string | null
+          bid_pdf_generated_at?: string | null
+          outcome_reason?: string | null
+          parent_estimate_id?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "estimates_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "estimates_parent_estimate_id_fkey"
+            columns: ["parent_estimate_id"]
+            isOneToOne: false
+            referencedRelation: "estimates"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      estimate_line_items: {
+        Row: {
+          id: string
+          estimate_id: string
+          user_id: string
+          position: number
+          category: string
+          description: string
+          quantity: number
+          unit: string | null
+          unit_cost: number
+          unit_price: number
+          line_total: number
+          source_kind: string | null
+          source_id: string | null
+          assembly_key: string | null
+          taxable: boolean
+          markup_overridden: boolean
+          notes: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          estimate_id: string
+          user_id: string
+          position?: number
+          category: string
+          description: string
+          quantity?: number
+          unit?: string | null
+          unit_cost?: number
+          unit_price?: number
+          line_total?: number
+          source_kind?: string | null
+          source_id?: string | null
+          assembly_key?: string | null
+          taxable?: boolean
+          markup_overridden?: boolean
+          notes?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          estimate_id?: string
+          user_id?: string
+          position?: number
+          category?: string
+          description?: string
+          quantity?: number
+          unit?: string | null
+          unit_cost?: number
+          unit_price?: number
+          line_total?: number
+          source_kind?: string | null
+          source_id?: string | null
+          assembly_key?: string | null
+          taxable?: boolean
+          markup_overridden?: boolean
+          notes?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "estimate_line_items_estimate_id_fkey"
+            columns: ["estimate_id"]
+            isOneToOne: false
+            referencedRelation: "estimates"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       feeders: {
         Row: {
           ambient_temperature_c: number | null
