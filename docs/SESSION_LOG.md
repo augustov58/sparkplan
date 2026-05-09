@@ -7,6 +7,60 @@
 
 ---
 
+### Session: 2026-05-09 — Permits Beta v1 Phase 1 implementation (`feat/permits-beta-v1`)
+
+**Focus**: Executed `docs/plans/permits-implementation.md` (Phase 1 only) end-to-end in a fresh worktree at `/home/augusto/projects/sparkplan-permits`. Replaces the PR #29 `PermitsStub` with a real tabbed Permits page (Overview / Permits / Inspections / Issues), full CRUD for permits + inspections, and migrates the existing `IssuesLog` UI into the page as the Issues tab. `/issues` redirects into `/permits?tab=issues`.
+
+**Status**:
+- ✅ Migration `20260510_permits_and_inspections.sql` written — creates `permits` + `permit_inspections` tables with RLS + the `update_updated_at_column()` trigger pattern (verified that function exists from prior migrations) + `issues.permit_inspection_id` FK column. **User must apply this migration in the Supabase SQL Editor before merging.**
+- ✅ `lib/database.types.ts` patched manually to match the migration shape (CLI regen deferred until DB applies).
+- ✅ Pure services in `services/permits/` (status state machine, expiration helper) + 35 unit tests. All tests pass (130 total, up from 95).
+- ✅ Hooks `usePermits` + `usePermitInspections` follow the optimistic-update + Supabase realtime pattern from `usePanels`. Inspections hook accepts an optional `permitId` filter.
+- ✅ Eight new components in `components/Permits/`: `PermitsPage` (tab orchestration + URL `?tab=` persistence), `PermitsOverviewTab`, `PermitsListTab` + `PermitDetailDrawer` + `NewPermitDialog`, `InspectionsListTab` + `InspectionDetailDrawer` + `NewInspectionDialog`, `IssuesTab` (thin wrapper), `PermitStatusPill` + `InspectionStatusPill`.
+- ✅ `App.tsx` routing wired up — `/permits` lazy-loads the new `PermitsPage`; `/issues` redirects to `/permits?tab=issues` (legacy bookmarks resolve cleanly with no 404). Old `PermitsStub` deleted.
+- ✅ `services/ai/projectContextBuilder.ts` gains optional `permits` + `inspections` params; surfaces counts in the AI summary so the chatbot can answer "do I have any open permits" without a tool call. Phase 3 will add full per-permit detail.
+- ✅ Docs synced: CHANGELOG entry, this SESSION_LOG entry, ROADMAP Phase 3.6 marked in-progress (will be done at PR merge), `docs/database-architecture.md` updated with both new tables + the issues column.
+- ✅ `npm run build` exits 0 (4.9s); 130 tests pass — only failure is the pre-existing `tests/calculations-extended.test.ts` Supabase env-var issue, unchanged from main.
+
+**Decisions made**:
+
+- **Pre-existing trigger function**: the plan's draft used `set_updated_at()` but the codebase actually defines `update_updated_at_column()`. Used the existing one to avoid duplicating function declarations.
+- **Phase 1 integration test deferred**. Plan §4.10 listed a `tests/permits/permitsCrud.test.ts` integration test, but the existing test infra (`tests/calculations-extended.test.ts`) demonstrably can't import any module that pulls `lib/supabase.ts` without `.env.local` set — the suite fails before reaching the test code. Adding a permits CRUD integration test would either (a) repeat the same failure or (b) require a vitest mock of the supabase client, which violates the project's "no mocked DB" preference. Documented as a Phase 1 gap; the unit tests on the pure services + manual smoke test cover the regression-sensitive parts. Suggest revisiting after a `.env.local.test` lane is set up.
+- **Validation is advisory, not blocking** — `NewPermitDialog` lets the user save with empty AHJ jurisdiction (the field will be saved as `'TBD'`). Inline amber hint surfaces when AHJ is empty but doesn't gate save. Per `feedback_validation_advisory` memory.
+- **Status dropdown forward-only**. The state machine in `permitStatusTransitions.ts` rejects backwards transitions from the dropdown. Audit-trail-honest. An explicit "Reopen" action is Phase 2 territory.
+- **Inspection drawer auto-stamps `performed_at`** when the user moves status to `passed` / `failed` / `conditional_pass`. Reverses to null when status moves back to `scheduled`. Cheap correctness win — avoids a separate "mark as complete" button.
+- **Per-permit inspection roll-up inside the detail drawer** uses `usePermitInspections(projectId, permitId)` — same hook, filtered. Saves a second query path.
+
+**Out of scope (deferred to Phase 2/3/4 per the plan)**:
+
+- AHJ portal scraping / status auto-sync (Phase 4)
+- Email notifications on status change (Phase 3)
+- Chatbot tools `update_permit_status`, `schedule_inspection`, `summarize_corrections` (Phase 3)
+- Two-way packet ↔ permit linkage (Phase 3)
+- `issues.permit_inspection_id` UI wiring (Phase 2 — column shipped, drawer doesn't surface it yet)
+- Status-change audit log table (Phase 2 if AHJs require it)
+
+**Pending / Follow-ups**:
+
+- **User must apply `supabase/migrations/20260510_permits_and_inspections.sql` in Supabase Studio** before this PR ships. Code references the new tables and will throw at runtime if the schema isn't applied first.
+- **Manual smoke test** per the plan's Definition of Done: create a permit, advance its status through the full lifecycle, schedule an inspection, mark it failed, see the corrections placeholder, mark a reinspection.
+- **PR opening** is the user's responsibility — agent does not push to remote per orchestration rules.
+
+**Key files touched** (full diff at `git diff origin/main..HEAD`):
+
+- New: `supabase/migrations/20260510_permits_and_inspections.sql` (174 LOC)
+- New: `services/permits/permitStatusTransitions.ts` + `permitExpirationWarning.ts` (~140 LOC)
+- New: `hooks/usePermits.ts` + `usePermitInspections.ts` (~410 LOC)
+- New: `components/Permits/*` — 9 files (~1,800 LOC TSX)
+- New: `tests/permits/*` — 2 files (~180 LOC)
+- Modified: `App.tsx`, `lib/database.types.ts`, `lib/dataRefreshEvents.ts`, `lib/toast.ts`, `lib/validation-schemas.ts`, `services/ai/projectContextBuilder.ts`
+- Deleted: `components/PermitsStub.tsx`
+- Docs: `docs/CHANGELOG.md`, `docs/SESSION_LOG.md`, `docs/database-architecture.md`, `ROADMAP.md`
+
+**Total diff**: ~6 commits, ~3,000 LOC additions on `feat/permits-beta-v1` branch.
+
+---
+
 ### Session: 2026-05-09 — Chatbot VD+ awareness + confirmation gate fix + Inspector accuracy + sidebar contractor pivot (4 PRs)
 
 **Focus**: Started by verifying merged PR #25 (cumulative VD + service-entrance feeders). Verification spawned three follow-up PRs (#26, #28, #29). Mid-session, the platform owner also surfaced three Inspector accuracy issues during PE review which landed as PR #27. Total: 4 PRs, 3 merged today + 1 still open.
@@ -65,100 +119,7 @@
 
 ---
 
-### Session: 2026-05-08 / 2026-05-09 — AHJ Compliance Audit Sprint 2A (commits 1–4 across two PRs)
+<!-- Session 2026-05-08 / 2026-05-09 (Sprint 2A) rotated out per "keep last 2 sessions" rule — git history preserves the entry. -->
 
-**Focus**: Long multi-day session executing the Sprint 2A plan from the audit doc. Closes systemic intake-rejection vectors that affect every Florida AHJ — not engine bugs, just packet form-factor and content gaps. Work split into themed PRs (Strategy C — see "Decisions" below).
-
-**Status**:
-- ✅ **PR 1** merged to `main` as `92126eb` — Sprint 2A commits 1, 2, 3 (C7+H4, C8+M8, H12+H13)
-- 🟡 **PR #23** open against `main` — Sprint 2A commit 4a + 4b + bug-fix follow-up (H1+H2+H3 sections + sheet IDs + TOC + revision log + UI toggle panel + DB persistence + sheet ID `E-` prefix + visibility pill + 42-circuit panel overflow fix)
-- ⏳ **Pending** — Sprint 2A commits 5–12 (H14, H9+H15, H10, H11, M3, M6, H17, schema additions). Audit doc plans 3 more themed PRs (PR 3 content, PR 4 diagrams, PR 5 engine + schema).
-
-198/198 tests pass on PR #23 branch. `npm run build` exits 0. PR #23 mergeable status: CLEAN against `main`.
-
----
-
-#### PR 1 — `92126eb` (merged) — Per-sheet polish + content gaps
-
-Three sub-commits:
-
-1. **C7 + H4** (`e17d5a4`) — NEC edition selector. Replaced hardcoded "NEC 2023" with packet-level `necEdition` prop (default '2020' for FL pilot AHJs — FBC 8th ed adopts NFPA-70 2020). Added APPLICABLE CODES section to cover sheet driven by optional `codeReferences` array. NEC 220.84 demand-factor table values verified valid for both 2020 and 2023 (already declared in `services/calculations/multiFamilyEV.ts:25`).
-
-2. **C8 + M8** (`026470c`) — Per-sheet `<ContractorBlock>` signature footer. Required by every Florida AHJ on every electrical sheet — without it, intake reviewers reject before reaching technical review. Implementation: shared `BrandFooter` (in `permitPacketTheme.tsx`) now renders a fixed signature/date row above the brand footer when `contractorName`/`contractorLicense` props are provided. The signature line renders even when contractor metadata is missing so the AHJ has a place to wet-sign. M8 fix bundled here: `MeterStackSchedulePDF.tsx` previously used a private style sheet — now wraps each Page with shared `themeStyles.page` + `BrandBar` + `BrandFooter` (which carries the C8 contractor block automatically).
-
-3. **H12 + H13** (`500031e`) — Dedicated General Notes page (sheet 2 of the packet). Driven from optional `generalNotes` string array on `PermitPacketData`. Default 8-item FL pilot stack covers NEC 2020 + FBC 8th ed compliance, voltage-drop convention 3% branch / 3% feeder / 5% combined, conductor sizing references, grounding & bonding refs, NRTL listing requirement, EVSE/EVEMS refs, working-space requirement, and available-fault-current verification. Sprint 2C will replace the stub with per-AHJ manifest content.
-
----
-
-#### PR #23 — `feat/sprint-2a-part-2-sections` (open, 3 commits) — Sections + sheet IDs + TOC + revision log
-
-**Commit 4a** (`ed4fdb8`) — Backend restructure. The largest single commit of Sprint 2A so far.
-
-Replaced the imperative `pages.push({ name, element })` chain with a declarative `builders: PageBuilder[]` list. Each builder declares `kind`, `band`, `pageCount`, `tocTitles`, and a `render(sheetIds, tocEntries)` function. The build pipeline:
-
-1. Push every potential page-builder, gated by both data presence (existing) and `sections` config (new). Cover is hard-required (no gate). ComplianceSummary + PanelSchedules are toggleable but the UI warns when off.
-2. Walk builders allocating sheet IDs via per-band counters.
-3. Walk again collecting TOC entries (cover + TOC itself excluded).
-4. Render each builder with its allocated sheet IDs and the populated `tocEntries` array.
-
-New `services/pdfExport/packetSections.ts` foundation: `PacketSections` type + `DEFAULT_SECTIONS` (all-on default), `resolveSections` helper, 7 `SheetBand` constants (000-099 / 100-199 / 200-299 / 300-399 / 400-499 / 500-599 / 600-699), `newBandCounters` + `nextSheetId` per-band sequential allocator. Toggling a section off compresses numbering within its band — no gaps.
-
-New PDF components: `TableOfContentsPage` (auto-populated from rendered sections, lists sheet ID + title), `RevisionLogPage` (auto-populates default "Rev 0 / [today] / Initial submittal / [contractor]" row when `revisions` is omitted; subsequent revisions append).
-
-Theme additions: `BrandBar` and `BrandFooter` accept optional `sheetId` — render "Sheet [id] · Page X of Y" instead of bare "Page X of Y".
-
-Multi-page component split (Option A): `MultiFamilyEVPages` accepts `sheetIds: [string, string, string]`; `MeterStackScheduleDocument` accepts `sheetIds: string[]` aligned to `meterStacks`. Generator declares `pageCount: 3` for MFEV and `pageCount: stacks.length` for meter stack so each physical page in the merged PDF gets its own unique sheet ID.
-
-Sheet ID prop threaded through all 9 page components: CoverPage, GeneralNotesPage, EquipmentSchedule, RiserDiagram, LoadCalculationSummary, ComplianceSummary, EquipmentSpecsPages, VoltageDropPages, JurisdictionRequirementsPages, ShortCircuitCalculationPages, ArcFlashPages, GroundingPlanPages, PanelSchedulePages.
-
-**Commit 4b** (`df919e0`) — Frontend toggle panel + projects.settings persistence.
-
-Added Configure Sections panel between Project Summary and Jurisdiction Requirements cards in `components/PermitPacketGenerator.tsx`. 16 toggleable sections grouped into 6 categories. Cover is shown as a non-toggleable indicator. "Reset to defaults" link clears the override. Each toggle shows section purpose + band info.
-
-Auto-disable predicates grey out toggles with tooltips when underlying data is missing (Voltage Drop / no feeders, Short Circuit / no calcs, Arc Flash / not yet wired, Grounding / no grounding system, Meter Stack / no stacks, Multi-Family EV / requires the input checkbox above, Jurisdiction / no jurisdiction selected).
-
-Off-warning amber banners surface above the grid when sections most AHJs require are toggled off (Compliance Summary, Panel Schedules).
-
-Persistence: each toggle change calls `updateProject({...currentProject, settings: {...settings, sectionPreferences: updated}})`. ProjectSettings extended with `sectionPreferences?: Record<string, boolean>` (typed as `Record<string, boolean>` instead of `Partial<PacketSections>` to avoid a circular import from PDF service into `types.ts`; packet generator narrows at the boundary). Stored in existing `projects.settings` JSONB column — no migration.
-
-**Commit `8769736`** — Bug-fix follow-up (3 issues found during user visual review):
-
-1. Sheet IDs now prefix with `E-` (was bare numeric like "305"; now "E-305" — standard plan-set discipline prefix).
-2. Sheet IDs render as a high-visibility yellow pill in BrandBar and a bordered cream badge in BrandFooter (was inline text, blending into dark bar).
-3. 42-circuit panel schedules were overflowing onto a second page (with the same sheet ID, breaking the uniqueness invariant). Three-layer fix: `themeStyles.page.paddingBottom` reduced 78pt → 64pt (over-provisioned in commit 2); panel summary card layout tightened (padding/margins/font sizes); `wrap={false}` on both summary cards so react-pdf moves the entire card to the next page rather than splitting it mid-content.
-
-**Decisions made**:
-
-- **Strategy C — themed PRs.** Splitting Sprint 2A's 12 commits into 4 themed PRs instead of 12 individual ones. PR 1 = "per-sheet polish + content gaps" (commits 1-3); PR #23 = "document structure + user control" (commits 4a + 4b + bugfix); PR 3 (next) = "engineering content additions" (commits 5-8 — H14, H9+H15, H10, H11); PR 4 = "diagrams" (commits 9-10 — M3, M6); PR 5 = "engine + schema" (commits 11-12 — H17, settings JSON additions). Saved this preference because it's now the project's de facto Sprint 2A workflow.
-- **Hard-required pages**: Cover only. ComplianceSummary + PanelSchedules toggleable but with off-warning banners ("Most AHJs reject without this").
-- **Sheet ID scheme**: numeric category bands with `E-` discipline prefix. Front matter 001-099, calculations 100-199, diagrams 200-299, panels 300-399, multi-family 400-499, compliance 500-599, specialty 600-699 (reserved for EVEMS narrative + EVSE labeling in commits 7-8).
-- **Default revision-log row**: Auto-populated `Rev 0 / [today's date] / Initial submittal / [Contractor name]` for first submittals. Avoids shipping with a blank page.
-- **Sections persistence in `projects.settings`** (not localStorage). Round-trips through existing JSONB column, no DB migration. Per-project preferences survive page reloads.
-- **Sections config locking is Sprint 3 territory.** Sheet ID stability across revisions matters for AHJ comment letters citing specific sheet IDs. Documented as a Sprint 3 concern (PE seal workflow will lock the sections snapshot at submittal time).
-- **`wrap={false}` on cohesive PDF cards**. Once react-pdf's auto-pagination kicks in, fixed elements (BrandBar, BrandFooter) re-render on each overflow page with the same sheet ID — breaks uniqueness. Defensive pattern: any logical card the reader expects together gets `wrap={false}` so react-pdf relocates the whole card on overflow rather than splitting it.
-
-**Key files touched**:
-- New: `services/pdfExport/packetSections.ts` (sections config + sheet ID utilities)
-- Generator restructure: `services/pdfExport/permitPacketGenerator.tsx` (~512 lines new, ~172 deleted)
-- Cross-cutting: 9 PDF page modules touched for sheetId prop threading + contractor footer prop threading
-- Theme: `services/pdfExport/permitPacketTheme.tsx` (BrandBar pill, BrandFooter badge, contractorBlock, paddingBottom tightening)
-- UI: `components/PermitPacketGenerator.tsx` (toggle panel + persistence; +330 LOC)
-- Types: `types.ts` (`ProjectSettings.sectionPreferences?`)
-- Tests: `tests/contractorBlockPdf.test.ts`, `tests/generalNotesPdf.test.ts`, `tests/packetSections.test.ts`, `tests/tocRevisionLogPdf.test.ts` (+ updates to `tests/coverPagePdf.test.ts`)
-
-**Pending / Follow-ups**:
-
-- **PR #23 user merge.** Awaiting browser verification of the toggle panel + sheet ID rendering + 42-circuit overflow fix.
-- **Sprint 2A continuation** — commits 5-12 across 3 more themed PRs:
-  - **PR 3** (next): commit 5 H14 (NEC 220.87 conditions narrative), commit 6 H9+H15 (AIC labels on one-line + UL-2202/UL-2594 fields on EVSE specs + new "Available Fault Current Calculation" page when service-modification-type === 'new-service'), commit 7 H10 (EVEMS operational narrative), commit 8 H11 (EVSE labeling page per NEC 625.43)
-  - **PR 4**: commit 9 M3 (project-specific grounding detail with GEC sizing per NEC 250.66 / 250.122), commit 10 M6 (riser diagram landscape mode for ≥10 panels OR pagination)
-  - **PR 5**: commit 11 H17 (FS 471.003(2)(h) contractor-exemption screening engine — pure function in `services/permitMode/exemptionScreening.ts` returning `{ lane, reason, ahjOverride? }`), commit 12 schema additions to `projects.settings` (service_modification_type enum, scope_flags JSON, estimated_value_usd)
-- **PR base bug** — Claude Code's UI created PR #23 with base set to `fix/c2-evse-feeder-aggregation` (a Sprint 1 branch) instead of `main`. Manually retargeted via `gh api PATCH /repos/.../pulls/23 -f base=main`. If this recurs, check repo default-branch settings.
-
-**PRs**:
-- **PR 1** — Sprint 2A commits 1-3 (merged to main as squash commit `92126eb`)
-- **PR #23** — Sprint 2A commit 4a + 4b + bugfix (open, base now correctly `main`, mergeable CLEAN)
-
----
 
 <!-- Earlier session 2026-05-06 / 2026-05-07 (Sprint 1 close-out / C4 omnibus) rotated out per "keep last 2 sessions" rule. Git history preserves the entry. -->

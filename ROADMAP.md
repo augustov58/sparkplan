@@ -1,19 +1,19 @@
 # SparkPlan - Roadmap
 
-## Current Phase: 3.6 (Permits Beta v1) - PLANNING (May 2026)
+## Current Phase: 3.6 (Permits Beta v1) - PHASE 1 IMPLEMENTED (May 2026)
 
 ## Latest Completed Phase: 3.5 (Contractor Pivot — Sidebar Betas + Chatbot Restoration) - May 2026
 ## Active Sprint: 3.4 (AHJ Compliance Audit Sprint 2A) - 2 PRs merged, 3 still planned
 
 ---
 
-## Phase 3.6: Permits Beta v1 - PLANNING (May 2026)
+## Phase 3.6: Permits Beta v1 - PHASE 1 IMPLEMENTED (May 2026)
 
 First contractor-pivot beta selected for actual implementation. Phase 3.5's demand-discovery stubs identified Permits as the highest-leverage entry point because it absorbs the existing `Inspection & Issues` page (already built in Phase 0) and adds a permit-submission lifecycle on top — fastest path from beta stub to a real shipped feature.
 
 | Phase | Scope | Status |
 |---|---|---|
-| **Phase 1 (MVP)** | Tabbed Permits page (Overview / Permits / Inspections / Issues). New `permits` + `permit_inspections` tables. Permit + inspection CRUD with status-transition state machine. Existing `IssuesLog` UI relocated as Issues tab. Redirect `/issues` → `/permits?tab=issues`. Manual permit-status updates. | 📋 Planned (PR #30 — handoff doc) |
+| **Phase 1 (MVP)** | Tabbed Permits page (Overview / Permits / Inspections / Issues). New `permits` + `permit_inspections` tables. Permit + inspection CRUD with status-transition state machine. Existing `IssuesLog` UI relocated as Issues tab. Redirect `/issues` → `/permits?tab=issues`. Manual permit-status updates. | ✅ IMPLEMENTED on `feat/permits-beta-v1` (awaiting migration apply + PR + merge) |
 | **Phase 2** | AHJ contact integration (auto-populate from FL pilot AHJ database). Inspection scheduling via existing `CalendarView`. Expiration warnings (banner ≤30 days). Corrections-to-issue linkage in UI. | ⏳ Pending |
 | **Phase 3** | AI assistance — chatbot tools `update_permit_status`, `schedule_inspection`, `summarize_corrections`. Auto-link generated permit packets to permits. Email notifications for status changes. | ⏳ Pending |
 | **Phase 4** | AHJ portal scraping per-AHJ (Orange County, Miami-Dade, Pompano Beach). Automated status syncing. | ⏳ Pending |

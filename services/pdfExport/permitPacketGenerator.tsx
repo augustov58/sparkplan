@@ -24,11 +24,23 @@ import {
   ComplianceSummary,
   TableOfContentsPage,
   RevisionLogPage,
+  NEC22087NarrativePage,
+  AvailableFaultCurrentPage,
+  EVEMSNarrativePage,
+  EVSELabelingPage,
   type TocEntry,
   type RevisionEntry,
+  type NEC22087NarrativeData,
+  type AvailableFaultCurrentInput,
+  type EVEMSNarrativePanelEntry,
+  type EVSELabelingPanelEntry,
 } from './PermitPacketDocuments';
 import { PanelSchedulePages } from './PanelScheduleDocuments';
-import { calculateAggregatedLoad } from '../calculations/upstreamLoadAggregation';
+import {
+  calculateAggregatedLoad,
+  isEVEMSManagedPanel,
+  findEVEMSSetpointMarker,
+} from '../calculations/upstreamLoadAggregation';
 import { EquipmentSpecsPages } from './EquipmentSpecsDocuments';
 import { VoltageDropPages } from './VoltageDropDocuments';
 import { JurisdictionRequirementsPages } from './JurisdictionDocuments';
@@ -49,6 +61,7 @@ import {
   BAND_PANELS,
   BAND_MULTIFAMILY,
   BAND_COMPLIANCE,
+  BAND_SPECIALTY,
 } from './packetSections';
 
 export interface PermitPacketData {
@@ -141,6 +154,14 @@ export interface PermitPacketData {
    * row using `contractorName ?? preparedBy` as the issuer.
    */
   revisions?: RevisionEntry[];
+  /**
+   * Sprint 2A H14: opt-in NEC 220.87 existing-service narrative. When provided,
+   * the generator inserts a structured 3-condition checklist sheet (band 100)
+   * required by Orlando's existing-service permit checklist. When omitted, the
+   * `nec22087Narrative` section toggle auto-disables in the UI — only projects
+   * claiming an NEC 220.87 service upgrade need this page.
+   */
+  nec22087Narrative?: NEC22087NarrativeData;
 }
 
 const downloadBlob = (blob: Blob, fileName: string): void => {
@@ -230,6 +251,8 @@ export const generatePermitPacket = async (data: PermitPacketData): Promise<void
     | 'revisionLog'
     | 'generalNotes'
     | 'loadCalculation'
+    | 'nec22087Narrative'
+    | 'availableFaultCurrent'
     | 'voltageDrop'
     | 'shortCircuit'
     | 'arcFlash'
@@ -241,7 +264,9 @@ export const generatePermitPacket = async (data: PermitPacketData): Promise<void
     | 'meterStack'
     | 'multiFamilyEV'
     | 'complianceSummary'
-    | 'jurisdiction';
+    | 'jurisdiction'
+    | 'evemsNarrative'
+    | 'evseLabeling';
 
   interface PageBuilder {
     name: string;
@@ -361,6 +386,30 @@ export const generatePermitPacket = async (data: PermitPacketData): Promise<void
     });
   }
 
+  // Sprint 2A H14: NEC 220.87 narrative is opt-in — only renders when an
+  // explicit narrative data block is provided AND the section toggle is on.
+  // Most projects don't claim an NEC 220.87 existing-service path, so the
+  // page is gated on data presence to avoid emitting an empty / boilerplate
+  // sheet for the majority of packets.
+  if (sections.nec22087Narrative && data.nec22087Narrative) {
+    const narrative = data.nec22087Narrative;
+    builders.push({
+      name: 'NEC22087Narrative',
+      kind: 'nec22087Narrative',
+      band: BAND_CALCULATIONS,
+      pageCount: 1,
+      tocTitles: ['NEC 220.87 — Existing Service Capacity Verification'],
+      render: (sheetIds) => (
+        <NEC22087NarrativePage
+          projectName={data.projectName}
+          data={narrative}
+          {...contractor}
+          sheetId={sheetIds[0]}
+        />
+      ),
+    });
+  }
+
   if (sections.voltageDrop && data.feeders && data.feeders.length > 0) {
     builders.push({
       name: 'VoltageDrop',
@@ -382,6 +431,52 @@ export const generatePermitPacket = async (data: PermitPacketData): Promise<void
         />
       ),
     });
+  }
+
+  // Sprint 2A H9: Available Fault Current Calculation page — required by
+  // Orlando new-service path. Selects the service-level entry from the
+  // shortCircuitCalculations array (calculation_type === 'service'). When
+  // no service-level entry exists, the section toggle auto-disables in the
+  // UI and the builder is not pushed.
+  if (sections.availableFaultCurrent && data.shortCircuitCalculations) {
+    const serviceCalc = data.shortCircuitCalculations.find(
+      c => c.calculation_type === 'service',
+    );
+    if (serviceCalc) {
+      const input: AvailableFaultCurrentInput = {
+        serviceAmps: serviceCalc.service_amps,
+        serviceVoltage: serviceCalc.service_voltage,
+        servicePhase: serviceCalc.service_phase,
+        sourceFaultCurrent: serviceCalc.source_fault_current,
+        transformerKVA: serviceCalc.transformer_kva,
+        transformerImpedance: serviceCalc.transformer_impedance,
+        serviceConductorSize: serviceCalc.service_conductor_size,
+        serviceConductorMaterial: serviceCalc.service_conductor_material,
+        serviceConductorLength: serviceCalc.service_conductor_length,
+        // The `results` column is typed `Json` in the DB; the IEEE-141 engine
+        // writes a structured block whose shape lines up with
+        // ShortCircuitResultsBlock. Cast through `unknown` so the typecheck
+        // doesn't over-constrain consumers of the raw Json column.
+        results: (serviceCalc.results as unknown as AvailableFaultCurrentInput['results']) ?? null,
+        notes: serviceCalc.notes,
+      };
+      builders.push({
+        name: 'AvailableFaultCurrent',
+        kind: 'availableFaultCurrent',
+        band: BAND_CALCULATIONS,
+        pageCount: 1,
+        tocTitles: ['Available Fault Current — Service Main'],
+        render: (sheetIds) => (
+          <AvailableFaultCurrentPage
+            projectName={data.projectName}
+            projectAddress={data.projectAddress}
+            input={input}
+            {...contractor}
+            sheetId={sheetIds[0]}
+          />
+        ),
+      });
+    }
   }
 
   if (sections.shortCircuit && data.shortCircuitCalculations && data.shortCircuitCalculations.length > 0) {
@@ -485,6 +580,7 @@ export const generatePermitPacket = async (data: PermitPacketData): Promise<void
           projectAddress={data.projectAddress}
           panels={data.panels}
           transformers={data.transformers}
+          circuits={data.circuits}
           includeNECReferences={true}
           {...contractor}
           sheetId={sheetIds[0]}
@@ -603,6 +699,97 @@ export const generatePermitPacket = async (data: PermitPacketData): Promise<void
         />
       ),
     });
+  }
+
+  // ---- Specialty / scope-specific (band 600) ----
+  // Sprint 2A H10: EVEMS operational narrative — only renders when at least
+  // one EVEMS-managed panel is detected. Setpoint pulled from explicit marker
+  // circuit (preferred); legacy projects without the marker get a "estimated"
+  // breaker × voltage proxy with the source flag exposed in the output.
+  if (sections.evemsNarrative) {
+    const evemsPanels: EVEMSNarrativePanelEntry[] = sortedPanels
+      .filter(p => isEVEMSManagedPanel(p.id, data.circuits))
+      .map(p => {
+        const marker = findEVEMSSetpointMarker(p.id, data.circuits);
+        const explicitSetpointVA = marker?.load_watts ?? null;
+        const phaseAsLit: 1 | 3 = p.phase === 3 ? 3 : 1;
+        // Proxy fallback: panel main breaker × voltage. Bounds the setpoint
+        // from above for legacy projects that pre-date the marker circuit.
+        const proxyVA = p.main_breaker_amps && p.voltage
+          ? p.main_breaker_amps * p.voltage * (phaseAsLit === 3 ? 1.732 : 1)
+          : null;
+        return {
+          panelId: p.id,
+          panelName: p.name,
+          setpointVA: explicitSetpointVA && explicitSetpointVA > 0 ? explicitSetpointVA : proxyVA,
+          hasExplicitMarker: !!(explicitSetpointVA && explicitSetpointVA > 0),
+          mainBreakerAmps: p.main_breaker_amps ?? null,
+          voltage: p.voltage,
+          phase: phaseAsLit,
+        };
+      });
+    if (evemsPanels.length > 0) {
+      builders.push({
+        name: 'EVEMSNarrative',
+        kind: 'evemsNarrative',
+        band: BAND_SPECIALTY,
+        pageCount: 1,
+        tocTitles: ['EVEMS Operational Narrative (NEC 625.42)'],
+        render: (sheetIds) => (
+          <EVEMSNarrativePage
+            projectName={data.projectName}
+            panels={evemsPanels}
+            {...contractor}
+            sheetId={sheetIds[0]}
+          />
+        ),
+      });
+    }
+  }
+
+  // Sprint 2A H11: EVSE labeling reference — applies to any EV-bank panel
+  // (EVEMS-managed or not). Detection mirrors the H15 EquipmentSpecs card:
+  // EVEMS marker circuit OR panel name pattern. The labeling page itself
+  // is generic enough that even false positives just produce a useful
+  // contractor reference.
+  if (sections.evseLabeling) {
+    const evNamePattern = /\b(ev|evse|charger|charging|level\s*2|l2)\b/i;
+    const evseLabelingPanels: EVSELabelingPanelEntry[] = sortedPanels
+      .filter(
+        p => isEVEMSManagedPanel(p.id, data.circuits) || evNamePattern.test(p.name),
+      )
+      .map(p => {
+        // Count the charger branch circuits for this panel (filter out the
+        // EVEMS marker so the count reflects real chargers).
+        const chargerCount = data.circuits.filter(
+          c => c.panel_id === p.id && c.description && evNamePattern.test(c.description),
+        ).length;
+        return {
+          panelId: p.id,
+          panelName: p.name,
+          chargerCircuitCount: chargerCount,
+          location: p.location ?? undefined,
+        };
+      });
+    if (evseLabelingPanels.length > 0) {
+      const isCommercial = data.projectType === 'Commercial' || data.projectType === 'Industrial';
+      builders.push({
+        name: 'EVSELabeling',
+        kind: 'evseLabeling',
+        band: BAND_SPECIALTY,
+        pageCount: 1,
+        tocTitles: ['EVSE Labeling & Disconnect Requirements (NEC 625.43)'],
+        render: (sheetIds) => (
+          <EVSELabelingPage
+            projectName={data.projectName}
+            panels={evseLabelingPanels}
+            isCommercial={isCommercial}
+            {...contractor}
+            sheetId={sheetIds[0]}
+          />
+        ),
+      });
+    }
   }
 
   // Synthesize virtual feeder-circuit rows for panels that feed downstream

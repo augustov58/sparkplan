@@ -17,6 +17,8 @@ type Panel = Database['public']['Tables']['panels']['Row'];
 type Circuit = Database['public']['Tables']['circuits']['Row'];
 type Feeder = Database['public']['Tables']['feeders']['Row'];
 type Transformer = Database['public']['Tables']['transformers']['Row'];
+type Permit = Database['public']['Tables']['permits']['Row'];
+type PermitInspection = Database['public']['Tables']['permit_inspections']['Row'];
 
 export interface ProjectContext {
   projectId: string;
@@ -114,7 +116,11 @@ export function buildProjectContext(
       evChargerCount?: number;
       useEVEMS?: boolean;
     };
-  }
+  },
+  // Phase 1 Permits Beta: surface counts so the AI knows whether to suggest
+  // checking the Permits tab. Phase 3 will add full per-permit detail.
+  permits?: Permit[],
+  inspections?: PermitInspection[],
 ): ProjectContext {
   // Build panel summaries with hierarchy information
   const panelSummaries: PanelSummary[] = panels.map(panel => {
@@ -326,6 +332,25 @@ export function buildProjectContext(
     multiFamilyText += `\nMeter Stack (CT Cabinet): Yes`;
   }
 
+  // Phase 1 Permits Beta: high-level permit/inspection counts. Phase 3
+  // will add per-permit detail (status, expiration, AHJ contact).
+  let permitsText = '';
+  if (permits && permits.length > 0) {
+    const activePermits = permits.filter(
+      (p) =>
+        p.status !== 'closed' &&
+        p.status !== 'cancelled' &&
+        p.status !== 'expired',
+    ).length;
+    permitsText = `\nPermits: ${permits.length} (${activePermits} active)`;
+  }
+  if (inspections && inspections.length > 0) {
+    const openInspections = inspections.filter(
+      (i) => i.status === 'scheduled',
+    ).length;
+    permitsText += `\nInspections: ${inspections.length} (${openInspections} scheduled)`;
+  }
+
   const summary = `
 PROJECT: ${projectName}
 Type: ${projectType}
@@ -336,7 +361,7 @@ Total Circuits: ${circuits.length}
 Total Connected Load: ${Math.round(totalConnectedVA / 1000)} kVA
 Estimated Demand Load: ${Math.round(totalDemandVA / 1000)} kVA
 ${feeders.length > 0 ? `Feeders: ${feeders.length}` : ''}
-${transformers.length > 0 ? `Transformers: ${transformers.length}` : ''}${multiFamilyText}${hierarchyText}
+${transformers.length > 0 ? `Transformers: ${transformers.length}` : ''}${permitsText}${multiFamilyText}${hierarchyText}
   `.trim();
 
   return {
