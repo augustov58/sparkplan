@@ -1,13 +1,36 @@
 # SparkPlan - Roadmap
 
-## Current Phase: 3.7 (Estimating Beta v1) - IN PROGRESS (May 2026)
+## Current Phase: 3.8 (T&M Billing Beta v1) - PHASE 1 IMPLEMENTED (May 2026)
 
-## Latest Completed Phase: 3.5 (Contractor Pivot — Sidebar Betas + Chatbot Restoration) - May 2026
-## Active Sprint: 3.4 (AHJ Compliance Audit Sprint 2A) - 2 PRs merged, 3 still planned
+## Latest Completed Phase: 3.7 (Estimating Beta v1) - PHASE 1 IMPLEMENTED (May 2026)
+## Also Just Shipped: 3.6 (Permits Beta v1) - PHASE 1 IMPLEMENTED (May 2026)
+## Active Sprint: 3.4 (AHJ Compliance Audit Sprint 2A) - 3 PRs merged, 2 still planned
 
 ---
 
-## Phase 3.7: Estimating Beta v1 - IN PROGRESS (May 2026)
+## Phase 3.8: T&M Billing Beta v1 - PHASE 1 IMPLEMENTED (May 2026)
+
+Third contractor-pivot beta. Implements Phase 1 of T&M billing per `docs/plans/tm-billing-implementation.md`. Shipped as two stacked PRs (#34 Phase 1a + #35 Phase 1b) splitting the ~7,700 LOC scope into a reviewable foundation + invoicing layer.
+
+| Phase | Scope | Status |
+|---|---|---|
+| **Phase 1a (PR #34)** | `project_billing_settings`, `time_entries`, `material_entries` tables. Tabbed `BillingPage` (Overview / Time / Materials / Settings). Pure-function `billingMath.ts`. Hooks following optimistic + realtime pattern. | ✅ MERGED 2026-05-09 |
+| **Phase 1b (PR #35)** | `invoices` + `payments` tables. `generate_invoice_atomic` RPC + `sync_invoice_paid_totals` trigger. Invoice generation modal, detail drawer, payment recording. Invoice PDF via `@react-pdf/renderer`. | ✅ MERGED 2026-05-09 |
+| **Phase 2** | Cost code lookup library (replaces free-text). Change orders as first-class entity. Equipment rental tracking. Retention support (% withheld + cumulative across pay applications). Tax tables per zip. | ⏳ Pending |
+| **Phase 3** | AIA G702/G703-style PDF format. Multi-period pay applications. AI tools (`add_time_entry`, `summarize_unbilled`, `generate_invoice`). | ⏳ Pending |
+| **Phase 4** | Stripe payment-intent integration for invoice payment. Email-invoice flow with click-to-pay. QuickBooks export. Project profitability dashboards. | ⏳ Pending |
+
+**Implementation handoff doc**: [`docs/plans/tm-billing-implementation.md`](docs/plans/tm-billing-implementation.md).
+
+**Tier gating**: Already done in Phase 3.5 (PR #29). `tm-billing` is in `FEATURE_TIERS` as `['business', 'enterprise']`. Trial users get access automatically.
+
+**Migrations applied** (via Supabase MCP, project `ioarszhzltpisxsxrsgl`):
+- `20260509193801_tm_billing_phase1a` — settings + time + material entries.
+- `20260509193850_tm_billing_phase1b` — invoices + payments + FK retrofit + RPC + trigger.
+
+---
+
+## Phase 3.7: Estimating Beta v1 - PHASE 1 IMPLEMENTED (May 2026)
 
 Second contractor-pivot beta. Implements Phase 1 of the Estimating feature
 in parallel with Phase 3.6 Permits. The differentiator: SparkPlan reads the
@@ -18,7 +41,7 @@ knows what's in it.
 
 | Phase | Scope | Status |
 |---|---|---|
-| **Phase 1 (MVP)** | `estimates` + `estimate_line_items` tables with RLS. Pure-function math (subtotals, markup, tax). Status state machine. Auto-takeoff from project. 5-tab UI (Overview / Takeoff / Materials / Labor / Bid Output). Bid PDF via `@react-pdf/renderer`. Clone-as-revision flow. | 🟡 Implementation (branch `feat/estimating-beta-v1`) |
+| **Phase 1 (MVP)** | `estimates` + `estimate_line_items` tables with RLS. Pure-function math (subtotals, markup, tax). Status state machine. Auto-takeoff from project. 4-tab UI (Overview / Line Items / Bid Output). Bid PDF via `@react-pdf/renderer`. Clone-as-revision flow. | ✅ MERGED PR #33 (2026-05-09) |
 | **Phase 2** | Pre-built assemblies (200A service upgrade, kitchen remodel, EV install). Per-category markup. Sales-tax tables per US zip. Custom user assemblies. | ⏳ Pending |
 | **Phase 3** | AI-assisted takeoff — chatbot tools `generate_estimate_from_project`, `add_assembly`, `tune_markup`. Auto-suggest assemblies based on project shape. | ⏳ Pending |
 | **Phase 4** | External price feeds (Lowe's Pro / Home Depot / Graybar). Live price snapshots. Revision diff visualization. DocuSign integration. | ⏳ Pending |

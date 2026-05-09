@@ -7,156 +7,84 @@
 
 ---
 
-### Session: 2026-05-09 — Estimating Beta v1 — Phase 1 implementation (branch `feat/estimating-beta-v1`)
+### Session: 2026-05-09 — Permits + Estimating + T&M Billing Phase 1 shipped via three parallel agents (PRs #32, #33, #34, #35)
 
-**Focus**: Built Phase 1 of the Estimating beta per `docs/plans/estimating-implementation.md`. Replaces the demand-discovery `EstimatingStub` (PR #29) with a working estimating module. Branch off `main` at commit `74df3e1` plus the cherry-picked plan-doc commit `b7386fd`. Worktree at `/home/augusto/projects/sparkplan-estimating`.
+**Focus**: Built and shipped Phase 1 of all three contractor-pivot betas concurrently. Three features, three plans (`docs/plans/{permits,estimating,tm-billing}-implementation.md`), three Sonnet 4.6 agents working in three independent git worktrees. Total: 4 PRs merged today (#32 Permits, #33 Estimating, #34 T&M Phase 1a, #35 T&M Phase 1b), 4 Supabase migrations applied, 5 net cascading conflict-resolution merges across the three sibling branches.
 
-**Status**:
-- 🟡 Branch `feat/estimating-beta-v1` ready, build clean, 129 tests passing (was 95 at branch start). Migration not yet applied.
-- 🟡 PR not opened — user opens it manually after applying the migration and smoke-testing.
+**Status**: ✅ All three features in main. All 4 migrations live in Supabase project `ioarszhzltpisxsxrsgl`. Test suite at 250 passing (was 95 baseline). Build clean (~4.9s consistently across all branches).
 
-**What shipped (7 commits)**:
-1. Migration + types extension. `supabase/migrations/20260511_estimates_and_line_items.sql` creates `estimates` (header) + `estimate_line_items` (detail) with full RLS, indexes, realtime publication. `lib/database.types.ts` hand-extended.
-2. Pure services. `services/estimating/estimateMath.ts` (subtotals + markup + tax), `estimateStatusTransitions.ts` (state machine: draft → submitted → accepted/rejected/expired/cancelled), `defaultPricing.ts` (Phase-1 starter price tables). 25 tests.
-3. Auto-takeoff. `services/estimating/autoTakeoffFromProject.ts` walks panels (MDP first), transformers, feeders (phase + neutral + EGC + conduit + labor), and branch circuits (per-panel grouped + bundled labor). Snapshot semantics; the user re-runs from the takeoff tab to append. 9 tests.
-4. Hooks. `hooks/useEstimates.ts` + `hooks/useEstimateLineItems.ts` follow the optimistic-update + Supabase realtime pattern from `usePanels.ts`. `bulkInsert` for auto-takeoff round-trip; `cloneAsRevision` + `cloneLineItemsForEstimate` for revisions.
-5. Bid PDF. `services/estimating/estimatePdfGenerator.tsx` — 3-page Document (cover + detail + terms/signature) using `@react-pdf/renderer` with shared `permitPacketTheme` BrandBar/Footer.
-6. UI components in `components/Estimating/`: `EstimatingPage`, `EstimatesListView`, `EstimateDetailView` (5-tab strip with `?tab=` URL persistence), `EstimateOverviewTab` (totals + customer + scope), `LineItemsTab` (used by Takeoff/Materials/Labor with optional category filter), `EstimateLineItemRow`, `BidOutputTab`, `EstimateStatusPill`. `App.tsx` swaps lazy import from `EstimatingStub` to `EstimatingPage`. Stub deleted.
-7. AI context + docs. `services/ai/projectContextBuilder.ts` accepts an optional `estimates` array and surfaces count + most-recent in the formatted context (Phase 3 will expand). ROADMAP / CHANGELOG / SESSION_LOG updated.
+**Architecture decisions worth carrying forward**:
 
-**Decisions made**:
-- **Tax applied to taxable basis BEFORE markup** (plan §5 decision 1). Markup is on subtotal; tax is on materials only; both add to total. Don't tax the markup itself.
-- **Snapshot, not live binding** (plan §5 decision 4). Auto-takeoff at create time pulls a frozen snapshot of the project. Re-running from the takeoff tab APPENDS rather than reconciles.
-- **Soft FK for line items** (plan §5 decision 9). `source_id` is a UUID with no DB-level FK constraint. If the user deletes a panel after the estimate exists, the estimate keeps the line items with an orphaned `source_id`. Acceptable; revisions are explicit.
-- **Subtotal_other rolls up equipment + subcontract + other** in the DB. Phase 2 (per-category markup) will split them into dedicated columns. Saves 2 columns now at the cost of a small adapter in `totalsForPersistence`.
-- **No `set_updated_at()` trigger** in the migration. The project doesn't ship that helper function — every existing migration just defaults `updated_at NOW()` and lets the app update it explicitly. Followed convention.
-- **PDF stays client-side in Phase 1**. The `bid_pdf_url` column is in the schema for Phase 4; today the user clicks Download and the browser saves the blob. Avoided the storage-bucket + signed-URL plumbing that adds complexity for marginal Phase 1 value.
+- **Parallel features that share *registries*; serial features that share *logic*.** The three Phase 1 plans had zero shared business logic but extensively shared "registry" files: `App.tsx` (route list), `lib/dataRefreshEvents.ts` (event-type union), `lib/validation-schemas.ts` (Zod schemas), `services/ai/projectContextBuilder.ts` (chatbot context params), and the doc files. Parallel agents produce *additive* conflicts in registry files (mechanical to resolve, ~30s per file), but they would produce *semantic* conflicts in shared logic (much harder). Three Phase 1s in parallel saved ~50 min wall-clock vs serial; conflict resolution added ~15 min total. Net win.
+- **Worktree isolation pattern**: `git worktree add -b feat/<branch> /home/augusto/projects/sparkplan-<feature> origin/main`. Each worktree shares `.git` but has independent `node_modules` and working tree. Three Sonnet agents each in their own worktree = no contention, parallelizable npm install / build / test runs.
+- **MCP-driven migrations** are a real productivity boost. Skipped the SQL-Editor copy-paste round-trip for all 4 migrations + the type regen. Auth flow is one OAuth click; afterwards `apply_migration` + `execute_sql` + `generate_typescript_types` are tool calls.
 
-**Numbers**:
-- Build: 4.87s clean. New `EstimatingPage` chunk 53.81 kB (gzip 13.71 kB).
-- Tests: 95 → 129 (+34 new in `tests/estimating/`). Pre-existing 1-suite failure in `tests/calculations-extended.test.ts` is the missing-Supabase-env error from `lib/supabase.ts:13` (untouched by this work).
+**Process gotchas worth remembering**:
 
-**Pending / follow-ups for the user**:
-1. **Apply the migration** in Supabase SQL Editor: `supabase/migrations/20260511_estimates_and_line_items.sql`.
-2. **Optionally regenerate `lib/database.types.ts` via Supabase CLI** to replace the hand-written rows. The hand-written types match the migration field-for-field but the CLI version may add extra metadata (e.g. timestamp string vs. Date).
-3. **Smoke test** — create a project with 2 panels + 1 transformer + a feeder, click "New estimate" with auto-takeoff on, edit a line, change status to submitted, click Generate PDF in the Bid Output tab.
-4. **Open the PR**. Suggested title: `feat(estimating): Phase 1 — auto-takeoff + bid PDF + 5-tab UI`. Base is `main`.
+- **Stacked-PR squash-merge can strand upstream code on main.** PR #35 (T&M Phase 1b) was stacked on `feat/tm-billing-beta-v1a`. After PR #34 squash-merged v1a → main, GitHub did NOT auto-retarget #35's base. Clicking Merge on #35 merged v1b INTO v1a (not into main). #35 showed `state: MERGED` even though its code never landed on main. **Fix**: caught it during a status check ("did you doc all this to update where we are?"). Opened a follow-up PR `feat/tm-billing-beta-v1a → main` to bring v1b's code over. **Prevention**: when stacking, either (a) merge the stacked PR FIRST while base is still its dependency branch, then merge the dependency PR which now contains both, or (b) after squash-merging the bottom PR, manually retarget the top PR's base via the GitHub UI before clicking Merge.
+- **Three cascade rounds during merge.** After each PR landed, every still-in-flight PR had to absorb the new main state. Permits→main triggered cascades on Estimating + T&M v1a + T&M v1b. Estimating→main triggered another cascade on T&M v1a + v1b. T&M v1a→main triggered final cascade on v1b. Each round resolved in ~5 minutes because the conflicts were always the same shape: additive entries to the same registry files. The pattern was muscle memory by the third pass.
+- **Doc rollout deferred ≠ doc rollout done.** The T&M agent's report flagged "doc updates deferred to PR-merge time." That guidance was followed by the *agent* but not by anyone afterwards. Phase 1a + 1b shipped with no CHANGELOG / ROADMAP / SESSION_LOG / database-architecture entries until this consolidating commit. **Lesson**: if an agent says "deferred to merge time," the orchestrator must take the baton at merge time. Better: have the agent ship the docs proactively in their original PR; reviewers see the doc updates as part of the change.
 
----
+**Deliverables across the day**:
 
-### Session: 2026-05-09 — Permits Beta v1 Phase 1 implementation (`feat/permits-beta-v1`)
+| PR | Branch | Files | Result |
+|---|---|---|---|
+| #32 | `feat/permits-beta-v1` | 28 | Tabbed PermitsPage (Overview / Permits / Inspections / Issues), `permits` + `permit_inspections` tables, status state machine, `/issues` redirects to `/permits?tab=issues`, IssuesLog migrated as Issues tab |
+| #33 | `feat/estimating-beta-v1` | 32 | EstimatingPage (4 tabs), `estimates` + `estimate_line_items` tables, **auto-takeoff from project model** (the differentiator), bid PDF, clone-as-revision |
+| #34 | `feat/tm-billing-beta-v1a` | 22 | BillingPage (4 tabs), `time_entries` + `material_entries` + `project_billing_settings` tables, hooks, billing math |
+| #35 | `feat/tm-billing-beta-v1b` (stacked) | 19 | InvoicesTab + payments + invoice PDF + `generate_invoice_atomic` RPC + `sync_invoice_paid_totals` trigger |
+| follow-up | `feat/tm-billing-beta-v1a → main` | (this commit) | Brings #35's code to main + consolidates T&M + cross-feature docs |
 
-**Focus**: Executed `docs/plans/permits-implementation.md` (Phase 1 only) end-to-end in a fresh worktree at `/home/augusto/projects/sparkplan-permits`. Replaces the PR #29 `PermitsStub` with a real tabbed Permits page (Overview / Permits / Inspections / Issues), full CRUD for permits + inspections, and migrates the existing `IssuesLog` UI into the page as the Issues tab. `/issues` redirects into `/permits?tab=issues`.
+**Migrations applied via Supabase MCP** (in order):
+1. `20260509193634_permits_and_inspections`
+2. `20260509193720_estimates_and_line_items`
+3. `20260509193801_tm_billing_phase1a`
+4. `20260509193850_tm_billing_phase1b`
 
-**Status**:
-- ✅ Migration `20260510_permits_and_inspections.sql` written — creates `permits` + `permit_inspections` tables with RLS + the `update_updated_at_column()` trigger pattern (verified that function exists from prior migrations) + `issues.permit_inspection_id` FK column. **User must apply this migration in the Supabase SQL Editor before merging.**
-- ✅ `lib/database.types.ts` patched manually to match the migration shape (CLI regen deferred until DB applies).
-- ✅ Pure services in `services/permits/` (status state machine, expiration helper) + 35 unit tests. All tests pass (130 total, up from 95).
-- ✅ Hooks `usePermits` + `usePermitInspections` follow the optimistic-update + Supabase realtime pattern from `usePanels`. Inspections hook accepts an optional `permitId` filter.
-- ✅ Eight new components in `components/Permits/`: `PermitsPage` (tab orchestration + URL `?tab=` persistence), `PermitsOverviewTab`, `PermitsListTab` + `PermitDetailDrawer` + `NewPermitDialog`, `InspectionsListTab` + `InspectionDetailDrawer` + `NewInspectionDialog`, `IssuesTab` (thin wrapper), `PermitStatusPill` + `InspectionStatusPill`.
-- ✅ `App.tsx` routing wired up — `/permits` lazy-loads the new `PermitsPage`; `/issues` redirects to `/permits?tab=issues` (legacy bookmarks resolve cleanly with no 404). Old `PermitsStub` deleted.
-- ✅ `services/ai/projectContextBuilder.ts` gains optional `permits` + `inspections` params; surfaces counts in the AI summary so the chatbot can answer "do I have any open permits" without a tool call. Phase 3 will add full per-permit detail.
-- ✅ Docs synced: CHANGELOG entry, this SESSION_LOG entry, ROADMAP Phase 3.6 marked in-progress (will be done at PR merge), `docs/database-architecture.md` updated with both new tables + the issues column.
-- ✅ `npm run build` exits 0 (4.9s); 130 tests pass — only failure is the pre-existing `tests/calculations-extended.test.ts` Supabase env-var issue, unchanged from main.
+**Test counts** (cumulative):
+- Baseline: 95
+- After Permits agents: 130 (+35 status / expiration unit tests)
+- After Estimating agent: 129 in own branch (+34 own; lower because no Permits tests)
+- After T&M Phase 1a agent: 122 in own branch (+27 billingMath)
+- After T&M Phase 1b agent: 160 in own branch (+38 status/generator/payments)
+- Final on main after all merges: **250 passing** (one pre-existing test file fails at module-load due to missing `VITE_SUPABASE_URL` — present on main since before this session, untouched).
 
-**Decisions made**:
+**Type regen**: `lib/database.types.ts` regenerated from live Supabase schema via MCP after migrations applied. Replaces hand-written types from each agent (which were field-equivalent but used a slightly older generic-helper structure than `supabase gen types typescript` emits).
 
-- **Pre-existing trigger function**: the plan's draft used `set_updated_at()` but the codebase actually defines `update_updated_at_column()`. Used the existing one to avoid duplicating function declarations.
-- **Phase 1 integration test deferred**. Plan §4.10 listed a `tests/permits/permitsCrud.test.ts` integration test, but the existing test infra (`tests/calculations-extended.test.ts`) demonstrably can't import any module that pulls `lib/supabase.ts` without `.env.local` set — the suite fails before reaching the test code. Adding a permits CRUD integration test would either (a) repeat the same failure or (b) require a vitest mock of the supabase client, which violates the project's "no mocked DB" preference. Documented as a Phase 1 gap; the unit tests on the pure services + manual smoke test cover the regression-sensitive parts. Suggest revisiting after a `.env.local.test` lane is set up.
-- **Validation is advisory, not blocking** — `NewPermitDialog` lets the user save with empty AHJ jurisdiction (the field will be saved as `'TBD'`). Inline amber hint surfaces when AHJ is empty but doesn't gate save. Per `feedback_validation_advisory` memory.
-- **Status dropdown forward-only**. The state machine in `permitStatusTransitions.ts` rejects backwards transitions from the dropdown. Audit-trail-honest. An explicit "Reopen" action is Phase 2 territory.
-- **Inspection drawer auto-stamps `performed_at`** when the user moves status to `passed` / `failed` / `conditional_pass`. Reverses to null when status moves back to `scheduled`. Cheap correctness win — avoids a separate "mark as complete" button.
-- **Per-permit inspection roll-up inside the detail drawer** uses `usePermitInspections(projectId, permitId)` — same hook, filtered. Saves a second query path.
+**Pre-existing advisory surfaced (not addressed today)**: `public.jurisdictions` has RLS disabled. Read-only reference data; enabling RLS without policies would break existing reads. Fix when convenient: `ALTER TABLE public.jurisdictions ENABLE ROW LEVEL SECURITY;` + `CREATE POLICY "jurisdictions_read_all" ON public.jurisdictions FOR SELECT USING (true);`.
 
-**Out of scope (deferred to Phase 2/3/4 per the plan)**:
+**Pending / follow-ups**:
 
-- AHJ portal scraping / status auto-sync (Phase 4)
-- Email notifications on status change (Phase 3)
-- Chatbot tools `update_permit_status`, `schedule_inspection`, `summarize_corrections` (Phase 3)
-- Two-way packet ↔ permit linkage (Phase 3)
-- `issues.permit_inspection_id` UI wiring (Phase 2 — column shipped, drawer doesn't surface it yet)
-- Status-change audit log table (Phase 2 if AHJs require it)
+1. **Manual smoke test all three features end-to-end**:
+   - Permits: create → advance status (draft → submitted → in_review → approved) → schedule + fail inspection → reinspect.
+   - Estimating: project with 2 panels + 1 transformer + 1 feeder → New estimate (auto-takeoff on) → edit line → submit → Generate PDF.
+   - T&M Billing: log time + material → Generate invoice → mark sent → record partial payment → record full payment → confirm status flips to `paid` (exercises the trigger) → Download PDF.
+2. **Watch beta usage signal** (`feature_interest` clicks + actual feature engagement) for 2-3 weeks before committing to Phase 2 of any of the three. Phase 2 priority should follow demand, not implementation order.
+3. **Address `public.jurisdictions` RLS advisory** when convenient.
+4. **Consider `.env.local.test` lane** to unblock integration tests across the three features. All three agents had to defer their integration tests because `lib/supabase.ts` throws at import without env vars and the project's `feedback_validation_advisory` memory rules out DB mocking. A dedicated test-env lane would unblock real CRUD test coverage.
 
-**Pending / Follow-ups**:
-
-- **User must apply `supabase/migrations/20260510_permits_and_inspections.sql` in Supabase Studio** before this PR ships. Code references the new tables and will throw at runtime if the schema isn't applied first.
-- **Manual smoke test** per the plan's Definition of Done: create a permit, advance its status through the full lifecycle, schedule an inspection, mark it failed, see the corrections placeholder, mark a reinspection.
-- **PR opening** is the user's responsibility — agent does not push to remote per orchestration rules.
-
-**Key files touched** (full diff at `git diff origin/main..HEAD`):
-
-- New: `supabase/migrations/20260510_permits_and_inspections.sql` (174 LOC)
-- New: `services/permits/permitStatusTransitions.ts` + `permitExpirationWarning.ts` (~140 LOC)
-- New: `hooks/usePermits.ts` + `usePermitInspections.ts` (~410 LOC)
-- New: `components/Permits/*` — 9 files (~1,800 LOC TSX)
-- New: `tests/permits/*` — 2 files (~180 LOC)
-- Modified: `App.tsx`, `lib/database.types.ts`, `lib/dataRefreshEvents.ts`, `lib/toast.ts`, `lib/validation-schemas.ts`, `services/ai/projectContextBuilder.ts`
-- Deleted: `components/PermitsStub.tsx`
-- Docs: `docs/CHANGELOG.md`, `docs/SESSION_LOG.md`, `docs/database-architecture.md`, `ROADMAP.md`
-
-**Total diff**: ~6 commits, ~3,000 LOC additions on `feat/permits-beta-v1` branch.
+**Worktrees still on disk** (kept for potential Phase 2 work; remove via `git worktree remove <path>` if not needed):
+- `/home/augusto/projects/sparkplan-permits` on `feat/permits-beta-v1`
+- `/home/augusto/projects/sparkplan-estimating` on `feat/estimating-beta-v1`
+- `/home/augusto/projects/sparkplan-tm-billing` on `feat/tm-billing-beta-v1a` (now also contains v1b's content via the #35 merge)
 
 ---
 
-### Session: 2026-05-09 — Chatbot VD+ awareness + confirmation gate fix + Inspector accuracy + sidebar contractor pivot (4 PRs)
+### Session: 2026-05-09 (earlier) — Chatbot VD+ awareness + confirmation gate fix + Inspector accuracy + sidebar contractor pivot (4 PRs)
 
-**Focus**: Started by verifying merged PR #25 (cumulative VD + service-entrance feeders). Verification spawned three follow-up PRs (#26, #28, #29). Mid-session, the platform owner also surfaced three Inspector accuracy issues during PE review which landed as PR #27. Total: 4 PRs, 3 merged today + 1 still open.
+**Focus**: Started by verifying merged PR #25 (cumulative VD + service-entrance feeders). Verification spawned three follow-up PRs (#26, #28, #29). Mid-session, the platform owner also surfaced three Inspector accuracy issues during PE review which landed as PR #27. Total: 4 PRs, 3 merged today + 1 still open at session boundary.
 
 **Status**:
 - ✅ **PR #25** verified — service-entrance label + cumulative VD on one-line + PDF + FeederManager. Migration `20260508_riser_service_entrance_and_cumulative_vd.sql` already applied to Supabase.
 - ✅ **PR #26** MERGED 13:25 UTC — chatbot context + tools + system instructions teach the AI about VD+ semantics, NEC 215.2(A)(1) IN No. 2 / 210.19(A)(1) IN No. 4 thresholds (3% feeder / 5% combined), SE feeder convention, parallel sets. New `calculate_cumulative_voltage_drop` panel-keyed tool. `calculate_feeder_voltage_drop` augmented with cumulative + crossesTransformer + isServiceEntrance.
-- ✅ **PR #27** MERGED 13:35 UTC — Inspector accuracy fixes (3 issues) + slot visibility on the panel header. Branch `fix/inspector-panel-cap-and-branch-conductor`. Details below.
+- ✅ **PR #27** MERGED 13:35 UTC — Inspector accuracy fixes (3 issues) + slot visibility on the panel header. Branch `fix/inspector-panel-cap-and-branch-conductor`.
 - ✅ **PR #28** MERGED 14:07 UTC — restores chatbot write-tool functionality. Root cause traced to commit `3490c68` (PR #13, 2026-04-24 security/correctness audit) which added the `requiresConfirmation` server-side gate without shipping the matching UI. Five write tools (`add_circuit`, `add_panel`, `fill_panel_with_test_loads`, `empty_panel`, `fill_with_spares`) had been completely unreachable for ~2 weeks. Fix: `executeTool` gains `bypassConfirmation` option, `askNecAssistantWithTools` short-circuits on confirmation results without round-tripping Gemini, new `applyConfirmedAction` export, App.tsx renders Apply/Cancel inline.
-- ✅ **PR #29** MERGED 2026-05-09 — sidebar contractor pivot. Dropped Site Visits + RFI Tracking from the Project Management section (engineer-flavored). Added three (beta) stubs based on validated market research (small electrical shops $1M-$10M): Estimating, Permits (absorbs the inspection/issues lifecycle), T&M Billing. **All three gated to Business + Enterprise** (commit `0c4a742` after initial review — restored Pro/Business pricing distinction; trial users get access automatically via `effectivePlan`). New `feature_interest` table captures one-line demand notes. Existing routes (`/issues`, `/rfis`, `/site-visits`) preserved server-side for direct-link compatibility.
-- 🟡 **PR #30** open — Permits implementation plan handoff doc. 623-line self-contained markdown plan at `docs/plans/permits-implementation.md` for the next session's build of Permits Beta v1. Phase 1 only (MVP); Phases 2-4 referenced but deferred. Includes data model, file tree, status-transition state machine, expiration thresholds, validation schemas, test plan, file-by-file implementation order. Hand-off prompt: *"Implement the Permits feature per `docs/plans/permits-implementation.md`. Phase 1 only. Branch off main."*
-
-**PR #27 Inspector fixes (detail)**:
-
-1. **AI Inspector hard-coded panel cap at 42 poles**. `services/inspection/inspectorMode.ts:checkPanelMaxPoles` ignored each panel's `num_spaces`. A 24-space panel at 28 poles still passed inspection. Fix: read `panel.num_spaces` with same `panel.is_main ? 30 : 42` fallback used elsewhere; cite NEC 110.3(B) instead of the long-deleted NEC 408.36.
-2. **Inspector flagged branch-circuit conductor sizing on placeholder data**. NEC 240.4(D) audit ran against `circuit.conductor_size` which is a defaulted `"12 AWG"` placeholder. Every 30A+ circuit got a false "12 AWG on 30A breaker" critical issue. Fix: deleted `checkConductorProtection` from the inspector. NEC 240.4(D) still correctly enforced inside `services/calculations/conductorSizing.ts` + `breakerSizing.ts` where real feeder data drives it.
-3. **Breaker-vs-load check was receptacle-only and assumed 120V**. Lighting / EV / dryer / 2-pole 240V / 3-phase circuits got no audit. Fix: `checkCircuitLoading` runs on every circuit and derives capacity from pole count + panel voltage·phase (1P/1Φ=120V, 1P/3Φ=LtoL/√3, 2P=LtoL, 3P=LtoL×√3). Critical >100%, warning >80% per NEC 210.20(A).
-4. **Slot cap was invisible until users bumped into it.** Added 5th "Slots" stat card to panel header (`<polesUsed> / <totalSlots>` with amber/red tone at >90% / >100%).
-5. **Bulk Circuit Creator skipped slot cap.** Pre-create cap added using same multi-pole formula as manual-add path.
-
-**Decisions made**:
-
-- **Skip the second Gemini round-trip on the Apply path.** The original `askNecAssistantWithTools` flow always sent the tool result back to Gemini for paraphrasing. That's what amplified the #13 regression — Gemini paraphrased the gate's "I cannot..." message into a flat refusal, making the "Apply button missing" bug invisible. PR #28's `applyConfirmedAction` synthesizes the "Done — ..." follow-up locally from each tool's `data.message` field. Faster (one LLM call instead of two), cheaper, and the LLM can no longer refuse what the user just authorized.
-- **Generic Apply card, not per-tool.** The plumbing inspects `result.data.requiresConfirmation` rather than switching on tool name. Any future write tool with `requiresConfirmation: true` automatically gets Apply/Cancel UI for free.
-- **Two-PR split for the sidebar pivot.** This PR ships the sidebar reshuffle + 3 stub pages only; Phase 1 (follow-up PR) actually relocates the existing Inspection & Issues UI into the Permits page as a tab. Rationale: the merge work is sunk cost if no contractor clicks "Permits" in the first 2 weeks of beta. Phase 0 buys demand signal cheaply.
-- **Sidebar names: short forms (`Estimating`, `Permits`, `T&M Billing`).** Sidebar is for navigation, not explanation. Page itself tells the longer story. User confirmed.
-- **`feature_interest` table is its own thing**, not piggybacking on `support_tickets`. Append-only, RLS-scoped to row owner, no admin policy at the DB layer (server-side queries via Supabase Studio cover prioritization). CHECK constraint on `feature_name IN ('estimating', 'permits', 'tm_billing')` so unknown betas can't be silently inserted.
-- **Engineer-flavored items removed from sidebar but routes kept alive.** No 404s on bookmarks. Drop them only — don't unbuild them yet — in case the persona analysis is wrong.
+- ✅ **PR #29** MERGED 2026-05-09 — sidebar contractor pivot. Dropped Site Visits + RFI Tracking from the Project Management section (engineer-flavored). Added three (beta) stubs: Estimating, Permits, T&M Billing — all gated to Business + Enterprise tier (matches sibling PM features; trial users get access automatically via `effectivePlan`). New `feature_interest` table captures one-line demand notes.
 
 **Why the sidebar pivot now**: validated against external market research the user pulled — the top 3 unmet pain points for small electrical shops ($1M-$10M annual revenue) are estimating + job costing (CRITICAL), permit + inspection lifecycle (HIGH), and T&M billing (HIGH). Existing tools like IntelliBid, Trimble Accubid, Knowify, Jobber are either enterprise-priced, desktop-only, or shaped wrong for commercial T&M. SparkPlan can credibly enter at $99-$199/month with electrical-specific assemblies tied to its existing panel/circuit/feeder model — but only if the sidebar reflects contractor workflow, which it didn't.
 
 **Insight worth carrying forward**: PR #13's break (write-tool confirmation gate without UI) is a textbook example of bundling unrelated security fixes — JWT log redaction, RLS-bypass via service role, Stripe price-ID hardening, and the chatbot gate all rode in one PR. The gate compiled, tests passed (the gate code was correct), and the missing UI counterpart slipped through review because attention was on the security items. **Lesson**: when a "security audit" PR introduces a new user-facing gate (confirmation, modal, banner, second-factor), the same PR must include the UI that satisfies it. The two halves are inseparable; CI cannot catch the gap.
 
-**Key Files Touched**:
-
-- PR #26: `services/ai/projectContextBuilder.ts`, `services/ai/chatTools.ts`, `services/geminiService.ts` (3 files, +193/-7)
-- PR #28: `App.tsx`, `services/ai/chatTools.ts`, `services/geminiService.ts` (3 files, +156/-6)
-- This PR: `components/Layout.tsx`, `App.tsx`, `components/BetaFeatureStub.tsx` (new), `components/EstimatingStub.tsx` (new), `components/PermitsStub.tsx` (new), `components/TmBillingStub.tsx` (new), `supabase/migrations/20260509_feature_interest.sql` (new)
-
-**Pending / Follow-ups**:
-
-- **Apply migration `20260509_feature_interest.sql` to Supabase** before the stub pages can record clicks. (Like PR #25's migration: code ships first, schema applied separately.)
-- **Phase 1 (next session)**: relocate Inspection & Issues UI into Permits page as a `?tab=issues` tab. Redirect `/project/:id/issues` → `/project/:id/permits?tab=issues`. Delete the "until then, open Inspection & Issues directly →" forward-link from the Permits stub.
-- **Track click-through and `feature_interest` insert rates per beta** for the next 2-3 weeks. Highest-signal feature gets prioritized for actual build work.
-
-**PRs**:
-
-- **#25** (merged 04:53 UTC) — riser SE label + cumulative VD on diagram/PDF/FeederManager
-- **#26** (merged 13:25 UTC) — chatbot VD+ awareness + new cumulative tool
-- **#27** (merged 13:35 UTC) — Inspector accuracy + slot visibility (5 fixes)
-- **#28** (merged 14:07 UTC) — confirmation card UI restoration (broken since #13)
-- **#29** (merged) — sidebar contractor pivot + 3 beta stubs + `feature_interest` migration + Business+ tier gating
-- **#30** (open) — Permits implementation plan handoff doc (`docs/plans/permits-implementation.md`)
-
-**Next phase**: Phase 3.6 — Permits Beta v1 build. Plan doc complete; awaits a fresh-context implementation session per the handoff prompt.
-
 ---
 
-<!-- Session 2026-05-08 / 2026-05-09 (Sprint 2A) rotated out per "keep last 2 sessions" rule — git history preserves the entry. -->
-
-
-<!-- Earlier session 2026-05-06 / 2026-05-07 (Sprint 1 close-out / C4 omnibus) rotated out per "keep last 2 sessions" rule. Git history preserves the entry. -->
+<!-- Earlier sessions (2026-05-06/07 Sprint 1 close-out, 2026-05-08/09 Sprint 2A, 2026-05-09 morning Estimating + Permits agent details) rotated out per "keep last 2 sessions" rule. Git history preserves them. The orchestrator-level entry above consolidates the agent-level Estimating + Permits sessions into a single multi-feature shipping day. -->

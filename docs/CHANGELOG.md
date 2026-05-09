@@ -4,6 +4,49 @@ All notable changes to SparkPlan.
 
 ---
 
+## 2026-05-09: T&M Billing Beta v1 — Phase 1 implementation (PRs #34 + #35, stacked)
+
+Replaces the `TmBillingStub` page (PR #29 demand-discovery) with the real T&M billing module. Shipped as two stacked PRs splitting Phase 1's ~7,700 LOC scope into a reviewable foundation + invoicing layer.
+
+**User-facing changes (Phase 1a — PR #34):**
+
+- **`/billing` route now functional.** Tabbed `BillingPage` (Overview / Time Entries / Materials / Settings) replaces the demand-discovery stub.
+- **Time entry log.** Per-worker daily hours with billable rate snapshotted at entry time. Cost rate optional (small shops not always tracking payroll). Cost code is free-text in Phase 1; lookup table is Phase 2.
+- **Material entry log.** Per-line installed materials with supplier cost, markup %, and computed billing price. Receipt URL + supplier/invoice metadata for audit trail. Taxable flag per line.
+- **Project billing settings.** Singleton-per-project: default billable + cost rates, default material markup %, tax %, payment terms (days), invoice prefix, customer info snapshot. Drives invoice generation in Phase 1b.
+
+**User-facing changes (Phase 1b — PR #35):**
+
+- **Invoice generation.** New `Invoices` tab. Pick unbilled time + material entries within a date period, preview totals (labor + materials + tax), generate as `draft` or auto-send. Invoice number auto-increments per project's `next_invoice_number` setting.
+- **Payments.** Record manual payments (check / ACH / wire / cash / other) against an invoice. Server-side trigger (`sync_invoice_paid_totals`) recomputes `paid_amount` + `balance_due` and auto-flips status `sent → partial_paid → paid` as payments come in.
+- **Invoice PDF** via `@react-pdf/renderer`. Customer block, period, time/material line items grouped by category, payment history, totals card with balance due. Reuses `BrandBar` + `BrandFooter` from the permit-packet theme for visual consistency.
+
+**Why this matters**: External market research ranked T&M billing as the **#3 unmet pain point** for $1M-$10M small electrical shops. Existing tools (Knowify, Procore) are wrong-shaped or enterprise-priced; QuickBooks Time + a generic invoicing tool means double-entry. SparkPlan's electrical-specific data model + integrated invoicing closes that gap at $99-$199/mo.
+
+**Technical:**
+
+- Two migrations applied via Supabase MCP (project `ioarszhzltpisxsxrsgl`):
+  - `20260509193801_tm_billing_phase1a` — `project_billing_settings`, `time_entries`, `material_entries` with RLS, partial unbilled indexes, `update_billing_updated_at()` trigger.
+  - `20260509193850_tm_billing_phase1b` — `invoices`, `payments`; FK retrofit on v1a `invoice_id` columns; `sync_invoice_paid_totals` trigger; `generate_invoice_atomic(...)` SECURITY DEFINER RPC for transactional invoice creation.
+- Money precision: NUMERIC(12,2) in DB; plain `number` in TS; explicit half-up `roundCurrency` at output boundaries (epsilon-bumped to defeat the `Math.round(1.005*100)` IEEE-754 trap). Tested: 100 × \$13.33 === \$1333.00.
+- `paid_amount <= total + 0.01` CHECK constraint: $0.01 floating-point grace covers any path that bypasses the app's rounding helper.
+- New pure services in `services/billing/`: `billingMath.ts`, `invoiceStatusTransitions.ts`, `invoiceGenerator.ts`. All follow CLAUDE.md calc rules.
+- New hooks: `useProjectBillingSettings`, `useTimeEntries`, `useMaterialEntries`, `useInvoices`, `useInvoicePayments` (optimistic + Supabase realtime).
+- New UI in `components/Billing/`: `BillingPage`, `BillingOverviewTab`, `TimeEntriesTab`, `TimeEntryEditor`, `MaterialEntriesTab`, `MaterialEntryEditor`, `BillingSettingsTab`, `InvoicesTab`, `InvoiceDetailDrawer`, `GenerateInvoiceModal`, `RecordPaymentModal`, `InvoiceStatusPill`, `AmountDisplay`.
+- `App.tsx` swaps `TmBillingStub` lazy import for `BillingPage`. Stub deleted.
+- `services/pdfExport/InvoicePdfDocument.tsx` — invoice PDF document.
+- `lib/database.types.ts` regenerated from live Supabase schema after migrations applied.
+
+**Tests**: 27 new pure-function tests for `billingMath`; 13 for `invoiceStatusTransitions`; 16 for `invoiceGenerator`; 9 for `paymentReconciliation`. Suite at 250 passing post-merge (was 95 baseline).
+
+**Process notes (worth remembering)**:
+
+- Three Phase-1 features (Permits, Estimating, T&M) built in parallel via three git worktrees + three concurrent Sonnet agents. Wall-clock ~25 min vs ~75 min serial.
+- Conflicts arose only at merge time: shared "registry" files (`App.tsx` route list, `lib/dataRefreshEvents.ts` event-type union, `lib/validation-schemas.ts` schema sections, `services/ai/projectContextBuilder.ts` param list, doc files). All conflicts were *additive* — "include both sides." Mechanical to resolve, ~15 min total across 3 cascade rounds.
+- Lesson: parallelize features that share registries; serialize features that share business logic. Phase 2 work that's purely internal to each feature can also parallelize.
+
+---
+
 ## 2026-05-09: Estimating Beta v1 — Phase 1 implementation (branch `feat/estimating-beta-v1`)
 
 Replaces the `EstimatingStub` page (PR #29 demand-discovery) with a real estimating module. Phase 1 of the Estimating feature per `docs/plans/estimating-implementation.md`.
