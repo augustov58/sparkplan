@@ -6,6 +6,7 @@
 import React, { useState, useEffect } from 'react';
 import { FileText, Download, Loader2, AlertCircle, CheckCircle, Info, Building2, AlertTriangle, ListChecks } from 'lucide-react';
 import { generatePermitPacket, generateLightweightPermitPacket, type PermitPacketData } from '../services/pdfExport/permitPacketGenerator';
+import type { NEC22087NarrativeData, NEC22087Method } from '../services/pdfExport/PermitPacketDocuments';
 import {
   DEFAULT_SECTIONS,
   resolveSections,
@@ -24,7 +25,7 @@ import { useMeters } from '../hooks/useMeters';
 import { useProfile } from '../hooks/useProfile';
 import { JurisdictionSearchWizard } from './JurisdictionSearchWizard';
 import { calculateMultiFamilyEV, type MultiFamilyEVInput } from '../services/calculations/multiFamilyEV';
-import { buildMultiFamilyContext } from '../services/calculations/upstreamLoadAggregation';
+import { buildMultiFamilyContext, isEVEMSManagedPanel } from '../services/calculations/upstreamLoadAggregation';
 import {
   projectAddressSchema,
   flContractorLicenseSchema,
@@ -79,6 +80,18 @@ const SECTION_TOGGLE_CONFIG: SectionToggleConfig[] = [
     key: 'loadCalculation',
     label: 'Load Calculation Summary',
     description: 'NEC 220 demand factor breakdown for the MDP',
+    group: 'Engineering',
+  },
+  {
+    key: 'nec22087Narrative',
+    label: 'NEC 220.87 Existing-Service Narrative',
+    description: 'Required by Orlando existing-service path: 3-condition checklist + cited data source',
+    group: 'Engineering',
+  },
+  {
+    key: 'availableFaultCurrent',
+    label: 'Available Fault Current Calculation',
+    description: 'Service-main fault current (IEEE 141) — required by Orlando new-service path',
     group: 'Engineering',
   },
   {
@@ -155,6 +168,18 @@ const SECTION_TOGGLE_CONFIG: SectionToggleConfig[] = [
     description: 'Per-AHJ checklist (requires a jurisdiction selected above)',
     group: 'Compliance & AHJ',
   },
+  {
+    key: 'evemsNarrative',
+    label: 'EVEMS Operational Narrative',
+    description: 'NEC 625.42 — device, setpoint, monitoring, failure mode, NEC 750 tamper protection',
+    group: 'Compliance & AHJ',
+  },
+  {
+    key: 'evseLabeling',
+    label: 'EVSE Labeling Reference',
+    description: 'NEC 625.43 — disconnect labels, breaker locking, emergency shutoff (commercial)',
+    group: 'Compliance & AHJ',
+  },
 ];
 
 export const PermitPacketGenerator: React.FC<PermitPacketGeneratorProps> = ({ projectId }) => {
@@ -177,6 +202,18 @@ export const PermitPacketGenerator: React.FC<PermitPacketGeneratorProps> = ({ pr
   const [mfEvChargersPerUnit, setMfEvChargersPerUnit] = useState(1);
   const [mfEvChargerLevel, setMfEvChargerLevel] = useState<'level1' | 'level2'>('level2');
   const [mfEvBuildingName, setMfEvBuildingName] = useState('');
+
+  // Sprint 2A H14: NEC 220.87 existing-service narrative inputs.
+  // Off by default; the user opts in by checking includeNEC22087 and filling
+  // the source citation + observation window. Auto-disable predicate hides
+  // the toggle when these are blank.
+  const [includeNEC22087, setIncludeNEC22087] = useState(false);
+  const [nec22087Method, setNec22087Method] = useState<NEC22087Method>('utility_bill');
+  const [nec22087DataSource, setNec22087DataSource] = useState('');
+  const [nec22087DateFrom, setNec22087DateFrom] = useState('');
+  const [nec22087DateTo, setNec22087DateTo] = useState('');
+  const [nec22087MaxDemandKVA, setNec22087MaxDemandKVA] = useState('');
+  const [nec22087ProposedKVA, setNec22087ProposedKVA] = useState('');
 
   // Sprint 2A H1+H2+H3: per-section toggles for the packet generator. Initialized
   // from `projects.settings.sectionPreferences` (when present); otherwise falls
@@ -276,6 +313,10 @@ export const PermitPacketGenerator: React.FC<PermitPacketGeneratorProps> = ({ pr
         return (shortCircuitCalculations?.length ?? 0) === 0
           ? 'No short circuit calculations recorded'
           : undefined;
+      case 'availableFaultCurrent':
+        return (shortCircuitCalculations?.some(c => c.calculation_type === 'service') ?? false)
+          ? undefined
+          : 'No service-main short-circuit calculation recorded — run a service-level calc to enable';
       case 'arcFlash':
         // Arc flash data is not currently surfaced from a hook; the generator
         // only renders an Arc Flash page when `data.arcFlashData` is set,
@@ -291,10 +332,27 @@ export const PermitPacketGenerator: React.FC<PermitPacketGeneratorProps> = ({ pr
         return !includeMultiFamilyEV
           ? 'Enable Multi-Family EV inputs above to include this analysis'
           : undefined;
+      case 'nec22087Narrative':
+        return !includeNEC22087 || !nec22087DataSource.trim() || !nec22087MaxDemandKVA
+          ? 'Provide NEC 220.87 narrative inputs below (source citation + max demand) to enable'
+          : undefined;
       case 'jurisdiction':
         return !currentProject?.jurisdiction_id
           ? 'No jurisdiction selected for this project'
           : undefined;
+      case 'evemsNarrative':
+        return panels.some(p => isEVEMSManagedPanel(p.id, circuits))
+          ? undefined
+          : 'No EVEMS-managed panels detected (NEC 625.42 narrative is only required when an EV bank uses energy management)';
+      case 'evseLabeling': {
+        const evNamePattern = /\b(ev|evse|charger|charging|level\s*2|l2)\b/i;
+        const hasEVPanels = panels.some(
+          p => isEVEMSManagedPanel(p.id, circuits) || evNamePattern.test(p.name),
+        );
+        return hasEVPanels
+          ? undefined
+          : 'No EV-bank panels detected (NEC 625.43 labeling reference is only relevant for projects with EVSE)';
+      }
       default:
         return undefined;
     }
@@ -404,6 +462,36 @@ export const PermitPacketGenerator: React.FC<PermitPacketGeneratorProps> = ({ pr
         // Sprint 2A H1+H2+H3: per-section toggles. Empty object = use defaults.
         sections: sectionPrefs,
       };
+
+      // Sprint 2A H14: NEC 220.87 narrative — only attached when the user
+      // has opted in AND filled the minimum-required citation + max-demand
+      // fields. Without those, the page would render with placeholder text
+      // and risk being mistaken for the real evidence the AHJ needs.
+      const maxDemandParsed = parseFloat(nec22087MaxDemandKVA);
+      const proposedParsed = parseFloat(nec22087ProposedKVA);
+      if (
+        includeNEC22087
+        && nec22087DataSource.trim().length > 0
+        && Number.isFinite(maxDemandParsed)
+        && maxDemandParsed > 0
+      ) {
+        const mainPanel = panels.find(p => p.is_main);
+        const serviceCapacityAmps = mainPanel?.bus_rating
+          ?? mainPanel?.main_breaker_amps
+          ?? 200; // sensible fallback for residential
+        const narrative: NEC22087NarrativeData = {
+          method: nec22087Method,
+          dataSourceCitation: nec22087DataSource.trim(),
+          dateRangeFrom: nec22087DateFrom || new Date(Date.now() - 365 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+          dateRangeTo: nec22087DateTo || new Date().toISOString().split('T')[0],
+          maxDemandKVA: maxDemandParsed,
+          proposedNewLoadKVA: Number.isFinite(proposedParsed) ? proposedParsed : 0,
+          serviceCapacityAmps,
+          serviceVoltage: currentProject.serviceVoltage,
+          servicePhase: currentProject.servicePhase as 1 | 3,
+        };
+        packetData.nec22087Narrative = narrative;
+      }
 
       // Add Multi-Family EV Analysis if enabled
       if (includeMultiFamilyEV && mfEvDwellingUnits > 0) {
@@ -893,6 +981,135 @@ export const PermitPacketGenerator: React.FC<PermitPacketGeneratorProps> = ({ pr
                   <p className="text-gray-500">NEC Reference</p>
                   <p className="font-semibold">220.57</p>
                 </div>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Sprint 2A H14: NEC 220.87 Existing-Service Narrative inputs */}
+      <div className="bg-white border border-gray-200 rounded-lg p-6 space-y-4">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <FileText className="w-5 h-5 text-[#2d3b2d]" />
+            <div>
+              <h3 className="font-bold text-gray-900">NEC 220.87 Existing-Service Narrative</h3>
+              <p className="text-sm text-gray-500">
+                Required by Orlando + most FL AHJs when claiming existing-service capacity for an EV upgrade.
+              </p>
+            </div>
+          </div>
+          <label className="relative inline-flex items-center cursor-pointer">
+            <input
+              type="checkbox"
+              checked={includeNEC22087}
+              onChange={(e) => setIncludeNEC22087(e.target.checked)}
+              className="sr-only peer"
+            />
+            <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-[#2d3b2d]/20/20 rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[#2d3b2d]"></div>
+            <span className="ml-2 text-sm font-medium text-gray-700">Include</span>
+          </label>
+        </div>
+
+        {includeNEC22087 && (
+          <div className="pt-4 border-t border-gray-200 space-y-4">
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+              <p className="text-sm text-blue-800">
+                <strong>What this generates:</strong> A signed sheet documenting the three NEC 220.87 conditions
+                (12-month max demand source, demand × 125% + new load ≤ ampacity, OCPD per 240.4 / overload per 230.90).
+                Without this, Orlando rejects existing-service EV submittals on intake.
+              </p>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label htmlFor="nec22087Method" className="block text-sm font-medium text-gray-700 mb-2">
+                  Existing-Load Method
+                </label>
+                <select
+                  id="nec22087Method"
+                  value={nec22087Method}
+                  onChange={(e) => setNec22087Method(e.target.value as NEC22087Method)}
+                  className="w-full border border-gray-200 rounded px-3 py-2 text-sm focus:border-[#2d3b2d] focus:ring-2 focus:ring-[#2d3b2d]/20/20 outline-none"
+                >
+                  <option value="utility_bill">Utility billing — 12-month peak (preferred)</option>
+                  <option value="load_study">Recording load study — 30-day at 15-min intervals</option>
+                  <option value="calculated">Calculated from existing panel schedule (NEC 220.82/220.84)</option>
+                  <option value="manual">Manual entry (informational only)</option>
+                </select>
+                <p className="text-xs text-gray-500 mt-1">
+                  Measured methods (bill / study) skip the 125% multiplier. Calculated/manual apply 125%.
+                </p>
+              </div>
+              <div>
+                <label htmlFor="nec22087DataSource" className="block text-sm font-medium text-gray-700 mb-2">
+                  Source Citation
+                </label>
+                <input
+                  id="nec22087DataSource"
+                  type="text"
+                  value={nec22087DataSource}
+                  onChange={(e) => setNec22087DataSource(e.target.value)}
+                  placeholder="e.g., FPL utility billing, account #12345-67"
+                  className="w-full border border-gray-200 rounded px-3 py-2 text-sm focus:border-[#2d3b2d] focus:ring-2 focus:ring-[#2d3b2d]/20/20 outline-none"
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+              <div>
+                <label htmlFor="nec22087DateFrom" className="block text-sm font-medium text-gray-700 mb-2">
+                  Window From
+                </label>
+                <input
+                  id="nec22087DateFrom"
+                  type="date"
+                  value={nec22087DateFrom}
+                  onChange={(e) => setNec22087DateFrom(e.target.value)}
+                  className="w-full border border-gray-200 rounded px-3 py-2 text-sm focus:border-[#2d3b2d] focus:ring-2 focus:ring-[#2d3b2d]/20/20 outline-none"
+                />
+              </div>
+              <div>
+                <label htmlFor="nec22087DateTo" className="block text-sm font-medium text-gray-700 mb-2">
+                  Window To
+                </label>
+                <input
+                  id="nec22087DateTo"
+                  type="date"
+                  value={nec22087DateTo}
+                  onChange={(e) => setNec22087DateTo(e.target.value)}
+                  className="w-full border border-gray-200 rounded px-3 py-2 text-sm focus:border-[#2d3b2d] focus:ring-2 focus:ring-[#2d3b2d]/20/20 outline-none"
+                />
+              </div>
+              <div>
+                <label htmlFor="nec22087MaxDemandKVA" className="block text-sm font-medium text-gray-700 mb-2">
+                  Max Demand (kVA)
+                </label>
+                <input
+                  id="nec22087MaxDemandKVA"
+                  type="number"
+                  min="0"
+                  step="0.1"
+                  value={nec22087MaxDemandKVA}
+                  onChange={(e) => setNec22087MaxDemandKVA(e.target.value)}
+                  placeholder="e.g., 145.5"
+                  className="w-full border border-gray-200 rounded px-3 py-2 text-sm focus:border-[#2d3b2d] focus:ring-2 focus:ring-[#2d3b2d]/20/20 outline-none"
+                />
+              </div>
+              <div>
+                <label htmlFor="nec22087ProposedKVA" className="block text-sm font-medium text-gray-700 mb-2">
+                  Proposed New Load (kVA)
+                </label>
+                <input
+                  id="nec22087ProposedKVA"
+                  type="number"
+                  min="0"
+                  step="0.1"
+                  value={nec22087ProposedKVA}
+                  onChange={(e) => setNec22087ProposedKVA(e.target.value)}
+                  placeholder="e.g., 48.0"
+                  className="w-full border border-gray-200 rounded px-3 py-2 text-sm focus:border-[#2d3b2d] focus:ring-2 focus:ring-[#2d3b2d]/20/20 outline-none"
+                />
               </div>
             </div>
           </div>
