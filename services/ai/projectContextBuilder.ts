@@ -8,6 +8,10 @@
  */
 
 import type { Database } from '@/lib/database.types';
+import {
+  calculateAllCumulativeVoltageDrops,
+  calculateCumulativeForFeeder,
+} from '@/services/calculations/cumulativeVoltageDrop';
 
 type Panel = Database['public']['Tables']['panels']['Row'];
 type Circuit = Database['public']['Tables']['circuits']['Row'];
@@ -69,6 +73,10 @@ interface FeederSummary {
   destinationTransformer?: string;
   phaseConductorSize: string;
   voltageDropPercent?: number;
+  isServiceEntrance?: boolean;
+  setsInParallel?: number;
+  cumulativeVoltageDropPercent?: number;
+  crossesTransformer?: boolean;
 }
 
 interface TransformerSummary {
@@ -173,6 +181,14 @@ export function buildProjectContext(
       };
     });
 
+  // Cumulative VD map (panel-keyed). Computed once here so each feeder
+  // summary can derive its VD+ value without re-walking the chain.
+  const cumulativeMap = calculateAllCumulativeVoltageDrops(
+    panels,
+    feeders,
+    transformers,
+  );
+
   // Build feeder summaries
   const feederSummaries: FeederSummary[] = feeders.map(feeder => {
     const sourcePanel = panels.find(p => p.id === feeder.source_panel_id);
@@ -182,16 +198,24 @@ export function buildProjectContext(
     const destTransformer = feeder.destination_transformer_id
       ? transformers.find(t => t.id === feeder.destination_transformer_id)
       : undefined;
-    
+
+    const cumulative = calculateCumulativeForFeeder(feeder, cumulativeMap);
+
     return {
       id: feeder.id,
       name: feeder.name,
-      sourcePanel: sourcePanel?.name || 'Unknown',
+      sourcePanel: feeder.is_service_entrance
+        ? 'Utility Service'
+        : sourcePanel?.name || 'Unknown',
       destinationPanel: destPanel?.name,
       destinationTransformer: destTransformer?.name,
       phaseConductorSize: feeder.phase_conductor_size || 'Not calculated',
       // totalLoadVA removed - field doesn't exist in database schema
       voltageDropPercent: feeder.voltage_drop_percent || undefined,
+      isServiceEntrance: feeder.is_service_entrance || false,
+      setsInParallel: feeder.sets_in_parallel ?? undefined,
+      cumulativeVoltageDropPercent: cumulative?.cumulativePercent,
+      crossesTransformer: cumulative?.crossesTransformer,
     };
   });
 
@@ -387,12 +411,23 @@ export function formatContextForAI(context: ProjectContext): string {
   if (context.feeders.length > 0) {
     prompt += `FEEDERS:\n`;
     context.feeders.forEach(feeder => {
-      prompt += `- ${feeder.name}: ${feeder.sourcePanel} → ${feeder.destinationPanel || feeder.destinationTransformer || 'Unknown'}, ${feeder.phaseConductorSize}`;
-      if (feeder.voltageDropPercent) {
+      const seTag = feeder.isServiceEntrance ? ' [SERVICE ENTRANCE]' : '';
+      prompt += `- ${feeder.name}${seTag}: ${feeder.sourcePanel} → ${feeder.destinationPanel || feeder.destinationTransformer || 'Unknown'}, ${feeder.phaseConductorSize}`;
+      if (feeder.setsInParallel && feeder.setsInParallel > 1) {
+        prompt += ` (${feeder.setsInParallel} sets parallel)`;
+      }
+      if (feeder.voltageDropPercent !== undefined) {
         prompt += `, ${feeder.voltageDropPercent.toFixed(1)}% VD`;
+      }
+      if (feeder.cumulativeVoltageDropPercent !== undefined) {
+        const star = feeder.crossesTransformer ? '*' : '';
+        prompt += `, ${feeder.cumulativeVoltageDropPercent.toFixed(1)}% VD+${star}`;
       }
       prompt += `\n`;
     });
+    if (context.feeders.some(f => f.crossesTransformer)) {
+      prompt += `  * VD+ resets at each transformer secondary (NEC has no defined cross-transformer % summation).\n`;
+    }
     prompt += `\n`;
   }
 

@@ -13,6 +13,12 @@ Your goal is to assist users in designing safe, compliant electrical systems.
 Always reference specific NEC articles (using the 2023 edition unless specified otherwise).
 Be concise, technical, and professional.
 
+VOLTAGE DROP:
+- Per-segment VD on a single feeder vs. cumulative VD+ from the nearest source down to a panel.
+- VD+ resets at each transformer secondary (cross-transformer % summation is undefined per NEC).
+- NEC 215.2(A)(1) IN No. 2: feeder ≤3%. NEC 210.19(A)(1) IN No. 4: combined feeder+branch ≤5%.
+- Service-entrance feeders ([SERVICE ENTRANCE]) model the UTIL→MDP run (one per project, source = Utility Service).
+
 MULTI-FAMILY DWELLING KNOWLEDGE:
 - NEC 220.84 Optional Calculation applies to multi-family (3+ units) with individual cooking + heating/AC
 - It replaces standard NEC 220 demand factors with a single blanket demand factor based on unit count
@@ -265,6 +271,12 @@ This is a follow-up message in an ongoing conversation. The user may be:
 - Requesting additional calculations or analysis
 - Changing parameters from an earlier scenario
 ` : ''}
+
+VOLTAGE DROP CONTEXT:
+- Feeder context lines may show "X% VD" (this segment) and "Y% VD+" (cumulative within voltage segment).
+- VD+* (asterisk) means the chain crosses a transformer; cumulative restarts at the secondary.
+- NEC 215.2(A)(1) IN No. 2: ≤3% per feeder. NEC 210.19(A)(1) IN No. 4: ≤5% combined feeder + branch.
+- A feeder tagged [SERVICE ENTRANCE] is the synthetic UTIL→MDP run; source is "Utility Service".
 
 MULTI-FAMILY DWELLING KNOWLEDGE:
 - NEC 220.84 Optional Calculation applies to multi-family buildings (3+ dwelling units)
@@ -528,7 +540,8 @@ You can execute real calculations and checks on the user's project data.
 AVAILABLE TOOLS:
 
 **Read/Check Tools:**
-- calculate_feeder_voltage_drop: Get voltage drop info for feeders
+- calculate_feeder_voltage_drop: Per-segment VD on a single feeder; also returns the cumulative VD (VD+) downstream of that feeder
+- calculate_cumulative_voltage_drop: Cumulative VD at a panel (sum of all feeder VD% from nearest voltage source down to the panel) — use for "what's the total VD at panel X?"
 - check_panel_capacity: Check if panel can handle additional load
 - check_conductor_sizing: Verify conductor sizing per Table 310.16
 - check_service_upgrade: Analyze service upgrade needs
@@ -548,7 +561,8 @@ AVAILABLE TOOLS:
 - fill_with_spares: Fill remaining empty slots with SPARE circuits (no load, placeholder breakers)
 
 WHEN TO USE TOOLS:
-- User asks about feeder voltage drop → calculate_feeder_voltage_drop
+- User asks about a single feeder's voltage drop → calculate_feeder_voltage_drop
+- User asks for cumulative / total VD at a panel ("total VD at L1", "are we under 5% at the lighting panel") → calculate_cumulative_voltage_drop
 - User asks "what if I add..." → analyze_change_impact
 - User wants to create an RFI → draft_rfi
 - User asks about inspection prep → predict_inspection
@@ -573,6 +587,15 @@ WHEN NOT TO USE TOOLS:
 
 PROJECT CONTEXT:
 ${formatContextForAI(projectContext)}
+
+VOLTAGE DROP — PER-SEGMENT vs CUMULATIVE (VD+):
+- Each feeder has TWO VD numbers: its own run (single segment) and the cumulative VD+ from the nearest voltage source down to it.
+- VD+ resets at each transformer secondary because adding percentages across a voltage change is mathematically meaningless (1% on 480V = 4.8V, but 4.8V on a 208V secondary is 2.3%).
+- NEC 215.2(A)(1) IN No. 2: feeder VD ≤3% recommended.
+- NEC 210.19(A)(1) IN No. 4: combined feeder + branch VD ≤5% recommended. The 5% target applies WITHIN a single voltage segment.
+- When the project context shows "X% VD+*", the asterisk means the upstream chain crossed a transformer — VD+ counts only the conductor runs below that transformer secondary.
+- A feeder labeled "[SERVICE ENTRANCE]" is the synthetic UTIL→MDP run. Source is "Utility Service" (no upstream panel), exactly one per project, destination is always the MDP.
+- "sets in parallel" on a feeder = number of parallel conductor sets per phase (used for VD/SC derating on large feeders).
 
 MULTI-FAMILY DWELLING KNOWLEDGE:
 - NEC 220.84 Optional Calculation applies to multi-family buildings (3+ dwelling units)
