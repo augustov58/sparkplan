@@ -13,7 +13,8 @@ import {
   calculateVoltageDropAC,
   calculateFeederSizing,
   calculateCumulativeVoltageDrop,
-  calculateAllCumulativeVoltageDrops
+  calculateAllCumulativeVoltageDrops,
+  calculateCumulativeForFeeder
 } from '../services/calculations';
 import type { Database } from '../lib/database.types';
 import { calculateEgcSize } from '../services/calculations/conductorSizing';
@@ -1038,5 +1039,91 @@ describe('Cumulative Voltage Drop (riser chain walker)', () => {
     expect(all.size).toBe(2);
     expect(all.get('p-mdp')?.cumulativePercent).toBe(0.5);
     expect(all.get('p-h')?.cumulativePercent).toBe(2.0);
+  });
+
+  it('per-feeder cumulative: panel→transformer feeder includes source panel cumulative + its own VD', () => {
+    const mdp = makePanel({ id: 'p-mdp', name: 'MDP', is_main: true, voltage: 480 });
+    const ph = makePanel({ id: 'p-h', name: 'H1', voltage: 480 });
+    const feeders: Feeder[] = [
+      makeFeeder({
+        id: 'f-se',
+        name: 'SE',
+        is_service_entrance: true,
+        destination_panel_id: 'p-mdp',
+        voltage_drop_percent: 0.30,
+      }),
+      makeFeeder({
+        id: 'f-mdp-h',
+        name: 'MDP→H1',
+        source_panel_id: 'p-mdp',
+        destination_panel_id: 'p-h',
+        voltage_drop_percent: 0.46,
+      }),
+      // Panel→transformer-primary feeder. Walker doesn't key transformers, so
+      // before the per-feeder helper this would have shown no VD+ at all.
+      makeFeeder({
+        id: 'f-h-xfmr',
+        name: 'H1→XFMR-L1',
+        source_panel_id: 'p-h',
+        destination_panel_id: null,
+        destination_transformer_id: 't-xfmr-l1',
+        voltage_drop_percent: 0.42,
+      }),
+    ];
+
+    const panelMap = calculateAllCumulativeVoltageDrops([mdp, ph], feeders, []);
+    const xfmrFeeder = feeders.find(f => f.id === 'f-h-xfmr')!;
+    const cum = calculateCumulativeForFeeder(xfmrFeeder, panelMap);
+
+    // H1 panel cumulative = 0.30 + 0.46 = 0.76. Then this feeder adds 0.42.
+    expect(cum).not.toBeNull();
+    expect(cum!.cumulativePercent).toBe(1.18);
+    expect(cum!.crossesTransformer).toBe(false);
+  });
+
+  it('per-feeder cumulative: transformer→transformer cascade resets and flags asterisk', () => {
+    const mdp = makePanel({ id: 'p-mdp', name: 'MDP', is_main: true });
+    const cascadeFeeder = makeFeeder({
+      id: 'f-cascade',
+      name: 'XFMR-1 secondary → XFMR-2 primary',
+      source_panel_id: null,
+      source_transformer_id: 't-1',
+      destination_panel_id: null,
+      destination_transformer_id: 't-2',
+      voltage_drop_percent: 0.5,
+    });
+    const panelMap = calculateAllCumulativeVoltageDrops([mdp], [cascadeFeeder], []);
+    const cum = calculateCumulativeForFeeder(cascadeFeeder, panelMap);
+
+    expect(cum).not.toBeNull();
+    expect(cum!.cumulativePercent).toBe(0.5); // restart at upstream secondary
+    expect(cum!.crossesTransformer).toBe(true); // VD+* label
+  });
+
+  it('per-feeder cumulative: panel-destination feeder reuses panel walker result', () => {
+    const mdp = makePanel({ id: 'p-mdp', name: 'MDP', is_main: true });
+    const ph = makePanel({ id: 'p-h', name: 'H' });
+    const feeders: Feeder[] = [
+      makeFeeder({
+        id: 'f-se',
+        name: 'SE',
+        is_service_entrance: true,
+        destination_panel_id: 'p-mdp',
+        voltage_drop_percent: 0.5,
+      }),
+      makeFeeder({
+        id: 'f-mdp-h',
+        name: 'MDP→H',
+        source_panel_id: 'p-mdp',
+        destination_panel_id: 'p-h',
+        voltage_drop_percent: 1.5,
+      }),
+    ];
+
+    const panelMap = calculateAllCumulativeVoltageDrops([mdp, ph], feeders, []);
+    const cum = calculateCumulativeForFeeder(feeders[1]!, panelMap);
+
+    expect(cum).not.toBeNull();
+    expect(cum!.cumulativePercent).toBe(2.0); // walker already includes this feeder
   });
 });

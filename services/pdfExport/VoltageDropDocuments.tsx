@@ -17,7 +17,7 @@ import {
 } from '@react-pdf/renderer';
 import type { Database } from '../../lib/database.types';
 import { calculateFeederSizing } from '../calculations/feederSizing';
-import { calculateAllCumulativeVoltageDrops } from '../calculations/cumulativeVoltageDrop';
+import { calculateAllCumulativeVoltageDrops, calculateCumulativeForFeeder } from '../calculations/cumulativeVoltageDrop';
 import { computeFeederLoadVA } from '../feeder/feederLoadSync';
 import type { FeederCalculationInput, FeederCalculationResult } from '../../types';
 import {
@@ -289,9 +289,11 @@ function calculateAllFeederVoltageDrops(
   const cumulativeMap = calculateAllCumulativeVoltageDrops(panels, feedersWithFreshVd, transformers);
 
   return baseRows.map(row => {
-    const cum = row.feeder.destination_panel_id
-      ? cumulativeMap.get(row.feeder.destination_panel_id) ?? null
-      : null;
+    // Per-feeder cumulative — covers both panel-destination and
+    // transformer-primary destination feeders. The fresh-VD feeder array is
+    // used so the report's per-row VD and cumulative agree.
+    const freshFeeder = feedersWithFreshVd.find(f => f.id === row.feeder.id) ?? row.feeder;
+    const cum = calculateCumulativeForFeeder(freshFeeder, cumulativeMap);
     return {
       ...row,
       cumulativeVdPercent: cum?.cumulativePercent ?? null,

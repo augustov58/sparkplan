@@ -270,6 +270,60 @@ export function calculateCumulativeVoltageDrop(
 }
 
 /**
+ * Resolve cumulative VD for the *endpoint* of a single feeder. Used by the
+ * riser label, FeederManager card, and PDF report — all three need
+ * "cumulative downstream of this feeder", not just "cumulative at this panel".
+ *
+ * Three cases:
+ *   1. Destination is a panel → reuse the panel walker's result (panel-keyed map).
+ *      Includes this feeder's VD% (the walker's chain ends with this feeder).
+ *   2. Destination is a transformer primary, source is a panel → still in the
+ *      same voltage segment as upstream, so cumulative = source-panel cumulative
+ *      + this feeder's VD%.
+ *   3. Destination is a transformer primary, source is a transformer (cascade) →
+ *      cumulative resets at the upstream transformer secondary, so this feeder
+ *      stands alone. Mark crossesTransformer so the label shows VD+*.
+ *
+ * Returns null when no meaningful cumulative can be computed (e.g. feeder has
+ * no destination set, or the source panel isn't in the map).
+ */
+export function calculateCumulativeForFeeder(
+  feeder: Feeder,
+  panelCumulativeMap: Map<string, CumulativeVoltageDropResult>,
+): { cumulativePercent: number; crossesTransformer: boolean } | null {
+  const thisVD = feeder.voltage_drop_percent ?? 0;
+
+  if (feeder.destination_panel_id) {
+    const cum = panelCumulativeMap.get(feeder.destination_panel_id);
+    if (!cum) return null;
+    return {
+      cumulativePercent: cum.cumulativePercent,
+      crossesTransformer: cum.crossesTransformer,
+    };
+  }
+
+  if (feeder.destination_transformer_id) {
+    if (feeder.source_panel_id) {
+      const sourceCum = panelCumulativeMap.get(feeder.source_panel_id);
+      if (sourceCum) {
+        return {
+          cumulativePercent: round2(sourceCum.cumulativePercent + thisVD),
+          crossesTransformer: sourceCum.crossesTransformer,
+        };
+      }
+      return { cumulativePercent: round2(thisVD), crossesTransformer: false };
+    }
+    if (feeder.source_transformer_id) {
+      // Cascaded transformers: cumulative restarts at the upstream secondary,
+      // so this feeder stands alone. Asterisk-flag it.
+      return { cumulativePercent: round2(thisVD), crossesTransformer: true };
+    }
+  }
+
+  return null;
+}
+
+/**
  * Bulk calculate cumulative VD for every panel in a project. The riser diagram
  * uses this once per render to avoid recomputing in every panel-glyph call.
  */

@@ -22,6 +22,7 @@ import { validateFeederConnectivityEnhanced, getValidFeederDestinations, getVali
 import { checkFeederLoadStatus, getStaleFeedersList } from '../services/feeder/feederLoadSync';
 import { calculateAggregatedLoad } from '../services/calculations/upstreamLoadAggregation';
 import { useCumulativeVoltageDrop } from '../hooks/useCumulativeVoltageDrop';
+import { calculateCumulativeForFeeder } from '../services/calculations/cumulativeVoltageDrop';
 import { exportVoltageDropReport, hasVoltageDropData } from '../services/pdfExport/voltageDropPDF';
 import { computeFeederLoadVA } from '../services/feeder/feederLoadSync';
 import type { Feeder, FeederCalculationResult } from '../types';
@@ -1307,9 +1308,9 @@ export const FeederManager: React.FC<FeederManagerProps> = ({
         <div className="space-y-4">
           {feeders.map(feeder => {
             const staleStatus = checkFeederLoadStatus(feeder, circuits, panels, 5);
-            const cum = feeder.destination_panel_id
-              ? cumulativeVdMap.get(feeder.destination_panel_id) ?? null
-              : null;
+            // Per-feeder cumulative — handles both panel-destination and
+            // transformer-primary destination feeders correctly.
+            const cum = calculateCumulativeForFeeder(feeder, cumulativeVdMap);
             return (
               <FeederCard
                 key={feeder.id}

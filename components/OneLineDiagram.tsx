@@ -126,6 +126,7 @@ import { useFeeders } from '../hooks/useFeeders';
 import { useMeterStacks } from '../hooks/useMeterStacks';
 import { useMeters } from '../hooks/useMeters';
 import { useCumulativeVoltageDrop } from '../hooks/useCumulativeVoltageDrop';
+import { calculateCumulativeForFeeder } from '../services/calculations/cumulativeVoltageDrop';
 import { FeederManager } from './FeederManager';
 import { BulkCircuitCreator } from './BulkCircuitCreator';
 import { EquipmentSpecForm } from './EquipmentSpecForm';
@@ -760,17 +761,15 @@ export const OneLineDiagram: React.FC<OneLineDiagramProps> = ({ project, updateP
       const color = vd > 3 ? '#DC2626' : vd > 2 ? '#D97706' : '#059669';
       lines.push({ text: `VD ${vd.toFixed(2)}%`, fontSize: 6.5, color, bold: true });
     }
-    // Cumulative VD from this feeder's destination panel back to the nearest
-    // voltage source (service or transformer secondary). Skip transformer
-    // destinations — cumulative resets at transformers, not meaningful there.
-    if (feeder.destination_panel_id) {
-      const cum = cumulativeVdMap.get(feeder.destination_panel_id);
-      if (cum && cum.cumulativePercent > 0) {
-        const cumPct = cum.cumulativePercent;
-        const cumColor = cumPct > 5 ? '#DC2626' : cumPct > 3 ? '#D97706' : '#059669';
-        const label = cum.crossesTransformer ? `VD+* ${cumPct.toFixed(2)}%` : `VD+ ${cumPct.toFixed(2)}%`;
-        lines.push({ text: label, fontSize: 6.5, color: cumColor, bold: true });
-      }
+    // Cumulative VD at this feeder's endpoint, walking back to the nearest
+    // voltage source (service or transformer secondary). Handles both panel-
+    // and transformer-destination feeders — see calculateCumulativeForFeeder.
+    const cum = calculateCumulativeForFeeder(feeder, cumulativeVdMap);
+    if (cum && cum.cumulativePercent > 0) {
+      const cumPct = cum.cumulativePercent;
+      const cumColor = cumPct > 5 ? '#DC2626' : cumPct > 3 ? '#D97706' : '#059669';
+      const label = cum.crossesTransformer ? `VD+* ${cumPct.toFixed(2)}%` : `VD+ ${cumPct.toFixed(2)}%`;
+      lines.push({ text: label, fontSize: 6.5, color: cumColor, bold: true });
     }
     return lines;
   };
