@@ -205,23 +205,29 @@ const ProjectWrapper = ({ projects, updateProject, deleteProject, onSignOut }: {
                 } />
                 <Route path="/estimating" element={
                     <FeatureErrorBoundary>
-                        <Suspense fallback={<LoadingSpinner />}>
-                            <EstimatingStub projectId={project.id} />
-                        </Suspense>
+                        <FeatureGate feature="estimating" message="Generate electrical takeoffs and bid pricing tied to your panel/circuit model. Available on the Business plan — preview free during your trial.">
+                            <Suspense fallback={<LoadingSpinner />}>
+                                <EstimatingStub projectId={project.id} />
+                            </Suspense>
+                        </FeatureGate>
                     </FeatureErrorBoundary>
                 } />
                 <Route path="/permits" element={
                     <FeatureErrorBoundary>
-                        <Suspense fallback={<LoadingSpinner />}>
-                            <PermitsStub projectId={project.id} />
-                        </Suspense>
+                        <FeatureGate feature="permits" message="Track the full permit + inspection lifecycle: submission, AHJ review, approval, inspection scheduling, results, corrections. Available on the Business plan — preview free during your trial.">
+                            <Suspense fallback={<LoadingSpinner />}>
+                                <PermitsStub projectId={project.id} />
+                            </Suspense>
+                        </FeatureGate>
                     </FeatureErrorBoundary>
                 } />
                 <Route path="/billing" element={
                     <FeatureErrorBoundary>
-                        <Suspense fallback={<LoadingSpinner />}>
-                            <TmBillingStub projectId={project.id} />
-                        </Suspense>
+                        <FeatureGate feature="tm-billing" message="Time & materials billing with phases, change orders, and AIA pay applications for commercial electrical subcontractors. Available on the Business plan — preview free during your trial.">
+                            <Suspense fallback={<LoadingSpinner />}>
+                                <TmBillingStub projectId={project.id} />
+                            </Suspense>
+                        </FeatureGate>
                     </FeatureErrorBoundary>
                 } />
                 <Route path="/check" element={
