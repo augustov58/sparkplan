@@ -14,6 +14,8 @@ type RefreshEventType =
   | 'support_tickets'
   | 'estimates'
   | 'estimate_line_items'
+  | 'permits'
+  | 'permit_inspections'
   | 'all';
 type RefreshCallback = () => void;
 

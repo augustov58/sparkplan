@@ -15,7 +15,6 @@ const GroundingBonding = lazy(() => import('./components/GroundingBonding').then
 const PanelSchedule = lazy(() => import('./components/PanelSchedule').then(m => ({ default: m.PanelSchedule })));
 const PreInspection = lazy(() => import('./components/PreInspection').then(m => ({ default: m.PreInspection })));
 const Calculators = lazy(() => import('./components/Calculators').then(m => ({ default: m.Calculators })));
-const IssuesLog = lazy(() => import('./components/IssuesLog').then(m => ({ default: m.IssuesLog })));
 const MaterialTakeOff = lazy(() => import('./components/MaterialTakeOff').then(m => ({ default: m.MaterialTakeOff })));
 const FeederManager = lazy(() => import('./components/FeederManager').then(m => ({ default: m.FeederManager })));
 const DwellingLoadCalculator = lazy(() => import('./components/DwellingLoadCalculator').then(m => ({ default: m.DwellingLoadCalculator })));
@@ -27,7 +26,7 @@ const RFIManager = lazy(() => import('./components/RFIManager').then(m => ({ def
 const SiteVisitManager = lazy(() => import('./components/SiteVisitManager').then(m => ({ default: m.SiteVisitManager })));
 const CalendarView = lazy(() => import('./components/CalendarView').then(m => ({ default: m.CalendarView })));
 const EstimatingPage = lazy(() => import('./components/Estimating/EstimatingPage').then(m => ({ default: m.EstimatingPage })));
-const PermitsStub = lazy(() => import('./components/PermitsStub').then(m => ({ default: m.PermitsStub })));
+const PermitsPage = lazy(() => import('./components/Permits/PermitsPage').then(m => ({ default: m.PermitsPage })));
 const TmBillingStub = lazy(() => import('./components/TmBillingStub').then(m => ({ default: m.TmBillingStub })));
 const AgentActivityLog = lazy(() => import('./components/AgentActivityLog').then(m => ({ default: m.AgentActivityLog })));
 const UtilityInterconnectionForm = lazy(() => import('./components/UtilityInterconnectionForm').then(m => ({ default: m.UtilityInterconnectionForm })));
@@ -167,14 +166,12 @@ const ProjectWrapper = ({ projects, updateProject, deleteProject, onSignOut }: {
                         </FeatureGate>
                     </FeatureErrorBoundary>
                 } />
+                {/* /issues legacy route — redirect into the Permits tabs.
+                    Bookmarks that still point at /project/:id/issues land on
+                    /project/:id/permits?tab=issues which renders the same
+                    IssuesLog UI inside the new tabbed Permits page. */}
                 <Route path="/issues" element={
-                    <FeatureErrorBoundary>
-                        <FeatureGate feature="issues-log" message="Track project issues, inspection findings, and action items with our Issues Log. Available in Business plan.">
-                            <Suspense fallback={<LoadingSpinner />}>
-                                <IssuesLog project={project} updateProject={updateProject} />
-                            </Suspense>
-                        </FeatureGate>
-                    </FeatureErrorBoundary>
+                    <Navigate to={`/project/${project.id}/permits?tab=issues`} replace />
                 } />
                 <Route path="/rfis" element={
                     <FeatureErrorBoundary>
@@ -216,7 +213,7 @@ const ProjectWrapper = ({ projects, updateProject, deleteProject, onSignOut }: {
                     <FeatureErrorBoundary>
                         <FeatureGate feature="permits" message="Track the full permit + inspection lifecycle: submission, AHJ review, approval, inspection scheduling, results, corrections. Available on the Business plan — preview free during your trial.">
                             <Suspense fallback={<LoadingSpinner />}>
-                                <PermitsStub projectId={project.id} />
+                                <PermitsPage project={project} updateProject={updateProject} />
                             </Suspense>
                         </FeatureGate>
                     </FeatureErrorBoundary>

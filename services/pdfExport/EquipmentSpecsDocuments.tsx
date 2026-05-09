@@ -10,6 +10,8 @@
 import React from 'react';
 import { Document, Page, View, Text, StyleSheet } from '@react-pdf/renderer';
 import type { PanelEquipmentSpecs, TransformerEquipmentSpecs } from '@/types';
+import type { Circuit } from '../../lib/database.types';
+import { isEVEMSManagedPanel } from '../calculations/upstreamLoadAggregation';
 import {
   BrandBar,
   Footer as BrandFooter,
@@ -64,6 +66,9 @@ interface EquipmentSpecsDocumentProps {
   projectAddress?: string;
   panels: Panel[];
   transformers: Transformer[];
+  // Sprint 2A H15: optional circuits for EV-panel detection (EVEMS marker
+  // circuits). Without circuits, EV detection falls back to name pattern.
+  circuits?: Circuit[];
   includeNECReferences?: boolean;
   // Sprint 2A C8: per-sheet contractor signature block
   contractorName?: string;
@@ -324,6 +329,72 @@ const TransformerSpecsTable: React.FC<{ transformers: Transformer[] }> = ({ tran
 };
 
 /**
+ * Sprint 2A H15 — EV Charging Supply Equipment listings card.
+ *
+ * Required by Orlando's "EV Charging Station Permit Checklist" item #7
+ * (both paths): "electrical specifications of EV chargers to include UL-2202
+ * and UL-2594 listing and label information." This card cites the listing
+ * standards by number on the Equipment Specs sheet so AHJ reviewers can
+ * cross-check the contractor-supplied cut sheets (uploaded in Sprint 2B)
+ * against the named standards.
+ *
+ * Renders only when at least one EV-bank panel is detected — either by
+ * EVEMS marker circuit (NEC 625.42 managed) or by name pattern fallback
+ * (residential duplex EV panels without EVEMS).
+ */
+const EVChargingListingsCard: React.FC<{
+  evPanels: Panel[];
+}> = ({ evPanels }) => {
+  if (evPanels.length === 0) return null;
+
+  return (
+    <View style={styles.section} wrap={false}>
+      <Text style={styles.sectionTitle}>EV CHARGING SUPPLY EQUIPMENT — APPLICABLE LISTING STANDARDS</Text>
+
+      <View style={styles.table}>
+        <View style={styles.tableHeader}>
+          <Text style={[styles.col_name, { width: '15%' }]}>Panel</Text>
+          <Text style={{ width: '15%', fontSize: 8 }}>UL Standard</Text>
+          <Text style={{ width: '70%', fontSize: 8 }}>Title</Text>
+        </View>
+
+        {evPanels.map((panel, idx) => (
+          <React.Fragment key={panel.id}>
+            <View style={idx % 2 === 0 ? styles.tableRow : styles.tableRowAlt}>
+              <Text style={[styles.col_name, { width: '15%' }]}>{panel.name}</Text>
+              <Text style={{ width: '15%', fontSize: 8, fontFamily: 'Helvetica-Bold' }}>UL-2202</Text>
+              <Text style={{ width: '70%', fontSize: 7.5 }}>
+                Standard for Electric Vehicle (EV) Charging System Equipment
+              </Text>
+            </View>
+            <View style={idx % 2 === 0 ? styles.tableRow : styles.tableRowAlt}>
+              <Text style={[styles.col_name, { width: '15%' }]}> </Text>
+              <Text style={{ width: '15%', fontSize: 8, fontFamily: 'Helvetica-Bold' }}>UL-2594</Text>
+              <Text style={{ width: '70%', fontSize: 7.5 }}>
+                Standard for Electric Vehicle Supply Equipment (EVSE)
+              </Text>
+            </View>
+          </React.Fragment>
+        ))}
+      </View>
+
+      <View style={styles.necBox} wrap={false}>
+        <Text style={styles.necTitle}>EVSE LISTING REQUIREMENT</Text>
+        <View style={styles.necList}>
+          <Text>
+            Each EV charger installed under this permit shall bear the listing
+            mark of UL-2202 (charging system) and/or UL-2594 (supply equipment)
+            as applicable to its construction. Manufacturer cut sheets submitted
+            with this packet must show the listing label or carry the listing
+            file number from the appropriate NRTL (UL, ETL, or equivalent).
+          </Text>
+        </View>
+      </View>
+    </View>
+  );
+};
+
+/**
  * NEC References Section
  */
 const NECReferences: React.FC = () => (
@@ -365,11 +436,30 @@ const NECReferences: React.FC = () => (
  * @param props - Document properties
  * @returns React-PDF Document component
  */
+/**
+ * Sprint 2A H15 \u2014 detect EV-bank panels for the UL-2202/2594 listings card.
+ *
+ * Two signals: (a) panel has an EVEMS marker circuit (NEC 625.42 managed
+ * panel \u2014 most reliable), (b) panel name matches a common EV/charger pattern
+ * (fallback for residential duplex EV panels with no EVEMS). Either signal
+ * is enough \u2014 false positives just trigger a UL standards card on a panel
+ * that may have no EVSE, which is safe (the card cites standards generically).
+ */
+const EV_NAME_PATTERN = /\b(ev|evse|charger|charging|level\s*2|l2)\b/i;
+
+const detectEVPanels = (panels: Panel[], circuits: Circuit[] | undefined): Panel[] => {
+  const dbCircuits = circuits ?? [];
+  return panels.filter(
+    p => isEVEMSManagedPanel(p.id, dbCircuits) || EV_NAME_PATTERN.test(p.name),
+  );
+};
+
 export const EquipmentSpecsPages: React.FC<EquipmentSpecsDocumentProps> = ({
   projectName,
   projectAddress,
   panels,
   transformers,
+  circuits,
   includeNECReferences = true,
   contractorName,
   contractorLicense,
@@ -380,6 +470,8 @@ export const EquipmentSpecsPages: React.FC<EquipmentSpecsDocumentProps> = ({
     month: 'long',
     day: 'numeric'
   });
+
+  const evPanels = detectEVPanels(panels, circuits);
 
   return (
     <Page size="LETTER" orientation="landscape" style={themeStyles.page}>
@@ -398,6 +490,9 @@ export const EquipmentSpecsPages: React.FC<EquipmentSpecsDocumentProps> = ({
 
       {/* Transformer Specifications Table */}
       <TransformerSpecsTable transformers={transformers} />
+
+      {/* Sprint 2A H15: EV charging listing standards (UL-2202 + UL-2594) */}
+      <EVChargingListingsCard evPanels={evPanels} />
 
       {/* NEC References */}
       {includeNECReferences && <NECReferences />}

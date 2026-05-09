@@ -44,6 +44,60 @@
 
 ---
 
+### Session: 2026-05-09 — Permits Beta v1 Phase 1 implementation (`feat/permits-beta-v1`)
+
+**Focus**: Executed `docs/plans/permits-implementation.md` (Phase 1 only) end-to-end in a fresh worktree at `/home/augusto/projects/sparkplan-permits`. Replaces the PR #29 `PermitsStub` with a real tabbed Permits page (Overview / Permits / Inspections / Issues), full CRUD for permits + inspections, and migrates the existing `IssuesLog` UI into the page as the Issues tab. `/issues` redirects into `/permits?tab=issues`.
+
+**Status**:
+- ✅ Migration `20260510_permits_and_inspections.sql` written — creates `permits` + `permit_inspections` tables with RLS + the `update_updated_at_column()` trigger pattern (verified that function exists from prior migrations) + `issues.permit_inspection_id` FK column. **User must apply this migration in the Supabase SQL Editor before merging.**
+- ✅ `lib/database.types.ts` patched manually to match the migration shape (CLI regen deferred until DB applies).
+- ✅ Pure services in `services/permits/` (status state machine, expiration helper) + 35 unit tests. All tests pass (130 total, up from 95).
+- ✅ Hooks `usePermits` + `usePermitInspections` follow the optimistic-update + Supabase realtime pattern from `usePanels`. Inspections hook accepts an optional `permitId` filter.
+- ✅ Eight new components in `components/Permits/`: `PermitsPage` (tab orchestration + URL `?tab=` persistence), `PermitsOverviewTab`, `PermitsListTab` + `PermitDetailDrawer` + `NewPermitDialog`, `InspectionsListTab` + `InspectionDetailDrawer` + `NewInspectionDialog`, `IssuesTab` (thin wrapper), `PermitStatusPill` + `InspectionStatusPill`.
+- ✅ `App.tsx` routing wired up — `/permits` lazy-loads the new `PermitsPage`; `/issues` redirects to `/permits?tab=issues` (legacy bookmarks resolve cleanly with no 404). Old `PermitsStub` deleted.
+- ✅ `services/ai/projectContextBuilder.ts` gains optional `permits` + `inspections` params; surfaces counts in the AI summary so the chatbot can answer "do I have any open permits" without a tool call. Phase 3 will add full per-permit detail.
+- ✅ Docs synced: CHANGELOG entry, this SESSION_LOG entry, ROADMAP Phase 3.6 marked in-progress (will be done at PR merge), `docs/database-architecture.md` updated with both new tables + the issues column.
+- ✅ `npm run build` exits 0 (4.9s); 130 tests pass — only failure is the pre-existing `tests/calculations-extended.test.ts` Supabase env-var issue, unchanged from main.
+
+**Decisions made**:
+
+- **Pre-existing trigger function**: the plan's draft used `set_updated_at()` but the codebase actually defines `update_updated_at_column()`. Used the existing one to avoid duplicating function declarations.
+- **Phase 1 integration test deferred**. Plan §4.10 listed a `tests/permits/permitsCrud.test.ts` integration test, but the existing test infra (`tests/calculations-extended.test.ts`) demonstrably can't import any module that pulls `lib/supabase.ts` without `.env.local` set — the suite fails before reaching the test code. Adding a permits CRUD integration test would either (a) repeat the same failure or (b) require a vitest mock of the supabase client, which violates the project's "no mocked DB" preference. Documented as a Phase 1 gap; the unit tests on the pure services + manual smoke test cover the regression-sensitive parts. Suggest revisiting after a `.env.local.test` lane is set up.
+- **Validation is advisory, not blocking** — `NewPermitDialog` lets the user save with empty AHJ jurisdiction (the field will be saved as `'TBD'`). Inline amber hint surfaces when AHJ is empty but doesn't gate save. Per `feedback_validation_advisory` memory.
+- **Status dropdown forward-only**. The state machine in `permitStatusTransitions.ts` rejects backwards transitions from the dropdown. Audit-trail-honest. An explicit "Reopen" action is Phase 2 territory.
+- **Inspection drawer auto-stamps `performed_at`** when the user moves status to `passed` / `failed` / `conditional_pass`. Reverses to null when status moves back to `scheduled`. Cheap correctness win — avoids a separate "mark as complete" button.
+- **Per-permit inspection roll-up inside the detail drawer** uses `usePermitInspections(projectId, permitId)` — same hook, filtered. Saves a second query path.
+
+**Out of scope (deferred to Phase 2/3/4 per the plan)**:
+
+- AHJ portal scraping / status auto-sync (Phase 4)
+- Email notifications on status change (Phase 3)
+- Chatbot tools `update_permit_status`, `schedule_inspection`, `summarize_corrections` (Phase 3)
+- Two-way packet ↔ permit linkage (Phase 3)
+- `issues.permit_inspection_id` UI wiring (Phase 2 — column shipped, drawer doesn't surface it yet)
+- Status-change audit log table (Phase 2 if AHJs require it)
+
+**Pending / Follow-ups**:
+
+- **User must apply `supabase/migrations/20260510_permits_and_inspections.sql` in Supabase Studio** before this PR ships. Code references the new tables and will throw at runtime if the schema isn't applied first.
+- **Manual smoke test** per the plan's Definition of Done: create a permit, advance its status through the full lifecycle, schedule an inspection, mark it failed, see the corrections placeholder, mark a reinspection.
+- **PR opening** is the user's responsibility — agent does not push to remote per orchestration rules.
+
+**Key files touched** (full diff at `git diff origin/main..HEAD`):
+
+- New: `supabase/migrations/20260510_permits_and_inspections.sql` (174 LOC)
+- New: `services/permits/permitStatusTransitions.ts` + `permitExpirationWarning.ts` (~140 LOC)
+- New: `hooks/usePermits.ts` + `usePermitInspections.ts` (~410 LOC)
+- New: `components/Permits/*` — 9 files (~1,800 LOC TSX)
+- New: `tests/permits/*` — 2 files (~180 LOC)
+- Modified: `App.tsx`, `lib/database.types.ts`, `lib/dataRefreshEvents.ts`, `lib/toast.ts`, `lib/validation-schemas.ts`, `services/ai/projectContextBuilder.ts`
+- Deleted: `components/PermitsStub.tsx`
+- Docs: `docs/CHANGELOG.md`, `docs/SESSION_LOG.md`, `docs/database-architecture.md`, `ROADMAP.md`
+
+**Total diff**: ~6 commits, ~3,000 LOC additions on `feat/permits-beta-v1` branch.
+
+---
+
 ### Session: 2026-05-09 — Chatbot VD+ awareness + confirmation gate fix + Inspector accuracy + sidebar contractor pivot (4 PRs)
 
 **Focus**: Started by verifying merged PR #25 (cumulative VD + service-entrance feeders). Verification spawned three follow-up PRs (#26, #28, #29). Mid-session, the platform owner also surfaced three Inspector accuracy issues during PE review which landed as PR #27. Total: 4 PRs, 3 merged today + 1 still open.
@@ -102,4 +156,7 @@
 
 ---
 
-<!-- Earlier sessions (2026-05-06/07 Sprint 1 close-out, 2026-05-08/09 Sprint 2A) rotated out per "keep last 2 sessions" rule. Git history preserves them. -->
+<!-- Session 2026-05-08 / 2026-05-09 (Sprint 2A) rotated out per "keep last 2 sessions" rule — git history preserves the entry. -->
+
+
+<!-- Earlier session 2026-05-06 / 2026-05-07 (Sprint 1 close-out / C4 omnibus) rotated out per "keep last 2 sessions" rule. Git history preserves the entry. -->

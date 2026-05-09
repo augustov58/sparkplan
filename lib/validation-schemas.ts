@@ -570,3 +570,98 @@ export const estimateLineItemSchema = z.object({
 });
 
 export type EstimateLineItemFormData = z.infer<typeof estimateLineItemSchema>;
+
+// ============================================
+// Permit Schemas (Phase 1 Permits Beta)
+// ============================================
+// Per the project's "validation is advisory, not blocking" preference,
+// these schemas describe the AHJ-acceptable shape of a permit record but
+// callers run safeParse and surface friendly warnings instead of hard
+// blocking. Drafts with TBD fields must remain saveable.
+
+export const PERMIT_STATUSES = [
+  'draft',
+  'submitted',
+  'in_review',
+  'returned',
+  'approved',
+  'expired',
+  'closed',
+  'cancelled',
+] as const;
+
+export const PERMIT_TYPES = [
+  'electrical',
+  'evse',
+  'low_voltage',
+  'service_upgrade',
+  'other',
+] as const;
+
+export const INSPECTION_TYPES = [
+  'rough_in',
+  'underground',
+  'service',
+  'final',
+  'temporary',
+  'reinspection',
+  'other',
+] as const;
+
+export const INSPECTION_STATUSES = [
+  'scheduled',
+  'passed',
+  'failed',
+  'conditional_pass',
+  'cancelled',
+  'no_show',
+] as const;
+
+export const permitSchema = z.object({
+  project_id: z.string().uuid(),
+  permit_number: z.string().max(64).optional().nullable(),
+  permit_type: z.enum(PERMIT_TYPES),
+  description: z.string().max(500).optional().nullable(),
+  ahj_jurisdiction: z.string().min(1, 'AHJ jurisdiction is required').max(200),
+  ahj_contact_name: z.string().max(200).optional().nullable(),
+  ahj_contact_email: z
+    .string()
+    .email('Must be a valid email address')
+    .optional()
+    .nullable()
+    .or(z.literal('')),
+  ahj_contact_phone: z.string().max(40).optional().nullable(),
+  status: z.enum(PERMIT_STATUSES),
+  submitted_at: z.string().optional().nullable(),
+  approved_at: z.string().optional().nullable(),
+  expires_at: z.string().optional().nullable(),
+  closed_at: z.string().optional().nullable(),
+  fee_amount: z
+    .number()
+    .nonnegative('Fee must be non-negative')
+    .max(1_000_000, 'Fee unrealistically large')
+    .optional()
+    .nullable(),
+  fee_paid_at: z.string().optional().nullable(),
+  fee_receipt_url: z.string().url().optional().nullable().or(z.literal('')),
+  plan_review_id: z.string().max(64).optional().nullable(),
+  notes: z.string().max(5000).optional().nullable(),
+});
+
+export type PermitFormData = z.infer<typeof permitSchema>;
+
+export const permitInspectionSchema = z.object({
+  permit_id: z.string().uuid(),
+  inspection_type: z.enum(INSPECTION_TYPES),
+  sequence: z.number().int().min(1).default(1),
+  description: z.string().max(500).optional().nullable(),
+  scheduled_date: z.string().optional().nullable(), // YYYY-MM-DD
+  scheduled_window: z.string().max(40).optional().nullable(),
+  inspector_name: z.string().max(200).optional().nullable(),
+  status: z.enum(INSPECTION_STATUSES),
+  performed_at: z.string().optional().nullable(),
+  result_notes: z.string().max(5000).optional().nullable(),
+  parent_inspection_id: z.string().uuid().optional().nullable(),
+});
+
+export type PermitInspectionFormData = z.infer<typeof permitInspectionSchema>;

@@ -35,6 +35,49 @@ Replaces the `EstimatingStub` page (PR #29 demand-discovery) with a real estimat
 
 ---
 
+## 2026-05-09: Permits Beta v1 — Phase 1 implementation (in PR, branch `feat/permits-beta-v1`)
+
+Replaces the PR #29 `PermitsStub` with the real Permits feature. The new tabbed page lives at `/project/:id/permits` and provides the full submission → inspection lifecycle entrypoint for contractors.
+
+**User-Facing Changes:**
+
+- **Tabbed Permits page** with four tabs, persisted in URL via `?tab=`:
+  1. **Overview** — at-a-glance card per permit (status pill, expiration chip, AHJ, inspection count, next scheduled inspection) plus a recent-activity timeline.
+  2. **Permits** — full table with click-to-edit detail drawer + inline "New permit" modal. Drafts savable with `TBD` AHJ (advisory hint, not a hard gate).
+  3. **Inspections** — flat table across all permits in the project. Click row to open the inspection detail drawer. New-inspection modal requires picking a parent permit.
+  4. **Issues** — wraps the existing `IssuesLog` component unchanged. Phase 2 will wire issue rows to the new `issues.permit_inspection_id` FK.
+- **`/issues` legacy route** now redirects to `/permits?tab=issues` so old bookmarks land on the same UI inside the new page (no 404s, no double-maintenance of two routes pointing at the same component).
+- **Status state machine** (forward-only, terminal at `closed` / `cancelled`). The detail drawer's status dropdown shows only valid next states. Backwards transitions (e.g. `approved → in_review`) are intentionally blocked from the dropdown to keep the audit trail honest. Phase 2 may add an explicit Reopen action.
+- **Expiration warnings** — amber chip ("Expires in 18 days") at ≤30 days remaining, red chip ("Expired 3 days ago") past expiration. Visible on Overview cards + Permits list.
+- **Status pills** — color-coded by lifecycle stage: DRAFT gray, SUBMITTED amber, IN REVIEW blue, RETURNED orange, APPROVED green, EXPIRED red, CLOSED slate, CANCELLED zinc.
+
+**Schema (migration `20260510_permits_and_inspections.sql`):**
+
+- New `permits` table — full permit record including AHJ contact (per-permit, not per-AHJ — plan reviewers and inspectors at the same AHJ are different people), submitted/approved/expires/closed timestamps, fees, plan review ID, conditions JSONB, packet URL linkage, status with `CHECK` constraint enforcing the 8 valid lifecycle states.
+- New `permit_inspections` table — 1:N per permit. Type enum covers rough-in / underground / service / final / temporary / reinspection / other. Status enum: scheduled / passed / failed / conditional_pass / cancelled / no_show. `parent_inspection_id` self-FK links a reinspection back to the original failed inspection.
+- `issues.permit_inspection_id` FK (nullable, `ON DELETE SET NULL`) — column shipped now so a failed inspection's corrections can be tracked as `issues` rows; UI wiring deferred to Phase 2.
+- Both tables enable RLS with `auth.uid() = user_id` policies (same pattern as panels/circuits/issues).
+
+**Validation:** Per the project's "validation is advisory, not blocking" preference, Zod schemas in `lib/validation-schemas.ts` describe AHJ-acceptable shape but callers run `safeParse` and surface friendly warnings. Drafts with TBD fields remain saveable.
+
+**Technical:**
+
+- New hooks `usePermits` + `usePermitInspections` follow the optimistic-update + Supabase realtime pattern from `usePanels`. Inspections hook accepts an optional `permitId` filter so the same hook backs both the project-wide Inspections tab and the per-permit detail drawer roll-up.
+- Pure services in `services/permits/` for the status-transition state machine and the expiration helper. 35 unit tests added (statusTransitions + expirationWarning) — 130 tests passing total now (up from 95).
+- AI context (`services/ai/projectContextBuilder.ts`) gains optional `permits` + `inspections` params; when supplied, the summary surfaces `Permits: N (M active)` and `Inspections: N (M scheduled)` so the chatbot can answer "do I have any open permits" without a tool call. Full per-permit detail + chatbot tools (`update_permit_status`, `schedule_inspection`) are Phase 3.
+
+**Out of scope (deferred):**
+
+- AHJ portal scraping / status auto-sync (Phase 4 — per-AHJ work).
+- Email notifications on status change (Phase 3).
+- Chatbot tools for permit/inspection updates (Phase 3).
+- Two-way packet ↔ permit linkage (Phase 3).
+- Status-change audit log table (Phase 2 if AHJs require it).
+
+**Migration application required:** the user must run `supabase/migrations/20260510_permits_and_inspections.sql` in the Supabase SQL Editor before this PR can ship. `lib/database.types.ts` was patched manually to match.
+
+---
+
 ## 2026-05-09: Permits Beta v1 — Phase 1 implementation plan (PR #30, planning doc only)
 
 Self-contained planning artifact for the next implementation cycle. **No code, no schema, no behavior change** — just a 623-line markdown plan in `docs/plans/permits-implementation.md` written for handoff to a fresh Claude context after `/clear`.
