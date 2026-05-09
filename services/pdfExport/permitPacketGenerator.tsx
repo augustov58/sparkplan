@@ -24,8 +24,10 @@ import {
   ComplianceSummary,
   TableOfContentsPage,
   RevisionLogPage,
+  NEC22087NarrativePage,
   type TocEntry,
   type RevisionEntry,
+  type NEC22087NarrativeData,
 } from './PermitPacketDocuments';
 import { PanelSchedulePages } from './PanelScheduleDocuments';
 import { calculateAggregatedLoad } from '../calculations/upstreamLoadAggregation';
@@ -141,6 +143,14 @@ export interface PermitPacketData {
    * row using `contractorName ?? preparedBy` as the issuer.
    */
   revisions?: RevisionEntry[];
+  /**
+   * Sprint 2A H14: opt-in NEC 220.87 existing-service narrative. When provided,
+   * the generator inserts a structured 3-condition checklist sheet (band 100)
+   * required by Orlando's existing-service permit checklist. When omitted, the
+   * `nec22087Narrative` section toggle auto-disables in the UI — only projects
+   * claiming an NEC 220.87 service upgrade need this page.
+   */
+  nec22087Narrative?: NEC22087NarrativeData;
 }
 
 const downloadBlob = (blob: Blob, fileName: string): void => {
@@ -230,6 +240,7 @@ export const generatePermitPacket = async (data: PermitPacketData): Promise<void
     | 'revisionLog'
     | 'generalNotes'
     | 'loadCalculation'
+    | 'nec22087Narrative'
     | 'voltageDrop'
     | 'shortCircuit'
     | 'arcFlash'
@@ -354,6 +365,30 @@ export const generatePermitPacket = async (data: PermitPacketData): Promise<void
           servicePhase={data.servicePhase}
           projectType={data.projectType}
           multiFamilyContext={data.multiFamilyContext}
+          {...contractor}
+          sheetId={sheetIds[0]}
+        />
+      ),
+    });
+  }
+
+  // Sprint 2A H14: NEC 220.87 narrative is opt-in — only renders when an
+  // explicit narrative data block is provided AND the section toggle is on.
+  // Most projects don't claim an NEC 220.87 existing-service path, so the
+  // page is gated on data presence to avoid emitting an empty / boilerplate
+  // sheet for the majority of packets.
+  if (sections.nec22087Narrative && data.nec22087Narrative) {
+    const narrative = data.nec22087Narrative;
+    builders.push({
+      name: 'NEC22087Narrative',
+      kind: 'nec22087Narrative',
+      band: BAND_CALCULATIONS,
+      pageCount: 1,
+      tocTitles: ['NEC 220.87 — Existing Service Capacity Verification'],
+      render: (sheetIds) => (
+        <NEC22087NarrativePage
+          projectName={data.projectName}
+          data={narrative}
           {...contractor}
           sheetId={sheetIds[0]}
         />

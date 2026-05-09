@@ -29,6 +29,7 @@ export interface PacketSections {
 
   // Engineering content
   loadCalculation: boolean;
+  nec22087Narrative: boolean;       // Sprint 2A H14 — existing-service NEC 220.87 conditions
   voltageDrop: boolean;
   shortCircuit: boolean;
   arcFlash: boolean;
@@ -56,6 +57,7 @@ export const DEFAULT_SECTIONS: PacketSections = {
   generalNotes: true,
   revisionLog: true,
   loadCalculation: true,
+  nec22087Narrative: true,
   voltageDrop: true,
   shortCircuit: true,
   arcFlash: true,

@@ -1730,3 +1730,278 @@ export const ComplianceSummary: React.FC<ComplianceSummaryProps> = ({
   );
 };
 
+// ============================================================================
+// NEC 220.87 EXISTING-SERVICE NARRATIVE (Sprint 2A H14)
+// ============================================================================
+// Required by Orlando's "EV Charging Station Permit Checklist" existing-service
+// path. Renders the structured 3-condition checklist mandated by NEC 220.87 so
+// AHJ intake reviewers can confirm: (1) maximum demand data is available for a
+// 1-year period, (2) max demand x 125% + new load <= ampacity, (3) OCPD per
+// NEC 240.4 + service overload protection per NEC 230.90. Contractor signs off
+// on the conditions; the page itself is the audit trail the AHJ reviews.
+//
+// Driven by an opt-in `nec22087Narrative` data block on PermitPacketData. The
+// section toggle auto-disables in the UI when no data block is provided.
+
+/**
+ * Method by which the existing maximum demand was determined. Mirrors
+ * `ExistingLoadDeterminationMethod` from `types.ts` but kept narrow to the
+ * three NEC 220.87-recognized methods that produce a citation; "manual" is
+ * accepted but flagged in the page as informational only (AHJs typically
+ * require billing data or a load study, not a hand-entered value).
+ */
+export type NEC22087Method = 'utility_bill' | 'load_study' | 'calculated' | 'manual';
+
+export interface NEC22087NarrativeData {
+  /** How the existing maximum demand was determined (drives Condition 1 wording). */
+  method: NEC22087Method;
+  /** Free-text citation: "FPL utility billing, account #12345-67, Sept 2024 - Aug 2025". */
+  dataSourceCitation: string;
+  /** ISO yyyy-mm-dd; start of the 12-month observation window. */
+  dateRangeFrom: string;
+  /** ISO yyyy-mm-dd; end of the 12-month observation window. */
+  dateRangeTo: string;
+  /** Maximum demand observed during the window, in kVA (per NEC 220.87 input). */
+  maxDemandKVA: number;
+  /** Sum of proposed new loads being added (e.g., new EVSE bank), in kVA. */
+  proposedNewLoadKVA: number;
+  /** Existing service ampacity rating (the number stamped on the meter / main). */
+  serviceCapacityAmps: number;
+  /** Service voltage in volts (typically 120/240 single-phase or 208/480 3-phase). */
+  serviceVoltage: number;
+  /** Service phase: 1-phase or 3-phase. */
+  servicePhase: 1 | 3;
+  /** Free-text confirmation of NEC 240.4 OCPD compliance (e.g., "Existing 200A main breaker"). */
+  ocpdNotes?: string;
+  /** Free-text confirmation of NEC 230.90 service overload protection. */
+  serviceOverloadNotes?: string;
+}
+
+interface NEC22087NarrativePageProps {
+  projectName: string;
+  data: NEC22087NarrativeData;
+  contractorName?: string;
+  contractorLicense?: string;
+  sheetId?: string;
+}
+
+const METHOD_LABEL: Record<NEC22087Method, string> = {
+  utility_bill: 'Utility billing data \u2014 12-month peak demand',
+  load_study: 'Recording load study \u2014 30-day at 15-minute intervals',
+  calculated: 'Calculated from existing panel schedule \u2014 NEC 220.82/220.84 demand factors',
+  manual: 'Manual entry (informational only \u2014 AHJ may require source documentation)',
+};
+
+const METHOD_NEC_REF: Record<NEC22087Method, string> = {
+  utility_bill: 'NEC 220.87 Method 1 \u2014 actual maximum demand',
+  load_study: 'NEC 220.87 Method 1 \u2014 actual maximum demand (load study)',
+  calculated: 'NEC 220.87 Method 2 \u2014 calculated using NEC 220.82/220.84',
+  manual: 'NEC 220.87 \u2014 method unspecified',
+};
+
+const serviceCapacityKVA = (amps: number, volts: number, phase: 1 | 3): number => {
+  if (phase === 3) return (amps * volts * 1.732) / 1000;
+  return (amps * volts) / 1000;
+};
+
+export const NEC22087NarrativePage: React.FC<NEC22087NarrativePageProps> = ({
+  projectName,
+  data,
+  contractorName,
+  contractorLicense,
+  sheetId,
+}) => {
+  const capacityKVA = serviceCapacityKVA(
+    data.serviceCapacityAmps,
+    data.serviceVoltage,
+    data.servicePhase,
+  );
+  // NEC 220.87: measured methods (utility bill / load study) use the value
+  // directly; calculated/manual methods apply the 125% safety multiplier.
+  const isMeasured = data.method === 'utility_bill' || data.method === 'load_study';
+  const adjustedExisting = isMeasured ? data.maxDemandKVA : data.maxDemandKVA * 1.25;
+  const totalFutureDemand = adjustedExisting + data.proposedNewLoadKVA;
+  const utilizationPct = capacityKVA > 0 ? (totalFutureDemand / capacityKVA) * 100 : 0;
+  const isCompliant = totalFutureDemand <= capacityKVA;
+
+  return (
+    <Page size="LETTER" style={themeStyles.page}>
+      <BrandBar pageLabel="NEC 220.87 NARRATIVE" sheetId={sheetId} />
+
+      <View style={themeStyles.titleBlock}>
+        <Text style={themeStyles.docTitle}>Existing Service Capacity Verification</Text>
+        <Text style={themeStyles.docSubtitle}>
+          {`${projectName} \u2022 NEC 220.87 \u2014 Determining Existing Loads`}
+        </Text>
+      </View>
+
+      <View style={themeStyles.summaryRow}>
+        <View style={themeStyles.summaryCard}>
+          <Text style={themeStyles.summaryLabel}>Service Capacity</Text>
+          <Text style={themeStyles.summaryValue}>
+            {data.serviceCapacityAmps}
+            <Text style={themeStyles.summaryUnit}>A</Text>
+          </Text>
+          <Text style={themeStyles.summarySub}>
+            {`${data.serviceVoltage}V ${phaseLabel(data.servicePhase)} \u2022 ${capacityKVA.toFixed(1)} kVA`}
+          </Text>
+        </View>
+        <View style={themeStyles.summaryCard}>
+          <Text style={themeStyles.summaryLabel}>Existing Max Demand</Text>
+          <Text style={themeStyles.summaryValue}>
+            {data.maxDemandKVA.toFixed(1)}
+            <Text style={themeStyles.summaryUnit}>kVA</Text>
+          </Text>
+          <Text style={themeStyles.summarySub}>
+            {isMeasured ? 'measured (no 125% mult.)' : 'calculated x 1.25'}
+          </Text>
+        </View>
+        <View style={themeStyles.summaryCard}>
+          <Text style={themeStyles.summaryLabel}>Proposed New Load</Text>
+          <Text style={themeStyles.summaryValue}>
+            {data.proposedNewLoadKVA.toFixed(1)}
+            <Text style={themeStyles.summaryUnit}>kVA</Text>
+          </Text>
+          <Text style={themeStyles.summarySub}>added to existing</Text>
+        </View>
+        <View style={isCompliant ? themeStyles.summaryCardHighlight : themeStyles.summaryCard}>
+          <Text style={themeStyles.summaryLabel}>Total Future Demand</Text>
+          <Text style={themeStyles.summaryValue}>
+            {totalFutureDemand.toFixed(1)}
+            <Text style={themeStyles.summaryUnit}>kVA</Text>
+          </Text>
+          <Text style={themeStyles.summarySub}>{`${utilizationPct.toFixed(1)}% utilization`}</Text>
+        </View>
+      </View>
+
+      <View wrap={false}>
+        <Text style={themeStyles.sectionTitle}>CONDITIONS PER NEC 220.87</Text>
+
+        <View style={{ flexDirection: 'row', marginTop: 4, marginBottom: 6 }}>
+          <Text style={{ fontSize: 9, fontFamily: 'Helvetica-Bold', width: 18, color: '#1f2937' }}>1.</Text>
+          <View style={{ flex: 1 }}>
+            <Text
+              style={{
+                fontSize: 9,
+                fontFamily: 'Helvetica-Bold',
+                color: '#111827',
+                marginBottom: 1,
+              }}
+            >
+              Maximum demand data is available for a 1-year period (NEC 220.87(1))
+            </Text>
+            <Text style={{ fontSize: 8.5, color: '#374151', lineHeight: 1.4 }}>
+              {`Method: ${METHOD_LABEL[data.method]}. ${METHOD_NEC_REF[data.method]}.`}
+            </Text>
+            <Text
+              style={{ fontSize: 8.5, color: '#374151', lineHeight: 1.4, marginTop: 1 }}
+            >
+              {`Observation window: ${data.dateRangeFrom} to ${data.dateRangeTo}.`}
+            </Text>
+            <Text
+              style={{
+                fontSize: 8.5,
+                color: '#1e3a8a',
+                lineHeight: 1.4,
+                marginTop: 1,
+                fontFamily: 'Helvetica-Bold',
+              }}
+            >
+              {`Source: ${data.dataSourceCitation || '\u2014 NOT PROVIDED \u2014'}`}
+            </Text>
+          </View>
+        </View>
+
+        <View style={{ flexDirection: 'row', marginBottom: 6 }}>
+          <Text style={{ fontSize: 9, fontFamily: 'Helvetica-Bold', width: 18, color: '#1f2937' }}>2.</Text>
+          <View style={{ flex: 1 }}>
+            <Text
+              style={{
+                fontSize: 9,
+                fontFamily: 'Helvetica-Bold',
+                color: '#111827',
+                marginBottom: 1,
+              }}
+            >
+              Maximum demand at 125% plus the new load does not exceed the ampacity (NEC 220.87(2))
+            </Text>
+            <Text style={{ fontSize: 8.5, color: '#374151', lineHeight: 1.4 }}>
+              {isMeasured
+                ? `${data.maxDemandKVA.toFixed(2)} kVA (measured \u2014 no 125% multiplier per NEC 220.87) + ${data.proposedNewLoadKVA.toFixed(2)} kVA (new) = ${totalFutureDemand.toFixed(2)} kVA`
+                : `${data.maxDemandKVA.toFixed(2)} kVA x 1.25 = ${adjustedExisting.toFixed(2)} kVA (adjusted) + ${data.proposedNewLoadKVA.toFixed(2)} kVA (new) = ${totalFutureDemand.toFixed(2)} kVA`}
+            </Text>
+            <Text style={{ fontSize: 8.5, color: '#374151', lineHeight: 1.4, marginTop: 1 }}>
+              {`Service ampacity: ${data.serviceCapacityAmps}A x ${data.serviceVoltage}V${data.servicePhase === 3 ? ' x sqrt(3)' : ''} = ${capacityKVA.toFixed(2)} kVA`}
+            </Text>
+            <Text
+              style={{
+                fontSize: 8.5,
+                color: isCompliant ? '#15803d' : '#b91c1c',
+                lineHeight: 1.4,
+                marginTop: 1,
+                fontFamily: 'Helvetica-Bold',
+              }}
+            >
+              {isCompliant
+                ? `[OK] ${totalFutureDemand.toFixed(2)} kVA <= ${capacityKVA.toFixed(2)} kVA  (${utilizationPct.toFixed(1)}% utilization)`
+                : `[FAIL] ${totalFutureDemand.toFixed(2)} kVA EXCEEDS ${capacityKVA.toFixed(2)} kVA  (${utilizationPct.toFixed(1)}% utilization \u2014 SERVICE UPGRADE REQUIRED)`}
+            </Text>
+          </View>
+        </View>
+
+        <View style={{ flexDirection: 'row', marginBottom: 4 }}>
+          <Text style={{ fontSize: 9, fontFamily: 'Helvetica-Bold', width: 18, color: '#1f2937' }}>3.</Text>
+          <View style={{ flex: 1 }}>
+            <Text
+              style={{
+                fontSize: 9,
+                fontFamily: 'Helvetica-Bold',
+                color: '#111827',
+                marginBottom: 1,
+              }}
+            >
+              Feeder OCPD per NEC 240.4 and service overload per NEC 230.90 (NEC 220.87(3))
+            </Text>
+            <Text style={{ fontSize: 8.5, color: '#374151', lineHeight: 1.4 }}>
+              {`OCPD (NEC 240.4): ${data.ocpdNotes || 'Existing service main breaker confirmed; sized per NEC 240.4(B) for the conductors it protects.'}`}
+            </Text>
+            <Text style={{ fontSize: 8.5, color: '#374151', lineHeight: 1.4, marginTop: 1 }}>
+              {`Overload (NEC 230.90): ${data.serviceOverloadNotes || 'Existing service overload protection in place; rating not exceeded by the new load.'}`}
+            </Text>
+          </View>
+        </View>
+      </View>
+
+      <View
+        style={isCompliant ? themeStyles.noteBox : themeStyles.warningBox}
+        wrap={false}
+      >
+        <Text
+          style={{
+            fontSize: 9,
+            fontFamily: 'Helvetica-Bold',
+            marginBottom: 2,
+            color: isCompliant ? '#1e3a8a' : '#78350f',
+          }}
+        >
+          {isCompliant
+            ? 'EXISTING SERVICE ADEQUATE PER NEC 220.87'
+            : 'EXISTING SERVICE INADEQUATE \u2014 UPGRADE REQUIRED'}
+        </Text>
+        <Text style={isCompliant ? themeStyles.noteText : themeStyles.warningText}>
+          {isCompliant
+            ? `Per NEC 220.87, the existing ${data.serviceCapacityAmps}A service has sufficient capacity for the proposed new load. Contractor's signature on this sheet attests that the three conditions above are verified.`
+            : `The proposed new load combined with the existing maximum demand exceeds the ${data.serviceCapacityAmps}A service ampacity. NEC 220.87 cannot be claimed; a service upgrade or load management (NEC 750 / NEC 625.42) is required.`}
+        </Text>
+      </View>
+
+      <BrandFooter
+        projectName={projectName}
+        contractorName={contractorName}
+        contractorLicense={contractorLicense}
+        sheetId={sheetId}
+      />
+    </Page>
+  );
+};
+
