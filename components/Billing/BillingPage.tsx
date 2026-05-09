@@ -20,6 +20,7 @@ import { BillingOverviewTab } from './BillingOverviewTab';
 import { TimeEntriesTab } from './TimeEntriesTab';
 import { MaterialEntriesTab } from './MaterialEntriesTab';
 import { BillingSettingsTab } from './BillingSettingsTab';
+import { InvoicesTab } from './InvoicesTab';
 
 type TabKey = 'overview' | 'time' | 'materials' | 'invoices' | 'settings';
 
@@ -97,29 +98,9 @@ export const BillingPage: React.FC<BillingPageProps> = ({ projectId }) => {
         {activeTab === 'overview' && <BillingOverviewTab projectId={projectId} />}
         {activeTab === 'time' && <TimeEntriesTab projectId={projectId} />}
         {activeTab === 'materials' && <MaterialEntriesTab projectId={projectId} />}
-        {activeTab === 'invoices' && <InvoicesComingSoon />}
+        {activeTab === 'invoices' && <InvoicesTab projectId={projectId} />}
         {activeTab === 'settings' && <BillingSettingsTab projectId={projectId} />}
       </div>
     </div>
   );
 };
-
-/**
- * Phase-1a placeholder for the Invoices tab. Replaced by `InvoicesTab` in
- * the v1b branch which adds invoice generation, PDF export, and payment
- * tracking. Showing it here gives users a preview of what's next without
- * leaving them confused about a missing tab on a beta product.
- */
-const InvoicesComingSoon: React.FC = () => (
-  <div className="bg-white border border-[#e8e6e3] rounded-lg p-10 text-center">
-    <FileText className="w-10 h-10 text-[#aaa] mx-auto mb-3" />
-    <h3 className="text-base font-semibold text-[#1a1a1a] mb-1">
-      Invoicing arrives in Phase 1b
-    </h3>
-    <p className="text-sm text-[#666] max-w-md mx-auto">
-      Phase 1a focuses on the capture layer — logging time and materials. Phase 1b adds invoice
-      generation, payment tracking, and PDF export. In the meantime, all your unbilled time and
-      materials are tracked on the Overview tab.
-    </p>
-  </div>
-);
