@@ -79,7 +79,9 @@ Other project tables:
 - feeders (1:many with projects, source_panel → destination_panel)
 - grounding_details (1:many with projects)
 - inspection_items (1:many with projects)
-- issues (1:many with projects)
+- issues (1:many with projects; nullable permit_inspection_id FK added Phase 3.6)
+- permits (1:many with projects; added Phase 3.6, May 2026)
+- permit_inspections (1:many with permits; added Phase 3.6, May 2026)
 
 Support tables (added Phase 3.2, Apr 2026):
 ┌──────────────────┐         ┌──────────────────┐
@@ -505,9 +507,104 @@ demand_factor NUMERIC DEFAULT 1.0
 **`feeders`** - Feeder conductors between panels/transformers
 **`grounding_details`** - Grounding electrode system data
 **`inspection_items`** - Pre-inspection checklist items
-**`issues`** - Code compliance issues tracking
+**`issues`** - Code compliance issues tracking. **(Phase 3.6)** Adds nullable `permit_inspection_id UUID REFERENCES permit_inspections(id) ON DELETE SET NULL` so a failed inspection's corrections can be tracked as `issues` rows linked back to the inspection.
 
 *(Similar structure: UUID, project_id FK, domain-specific fields)*
+
+---
+
+#### `permits` / `permit_inspections` — Permit Lifecycle (Added Phase 3.6, May 2026)
+
+**Purpose**: Backs the new tabbed Permits page (Overview / Permits / Inspections / Issues). Models the contractor-side permit lifecycle from draft → submitted → AHJ review → approved → expired/closed plus 1:N inspections per permit. Ships with `feat/permits-beta-v1`.
+
+**Why two tables**: One project commonly has multiple permits (electrical, EVSE, low-voltage in a multi-family build). Each permit has multiple inspections (rough-in, underground, service, final, plus reinspections). Plan reviewers and inspectors at the same AHJ are different people, so AHJ contact is stored per-permit, not per-AHJ. See `docs/plans/permits-implementation.md` for the domain model.
+
+**Schema**:
+```sql
+CREATE TABLE permits (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  project_id UUID NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+  user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+
+  permit_number TEXT,                                    -- nullable until AHJ assigns one
+  permit_type TEXT NOT NULL DEFAULT 'electrical'
+    CHECK (permit_type IN ('electrical','evse','low_voltage','service_upgrade','other')),
+  description TEXT,
+
+  ahj_jurisdiction TEXT NOT NULL,
+  ahj_contact_name TEXT,
+  ahj_contact_email TEXT
+    CHECK (ahj_contact_email IS NULL OR ahj_contact_email ~* '^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$'),
+  ahj_contact_phone TEXT,
+
+  status TEXT NOT NULL DEFAULT 'draft'
+    CHECK (status IN ('draft','submitted','in_review','returned','approved','expired','closed','cancelled')),
+  submitted_at TIMESTAMPTZ,
+  approved_at TIMESTAMPTZ,
+  expires_at TIMESTAMPTZ,
+  closed_at TIMESTAMPTZ,
+
+  fee_amount NUMERIC(10,2),
+  fee_paid_at TIMESTAMPTZ,
+  fee_receipt_url TEXT,
+  plan_review_id TEXT,
+  conditions JSONB NOT NULL DEFAULT '[]'::jsonb,
+  notes TEXT,
+  packet_url TEXT,
+  packet_generated_at TIMESTAMPTZ,
+
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE TABLE permit_inspections (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  permit_id UUID NOT NULL REFERENCES permits(id) ON DELETE CASCADE,
+  project_id UUID NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+  user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+
+  inspection_type TEXT NOT NULL
+    CHECK (inspection_type IN ('rough_in','underground','service','final','temporary','reinspection','other')),
+  sequence INTEGER NOT NULL DEFAULT 1,
+  description TEXT,
+
+  scheduled_date DATE,
+  scheduled_window TEXT,
+  inspector_name TEXT,
+
+  status TEXT NOT NULL DEFAULT 'scheduled'
+    CHECK (status IN ('scheduled','passed','failed','conditional_pass','cancelled','no_show')),
+  performed_at TIMESTAMPTZ,
+  result_notes TEXT,
+
+  parent_inspection_id UUID REFERENCES permit_inspections(id) ON DELETE SET NULL,
+
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+```
+
+**Indexes**:
+- `idx_permits_project` ON `permits(project_id)`
+- `idx_permits_status` ON `permits(status, expires_at) WHERE status NOT IN ('closed','cancelled')` — partial index keeps lookups for active permits hot.
+- `idx_permits_user` ON `permits(user_id)`
+- `idx_permit_inspections_permit` ON `permit_inspections(permit_id)`
+- `idx_permit_inspections_scheduled` ON `permit_inspections(scheduled_date) WHERE status = 'scheduled'` — partial index for the upcoming-inspections roll-up on the Overview tab.
+- `idx_permit_inspections_project` ON `permit_inspections(project_id)`
+
+**RLS**: standard `auth.uid() = user_id` SELECT/INSERT/UPDATE/DELETE policies on both tables. Same pattern as panels/circuits/issues.
+
+**Triggers**: both tables have `BEFORE UPDATE` triggers calling the existing `update_updated_at_column()` function (defined in earlier migrations).
+
+**Design Decisions**:
+
+- **Permit number is nullable.** Contractors often track permits in SparkPlan before the AHJ assigns a number, e.g. for fee receipts and submission status.
+- **AHJ contact stored per-permit, not per-AHJ.** Plan reviewers and inspectors at the same AHJ are different people; normalizing prematurely would force the contractor to maintain a contact directory they don't actually have.
+- **`conditions` is JSONB array** of `{text, source, acknowledged}` records — not its own table. Conditions are write-once-then-checked-off; a relational table would be overkill.
+- **`issues.permit_inspection_id` is nullable.** Phase 3.6 ships the column so the data shape is in place; the UI wiring (linking corrections to a parent inspection) is deferred to Phase 2 of the Permits roadmap.
+- **No status history table.** Phase 1 just enforces valid forward transitions via the application-layer state machine (`services/permits/permitStatusTransitions.ts`). If AHJs require an immutable audit log, a `permit_status_history` append-only table is Phase 2.
+
+**Migration**: `supabase/migrations/20260510_permits_and_inspections.sql`
 
 ---
 
