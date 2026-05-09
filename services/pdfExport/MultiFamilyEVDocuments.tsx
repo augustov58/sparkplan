@@ -249,6 +249,9 @@ interface MultiFamilyEVDocumentProps {
   buildingName?: string;
   preparedBy?: string;
   preparedFor?: string;
+  // Sprint 2A C8: per-sheet contractor signature block
+  contractorName?: string;
+  contractorLicense?: string;
 }
 
 /**
@@ -260,6 +263,8 @@ export const MultiFamilyEVPages: React.FC<MultiFamilyEVDocumentProps> = ({
   buildingName,
   preparedBy,
   preparedFor,
+  contractorName,
+  contractorLicense,
 }) => {
   const currentDate = new Date().toLocaleDateString('en-US', {
     year: 'numeric',
@@ -359,7 +364,11 @@ export const MultiFamilyEVPages: React.FC<MultiFamilyEVDocumentProps> = ({
           </View>
         </View>
 
-        <BrandFooter projectName={buildingName || 'Building Analysis'} />
+        <BrandFooter
+          projectName={buildingName || 'Building Analysis'}
+          contractorName={contractorName}
+          contractorLicense={contractorLicense}
+        />
       </Page>
 
       {/* Page 2: Scenarios & Cost Comparison */}
@@ -536,7 +545,11 @@ export const MultiFamilyEVPages: React.FC<MultiFamilyEVDocumentProps> = ({
           </View>
         )}
 
-        <BrandFooter projectName={buildingName || 'Building Analysis'} />
+        <BrandFooter
+          projectName={buildingName || 'Building Analysis'}
+          contractorName={contractorName}
+          contractorLicense={contractorLicense}
+        />
       </Page>
 
       {/* Page 3: Compliance & Load Breakdown */}
@@ -690,7 +703,11 @@ export const MultiFamilyEVPages: React.FC<MultiFamilyEVDocumentProps> = ({
           </Text>
         </View>
 
-        <BrandFooter projectName={buildingName || 'Building Analysis'} />
+        <BrandFooter
+          projectName={buildingName || 'Building Analysis'}
+          contractorName={contractorName}
+          contractorLicense={contractorLicense}
+        />
       </Page>
     </>
   );

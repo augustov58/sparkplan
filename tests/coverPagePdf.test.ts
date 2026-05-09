@@ -47,4 +47,26 @@ describe('CoverPage (themed) renders in Node', () => {
     const blob = await pdf(doc).toBlob();
     expect(blob.size).toBeGreaterThan(0);
   });
+
+  it('renders with NEC 2023 edition + custom code references (Sprint 2A C7/H4)', async () => {
+    const doc = React.createElement(
+      Document,
+      null,
+      React.createElement(CoverPage, {
+        projectName: 'Edition Test',
+        projectAddress: '789 Code Way',
+        projectType: 'Commercial',
+        serviceVoltage: 480,
+        servicePhase: 3,
+        necEdition: '2023',
+        codeReferences: [
+          'NFPA-70 (NEC) 2023',
+          'IBC 2021',
+          'Local AHJ Amendments',
+        ],
+      })
+    );
+    const blob = await pdf(doc).toBlob();
+    expect(blob.size).toBeGreaterThan(0);
+  });
 });

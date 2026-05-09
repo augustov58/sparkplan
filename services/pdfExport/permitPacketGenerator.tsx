@@ -17,10 +17,11 @@ type MeterStack = Database['public']['Tables']['meter_stacks']['Row'];
 type MeterDB = Database['public']['Tables']['meters']['Row'];
 import {
   CoverPage,
+  GeneralNotesPage,
   EquipmentSchedule,
   RiserDiagram,
   LoadCalculationSummary,
-  ComplianceSummary
+  ComplianceSummary,
 } from './PermitPacketDocuments';
 import { PanelSchedulePages } from './PanelScheduleDocuments';
 import { calculateAggregatedLoad } from '../calculations/upstreamLoadAggregation';
@@ -84,6 +85,32 @@ export interface PermitPacketData {
    * the standard NEC 220 cascade.
    */
   multiFamilyContext?: MultiFamilyContext;
+  /**
+   * Sprint 2A C7: NEC edition stamped on cover sheet + compliance summary.
+   * Defaults to '2020' for the FL pilot AHJs (FBC 8th ed adopts NFPA-70 2020).
+   * NEC 220.84 demand-factor table values are unchanged between 2020 and 2023.
+   */
+  necEdition?: '2020' | '2023';
+  /**
+   * Sprint 2A H4: applicable model codes shown in the cover-sheet
+   * "APPLICABLE CODES" section. Defaults to FL pilot stack
+   * (NFPA-70 2020 + FBC 8th ed 2023). Override per AHJ when other codes apply.
+   */
+  codeReferences?: string[];
+  /**
+   * Sprint 2A C8: contractor name printed in the per-sheet signature block.
+   * Falls back to `preparedBy` when not provided so existing callers keep
+   * working (preparedBy is often the same person on residential / single-PE
+   * jobs). Distinct from preparedBy in cases where the design preparer is
+   * different from the signing contractor (PE-stamped commercial work).
+   */
+  contractorName?: string;
+  /**
+   * Sprint 2A H12 + H13: numbered general-notes list shown on the dedicated
+   * General Notes page. Defaults to the FL pilot stack (NEC 2020 + 3/3/5
+   * voltage drop). Sprint 2C will override this from per-AHJ manifests.
+   */
+  generalNotes?: string[];
 }
 
 const downloadBlob = (blob: Blob, fileName: string): void => {
@@ -147,6 +174,15 @@ export const generatePermitPacket = async (data: PermitPacketData): Promise<void
     return a.name.localeCompare(b.name);
   });
 
+  // Sprint 2A C8: every electrical sheet renders a per-sheet contractor
+  // signature block above its footer. Fall back to `preparedBy` when an
+  // explicit `contractorName` isn't supplied — most residential / single-PE
+  // packets have one person filling both roles.
+  const contractor = {
+    contractorName: data.contractorName ?? data.preparedBy,
+    contractorLicense: data.contractorLicense,
+  };
+
   // Build labeled Page list. Each entry is ONE top-level <Page> in the Document.
   // Keep names unique and descriptive so bisect output is actionable.
   const pages: Array<{ name: string; element: React.ReactElement }> = [];
@@ -167,6 +203,19 @@ export const generatePermitPacket = async (data: PermitPacketData): Promise<void
         serviceType={data.serviceType}
         meterLocation={data.meterLocation}
         serviceConductorRouting={data.serviceConductorRouting}
+        necEdition={data.necEdition}
+        codeReferences={data.codeReferences}
+      />
+    ),
+  });
+
+  pages.push({
+    name: 'GeneralNotes',
+    element: (
+      <GeneralNotesPage
+        projectName={data.projectName}
+        generalNotes={data.generalNotes}
+        {...contractor}
       />
     ),
   });
@@ -179,6 +228,7 @@ export const generatePermitPacket = async (data: PermitPacketData): Promise<void
         transformers={data.transformers}
         feeders={data.feeders}
         projectName={data.projectName}
+        {...contractor}
       />
     ),
   });
@@ -195,6 +245,7 @@ export const generatePermitPacket = async (data: PermitPacketData): Promise<void
         projectName={data.projectName}
         serviceVoltage={data.serviceVoltage}
         servicePhase={data.servicePhase}
+        {...contractor}
       />
     ),
   });
@@ -211,6 +262,7 @@ export const generatePermitPacket = async (data: PermitPacketData): Promise<void
         servicePhase={data.servicePhase}
         projectType={data.projectType}
         multiFamilyContext={data.multiFamilyContext}
+        {...contractor}
       />
     ),
   });
@@ -224,6 +276,8 @@ export const generatePermitPacket = async (data: PermitPacketData): Promise<void
         feeders={data.feeders}
         projectName={data.projectName}
         hasGrounding={data.hasGrounding}
+        necEdition={data.necEdition}
+        {...contractor}
       />
     ),
   });
@@ -237,6 +291,7 @@ export const generatePermitPacket = async (data: PermitPacketData): Promise<void
         panels={data.panels}
         transformers={data.transformers}
         includeNECReferences={true}
+        {...contractor}
       />
     ),
   });
@@ -253,6 +308,7 @@ export const generatePermitPacket = async (data: PermitPacketData): Promise<void
           transformers={data.transformers}
           circuits={data.circuits}
           includeNECReferences={true}
+          {...contractor}
         />
       ),
     });
@@ -268,6 +324,7 @@ export const generatePermitPacket = async (data: PermitPacketData): Promise<void
             projectName={data.projectName}
             projectAddress={data.projectAddress}
             panelName={calc.calculation_type === 'panel' ? calc.panel_name : undefined}
+            {...contractor}
           />
         ),
       });
@@ -283,6 +340,7 @@ export const generatePermitPacket = async (data: PermitPacketData): Promise<void
           projectAddress={data.projectAddress}
           equipmentName={data.arcFlashData.equipmentName}
           arcFlashData={data.arcFlashData}
+          {...contractor}
         />
       ),
     });
@@ -298,6 +356,7 @@ export const generatePermitPacket = async (data: PermitPacketData): Promise<void
           grounding={data.groundingSystem}
           serviceAmperage={sortedPanels.find(p => p.is_main)?.bus_rating || data.serviceVoltage}
           conductorMaterial="Cu"
+          {...contractor}
         />
       ),
     });
@@ -313,6 +372,7 @@ export const generatePermitPacket = async (data: PermitPacketData): Promise<void
           meterStacks={data.meterStacks}
           meters={data.meters}
           panels={data.panels}
+          {...contractor}
         />
       ),
     });
@@ -325,6 +385,7 @@ export const generatePermitPacket = async (data: PermitPacketData): Promise<void
         <MultiFamilyEVPages
           result={data.multiFamilyEVAnalysis.result}
           buildingName={data.multiFamilyEVAnalysis.buildingName || data.projectName}
+          {...contractor}
         />
       ),
     });
@@ -337,6 +398,7 @@ export const generatePermitPacket = async (data: PermitPacketData): Promise<void
         <JurisdictionRequirementsPages
           jurisdiction={data.jurisdiction}
           projectName={data.projectName}
+          {...contractor}
         />
       ),
     });
@@ -449,6 +511,7 @@ export const generatePermitPacket = async (data: PermitPacketData): Promise<void
           circuits={allCircuits}
           projectName={data.projectName}
           projectAddress={data.projectAddress}
+          {...contractor}
         />
       ),
     });
@@ -527,6 +590,11 @@ export const generateLightweightPermitPacket = async (data: PermitPacketData): P
   try {
     console.log('Generating lightweight permit packet for project:', data.projectName);
 
+    const contractor = {
+      contractorName: data.contractorName ?? data.preparedBy,
+      contractorLicense: data.contractorLicense,
+    };
+
     const LightweightPacketDocument = () => (
       <Document>
         <CoverPage
@@ -537,12 +605,15 @@ export const generateLightweightPermitPacket = async (data: PermitPacketData): P
           servicePhase={data.servicePhase}
           preparedBy={data.preparedBy}
           permitNumber={data.permitNumber}
+          necEdition={data.necEdition}
+          codeReferences={data.codeReferences}
         />
         <EquipmentSchedule
           panels={data.panels}
           transformers={data.transformers}
           feeders={data.feeders}
           projectName={data.projectName}
+          {...contractor}
         />
         <LoadCalculationSummary
           panels={data.panels}
@@ -553,6 +624,7 @@ export const generateLightweightPermitPacket = async (data: PermitPacketData): P
           servicePhase={data.servicePhase}
           projectType={data.projectType}
           multiFamilyContext={data.multiFamilyContext}
+          {...contractor}
         />
         <ComplianceSummary
           panels={data.panels}
@@ -560,6 +632,8 @@ export const generateLightweightPermitPacket = async (data: PermitPacketData): P
           feeders={data.feeders}
           projectName={data.projectName}
           hasGrounding={data.hasGrounding}
+          necEdition={data.necEdition}
+          {...contractor}
         />
       </Document>
     );

@@ -173,7 +173,18 @@ interface CoverPageProps {
   serviceType?: 'overhead' | 'underground';
   meterLocation?: string;
   serviceConductorRouting?: string;
+  // Sprint 2A C7 / H4: applicable codes
+  necEdition?: '2020' | '2023';
+  codeReferences?: string[];
 }
+
+// FL pilot AHJs adopt NFPA-70 2020 via FBC 8th ed. NEC 220.84 demand-factor
+// table values match across both editions (see services/calculations/multiFamilyEV.ts:25).
+const DEFAULT_NEC_EDITION: '2020' | '2023' = '2020';
+const DEFAULT_CODE_REFERENCES = [
+  'NFPA-70 (NEC) 2020',
+  'Florida Building Code 8th Edition (2023)',
+];
 
 export const CoverPage: React.FC<CoverPageProps> = ({
   projectName,
@@ -189,6 +200,8 @@ export const CoverPage: React.FC<CoverPageProps> = ({
   serviceType,
   meterLocation,
   serviceConductorRouting,
+  necEdition = DEFAULT_NEC_EDITION,
+  codeReferences = DEFAULT_CODE_REFERENCES,
 }) => (
   <Page size="LETTER" style={themeStyles.page}>
     <BrandBar pageLabel="PERMIT APPLICATION" />
@@ -196,7 +209,7 @@ export const CoverPage: React.FC<CoverPageProps> = ({
     <View style={themeStyles.titleBlock}>
       <Text style={themeStyles.docTitle}>Electrical Permit Application</Text>
       <Text style={themeStyles.docSubtitle}>
-        NEC 2023 Compliant Design Package
+        {`NEC ${necEdition} Compliant Design Package`}
       </Text>
     </View>
 
@@ -250,8 +263,18 @@ export const CoverPage: React.FC<CoverPageProps> = ({
       </View>
       <View style={themeStyles.projectCell}>
         <Text style={themeStyles.projectLabel}>NEC Edition</Text>
-        <Text style={themeStyles.projectValue}>NEC 2023</Text>
+        <Text style={themeStyles.projectValue}>{`NEC ${necEdition}`}</Text>
       </View>
+    </View>
+
+    <Text style={themeStyles.sectionTitle}>APPLICABLE CODES</Text>
+    <View style={themeStyles.projectGrid}>
+      {codeReferences.map((code, idx) => (
+        <View key={idx} style={themeStyles.projectCellWide}>
+          <Text style={themeStyles.projectLabel}>{`Code ${idx + 1}`}</Text>
+          <Text style={themeStyles.projectValue}>{code}</Text>
+        </View>
+      ))}
     </View>
 
     {scopeOfWork && (
@@ -289,7 +312,103 @@ export const CoverPage: React.FC<CoverPageProps> = ({
       </>
     )}
 
-    <BrandFooter projectName={projectName} />
+    <BrandFooter
+      projectName={projectName}
+      contractorName={preparedBy}
+      contractorLicense={contractorLicense}
+    />
+  </Page>
+);
+
+// ============================================================================
+// GENERAL NOTES (Sprint 2A H12 + H13)
+// ============================================================================
+// Numbered general-notes page driven from an optional `generalNotes` array on
+// the packet data. Defaults to the FL pilot stack (NEC 2020 compliance + the
+// 3% / 3% / 5% voltage-drop convention required by Orlando + most FL AHJs).
+// Sprint 2C will replace the defaults with per-AHJ manifest content.
+
+const DEFAULT_GENERAL_NOTES: string[] = [
+  'All electrical work shall comply with NFPA-70 (NEC) 2020, Florida Building Code 8th Edition (2023), local AHJ amendments, and all applicable utility provider requirements.',
+  'Voltage drop shall not exceed 3% on branch circuits and 3% on feeders, with combined drop not exceeding 5% per NEC 210.19(A) Informational Note 4 and NEC 215.2(A)(1) Informational Note 2.',
+  'All conductor sizing, ampacity, and protection shall be per NEC Article 310, Article 215 (feeders), Article 240 (overcurrent protection), and Chapter 9 Tables 8 and 9 (impedance method).',
+  'Grounding electrode conductor and equipment grounding conductor sizing per NEC Article 250, Tables 250.66 and 250.122. Bonding per NEC 250.92 / 250.94 as applicable.',
+  'Equipment shall be listed and labeled by an OSHA-recognized NRTL (UL or equivalent). Field-installed listed-by-NRTL equipment shall comply with manufacturer instructions per NEC 110.3(B).',
+  'All EVSE installations shall comply with NEC Article 625, including 625.42 load management for energy-management-system-controlled installations and 625.43 disconnect / labeling requirements.',
+  'Working space and dedicated electrical space shall be maintained per NEC 110.26 and 110.27. Access shall not be obstructed by storage, equipment, or finishes.',
+  'Where existing service is reused, available short-circuit current shall be verified at every panel and overcurrent protective device per NEC 110.10. All new equipment AIC ratings shall meet or exceed available fault current.',
+];
+
+interface GeneralNotesPageProps {
+  projectName: string;
+  generalNotes?: string[];
+  contractorName?: string;
+  contractorLicense?: string;
+}
+
+export const GeneralNotesPage: React.FC<GeneralNotesPageProps> = ({
+  projectName,
+  generalNotes = DEFAULT_GENERAL_NOTES,
+  contractorName,
+  contractorLicense,
+}) => (
+  <Page size="LETTER" style={themeStyles.page}>
+    <BrandBar pageLabel="GENERAL NOTES" />
+
+    <View style={themeStyles.titleBlock}>
+      <Text style={themeStyles.docTitle}>General Notes</Text>
+      <Text style={themeStyles.docSubtitle}>{projectName}</Text>
+    </View>
+
+    <Text style={themeStyles.sectionTitle}>NOTES APPLICABLE TO ALL ELECTRICAL SHEETS</Text>
+
+    <View style={{ marginTop: 4 }}>
+      {generalNotes.map((note, idx) => (
+        <View
+          key={idx}
+          style={{ flexDirection: 'row', marginBottom: 5 }}
+          wrap={false}
+        >
+          <Text
+            style={{
+              fontSize: 8.5,
+              fontFamily: 'Helvetica-Bold',
+              width: 18,
+              color: '#1f2937',
+            }}
+          >
+            {idx + 1}.
+          </Text>
+          <Text style={{ fontSize: 8.5, lineHeight: 1.4, flex: 1, color: '#111827' }}>
+            {note}
+          </Text>
+        </View>
+      ))}
+    </View>
+
+    <View style={[themeStyles.noteBox, { marginTop: 10 }]}>
+      <Text
+        style={{
+          fontSize: 9,
+          fontFamily: 'Helvetica-Bold',
+          marginBottom: 3,
+          color: '#1e3a8a',
+        }}
+      >
+        AHJ-SPECIFIC NOTES
+      </Text>
+      <Text style={themeStyles.noteText}>
+        Additional jurisdiction-specific notes from the AHJ manifest will appear
+        here when this packet is bound to a specific AHJ. Contact the local
+        building department for current submittal requirements.
+      </Text>
+    </View>
+
+    <BrandFooter
+      projectName={projectName}
+      contractorName={contractorName}
+      contractorLicense={contractorLicense}
+    />
   </Page>
 );
 
@@ -302,6 +421,9 @@ interface EquipmentScheduleProps {
   transformers: Transformer[];
   feeders: Feeder[];
   projectName: string;
+  // Sprint 2A C8: per-sheet contractor signature block
+  contractorName?: string;
+  contractorLicense?: string;
 }
 
 export const EquipmentSchedule: React.FC<EquipmentScheduleProps> = ({
@@ -309,6 +431,8 @@ export const EquipmentSchedule: React.FC<EquipmentScheduleProps> = ({
   transformers,
   feeders,
   projectName,
+  contractorName,
+  contractorLicense,
 }) => {
   const mainPanel = panels.find(p => p.is_main);
   const subPanels = panels.filter(p => !p.is_main);
@@ -465,7 +589,11 @@ export const EquipmentSchedule: React.FC<EquipmentScheduleProps> = ({
         </>
       )}
 
-      <BrandFooter projectName={projectName} />
+      <BrandFooter
+        projectName={projectName}
+        contractorName={contractorName}
+        contractorLicense={contractorLicense}
+      />
     </Page>
   );
 };
@@ -810,6 +938,9 @@ interface RiserDiagramProps {
   projectName: string;
   serviceVoltage: number;
   servicePhase: number;
+  // Sprint 2A C8: per-sheet contractor signature block
+  contractorName?: string;
+  contractorLicense?: string;
 }
 
 export const RiserDiagram: React.FC<RiserDiagramProps> = ({
@@ -821,6 +952,8 @@ export const RiserDiagram: React.FC<RiserDiagramProps> = ({
   projectName,
   serviceVoltage,
   servicePhase,
+  contractorName,
+  contractorLicense,
 }) => {
   const tree = buildRiserTree(
     panels,
@@ -927,7 +1060,11 @@ export const RiserDiagram: React.FC<RiserDiagramProps> = ({
         Feeder labels show conductor size + design load in kVA
       </Text>
 
-      <BrandFooter projectName={projectName} />
+      <BrandFooter
+        projectName={projectName}
+        contractorName={contractorName}
+        contractorLicense={contractorLicense}
+      />
     </Page>
   );
 };
@@ -955,6 +1092,9 @@ interface LoadSummaryProps {
    * that is not a multi-family dwelling with 3+ units.
    */
   multiFamilyContext?: MultiFamilyContext;
+  // Sprint 2A C8: per-sheet contractor signature block
+  contractorName?: string;
+  contractorLicense?: string;
 }
 
 export const LoadCalculationSummary: React.FC<LoadSummaryProps> = ({
@@ -966,6 +1106,8 @@ export const LoadCalculationSummary: React.FC<LoadSummaryProps> = ({
   servicePhase,
   projectType,
   multiFamilyContext,
+  contractorName,
+  contractorLicense,
 }) => {
   const mdp = panels.find(p => p.is_main);
   const occupancy = mapProjectTypeToOccupancy(projectType);
@@ -1190,7 +1332,11 @@ export const LoadCalculationSummary: React.FC<LoadSummaryProps> = ({
         </View>
       )}
 
-      <BrandFooter projectName={projectName} />
+      <BrandFooter
+        projectName={projectName}
+        contractorName={contractorName}
+        contractorLicense={contractorLicense}
+      />
     </Page>
   );
 };
@@ -1205,6 +1351,10 @@ interface ComplianceSummaryProps {
   feeders: Feeder[];
   projectName: string;
   hasGrounding?: boolean;
+  necEdition?: '2020' | '2023';
+  // Sprint 2A C8: per-sheet contractor signature block
+  contractorName?: string;
+  contractorLicense?: string;
 }
 
 export const ComplianceSummary: React.FC<ComplianceSummaryProps> = ({
@@ -1213,6 +1363,9 @@ export const ComplianceSummary: React.FC<ComplianceSummaryProps> = ({
   feeders,
   projectName,
   hasGrounding = false,
+  necEdition = DEFAULT_NEC_EDITION,
+  contractorName,
+  contractorLicense,
 }) => {
   const mainPanel = panels.find(p => p.is_main);
   const totalCircuits = circuits.length;
@@ -1277,7 +1430,7 @@ export const ComplianceSummary: React.FC<ComplianceSummaryProps> = ({
       <View style={themeStyles.titleBlock}>
         <Text style={themeStyles.docTitle}>NEC Compliance Summary</Text>
         <Text style={themeStyles.docSubtitle}>
-          NEC 2023 design review checklist
+          {`NEC ${necEdition} design review checklist`}
         </Text>
       </View>
 
@@ -1297,7 +1450,7 @@ export const ComplianceSummary: React.FC<ComplianceSummaryProps> = ({
         </View>
         <View style={themeStyles.projectCell}>
           <Text style={themeStyles.projectLabel}>NEC Edition</Text>
-          <Text style={themeStyles.projectValue}>2023</Text>
+          <Text style={themeStyles.projectValue}>{necEdition}</Text>
         </View>
       </View>
 
@@ -1344,11 +1497,15 @@ export const ComplianceSummary: React.FC<ComplianceSummaryProps> = ({
           IMPORTANT NOTES
         </Text>
         <Text style={themeStyles.noteText}>
-          {`\u2022 This summary is based on the design data provided. Field verification is required.\n\u2022 All calculations comply with NEC 2023.\n\u2022 Final approval is subject to local building code requirements and inspector review.\n\u2022 For detailed compliance analysis, use the Inspector Mode AI feature.`}
+          {`\u2022 This summary is based on the design data provided. Field verification is required.\n\u2022 All calculations comply with NEC ${necEdition}.\n\u2022 Final approval is subject to local building code requirements and inspector review.\n\u2022 For detailed compliance analysis, use the Inspector Mode AI feature.`}
         </Text>
       </View>
 
-      <BrandFooter projectName={projectName} />
+      <BrandFooter
+        projectName={projectName}
+        contractorName={contractorName}
+        contractorLicense={contractorLicense}
+      />
     </Page>
   );
 };

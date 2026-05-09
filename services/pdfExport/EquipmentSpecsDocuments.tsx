@@ -65,6 +65,9 @@ interface EquipmentSpecsDocumentProps {
   panels: Panel[];
   transformers: Transformer[];
   includeNECReferences?: boolean;
+  // Sprint 2A C8: per-sheet contractor signature block
+  contractorName?: string;
+  contractorLicense?: string;
 }
 
 // ============================================================================
@@ -365,7 +368,9 @@ export const EquipmentSpecsPages: React.FC<EquipmentSpecsDocumentProps> = ({
   projectAddress,
   panels,
   transformers,
-  includeNECReferences = true
+  includeNECReferences = true,
+  contractorName,
+  contractorLicense,
 }) => {
   const currentDate = new Date().toLocaleDateString('en-US', {
     year: 'numeric',
@@ -394,7 +399,11 @@ export const EquipmentSpecsPages: React.FC<EquipmentSpecsDocumentProps> = ({
       {/* NEC References */}
       {includeNECReferences && <NECReferences />}
 
-      <BrandFooter projectName={projectName} />
+      <BrandFooter
+        projectName={projectName}
+        contractorName={contractorName}
+        contractorLicense={contractorLicense}
+      />
     </Page>
   );
 };
