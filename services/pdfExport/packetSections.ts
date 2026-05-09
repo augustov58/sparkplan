@@ -54,6 +54,7 @@ export interface PacketSections {
 
   // Specialty / scope-specific (band 600) — auto-disabled when not applicable
   evemsNarrative: boolean;          // Sprint 2A H10 — NEC 625.42 EVEMS operational narrative
+  evseLabeling: boolean;            // Sprint 2A H11 — NEC 625.43 EVSE labeling reference
 }
 
 export const DEFAULT_SECTIONS: PacketSections = {
@@ -76,6 +77,7 @@ export const DEFAULT_SECTIONS: PacketSections = {
   complianceSummary: true,
   jurisdiction: true,
   evemsNarrative: true,
+  evseLabeling: true,
 };
 
 /** Resolve a partial override against the defaults. */

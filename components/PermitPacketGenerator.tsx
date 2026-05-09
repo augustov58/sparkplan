@@ -174,6 +174,12 @@ const SECTION_TOGGLE_CONFIG: SectionToggleConfig[] = [
     description: 'NEC 625.42 — device, setpoint, monitoring, failure mode, NEC 750 tamper protection',
     group: 'Compliance & AHJ',
   },
+  {
+    key: 'evseLabeling',
+    label: 'EVSE Labeling Reference',
+    description: 'NEC 625.43 — disconnect labels, breaker locking, emergency shutoff (commercial)',
+    group: 'Compliance & AHJ',
+  },
 ];
 
 export const PermitPacketGenerator: React.FC<PermitPacketGeneratorProps> = ({ projectId }) => {
@@ -338,6 +344,15 @@ export const PermitPacketGenerator: React.FC<PermitPacketGeneratorProps> = ({ pr
         return panels.some(p => isEVEMSManagedPanel(p.id, circuits))
           ? undefined
           : 'No EVEMS-managed panels detected (NEC 625.42 narrative is only required when an EV bank uses energy management)';
+      case 'evseLabeling': {
+        const evNamePattern = /\b(ev|evse|charger|charging|level\s*2|l2)\b/i;
+        const hasEVPanels = panels.some(
+          p => isEVEMSManagedPanel(p.id, circuits) || evNamePattern.test(p.name),
+        );
+        return hasEVPanels
+          ? undefined
+          : 'No EV-bank panels detected (NEC 625.43 labeling reference is only relevant for projects with EVSE)';
+      }
       default:
         return undefined;
     }

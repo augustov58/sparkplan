@@ -27,11 +27,13 @@ import {
   NEC22087NarrativePage,
   AvailableFaultCurrentPage,
   EVEMSNarrativePage,
+  EVSELabelingPage,
   type TocEntry,
   type RevisionEntry,
   type NEC22087NarrativeData,
   type AvailableFaultCurrentInput,
   type EVEMSNarrativePanelEntry,
+  type EVSELabelingPanelEntry,
 } from './PermitPacketDocuments';
 import { PanelSchedulePages } from './PanelScheduleDocuments';
 import {
@@ -263,7 +265,8 @@ export const generatePermitPacket = async (data: PermitPacketData): Promise<void
     | 'multiFamilyEV'
     | 'complianceSummary'
     | 'jurisdiction'
-    | 'evemsNarrative';
+    | 'evemsNarrative'
+    | 'evseLabeling';
 
   interface PageBuilder {
     name: string;
@@ -736,6 +739,51 @@ export const generatePermitPacket = async (data: PermitPacketData): Promise<void
           <EVEMSNarrativePage
             projectName={data.projectName}
             panels={evemsPanels}
+            {...contractor}
+            sheetId={sheetIds[0]}
+          />
+        ),
+      });
+    }
+  }
+
+  // Sprint 2A H11: EVSE labeling reference — applies to any EV-bank panel
+  // (EVEMS-managed or not). Detection mirrors the H15 EquipmentSpecs card:
+  // EVEMS marker circuit OR panel name pattern. The labeling page itself
+  // is generic enough that even false positives just produce a useful
+  // contractor reference.
+  if (sections.evseLabeling) {
+    const evNamePattern = /\b(ev|evse|charger|charging|level\s*2|l2)\b/i;
+    const evseLabelingPanels: EVSELabelingPanelEntry[] = sortedPanels
+      .filter(
+        p => isEVEMSManagedPanel(p.id, data.circuits) || evNamePattern.test(p.name),
+      )
+      .map(p => {
+        // Count the charger branch circuits for this panel (filter out the
+        // EVEMS marker so the count reflects real chargers).
+        const chargerCount = data.circuits.filter(
+          c => c.panel_id === p.id && c.description && evNamePattern.test(c.description),
+        ).length;
+        return {
+          panelId: p.id,
+          panelName: p.name,
+          chargerCircuitCount: chargerCount,
+          location: p.location ?? undefined,
+        };
+      });
+    if (evseLabelingPanels.length > 0) {
+      const isCommercial = data.projectType === 'Commercial' || data.projectType === 'Industrial';
+      builders.push({
+        name: 'EVSELabeling',
+        kind: 'evseLabeling',
+        band: BAND_SPECIALTY,
+        pageCount: 1,
+        tocTitles: ['EVSE Labeling & Disconnect Requirements (NEC 625.43)'],
+        render: (sheetIds) => (
+          <EVSELabelingPage
+            projectName={data.projectName}
+            panels={evseLabelingPanels}
+            isCommercial={isCommercial}
             {...contractor}
             sheetId={sheetIds[0]}
           />

@@ -2431,3 +2431,159 @@ export const EVEMSNarrativePage: React.FC<EVEMSNarrativePageProps> = ({
   </Page>
 );
 
+// ============================================================================
+// EVSE LABELING (Sprint 2A H11 — NEC 625.43, NEC 110.21, NEC 110.22)
+// ============================================================================
+// Required by every FL AHJ. NEC 625.43 mandates disconnect labels at every
+// EVSE installation; NEC 110.21 requires the equipment to be identified by
+// manufacturer; NEC 110.22 requires each disconnect to be marked with its
+// purpose. This page is the contractor's reference for what labels must be
+// applied in the field — the actual label application happens on inspection,
+// but the AHJ wants the contractor to have signed off that they understand
+// the requirements before energization.
+//
+// Renders one row per detected EV-bank panel with the required label text.
+// Adds an emergency-shutoff section that's flagged as commercial-only (Davie
+// + commercial scopes). Bottom signature line for contractor attestation.
+
+export interface EVSELabelingPanelEntry {
+  panelId: string;
+  panelName: string;
+  /** Number of EV charging branch circuits on this panel (informational). */
+  chargerCircuitCount: number;
+  /** Optional EVSE location text — "Parking garage level B-2", etc. */
+  location?: string;
+}
+
+interface EVSELabelingPageProps {
+  projectName: string;
+  panels: EVSELabelingPanelEntry[];
+  /** When true, also renders the commercial emergency-shutoff section. */
+  isCommercial: boolean;
+  contractorName?: string;
+  contractorLicense?: string;
+  sheetId?: string;
+}
+
+export const EVSELabelingPage: React.FC<EVSELabelingPageProps> = ({
+  projectName,
+  panels,
+  isCommercial,
+  contractorName,
+  contractorLicense,
+  sheetId,
+}) => (
+  <Page size="LETTER" style={themeStyles.page}>
+    <BrandBar pageLabel="EVSE LABELING" sheetId={sheetId} />
+
+    <View style={themeStyles.titleBlock}>
+      <Text style={themeStyles.docTitle}>EVSE Labeling &amp; Disconnect Requirements</Text>
+      <Text style={themeStyles.docSubtitle}>
+        {`${projectName} • NEC 625.43, 110.21, 110.22 — Field labeling reference`}
+      </Text>
+    </View>
+
+    <View style={themeStyles.noteBox}>
+      <Text style={{ fontSize: 9, fontFamily: 'Helvetica-Bold', marginBottom: 2, color: '#1e3a8a' }}>
+        SCOPE OF THIS SHEET
+      </Text>
+      <Text style={themeStyles.noteText}>
+        Contractor shall apply the labels documented below to all EVSE branch
+        circuits, disconnects, and panel directories prior to energization.
+        Field-applied labels shall be permanent (engraved phenolic, embossed,
+        or weatherproof printed adhesive — not handwritten). AHJ inspector
+        will verify labels are applied per this reference at final inspection.
+      </Text>
+    </View>
+
+    <View wrap={false}>
+      <Text style={themeStyles.sectionTitle}>EVSE PANEL DISCONNECT LABELS (NEC 625.43)</Text>
+      <View style={themeStyles.table}>
+        <View style={themeStyles.tableHeaderRow}>
+          <Text style={[themeStyles.th, { width: '25%' }]}>Panel</Text>
+          <Text style={[themeStyles.th, { width: '15%' }]}>Branches</Text>
+          <Text style={[themeStyles.th, { width: '60%' }]}>Required Label Text</Text>
+        </View>
+        {panels.map((p, idx) => (
+          <View
+            key={p.panelId}
+            style={idx % 2 === 0 ? themeStyles.tableRow : themeStyles.tableRowAlt}
+            wrap={false}
+          >
+            <Text style={[themeStyles.td, { width: '25%', fontFamily: 'Helvetica-Bold' }]}>
+              {p.panelName}
+            </Text>
+            <Text style={[themeStyles.td, { width: '15%' }]}>{p.chargerCircuitCount}</Text>
+            <Text style={[themeStyles.td, { width: '60%', fontSize: 7 }]}>
+              {`"EV CHARGING — ${p.panelName.toUpperCase()}${p.location ? `, ${p.location.toUpperCase()}` : ''} — DO NOT OPERATE WHILE LOADED" — applied to panel deadfront and to each EVSE disconnect cover.`}
+            </Text>
+          </View>
+        ))}
+      </View>
+    </View>
+
+    <View wrap={false}>
+      <Text style={themeStyles.sectionTitle}>REQUIRED LABEL CONTENT — APPLIES TO EACH EVSE</Text>
+      {[
+        'Manufacturer name and EVSE model number (NEC 110.21).',
+        'Circuit source and OCPD identifier (e.g., "Fed from EV Sub-Panel, breaker #5") (NEC 408.4 + 110.22).',
+        'Voltage and ampacity ratings on the disconnect cover (NEC 110.22).',
+        'Disconnect within sight of the EVSE OR a lockable disconnect within sight, lockable in the OFF position only (NEC 625.43 + 110.25).',
+        'Required arc-flash hazard / shock hazard warning per NEC 110.16 — applied to panels rated 1200A+ or where calculations indicate Cat 2+ exposure.',
+        'Available fault current marking (kA) at the service-side equipment (NEC 110.24) — coordinate with the Available Fault Current sheet.',
+      ].map((line, idx) => (
+        <View key={idx} style={{ flexDirection: 'row', marginBottom: 3 }}>
+          <Text style={{ fontSize: 9, fontFamily: 'Helvetica-Bold', width: 18, color: '#1f2937' }}>
+            {`${idx + 1}.`}
+          </Text>
+          <Text style={{ fontSize: 8.5, color: '#374151', lineHeight: 1.4, flex: 1 }}>
+            {line}
+          </Text>
+        </View>
+      ))}
+    </View>
+
+    <View wrap={false}>
+      <Text style={themeStyles.sectionTitle}>BREAKER / DISCONNECT LOCKING</Text>
+      <Text style={themeStyles.proseBlock}>
+        Each EV branch circuit breaker shall be capable of being locked in the OFF position. Locking
+        means shall remain in place whether or not the lock is installed (per NEC 110.25 / 625.43).
+        Where the breaker itself is not lockable, a UL-listed lockoff accessory shall be installed.
+      </Text>
+    </View>
+
+    {isCommercial && (
+      <View wrap={false}>
+        <Text style={themeStyles.sectionTitle}>EMERGENCY SHUTOFF — COMMERCIAL EVSE INSTALLATIONS</Text>
+        <Text style={themeStyles.proseBlock}>
+          Commercial EVSE installations (Davie commercial scope, Knox-box-required jurisdictions)
+          shall include an emergency-shutoff means accessible to first responders. Mount in a
+          location pre-coordinated with the local fire marshal — typically near the main entrance
+          of the parking facility or at the building service entrance. Label clearly: "EV CHARGING
+          — EMERGENCY SHUTOFF". The shutoff shall be a single-action device that disconnects all
+          EVSE-feeding circuits.
+        </Text>
+      </View>
+    )}
+
+    <View style={themeStyles.warningBox} wrap={false}>
+      <Text style={{ fontSize: 9, fontFamily: 'Helvetica-Bold', marginBottom: 2, color: '#78350f' }}>
+        CONTRACTOR ATTESTATION
+      </Text>
+      <Text style={themeStyles.warningText}>
+        By signing this sheet, the contractor confirms that all field-applied labels per the
+        requirements above will be installed before energization, and that the AHJ inspector
+        will verify them at final inspection. Failure to install required labels is grounds for
+        rejection of the inspection.
+      </Text>
+    </View>
+
+    <BrandFooter
+      projectName={projectName}
+      contractorName={contractorName}
+      contractorLicense={contractorLicense}
+      sheetId={sheetId}
+    />
+  </Page>
+);
+
