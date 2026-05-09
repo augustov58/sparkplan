@@ -17,6 +17,7 @@ import {
 } from '@react-pdf/renderer';
 import type { Database } from '../../lib/database.types';
 import { calculateFeederSizing } from '../calculations/feederSizing';
+import { calculateAllCumulativeVoltageDrops } from '../calculations/cumulativeVoltageDrop';
 import { computeFeederLoadVA } from '../feeder/feederLoadSync';
 import type { FeederCalculationInput, FeederCalculationResult } from '../../types';
 import {
@@ -93,15 +94,16 @@ const styles = StyleSheet.create({
     borderBottomColor: '#e5e7eb',
     borderBottomStyle: 'solid',
   },
-  // Column widths for voltage drop table
-  col1: { width: '12%' }, // Feeder Name
-  col2: { width: '15%' }, // From → To
-  col3: { width: '10%' }, // Distance
-  col4: { width: '15%' }, // Conductor
-  col5: { width: '10%' }, // Current
-  col6: { width: '10%' }, // VD Volts
-  col7: { width: '10%' }, // VD %
-  col8: { width: '18%' }, // Compliance
+  // Column widths for voltage drop table (sum to 100%)
+  col1: { width: '11%' }, // Feeder Name
+  col2: { width: '14%' }, // From → To
+  col3: { width: '8%' },  // Distance
+  col4: { width: '13%' }, // Conductor
+  col5: { width: '9%' },  // Current
+  col6: { width: '8%' },  // VD Volts
+  col7: { width: '9%' },  // VD %
+  col8: { width: '9%' },  // Cum VD %  ← new (chain total at destination)
+  col9: { width: '19%' }, // Compliance
   cellCenter: {
     textAlign: 'center',
   },
@@ -221,6 +223,8 @@ interface FeederVoltageDropData {
   fromName: string;
   toName: string;
   calculation: FeederCalculationResult;
+  cumulativeVdPercent: number | null;          // chain total at destination panel (null for transformer destinations)
+  cumulativeCrossesTransformer: boolean;        // flag a 'Cum*' label when chain hits a reset boundary
 }
 
 // ============================================================================
@@ -274,8 +278,38 @@ function calculateAllFeederVoltageDrops(
   transformers: Transformer[],
   circuits?: Circuit[]
 ): FeederVoltageDropData[] {
-  return feeders.map((feeder, idx) => {
-    try {
+  // First pass: compute every feeder's fresh VD result so we can build
+  // a temporary feeder array that reflects the report's current values
+  // (not the cached ones), and feed THAT into the cumulative walker.
+  const baseRows = feeders.map((feeder, idx) => buildBaseFeederRow(feeder, idx, panels, transformers, circuits));
+  const feedersWithFreshVd = baseRows.map(row => ({
+    ...row.feeder,
+    voltage_drop_percent: row.calculation.voltage_drop_percent,
+  }));
+  const cumulativeMap = calculateAllCumulativeVoltageDrops(panels, feedersWithFreshVd, transformers);
+
+  return baseRows.map(row => {
+    const cum = row.feeder.destination_panel_id
+      ? cumulativeMap.get(row.feeder.destination_panel_id) ?? null
+      : null;
+    return {
+      ...row,
+      cumulativeVdPercent: cum?.cumulativePercent ?? null,
+      cumulativeCrossesTransformer: cum?.crossesTransformer ?? false,
+    };
+  });
+}
+
+// Original per-feeder calc — extracted into a helper so cumulativeVD can run
+// over fresh results before the data rows are finalized.
+function buildBaseFeederRow(
+  feeder: Feeder,
+  idx: number,
+  panels: Panel[],
+  transformers: Transformer[],
+  circuits?: Circuit[]
+): Omit<FeederVoltageDropData, 'cumulativeVdPercent' | 'cumulativeCrossesTransformer'> {
+  try {
       const fromName = getEquipmentName(feeder.source_panel_id, panels, transformers);
       const toName = getEquipmentName(
         feeder.destination_panel_id || feeder.destination_transformer_id,
@@ -339,10 +373,9 @@ function calculateAllFeederVoltageDrops(
           panels,
           transformers
         ),
-        calculation: makeCalcErrorResult(message),
-      };
-    }
-  });
+      calculation: makeCalcErrorResult(message),
+    };
+  }
 }
 
 /**
@@ -452,7 +485,8 @@ const VoltageDropTable: React.FC<{ feederData: FeederVoltageDropData[] }> = ({ f
         <Text style={[styles.col5, styles.cellCenter]}>Current</Text>
         <Text style={[styles.col6, styles.cellCenter]}>VD (V)</Text>
         <Text style={[styles.col7, styles.cellCenter]}>VD (%)</Text>
-        <Text style={[styles.col8, styles.cellCenter]}>Compliance</Text>
+        <Text style={[styles.col8, styles.cellCenter]}>Cum (%)</Text>
+        <Text style={[styles.col9, styles.cellCenter]}>Compliance</Text>
       </View>
 
       {/* Data Rows */}
@@ -475,9 +509,14 @@ const VoltageDropTable: React.FC<{ feederData: FeederVoltageDropData[] }> = ({ f
           <Text style={[styles.col7, styles.cellCenter]}>
             {`${(data.calculation.voltage_drop_percent || 0).toFixed(2)}%`}
           </Text>
+          <Text style={[styles.col8, styles.cellCenter]}>
+            {data.cumulativeVdPercent != null && data.cumulativeVdPercent > 0
+              ? `${data.cumulativeCrossesTransformer ? '*' : ''}${data.cumulativeVdPercent.toFixed(2)}%`
+              : '—'}
+          </Text>
           <Text
             style={[
-              styles.col8,
+              styles.col9,
               styles.cellCenter,
               data.calculation.meets_voltage_drop ? styles.compliantText : styles.nonCompliantText,
             ]}

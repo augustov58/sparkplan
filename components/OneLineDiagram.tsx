@@ -656,9 +656,6 @@ export const OneLineDiagram: React.FC<OneLineDiagramProps> = ({ project, updateP
           {/* ✅ Professional panel symbol with connection ports */}
           {panelGlyph.element}
 
-          {/* Voltage drop badge: this run + cumulative from voltage source */}
-          {renderPanelVoltageDropBadge(xPos, currentY + DIAGRAM_CONSTANTS.PANEL_HEIGHT, panel.id)}
-
           {/* Bus bar for downstream elements (port-based routing) */}
           {totalDownstream > 0 && renderBusBar(xPos, currentY + DIAGRAM_CONSTANTS.PANEL_HEIGHT, downstreamPositions, "#4B5563")}
 
@@ -763,6 +760,18 @@ export const OneLineDiagram: React.FC<OneLineDiagramProps> = ({ project, updateP
       const color = vd > 3 ? '#DC2626' : vd > 2 ? '#D97706' : '#059669';
       lines.push({ text: `VD ${vd.toFixed(2)}%`, fontSize: 6.5, color, bold: true });
     }
+    // Cumulative VD from this feeder's destination panel back to the nearest
+    // voltage source (service or transformer secondary). Skip transformer
+    // destinations — cumulative resets at transformers, not meaningful there.
+    if (feeder.destination_panel_id) {
+      const cum = cumulativeVdMap.get(feeder.destination_panel_id);
+      if (cum && cum.cumulativePercent > 0) {
+        const cumPct = cum.cumulativePercent;
+        const cumColor = cumPct > 5 ? '#DC2626' : cumPct > 3 ? '#D97706' : '#059669';
+        const label = cum.crossesTransformer ? `Cum* ${cumPct.toFixed(2)}%` : `Cum ${cumPct.toFixed(2)}%`;
+        lines.push({ text: label, fontSize: 6.5, color: cumColor, bold: true });
+      }
+    }
     return lines;
   };
 
@@ -830,68 +839,6 @@ export const OneLineDiagram: React.FC<OneLineDiagramProps> = ({ project, updateP
             {line.text}
           </text>
         ))}
-      </g>
-    );
-  };
-
-  /**
-   * Floating badge under a panel showing run% (this segment) and cum% (from
-   * service or transformer secondary). Reads from cumulativeVdMap. Returns
-   * null when there's no chain data — keeps unlabelled panels visually clean.
-   */
-  const renderPanelVoltageDropBadge = (
-    centerX: number,
-    bottomY: number,
-    panelId: string,
-  ): React.ReactNode => {
-    const result = cumulativeVdMap.get(panelId);
-    if (!result || result.segmentCount === 0) return null;
-
-    const lastSegment = result.perSegment[result.perSegment.length - 1];
-    const runPercent = lastSegment?.runPercent ?? 0;
-    const cumPercent = result.cumulativePercent;
-
-    const cumColor = cumPercent > 5 ? '#DC2626' : cumPercent > 3 ? '#D97706' : '#059669';
-    const runColor = runPercent > 3 ? '#DC2626' : runPercent > 2 ? '#D97706' : '#059669';
-
-    const text = result.crossesTransformer
-      ? `Run ${runPercent.toFixed(2)}%  •  Cum* ${cumPercent.toFixed(2)}%`
-      : `Run ${runPercent.toFixed(2)}%  •  Cum ${cumPercent.toFixed(2)}%`;
-
-    const fontSize = 7;
-    const padding = 3;
-    const boxWidth = text.length * 4 + padding * 2;
-    const boxHeight = fontSize + padding * 2;
-    const boxX = centerX - boxWidth / 2;
-    const boxY = bottomY + 4;
-
-    return (
-      <g key={`vd-badge-${panelId}`}>
-        <rect
-          x={boxX}
-          y={boxY}
-          width={boxWidth}
-          height={boxHeight}
-          fill="white"
-          stroke={cumColor}
-          strokeWidth={1}
-          rx={2}
-        />
-        <text
-          x={centerX}
-          y={boxY + boxHeight - padding - 1}
-          textAnchor="middle"
-          fontSize={fontSize}
-          fontWeight={600}
-        >
-          <tspan fill={runColor}>{`Run ${runPercent.toFixed(2)}%`}</tspan>
-          <tspan fill="#6B7280">{`  •  `}</tspan>
-          <tspan fill={cumColor}>
-            {result.crossesTransformer
-              ? `Cum* ${cumPercent.toFixed(2)}%`
-              : `Cum ${cumPercent.toFixed(2)}%`}
-          </tspan>
-        </text>
       </g>
     );
   };
@@ -2664,13 +2611,6 @@ export const OneLineDiagram: React.FC<OneLineDiagramProps> = ({ project, updateP
                             {/* ✅ Professional MDP symbol with connection ports */}
                             {mdpGlyph.element}
 
-                            {/* MDP cumulative VD badge (run = service-entrance VD%) */}
-                            {mainPanel && renderPanelVoltageDropBadge(
-                              serviceX,
-                              DIAGRAM_CONSTANTS.MDP_Y + DIAGRAM_CONSTANTS.MDP_HEIGHT,
-                              mainPanel.id,
-                            )}
-
                           {/* ✅ FIXED: MDP Bus Bar using actual bottomPort position for accurate connections */}
                           {totalElements > 0 && renderBusBar(
                             serviceX,
@@ -3659,13 +3599,6 @@ export const OneLineDiagram: React.FC<OneLineDiagramProps> = ({ project, updateP
                           <>
                             {/* ✅ Professional MDP symbol with connection ports */}
                             {mdpGlyph.element}
-
-                            {/* MDP cumulative VD badge (run = service-entrance VD%) */}
-                            {mainPanel && renderPanelVoltageDropBadge(
-                              serviceX,
-                              DIAGRAM_CONSTANTS.MDP_Y + DIAGRAM_CONSTANTS.MDP_HEIGHT,
-                              mainPanel.id,
-                            )}
 
                           {/* ✅ FIXED: MDP Bus Bar using actual bottomPort position for accurate connections */}
                           {totalElements > 0 && renderBusBar(

@@ -21,6 +21,7 @@ import { validateFeederForm, showValidationErrors } from '../lib/validation-util
 import { validateFeederConnectivityEnhanced, getValidFeederDestinations, getValidPanelDestinationsFromTransformer } from '../services/validation/panelConnectivityValidation';
 import { checkFeederLoadStatus, getStaleFeedersList } from '../services/feeder/feederLoadSync';
 import { calculateAggregatedLoad } from '../services/calculations/upstreamLoadAggregation';
+import { useCumulativeVoltageDrop } from '../hooks/useCumulativeVoltageDrop';
 import { exportVoltageDropReport, hasVoltageDropData } from '../services/pdfExport/voltageDropPDF';
 import { computeFeederLoadVA } from '../services/feeder/feederLoadSync';
 import type { Feeder, FeederCalculationResult } from '../types';
@@ -42,6 +43,10 @@ export const FeederManager: React.FC<FeederManagerProps> = ({
   const { panels } = usePanels(projectId);
   const { transformers } = useTransformers(projectId);
   const { circuits } = useCircuits(projectId);
+
+  // Cumulative VD per panel — used to annotate each feeder card with the
+  // chain-total at the destination panel (the one this run lands on).
+  const cumulativeVdMap = useCumulativeVoltageDrop(panels, feeders, transformers);
 
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -1217,6 +1222,9 @@ export const FeederManager: React.FC<FeederManagerProps> = ({
         <div className="space-y-4">
           {feeders.map(feeder => {
             const staleStatus = checkFeederLoadStatus(feeder, circuits, panels, 5);
+            const cum = feeder.destination_panel_id
+              ? cumulativeVdMap.get(feeder.destination_panel_id) ?? null
+              : null;
             return (
               <FeederCard
                 key={feeder.id}
@@ -1228,6 +1236,8 @@ export const FeederManager: React.FC<FeederManagerProps> = ({
                 onRecalculate={handleRecalculateFeeder}
                 isEditing={editingId === feeder.id}
                 staleStatus={staleStatus}
+                cumulativeVdPercent={cum?.cumulativePercent ?? null}
+                cumulativeCrossesTransformer={cum?.crossesTransformer ?? false}
               />
             );
           })}
@@ -1253,6 +1263,8 @@ interface FeederCardProps {
     loadDifferencePercent: number;
     message: string;
   };
+  cumulativeVdPercent: number | null;          // chain total at destination panel
+  cumulativeCrossesTransformer: boolean;       // true → label as 'Cum*' to flag the reset boundary
 }
 
 const FeederCard: React.FC<FeederCardProps> = ({
@@ -1263,7 +1275,9 @@ const FeederCard: React.FC<FeederCardProps> = ({
   onDelete,
   onRecalculate,
   isEditing,
-  staleStatus
+  staleStatus,
+  cumulativeVdPercent,
+  cumulativeCrossesTransformer
 }) => {
   // Safety check: ensure panels and transformers are arrays (defensive programming)
   const panelsArray = Array.isArray(panels) ? panels : [];
@@ -1395,6 +1409,17 @@ const FeederCard: React.FC<FeederCardProps> = ({
             <span className={`font-medium ${vdCompliant ? 'text-green-900' : 'text-red-900'}`}>
               VD: {feeder.voltage_drop_percent.toFixed(2)}%
             </span>
+            {cumulativeVdPercent != null && cumulativeVdPercent > 0 && (() => {
+              const cumOver5 = cumulativeVdPercent > 5;
+              const cumOver3 = cumulativeVdPercent > 3;
+              const cumColor = cumOver5 ? 'text-red-700' : cumOver3 ? 'text-amber-700' : 'text-green-700';
+              const label = cumulativeCrossesTransformer ? 'Cum*' : 'Cum';
+              return (
+                <span className={`font-medium ${cumColor}`} title={cumulativeCrossesTransformer ? 'Cumulative resets at transformer; this total spans only the current voltage segment.' : 'Cumulative VD from service to this panel.'}>
+                  • {label}: {cumulativeVdPercent.toFixed(2)}%
+                </span>
+              );
+            })()}
           </div>
           <span className={vdCompliant ? 'text-green-600' : 'text-red-600'}>
             {vdCompliant ? '≤3% OK' : '>3% High'}
