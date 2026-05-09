@@ -57,7 +57,7 @@ export const FeederManager: React.FC<FeederManagerProps> = ({
     ambient_temperature_c: 30,
     num_current_carrying: 4
   });
-  const [sourceType, setSourceType] = useState<'panel' | 'transformer'>('panel'); // NEW: Source type toggle
+  const [sourceType, setSourceType] = useState<'panel' | 'transformer' | 'service'>('panel'); // 'service' = synthetic UTIL→MDP feeder (is_service_entrance)
   const [destinationType, setDestinationType] = useState<'panel' | 'transformer'>('panel');
   const [connectivityError, setConnectivityError] = useState<string | null>(null);
   const [showStaleWarning, setShowStaleWarning] = useState(true);
@@ -319,6 +319,33 @@ export const FeederManager: React.FC<FeederManagerProps> = ({
 
   // Calculate feeder and update database
   const handleCalculateFeeder = async (feeder: Partial<Feeder>) => {
+    // Service-entrance feeders bypass auto-sizing: utility coordination drives
+    // the conductor specs (often dictated by the utility), not load calc. We
+    // save whatever the user typed and let the riser pick it up.
+    if (sourceType === 'service') {
+      if (!feeder.destination_panel_id) {
+        showValidationErrors({ destination_panel_id: 'Service entrance must terminate at the MDP (a panel).' });
+        return;
+      }
+      const seFeeder: Partial<Feeder> = {
+        ...feeder,
+        is_service_entrance: true,
+        sets_in_parallel: feeder.sets_in_parallel ?? 1,
+        source_panel_id: null,
+        source_transformer_id: null,
+        project_id: projectId,
+      };
+      if (editingId) {
+        await updateFeeder(editingId, seFeeder);
+        setEditingId(null);
+      } else {
+        await createFeeder(seFeeder as Omit<Feeder, 'id' | 'created_at' | 'updated_at'>);
+        setShowCreateForm(false);
+        resetForm();
+      }
+      return;
+    }
+
     // Validate form data - ensure at least one source (panel OR transformer)
     const validation = validateFeederForm({
       name: feeder.name || '',
@@ -525,7 +552,9 @@ export const FeederManager: React.FC<FeederManagerProps> = ({
         neutral_conductor_size: result.neutral_conductor_size,
         egc_size: egcSize, // Use corrected EGC size based on panel OCPD per NEC 250.122
         conduit_size: result.recommended_conduit_size,
-        voltage_drop_percent: result.voltage_drop_percent
+        voltage_drop_percent: result.voltage_drop_percent,
+        is_service_entrance: false, // service-entrance path returned earlier
+        sets_in_parallel: feeder.sets_in_parallel ?? 1,
       };
 
       if (editingId) {
@@ -563,7 +592,13 @@ export const FeederManager: React.FC<FeederManagerProps> = ({
 
   const handleEdit = (feeder: Feeder) => {
     setFormData(feeder);
-    setSourceType(feeder.source_panel_id ? 'panel' : 'transformer');
+    setSourceType(
+      feeder.is_service_entrance
+        ? 'service'
+        : feeder.source_panel_id
+        ? 'panel'
+        : 'transformer'
+    );
     setDestinationType(feeder.destination_panel_id ? 'panel' : 'transformer');
     setEditingId(feeder.id);
     setShowCreateForm(false);
@@ -770,15 +805,38 @@ export const FeederManager: React.FC<FeederManagerProps> = ({
                 >
                   Transformer
                 </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSourceType('service');
+                    setFormData({ ...formData, source_panel_id: null, source_transformer_id: null });
+                  }}
+                  className={`flex-1 py-2 px-4 rounded-md text-sm font-medium transition-colors ${
+                    sourceType === 'service'
+                      ? 'bg-[#2d3b2d] text-white'
+                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                  }`}
+                  title="Synthetic UTIL→MDP run; one allowed per project"
+                >
+                  Service
+                </button>
               </div>
             </div>
 
             {/* Source Selection */}
             <div>
               <label className="block text-xs font-semibold text-gray-500 mb-1 uppercase tracking-wider">
-                {sourceType === 'panel' ? 'Source Panel' : 'Source Transformer'}
+                {sourceType === 'panel'
+                  ? 'Source Panel'
+                  : sourceType === 'transformer'
+                  ? 'Source Transformer'
+                  : 'Source'}
               </label>
-              {sourceType === 'panel' ? (
+              {sourceType === 'service' ? (
+                <div className="px-3 py-2 bg-amber-50 border border-amber-300 rounded-md text-xs text-amber-900 leading-relaxed">
+                  <strong>Utility (point of service)</strong> — this run represents the conductors from the utility transformer to the MDP. Destination must be the main panel.
+                </div>
+              ) : sourceType === 'panel' ? (
                 <select
                   value={formData.source_panel_id || ''}
                   onChange={e => setFormData({ ...formData, source_panel_id: e.target.value || null })}

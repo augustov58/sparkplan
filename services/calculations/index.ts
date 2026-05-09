@@ -10,6 +10,7 @@ export * from './arcFlash';
 export * from './evemsLoadManagement';
 export * from './breakerSizing';
 export * from './voltageDrop';
+export * from './cumulativeVoltageDrop';
 export * from './feederSizing';
 export * from './evCharging';
 export * from './evemsLoadManagement';

@@ -13,6 +13,7 @@ import {
   type AggregatedLoad,
   type MultiFamilyContext,
 } from '../calculations/upstreamLoadAggregation';
+import { calculateAllCumulativeVoltageDrops } from '../calculations/cumulativeVoltageDrop';
 import {
   BrandBar,
   Footer as BrandFooter,
@@ -626,9 +627,15 @@ const H_GAP = 18;
 const buildFeederLabel = (feeder: Feeder): string => {
   const parts: string[] = [];
   if (feeder.phase_conductor_size) {
-    parts.push(`${feeder.phase_conductor_size} ${feeder.conductor_material || 'Cu'}`);
+    const sets = (feeder.sets_in_parallel ?? 1) > 1 ? `${feeder.sets_in_parallel}× ` : '';
+    parts.push(`${sets}${feeder.phase_conductor_size} ${feeder.conductor_material || 'Cu'}`);
   }
-  if (typeof feeder.design_load_va === 'number' && feeder.design_load_va > 0) {
+  if (feeder.distance_ft) {
+    parts.push(`${feeder.distance_ft} ft`);
+  }
+  if (typeof feeder.voltage_drop_percent === 'number') {
+    parts.push(`VD ${feeder.voltage_drop_percent.toFixed(2)}%`);
+  } else if (typeof feeder.design_load_va === 'number' && feeder.design_load_va > 0) {
     parts.push(`${(feeder.design_load_va / 1000).toFixed(1)} kVA`);
   }
   return parts.length > 0 ? parts.join(' • ') : 'Feeder';
@@ -639,14 +646,21 @@ const buildPanelSubtree = (
   panels: Panel[],
   transformers: Transformer[],
   feeders: Feeder[],
-  feederLabel?: string
+  feederLabel?: string,
+  cumulativeVd?: Map<string, number>
 ): RiserNode => {
+  const baseLine3 = panel.main_breaker_amps ? `${panel.main_breaker_amps}A Main` : 'MLO';
+  const cum = cumulativeVd?.get(panel.id);
+  const line3 = typeof cum === 'number' && cum > 0
+    ? `${baseLine3} \u2022 \u03a3 ${cum.toFixed(2)}%`  // \u03a3 = cumulative VD from voltage source
+    : baseLine3;
+
   const node: RiserNode = {
     id: panel.id,
     kind: 'panel',
     line1: panel.name + (panel.is_main ? ' (MDP)' : ''),
     line2: `${panel.voltage}V ${phaseLabel(panel.phase)} \u2022 ${panel.bus_rating}A bus`,
-    line3: panel.main_breaker_amps ? `${panel.main_breaker_amps}A Main` : 'MLO',
+    line3,
     feederLabel,
     children: [],
   };
@@ -658,7 +672,7 @@ const buildPanelSubtree = (
       const dest = panels.find(p => p.id === feeder.destination_panel_id);
       if (dest) {
         node.children.push(
-          buildPanelSubtree(dest, panels, transformers, feeders, label)
+          buildPanelSubtree(dest, panels, transformers, feeders, label, cumulativeVd)
         );
       }
     } else if (feeder.destination_transformer_id) {
@@ -677,7 +691,7 @@ const buildPanelSubtree = (
           p => p.fed_from_type === 'transformer' && p.fed_from_transformer_id === xfmr.id
         );
         for (const p of xfmrPanels) {
-          xfmrNode.children.push(buildPanelSubtree(p, panels, transformers, feeders));
+          xfmrNode.children.push(buildPanelSubtree(p, panels, transformers, feeders, undefined, cumulativeVd));
         }
         node.children.push(xfmrNode);
       }
@@ -694,8 +708,11 @@ const buildRiserTree = (
   meterStacks: MeterStack[],
   meters: MeterDB[],
   serviceVoltage: number,
-  servicePhase: number
+  servicePhase: number,
+  cumulativeVd?: Map<string, number>
 ): RiserNode | null => {
+  const serviceEntranceFeeder = feeders.find(f => f.is_service_entrance) ?? null;
+  const seLabel = serviceEntranceFeeder ? buildFeederLabel(serviceEntranceFeeder) : undefined;
   const mdp = panels.find(p => p.is_main);
 
   // Multi-family: meter stack is the structural root between utility and the
@@ -721,7 +738,7 @@ const buildRiserTree = (
             meter.breaker_amps ? `${meter.breaker_amps}A` : 'MLO'
           }`;
           stackNode.children.push(
-            buildPanelSubtree(panel, panels, transformers, feeders, meterLabel)
+            buildPanelSubtree(panel, panels, transformers, feeders, meterLabel, cumulativeVd)
           );
         }
       }
@@ -730,19 +747,22 @@ const buildRiserTree = (
         kind: 'utility',
         line1: 'UTILITY',
         line2: `${serviceVoltage}V ${phaseLabel(servicePhase)} service`,
-        children: [stackNode],
+        // Service-entrance label hangs on the edge from UTIL to the meter stack.
+        children: [{ ...stackNode, feederLabel: seLabel ?? stackNode.feederLabel }],
       };
     }
   }
 
   if (!mdp) return null;
 
+  const mdpSubtree = buildPanelSubtree(mdp, panels, transformers, feeders, seLabel, cumulativeVd);
+
   return {
     id: 'utility',
     kind: 'utility',
     line1: 'UTILITY',
     line2: `${serviceVoltage}V ${servicePhase}\u03C6 service`,
-    children: [buildPanelSubtree(mdp, panels, transformers, feeders)],
+    children: [mdpSubtree],
   };
 };
 
@@ -955,6 +975,11 @@ export const RiserDiagram: React.FC<RiserDiagramProps> = ({
   contractorName,
   contractorLicense,
 }) => {
+  // Cumulative VD per panel (resets at transformer secondary, see service spec).
+  const cumulativeAll = calculateAllCumulativeVoltageDrops(panels, feeders, transformers);
+  const cumulativeVd = new Map<string, number>();
+  cumulativeAll.forEach((r, panelId) => cumulativeVd.set(panelId, r.cumulativePercent));
+
   const tree = buildRiserTree(
     panels,
     transformers,
@@ -962,7 +987,8 @@ export const RiserDiagram: React.FC<RiserDiagramProps> = ({
     meterStacks,
     meters,
     serviceVoltage,
-    servicePhase
+    servicePhase,
+    cumulativeVd
   );
 
   let svgWidth = NODE_W;

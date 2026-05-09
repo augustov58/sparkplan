@@ -116,7 +116,7 @@
  */
 
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { Project, PanelCircuit, ProjectType } from '../types';
+import { Project, PanelCircuit, ProjectType, Feeder } from '../types';
 import { generateOneLineDescription } from '../services/geminiService';
 import { RefreshCcw, Download, Zap, Plus, Trash2, Grid, Bolt, List, Image, FileCode, Edit2, X, Save } from 'lucide-react';
 import { useCircuits } from '../hooks/useCircuits';
@@ -125,6 +125,7 @@ import { useTransformers } from '../hooks/useTransformers';
 import { useFeeders } from '../hooks/useFeeders';
 import { useMeterStacks } from '../hooks/useMeterStacks';
 import { useMeters } from '../hooks/useMeters';
+import { useCumulativeVoltageDrop } from '../hooks/useCumulativeVoltageDrop';
 import { FeederManager } from './FeederManager';
 import { BulkCircuitCreator } from './BulkCircuitCreator';
 import { EquipmentSpecForm } from './EquipmentSpecForm';
@@ -166,6 +167,11 @@ export const OneLineDiagram: React.FC<OneLineDiagramProps> = ({ project, updateP
   const { feeders } = useFeeders(project.id);
   const { meterStacks } = useMeterStacks(project.id);
   const { meters } = useMeters(project.id);
+
+  // Cumulative voltage drop walker — pure derivation, memoized.
+  // Drives the per-panel run% / cumulative% badges and the service-entrance label.
+  const cumulativeVdMap = useCumulativeVoltageDrop(panels, feeders, transformers);
+  const serviceEntranceFeeder = feeders.find((f) => f.is_service_entrance) ?? null;
 
   // Effective service voltage/phase for diagram labels.
   // The MDP is the service entrance equipment and is the source of truth once created
@@ -650,6 +656,9 @@ export const OneLineDiagram: React.FC<OneLineDiagramProps> = ({ project, updateP
           {/* ✅ Professional panel symbol with connection ports */}
           {panelGlyph.element}
 
+          {/* Voltage drop badge: this run + cumulative from voltage source */}
+          {renderPanelVoltageDropBadge(xPos, currentY + DIAGRAM_CONSTANTS.PANEL_HEIGHT, panel.id)}
+
           {/* Bus bar for downstream elements (port-based routing) */}
           {totalDownstream > 0 && renderBusBar(xPos, currentY + DIAGRAM_CONSTANTS.PANEL_HEIGHT, downstreamPositions, "#4B5563")}
 
@@ -714,6 +723,179 @@ export const OneLineDiagram: React.FC<OneLineDiagramProps> = ({ project, updateP
     }
   };
 
+  // ----------------------------------------------------------------------------
+  // Feeder/service-entrance label helpers
+  // ----------------------------------------------------------------------------
+
+  type LabelLine = {
+    text: string;
+    fontSize?: number;
+    color?: string; // any svg fill (#hex or tailwind class via className unsupported here)
+    bold?: boolean;
+  };
+
+  /** Build the standard label lines for a feeder row (used by both feeder and SE labels). */
+  const buildFeederLabelLines = (
+    feeder: Feeder,
+    opts: { sourceTag?: string } = {},
+  ): LabelLine[] => {
+    const lines: LabelLine[] = [];
+    if (opts.sourceTag) {
+      lines.push({ text: opts.sourceTag, fontSize: 6, color: '#6B7280', bold: true });
+    }
+    const sets = feeder.sets_in_parallel > 1 ? `${feeder.sets_in_parallel}× ` : '';
+    lines.push({
+      text: `${sets}${feeder.phase_conductor_size ?? '?'} ${feeder.conductor_material}`,
+      fontSize: 6.5,
+      color: '#1F2937',
+    });
+    if (feeder.egc_size) {
+      lines.push({ text: `+ ${feeder.egc_size} EGC`, fontSize: 6.5, color: '#1F2937' });
+    }
+    if (feeder.conduit_size) {
+      lines.push({ text: feeder.conduit_size, fontSize: 6.5, color: '#4F46E5' });
+    }
+    if (feeder.distance_ft) {
+      lines.push({ text: `${feeder.distance_ft} ft`, fontSize: 6, color: '#6B7280' });
+    }
+    if (feeder.voltage_drop_percent != null) {
+      const vd = feeder.voltage_drop_percent;
+      const color = vd > 3 ? '#DC2626' : vd > 2 ? '#D97706' : '#059669';
+      lines.push({ text: `VD ${vd.toFixed(2)}%`, fontSize: 6.5, color, bold: true });
+    }
+    return lines;
+  };
+
+  /** Generic label-box renderer used for both standard feeder and service-entrance labels. */
+  const renderLabelBox = (args: {
+    keySuffix: string;
+    feederLineX: number;
+    feederStartY: number;
+    feederEndY: number;
+    offsetDirection: 'left' | 'right';
+    lines: LabelLine[];
+    accent?: string;
+  }): React.ReactNode => {
+    const { keySuffix, feederLineX, feederStartY, feederEndY, offsetDirection, lines } = args;
+    const accent = args.accent ?? '#6366F1';
+    if (lines.length === 0) return null;
+
+    const loopY = (feederStartY + feederEndY) / 2;
+    const loopRadius = 4;
+    const leaderLength = 40;
+    const labelOffsetX = offsetDirection === 'right' ? leaderLength : -leaderLength;
+    const labelX = feederLineX + labelOffsetX;
+
+    const charWidth = 4.5;
+    const lineHeight = 9;
+    const padding = 3;
+    const longest = lines.reduce((m, l) => Math.max(m, l.text.length), 0);
+    const labelWidth = longest * charWidth + padding * 2;
+    const labelHeight = lines.length * lineHeight + padding * 2;
+    const labelBoxX = offsetDirection === 'right' ? labelX : labelX - labelWidth;
+    const topY = loopY - labelHeight / 2;
+
+    return (
+      <g key={`label-${keySuffix}`}>
+        <circle cx={feederLineX} cy={loopY} r={loopRadius} fill="white" stroke={accent} strokeWidth={2} />
+        <line
+          x1={feederLineX + (offsetDirection === 'right' ? loopRadius : -loopRadius)}
+          y1={loopY}
+          x2={labelX}
+          y2={loopY}
+          stroke={accent}
+          strokeWidth={1.5}
+          strokeDasharray="2,2"
+        />
+        <rect
+          x={labelBoxX}
+          y={topY}
+          width={labelWidth}
+          height={labelHeight}
+          fill="white"
+          stroke={accent}
+          strokeWidth={1.5}
+          rx={3}
+        />
+        {lines.map((line, i) => (
+          <text
+            key={i}
+            x={labelBoxX + padding}
+            y={topY + padding + (i + 1) * lineHeight - 2}
+            fontSize={line.fontSize ?? 6.5}
+            fontWeight={line.bold ? 600 : 500}
+            fill={line.color ?? '#1F2937'}
+            textAnchor="start"
+          >
+            {line.text}
+          </text>
+        ))}
+      </g>
+    );
+  };
+
+  /**
+   * Floating badge under a panel showing run% (this segment) and cum% (from
+   * service or transformer secondary). Reads from cumulativeVdMap. Returns
+   * null when there's no chain data — keeps unlabelled panels visually clean.
+   */
+  const renderPanelVoltageDropBadge = (
+    centerX: number,
+    bottomY: number,
+    panelId: string,
+  ): React.ReactNode => {
+    const result = cumulativeVdMap.get(panelId);
+    if (!result || result.segmentCount === 0) return null;
+
+    const lastSegment = result.perSegment[result.perSegment.length - 1];
+    const runPercent = lastSegment?.runPercent ?? 0;
+    const cumPercent = result.cumulativePercent;
+
+    const cumColor = cumPercent > 5 ? '#DC2626' : cumPercent > 3 ? '#D97706' : '#059669';
+    const runColor = runPercent > 3 ? '#DC2626' : runPercent > 2 ? '#D97706' : '#059669';
+
+    const text = result.crossesTransformer
+      ? `Run ${runPercent.toFixed(2)}%  •  Cum* ${cumPercent.toFixed(2)}%`
+      : `Run ${runPercent.toFixed(2)}%  •  Cum ${cumPercent.toFixed(2)}%`;
+
+    const fontSize = 7;
+    const padding = 3;
+    const boxWidth = text.length * 4 + padding * 2;
+    const boxHeight = fontSize + padding * 2;
+    const boxX = centerX - boxWidth / 2;
+    const boxY = bottomY + 4;
+
+    return (
+      <g key={`vd-badge-${panelId}`}>
+        <rect
+          x={boxX}
+          y={boxY}
+          width={boxWidth}
+          height={boxHeight}
+          fill="white"
+          stroke={cumColor}
+          strokeWidth={1}
+          rx={2}
+        />
+        <text
+          x={centerX}
+          y={boxY + boxHeight - padding - 1}
+          textAnchor="middle"
+          fontSize={fontSize}
+          fontWeight={600}
+        >
+          <tspan fill={runColor}>{`Run ${runPercent.toFixed(2)}%`}</tspan>
+          <tspan fill="#6B7280">{`  •  `}</tspan>
+          <tspan fill={cumColor}>
+            {result.crossesTransformer
+              ? `Cum* ${cumPercent.toFixed(2)}%`
+              : `Cum ${cumPercent.toFixed(2)}%`}
+          </tspan>
+        </text>
+      </g>
+    );
+  };
+
   /**
    * Render feeder label with wire size and conduit info
    * Shows label with leader line and loop grabbing the feeder
@@ -737,6 +919,7 @@ export const OneLineDiagram: React.FC<OneLineDiagramProps> = ({ project, updateP
   ) => {
     // Find matching feeder in database
     const feeder = feeders.find(f => {
+      if (f.is_service_entrance) return false; // service-entrance has its own renderer
       const sourceMatches = f.source_panel_id === sourcePanelId;
       const destMatches = destPanelId
         ? f.destination_panel_id === destPanelId
@@ -749,99 +932,43 @@ export const OneLineDiagram: React.FC<OneLineDiagramProps> = ({ project, updateP
       return null;
     }
 
-    // Calculate label position
-    const loopY = (feederStartY + feederEndY) / 2; // Middle of feeder line
-    const loopRadius = 4;
-    const leaderLength = 40;
-    const labelOffsetX = offsetDirection === 'right' ? leaderLength : -leaderLength;
-    const labelX = feederLineX + labelOffsetX;
+    return renderLabelBox({
+      keySuffix: feeder.id,
+      feederLineX,
+      feederStartY,
+      feederEndY,
+      offsetDirection,
+      lines: buildFeederLabelLines(feeder),
+    });
+  };
 
-    // Build label text lines
-    const line1 = `${feeder.phase_conductor_size} ${feeder.conductor_material}`;
-    const line2 = feeder.egc_size ? `+ ${feeder.egc_size} EGC` : '';
-    const line3 = feeder.conduit_size;
+  /**
+   * Render the synthetic UTIL→MDP service-entrance label. Picks the project's
+   * one is_service_entrance feeder and renders identically to the standard
+   * feeder label (size+material / length / VD%), anchored to the supplied
+   * vertical segment. Returns null if no service-entrance row exists.
+   */
+  const renderServiceEntranceLabel = (
+    feederLineX: number,
+    feederStartY: number,
+    feederEndY: number,
+    offsetDirection: 'left' | 'right' = 'right',
+  ) => {
+    if (!serviceEntranceFeeder) return null;
+    if (!serviceEntranceFeeder.phase_conductor_size) return null;
 
-    // Estimate label dimensions (reduced for more compact labels)
-    const charWidth = 4.5;  // Reduced from 6
-    const lineHeight = 9;   // Reduced from 12
-    const padding = 3;      // Reduced from 4
-    const maxLineLength = Math.max(line1.length, line2.length, line3.length);
-    const labelWidth = maxLineLength * charWidth + padding * 2;
-    const labelHeight = (line2 ? 3 : 2) * lineHeight + padding * 2;
+    const lines = buildFeederLabelLines(serviceEntranceFeeder, {
+      sourceTag: 'SE',
+    });
 
-    // Adjust label box position based on direction
-    const labelBoxX = offsetDirection === 'right' ? labelX : labelX - labelWidth;
-
-    return (
-      <g key={`feeder-label-${feeder.id}`}>
-        {/* Loop on feeder line */}
-        <circle
-          cx={feederLineX}
-          cy={loopY}
-          r={loopRadius}
-          fill="white"
-          stroke="#6366F1"
-          strokeWidth="2"
-        />
-
-        {/* Leader line from loop to label */}
-        <line
-          x1={feederLineX + (offsetDirection === 'right' ? loopRadius : -loopRadius)}
-          y1={loopY}
-          x2={labelX}
-          y2={loopY}
-          stroke="#6366F1"
-          strokeWidth="1.5"
-          strokeDasharray="2,2"
-        />
-
-        {/* Label box with border */}
-        <rect
-          x={labelBoxX}
-          y={loopY - labelHeight / 2}
-          width={labelWidth}
-          height={labelHeight}
-          fill="white"
-          stroke="#6366F1"
-          strokeWidth="1.5"
-          rx="3"
-        />
-
-        {/* Label text */}
-        <text
-          x={labelBoxX + padding}
-          y={loopY - labelHeight / 2 + lineHeight}
-          fontSize="6.5"
-          fontWeight="500"
-          className="fill-gray-800"
-          textAnchor="start"
-        >
-          {line1}
-        </text>
-        {line2 && (
-          <text
-            x={labelBoxX + padding}
-            y={loopY - labelHeight / 2 + lineHeight * 2}
-            fontSize="8"
-            fontWeight="500"
-            className="fill-gray-800"
-            textAnchor="start"
-          >
-            {line2}
-          </text>
-        )}
-        <text
-          x={labelBoxX + padding}
-          y={loopY - labelHeight / 2 + lineHeight * (line2 ? 3 : 2)}
-          fontSize="6.5"
-          fontWeight="500"
-          className="fill-indigo-600"
-          textAnchor="start"
-        >
-          {line3}
-        </text>
-      </g>
-    );
+    return renderLabelBox({
+      keySuffix: `se-${serviceEntranceFeeder.id}`,
+      feederLineX,
+      feederStartY,
+      feederEndY,
+      offsetDirection,
+      lines,
+    });
   };
 
   const handleGenerate = async () => {
@@ -2479,6 +2606,14 @@ export const OneLineDiagram: React.FC<OneLineDiagramProps> = ({ project, updateP
                 {/* Service Line to First Panel */}
                 <line x1={serviceX} y1={meterStacks.length > 0 ? 138 : 120} x2={serviceX} y2={160} stroke="#111827" strokeWidth="3" />
 
+                {/* Service-entrance label (UTIL→MDP run): size, length, VD% */}
+                {renderServiceEntranceLabel(
+                  serviceX,
+                  meterStacks.length > 0 ? 138 : 120,
+                  160,
+                  'right',
+                )}
+
                 {/* Render System Hierarchy */}
                 {(() => {
                   const mainPanel = getMainPanel();
@@ -2528,6 +2663,13 @@ export const OneLineDiagram: React.FC<OneLineDiagramProps> = ({ project, updateP
                           <>
                             {/* ✅ Professional MDP symbol with connection ports */}
                             {mdpGlyph.element}
+
+                            {/* MDP cumulative VD badge (run = service-entrance VD%) */}
+                            {mainPanel && renderPanelVoltageDropBadge(
+                              serviceX,
+                              DIAGRAM_CONSTANTS.MDP_Y + DIAGRAM_CONSTANTS.MDP_HEIGHT,
+                              mainPanel.id,
+                            )}
 
                           {/* ✅ FIXED: MDP Bus Bar using actual bottomPort position for accurate connections */}
                           {totalElements > 0 && renderBusBar(
@@ -3458,6 +3600,14 @@ export const OneLineDiagram: React.FC<OneLineDiagramProps> = ({ project, updateP
                 {/* Service Line to First Panel */}
                 <line x1={serviceX} y1={meterStacks.length > 0 ? 138 : 120} x2={serviceX} y2={160} stroke="#111827" strokeWidth="3" />
 
+                {/* Service-entrance label (UTIL→MDP run): size, length, VD% */}
+                {renderServiceEntranceLabel(
+                  serviceX,
+                  meterStacks.length > 0 ? 138 : 120,
+                  160,
+                  'right',
+                )}
+
                 {/* Render System Hierarchy */}
                 {(() => {
                   const mainPanel = panels.find(p => p.is_main);
@@ -3509,6 +3659,13 @@ export const OneLineDiagram: React.FC<OneLineDiagramProps> = ({ project, updateP
                           <>
                             {/* ✅ Professional MDP symbol with connection ports */}
                             {mdpGlyph.element}
+
+                            {/* MDP cumulative VD badge (run = service-entrance VD%) */}
+                            {mainPanel && renderPanelVoltageDropBadge(
+                              serviceX,
+                              DIAGRAM_CONSTANTS.MDP_Y + DIAGRAM_CONSTANTS.MDP_HEIGHT,
+                              mainPanel.id,
+                            )}
 
                           {/* ✅ FIXED: MDP Bus Bar using actual bottomPort position for accurate connections */}
                           {totalElements > 0 && renderBusBar(
