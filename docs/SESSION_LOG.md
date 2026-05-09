@@ -7,6 +7,43 @@
 
 ---
 
+### Session: 2026-05-09 — Estimating Beta v1 — Phase 1 implementation (branch `feat/estimating-beta-v1`)
+
+**Focus**: Built Phase 1 of the Estimating beta per `docs/plans/estimating-implementation.md`. Replaces the demand-discovery `EstimatingStub` (PR #29) with a working estimating module. Branch off `main` at commit `74df3e1` plus the cherry-picked plan-doc commit `b7386fd`. Worktree at `/home/augusto/projects/sparkplan-estimating`.
+
+**Status**:
+- 🟡 Branch `feat/estimating-beta-v1` ready, build clean, 129 tests passing (was 95 at branch start). Migration not yet applied.
+- 🟡 PR not opened — user opens it manually after applying the migration and smoke-testing.
+
+**What shipped (7 commits)**:
+1. Migration + types extension. `supabase/migrations/20260511_estimates_and_line_items.sql` creates `estimates` (header) + `estimate_line_items` (detail) with full RLS, indexes, realtime publication. `lib/database.types.ts` hand-extended.
+2. Pure services. `services/estimating/estimateMath.ts` (subtotals + markup + tax), `estimateStatusTransitions.ts` (state machine: draft → submitted → accepted/rejected/expired/cancelled), `defaultPricing.ts` (Phase-1 starter price tables). 25 tests.
+3. Auto-takeoff. `services/estimating/autoTakeoffFromProject.ts` walks panels (MDP first), transformers, feeders (phase + neutral + EGC + conduit + labor), and branch circuits (per-panel grouped + bundled labor). Snapshot semantics; the user re-runs from the takeoff tab to append. 9 tests.
+4. Hooks. `hooks/useEstimates.ts` + `hooks/useEstimateLineItems.ts` follow the optimistic-update + Supabase realtime pattern from `usePanels.ts`. `bulkInsert` for auto-takeoff round-trip; `cloneAsRevision` + `cloneLineItemsForEstimate` for revisions.
+5. Bid PDF. `services/estimating/estimatePdfGenerator.tsx` — 3-page Document (cover + detail + terms/signature) using `@react-pdf/renderer` with shared `permitPacketTheme` BrandBar/Footer.
+6. UI components in `components/Estimating/`: `EstimatingPage`, `EstimatesListView`, `EstimateDetailView` (5-tab strip with `?tab=` URL persistence), `EstimateOverviewTab` (totals + customer + scope), `LineItemsTab` (used by Takeoff/Materials/Labor with optional category filter), `EstimateLineItemRow`, `BidOutputTab`, `EstimateStatusPill`. `App.tsx` swaps lazy import from `EstimatingStub` to `EstimatingPage`. Stub deleted.
+7. AI context + docs. `services/ai/projectContextBuilder.ts` accepts an optional `estimates` array and surfaces count + most-recent in the formatted context (Phase 3 will expand). ROADMAP / CHANGELOG / SESSION_LOG updated.
+
+**Decisions made**:
+- **Tax applied to taxable basis BEFORE markup** (plan §5 decision 1). Markup is on subtotal; tax is on materials only; both add to total. Don't tax the markup itself.
+- **Snapshot, not live binding** (plan §5 decision 4). Auto-takeoff at create time pulls a frozen snapshot of the project. Re-running from the takeoff tab APPENDS rather than reconciles.
+- **Soft FK for line items** (plan §5 decision 9). `source_id` is a UUID with no DB-level FK constraint. If the user deletes a panel after the estimate exists, the estimate keeps the line items with an orphaned `source_id`. Acceptable; revisions are explicit.
+- **Subtotal_other rolls up equipment + subcontract + other** in the DB. Phase 2 (per-category markup) will split them into dedicated columns. Saves 2 columns now at the cost of a small adapter in `totalsForPersistence`.
+- **No `set_updated_at()` trigger** in the migration. The project doesn't ship that helper function — every existing migration just defaults `updated_at NOW()` and lets the app update it explicitly. Followed convention.
+- **PDF stays client-side in Phase 1**. The `bid_pdf_url` column is in the schema for Phase 4; today the user clicks Download and the browser saves the blob. Avoided the storage-bucket + signed-URL plumbing that adds complexity for marginal Phase 1 value.
+
+**Numbers**:
+- Build: 4.87s clean. New `EstimatingPage` chunk 53.81 kB (gzip 13.71 kB).
+- Tests: 95 → 129 (+34 new in `tests/estimating/`). Pre-existing 1-suite failure in `tests/calculations-extended.test.ts` is the missing-Supabase-env error from `lib/supabase.ts:13` (untouched by this work).
+
+**Pending / follow-ups for the user**:
+1. **Apply the migration** in Supabase SQL Editor: `supabase/migrations/20260511_estimates_and_line_items.sql`.
+2. **Optionally regenerate `lib/database.types.ts` via Supabase CLI** to replace the hand-written rows. The hand-written types match the migration field-for-field but the CLI version may add extra metadata (e.g. timestamp string vs. Date).
+3. **Smoke test** — create a project with 2 panels + 1 transformer + a feeder, click "New estimate" with auto-takeoff on, edit a line, change status to submitted, click Generate PDF in the Bid Output tab.
+4. **Open the PR**. Suggested title: `feat(estimating): Phase 1 — auto-takeoff + bid PDF + 5-tab UI`. Base is `main`.
+
+---
+
 ### Session: 2026-05-09 — Permits Beta v1 Phase 1 implementation (`feat/permits-beta-v1`)
 
 **Focus**: Executed `docs/plans/permits-implementation.md` (Phase 1 only) end-to-end in a fresh worktree at `/home/augusto/projects/sparkplan-permits`. Replaces the PR #29 `PermitsStub` with a real tabbed Permits page (Overview / Permits / Inspections / Issues), full CRUD for permits + inspections, and migrates the existing `IssuesLog` UI into the page as the Issues tab. `/issues` redirects into `/permits?tab=issues`.

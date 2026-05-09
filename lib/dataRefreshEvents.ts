@@ -12,6 +12,8 @@ type RefreshEventType =
   | 'meter_stacks'
   | 'meters'
   | 'support_tickets'
+  | 'estimates'
+  | 'estimate_line_items'
   | 'permits'
   | 'permit_inspections'
   // T&M Billing (Phase 1a — time/materials/settings; Phase 1b adds invoices/payments)
