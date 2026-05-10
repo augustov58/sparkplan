@@ -2052,6 +2052,39 @@ export const OneLineDiagram: React.FC<OneLineDiagramProps> = ({ project, updateP
           {panel.voltage}V {panel.phase === 3 ? '3Φ' : '1Φ'}
         </text>
 
+        {/* Sprint 2A PR 4 (H9 AIC overlay): AIC chip overlapping the lower-right
+            corner of the panel. Required by Orlando new-service item #4 — every
+            node on the one-line must show voltage / phase / amperage / AIC. The
+            three existing labels above already cover V / phase / bus + main; the
+            chip appends AIC without crowding them. Hidden when no rating is set. */}
+        {(panel as any).aic_rating && (panel as any).aic_rating > 0 && (
+          <g>
+            <rect
+              x={x + width / 2 - 28}
+              y={y + height - 4}
+              width={28}
+              height={10}
+              fill="#fef3c7"
+              stroke="#d97706"
+              strokeWidth={0.6}
+              rx={1.5}
+            />
+            <text
+              x={x + width / 2 - 14}
+              y={y + height + 3}
+              textAnchor="middle"
+              fontSize={DIAGRAM_CONSTANTS.SMALL_FONT - 2}
+              fontWeight="bold"
+              fill="#7c2d12"
+            >
+              {(() => {
+                const ka = (panel as any).aic_rating / 1000;
+                return `AIC ${ka >= 10 ? Math.round(ka) : ka.toFixed(1)}kA`;
+              })()}
+            </text>
+          </g>
+        )}
+
         {/* Connection ports (visual indicators) */}
         <circle
           cx={topPort.x}
