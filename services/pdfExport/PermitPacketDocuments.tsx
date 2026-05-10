@@ -794,6 +794,10 @@ interface RiserNode {
   line1: string;
   line2?: string;
   line3?: string;
+  // Sprint 2A PR 4 (H9 AIC overlay): Orlando #4 new-service path requires
+  // voltage / phase / amperage / AIC labels per node on the riser. line2 already
+  // covers V / phase / bus rating; line4 carries the AIC interrupting rating.
+  line4?: string;
   feederLabel?: string;
   children: RiserNode[];
   subtreeWidth?: number;
@@ -802,9 +806,22 @@ interface RiserNode {
 }
 
 const NODE_W = 150;
-const NODE_H = 54;
+// Sprint 2A PR 4 (H9): bumped from 54 to 66 to fit the new line4 (AIC) without
+// the bottom line crowding into line3. Layout helpers honor this dynamically.
+const NODE_H = 66;
 const V_GAP = 64;
 const H_GAP = 18;
+
+// Sprint 2A PR 4 (H9 AIC overlay): format a panel/equipment AIC rating for the
+// riser node. Returns undefined when no rating is known so the line4 slot stays
+// empty (no fake "AIC: —" pollution). Display in kAIC for compactness.
+const formatAic = (aicRating: number | null | undefined): string | undefined => {
+  if (aicRating == null || aicRating <= 0) return undefined;
+  // 22000 -> "22 kAIC", 65000 -> "65 kAIC"; 9500 -> "9.5 kAIC"
+  const ka = aicRating / 1000;
+  const display = ka >= 10 ? `${Math.round(ka)}` : ka.toFixed(1);
+  return `AIC ${display} kA`;
+};
 
 const buildFeederLabel = (feeder: Feeder): string => {
   const parts: string[] = [];
@@ -843,6 +860,10 @@ const buildPanelSubtree = (
     line1: panel.name + (panel.is_main ? ' (MDP)' : ''),
     line2: `${panel.voltage}V ${phaseLabel(panel.phase)} \u2022 ${panel.bus_rating}A bus`,
     line3,
+    // Sprint 2A PR 4 (H9 AIC overlay): per Orlando new-service item #4, every
+    // node on the one-line must carry voltage / phase / amperage / AIC. Pull
+    // from the panel's stored aic_rating; omitted when unset.
+    line4: formatAic(panel.aic_rating),
     feederLabel,
     children: [],
   };
@@ -910,7 +931,11 @@ const buildRiserTree = (
         kind: 'meter_stack',
         line1: stack.name,
         line2: `${stack.voltage}V ${phaseLabel(stack.phase)} \u2022 ${stack.bus_rating_amps}A bus`,
-        line3: `${stack.num_meter_positions} meter positions`,
+        // Sprint 2A PR 4 (M6): "positions" was wrapping mid-character at the
+        // shrink-to-fit scale. Drop the redundant "positions" word \u2014 bus rating
+        // already conveys "stack". Stays inside the 150pt label width down to
+        // the smallest scale we render.
+        line3: `${stack.num_meter_positions} meters`,
         children: [],
       };
       for (const meter of stackMeters) {
@@ -982,6 +1007,107 @@ const assignXPositions = (node: RiserNode, leftEdge: number): void => {
 
 const depth = (node: RiserNode): number =>
   1 + node.children.reduce((max, c) => Math.max(max, depth(c)), 0);
+
+// Sprint 2A PR 4 (M6): paginate the riser when one branch has too many children
+// to fit on a single landscape sheet without text wrapping mid-character.
+//
+// Background: the previous renderer scaled the entire SVG to 720pt, so a 14-
+// child meter stack (~14 × (150 + 18) = 2352pt) shrank to ~31% of original;
+// at that scale the 8-9pt labels clamped to the 6pt floor, and "15 meters
+// positions" (now shortened) crammed into a 46pt label slot, wrapping to
+// "15 me|s posi|tions". The audit fixture (15 meters, 14 panels) is the
+// canonical reproducer — see example_reports/Permit_Packet_Multifamily_Test_2026-05-05.pdf.
+//
+// Strategy: find the "widest" node (the one with the most direct children).
+// If its child count exceeds RISER_PAGE_CHUNK_SIZE, split its children into
+// chunks of that size and clone the tree once per chunk. Each clone re-uses
+// the same parent path — UTIL → MeterStack → 1/N of meters — and gets a
+// distinct page-of-N annotation in the title block.
+const RISER_PAGE_CHUNK_SIZE = 6;
+
+// Find the node we want to split, if any. Returns the "widest" node whose
+// child count exceeds the chunk threshold. Single-tree-walk; ties broken by
+// shallowest depth (so we paginate the meter stack, not a single sub-panel
+// that happens to also have many children).
+const findSplitNode = (root: RiserNode): RiserNode | null => {
+  let candidate: RiserNode | null = null;
+  let candidateDepth = Infinity;
+  const walk = (node: RiserNode, d: number) => {
+    if (
+      node.children.length > RISER_PAGE_CHUNK_SIZE &&
+      (candidate === null || d < candidateDepth ||
+        (d === candidateDepth && node.children.length > (candidate?.children.length ?? 0)))
+    ) {
+      candidate = node;
+      candidateDepth = d;
+    }
+    node.children.forEach(c => walk(c, d + 1));
+  };
+  walk(root, 0);
+  return candidate;
+};
+
+// Deep-clone a tree, swapping the children array of `target` for `replacementChildren`.
+// (We mutate xy/_y/subtreeWidth fields during layout so each page must own its own
+// copy; we cannot reuse the same node across pages.)
+const cloneTreeWithSplit = (
+  node: RiserNode,
+  target: RiserNode,
+  replacementChildren: RiserNode[]
+): RiserNode => {
+  if (node === target) {
+    return {
+      ...node,
+      children: replacementChildren.map(c => cloneTreeWithSplit(c, target, replacementChildren)),
+      subtreeWidth: undefined,
+      x: undefined,
+      _y: undefined,
+    };
+  }
+  return {
+    ...node,
+    children: node.children.map(c => cloneTreeWithSplit(c, target, replacementChildren)),
+    subtreeWidth: undefined,
+    x: undefined,
+    _y: undefined,
+  };
+};
+
+interface RiserPagePlan {
+  tree: RiserNode;
+  pageIndex: number;       // 0-based
+  totalPages: number;
+  splitParentId?: string;  // id of the parent whose children were chunked
+  rangeLabel?: string;     // human label e.g. "Meters 1-6 of 15"
+}
+
+// Returns one or more trees, each one ready to lay out on a single page.
+// Single page when no node exceeds the chunk threshold.
+const planRiserPages = (root: RiserNode): RiserPagePlan[] => {
+  const target = findSplitNode(root);
+  if (!target) {
+    return [{ tree: root, pageIndex: 0, totalPages: 1 }];
+  }
+  const chunks: RiserNode[][] = [];
+  for (let i = 0; i < target.children.length; i += RISER_PAGE_CHUNK_SIZE) {
+    chunks.push(target.children.slice(i, i + RISER_PAGE_CHUNK_SIZE));
+  }
+  // Remember the original child count for the human-readable range label —
+  // we lose it after we swap children into each clone.
+  const totalChildren = target.children.length;
+  const splitParentId = target.id;
+  return chunks.map((chunk, idx) => {
+    const start = idx * RISER_PAGE_CHUNK_SIZE + 1;
+    const end = Math.min(start + chunk.length - 1, totalChildren);
+    return {
+      tree: cloneTreeWithSplit(root, target, chunk),
+      pageIndex: idx,
+      totalPages: chunks.length,
+      splitParentId,
+      rangeLabel: `Branches ${start}-${end} of ${totalChildren}`,
+    };
+  });
+};
 
 const NODE_FILL: Record<RiserNode['kind'], string> = {
   utility: '#f3f4f6',
@@ -1076,6 +1202,21 @@ const buildRiserDraw = (node: RiserNode, draw: RiserDraw): void => {
       align: 'center',
     });
   }
+  if (node.line4) {
+    // Sprint 2A PR 4 (H9): AIC overlay — small, monospace-looking accent so
+    // it reads as a rating chip rather than continuation prose.
+    draw.labels.push({
+      key: `l4-${node.id}`,
+      x,
+      y: y + 49,
+      width: NODE_W,
+      content: node.line4,
+      fontSize: 7.5,
+      bold: true,
+      color: '#7c2d12', // dark amber, matches AIC tagging on the AIC page
+      align: 'center',
+    });
+  }
 
   const cx = x + NODE_W / 2;
   for (const child of node.children) {
@@ -1147,35 +1288,33 @@ interface RiserDiagramProps {
   sheetId?: string;
 }
 
-export const RiserDiagram: React.FC<RiserDiagramProps> = ({
-  panels,
-  transformers,
-  feeders,
-  meterStacks = [],
-  meters = [],
+// Render a single laid-out RiserNode tree onto a single landscape Page.
+// Centralized so the multi-page paginator (M6) can reuse the same render path
+// for each chunk; nothing in here depends on the chunk index.
+interface RiserPageBodyProps {
+  tree: RiserNode | null;
+  projectName: string;
+  contractorName?: string;
+  contractorLicense?: string;
+  sheetId?: string;
+  // Pagination annotation. Omitted on single-page riser; populated when the
+  // diagram had to be split across multiple sheets so the reader sees
+  // "Sheet 2 of 3 — Branches 7-12 of 15" rather than three identical headers.
+  pageIndex?: number;
+  totalPages?: number;
+  rangeLabel?: string;
+}
+
+const RiserPageBody: React.FC<RiserPageBodyProps> = ({
+  tree,
   projectName,
-  serviceVoltage,
-  servicePhase,
   contractorName,
   contractorLicense,
   sheetId,
+  pageIndex,
+  totalPages,
+  rangeLabel,
 }) => {
-  // Cumulative VD per panel (resets at transformer secondary, see service spec).
-  const cumulativeAll = calculateAllCumulativeVoltageDrops(panels, feeders, transformers);
-  const cumulativeVd = new Map<string, number>();
-  cumulativeAll.forEach((r, panelId) => cumulativeVd.set(panelId, r.cumulativePercent));
-
-  const tree = buildRiserTree(
-    panels,
-    transformers,
-    feeders,
-    meterStacks,
-    meters,
-    serviceVoltage,
-    servicePhase,
-    cumulativeVd
-  );
-
   let svgWidth = NODE_W;
   let svgHeight = NODE_H;
   const draw: RiserDraw = { geometry: [], labels: [] };
@@ -1201,6 +1340,15 @@ export const RiserDiagram: React.FC<RiserDiagramProps> = ({
   const scale = Math.min(1, widthScale, heightScale);
   const renderedW = svgWidth * scale;
   const renderedH = svgHeight * scale;
+  // Sprint 2A PR 4 (M6): label readability floor. Old code clamped to 6pt
+  // which collapsed under heavy width-scaling and forced text to wrap mid-word.
+  // 7pt is a comfortable AHJ-readable minimum; pagination keeps the scale high
+  // enough that this floor rarely engages.
+  const MIN_LABEL_FONT = 7;
+
+  const subtitle = totalPages && totalPages > 1
+    ? `Sheet ${(pageIndex ?? 0) + 1} of ${totalPages}${rangeLabel ? ` — ${rangeLabel}` : ''}. Power distribution from utility service through the MDP, downstream panels, transformers, and meter banks.`
+    : 'Electrical power distribution from utility service through the MDP and all downstream panels, transformers, and meter banks.';
 
   return (
     <Page size="LETTER" orientation="landscape" style={themeStyles.page}>
@@ -1208,10 +1356,7 @@ export const RiserDiagram: React.FC<RiserDiagramProps> = ({
 
       <View style={themeStyles.titleBlock}>
         <Text style={themeStyles.docTitle}>Riser Diagram</Text>
-        <Text style={themeStyles.docSubtitle}>
-          Electrical power distribution from utility service through the MDP
-          and all downstream panels, transformers, and meter banks.
-        </Text>
+        <Text style={themeStyles.docSubtitle}>{subtitle}</Text>
       </View>
 
       {tree ? (
@@ -1243,7 +1388,7 @@ export const RiserDiagram: React.FC<RiserDiagramProps> = ({
             >
               <Text
                 style={{
-                  fontSize: Math.max(6, label.fontSize * scale),
+                  fontSize: Math.max(MIN_LABEL_FONT, label.fontSize * scale),
                   fontFamily: label.bold ? 'Helvetica-Bold' : 'Helvetica',
                   color: label.color || '#000',
                   textAlign: label.align || 'left',
@@ -1265,10 +1410,10 @@ export const RiserDiagram: React.FC<RiserDiagramProps> = ({
         {`Utility service \u2022 Meter stack (multi-family) \u2022 Panel / MDP \u2022 Transformer`}
       </Text>
       <Text style={{ fontSize: 8, marginBottom: 2 }}>
-        MLO = Main Lug Only (no main breaker)
+        {`MLO = Main Lug Only (no main breaker) \u2022 AIC = Available Interrupting Current`}
       </Text>
       <Text style={{ fontSize: 8 }}>
-        Feeder labels show conductor size + design load in kVA
+        Feeder labels show conductor size + design load in kVA. Per-node AIC ratings per Orlando one-line item #4 (NEC 110.9 / 110.10).
       </Text>
 
       <BrandFooter
@@ -1278,6 +1423,86 @@ export const RiserDiagram: React.FC<RiserDiagramProps> = ({
         sheetId={sheetId}
       />
     </Page>
+  );
+};
+
+export const RiserDiagram: React.FC<RiserDiagramProps> = ({
+  panels,
+  transformers,
+  feeders,
+  meterStacks = [],
+  meters = [],
+  projectName,
+  serviceVoltage,
+  servicePhase,
+  contractorName,
+  contractorLicense,
+  sheetId,
+}) => {
+  // Cumulative VD per panel (resets at transformer secondary, see service spec).
+  const cumulativeAll = calculateAllCumulativeVoltageDrops(panels, feeders, transformers);
+  const cumulativeVd = new Map<string, number>();
+  cumulativeAll.forEach((r, panelId) => cumulativeVd.set(panelId, r.cumulativePercent));
+
+  const tree = buildRiserTree(
+    panels,
+    transformers,
+    feeders,
+    meterStacks,
+    meters,
+    serviceVoltage,
+    servicePhase,
+    cumulativeVd
+  );
+
+  // Sprint 2A PR 4 (M6): when the tree has too many siblings to fit cleanly on
+  // one landscape sheet (e.g. 14-meter multifamily fixture), split into chunks
+  // and emit one Page per chunk. Single-page render path is preserved when the
+  // tree is small enough \u2014 most projects.
+  if (!tree) {
+    return (
+      <RiserPageBody
+        tree={null}
+        projectName={projectName}
+        contractorName={contractorName}
+        contractorLicense={contractorLicense}
+        sheetId={sheetId}
+      />
+    );
+  }
+
+  const plans = planRiserPages(tree);
+  if (plans.length === 1) {
+    return (
+      <RiserPageBody
+        tree={plans[0].tree}
+        projectName={projectName}
+        contractorName={contractorName}
+        contractorLicense={contractorLicense}
+        sheetId={sheetId}
+      />
+    );
+  }
+
+  return (
+    <>
+      {plans.map(plan => (
+        <RiserPageBody
+          key={`riser-page-${plan.pageIndex}`}
+          tree={plan.tree}
+          projectName={projectName}
+          contractorName={contractorName}
+          contractorLicense={contractorLicense}
+          // All paginated pages share the parent sheetId \u2014 the riser is one
+          // logical sheet (E-200) split across N physical pages. The pageIndex
+          // / range label in the subtitle disambiguates them for the AHJ.
+          sheetId={sheetId}
+          pageIndex={plan.pageIndex}
+          totalPages={plan.totalPages}
+          rangeLabel={plan.rangeLabel}
+        />
+      ))}
+    </>
   );
 };
 
