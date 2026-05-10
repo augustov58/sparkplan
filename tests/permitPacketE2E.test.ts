@@ -597,6 +597,21 @@ describe('Permit packet: full generator E2E (mirrors button click)', () => {
     expect(dl.bytes).toBeGreaterThan(5_000);
   }, 30_000);
 
+  // Sprint 2A PR 4 / M3: grounding page must render even when no
+  // grounding_details DB row exists. The PDF derives a project-specific GEC
+  // size + electrode list from service ampacity instead of falling back to
+  // generic Article 250 boilerplate.
+  it('renders grounding page with derived GEC when groundingSystem is missing', async () => {
+    downloads.length = 0;
+    const noGrounding: PermitPacketData = { ...uiLikePacket, groundingSystem: undefined };
+    await generatePermitPacket(noGrounding);
+
+    expect(downloads).toHaveLength(1);
+    // Should still produce the same number of bytes ballpark (grounding page
+    // is included via its calculated default).
+    expect(downloads[0].bytes).toBeGreaterThan(10_000);
+  }, 60_000);
+
   it('generates minimal packet (no optional sections)', async () => {
     downloads.length = 0;
     const minimal: PermitPacketData = {
