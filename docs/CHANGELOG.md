@@ -4,6 +4,30 @@ All notable changes to SparkPlan.
 
 ---
 
+## 2026-05-10: Permit packet — Sprint 2A engineering content additions (PR #31)
+
+Closes 5 systemic AHJ-rejection vectors documented in `docs/AHJ_COMPLIANCE_AUDIT_2026-05-04.md`. All 5 findings ride into the existing permit-packet generator as new sheets in the band-100 (calculations) and band-600 (specialty) ranges, with section toggles + auto-disable predicates so they don't render with placeholder content for projects that don't need them.
+
+**User-facing changes:**
+
+- **NEC 220.87 Existing-Service Narrative sheet (band 100, opt-in).** Required by Orlando's existing-service path: a structured 3-condition checklist that the AHJ reviewer can scan in seconds — (1) max demand data over 1 year, (2) demand × 125% + new load ≤ ampacity, (3) OCPD per NEC 240.4 + service overload per NEC 230.90. The Permit Packet Generator UI gains a section that captures the existing-load determination method (utility bill / load study / calculated / manual), source citation, observation window dates, max demand kVA, and proposed new load kVA. Measured methods (utility bill / load study) skip the 125% multiplier per NEC 220.87; calculated/manual methods apply it. Auto-disabled until source citation + max demand are filled, so empty/placeholder pages don't ship.
+- **Available Fault Current Calculation sheet (band 100).** Required by Orlando's new-service path. Renders when the project has a service-level entry in `short_circuit_calculations` (`calculation_type === 'service'`). Shows source assumptions (utility transformer + service conductor specs), the IEEE 141 derivation table, the calculated available fault current at the service main, and a NEC 110.9 / 110.10 verdict callout — equipment AIC must meet or exceed the available fault current. Distinct from the existing per-panel ShortCircuit pages — this is the service-main summary AHJs cite. The on-diagram AIC overlay portion of H9 is deferred to PR 4 (paired with M6 riser layout).
+- **UL-2202 / UL-2594 EVSE listings card on Equipment Specs (existing band-200 sheet).** Required by Orlando item #7. Renders an "EV CHARGING SUPPLY EQUIPMENT — APPLICABLE LISTING STANDARDS" card listing both standards by number for each detected EV-bank panel. Detection: panel has an EVEMS marker circuit (NEC 625.42 managed) OR panel name matches `/ev|evse|charger|charging|level\s*2|l2/i`. Card omitted when no EV panels present.
+- **EVEMS Operational Narrative sheet (band 600).** Required by every FL AHJ that reviews NEC 625.42 designs. One detail block per EVEMS-managed panel covering the six narrative elements every reviewer asks for: device + UL 916, max aggregate setpoint with derivation, monitoring points, failure mode (default lowest setpoint on signal loss), tamper protection per NEC 750, NEC 625.42 compliance statement re: branch (625.40) vs feeder (625.42) sizing. Setpoint sourced from the explicit "EVEMS Aggregate Setpoint" marker circuit; legacy projects fall back to a `panel.main_breaker_amps × voltage` proxy with a "estimated" source flag in the summary.
+- **EVSE Labeling Reference sheet (band 600).** Required by every FL AHJ. Per-panel disconnect label text + 6-item required-content checklist (manufacturer, source breaker, V/A ratings, lockable disconnect, arc-flash warning, available fault current marking) + breaker locking note + commercial-only emergency-shutoff section (Davie + Knox-box scopes — rendered only when projectType is Commercial or Industrial) + contractor attestation callout.
+
+**Why this matters:** Without these five sheets, Orlando rejects multifamily EV permit submittals on intake before the technical review starts. The audit found this path was costing contractors 2–3 day permit-cycle delays per project. PR #31 closes the systemic vectors that affect every FL AHJ; per-AHJ specifics (Miami-Dade, Pompano, Davie, Hillsborough) come in Sprint 2C with the manifest engine.
+
+**Technical:**
+
+- 4 new exported PDF components in `services/pdfExport/PermitPacketDocuments.tsx` (~700 LOC): `NEC22087NarrativePage`, `AvailableFaultCurrentPage`, `EVEMSNarrativePage`, `EVSELabelingPage`. Plus a new `EVChargingListingsCard` private component in `EquipmentSpecsDocuments.tsx`.
+- 4 new section toggles in `PacketSections` (now 20 toggles total), each with an auto-disable predicate so the section greys out when underlying data is absent.
+- 21 new vitest PDF render tests across 4 new test files. Build clean. No DB migrations.
+- Detection regex `/\b(ev|evse|charger|charging|level\s*2|l2)\b/i` is now used in 3 call sites (audit memory tracks this as a DRY follow-up — extract to `isLikelyEVPanel` helper next time `upstreamLoadAggregation.ts` is touched).
+- Squash hash `dacaab2`. Replaces the manual narrative work contractors were stitching together in Word for FL pilot AHJs.
+
+---
+
 ## 2026-05-09: T&M Billing Beta v1 — Phase 1 implementation (PRs #34 + #35, stacked)
 
 Replaces the `TmBillingStub` page (PR #29 demand-discovery) with the real T&M billing module. Shipped as two stacked PRs splitting Phase 1's ~7,700 LOC scope into a reviewable foundation + invoicing layer.
