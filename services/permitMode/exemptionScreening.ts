@@ -18,6 +18,12 @@
  *   Commercial:  service ≤ 800 A @ 240 V
  *   Project value: ≤ $125,000 (regardless of occupancy)
  *
+ * The statute is written in 240 V terms. For 480 V / 208 V / 277 V services
+ * the caller passes the nameplate ampacity + the actual service voltage; this
+ * function normalizes internally before comparing to the 240 V thresholds.
+ * Per CLAUDE.md "No implicit unit conversions" — the caller must supply
+ * voltage so the function can convert explicitly.
+ *
  * Per CLAUDE.md "Calculation Service Rules":
  *   - Pure function. No DB calls, no hooks, no side effects.
  *   - Never throws. Returns a result with `warnings[]` instead.
@@ -25,6 +31,10 @@
  *     reused in the cover-sheet exemption stamp). NEC isn't applicable for
  *     this lane decision — the citation is FL-statutory — but we keep the
  *     field name to match the calc-service contract.
+ *   - Fail-safe defaults: malformed inputs (NaN, negative, non-finite)
+ *     resolve to `pe-required` with a WARNING, never silently to `exempt`.
+ *     A compliance flag must lean toward over-requiring engineering review,
+ *     not under-requiring it.
  *
  * Audit-fixture interpretation:
  *   A 12-unit multifamily building with a 1,000 A @ 240 V service IS a
@@ -49,11 +59,21 @@ export interface ExemptionScreeningInput {
   occupancyType: 'residential' | 'commercial';
 
   /**
-   * Service ampacity at 240 V (per FS 471.003(2)(h) which is written in
-   * 240 V terms). For 480 V services convert ampacity to its 240 V
-   * equivalent before passing in (caller's responsibility).
+   * Service nameplate ampacity at the actual service voltage. The function
+   * normalizes this to 240 V terms (per FS 471.003(2)(h)) before applying
+   * thresholds. For a 480 V/800 A commercial service this is `800`, voltage
+   * is `480`, normalized = 1600 A @ 240 V — exceeds the 800 A commercial
+   * threshold → `pe-required`.
    */
-  serviceCapacity_240V_amps: number;
+  serviceCapacityAmps: number;
+
+  /**
+   * Service voltage in volts (e.g. 240 for typical residential, 208 for
+   * 208Y/120 commercial, 480 for 480Y/277 commercial, 600 for 600Y/347
+   * industrial). Used to normalize `serviceCapacityAmps` to FS 471.003(2)(h)'s
+   * 240 V thresholds.
+   */
+  serviceVoltageV: number;
 
   /** Scope flags from Project Setup — used for context + future Sprint 2C rules. */
   scopeFlags: {
@@ -101,15 +121,27 @@ const FS_THRESHOLD_COMMERCIAL_AMPS = 800;
 const FS_CITATION = 'FS 471.003(2)(h)';
 
 /**
+ * Coerce a numeric input to a fail-safe value. Returns the input if it's a
+ * finite non-negative number; otherwise returns the sentinel passed in.
+ * Used at the top of `screenContractorExemption` so that NaN / Infinity /
+ * negative values produced by malformed user input flow to `pe-required`
+ * (the safe direction for a compliance flag) instead of silently passing
+ * through to `exempt`.
+ */
+function coerceNonNegativeFinite(value: number, sentinel: number): number {
+  return Number.isFinite(value) && value >= 0 ? value : sentinel;
+}
+
+/**
  * Decide whether the project qualifies for the FL contractor exemption
  * (lane = 'exempt') or requires a PE seal (lane = 'pe-required').
  *
  * Order of evaluation (first match wins):
- *   1. AHJ override present                              → pe-required
- *   2. Project value > $125,000                          → pe-required
- *   3. Residential AND service > 600 A @ 240 V           → pe-required
- *   4. Commercial AND service > 800 A @ 240 V            → pe-required
- *   5. Otherwise                                          → exempt
+ *   1. AHJ override present                                  → pe-required
+ *   2. Project value > $125,000                              → pe-required
+ *   3. Residential AND service > 600 A @ 240 V (normalized)  → pe-required
+ *   4. Commercial AND service > 800 A @ 240 V (normalized)   → pe-required
+ *   5. Otherwise                                              → exempt
  */
 export function screenContractorExemption(
   input: ExemptionScreeningInput,
@@ -128,11 +160,51 @@ export function screenContractorExemption(
     };
   }
 
+  // Defensive coercion: malformed inputs (NaN, negative, Infinity) fail-safe
+  // to a sentinel that trips the threshold checks, producing `pe-required`
+  // with a WARNING. A regulatory-compliance flag should lean toward over-
+  // requiring engineering review, not under-requiring it.
+  const rawValue = input.estimatedValueUsd;
+  const safeValue = coerceNonNegativeFinite(rawValue, Number.POSITIVE_INFINITY);
+  if (safeValue !== rawValue) {
+    warnings.push(
+      `WARNING: estimated project value is missing or invalid (received ${rawValue}); fail-safe to pe-required`,
+    );
+  }
+
+  const rawAmps = input.serviceCapacityAmps;
+  const rawVolts = input.serviceVoltageV;
+  const safeAmps = coerceNonNegativeFinite(rawAmps, Number.POSITIVE_INFINITY);
+  // Voltage must be strictly positive — a 0 V "service" is meaningless and
+  // would produce a 0-amp normalized value (silently exempt). Use 240 as the
+  // sentinel so malformed voltage still allows a sane normalization, but emit
+  // a warning so the UI can prompt the user to set service voltage.
+  const safeVolts =
+    Number.isFinite(rawVolts) && rawVolts > 0 ? rawVolts : 240;
+  if (safeAmps !== rawAmps) {
+    warnings.push(
+      `WARNING: service capacity is missing or invalid (received ${rawAmps} A); fail-safe to pe-required`,
+    );
+  }
+  if (safeVolts !== rawVolts) {
+    warnings.push(
+      `WARNING: service voltage is missing or invalid (received ${rawVolts} V); defaulting to 240 V for threshold normalization`,
+    );
+  }
+
+  // Normalize to FS 471.003(2)(h)'s 240 V terms. For a 240 V service this
+  // is a no-op; for 480 V/800 A it yields 1600 A which trips the commercial
+  // 800 A threshold (the bug H2 from the Sprint 2A PR 5 code review fixed).
+  const serviceCapacity240VAmps = safeAmps * (safeVolts / 240);
+
   // 2. Project-value cap (applies to both occupancies).
-  if (input.estimatedValueUsd > FS_THRESHOLD_VALUE_USD) {
+  if (safeValue > FS_THRESHOLD_VALUE_USD) {
+    const valueText = Number.isFinite(safeValue)
+      ? `$${safeValue.toLocaleString('en-US')}`
+      : '(unknown)';
     return {
       lane: 'pe-required',
-      reason: `Project value ($${input.estimatedValueUsd.toLocaleString('en-US')}) exceeds $${FS_THRESHOLD_VALUE_USD.toLocaleString('en-US')} ${FS_CITATION} threshold`,
+      reason: `Project value (${valueText}) exceeds $${FS_THRESHOLD_VALUE_USD.toLocaleString('en-US')} ${FS_CITATION} threshold`,
       necReferences: [FS_CITATION],
       warnings,
     };
@@ -141,11 +213,14 @@ export function screenContractorExemption(
   // 3. Residential service-capacity threshold.
   if (
     input.occupancyType === 'residential'
-    && input.serviceCapacity_240V_amps > FS_THRESHOLD_RESIDENTIAL_AMPS
+    && serviceCapacity240VAmps > FS_THRESHOLD_RESIDENTIAL_AMPS
   ) {
+    const ampsText = Number.isFinite(serviceCapacity240VAmps)
+      ? `${Math.round(serviceCapacity240VAmps)} A`
+      : '(unknown)';
     return {
       lane: 'pe-required',
-      reason: `Residential service capacity (${input.serviceCapacity_240V_amps} A @ 240 V) exceeds ${FS_THRESHOLD_RESIDENTIAL_AMPS} A ${FS_CITATION} residential threshold`,
+      reason: `Residential service capacity (${ampsText} @ 240 V equivalent, from ${safeAmps} A @ ${safeVolts} V) exceeds ${FS_THRESHOLD_RESIDENTIAL_AMPS} A ${FS_CITATION} residential threshold`,
       necReferences: [FS_CITATION],
       warnings,
     };
@@ -154,11 +229,14 @@ export function screenContractorExemption(
   // 4. Commercial service-capacity threshold.
   if (
     input.occupancyType === 'commercial'
-    && input.serviceCapacity_240V_amps > FS_THRESHOLD_COMMERCIAL_AMPS
+    && serviceCapacity240VAmps > FS_THRESHOLD_COMMERCIAL_AMPS
   ) {
+    const ampsText = Number.isFinite(serviceCapacity240VAmps)
+      ? `${Math.round(serviceCapacity240VAmps)} A`
+      : '(unknown)';
     return {
       lane: 'pe-required',
-      reason: `Commercial service capacity (${input.serviceCapacity_240V_amps} A @ 240 V) exceeds ${FS_THRESHOLD_COMMERCIAL_AMPS} A ${FS_CITATION} commercial threshold`,
+      reason: `Commercial service capacity (${ampsText} @ 240 V equivalent, from ${safeAmps} A @ ${safeVolts} V) exceeds ${FS_THRESHOLD_COMMERCIAL_AMPS} A ${FS_CITATION} commercial threshold`,
       necReferences: [FS_CITATION],
       warnings,
     };

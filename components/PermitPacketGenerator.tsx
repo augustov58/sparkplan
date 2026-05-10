@@ -439,10 +439,11 @@ export const PermitPacketGenerator: React.FC<PermitPacketGeneratorProps> = ({ pr
           || currentProject.settings.occupancyType === 'industrial'
             ? 'commercial'
             : 'residential',
-        serviceCapacity_240V_amps:
+        serviceCapacityAmps:
           currentProject.serviceAmps
           ?? mdp?.main_breaker_amps
           ?? 200,
+        serviceVoltageV: currentProject.serviceVoltage ?? 240,
         scopeFlags: currentProject.settings.scope_flags ?? {
           service_upgrade: false,
           ct_cabinet: false,
