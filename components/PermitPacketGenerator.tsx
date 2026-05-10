@@ -26,6 +26,7 @@ import { useProfile } from '../hooks/useProfile';
 import { JurisdictionSearchWizard } from './JurisdictionSearchWizard';
 import { calculateMultiFamilyEV, type MultiFamilyEVInput } from '../services/calculations/multiFamilyEV';
 import { buildMultiFamilyContext, isEVEMSManagedPanel } from '../services/calculations/upstreamLoadAggregation';
+import { screenContractorExemption } from '../services/permitMode/exemptionScreening';
 import {
   projectAddressSchema,
   flContractorLicenseSchema,
@@ -425,6 +426,37 @@ export const PermitPacketGenerator: React.FC<PermitPacketGeneratorProps> = ({ pr
         currentProject.settings,
       );
 
+      // Sprint 2A PR 5 / H17: FL contractor-exemption screening. Lane drives
+      // the cover-sheet stamp ("Designed under FS 471.003(2)(h)…" vs
+      // "PE-sealed plans required per [AHJ]"). When the user hasn't filled
+      // in the new scope-flag / value fields yet, fall back to safe defaults
+      // (occupancy from project type, service capacity from MDP main breaker).
+      // Sprint 2C will populate `ahjOverride` from the per-AHJ manifest.
+      const exemptionResult = screenContractorExemption({
+        estimatedValueUsd: currentProject.settings.estimated_value_usd ?? 0,
+        occupancyType:
+          currentProject.settings.occupancyType === 'commercial'
+          || currentProject.settings.occupancyType === 'industrial'
+            ? 'commercial'
+            : 'residential',
+        serviceCapacity_240V_amps:
+          currentProject.serviceAmps
+          ?? mdp?.main_breaker_amps
+          ?? 200,
+        scopeFlags: currentProject.settings.scope_flags ?? {
+          service_upgrade: false,
+          ct_cabinet: false,
+          meter_stack: false,
+          switchgear: false,
+          multi_tenant_feeder: false,
+          evems_used: false,
+        },
+      });
+      const permitMode = {
+        lane: exemptionResult.lane,
+        ahjName: jurisdiction?.ahj_name ?? jurisdiction?.jurisdiction_name,
+      };
+
       const packetData: PermitPacketData = {
         projectId,
         projectName: currentProject.name,
@@ -461,6 +493,8 @@ export const PermitPacketGenerator: React.FC<PermitPacketGeneratorProps> = ({ pr
         multiFamilyContext,
         // Sprint 2A H1+H2+H3: per-section toggles. Empty object = use defaults.
         sections: sectionPrefs,
+        // Sprint 2A PR 5 / H17: FL contractor-exemption lane stamp on cover sheet.
+        permitMode,
       };
 
       // Sprint 2A H14: NEC 220.87 narrative — only attached when the user

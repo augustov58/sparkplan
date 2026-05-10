@@ -197,6 +197,33 @@ export interface ProjectSettings {
    * generator narrows to `Partial<PacketSections>` at the boundary.
    */
   sectionPreferences?: Record<string, boolean>;
+
+  /**
+   * Sprint 2A PR 5 / H17: scope inputs that drive the FL contractor-exemption
+   * screening engine in `services/permitMode/exemptionScreening.ts`. All
+   * three keys are persisted in the `projects.settings` JSON column (no DB
+   * migration — extends the existing JSON blob). Optional so legacy projects
+   * without these values continue to load; the screening engine's caller is
+   * responsible for supplying defaults when a key is missing.
+   */
+  service_modification_type?: 'existing' | 'service-upgrade' | 'new-service';
+  scope_flags?: ProjectScopeFlags;
+  estimated_value_usd?: number;
+}
+
+/**
+ * Sprint 2A PR 5 / H17: scope checkboxes captured on Project Setup. Each
+ * flag describes a structural element of the project that may push the
+ * permit-packet lane toward `pe-required` (Sprint 2C will wire several of
+ * these into per-AHJ override rules).
+ */
+export interface ProjectScopeFlags {
+  service_upgrade: boolean;
+  ct_cabinet: boolean;
+  meter_stack: boolean;
+  switchgear: boolean;
+  multi_tenant_feeder: boolean;
+  evems_used: boolean;
 }
 
 export interface Project {

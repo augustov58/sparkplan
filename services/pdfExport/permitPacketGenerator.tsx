@@ -162,6 +162,16 @@ export interface PermitPacketData {
    * claiming an NEC 220.87 service upgrade need this page.
    */
   nec22087Narrative?: NEC22087NarrativeData;
+  /**
+   * Sprint 2A PR 5 / H17: permit-packet lane stamp on the cover sheet. Caller
+   * (UI layer) computes this from `screenContractorExemption(...)` and passes
+   * the result here. When omitted, the cover sheet renders without the
+   * lane-specific subtitle (legacy callers stay backward-compatible).
+   */
+  permitMode?: {
+    lane: 'exempt' | 'pe-required';
+    ahjName?: string;
+  };
 }
 
 const downloadBlob = (blob: Blob, fileName: string): void => {
@@ -303,6 +313,7 @@ export const generatePermitPacket = async (data: PermitPacketData): Promise<void
         necEdition={data.necEdition}
         codeReferences={data.codeReferences}
         sheetId={sheetIds[0]}
+        permitMode={data.permitMode}
       />
     ),
   });
@@ -1040,6 +1051,7 @@ export const generateLightweightPermitPacket = async (data: PermitPacketData): P
           permitNumber={data.permitNumber}
           necEdition={data.necEdition}
           codeReferences={data.codeReferences}
+          permitMode={data.permitMode}
         />
         <EquipmentSchedule
           panels={data.panels}
