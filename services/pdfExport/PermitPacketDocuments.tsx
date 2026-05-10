@@ -19,6 +19,7 @@ import {
   Footer as BrandFooter,
   PHASE,
   phaseLabel,
+  formatAicKa,
   themeStyles,
 } from './permitPacketTheme';
 
@@ -814,13 +815,11 @@ const H_GAP = 18;
 
 // Sprint 2A PR 4 (H9 AIC overlay): format a panel/equipment AIC rating for the
 // riser node. Returns undefined when no rating is known so the line4 slot stays
-// empty (no fake "AIC: —" pollution). Display in kAIC for compactness.
+// empty (no fake "AIC: —" pollution). Numeric formatting delegated to the
+// shared `formatAicKa` so the riser and Equipment Specs page stay in sync.
 const formatAic = (aicRating: number | null | undefined): string | undefined => {
-  if (aicRating == null || aicRating <= 0) return undefined;
-  // 22000 -> "22 kAIC", 65000 -> "65 kAIC"; 9500 -> "9.5 kAIC"
-  const ka = aicRating / 1000;
-  const display = ka >= 10 ? `${Math.round(ka)}` : ka.toFixed(1);
-  return `AIC ${display} kA`;
+  const ka = formatAicKa(aicRating);
+  return ka === undefined ? undefined : `AIC ${ka}`;
 };
 
 const buildFeederLabel = (feeder: Feeder): string => {
@@ -968,7 +967,7 @@ const buildRiserTree = (
     id: 'utility',
     kind: 'utility',
     line1: 'UTILITY',
-    line2: `${serviceVoltage}V ${servicePhase}\u03C6 service`,
+    line2: `${serviceVoltage}V ${phaseLabel(servicePhase)} service`,
     children: [mdpSubtree],
   };
 };

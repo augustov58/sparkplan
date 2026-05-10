@@ -16,6 +16,7 @@ import {
   BrandBar,
   Footer as BrandFooter,
   phaseLabel,
+  formatAicKa,
   themeStyles,
 } from './permitPacketTheme';
 
@@ -249,7 +250,7 @@ const PanelSpecsTable: React.FC<{ panels: Panel[] }> = ({ panels }) => {
             <Text style={styles.col_model}>{panel.model_number || '—'}</Text>
             <Text style={styles.col_nema}>{panel.nema_enclosure_type || '—'}</Text>
             <Text style={styles.col_aic}>
-              {panel.aic_rating ? `${panel.aic_rating} kA` : '—'}
+              {formatAicKa(panel.aic_rating) ?? '—'}
               {panel.series_rating && '*'}
             </Text>
             <Text style={styles.col_ul}>{panel.ul_listing || '—'}</Text>

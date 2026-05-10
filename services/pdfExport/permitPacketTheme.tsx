@@ -28,6 +28,27 @@ export const PHASE = 'Ø';
 /** Format 1 / 3 as "1Ø" / "3Ø". */
 export const phaseLabel = (phase: number | string): string => `${phase}${PHASE}`;
 
+/**
+ * Format a panel/equipment AIC rating (stored in raw amps) for display in
+ * kA. Returns `undefined` when no rating is set so call sites can decide
+ * whether to render a placeholder ("—") or omit the field entirely.
+ *
+ *   22000 → "22 kA"
+ *   65000 → "65 kA"
+ *    9500 → "9.5 kA"
+ *
+ * Use this everywhere instead of inline `${aic_rating} kA` (which would
+ * incorrectly label raw amps as kA — the bug fixed in PR #40 review).
+ */
+export const formatAicKa = (
+  aicRating: number | null | undefined,
+): string | undefined => {
+  if (aicRating == null || aicRating <= 0) return undefined;
+  const ka = aicRating / 1000;
+  const display = ka >= 10 ? `${Math.round(ka)}` : ka.toFixed(1);
+  return `${display} kA`;
+};
+
 // ==================== HELPERS ====================
 
 export const todayStr = (): string =>
