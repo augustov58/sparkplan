@@ -19,6 +19,12 @@ import {
 import type { Database } from '../lib/database.types';
 import { calculateEgcSize } from '../services/calculations/conductorSizing';
 import { getEgcSize } from '../data/nec/table-250-122';
+import {
+  getGecSize,
+  getGecSizeDetailed,
+  getGecSizeForServiceAmps,
+} from '../data/nec/table-250-66';
+import { calculateGroundingDetail } from '../services/calculations/groundingElectrodeConductor';
 import { calculateProportionalEgcSize } from '../data/nec/conductor-properties';
 import type { LoadItem, ProjectSettings, FeederCalculationInput } from '../types';
 
@@ -405,6 +411,162 @@ describe('Equipment Grounding Conductor (EGC) Sizing - NEC 250.122', () => {
       expect(result.egcSize).toBeDefined();
       // If phase conductors are upsized, EGC might need upsizing
       expect(result.necReferences).toContain('NEC 250.122(A) - Table 250.122');
+    });
+  });
+});
+
+describe('Grounding Electrode Conductor (GEC) Sizing - NEC 250.66', () => {
+  describe('Table 250.66 lookup by service conductor size', () => {
+    // Cross-checked against NEC 2023 Table 250.66.
+    it('sizes GEC for 2 AWG Cu service conductor (smallest bucket)', () => {
+      expect(getGecSize('2 AWG', 'Cu')).toBe('8 AWG');
+      expect(getGecSize('2', 'Cu')).toBe('8 AWG');
+    });
+
+    it('sizes GEC for 1/0 AWG Cu service conductor', () => {
+      // 1/0 AWG falls into "1 or 1/0 AWG" bucket → 6 AWG Cu
+      expect(getGecSize('1/0 AWG', 'Cu')).toBe('6 AWG');
+    });
+
+    it('sizes GEC for 2/0 AWG Cu service conductor (200A typical)', () => {
+      expect(getGecSize('2/0 AWG', 'Cu')).toBe('4 AWG');
+    });
+
+    it('sizes GEC for 4/0 AWG Cu service conductor (just over 3/0 bucket)', () => {
+      // 4/0 AWG (211,600 CM) is "Over 3/0 through 350 kcmil" → 2 AWG Cu
+      expect(getGecSize('4/0 AWG', 'Cu')).toBe('2 AWG');
+    });
+
+    it('sizes GEC for 350 kcmil Cu service conductor (bucket boundary)', () => {
+      expect(getGecSize('350 kcmil', 'Cu')).toBe('2 AWG');
+      expect(getGecSize('350', 'Cu')).toBe('2 AWG');
+    });
+
+    it('sizes GEC for 500 kcmil Cu service conductor', () => {
+      // "Over 350 through 600 kcmil" → 1/0 AWG Cu
+      expect(getGecSize('500 kcmil', 'Cu')).toBe('1/0 AWG');
+    });
+
+    it('sizes GEC for 1000 kcmil Cu equivalent (1000A parallel-set service)', () => {
+      // "Over 600 through 1100 kcmil" → 2/0 AWG Cu
+      expect(getGecSize('1000 kcmil', 'Cu')).toBe('2/0 AWG');
+    });
+
+    it('sizes GEC for 1500 kcmil Cu equivalent (very large service)', () => {
+      // "Over 1100 kcmil" → 3/0 AWG Cu
+      expect(getGecSize('1500 kcmil', 'Cu')).toBe('3/0 AWG');
+    });
+
+    it('aluminum GEC matches NEC 250.66 column for 1/0 Al', () => {
+      expect(getGecSize('1/0 AWG', 'Al')).toBe('6 AWG');
+    });
+
+    it('aluminum GEC for 250 kcmil Al falls in 4/0-or-250-kcmil bucket', () => {
+      expect(getGecSize('250 kcmil', 'Al')).toBe('2 AWG');
+    });
+
+    it('aluminum GEC for 1500 kcmil equivalent → 4/0 AWG', () => {
+      // "Over 900 through 1750 kcmil Al" → 4/0 AWG Al
+      expect(getGecSize('1500 kcmil', 'Al')).toBe('4/0 AWG');
+    });
+
+    it('falls back to largest GEC for unrecognized input', () => {
+      const detailed = getGecSizeDetailed('frobnitz', 'Cu');
+      expect(detailed.gecSize).toBe('3/0 AWG');
+      expect(detailed.notes.some(n => n.includes('Unrecognized'))).toBe(true);
+    });
+  });
+
+  describe('Service-amperage convenience helper', () => {
+    // These are the table edges the audit fixture cares about. The mapping
+    // assumes typical service-conductor sizing (Table 310.12 for ≤400A,
+    // representative parallel-set kcmil for >400A). Verify the result
+    // matches NEC Table 250.66 for the assumed conductor.
+    it('200A service → 4 AWG Cu GEC (2/0 AWG service conductor)', () => {
+      const result = getGecSizeForServiceAmps(200, 'Cu');
+      expect(result.gecSize).toBe('4 AWG');
+      expect(result.assumedServiceConductorSize).toBe('2/0 AWG');
+    });
+
+    it('400A service → 1/0 AWG Cu GEC (400 kcmil service conductor)', () => {
+      const result = getGecSizeForServiceAmps(400, 'Cu');
+      expect(result.gecSize).toBe('1/0 AWG');
+      expect(result.assumedServiceConductorSize).toBe('400 kcmil');
+    });
+
+    it('800A service → 2/0 AWG Cu GEC (parallel set, 1000 kcmil equiv)', () => {
+      const result = getGecSizeForServiceAmps(800, 'Cu');
+      expect(result.gecSize).toBe('2/0 AWG');
+      expect(result.notes.some(n => n.includes('parallel'))).toBe(true);
+    });
+
+    it('1000A service → 2/0 AWG Cu GEC (audit fixture)', () => {
+      const result = getGecSizeForServiceAmps(1000, 'Cu');
+      expect(result.gecSize).toBe('2/0 AWG');
+      // Aluminum equivalent for the same row
+      const alResult = getGecSizeForServiceAmps(1000, 'Al');
+      expect(alResult.gecSize).toBe('4/0 AWG');
+    });
+
+    it('2000A service → 3/0 AWG Cu GEC (largest standard bucket)', () => {
+      const result = getGecSizeForServiceAmps(2000, 'Cu');
+      expect(result.gecSize).toBe('3/0 AWG');
+    });
+  });
+
+  describe('calculateGroundingDetail integration', () => {
+    it('returns GEC, electrodes, bonding, and necReferences for 1000A audit fixture', () => {
+      const result = calculateGroundingDetail({
+        serviceAmps: 1000,
+        conductorMaterial: 'Cu',
+      });
+
+      expect(result.gecSize).toBe('2/0 AWG');
+      expect(result.tableMinimumGecSize).toBe('2/0 AWG');
+      expect(result.serviceConductorAssumed).toBe(true);
+      expect(result.electrodes.length).toBeGreaterThan(0);
+      expect(result.bondingRequirements.length).toBeGreaterThan(0);
+      expect(result.necReferences).toContain('NEC 250.66 - Grounding Electrode Conductor');
+      expect(result.necReferences).toContain('NEC 250.50 - Grounding Electrode System');
+      expect(result.necReferences).toContain('NEC 250.94 - Intersystem Bonding Termination');
+    });
+
+    it('honours an installed GEC override and notes it in warnings', () => {
+      const result = calculateGroundingDetail({
+        serviceAmps: 200,
+        installedGecSize: '2/0 AWG', // bigger than code minimum (4 AWG)
+      });
+      expect(result.gecSize).toBe('2/0 AWG');
+      expect(result.tableMinimumGecSize).toBe('4 AWG');
+      expect(result.warnings.some(w => w.includes('Installed GEC override'))).toBe(true);
+    });
+
+    it('flags water-pipe-only as a NEC 250.53(D)(2) supplemental warning', () => {
+      const result = calculateGroundingDetail({
+        serviceAmps: 200,
+        presentElectrodeKeys: ['metal-water-pipe'],
+      });
+      expect(
+        result.warnings.some(w => w.includes('250.53(D)(2)') || w.includes('supplemental')),
+      ).toBe(true);
+    });
+
+    it('flags zero electrodes as CRITICAL', () => {
+      const result = calculateGroundingDetail({
+        serviceAmps: 200,
+        presentElectrodeKeys: [],
+      });
+      expect(result.warnings.some(w => w.startsWith('CRITICAL'))).toBe(true);
+    });
+
+    it('uses provided service conductor size directly (no assumption flag)', () => {
+      const result = calculateGroundingDetail({
+        serviceAmps: 1000,
+        serviceConductorSize: '500 kcmil', // single-conductor scenario
+      });
+      // 500 kcmil falls in "Over 350 through 600 kcmil" → 1/0 Cu
+      expect(result.gecSize).toBe('1/0 AWG');
+      expect(result.serviceConductorAssumed).toBe(false);
     });
   });
 });
