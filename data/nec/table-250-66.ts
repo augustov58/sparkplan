@@ -13,10 +13,14 @@
  * - When the service conductor is exactly at a transition (e.g., 350 kcmil),
  *   the smaller bucket applies. Example: 350 kcmil Cu falls in
  *   "Over 3/0 through 350 kcmil" → 2 AWG GEC.
- * - Source: NEC 2023, Table 250.66
+ * - Source: NEC 2017 / 2020 / 2023 Table 250.66 — values are unchanged
+ *   across these editions. Florida currently adopts NEC 2020 via FBC 8th
+ *   ed. (2023); the table is forward-compatible with the 2023 edition that
+ *   FBC 9th ed. will adopt (anticipated ~2027). Project-level NEC edition
+ *   is read from `projects.settings.nec_edition` (default '2020').
  *
- * Cross-checked against the NEC 2023 code book (CLAUDE.md "NEC table data is
- * safety-critical" rule).
+ * Cross-checked against the NEC 2020 + 2023 code books (CLAUDE.md "NEC
+ * table data is safety-critical" rule).
  */
 
 /**
