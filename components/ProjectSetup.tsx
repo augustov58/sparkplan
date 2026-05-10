@@ -1,8 +1,8 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Project, ProjectType, ProjectStatus, DwellingType, ResidentialSettings } from '../types';
-import { Save, AlertTriangle, Building, Zap, Trash2, Home, Users, Lock } from 'lucide-react';
+import { Project, ProjectType, ProjectStatus, DwellingType, ResidentialSettings, ProjectScopeFlags } from '../types';
+import { Save, AlertTriangle, Building, Zap, Trash2, Home, Users, Lock, ClipboardCheck, DollarSign } from 'lucide-react';
 import { usePanels } from '../hooks/usePanels';
 
 interface ProjectSetupProps {
@@ -172,6 +172,28 @@ export const ProjectSetup: React.FC<ProjectSetupProps> = ({ project, updateProje
     debouncedUpdate(updated);
   };
   
+  // Sprint 2A PR 5 / H17: scope-flag toggle handler. Persists into the
+  // existing JSON `settings` blob so the FL contractor-exemption screening
+  // engine can read these on permit-packet generation.
+  const handleScopeFlagChange = (flag: keyof ProjectScopeFlags, value: boolean) => {
+    const currentFlags: ProjectScopeFlags = localProject.settings.scope_flags ?? {
+      service_upgrade: false,
+      ct_cabinet: false,
+      meter_stack: false,
+      switchgear: false,
+      multi_tenant_feeder: false,
+      evems_used: false,
+    };
+    const updated = {
+      ...localProject,
+      settings: {
+        ...localProject.settings,
+        scope_flags: { ...currentFlags, [flag]: value },
+      },
+    };
+    debouncedUpdate(updated);
+  };
+
   // Handle residential-specific settings
   const handleResidentialChange = (field: keyof ResidentialSettings, value: any) => {
     const updated = {
@@ -439,6 +461,81 @@ export const ProjectSetup: React.FC<ProjectSetupProps> = ({ project, updateProje
           <p className="text-xs text-[#888] mt-4 leading-relaxed">
             <strong className="text-[#1a1a1a]">Service conductors</strong> (size, length, material, conduit, sets in parallel) are configured in the Feeder Manager — create a feeder marked "Service Entrance" with the MDP as its destination.
           </p>
+        </div>
+
+        {/* Permit Scope (Sprint 2A PR 5 / H17) — drives FL contractor-exemption
+            screening on the permit-packet cover sheet. Captures the project-
+            value cap and structural-element scope flags from FS 471.003(2)(h). */}
+        <div className="md:col-span-2 bg-white border border-[#e8e6e3] rounded-lg p-6 shadow-sm">
+          <h3 className="text-lg font-medium text-[#1a1a1a] mb-2 flex items-center gap-2">
+            <ClipboardCheck className="w-5 h-5 text-[#2d3b2d]" /> Permit Scope (FL Contractor Exemption)
+          </h3>
+          <p className="text-xs text-[#888] mb-5 leading-relaxed">
+            Drives the cover-sheet exemption stamp on the permit packet. Per FS 471.003(2)(h), residential services ≤ 600 A @ 240 V, commercial ≤ 800 A @ 240 V, and project value ≤ $125,000 may be designed and signed by a licensed contractor without a PE seal. Anything above triggers the PE-required lane.
+          </p>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div>
+              <label className="block text-xs font-semibold text-[#888] uppercase mb-1">Service Modification Type</label>
+              <select
+                value={localProject.settings.service_modification_type ?? 'existing'}
+                onChange={e => handleSettingChange('service_modification_type', e.target.value)}
+                className="w-full border-[#e8e6e3] rounded-md text-sm"
+              >
+                <option value="existing">Existing service (no change)</option>
+                <option value="service-upgrade">Service upgrade (NEC 220.87)</option>
+                <option value="new-service">New service installation</option>
+              </select>
+              <p className="text-xs text-[#888] mt-1">Determines which calc narratives the packet generator emits.</p>
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-[#888] uppercase mb-1 flex items-center gap-1">
+                <DollarSign className="w-3 h-3" /> Estimated Project Value (USD)
+              </label>
+              <input
+                type="number"
+                value={localProject.settings.estimated_value_usd ?? ''}
+                onChange={e => handleSettingChange('estimated_value_usd', e.target.value === '' ? undefined : Number(e.target.value))}
+                className="w-full border-[#e8e6e3] rounded-md text-sm font-mono"
+                placeholder="e.g. 75000"
+                min={0}
+              />
+              <p className="text-xs text-[#888] mt-1">FS 471.003(2)(h) cap: $125,000.</p>
+            </div>
+          </div>
+
+          <div className="mt-6 pt-6 border-t border-[#f0eeeb]">
+            <h4 className="text-sm font-medium text-[#1a1a1a] mb-3">Scope Elements</h4>
+            <p className="text-xs text-[#888] mb-4">Check any element that applies. Used by the AHJ override engine in Sprint 2C to flag jurisdictions that require PE seal regardless of value/ampacity.</p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+              {([
+                { key: 'service_upgrade', label: 'Service upgrade' },
+                { key: 'ct_cabinet', label: 'CT cabinet' },
+                { key: 'meter_stack', label: 'Meter stack' },
+                { key: 'switchgear', label: 'Switchgear' },
+                { key: 'multi_tenant_feeder', label: 'Multi-tenant feeder' },
+                { key: 'evems_used', label: 'EVEMS in use (NEC 625.42)' },
+              ] as const).map(({ key, label }) => {
+                const flags = localProject.settings.scope_flags;
+                const checked = flags ? !!flags[key] : false;
+                return (
+                  <div key={key} className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      id={`scope-${key}`}
+                      checked={checked}
+                      onChange={e => handleScopeFlagChange(key, e.target.checked)}
+                      className="rounded border-[#e8e6e3] text-[#2d3b2d] focus:ring-[#2d3b2d]/20"
+                    />
+                    <label htmlFor={`scope-${key}`} className="text-sm text-[#444]">
+                      {label}
+                    </label>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
         </div>
 
         {/* Residential Settings - Only shown for Residential projects */}
