@@ -10,12 +10,7 @@
 
 ## Commands
 
-```bash
-npm install          # Install dependencies
-npm run dev          # Dev server (localhost:3000)
-npm run build        # Production build
-npm test             # Run tests
-```
+`npm install`, `npm run dev` (localhost:3000), `npm run build`, `npm test`. See `package.json` for full script list.
 
 ---
 
@@ -228,8 +223,7 @@ See [`.env.example`](./.env.example) and [`backend/.env.example`](./backend/.env
 
 ## Resources
 
-- **GitHub**: `augustov58/sparkplan`
-- **Backend**: https://sparkplan.app
+GitHub: `augustov58/sparkplan` • Backend: https://sparkplan.app
 
 ---
 
@@ -253,3 +247,6 @@ When a feature, phase, or milestone is completed, **update all affected document
 - After completing a feature: check ROADMAP.md and mark it done. Don't leave completed work showing as "NEXT UP" or "NOT STARTED".
 - After a DB migration: update `docs/database-architecture.md` with the new tables/columns.
 - After shipping a user-facing feature: add a CHANGELOG entry.
+
+### Concurrent worktrees
+Multiple worktrees and agents are often active in parallel (`git worktree list`). Before editing any shared doc above: `git fetch origin && git log -3 origin/main -- <file>` to check for recent activity. Pre-push: re-fetch and `git rebase origin/main` if the base moved. Cite squash hashes (not just dates) when flipping status flags — concurrent merges collide on dates.
