@@ -2057,7 +2057,7 @@ export const OneLineDiagram: React.FC<OneLineDiagramProps> = ({ project, updateP
             node on the one-line must show voltage / phase / amperage / AIC. The
             three existing labels above already cover V / phase / bus + main; the
             chip appends AIC without crowding them. Hidden when no rating is set. */}
-        {(panel as any).aic_rating && (panel as any).aic_rating > 0 && (
+        {panel.aic_rating && panel.aic_rating > 0 && (
           <g>
             <rect
               x={x + width / 2 - 28}
@@ -2078,7 +2078,7 @@ export const OneLineDiagram: React.FC<OneLineDiagramProps> = ({ project, updateP
               fill="#7c2d12"
             >
               {(() => {
-                const ka = (panel as any).aic_rating / 1000;
+                const ka = panel.aic_rating / 1000;
                 return `AIC ${ka >= 10 ? Math.round(ka) : ka.toFixed(1)}kA`;
               })()}
             </text>
