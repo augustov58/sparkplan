@@ -75,8 +75,13 @@ fed_from_transformer_id: UUID     // Only if type='transformer'
 ### PDF Generation
 Uses `@react-pdf/renderer`. Components are Page-level fragments (`<>...</>`), assembled in `permitPacketGenerator.tsx` Document.
 
-### OneLineDiagram.tsx
-Has **TWO SVG renderings** — interactive (~line 2340) and print/export (~line 3290). Both must be updated for visual changes.
+### One-line / riser diagram render paths
+There are **TWO independent render paths** for the same logical diagram, in **different files**:
+
+- **`components/OneLineDiagram.tsx`** — the in-app interactive viewer + standalone export (PNG/SVG/PDF directly from the diagram view). Has its own internal interactive rendering and a separate full-layout print rendering. Touches: panel glyphs, AIC chips, bus bars, layout geometry. **Not** the source of the audit-packet riser PDF page.
+- **`services/pdfExport/PermitPacketDocuments.tsx::RiserDiagram`** (~line 1150) — the riser page rendered into the permit-packet PDF (page 3 of the audit fixture). Uses `@react-pdf` SVG primitives. This is what changes when "the riser in the packet PDF looks wrong."
+
+When a diagram visual changes, decide which path needs updating: in-app viewer → `OneLineDiagram.tsx`; permit-packet PDF page → `PermitPacketDocuments.tsx`. Often **both** need updating for parity (e.g., AIC overlay was added to both in PR #40). Use the Sprint 1 diagnostic shortcut: in-app correct vs PDF wrong → look at the PDF call site (i.e., `PermitPacketDocuments.tsx`), not the in-app viewer.
 
 ---
 

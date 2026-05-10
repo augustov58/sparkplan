@@ -7,6 +7,44 @@
 
 ---
 
+### Session: 2026-05-10 — Sprint 2A final 2 PRs (PR #40 diagrams + PR #41 H17) shipped via 3 parallel worktree agents
+
+**Focus**: Closed Sprint 2A's last 4 open findings (M6 + H9 AIC overlay + M3 in PR #40; H17 + settings JSON in PR #41). Three worktree-isolated agents working concurrently from `main @ cbd132a`, then code-reviewer + security-reviewer in parallel on the combined diff, then 2 themed PRs opened. Sprint 2A is now ✅ COMPLETE at 19/19 findings across 5 themed PRs.
+
+**Status**: ✅ PR #40 + PR #41 open for review. Test suite at 413/413 on the combined branch (was 363 baseline at session start; +50 across the 3 agents + 7 reviewer-fix regression tests). Build green throughout. No DB migrations.
+
+**Architecture decisions worth carrying forward**:
+
+- **Worktree-isolated parallel agents safely co-edit a file** when their human-given scope assigns them to non-overlapping sections of it. PR #40 + PR #41 used 3 agents in worktrees; the 2 files with multi-agent edits (`PermitPacketDocuments.tsx` for Agent 1's RiserDiagram + Agent 3's CoverPage permitMode prop, `permitPacketGenerator.tsx` for Agent 2's grounding-section render + Agent 3's permitMode plumbing) auto-merged because each agent worked in distinct components/sections of the file. Git's "ort" merge strategy (default since 2.34) does smart hunk-level matching that handles this gracefully. Lesson: when fan-out parallelism is needed and shared files are inevitable, brief each agent on the specific *section* they own, not just the file.
+- **Spec line numbers decay; diagnostic shortcuts don't.** CLAUDE.md and the audit doc claimed `OneLineDiagram.tsx` had two SVG renderings at lines 2340 and 3290. Investigating during PR #40, those line numbers pointed at internal bus-bar geometry and an HTML `<select>`. Agent 1 correctly diagnosed via Sprint 1's diagnostic shortcut ("in-app correct vs PDF wrong → look at the PDF call site") that the actual permit-packet riser is in `services/pdfExport/PermitPacketDocuments.tsx::RiserDiagram` (~L1150). Lesson: when a CLAUDE.md instruction is invoked, do a one-line sanity check (does line X match the description?) before trusting it. Docs fix landed in the docs-sync PR.
+- **Fail-safe defaults are part of the calc-service contract for compliance logic.** CLAUDE.md's calc-service rule says "never throw, return warnings" — that handles the success path. PR #41's H2 + M1 reviewer findings showed that compliance functions (e.g., H17 lane screening) need to extend this to the failure path: malformed input gets a *safe-direction* default (fail-safe to pe-required, not silently exempt). Wrong direction creates regulatory risk; right direction errs toward over-requiring engineering review. Memory-worthy pattern for Sprint 3 PE seal logic and Sprint 2C AHJ overrides.
+- **Test-count arithmetic is a clean audit trail.** Combined branch: 363 baseline + 4 Agent 1 + 27 Agent 2 + 12 Agent 3 + 7 reviewer-fix regressions = 413. Every number ties to a specific finding. When the math doesn't add up, that signals a missing test or a regression silently swallowed. Worth running `git diff main..HEAD -- 'tests/**'` to validate at PR-time.
+
+**Process gotchas worth remembering**:
+
+- **Worktrees lack `.env.local`.** Agents 2 and 3 reported 250-test baselines in their worktrees vs the main-checkout 363 baseline. Cause: worktrees share the bare git directory but not the working-dir `.env.local` symlink, so Supabase-env-gated test files fail at import time and get excluded. Not a regression; the missing tests are present on main with proper env. When reconvening branches in the main checkout, expect the full test count. Lesson: don't trust worktree test counts as absolute — diff them to detect regressions but compare to a same-environment baseline when reporting "X/X passing."
+- **PRs need explicit conflict pre-validation when fanned out.** Before opening PR #40 I built a scratch `review/sprint2a-combined` branch merging all 3 agent branches to detect conflicts before reviewers saw the diff. Zero conflicts — but if there had been any, catching them pre-review would have been much cheaper than asking reviewers to re-run on a fixed combined branch. Lesson: always materialize the actual PR diff before review fan-out, not just review per-agent branches.
+- **Reviewer findings escalate based on direction-of-failure, not just rule violation.** Security-review and code-review both flagged M1 (NaN/negative inputs route to exempt). What made M1 high-priority wasn't that it failed — it's that it failed in the **wrong direction** for a compliance flag. Same-shape bug in a non-compliance context might be a defer-to-cleanup-PR. Lesson when triaging reviewer findings: check the *direction* of failure, not just the existence of failure.
+
+**Deliverables**:
+
+| PR | Branch | Files | Result |
+|---|---|---|---|
+| **#40 (open)** | `fix/sprint2a-pr4-diagrams` (Agents 1 + 2 + H1 + M3 fixes) | 14 changed, +1886 / -201 | M6 + H9 overlay + M3 grounding |
+| **#41 (open)** | `fix/sprint2a-pr5-h17-schema` (Agent 3 + H2 + M1 fixes) | 7 changed, +782 / -2 | H17 screening + settings JSON |
+| **this PR (open)** | `docs/sprint2a-pr4-pr5-sync` | audit + sprint2a + README + CHANGELOG + SESSION_LOG + CLAUDE.md | (this commit) |
+
+**Worktrees in play at session end**: none (3 agent worktrees auto-removed after their branches merged into the review scratch branch). Standard worktrees from other features still on disk.
+
+**Pending / follow-ups**:
+
+1. **Merge PR #40 + PR #41** (separate review surfaces; can merge in either order — they have no cross-dependencies).
+2. **Pre-existing `(panel as any).aic_rating` cast at `components/OneLineDiagram.tsx:1136`** — left in place during PR #40's H1 fix (outside its scope). Clean up in a separate refactor PR or next time the file is touched.
+3. **Sprint 2C is now unblocked** — H17 lane logic + settings JSON + AHJ-name placeholder are all in place. Sprint 2C wires per-AHJ manifests into `ahjOverride` and replaces the AHJ placeholder. M2/M3 (security) deferred items (enum whitelist on read, scope_flags runtime coercion) belong in Sprint 2C when those code paths get wired in.
+4. **Pre-existing 480V `(panel as any)` casts** can be cleaned up generically next time the panel-data load path is touched.
+
+---
+
 ### Session: 2026-05-10 — Sprint 2A PR #31 (engineering content additions) shipped + post-merge docs sync
 
 **Focus**: Continued the AHJ compliance audit Sprint 2A in a fresh worktree off `origin/main`, branched as `feat/sprint-2a-pr3-content`. Built and shipped the third themed PR of Sprint 2A — engineering content additions H14 + H9 (page only) + H15 + H10 + H11 — across 4 commits in `/home/augusto/projects/sparkplan-pr3`. Merged as PR #31 (`dacaab2`). Followed the merge with this docs-sync PR matching the precedent set by PR #24 (audit notes + ROADMAP + CHANGELOG + SESSION_LOG).
@@ -39,68 +77,5 @@
 
 ---
 
-### Session: 2026-05-09 — Permits + Estimating + T&M Billing Phase 1 shipped via three parallel agents (PRs #32, #33, #34, #35)
-
-**Focus**: Built and shipped Phase 1 of all three contractor-pivot betas concurrently. Three features, three plans (`docs/plans/{permits,estimating,tm-billing}-implementation.md`), three Sonnet 4.6 agents working in three independent git worktrees. Total: 4 PRs merged today (#32 Permits, #33 Estimating, #34 T&M Phase 1a, #35 T&M Phase 1b), 4 Supabase migrations applied, 5 net cascading conflict-resolution merges across the three sibling branches.
-
-**Status**: ✅ All three features in main. All 4 migrations live in Supabase project `ioarszhzltpisxsxrsgl`. Test suite at 250 passing (was 95 baseline). Build clean (~4.9s consistently across all branches).
-
-**Architecture decisions worth carrying forward**:
-
-- **Parallel features that share *registries*; serial features that share *logic*.** The three Phase 1 plans had zero shared business logic but extensively shared "registry" files: `App.tsx` (route list), `lib/dataRefreshEvents.ts` (event-type union), `lib/validation-schemas.ts` (Zod schemas), `services/ai/projectContextBuilder.ts` (chatbot context params), and the doc files. Parallel agents produce *additive* conflicts in registry files (mechanical to resolve, ~30s per file), but they would produce *semantic* conflicts in shared logic (much harder). Three Phase 1s in parallel saved ~50 min wall-clock vs serial; conflict resolution added ~15 min total. Net win.
-- **Worktree isolation pattern**: `git worktree add -b feat/<branch> /home/augusto/projects/sparkplan-<feature> origin/main`. Each worktree shares `.git` but has independent `node_modules` and working tree. Three Sonnet agents each in their own worktree = no contention, parallelizable npm install / build / test runs.
-- **MCP-driven migrations** are a real productivity boost. Skipped the SQL-Editor copy-paste round-trip for all 4 migrations + the type regen. Auth flow is one OAuth click; afterwards `apply_migration` + `execute_sql` + `generate_typescript_types` are tool calls.
-
-**Process gotchas worth remembering**:
-
-- **Stacked-PR squash-merge can strand upstream code on main.** PR #35 (T&M Phase 1b) was stacked on `feat/tm-billing-beta-v1a`. After PR #34 squash-merged v1a → main, GitHub did NOT auto-retarget #35's base. Clicking Merge on #35 merged v1b INTO v1a (not into main). #35 showed `state: MERGED` even though its code never landed on main. **Fix**: caught it during a status check ("did you doc all this to update where we are?"). Opened a follow-up PR `feat/tm-billing-beta-v1a → main` to bring v1b's code over. **Prevention**: when stacking, either (a) merge the stacked PR FIRST while base is still its dependency branch, then merge the dependency PR which now contains both, or (b) after squash-merging the bottom PR, manually retarget the top PR's base via the GitHub UI before clicking Merge.
-- **Three cascade rounds during merge.** After each PR landed, every still-in-flight PR had to absorb the new main state. Permits→main triggered cascades on Estimating + T&M v1a + T&M v1b. Estimating→main triggered another cascade on T&M v1a + v1b. T&M v1a→main triggered final cascade on v1b. Each round resolved in ~5 minutes because the conflicts were always the same shape: additive entries to the same registry files. The pattern was muscle memory by the third pass.
-- **Doc rollout deferred ≠ doc rollout done.** The T&M agent's report flagged "doc updates deferred to PR-merge time." That guidance was followed by the *agent* but not by anyone afterwards. Phase 1a + 1b shipped with no CHANGELOG / ROADMAP / SESSION_LOG / database-architecture entries until this consolidating commit. **Lesson**: if an agent says "deferred to merge time," the orchestrator must take the baton at merge time. Better: have the agent ship the docs proactively in their original PR; reviewers see the doc updates as part of the change.
-
-**Deliverables across the day**:
-
-| PR | Branch | Files | Result |
-|---|---|---|---|
-| #32 | `feat/permits-beta-v1` | 28 | Tabbed PermitsPage (Overview / Permits / Inspections / Issues), `permits` + `permit_inspections` tables, status state machine, `/issues` redirects to `/permits?tab=issues`, IssuesLog migrated as Issues tab |
-| #33 | `feat/estimating-beta-v1` | 32 | EstimatingPage (4 tabs), `estimates` + `estimate_line_items` tables, **auto-takeoff from project model** (the differentiator), bid PDF, clone-as-revision |
-| #34 | `feat/tm-billing-beta-v1a` | 22 | BillingPage (4 tabs), `time_entries` + `material_entries` + `project_billing_settings` tables, hooks, billing math |
-| #35 | `feat/tm-billing-beta-v1b` (stacked) | 19 | InvoicesTab + payments + invoice PDF + `generate_invoice_atomic` RPC + `sync_invoice_paid_totals` trigger |
-| follow-up | `feat/tm-billing-beta-v1a → main` | (this commit) | Brings #35's code to main + consolidates T&M + cross-feature docs |
-
-**Migrations applied via Supabase MCP** (in order):
-1. `20260509193634_permits_and_inspections`
-2. `20260509193720_estimates_and_line_items`
-3. `20260509193801_tm_billing_phase1a`
-4. `20260509193850_tm_billing_phase1b`
-
-**Test counts** (cumulative):
-- Baseline: 95
-- After Permits agents: 130 (+35 status / expiration unit tests)
-- After Estimating agent: 129 in own branch (+34 own; lower because no Permits tests)
-- After T&M Phase 1a agent: 122 in own branch (+27 billingMath)
-- After T&M Phase 1b agent: 160 in own branch (+38 status/generator/payments)
-- Final on main after all merges: **250 passing** (one pre-existing test file fails at module-load due to missing `VITE_SUPABASE_URL` — present on main since before this session, untouched).
-
-**Type regen**: `lib/database.types.ts` regenerated from live Supabase schema via MCP after migrations applied. Replaces hand-written types from each agent (which were field-equivalent but used a slightly older generic-helper structure than `supabase gen types typescript` emits).
-
-**Pre-existing advisory surfaced (not addressed today)**: `public.jurisdictions` has RLS disabled. Read-only reference data; enabling RLS without policies would break existing reads. Fix when convenient: `ALTER TABLE public.jurisdictions ENABLE ROW LEVEL SECURITY;` + `CREATE POLICY "jurisdictions_read_all" ON public.jurisdictions FOR SELECT USING (true);`.
-
-**Pending / follow-ups**:
-
-1. **Manual smoke test all three features end-to-end**:
-   - Permits: create → advance status (draft → submitted → in_review → approved) → schedule + fail inspection → reinspect.
-   - Estimating: project with 2 panels + 1 transformer + 1 feeder → New estimate (auto-takeoff on) → edit line → submit → Generate PDF.
-   - T&M Billing: log time + material → Generate invoice → mark sent → record partial payment → record full payment → confirm status flips to `paid` (exercises the trigger) → Download PDF.
-2. **Watch beta usage signal** (`feature_interest` clicks + actual feature engagement) for 2-3 weeks before committing to Phase 2 of any of the three. Phase 2 priority should follow demand, not implementation order.
-3. **Address `public.jurisdictions` RLS advisory** when convenient.
-4. **Consider `.env.local.test` lane** to unblock integration tests across the three features. All three agents had to defer their integration tests because `lib/supabase.ts` throws at import without env vars and the project's `feedback_validation_advisory` memory rules out DB mocking. A dedicated test-env lane would unblock real CRUD test coverage.
-
-**Worktrees still on disk** (kept for potential Phase 2 work; remove via `git worktree remove <path>` if not needed):
-- `/home/augusto/projects/sparkplan-permits` on `feat/permits-beta-v1`
-- `/home/augusto/projects/sparkplan-estimating` on `feat/estimating-beta-v1`
-- `/home/augusto/projects/sparkplan-tm-billing` on `feat/tm-billing-beta-v1a` (now also contains v1b's content via the #35 merge)
-
----
-
-<!-- Earlier sessions (2026-05-06/07 Sprint 1 close-out, 2026-05-08/09 Sprint 2A early phases, 2026-05-09 chatbot/inspector/sidebar pivot, 2026-05-09 morning Estimating + Permits agent details) rotated out per "keep last 2 sessions" rule. Git history preserves them. -->
+<!-- Earlier sessions (2026-05-06/07 Sprint 1 close-out, 2026-05-08/09 Sprint 2A early phases, 2026-05-09 Permits + Estimating + T&M Phase 1 parallel-agent session) rotated out per "keep last 2 sessions" rule. Git history preserves them. -->
 

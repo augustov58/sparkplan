@@ -1,6 +1,6 @@
 # AHJ Audit — Sprint Index
 
-**Last Updated:** 2026-05-10
+**Last Updated:** 2026-05-10 (Sprint 2A complete pending PR #40 + #41 merge)
 **Parent doc:** [`docs/AHJ_COMPLIANCE_AUDIT_2026-05-04.md`](../AHJ_COMPLIANCE_AUDIT_2026-05-04.md)
 
 This directory contains one design doc per sprint. Each file is self-contained with a "Cross-references" section at the bottom for when its scope touches another sprint's work.
@@ -12,7 +12,7 @@ This directory contains one design doc per sprint. Each file is self-contained w
 | # | Sprint | Status | Open work | Hard prerequisites |
 |---|---|---|---|---|
 | 1 | [Sprint 1 — Engine fixes](./sprint1-engine-fixes.md) | ✅ COMPLETE 2026-05-07 | — | — |
-| 2A | [Sprint 2A — Form-factor + content](./sprint2a-form-factor.md) | 🟡 14/19 done; PR 4 + PR 5 remaining | M6 + H9 AIC overlay + M3 (PR 4); H17 + settings JSON (PR 5) | Sprint 1 ✅ |
+| 2A | [Sprint 2A — Form-factor + content](./sprint2a-form-factor.md) | ✅ COMPLETE 2026-05-10 (19/19; PR #40 + #41 open) | — | Sprint 1 ✅ |
 | 2B | [Sprint 2B — Uploads + merge engine](./sprint2b-uploads.md) | ⚪ Not started | H5, H6, H7, H8, H16 + architecture (`pdf-lib` + Storage + attachments + title-sheet) | Sprint 2A schema (`service_modification_type`) |
 | 2C | [Sprint 2C — Per-AHJ manifests + M1](./sprint2c-ahj-manifests.md) | ⚪ Not started; research can start in parallel | M1 jurisdiction checklist engine + 4 AHJ checklists to source | Sprint 2A H17 lane logic + Sprint 2B manifest scaffold |
 | 3 | [Sprint 3 — PE Seal Workflow](./sprint3-pe-seal.md) | ⚪ Architecture decided; not started | C5 + cert vendor + FBPE registration | Sprint 2B (`pdf-lib` PAdES); pricing decision; cert vendor selection; FBPE business-entity registration |

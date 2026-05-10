@@ -1,6 +1,6 @@
 # Sprint 2A — Form-Factor + Content
 
-**Status:** 🟡 14/19 findings shipped; **2 PRs remaining** — PR 4 (M3 + M6 + H9 AIC overlay) + PR 5 (H17 + settings JSON)
+**Status:** ✅ COMPLETE 2026-05-10 (19/19 findings shipped via 5 themed PRs; PR #40 + #41 open for merge)
 **Hard prerequisites:** Sprint 1 ✅ COMPLETE
 **Inherits from:** [`sprint1-engine-fixes.md`](./sprint1-engine-fixes.md) — diagnostic shortcuts and the live-derive / helpers-from-calc-layer / basis-tracking / synthesize-virtual-rows patterns
 **Index:** [`docs/sprints/README.md`](./README.md)
@@ -11,55 +11,6 @@
 ## Why this sprint exists
 
 The 2026-05-08 Orlando line-by-line cross-walk surfaced systemic intake-rejection vectors that affect every drawing on every Orlando submittal — wrong NEC edition stamped, no per-sheet contractor signature block, no general notes page, no voltage drop note, no TOC, no revision log, no sheet IDs, no FBC reference, no EVSE labeling, no UL standard numbers, no available fault current calc page, no NEC 220.87 conditions narrative, no EVEMS narrative, no contractor-exemption screening. None of these require new dependencies, DB migrations, or upload UI — **all work lands in `services/pdfExport/permitPacketGenerator.tsx` + adjacent**. The sprint closes systemic-rejection vectors that affect every AHJ AND establishes the dual-path (exempt vs PE-required) lane logic that gates Sprint 3.
-
----
-
-## Open work
-
-### 🔴 PR 4 — Diagram work (M3 + M6 + H9 AIC overlay)
-
-These bundle because all three edit the same SVG render paths or grounding-page renderer.
-
-#### M6 — Riser diagram layout broken (page 3)
-
-- **Symptom:** Labels overlap; "15 meters positions" wraps mid-character on the audit fixture (15 meters, 14 panels).
-- **Code:** `components/OneLineDiagram.tsx` — has **TWO SVG renderings** per CLAUDE.md: interactive (~line 2340) and print/export (~line 3290). **Both must be updated for visual changes.**
-- **Fix shape:** Switch to landscape orientation when ≥10 panels OR paginate. Visual-verify on the audit fixture.
-- **Required by:** Orlando #4 (one-line diagram); all FL AHJs.
-
-#### H9 (AIC overlay portion) — AIC + voltage/phase/amperage labels per node
-
-- **Status:** Page-only portion (Available Fault Current Calculation page) shipped in PR #31 (`dacaab2`). **Only the per-node overlay on `OneLineDiagram.tsx` remains.**
-- **Code:** Same SVG render paths as M6 — bundle in same commit if labels can layer cleanly on the corrected layout.
-- **Required by:** Orlando #4 new-service path explicitly: *"voltage/phase/amperage/AIC labels per node."*
-
-#### M3 — Project-specific grounding detail with GEC sized per NEC 250.66/250.122
-
-- **Symptom:** Page 9-10 has generic grounding; Orlando new-service item #6 wants project-specific detail.
-- **Code:** `PermitPacketGenerator.tsx` grounding page section.
-- **Fix shape:** Pull GEC size from existing service-conductor sizing logic — don't reinvent. Grep for existing GEC sizing helpers first (likely in `services/calculations/`).
-- **Required by:** Orlando new-service #6.
-- **Note:** Sprint 4 has a sub-feature for the `[X]` (designed/specified) vs `[ ]` (field-verify) checklist-state distinction. M3 main scope here is the project-specific GEC sizing; the checklist-state polish is later.
-
-### 🔴 PR 5 — Engine + schema (H17 + settings JSON)
-
-#### H17 — FS 471.003(2)(h) contractor-exemption screening engine
-
-- **What:** Florida-statute-driven, not AHJ-specific. Per `FL_PILOT_REVISED_REPORT.md` §3.1 this is a **must-have** component of Florida Permit Mode v1.
-- **Why it matters:** Without it, contractors don't know which submission lane (exempt vs PE-sealed) applies and may pay for unnecessary PE review.
-- **FS 471.003(2)(h) thresholds:** residential ≤ 600 A @ 240 V, commercial ≤ 800 A @ 240 V, project value ≤ $125,000.
-- **Code shape:** New `services/permitMode/exemptionScreening.ts` pure function. Inputs: `(value, residentialOrCommercial, serviceCapacity_240V, scopeFlags)` → output: `{ lane: 'exempt' | 'pe-required', reason, ahjOverride? }`.
-- **Cover-sheet language drives off `lane`:** *"Designed under FS 471.003(2)(h) contractor exemption"* vs *"PE-sealed plans required per [Orlando AHJ]"*.
-- **AHJ overrides** (e.g., Orlando 277/480V → PE-required regardless of statute) come from manifest in Sprint 2C.
-- **Tests:** cover the 4 lanes — exempt residential, exempt commercial, threshold-exceeded → pe-required, ahjOverride → pe-required regardless.
-
-#### Settings JSON additions (no DB migration — `projects.settings` is a JSON column)
-
-- `service_modification_type` enum: `'existing'` | `'service-upgrade'` | `'new-service'` — **drives the Orlando manifest fork in Sprint 2B.**
-- `scope_flags` JSON: `service_upgrade`, `ct_cabinet`, `meter_stack`, `switchgear`, `multi_tenant_feeder`, `evems_used` — drives H17 inputs.
-- `estimated_value_usd` number — drives H17 input.
-- Update `lib/database.types.ts` typing for the JSON shape additions.
-- Add UI to capture these in project setup (small form section).
 
 ---
 
@@ -146,15 +97,72 @@ Themed: drawings-required engineering content.
 - **Required by:** Orlando item #7 (both paths): *"electrical specifications of EV chargers to include UL-2202 and UL-2594 listing and label information."*
 - **Fix:** New "EV CHARGING SUPPLY EQUIPMENT — APPLICABLE LISTING STANDARDS" card on existing Equipment Specs page. Detection: EVEMS marker circuit OR panel name pattern. H8 cut-sheet upload remains a Sprint 2B prerequisite for manufacturer-supplied evidence.
 
+### PR #40 (open 2026-05-10) — M6, H9 AIC overlay, M3 (diagrams + grounding)
+
+Themed: diagram + grounding render-layer work. Built via 3 parallel worktree-isolated agents, code-reviewer + security-reviewer pass, then merged onto a single PR branch. Test count 363 → 394 (+4 pagination boundary tests + 27 GEC/grounding tests).
+
+#### M6 — Riser diagram pagination (page 3 of audit packet)
+
+- **Symptom (pre-fix):** On the audit fixture (15 meters, 14 panels) labels overlapped and "15 meters positions" wrapped mid-character. Page 3 of `example_reports/Permit_Packet_Multifamily_Test_2026-05-05.pdf` is the broken-state reference.
+- **Spec correction during execution:** The original spec pointed at `components/OneLineDiagram.tsx` (~line 2340 / ~3290 per CLAUDE.md). Those line numbers point at internal bus-bar geometry and an HTML `<select>`, not at SVG rendering. The actual permit-packet riser is rendered by `services/pdfExport/PermitPacketDocuments.tsx::RiserDiagram` (~line 1150). Sprint 1's diagnostic shortcut (in-app correct vs PDF wrong → look at the PDF call site) caught this. CLAUDE.md docs fix included in this PR's docs-sync.
+- **Fix:** Pagination, not landscape (PDF was already landscape). Bug was scaling 14×(150+18)=2352pt of nodes into 720pt, collapsing labels to ~6pt. Paginate every >6 siblings; each page now keeps labels at 7-9pt. Shortened "N meters positions" → "N meters" so the meter-stack node label no longer wraps even at scale.
+
+#### H9 (AIC overlay portion) — AIC + voltage/phase/amperage labels per node
+
+- **Status:** Page-only portion shipped in PR #31 (`dacaab2`). PR #40 closes the per-node overlay — required by Orlando #4 new-service explicitly.
+- **Fix:** AIC chip overlapping the lower-right corner of each panel glyph. Layered onto the corrected paginated layout from M6.
+
+#### M3 — Project-specific grounding detail with GEC sized per NEC 250.66
+
+- **Symptom:** Pages 9-10 of audit packet had generic grounding boilerplate. Orlando new-service item #6 wants project-specific detail.
+- **Discovery during execution:** Two existing GEC helpers were unsuitable — `components/GroundingBonding.tsx::getRecommendedGecSize` was UI-coupled with an incorrect mapping (amps → GEC directly, not via service conductor); `services/calculations/residentialLoad.ts::recommendGecSize` was non-exported and only handled some buckets.
+- **Fix:** New `data/nec/table-250-66.ts` typed lookup (NEC 2017/2020/2023 — values unchanged across editions) + new `services/calculations/groundingElectrodeConductor.ts` pure function following `data/nec/table-250-122.ts` + `getEgcSizeDetailed` pattern. Card uses `wrap={false}` cohesive-card pattern. Audit fixture (1000 A service) → 2/0 AWG Cu (verified against NEC Table 250.66).
+
+#### Latent bug fix piggybacked
+
+`services/pdfExport/permitPacketGenerator.tsx` was falling back `serviceAmperage={bus_rating || data.serviceVoltage}` — for a panel with no `bus_rating` this silently treated **480 V as 480 A**. Fixed to `main_breaker_amps ?? bus_rating ?? 200`. Same failure class as the Sprint 1 short-circuit `1.732×` issue.
+
+#### Reviewer findings addressed in PR #40
+
+- **H1 (HIGH)** — `(panel as any).aic_rating` casts in `OneLineDiagram.tsx` defeated TypeScript needlessly. Removed the 2 new casts (left 1 pre-existing at line 1136 for separate cleanup PR).
+- **M3 (MEDIUM, code review on Agent 2)** — NEC table header said "NEC 2023" only. Updated to reflect multi-edition compatibility (2017 / 2020 / 2023 values unchanged) + reference `projects.settings.nec_edition` for project-level edition.
+
+### PR #41 (open 2026-05-10) — H17 + settings JSON (engine + schema)
+
+Themed: engine + schema. Florida Permit Mode v1 lane-screening foundation per `FL_PILOT_REVISED_REPORT.md` §3.1. Test count 363 → 382 (+12 original lane-scenario tests + 7 H2/M1 regression tests).
+
+#### H17 — FS 471.003(2)(h) contractor-exemption screening engine
+
+- **Why it matters:** Without it, contractors don't know which submission lane (exempt vs PE-sealed) applies and may pay for unnecessary PE review.
+- **FS 471.003(2)(h) thresholds:** residential ≤ 600 A @ 240 V, commercial ≤ 800 A @ 240 V, project value ≤ $125,000.
+- **Fix:** New `services/permitMode/exemptionScreening.ts` pure function. Inputs: `(estimatedValueUsd, occupancyType, serviceCapacityAmps, serviceVoltageV, scopeFlags, ahjOverride?)`. Output: `{ lane: 'exempt' | 'pe-required', reason, ahjOverride?, necReferences, warnings }`. Cover-sheet language switches on lane: *"Designed under FS 471.003(2)(h) contractor exemption"* vs *"PE-sealed plans required per [AHJ name]"*.
+- **AHJ overrides** (e.g., Orlando 277/480 V → PE-required regardless of statute) come from manifest in Sprint 2C. Currently uses `'AHJ'` placeholder when jurisdiction not bound.
+
+#### Settings JSON additions (no DB migration — `projects.settings` is JSON)
+
+- `service_modification_type` enum: `'existing'` | `'service-upgrade'` | `'new-service'` — drives Orlando manifest fork in Sprint 2B.
+- `scope_flags` JSON: 6 booleans — drives H17 inputs.
+- `estimated_value_usd` number — drives H17 input.
+- Typed in `types.ts` via extended `ProjectSettings` interface (matches existing PR 1 / #23 pattern for the `Json` column — `lib/database.types.ts` is auto-generated per CLAUDE.md "Stable Modules" rule).
+- Project Setup UI gains "Permit Scope (FL Contractor Exemption)" card (uses existing local-state + debounced-update pattern, not RHF/Zod, to match the surrounding form's pattern).
+
+#### Reviewer findings addressed in PR #41
+
+- **H2 (HIGH)** — Pre-fix the function expected `serviceCapacity_240V_amps` but the caller passed raw amps. For a 480 V/800 A commercial service, the function silently routed to `exempt` (≤ 800 A commercial threshold) — but the 240 V-equivalent is 1600 A which would trip the threshold. **Wrong-direction failure** for a regulatory-compliance flag. Fix: renamed input to `serviceCapacityAmps` + added `serviceVoltageV`; function normalizes internally to FS 471.003(2)(h)'s 240 V terms. Reason string surfaces both nameplate and normalized values so contractors see why the threshold tripped.
+- **M1 (MEDIUM, both reviewers)** — Pre-fix `NaN` / negative / non-finite inputs silently routed to `exempt`. Added `coerceNonNegativeFinite` helper that maps malformed values to `POSITIVE_INFINITY`, which trips the thresholds and produces `pe-required` with a `WARNING`. Compliance flags must lean toward over-requiring engineering review, not under-requiring it.
+
 ---
 
 ## Architectural patterns established (used by Sprint 2B / 2C / 3 / 4)
 
-- **Strategy C — themed PRs over per-finding PRs.** Bundle related findings into a single PR with shared infrastructure. PR 1 = code-edition + identity foundation; PR #23 = cover-sheet identity; PR #31 = engineering content. Reduces review overhead vs 14 separate PRs.
-- **Sheet ID category bands** (`packetSections.ts`): 7 numeric bands × `E-` discipline prefix → allocated by `nextSheetId(counters, band)`. **Sprint 2B uploads fit cleanly into existing bands without renumbering.**
-- **`wrap={false}` for cohesive cards in react-pdf** — prevents `react-pdf` from splitting visual cards across page boundaries. Apply to PR 4 grounding detail card.
-- **Generator builder pattern** — each finding gets a dedicated `<XxxPage>` component that auto-disables when its data prerequisites aren't met. Keeps `permitPacketGenerator.tsx` orchestration linear and per-page logic isolated. Apply to PR 5 H17 cover-sheet language conditional.
+- **Strategy C — themed PRs over per-finding PRs.** Bundle related findings into a single PR with shared infrastructure. PR 1 = code-edition + identity foundation; PR #23 = cover-sheet identity; PR #31 = engineering content; PR #40 = diagrams + grounding; PR #41 = engine + schema. Reduces review overhead vs 19 separate PRs.
+- **Sheet ID category bands** (`packetSections.ts`): 7 numeric bands × `E-` discipline prefix → allocated by `nextSheetId(counters, band)`. PR #40's new GroundingPlan component slotted in cleanly at `E-204` without renumbering. **Sprint 2B uploads fit cleanly into existing bands without renumbering.**
+- **`wrap={false}` for cohesive cards in react-pdf** — prevents `react-pdf` from splitting visual cards across page boundaries. Applied in PR #40 grounding detail card.
+- **Generator builder pattern** — each finding gets a dedicated `<XxxPage>` component that auto-disables when its data prerequisites aren't met. Keeps `permitPacketGenerator.tsx` orchestration linear and per-page logic isolated. Applied in PR #41 H17 cover-sheet language conditional.
 - **PR base bug workaround** — when GitHub PR creation rejects a base branch, push to a new branch off the rejected base and create the PR from there.
+- **Worktree-isolated parallel agents safe to co-edit a file** when their human-given scope assigns them to non-overlapping sections of it. PR #40 + PR #41 used 3 parallel agents; the 2 files with multi-agent edits (`PermitPacketDocuments.tsx`, `permitPacketGenerator.tsx`) auto-merged because each agent worked in distinct components/sections. Git "ort" merge strategy resolves hunk-level overlaps cleanly.
+- **Fail-safe defaults for compliance logic.** Calc-service rule "never throw, return warnings" handles the success path. Compliance functions (e.g., H17 lane screening) extend this to the failure path: malformed input gets a *safe-direction* default, not just a non-throwing one. Wrong direction (silently exempt) creates regulatory risk; right direction (fail-safe to pe-required) errs toward over-requiring engineering review.
+- **Spec line numbers decay; diagnostic shortcuts don't.** Sprint 2A PR #40 surfaced that `CLAUDE.md`'s OneLineDiagram.tsx line numbers (2340 / 3290) had drifted to point at unrelated code. Sprint 1's diagnostic shortcut ("in-app correct vs PDF wrong → look at the PDF call site") is the resilient guidance — line numbers should be re-validated when CLAUDE.md is touched.
 
 ---
 
@@ -172,25 +180,6 @@ Themed: drawings-required engineering content.
 
 ---
 
-## Recommended commit order
-
-### PR 4 — Diagrams
-
-1. **M6 — Riser layout fix.** Switch to landscape for ≥10 panels OR paginate. Both interactive (~line 2340) AND print/export (~line 3290) renderings must be updated. Visual-verify on audit fixture.
-2. **H9 AIC overlay.** AIC + voltage / phase / amperage labels per node on the one-line. Required by Orlando #4 new-service. Same files as M6 — bundle in same commit if labels can layer cleanly on the corrected layout.
-3. **M3 — Project-specific grounding detail.** GEC sized per NEC 250.66/250.122 (Orlando new-service item #6). Pull GEC size from existing service-conductor sizing logic — don't reinvent.
-
-**Visual verification per commit:** regenerate the audit packet, compare to prior visual snapshot. Sprint 1 diagnostic shortcut applies — these are PDF/SVG render-layer bugs, not engine bugs.
-
-### PR 5 — Engine + schema
-
-1. **Settings JSON additions** to `projects.settings` (no migration — JSON column). Update `lib/database.types.ts`. Add UI to capture these (small form section).
-2. **H17 — `services/permitMode/exemptionScreening.ts`** pure function. Tests cover the 4 lanes.
-3. **Cover-sheet language** drives off `lane`.
-4. **Gate the (future) PE seal upsell flow** off `lane === 'pe-required'`. Sprint 3 will read this gate.
-
----
-
 ## NEC references touched in this sprint
 
 - **220.87** — Existing-load method. Measured value used directly; calculated gets 125% multiplier. **Safety-critical.**
@@ -198,7 +187,8 @@ Themed: drawings-required engineering content.
 - **625.43** — EVSE labeling (H11).
 - **110.9, 110.10** — Available fault current verdict (H9).
 - **210.19(A) IN 4, 215.2(A)(1) IN 2** — Voltage drop notes (H13).
-- **250.66, 250.122** — Grounding electrode conductor sizing (M3 — PR 4).
+- **250.66, 250.122** — Grounding electrode conductor sizing (M3 — PR #40).
+- **FS 471.003(2)(h)** — FL contractor-exemption thresholds (H17 — PR #41); not NEC but cited via the calc-service `necReferences[]` contract.
 - **UL 2202, UL 2594, UL 916** — Listing standards on EVSE specs (H15) and EVEMS device (H10).
 
 ---
