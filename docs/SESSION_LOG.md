@@ -3,7 +3,39 @@
 **Purpose**: Tracks recent work for seamless handoff between Claude instances.
 **Maintenance Rule**: Keep only the last 2 sessions. At the start of a new session, delete older entries — git history preserves everything.
 
-**Last Updated**: 2026-05-09
+**Last Updated**: 2026-05-10
+
+---
+
+### Session: 2026-05-10 — Sprint 2A PR #31 (engineering content additions) shipped + post-merge docs sync
+
+**Focus**: Continued the AHJ compliance audit Sprint 2A in a fresh worktree off `origin/main`, branched as `feat/sprint-2a-pr3-content`. Built and shipped the third themed PR of Sprint 2A — engineering content additions H14 + H9 (page only) + H15 + H10 + H11 — across 4 commits in `/home/augusto/projects/sparkplan-pr3`. Merged as PR #31 (`dacaab2`). Followed the merge with this docs-sync PR matching the precedent set by PR #24 (audit notes + ROADMAP + CHANGELOG + SESSION_LOG).
+
+**Status**: ✅ PR #31 merged. 14 of the original ~16 Sprint 2A findings now ✅ RESOLVED on main. Test suite at 229/229 (was 213 post-PR-#23, +21 new PDF render tests across 4 new test files). Build clean. No DB migrations.
+
+**Architecture decisions worth carrying forward**:
+
+- **H9 split was deliberate.** The audit doc lists H9 as a single finding but the work has two physically separate landing zones: a new band-100 "Available Fault Current Calculation" page (PR #31), and AIC labels overlaid on the existing OneLineDiagram (deferred to PR 4). The latter touches the stable `OneLineDiagram.tsx` module — TWO SVG renderings (interactive ~line 2340 + print/export ~line 3290 per CLAUDE.md) — and pairs naturally with M6 (riser landscape mode for ≥10 panels). Adding labels in PR #31 without M6 would risk regressions on a stable module; bundling them into PR 4 is safer. Documented in the H9-row of the audit doc as the carryover.
+- **Per-finding commits inside a themed PR.** Sprint 2A pattern is one themed PR per category boundary (Strategy C). PR #31 had 4 commits, one per finding (H14 / H9+H15 / H10 / H11), each with self-contained build + tests. This is finer-grained than per-PR-merge but coarser than per-line. Review velocity was high because each commit's diff was scoped to one finding's files.
+- **Detection regex is now in 3 call sites.** PR #31 introduced `/\b(ev|evse|charger|charging|level\s*2|l2)\b/i` in `EquipmentSpecsDocuments.tsx` (H15), `permitPacketGenerator.tsx` (H11 builder), and `PermitPacketGenerator.tsx` UI (auto-disable predicate). Captured in memory as a DRY follow-up: extract to `isLikelyEVPanel(panel, circuits)` paired with the existing `isEVEMSManagedPanel` next time `upstreamLoadAggregation.ts` is touched. Three call sites is the threshold per the Sprint 1 diagnostic shortcut #3 ("when a calc is right at one layer but wrong at another, look for bypass / inline reimplementation").
+- **Post-merge docs-sync PR is part of the convention.** PR #24 set the precedent (audit notes + ROADMAP + CHANGELOG + SESSION_LOG for PRs 1 + #23). PR #31 needed the same treatment. **Lesson**: at PR-merge time the orchestrator must explicitly check "are the four sibling docs synced?" and fire a docs-sync PR if not. Skipping leaves audit doc rows showing ❌ for findings that are actually shipped — and the next session that opens the doc gets confused about what's pending.
+
+**Process gotchas worth remembering**:
+
+- **`.env.local` is not copied into worktrees.** Tests at `services/api/pythonBackend.ts` / `services/ai/chatTools.ts` throw at module-load time when `VITE_SUPABASE_URL` + `VITE_SUPABASE_ANON_KEY` are absent. Fix: invoke vitest with inline stub env vars: `VITE_SUPABASE_URL=http://localhost:54321 VITE_SUPABASE_ANON_KEY=test-stub-key npm test --run`. Don't copy real secrets into the worktree (auto mode classifier blocks that).
+- **PR base verification.** Sprint 2A pattern #7 from prior memory: when GitHub UI creates a PR, verify base is `main` before review. PR #31 created cleanly off `main` but worth confirming on every new PR.
+- **Concurrent main churn.** While PR #31 was open, three other PRs landed (#32 Permits, #33 Estimating, #34/#35 T&M Phase 1a/1b, plus a #36 docs rollout for v1b). Lessons: each themed PR must branch off latest `origin/main` after the previous merges (don't stack), and the docs-sync PR must `git fetch + rebase` right before push to absorb concurrent merges cleanly.
+
+**Deliverables**:
+
+| PR | Branch | Files | Result |
+|---|---|---|---|
+| **#31 (merged)** | `feat/sprint-2a-pr3-content` | 4 commits, 5 new PDF components, 4 new test files (~1.2k LOC) | ✅ MERGED `dacaab2` |
+| **this PR (open)** | `docs/sprint-2a-pr3-sync` | audit + ROADMAP + CHANGELOG + SESSION_LOG | (this commit) |
+
+**Worktrees in play at session end**:
+- `/home/augusto/projects/sparkplan-pr3` on `feat/sprint-2a-pr3-content` (post-merge — can be removed)
+- `/home/augusto/projects/sparkplan-docs-pr3` on `docs/sprint-2a-pr3-sync` (active)
 
 ---
 
@@ -70,21 +102,5 @@
 
 ---
 
-### Session: 2026-05-09 (earlier) — Chatbot VD+ awareness + confirmation gate fix + Inspector accuracy + sidebar contractor pivot (4 PRs)
+<!-- Earlier sessions (2026-05-06/07 Sprint 1 close-out, 2026-05-08/09 Sprint 2A early phases, 2026-05-09 chatbot/inspector/sidebar pivot, 2026-05-09 morning Estimating + Permits agent details) rotated out per "keep last 2 sessions" rule. Git history preserves them. -->
 
-**Focus**: Started by verifying merged PR #25 (cumulative VD + service-entrance feeders). Verification spawned three follow-up PRs (#26, #28, #29). Mid-session, the platform owner also surfaced three Inspector accuracy issues during PE review which landed as PR #27. Total: 4 PRs, 3 merged today + 1 still open at session boundary.
-
-**Status**:
-- ✅ **PR #25** verified — service-entrance label + cumulative VD on one-line + PDF + FeederManager. Migration `20260508_riser_service_entrance_and_cumulative_vd.sql` already applied to Supabase.
-- ✅ **PR #26** MERGED 13:25 UTC — chatbot context + tools + system instructions teach the AI about VD+ semantics, NEC 215.2(A)(1) IN No. 2 / 210.19(A)(1) IN No. 4 thresholds (3% feeder / 5% combined), SE feeder convention, parallel sets. New `calculate_cumulative_voltage_drop` panel-keyed tool. `calculate_feeder_voltage_drop` augmented with cumulative + crossesTransformer + isServiceEntrance.
-- ✅ **PR #27** MERGED 13:35 UTC — Inspector accuracy fixes (3 issues) + slot visibility on the panel header. Branch `fix/inspector-panel-cap-and-branch-conductor`.
-- ✅ **PR #28** MERGED 14:07 UTC — restores chatbot write-tool functionality. Root cause traced to commit `3490c68` (PR #13, 2026-04-24 security/correctness audit) which added the `requiresConfirmation` server-side gate without shipping the matching UI. Five write tools (`add_circuit`, `add_panel`, `fill_panel_with_test_loads`, `empty_panel`, `fill_with_spares`) had been completely unreachable for ~2 weeks. Fix: `executeTool` gains `bypassConfirmation` option, `askNecAssistantWithTools` short-circuits on confirmation results without round-tripping Gemini, new `applyConfirmedAction` export, App.tsx renders Apply/Cancel inline.
-- ✅ **PR #29** MERGED 2026-05-09 — sidebar contractor pivot. Dropped Site Visits + RFI Tracking from the Project Management section (engineer-flavored). Added three (beta) stubs: Estimating, Permits, T&M Billing — all gated to Business + Enterprise tier (matches sibling PM features; trial users get access automatically via `effectivePlan`). New `feature_interest` table captures one-line demand notes.
-
-**Why the sidebar pivot now**: validated against external market research the user pulled — the top 3 unmet pain points for small electrical shops ($1M-$10M annual revenue) are estimating + job costing (CRITICAL), permit + inspection lifecycle (HIGH), and T&M billing (HIGH). Existing tools like IntelliBid, Trimble Accubid, Knowify, Jobber are either enterprise-priced, desktop-only, or shaped wrong for commercial T&M. SparkPlan can credibly enter at $99-$199/month with electrical-specific assemblies tied to its existing panel/circuit/feeder model — but only if the sidebar reflects contractor workflow, which it didn't.
-
-**Insight worth carrying forward**: PR #13's break (write-tool confirmation gate without UI) is a textbook example of bundling unrelated security fixes — JWT log redaction, RLS-bypass via service role, Stripe price-ID hardening, and the chatbot gate all rode in one PR. The gate compiled, tests passed (the gate code was correct), and the missing UI counterpart slipped through review because attention was on the security items. **Lesson**: when a "security audit" PR introduces a new user-facing gate (confirmation, modal, banner, second-factor), the same PR must include the UI that satisfies it. The two halves are inseparable; CI cannot catch the gap.
-
----
-
-<!-- Earlier sessions (2026-05-06/07 Sprint 1 close-out, 2026-05-08/09 Sprint 2A, 2026-05-09 morning Estimating + Permits agent details) rotated out per "keep last 2 sessions" rule. Git history preserves them. The orchestrator-level entry above consolidates the agent-level Estimating + Permits sessions into a single multi-feature shipping day. -->
