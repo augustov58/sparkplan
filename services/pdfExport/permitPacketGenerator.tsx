@@ -223,6 +223,22 @@ export interface PermitPacketAttachment {
    * to coexist with the SparkPlan-stamped sheets.
    */
   includeSparkplanCover?: boolean;
+  /**
+   * Optional contractor-supplied sheet ID override (Sprint 2B PR-3 v4).
+   * When set, used verbatim as the title sheet ID (cover-ON path) instead
+   * of pulling from the band+discipline counter. When null/undefined, the
+   * orchestrator auto-allocates from the counter (current behavior).
+   *
+   * Custom IDs do NOT advance the band counter — that way, every upload
+   * with a custom ID acts as a "free slot" in the auto-allocation
+   * sequence, so neighboring auto-allocated uploads stay continuous.
+   * Multi-page upload pages still receive auto-allocated IDs continuing
+   * from where the counter would naturally have been.
+   *
+   * No-op for cover-OFF uploads (the sheet ID isn't stamped anywhere in
+   * that path; the contractor's own title block carries the identifier).
+   */
+  customSheetId?: string | null;
 }
 
 const downloadBlob = (blob: Blob, fileName: string): void => {
@@ -1146,7 +1162,14 @@ export const generatePermitPacket = async (data: PermitPacketData): Promise<void
         // pages. The architect's existing sheet number (if any) coexists
         // with the SparkPlan stamp because the stamp goes in the bottom
         // corner, off the architect's title block.
-        const titleSheetId = allocateId(discipline);
+        //
+        // v4 commit 11: when the contractor supplied a `customSheetId`,
+        // honor it verbatim for the title sheet (no allocator call —
+        // keeps the band counter continuous for the next auto-allocated
+        // upload). Upload-page IDs (for multi-page uploads) still come
+        // from the allocator since each one needs a unique identifier.
+        const customTitle = att.customSheetId?.trim() || null;
+        const titleSheetId = customTitle ?? allocateId(discipline);
         const uploadPageIds: string[] = [];
         for (let i = 0; i < uploadPageCount; i++) {
           uploadPageIds.push(allocateId(discipline));

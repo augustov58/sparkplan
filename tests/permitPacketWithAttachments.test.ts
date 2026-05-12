@@ -222,6 +222,146 @@ describe('generatePermitPacket — Sprint 2B PR-3 attachment wiring', () => {
     expect(Math.round(cutPages[1].width)).toBe(612); // Letter upload
   });
 
+  // ---------------------------------------------------------------------
+  // v4 commit 11 — custom sheet ID override (feature A).
+  // ---------------------------------------------------------------------
+
+  /**
+   * Helper: search every page-content stream for a drawn text literal.
+   * Looks in BOTH pdf-lib hex form (`<432D323031> Tj`) AND react-pdf's
+   * positioned-glyph TJ form (`[<43> -10 <2D32303031>] TJ`) — react-pdf
+   * uses kerned positioning so the full literal isn't always contiguous.
+   * To handle that we also accept a "stripped" form where all
+   * non-hex-char punctuation has been removed from the decompressed
+   * stream — kerning offsets between glyph runs vanish in that view.
+   */
+  async function docContainsDrawnText(
+    bytes: Uint8Array,
+    text: string,
+  ): Promise<boolean> {
+    const doc = await PDFDocument.load(bytes);
+    const saved = await doc.save({ useObjectStreams: false });
+    const zlib = await import('node:zlib');
+    let hex = '';
+    for (let i = 0; i < text.length; i++) {
+      hex += text.charCodeAt(i).toString(16).padStart(2, '0').toUpperCase();
+    }
+    const hexLiteral = `<${hex}>`;
+    const s = new TextDecoder('latin1').decode(saved);
+    let cursor = 0;
+    while (cursor < s.length) {
+      const start = s.indexOf('stream\n', cursor);
+      if (start < 0) break;
+      const end = s.indexOf('endstream', start);
+      if (end < 0) break;
+      const streamBytes = saved.subarray(start + 7, end - 1);
+      let decompressed: string;
+      try {
+        decompressed = zlib.inflateSync(streamBytes).toString('latin1');
+      } catch {
+        decompressed = new TextDecoder('latin1').decode(streamBytes);
+      }
+      if (decompressed.includes(hexLiteral)) return true;
+      if (decompressed.includes(text)) return true;
+      // Concatenate all hex runs <...><...><...> in the stream — react-pdf
+      // emits a kerned TJ array which splits a literal across multiple
+      // <hex> groups. Pulling them all together and matching against the
+      // continuous hex form handles that case.
+      const joined = decompressed
+        .split('<')
+        .map((part) => {
+          const close = part.indexOf('>');
+          return close >= 0 ? part.substring(0, close) : '';
+        })
+        .join('')
+        .toUpperCase();
+      if (joined.includes(hex.toUpperCase())) return true;
+      cursor = end + 'endstream'.length;
+    }
+    return false;
+  }
+
+  it('honors customSheetId on the title sheet (cover-ON path)', async () => {
+    const data = baseData();
+    const uploadBytes = await renderFakeUpload('LETTER', 1, 'site');
+    data.attachments = [
+      {
+        artifactType: 'site_plan',
+        filename: 'site.pdf',
+        uploadBytes,
+        customSheetId: 'A-100',
+      },
+    ];
+
+    await generatePermitPacket(data);
+    const bytes = new Uint8Array(await capturedBlob!.arrayBuffer());
+
+    // "A-100" should appear in the title sheet content stream (BrandBar
+    // pill + bottom-right sheet block both draw it).
+    expect(await docContainsDrawnText(bytes, 'A-100')).toBe(true);
+    // Note: C-201 will still show up because the single upload page
+    // gets auto-allocated (its stamp doesn't share with the title's
+    // custom ID). That's the per-spec behavior: custom ID replaces the
+    // title sheet only; upload-page IDs continue from the counter.
+  });
+
+  it('does not advance the band counter when customSheetId is used', async () => {
+    const data = baseData();
+    // Two single-page Letter site_plans. First has a custom override; second
+    // should land on C-201 (NOT C-202) because the custom one didn't burn
+    // a counter slot.
+    const upload1 = await renderFakeUpload('LETTER', 1, 'siteA');
+    const upload2 = await renderFakeUpload('LETTER', 1, 'siteB');
+    data.attachments = [
+      {
+        artifactType: 'site_plan',
+        filename: 'siteA.pdf',
+        uploadBytes: upload1,
+        customSheetId: 'SP-1',
+      },
+      {
+        artifactType: 'site_plan',
+        filename: 'siteB.pdf',
+        uploadBytes: upload2,
+      },
+    ];
+
+    await generatePermitPacket(data);
+    const bytes = new Uint8Array(await capturedBlob!.arrayBuffer());
+
+    // Custom value present on the first title sheet.
+    expect(await docContainsDrawnText(bytes, 'SP-1')).toBe(true);
+    // Second attachment's title sheet should be C-201 (counter starts at
+    // 201 within BAND_DIAGRAMS for the civil discipline).
+    expect(await docContainsDrawnText(bytes, 'C-201')).toBe(true);
+  });
+
+  it('upload-page IDs continue past the custom title-sheet ID', async () => {
+    const data = baseData();
+    // Multi-page upload with a custom title-sheet ID. Upload pages still
+    // need stamped IDs from the allocator — they should begin at C-201
+    // (the value the title sheet would have taken if not overridden).
+    const upload = await renderFakeUpload('LETTER', 3, 'multipage');
+    data.attachments = [
+      {
+        artifactType: 'site_plan',
+        filename: 'multipage.pdf',
+        uploadBytes: upload,
+        customSheetId: 'A-200',
+      },
+    ];
+
+    await generatePermitPacket(data);
+    const bytes = new Uint8Array(await capturedBlob!.arrayBuffer());
+
+    // Title sheet shows the custom value.
+    expect(await docContainsDrawnText(bytes, 'A-200')).toBe(true);
+    // Upload pages get auto-allocated IDs starting from C-201.
+    expect(await docContainsDrawnText(bytes, 'C-201')).toBe(true);
+    expect(await docContainsDrawnText(bytes, 'C-202')).toBe(true);
+    expect(await docContainsDrawnText(bytes, 'C-203')).toBe(true);
+  });
+
   it('continues with remaining attachments when one upload is corrupted', async () => {
     const data = baseData();
     const goodBytes = await renderFakeUpload('LETTER', 1, 'good');

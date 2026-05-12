@@ -575,6 +575,10 @@ export const PermitPacketGenerator: React.FC<PermitPacketGeneratorProps> = ({ pr
             // orchestrator treats as cover-ON (default). Once the DB
             // migration is applied, this carries the contractor's choice.
             includeSparkplanCover: a.include_sparkplan_cover ?? true,
+            // v4 commit 11: pass through the contractor's optional
+            // custom sheet ID override. Null/undefined keeps the merge
+            // orchestrator on the auto-allocation path.
+            customSheetId: a.custom_sheet_id ?? null,
           });
         }
         if (fetched.length > 0) {
