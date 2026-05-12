@@ -52,6 +52,7 @@ import { MeterStackScheduleDocument } from './MeterStackSchedulePDF';
 import {
   type PacketSections,
   type SheetBand,
+  type SheetDiscipline,
   resolveSections,
   newBandCounters,
   nextSheetId,
@@ -62,7 +63,15 @@ import {
   BAND_MULTIFAMILY,
   BAND_COMPLIANCE,
   BAND_SPECIALTY,
+  SHEET_DISCIPLINE_CIVIL,
+  SHEET_DISCIPLINE_MANUFACTURER,
 } from './packetSections';
+import { AttachmentTitleSheet } from './AttachmentTitleSheet';
+import { AttachmentTitleBlock } from './AttachmentTitleBlock';
+import { compositeTitleBlock } from './compositeTitleBlock';
+import { mergePacket } from './mergePacket';
+import { stampSheetIds, buildStampMaps } from './stampSheetIds';
+import type { ArtifactType, CoverMode } from '../../hooks/useProjectAttachments';
 
 export interface PermitPacketData {
   projectId: string;
@@ -172,6 +181,92 @@ export interface PermitPacketData {
     lane: 'exempt' | 'pe-required';
     ahjName?: string;
   };
+  /**
+   * Sprint 2B PR-3: user-uploaded PDF artifacts to splice into the packet.
+   *
+   * Storage fetch happens at the React layer (Supabase auth context lives
+   * there); this generator accepts the bytes already in memory so it can
+   * remain testable without a browser/Supabase context.
+   *
+   * Each attachment becomes a SparkPlan title sheet (size-matched to the
+   * upload's first page) followed by the user's PDF pages. Order is
+   * preserved — uploads with discipline 'C' (site_plan/survey/hvhz_anchoring)
+   * are emitted first, then 'X' (everything else), so reviewers see civil
+   * before manufacturer documents.
+   */
+  attachments?: PermitPacketAttachment[];
+}
+
+/**
+ * In-memory representation of one user-uploaded artifact. The React layer
+ * fetches the bytes from Supabase Storage; this generator never talks to
+ * Storage directly.
+ */
+export interface PermitPacketAttachment {
+  /** Discriminates the title sheet's discipline prefix + display title. */
+  artifactType: ArtifactType;
+  /** Human-readable name shown on the title sheet (falls back per ArtifactType). */
+  displayTitle?: string;
+  /** Original filename — surfaced in warning messages if merge fails. */
+  filename: string;
+  /** ISO timestamp when the user uploaded the file (drives "Date Received"). */
+  uploadedAt?: string;
+  /** The user's PDF, fetched from Supabase Storage by the caller. */
+  uploadBytes: Uint8Array;
+  /**
+   * Per-upload cover behavior (Sprint 2B PR-3 v4). Replaces the
+   * v3 boolean `includeSparkplanCover`.
+   *
+   * - 'separate' (default) — SparkPlan title sheet as its own page
+   *    preceding the upload. Upload pages stamped with sheet IDs.
+   * - 'overlay' — SparkPlan title block composited ONTO the upload
+   *    page itself. Each upload page becomes a composite (drawing +
+   *    title block) and receives a sheet-ID stamp.
+   * - 'none' — upload appended as-is, no SparkPlan ceremony, no
+   *    stamping. For pre-bordered drawings with their own architect
+   *    title block.
+   *
+   * Omitting this field is equivalent to 'separate' (preserves the
+   * v3 default behavior for legacy callers).
+   */
+  coverMode?: CoverMode;
+  /**
+   * Optional contractor-supplied sheet ID override (Sprint 2B PR-3 v4).
+   * When set, used verbatim as the title sheet ID (cover-ON path) instead
+   * of pulling from the band+discipline counter. When null/undefined, the
+   * orchestrator auto-allocates from the counter (current behavior).
+   *
+   * Custom IDs do NOT advance the band counter — that way, every upload
+   * with a custom ID acts as a "free slot" in the auto-allocation
+   * sequence, so neighboring auto-allocated uploads stay continuous.
+   * Multi-page upload pages still receive auto-allocated IDs continuing
+   * from where the counter would naturally have been.
+   *
+   * No-op for cover-OFF uploads (the sheet ID isn't stamped anywhere in
+   * that path; the contractor's own title block carries the identifier).
+   */
+  customSheetId?: string | null;
+  /**
+   * Optional per-upload discipline letter override (Sprint 2B PR-3 v5).
+   *
+   * When set, this single letter replaces the auto-determined discipline
+   * prefix (the 'C' in 'C-201') for this upload. Auto-determination
+   * (when this field is null/undefined) maps:
+   *   site_plan / survey / hvhz_anchoring → 'C' (civil)
+   *   everything else                     → 'X' (manufacturer)
+   *
+   * Override values are expected to be a single uppercase letter A-Z
+   * — typically one of `A` (architectural), `C`, `M`, `P`, `S`, `X`.
+   * `E` is reserved for SparkPlan-generated content and isn't offered
+   * in the UI, but the orchestrator accepts whatever letter is passed
+   * (the column has no DB-level CHECK constraint — feedback_validation_advisory).
+   *
+   * Overrides do NOT change the band counter; the band counter keeps
+   * advancing normally so neighboring auto-allocated uploads stay
+   * continuous in their own discipline numbering. Only the letter
+   * prefix on this upload's sheet IDs flips.
+   */
+  disciplineOverride?: string | null;
 }
 
 const downloadBlob = (blob: Blob, fileName: string): void => {
@@ -981,12 +1076,271 @@ export const generatePermitPacket = async (data: PermitPacketData): Promise<void
         {pages.map((p, i) => React.cloneElement(p.element, { key: `${p.name}-${i}` }))}
       </Document>
     );
-    const blob = await pdf(<FullDoc />).toBlob();
-    if (!blob || blob.size === 0) {
+    const sparkplanBlob = await pdf(<FullDoc />).toBlob();
+    if (!sparkplanBlob || sparkplanBlob.size === 0) {
       throw new Error('PDF blob was empty');
     }
-    downloadBlob(blob, fileName);
-    console.log('[permit-packet] SUCCESS', { bytes: blob.size, fileName });
+
+    // ====================================================================
+    // SPRINT 2B PR-3: merge user-uploaded artifacts behind title sheets.
+    // ====================================================================
+    // If the caller supplied attachments, we (a) render a size-matched
+    // title sheet per upload, (b) call mergePacket to splice them in
+    // behind the SparkPlan electrical portion, and (c) stamp continuous
+    // sheet IDs onto the upload pages. When no attachments are present,
+    // download the SparkPlan portion as-is (legacy behavior).
+    if (!data.attachments || data.attachments.length === 0) {
+      downloadBlob(sparkplanBlob, fileName);
+      console.log('[permit-packet] SUCCESS (no attachments)', {
+        bytes: sparkplanBlob.size,
+        fileName,
+      });
+      return;
+    }
+
+    const sparkplanBytes = new Uint8Array(await sparkplanBlob.arrayBuffer());
+    // mergePacket re-loads the SparkPlan bytes via pdf-lib and reads the
+    // actual page count off the rendered output — that's authoritative.
+    // We don't need to sum builders.pageCount manually here.
+
+    // Sort attachments: civil first (site_plan, survey, hvhz_anchoring),
+    // then manufacturer (cut_sheet, fire_stopping, manufacturer_data, noc,
+    // hoa_letter). Within each discipline, preserve insertion order.
+    const CIVIL_TYPES: ReadonlySet<ArtifactType> = new Set([
+      'site_plan',
+      'survey',
+      'hvhz_anchoring',
+    ]);
+    const disciplineOf = (t: ArtifactType): SheetDiscipline =>
+      CIVIL_TYPES.has(t) ? SHEET_DISCIPLINE_CIVIL : SHEET_DISCIPLINE_MANUFACTURER;
+
+    const sortedAttachments = [...data.attachments].sort((a, b) => {
+      const da = disciplineOf(a.artifactType);
+      const db = disciplineOf(b.artifactType);
+      if (da === db) return 0;
+      return da === SHEET_DISCIPLINE_CIVIL ? -1 : 1;
+    });
+
+    // Per-discipline counters for sheet ID allocation, starting at band 200.
+    // Civil + manufacturer share the BAND_DIAGRAMS (200-299) band — the
+    // discipline letter (C vs X) distinguishes them so AHJs can reference
+    // "C-201 site plan" or "X-203 cut sheet" without ambiguity.
+    // Per-AHJ band-specific assignments are deferred to Sprint 2C / PR-4.
+    const uploadCounters = newBandCounters();
+    const allocateId = (discipline: SheetDiscipline): string =>
+      nextSheetId(uploadCounters, BAND_DIAGRAMS, discipline);
+
+    // Render title sheets + allocate sheet IDs per attachment.
+    // `hasCover === false` means: no SparkPlan title sheet, no sheet-ID
+    // stamps — the upload is appended as-is. We still process it through
+    // the merge engine so it lands in the merged output in the right
+    // discipline order; mergePacket recognizes a zero-byte titleSheetBytes
+    // as "skip title page" and stampSheetIds skips empty sheet IDs.
+    const mergeInputs: Array<{
+      label: string;
+      titleSheetBytes: Uint8Array;
+      uploadBytes: Uint8Array;
+      sheetIdRange: string[];
+      hasCover: boolean;
+      /** v4 commit 15: overlay-mode flag — composite pages get stamped. */
+      overlay?: boolean;
+    }> = [];
+
+    for (const att of sortedAttachments) {
+      // v5 commit 17: per-upload discipline letter override. When set,
+      // the contractor-supplied letter replaces the auto-determined
+      // value but the band counter keeps advancing normally so adjacent
+      // auto-allocated sheets stay continuous. When NULL, falls back to
+      // disciplineOf(artifactType) (the v3 behavior).
+      const overrideLetter = att.disciplineOverride?.trim().toUpperCase();
+      const discipline: SheetDiscipline = overrideLetter
+        ? (overrideLetter as SheetDiscipline)
+        : disciplineOf(att.artifactType);
+      // v4 commit 15: 3-state cover mode (separate / overlay / none).
+      // Default 'separate' preserves existing behavior for callers / DB
+      // rows that pre-date the cover_mode column.
+      const coverMode: CoverMode = att.coverMode ?? 'separate';
+
+      // Pre-flight: parse the upload to (a) detect first-page dimensions
+      // for the size-aware title sheet/block and (b) count pages so we
+      // allocate the right number of stamp IDs. If pdf-lib can't parse
+      // the upload here, skip the attachment now — that keeps the
+      // sheet-ID counter aligned with what actually ends up in the
+      // merged output.
+      let pageSize: [number, number] = [612, 792];
+      let uploadPageCount = 0;
+      try {
+        const { PDFDocument } = await import('pdf-lib');
+        const probe = await PDFDocument.load(att.uploadBytes, {
+          ignoreEncryption: true,
+          throwOnInvalidObject: false,
+        });
+        if (probe.getPageCount() === 0) {
+          console.warn(
+            '[permit-packet] skipping attachment with zero pages:',
+            att.filename,
+          );
+          continue;
+        }
+        const first = probe.getPage(0).getSize();
+        pageSize = [first.width, first.height];
+        uploadPageCount = probe.getPageCount();
+      } catch (probeErr) {
+        console.warn(
+          '[permit-packet] could not parse attachment, skipping:',
+          att.filename,
+          probeErr,
+        );
+        continue;
+      }
+
+      const customTitle = att.customSheetId?.trim() || null;
+
+      if (coverMode === 'separate') {
+        // SparkPlan title sheet as its own page preceding the upload.
+        // Custom ID honors the contractor override; counter slot stays
+        // untouched when honored so the next upload's auto-allocation
+        // remains continuous.
+        const titleSheetId = customTitle ?? allocateId(discipline);
+        const uploadPageIds: string[] = [];
+        for (let i = 0; i < uploadPageCount; i++) {
+          uploadPageIds.push(allocateId(discipline));
+        }
+
+        const titleSheetBlob = await pdf(
+          <Document>
+            <AttachmentTitleSheet
+              sheetId={titleSheetId}
+              artifactType={att.artifactType}
+              displayTitle={att.displayTitle}
+              contractorName={data.contractorName ?? data.preparedBy}
+              contractorLicense={data.contractorLicense}
+              projectName={data.projectName}
+              projectAddress={data.projectAddress}
+              permitNumber={data.permitNumber}
+              dateReceived={att.uploadedAt}
+              pageSize={pageSize}
+            />
+          </Document>,
+        ).toBlob();
+        const titleSheetBytes = new Uint8Array(await titleSheetBlob.arrayBuffer());
+
+        mergeInputs.push({
+          label: att.filename,
+          titleSheetBytes,
+          uploadBytes: att.uploadBytes,
+          sheetIdRange: [titleSheetId, ...uploadPageIds],
+          hasCover: true,
+        });
+      } else if (coverMode === 'overlay') {
+        // SparkPlan title block composited ONTO each upload page. We
+        // allocate ONE sheet ID per upload page (the composite page IS
+        // the only page) — the contractor's custom ID (if supplied)
+        // is applied to the first composite page only. Subsequent
+        // composite pages auto-allocate.
+        const firstCompositeId = customTitle ?? allocateId(discipline);
+        const compositePageIds: string[] = [firstCompositeId];
+        for (let i = 1; i < uploadPageCount; i++) {
+          compositePageIds.push(allocateId(discipline));
+        }
+
+        // Render the title block at the upload's first-page size, then
+        // composite onto every page of the upload.
+        const titleBlockBlob = await pdf(
+          <Document>
+            <AttachmentTitleBlock
+              sheetId={firstCompositeId}
+              artifactType={att.artifactType}
+              displayTitle={att.displayTitle}
+              contractorName={data.contractorName ?? data.preparedBy}
+              contractorLicense={data.contractorLicense}
+              projectName={data.projectName}
+              projectAddress={data.projectAddress}
+              permitNumber={data.permitNumber}
+              dateReceived={att.uploadedAt}
+              pageSize={pageSize}
+            />
+          </Document>,
+        ).toBlob();
+        const titleBlockBytes = new Uint8Array(await titleBlockBlob.arrayBuffer());
+
+        const composite = await compositeTitleBlock({
+          uploadBytes: att.uploadBytes,
+          titleBlockBytes,
+          sheetId: firstCompositeId,
+          label: att.filename,
+        });
+        if (composite.warnings.length > 0) {
+          console.warn(
+            '[permit-packet] overlay warnings for',
+            att.filename,
+            composite.warnings,
+          );
+        }
+
+        // Push as a no-title-sheet merge input. The composite IS the
+        // upload pages; stampSheetIds will stamp each composite page
+        // with its sheet ID. Use the overlay sentinel by passing
+        // hasCover=false (no title-sheet insertion) AND a non-empty
+        // sheet ID range — the stamp map builder treats a non-empty ID
+        // with hasCover=false as a stamp-on-upload signal.
+        mergeInputs.push({
+          label: att.filename,
+          titleSheetBytes: new Uint8Array(0),
+          uploadBytes: composite.composedPdf,
+          sheetIdRange: compositePageIds,
+          hasCover: false,
+          // v4 commit 15: overlay mode flag — overrides the
+          // shouldStamp=false default for cover-OFF attachments so
+          // composite pages get a sheet ID stamp.
+          overlay: true,
+        });
+      } else {
+        // coverMode === 'none' — upload appended as-is, no title sheet,
+        // no stamping. Architect's own title block / numbering carries
+        // the identifier.
+        const blankIds = new Array(uploadPageCount).fill('');
+        mergeInputs.push({
+          label: att.filename,
+          titleSheetBytes: new Uint8Array(0),
+          uploadBytes: att.uploadBytes,
+          sheetIdRange: blankIds,
+          hasCover: false,
+        });
+      }
+    }
+
+    // Run the merge.
+    const merge = await mergePacket(sparkplanBytes, mergeInputs);
+    if (merge.warnings.length > 0) {
+      console.warn('[permit-packet] merge warnings:', merge.warnings);
+    }
+
+    // Build the stamp maps + run the stamp pass. `mergeInputs` already
+    // contains only the attachments that probed successfully above, so
+    // it aligns with the merged output 1:1.
+    const maps = buildStampMaps({
+      sparkplanPageCount: merge.sparkplanPageCount,
+      attachments: mergeInputs,
+    });
+    const stamped = await stampSheetIds({
+      merged: merge.bytes,
+      sheetIdMap: maps.sheetIdMap,
+      shouldStamp: maps.shouldStamp,
+    });
+    if (stamped.warnings.length > 0) {
+      console.warn('[permit-packet] stamp warnings:', stamped.warnings);
+    }
+
+    const finalBlob = new Blob([stamped.bytes], { type: 'application/pdf' });
+    downloadBlob(finalBlob, fileName);
+    console.log('[permit-packet] SUCCESS (with attachments)', {
+      bytes: finalBlob.size,
+      fileName,
+      sparkplanPages: merge.sparkplanPageCount,
+      mergedAttachments: merge.mergedAttachmentCount,
+      stampedPages: stamped.stampedCount,
+    });
     return;
   } catch (fullErr) {
     console.error('[permit-packet] full-document render failed, bisecting...', fullErr);

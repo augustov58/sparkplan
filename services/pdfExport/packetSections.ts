@@ -110,7 +110,7 @@ export function newBandCounters(): BandCounters {
 }
 
 /**
- * Sheet ID discipline prefixes (Sprint 2B PR-1).
+ * Sheet ID discipline prefixes (Sprint 2B PR-1; widened in PR-3 v5).
  *
  * Sheet IDs carry a single-letter discipline prefix in addition to the band-
  * based numbering. Standard plan-set convention:
@@ -118,17 +118,44 @@ export function newBandCounters(): BandCounters {
  *   C   civil       — contractor-supplied site plans, surveys
  *   X   manufacturer — contractor-supplied cut sheets, fire stopping schedules,
  *                     manufacturer installation data
+ *   A   architectural — contractor-supplied (v5, via discipline_override)
+ *   S   structural    — contractor-supplied (v5)
+ *   M   mechanical    — contractor-supplied (v5)
+ *   P   plumbing      — contractor-supplied (v5)
  *
  * The discipline prefix is orthogonal to the band — a civil site plan still
  * uses the appropriate numeric band; only the letter changes. The merge engine
- * (PR-3) will assign `C-` / `X-` IDs to uploaded artifacts via their title
- * sheets while electrical content keeps `E-`.
+ * (PR-3) auto-assigns `C-` / `X-` IDs to uploaded artifacts via their
+ * artifact_type while electrical content keeps `E-`. v5 added the
+ * `discipline_override` per-upload column so contractors can flip the letter
+ * (e.g., a Bluebeam markup landing in the architect's set wants `A-201`
+ * rather than the default `C-201`).
  */
-export type SheetDiscipline = 'E' | 'C' | 'X';
+export type SheetDiscipline = 'E' | 'C' | 'X' | 'A' | 'S' | 'M' | 'P';
 
 export const SHEET_DISCIPLINE_ELECTRICAL: SheetDiscipline = 'E';
 export const SHEET_DISCIPLINE_CIVIL: SheetDiscipline = 'C';
 export const SHEET_DISCIPLINE_MANUFACTURER: SheetDiscipline = 'X';
+export const SHEET_DISCIPLINE_ARCHITECTURAL: SheetDiscipline = 'A';
+export const SHEET_DISCIPLINE_STRUCTURAL: SheetDiscipline = 'S';
+export const SHEET_DISCIPLINE_MECHANICAL: SheetDiscipline = 'M';
+export const SHEET_DISCIPLINE_PLUMBING: SheetDiscipline = 'P';
+
+/**
+ * The discipline letters a contractor may pick as a per-upload override
+ * via the `discipline_override` column / AttachmentUploadCard dropdown.
+ * Electrical (`E`) is intentionally excluded — that's reserved for
+ * SparkPlan-generated sheets and would collide with the auto-allocated
+ * band counter for the SparkPlan content.
+ */
+export const DISCIPLINE_OVERRIDE_OPTIONS: readonly SheetDiscipline[] = [
+  'A',
+  'C',
+  'M',
+  'P',
+  'S',
+  'X',
+] as const;
 
 /**
  * Legacy single-prefix export retained for backward compatibility with any

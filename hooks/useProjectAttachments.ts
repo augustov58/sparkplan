@@ -45,8 +45,12 @@ import { dataRefreshEvents } from '@/lib/dataRefreshEvents';
 type ProjectAttachment = Database['public']['Tables']['project_attachments']['Row'];
 
 /**
- * Allowed artifact_type values. Mirrors the CHECK constraint in the
- * `20260512_project_attachments.sql` migration.
+ * Allowed artifact_type values. Mirrors the CHECK constraint in
+ * `20260512_project_attachments.sql` + `20260513_attachment_hvhz_anchoring.sql`.
+ *
+ * Sprint 2B PR-3 added `hvhz_anchoring` (Sprint 2C H19 finding) — FL Product
+ * Approval / MD-NOA tie-down / signed-sealed structural plans for outdoor
+ * pedestal/bollard EVSE statewide.
  */
 export type ArtifactType =
   | 'site_plan'
@@ -55,7 +59,31 @@ export type ArtifactType =
   | 'noc'
   | 'hoa_letter'
   | 'survey'
-  | 'manufacturer_data';
+  | 'manufacturer_data'
+  | 'hvhz_anchoring';
+
+/**
+ * 3-mode cover behavior (v4 commit 12). Replaces the boolean
+ * include_sparkplan_cover column from PR-3 commit 7.
+ *
+ * - 'separate' (default): SparkPlan title sheet as its own page
+ *    preceding the upload. AHJ-canonical layout for legal docs,
+ *    cut sheets, NOC, HOA.
+ * - 'overlay': SparkPlan title block composited onto the upload
+ *    page itself. One sheet, not two — designed for bare drawings
+ *    (Bluebeam markups, Google Earth printouts) that have no
+ *    existing title block.
+ * - 'none': upload appended as-is, no SparkPlan ceremony, no
+ *    stamping. For uploads that already carry a complete architect
+ *    title block (e.g., HOK A100).
+ */
+export type CoverMode = 'separate' | 'overlay' | 'none';
+
+export const COVER_MODES: readonly CoverMode[] = [
+  'separate',
+  'overlay',
+  'none',
+] as const;
 
 export const ARTIFACT_TYPES: readonly ArtifactType[] = [
   'site_plan',
@@ -65,6 +93,7 @@ export const ARTIFACT_TYPES: readonly ArtifactType[] = [
   'hoa_letter',
   'survey',
   'manufacturer_data',
+  'hvhz_anchoring',
 ] as const;
 
 const STORAGE_BUCKET = 'permit-attachments';
@@ -109,6 +138,92 @@ export interface UseProjectAttachmentsReturn {
    *   the user retries delete).
    */
   remove: (attachmentId: string) => Promise<void>;
+
+  /**
+   * Update the `cover_mode` enum on an attachment (Sprint 2B PR-3 v4).
+   *
+   * - `separate` (default): SparkPlan title sheet as its OWN page
+   *   preceding the upload. Current cover-ON behavior.
+   * - `overlay`: SparkPlan title block composited ONTO the upload
+   *   page itself. One sheet, not two — for bare drawings (Bluebeam
+   *   markups, Google Earth printouts) without their own title block.
+   * - `none`: upload appended as-is, no SparkPlan ceremony, no
+   *   stamping. For pre-bordered drawings with their own architect
+   *   title block.
+   *
+   * Optimistic update + realtime broadcast — same pattern as `upload` /
+   * `remove`. Surfaces a toast on failure; never throws.
+   */
+  updateCoverMode: (
+    attachmentId: string,
+    mode: CoverMode,
+  ) => Promise<void>;
+
+  /**
+   * Update the `custom_sheet_id` override on an attachment (v4 commit 9).
+   *
+   * - `value` is the contractor-supplied sheet ID (e.g., "A-100", "SP-1").
+   * - Pass `null` (or empty string) to clear the override — the merge
+   *   orchestrator will resume auto-allocating from the band+discipline
+   *   counter.
+   *
+   * Format validation is **advisory** (per the
+   * `feedback_validation_advisory` MEMORY entry): if the value doesn't
+   * match the recommended `^[A-Z][A-Za-z0-9]*-[A-Za-z0-9-]+$` pattern,
+   * the hook still saves but surfaces a toast asking the user to confirm.
+   *
+   * Optimistic update + rollback on Supabase failure.
+   */
+  updateCustomSheetId: (
+    attachmentId: string,
+    value: string | null,
+  ) => Promise<void>;
+
+  /**
+   * Update the `discipline_override` letter on an attachment (v5 commit 16).
+   *
+   * - `value` is a single uppercase letter A-Z (e.g., 'A', 'C', 'E', 'S', 'X',
+   *   'M', 'P'). Pass `null` to clear the override — the merge orchestrator
+   *   resumes auto-determining the discipline from `artifact_type`
+   *   (site_plan/survey/hvhz_anchoring → C; everything else → X).
+   *
+   * Discipline overrides do NOT change the band counter; only the letter
+   * prefix on this upload's sheet ID flips. Subsequent uploads continue
+   * auto-allocating from the same band counter so the packet stays
+   * continuous.
+   *
+   * Format validation is **advisory** (per the
+   * `feedback_validation_advisory` MEMORY entry): the hook accepts any
+   * value, normalizes to uppercase, and surfaces a toast if it doesn't
+   * match the recommended `^[A-Z]$` shape — but still saves it.
+   *
+   * Optimistic update + rollback on Supabase failure.
+   */
+  updateDisciplineOverride: (
+    attachmentId: string,
+    value: string | null,
+  ) => Promise<void>;
+}
+
+/**
+ * Recommended sheet ID format. Advisory only — saved values that don't
+ * match still go through. Pattern accepts architect/plan-set conventions
+ * like "A-100", "C-201", "SP-1", "E-001a", "M-1.1".
+ */
+export const SHEET_ID_PATTERN = /^[A-Z][A-Za-z0-9]*-[A-Za-z0-9.-]+$/;
+export function isLikelyValidSheetId(value: string): boolean {
+  return SHEET_ID_PATTERN.test(value.trim());
+}
+
+/**
+ * Recommended discipline letter format (v5). A single uppercase letter A-Z.
+ * Advisory only — saved values that don't match still go through, but a
+ * toast surfaces to flag the format. The merge orchestrator uses the
+ * letter verbatim as the sheet-ID prefix regardless.
+ */
+export const DISCIPLINE_OVERRIDE_PATTERN = /^[A-Z]$/;
+export function isLikelyValidDisciplineLetter(value: string): boolean {
+  return DISCIPLINE_OVERRIDE_PATTERN.test(value.trim());
 }
 
 /**
@@ -332,12 +447,174 @@ export function useProjectAttachments(
     }
   };
 
+  const updateCoverMode = async (
+    attachmentId: string,
+    mode: CoverMode,
+  ): Promise<void> => {
+    const target = attachments.find((a) => a.id === attachmentId);
+    if (!target) return;
+
+    // Optimistic update — swap locally so the radio/select reflects
+    // the choice immediately. Realtime subscription reconciles on the
+    // next tick.
+    const previous = target.cover_mode;
+    setAttachments((prev) =>
+      prev.map((a) =>
+        a.id === attachmentId ? { ...a, cover_mode: mode } : a,
+      ),
+    );
+
+    try {
+      const { error: updateError } = await supabase
+        .from('project_attachments')
+        .update({ cover_mode: mode })
+        .eq('id', attachmentId);
+
+      if (updateError) {
+        // Rollback.
+        setAttachments((prev) =>
+          prev.map((a) =>
+            a.id === attachmentId ? { ...a, cover_mode: previous } : a,
+          ),
+        );
+        throw updateError;
+      }
+
+      dataRefreshEvents.emit('project_attachments');
+    } catch (err) {
+      const message =
+        err instanceof Error ? err.message : 'Failed to update attachment';
+      setError(message);
+      showToast.error(toastMessages.attachment.coverModeFailed);
+      console.error('[useProjectAttachments] updateCoverMode failed', err);
+    }
+  };
+
+  const updateCustomSheetId = async (
+    attachmentId: string,
+    value: string | null,
+  ): Promise<void> => {
+    const target = attachments.find((a) => a.id === attachmentId);
+    if (!target) return;
+
+    // Normalize: empty string → null (clear override). Trim incidental
+    // whitespace so " C-201 " saves as "C-201".
+    const trimmed = value === null ? null : value.trim();
+    const normalized = trimmed === '' || trimmed === null ? null : trimmed;
+
+    // Advisory validation — warn but still save (per feedback_validation_advisory).
+    // We surface it as an info-style toast (`success` channel) rather than
+    // an error since the value is still saved; the message itself makes
+    // the "format looks unusual" caveat explicit.
+    if (normalized && !isLikelyValidSheetId(normalized)) {
+      showToast.success(toastMessages.attachment.customSheetIdInvalid);
+    }
+
+    // Optimistic update.
+    const previous = target.custom_sheet_id;
+    setAttachments((prev) =>
+      prev.map((a) =>
+        a.id === attachmentId ? { ...a, custom_sheet_id: normalized } : a,
+      ),
+    );
+
+    try {
+      const { error: updateError } = await supabase
+        .from('project_attachments')
+        .update({ custom_sheet_id: normalized })
+        .eq('id', attachmentId);
+
+      if (updateError) {
+        // Rollback.
+        setAttachments((prev) =>
+          prev.map((a) =>
+            a.id === attachmentId ? { ...a, custom_sheet_id: previous } : a,
+          ),
+        );
+        throw updateError;
+      }
+
+      showToast.success(toastMessages.attachment.customSheetIdSaved);
+      dataRefreshEvents.emit('project_attachments');
+    } catch (err) {
+      const message =
+        err instanceof Error
+          ? err.message
+          : 'Failed to update custom sheet ID';
+      setError(message);
+      showToast.error(toastMessages.attachment.customSheetIdFailed);
+      console.error('[useProjectAttachments] updateCustomSheetId failed', err);
+    }
+  };
+
+  const updateDisciplineOverride = async (
+    attachmentId: string,
+    value: string | null,
+  ): Promise<void> => {
+    const target = attachments.find((a) => a.id === attachmentId);
+    if (!target) return;
+
+    // Normalize: trim and uppercase a non-null input so 'a' → 'A'. Empty
+    // string → null (clear override).
+    const trimmed = value === null ? null : value.trim().toUpperCase();
+    const normalized = trimmed === '' || trimmed === null ? null : trimmed;
+
+    // Advisory validation — warn but still save (feedback_validation_advisory).
+    if (normalized && !isLikelyValidDisciplineLetter(normalized)) {
+      showToast.success(toastMessages.attachment.disciplineOverrideInvalid);
+    }
+
+    // Optimistic update.
+    const previous = target.discipline_override;
+    setAttachments((prev) =>
+      prev.map((a) =>
+        a.id === attachmentId ? { ...a, discipline_override: normalized } : a,
+      ),
+    );
+
+    try {
+      const { error: updateError } = await supabase
+        .from('project_attachments')
+        .update({ discipline_override: normalized })
+        .eq('id', attachmentId);
+
+      if (updateError) {
+        // Rollback.
+        setAttachments((prev) =>
+          prev.map((a) =>
+            a.id === attachmentId
+              ? { ...a, discipline_override: previous }
+              : a,
+          ),
+        );
+        throw updateError;
+      }
+
+      showToast.success(toastMessages.attachment.disciplineOverrideSaved);
+      dataRefreshEvents.emit('project_attachments');
+    } catch (err) {
+      const message =
+        err instanceof Error
+          ? err.message
+          : 'Failed to update discipline override';
+      setError(message);
+      showToast.error(toastMessages.attachment.disciplineOverrideFailed);
+      console.error(
+        '[useProjectAttachments] updateDisciplineOverride failed',
+        err,
+      );
+    }
+  };
+
   return {
     attachments,
     loading,
     error,
     upload,
     remove,
+    updateCoverMode,
+    updateCustomSheetId,
+    updateDisciplineOverride,
   };
 }
 
@@ -370,3 +647,31 @@ export function validateAttachmentFile(
 }
 
 export { buildStoragePath, countPdfPages, STORAGE_BUCKET };
+
+/**
+ * Fetch the raw PDF bytes for an uploaded attachment from Supabase Storage.
+ *
+ * The merge orchestrator (Sprint 2B PR-3) calls this for each attachment
+ * before invoking `mergePacket`. Kept as a free function (not a hook
+ * method) so it can be invoked imperatively from the
+ * "Generate packet" button handler without coupling to a React render
+ * cycle.
+ *
+ * Returns null on failure so callers can surface a warning and continue
+ * with the remaining attachments rather than aborting the whole packet.
+ */
+export async function downloadAttachmentBytes(
+  storagePath: string,
+): Promise<Uint8Array | null> {
+  try {
+    const { data, error } = await supabase.storage
+      .from(STORAGE_BUCKET)
+      .download(storagePath);
+    if (error || !data) return null;
+    const buf = await data.arrayBuffer();
+    return new Uint8Array(buf);
+  } catch (err) {
+    console.warn('[useProjectAttachments] downloadAttachmentBytes failed', err);
+    return null;
+  }
+}

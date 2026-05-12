@@ -1677,6 +1677,9 @@ export type Database = {
       project_attachments: {
         Row: {
           artifact_type: string
+          cover_mode: 'separate' | 'overlay' | 'none'
+          custom_sheet_id: string | null
+          discipline_override: string | null
           display_title: string | null
           filename: string
           id: string
@@ -1688,6 +1691,9 @@ export type Database = {
         }
         Insert: {
           artifact_type: string
+          cover_mode?: 'separate' | 'overlay' | 'none'
+          custom_sheet_id?: string | null
+          discipline_override?: string | null
           display_title?: string | null
           filename: string
           id?: string
@@ -1699,6 +1705,9 @@ export type Database = {
         }
         Update: {
           artifact_type?: string
+          cover_mode?: 'separate' | 'overlay' | 'none'
+          custom_sheet_id?: string | null
+          discipline_override?: string | null
           display_title?: string | null
           filename?: string
           id?: string

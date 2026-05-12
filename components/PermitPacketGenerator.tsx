@@ -5,8 +5,9 @@
 
 import React, { useState, useEffect } from 'react';
 import { FileText, Download, Loader2, AlertCircle, CheckCircle, Info, Building2, AlertTriangle, ListChecks, Paperclip } from 'lucide-react';
-import { generatePermitPacket, generateLightweightPermitPacket, type PermitPacketData } from '../services/pdfExport/permitPacketGenerator';
+import { generatePermitPacket, generateLightweightPermitPacket, type PermitPacketData, type PermitPacketAttachment } from '../services/pdfExport/permitPacketGenerator';
 import { AttachmentUploadCard } from './AttachmentUploadCard';
+import { useProjectAttachments, downloadAttachmentBytes, type ArtifactType } from '../hooks/useProjectAttachments';
 import type { NEC22087NarrativeData, NEC22087Method } from '../services/pdfExport/PermitPacketDocuments';
 import {
   DEFAULT_SECTIONS,
@@ -235,6 +236,8 @@ export const PermitPacketGenerator: React.FC<PermitPacketGeneratorProps> = ({ pr
   const { meterStacks } = useMeterStacks(projectId || '');
   const { meters } = useMeters(projectId || '');
   const { profile } = useProfile();
+  // Sprint 2B PR-3: user-uploaded artifacts to splice into the packet.
+  const { attachments: projectAttachments } = useProjectAttachments(projectId || '');
 
   // Auto-fill from profile (only on first load, before user edits)
   useEffect(() => {
@@ -549,6 +552,38 @@ export const PermitPacketGenerator: React.FC<PermitPacketGeneratorProps> = ({ pr
         };
       }
 
+      // Sprint 2B PR-3: fetch uploaded artifacts from Supabase Storage and
+      // attach them to the packet payload. The full-packet path uses these;
+      // the lightweight path skips them (lightweight is "just the
+      // calculations" by design).
+      if (packetType === 'full' && projectAttachments.length > 0) {
+        const fetched: PermitPacketAttachment[] = [];
+        for (const a of projectAttachments) {
+          const bytes = await downloadAttachmentBytes(a.storage_path);
+          if (!bytes) {
+            console.warn('[permit-packet] could not download attachment', a.filename);
+            continue;
+          }
+          // v4 commit 15: pass the 3-state cover_mode through to the
+          // orchestrator. Maps directly to PermitPacketAttachment.coverMode.
+          fetched.push({
+            artifactType: a.artifact_type as ArtifactType,
+            displayTitle: a.display_title ?? undefined,
+            filename: a.filename,
+            uploadedAt: a.uploaded_at,
+            uploadBytes: bytes,
+            coverMode: a.cover_mode ?? 'separate',
+            customSheetId: a.custom_sheet_id ?? null,
+            // v5 commit 17: per-upload discipline letter override. When
+            // null, the orchestrator auto-determines from artifact_type.
+            disciplineOverride: a.discipline_override ?? null,
+          });
+        }
+        if (fetched.length > 0) {
+          packetData.attachments = fetched;
+        }
+      }
+
       if (packetType === 'full') {
         await generatePermitPacket(packetData);
       } else {
@@ -750,9 +785,9 @@ export const PermitPacketGenerator: React.FC<PermitPacketGeneratorProps> = ({ pr
             <p className="text-sm text-gray-600 mt-1">
               Upload PDFs that SparkPlan cannot generate (site plan, equipment
               cut sheets, fire stopping schedule, NOC, HOA letter, survey,
-              manufacturer data). These are required by most AHJs for intake;
-              the next release splices them into the generated packet behind
-              themed title sheets.
+              manufacturer data, HVHZ anchoring details). These are required by
+              most AHJs for intake; they are spliced into the generated packet
+              behind SparkPlan title sheets at download time.
             </p>
           </div>
         </div>
@@ -801,6 +836,16 @@ export const PermitPacketGenerator: React.FC<PermitPacketGeneratorProps> = ({ pr
             title="HOA / Condo Approval Letter"
             description="Required for multi-family / association-governed properties (one file)"
             multiple={false}
+          />
+          {/* Sprint 2B PR-3 / Sprint 2C H19: HVHZ wind-anchoring documentation.
+              Applies to ANY outdoor pedestal/bollard EVSE statewide — cross-
+              validated Miami-Dade + Pompano Beach (Pompano enforces despite
+              being outside HVHZ proper). */}
+          <AttachmentUploadCard
+            projectId={projectId}
+            artifactType="hvhz_anchoring"
+            title="HVHZ / Outdoor Anchoring Detail"
+            description="Florida Product Approval, Miami-Dade NOA tie-down, or signed-and-sealed structural plans for outdoor pedestal/bollard EVSE statewide"
           />
         </div>
       </div>
