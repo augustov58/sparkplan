@@ -178,6 +178,31 @@ export interface UseProjectAttachmentsReturn {
     attachmentId: string,
     value: string | null,
   ) => Promise<void>;
+
+  /**
+   * Update the `discipline_override` letter on an attachment (v5 commit 16).
+   *
+   * - `value` is a single uppercase letter A-Z (e.g., 'A', 'C', 'E', 'S', 'X',
+   *   'M', 'P'). Pass `null` to clear the override — the merge orchestrator
+   *   resumes auto-determining the discipline from `artifact_type`
+   *   (site_plan/survey/hvhz_anchoring → C; everything else → X).
+   *
+   * Discipline overrides do NOT change the band counter; only the letter
+   * prefix on this upload's sheet ID flips. Subsequent uploads continue
+   * auto-allocating from the same band counter so the packet stays
+   * continuous.
+   *
+   * Format validation is **advisory** (per the
+   * `feedback_validation_advisory` MEMORY entry): the hook accepts any
+   * value, normalizes to uppercase, and surfaces a toast if it doesn't
+   * match the recommended `^[A-Z]$` shape — but still saves it.
+   *
+   * Optimistic update + rollback on Supabase failure.
+   */
+  updateDisciplineOverride: (
+    attachmentId: string,
+    value: string | null,
+  ) => Promise<void>;
 }
 
 /**
@@ -188,6 +213,17 @@ export interface UseProjectAttachmentsReturn {
 export const SHEET_ID_PATTERN = /^[A-Z][A-Za-z0-9]*-[A-Za-z0-9.-]+$/;
 export function isLikelyValidSheetId(value: string): boolean {
   return SHEET_ID_PATTERN.test(value.trim());
+}
+
+/**
+ * Recommended discipline letter format (v5). A single uppercase letter A-Z.
+ * Advisory only — saved values that don't match still go through, but a
+ * toast surfaces to flag the format. The merge orchestrator uses the
+ * letter verbatim as the sheet-ID prefix regardless.
+ */
+export const DISCIPLINE_OVERRIDE_PATTERN = /^[A-Z]$/;
+export function isLikelyValidDisciplineLetter(value: string): boolean {
+  return DISCIPLINE_OVERRIDE_PATTERN.test(value.trim());
 }
 
 /**
@@ -511,6 +547,65 @@ export function useProjectAttachments(
     }
   };
 
+  const updateDisciplineOverride = async (
+    attachmentId: string,
+    value: string | null,
+  ): Promise<void> => {
+    const target = attachments.find((a) => a.id === attachmentId);
+    if (!target) return;
+
+    // Normalize: trim and uppercase a non-null input so 'a' → 'A'. Empty
+    // string → null (clear override).
+    const trimmed = value === null ? null : value.trim().toUpperCase();
+    const normalized = trimmed === '' || trimmed === null ? null : trimmed;
+
+    // Advisory validation — warn but still save (feedback_validation_advisory).
+    if (normalized && !isLikelyValidDisciplineLetter(normalized)) {
+      showToast.success(toastMessages.attachment.disciplineOverrideInvalid);
+    }
+
+    // Optimistic update.
+    const previous = target.discipline_override;
+    setAttachments((prev) =>
+      prev.map((a) =>
+        a.id === attachmentId ? { ...a, discipline_override: normalized } : a,
+      ),
+    );
+
+    try {
+      const { error: updateError } = await supabase
+        .from('project_attachments')
+        .update({ discipline_override: normalized })
+        .eq('id', attachmentId);
+
+      if (updateError) {
+        // Rollback.
+        setAttachments((prev) =>
+          prev.map((a) =>
+            a.id === attachmentId
+              ? { ...a, discipline_override: previous }
+              : a,
+          ),
+        );
+        throw updateError;
+      }
+
+      showToast.success(toastMessages.attachment.disciplineOverrideSaved);
+      dataRefreshEvents.emit('project_attachments');
+    } catch (err) {
+      const message =
+        err instanceof Error
+          ? err.message
+          : 'Failed to update discipline override';
+      setError(message);
+      showToast.error(toastMessages.attachment.disciplineOverrideFailed);
+      console.error(
+        '[useProjectAttachments] updateDisciplineOverride failed',
+        err,
+      );
+    }
+  };
+
   return {
     attachments,
     loading,
@@ -519,6 +614,7 @@ export function useProjectAttachments(
     remove,
     updateCoverMode,
     updateCustomSheetId,
+    updateDisciplineOverride,
   };
 }
 

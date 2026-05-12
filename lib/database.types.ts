@@ -1679,6 +1679,7 @@ export type Database = {
           artifact_type: string
           cover_mode: 'separate' | 'overlay' | 'none'
           custom_sheet_id: string | null
+          discipline_override: string | null
           display_title: string | null
           filename: string
           id: string
@@ -1692,6 +1693,7 @@ export type Database = {
           artifact_type: string
           cover_mode?: 'separate' | 'overlay' | 'none'
           custom_sheet_id?: string | null
+          discipline_override?: string | null
           display_title?: string | null
           filename: string
           id?: string
@@ -1705,6 +1707,7 @@ export type Database = {
           artifact_type?: string
           cover_mode?: 'separate' | 'overlay' | 'none'
           custom_sheet_id?: string | null
+          discipline_override?: string | null
           display_title?: string | null
           filename?: string
           id?: string

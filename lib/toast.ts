@@ -275,6 +275,9 @@ export const toastMessages = {
     customSheetIdSaved: 'Custom sheet ID saved',
     customSheetIdFailed: 'Could not update custom sheet ID',
     customSheetIdInvalid: 'Sheet ID format looks unusual — expected e.g. "C-201", "A-100", "SP-1". Saved anyway.',
+    disciplineOverrideSaved: 'Discipline override saved',
+    disciplineOverrideFailed: 'Could not update discipline override',
+    disciplineOverrideInvalid: 'Discipline should be a single letter A-Z. Saved anyway.',
   },
 
   // Generic
