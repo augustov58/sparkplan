@@ -4,6 +4,52 @@ All notable changes to SparkPlan.
 
 ---
 
+## 2026-05-12: Permit packet — Sprint 2B merge engine (PR #49)
+
+Closes the merge-engine half of Sprint 2B. User-supplied PDF artifacts (site plans, equipment cut sheets, NOC, HOA letters, fire-stopping schedules, manufacturer data, HVHZ wind-anchoring) now upload through the SparkPlan UI and splice into the generated permit packet behind SparkPlan-themed title sheets, with continuous sheet-ID stamping across the merged document. Squash hash `fce6275`, 17 commits, 5,580 LOC.
+
+**User-facing changes:**
+
+- **Upload PDF artifacts to permit packets.** 8 artifact slots in the Permit Packet Generator: site plan, equipment cut sheet, fire-stopping schedule, NOC, HOA letter, survey, manufacturer data, and **HVHZ wind-anchoring** (FL Product Approval / Miami-Dade NOA tie-down / signed-sealed structural plans — required statewide for any outdoor pedestal or bollard EVSE, cross-validated against Miami-Dade + Pompano Beach AHJs). Each card shows the uploaded file, page count, advisory format hints, and a remove button.
+- **Merge engine splices uploaded PDFs into the generated packet.** `mergePacket` runs `pdf-lib` client-side after `react-pdf` produces the SparkPlan portion. Encrypted / corrupted / zero-byte / zero-page uploads surface as warnings on the generator UI — the merged output always includes everything that succeeded. Never throws.
+- **Size-aware title sheets.** Each user upload is preceded by a SparkPlan-themed cover that automatically matches the upload's first-page dimensions (Letter portrait, Letter landscape, Tabloid, ARCH C, ARCH D — landscape and portrait). The title block layout matches commercial architectural drawings: perimeter rule, right-margin vertical title-block strip (Project / Address / Prepared For / Permit-Job-No. / FL Reg/Seal / Seal Area / NOT FOR CONSTRUCTION / Revisions), centered drawing title, bottom-right Sheet block, bottom-left "Original sheet size" boilerplate.
+- **3-mode cover behavior per upload.** New segmented radio on each upload card:
+  - **Separate** (default) — full SparkPlan title sheet precedes the upload as its own page.
+  - **Overlay** — only the title-block strip is composited onto the upload's first page (transparent background; ideal for Bluebeam markups or Google Earth screenshots where the upload doesn't already have its own border).
+  - **None** — upload is appended as-is (for HOK-style pre-bordered drawings).
+- **Custom sheet ID override per upload.** Inline pill editor lets contractors override the auto-assigned sheet ID (e.g., `C-201` for civil site plans). Advisory format validation `^[A-Z][A-Za-z0-9]*-[A-Za-z0-9.-]+$` with cross-project duplicate detection — never blocks generation, just warns.
+- **Discipline prefix override per upload.** Dropdown for **A** / **C** / **E** / **M** / **P** / **S** / **X**, mapped to architectural, civil, electrical, mechanical, plumbing, structural, and manufacturer/external. Auto-assigned by `artifact_type` by default; overrideable per upload.
+- **Continuous sheet IDs across the merged packet.** `stampSheetIds` lays the assigned ID in the bottom-right of every upload page after merge, so a contractor sees `E-101 → E-102 → C-201 → C-202 → X-203 → X-204` as a continuous read.
+
+**Why this matters:** Sprint 2A closed the systemic AHJ-rejection vectors that come from generated content. Sprint 2B closes the rest — user-supplied artifacts that SparkPlan can't auto-generate (site plans, equipment cut sheets, fire-stopping schedules). Without this merge engine, contractors had to manually concatenate SparkPlan's PDF with their other artifacts in Adobe Acrobat or Bluebeam before submitting, breaking sheet ID continuity and stripping the SparkPlan title-block branding from the uploaded portion. PR #49 is also the architectural foundation Sprint 3's PE seal workflow needs — `pdf-lib` is the same library that handles PAdES digital signatures.
+
+**Technical:**
+
+- 17 commits, 5,580 LOC, iterative v1 → v5 review cycle.
+- 3 pure pdf-lib functions in `services/pdfExport/` — `mergePacket.ts`, `stampSheetIds.ts`, `compositeTitleBlock.ts`. All follow CLAUDE.md calc-service contract (no DB / no hooks / no throws / return warnings).
+- 2 new react-pdf components — `AttachmentTitleSheet.tsx` (size-aware full cover) + `AttachmentTitleBlock.tsx` (title-block only, used by overlay path).
+- Orchestrator in `services/pdfExport/permitPacketGenerator.tsx` branches on `cover_mode` per attachment.
+- 5 new migrations applied to live Supabase: `20260513_attachment_hvhz_anchoring.sql` (extends `artifact_type` CHECK to 8 values), `20260514_attachment_include_sparkplan_cover.sql` (boolean, superseded same day), `20260514_attachment_cover_mode.sql` (3-value enum + backfill + drops boolean), `20260514_attachment_custom_sheet_id.sql` (nullable column), `20260514_attachment_discipline_override.sql` (nullable column).
+- 522 tests passing across 35 test files (+31 new across 5 new test files: `attachmentTitleSheet`, `attachmentTitleBlock`, `compositeTitleBlock`, `stampSheetIds`, `mergePacket`).
+- Surfaced F-tier follow-up: **F8** — Enable RLS on `public.jurisdictions` before Sprint 2C M1 populates it (currently 0 rows; Supabase advisor flagged 2026-05-12).
+- Squash hash `fce6275`.
+
+---
+
+## 2026-05-11: Permit packet — Sprint 2B foundation + upload UI (PR #45 + PR #47)
+
+Sprint 2B PR-1 (foundation) and PR-2 (upload UI). Adds `pdf-lib` dependency, `project_attachments` table + `permit-attachments` Storage bucket, sheet ID discipline prefix infrastructure, `useProjectAttachments` hook, and the `AttachmentUploadCard` UI in the Permit Packet Generator. No user-visible merge yet (that lands in PR #49) — these PRs build the foundation.
+
+**Technical:**
+
+- New `services/pdfExport/packetSections.ts` `nextSheetId` allocator with discipline prefix support.
+- New table `project_attachments` (migration `20260512_project_attachments.sql`) with 9 columns + private `permit-attachments` Storage bucket. RLS scoped to `auth.uid()`. Path scheme `{user_id}/{project_id}/{artifact_type}/{filename}`.
+- New `hooks/useProjectAttachments.ts` following optimistic + realtime subscription pattern.
+- New `components/AttachmentUploadCard.tsx` integrated into `PermitPacketGenerator.tsx` (7 slots initially; 8th HVHZ slot added in PR #49).
+- Tests jumped from 460 baseline → 491 across 30 test files.
+
+---
+
 ## 2026-05-10: Permit packet — Sprint 2A complete (PR #40 diagrams + PR #41 H17)
 
 Closes the final 4 findings in Sprint 2A (M6 + H9 AIC overlay + M3 in PR #40; H17 + settings JSON in PR #41). Sprint 2A now ✅ COMPLETE at 19/19 findings shipped across 5 themed PRs (PR 1, #23, #31, #40, #41).
