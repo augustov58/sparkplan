@@ -16,12 +16,15 @@
  * is PR-3's merge engine — this PR only handles upload + listing.
  */
 
-import React, { useRef, useState } from 'react';
+import React, { useMemo, useRef, useState } from 'react';
 import {
   Upload,
   FileText,
   Trash2,
   Loader2,
+  Pencil,
+  Check,
+  X,
 } from 'lucide-react';
 import {
   useProjectAttachments,
@@ -66,6 +69,110 @@ const CoverToggle: React.FC<{
           value ? 'translate-x-3.5' : 'translate-x-0.5'
         }`}
       />
+    </button>
+  );
+};
+
+/**
+ * SheetIdEditor — small inline editor for the per-upload custom sheet ID
+ * override (v4 feature A). When `value` is null, the "auto" placeholder
+ * is shown until the contractor clicks the pencil icon. When set, the
+ * custom value is shown with a faint pencil to re-open the editor. The
+ * `duplicate` flag drives a small amber dot warning visual when another
+ * sheet in the same packet uses the same ID — advisory, not blocking.
+ */
+const SheetIdEditor: React.FC<{
+  value: string | null;
+  duplicate: boolean;
+  disabled?: boolean;
+  onSave: (next: string | null) => void;
+}> = ({ value, duplicate, disabled = false, onSave }) => {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(value ?? '');
+
+  const handleStart = () => {
+    if (disabled) return;
+    setDraft(value ?? '');
+    setEditing(true);
+  };
+
+  const handleSave = () => {
+    const trimmed = draft.trim();
+    onSave(trimmed === '' ? null : trimmed);
+    setEditing(false);
+  };
+
+  const handleCancel = () => {
+    setDraft(value ?? '');
+    setEditing(false);
+  };
+
+  if (editing) {
+    return (
+      <div className="flex items-center gap-1">
+        <input
+          type="text"
+          value={draft}
+          onChange={(e) => setDraft(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') handleSave();
+            if (e.key === 'Escape') handleCancel();
+          }}
+          autoFocus
+          placeholder="e.g., C-201, A-100, SP-1"
+          className="w-28 px-1.5 py-0.5 text-[11px] border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-electric-500 focus:border-electric-500"
+          aria-label="Custom sheet ID"
+        />
+        <button
+          type="button"
+          onClick={handleSave}
+          className="text-electric-500 hover:text-yellow-600 p-0.5"
+          aria-label="Save sheet ID"
+          title="Save (Enter)"
+        >
+          <Check className="w-3.5 h-3.5" />
+        </button>
+        <button
+          type="button"
+          onClick={handleCancel}
+          className="text-gray-400 hover:text-gray-700 p-0.5"
+          aria-label="Cancel sheet ID edit"
+          title="Cancel (Esc)"
+        >
+          <X className="w-3.5 h-3.5" />
+        </button>
+      </div>
+    );
+  }
+
+  const display = value ?? 'auto';
+  const isCustom = value !== null;
+  return (
+    <button
+      type="button"
+      onClick={handleStart}
+      disabled={disabled}
+      className={`flex items-center gap-1 px-1.5 py-0.5 rounded text-[11px] transition-colors ${
+        isCustom
+          ? 'bg-electric-500/15 text-[#2d3b2d] hover:bg-electric-500/25'
+          : 'bg-gray-100 text-gray-500 hover:bg-gray-200 italic'
+      } ${disabled ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'}`}
+      title={
+        isCustom
+          ? `Custom sheet ID: ${value}. Click to edit. Clear the field to revert to auto-allocation.`
+          : 'Sheet ID auto-allocated. Click to override (e.g., "A-100" to match an architect plan-set).'
+      }
+      aria-label={isCustom ? `Edit sheet ID ${value}` : 'Override auto-allocated sheet ID'}
+    >
+      <span className="font-mono">{display}</span>
+      <Pencil className="w-2.5 h-2.5 opacity-60" />
+      {duplicate && (
+        <span
+          className="ml-0.5 inline-block w-1.5 h-1.5 rounded-full bg-amber-500"
+          title="Another upload in this packet uses the same sheet ID — review before generating."
+          aria-label="Duplicate sheet ID warning"
+        />
+      )}
     </button>
   );
 };
@@ -117,10 +224,30 @@ export const AttachmentUploadCard: React.FC<AttachmentUploadCardProps> = ({
     upload,
     remove,
     updateIncludeSparkplanCover,
+    updateCustomSheetId,
   } = useProjectAttachments(projectId);
 
   // Filter the global list down to this card's slot.
   const ownAttachments = attachments.filter((a) => a.artifact_type === artifactType);
+
+  // Build a duplicate-detection map across ALL attachments (not just this
+  // card's slot) so cross-discipline collisions surface too — e.g., a
+  // site_plan custom-set to "X-201" while a cut_sheet auto-allocates X-201.
+  // Only non-null custom IDs are tracked; auto-allocated IDs aren't
+  // counted because the orchestrator guarantees uniqueness.
+  const duplicateIds = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const a of attachments) {
+      const cs = a.custom_sheet_id?.trim();
+      if (!cs) continue;
+      counts.set(cs, (counts.get(cs) ?? 0) + 1);
+    }
+    const dupes = new Set<string>();
+    for (const [id, n] of counts) {
+      if (n > 1) dupes.add(id);
+    }
+    return dupes;
+  }, [attachments]);
 
   const [isDragging, setIsDragging] = useState(false);
   const [uploadingCount, setUploadingCount] = useState(0);
@@ -299,6 +426,20 @@ export const AttachmentUploadCard: React.FC<AttachmentUploadCardProps> = ({
                       : ''}
                     uploaded {formatDate(a.uploaded_at)}
                   </p>
+                </div>
+                <div className="flex items-center gap-1.5 flex-shrink-0">
+                  <span className="text-[10px] text-gray-500 select-none">
+                    Sheet
+                  </span>
+                  <SheetIdEditor
+                    value={a.custom_sheet_id}
+                    duplicate={
+                      a.custom_sheet_id != null &&
+                      duplicateIds.has(a.custom_sheet_id)
+                    }
+                    disabled={isDeleting}
+                    onSave={(next) => updateCustomSheetId(a.id, next)}
+                  />
                 </div>
                 <div className="flex items-center gap-1.5 flex-shrink-0">
                   <span className="text-[10px] text-gray-500 select-none">
