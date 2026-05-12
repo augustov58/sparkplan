@@ -38,21 +38,26 @@ const styles = StyleSheet.create({
     color: '#555',
     marginBottom: 3,
   },
+  // Sprint 2A consolidation: section/grid/box margins tightened so the
+  // Multi-Family EV section fits in 2 pages instead of 3 after the
+  // pricing strip + scenario rearrange. Pre-consolidation values were
+  // section { mt:15 mb:10 }, grid { mb:15 }, scenarioBox { mt:10 p:10 },
+  // complianceBox { mt:15 p:10 }, tableRow { p:6 }, value { fs:14 }.
   section: {
-    marginTop: 15,
-    marginBottom: 10,
+    marginTop: 8,
+    marginBottom: 6,
   },
   sectionTitle: {
     fontSize: 12,
     fontFamily: 'Helvetica-Bold',
-    marginBottom: 8,
+    marginBottom: 5,
     paddingBottom: 3,
     borderBottomWidth: 1,
     borderBottomColor: '#ccc',
   },
   grid: {
     flexDirection: 'row',
-    marginBottom: 15,
+    marginBottom: 8,
   },
   gridItem: {
     width: '50%',
@@ -68,7 +73,7 @@ const styles = StyleSheet.create({
     marginBottom: 2,
   },
   value: {
-    fontSize: 14,
+    fontSize: 12,
     fontFamily: 'Helvetica-Bold',
   },
   subValue: {
@@ -76,7 +81,7 @@ const styles = StyleSheet.create({
     color: '#666',
   },
   table: {
-    marginTop: 10,
+    marginTop: 6,
     borderWidth: 1,
     borderColor: '#ccc',
   },
@@ -85,7 +90,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#f3f4f6',
     borderBottomWidth: 1,
     borderBottomColor: '#ccc',
-    padding: 6,
+    padding: 4,
   },
   tableHeaderCell: {
     fontSize: 8,
@@ -96,7 +101,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     borderBottomWidth: 1,
     borderBottomColor: '#eee',
-    padding: 6,
+    padding: 4,
   },
   tableCell: {
     fontSize: 9,
@@ -112,8 +117,8 @@ const styles = StyleSheet.create({
     fontFamily: 'Helvetica',
   },
   scenarioBox: {
-    marginTop: 10,
-    padding: 10,
+    marginTop: 6,
+    padding: 7,
     borderWidth: 1,
     borderRadius: 4,
     borderColor: '#d1d5db',
@@ -122,15 +127,39 @@ const styles = StyleSheet.create({
   scenarioTitle: {
     fontSize: 10,
     fontFamily: 'Helvetica-Bold',
-    marginBottom: 5,
+    marginBottom: 4,
   },
   scenarioGrid: {
     flexDirection: 'row',
     justifyContent: 'space-between',
   },
+  // 3-column layout for scenarios: stat (left) | notes (middle) | stat (right).
+  scenarioCol_stat: {
+    width: '22%',
+  },
+  scenarioCol_notes: {
+    width: '56%',
+    paddingLeft: 8,
+    paddingRight: 8,
+  },
+  scenarioCol_statRight: {
+    width: '22%',
+    textAlign: 'right',
+  },
+  // Inline 3-phase strip: single row with phase chips instead of the
+  // 3-column stack of LABEL/value/subvalue (saves ~50pt of vertical).
+  phaseStrip: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 4,
+  },
+  phaseStripCell: {
+    fontSize: 10,
+    fontFamily: 'Helvetica-Bold',
+  },
   complianceBox: {
-    marginTop: 15,
-    padding: 10,
+    marginTop: 8,
+    padding: 7,
     borderWidth: 1,
     borderRadius: 4,
   },
@@ -258,17 +287,25 @@ interface MultiFamilyEVDocumentProps {
    * narrative). When omitted, no sheet IDs render — kept optional so the
    * standalone document export (outside the permit packet) still works.
    */
-  sheetIds?: [string, string, string];
+  sheetIds?: [string, string];
 }
 
 /**
- * Single Multi-Family EV Analysis — page-level fragment.
- * Use when embedding inside a parent <Document>.
+ * Multi-Family EV Analysis — page-level fragment for embedding inside a
+ * parent <Document>.
  *
- * Renders 3 internal pages. Sprint 2A: each internal page gets its own
- * sheet ID via the `sheetIds` array (a 3-tuple). The generator pushes
- * 3 separate entries in the page list — but the component itself still
- * emits all 3 in one call so the existing structure stays intact.
+ * Renders 2 internal pages (consolidated from 3 in Sprint 2A PR #40
+ * follow-up via style tightening + scenario rearrange):
+ *   Page 1 (E-402) — Overview + EV Capacity Scenarios + Transformer/Phase checks
+ *   Page 2 (E-403) — NEC Compliance + Detailed Load Breakdown + EV Load Calc
+ *
+ * Pricing was removed from the scenarios (cost is procurement data, not
+ * permit data; AHJs review NEC compliance, not project budget). Cost
+ * comparison data lives on the Bid PDF from the Estimating module instead.
+ *
+ * Each internal page gets its own sheet ID via the `sheetIds` array
+ * (a 2-tuple). The packet generator pushes 2 separate entries in the
+ * page list but the component still emits both in one call.
  */
 export const MultiFamilyEVPages: React.FC<MultiFamilyEVDocumentProps> = ({
   result,
@@ -377,59 +414,57 @@ export const MultiFamilyEVPages: React.FC<MultiFamilyEVDocumentProps> = ({
           </View>
         </View>
 
-        <BrandFooter
-          projectName={buildingName || 'Building Analysis'}
-          contractorName={contractorName}
-          contractorLicense={contractorLicense}
-          sheetId={sheetIds?.[0]}
-        />
-      </Page>
-
-      {/* Page 2: Scenarios & Cost Comparison */}
-      <Page size="LETTER" style={themeStyles.page}>
-        <BrandBar pageLabel="MULTI-FAMILY EV READINESS" sheetId={sheetIds?.[1]} />
-        <View style={themeStyles.titleBlock}>
-          <Text style={themeStyles.docTitle}>EV Capacity Scenarios</Text>
-          <Text style={themeStyles.docSubtitle}>{buildingName || 'Building Analysis'}</Text>
+        {/* Inline section header (no Page break) — Sprint 2A consolidation
+            moved Scenarios + Transformer/Phase from a dedicated page into
+            the Overview page after the style tightening shrunk them
+            enough to fit. Pricing was REMOVED from the scenarios (cost is
+            procurement data, not permit data — AHJs review NEC compliance,
+            not project budget). Cost data lives on the Bid PDF instead. */}
+        <View style={[styles.section, { marginTop: 12 }]}>
+          <Text style={styles.sectionTitle}>EV Capacity Scenarios</Text>
         </View>
+
+        {/* 3-column scenario layout: stat (left) | notes (middle) | stat (right).
+            Pre-consolidation this was 2 stacked-grid stats with notes wrapping
+            BELOW, which was vertically wasteful. The new layout puts the
+            secondary stat (e.g. POWER PER CHARGER, UPGRADE REQUIRED) on the
+            right edge so the eye reads: headline number → context bullets
+            → secondary stat across one band. Notes use 7pt to fit. */}
 
         {/* Scenario A: No EVEMS */}
         <View style={styles.scenarioBox}>
           <Text style={styles.scenarioTitle}>{result.scenarios.noEVEMS.name}</Text>
           <View style={styles.scenarioGrid}>
-            <View style={styles.gridItem3}>
+            <View style={styles.scenarioCol_stat}>
               <Text style={styles.label}>MAX CHARGERS</Text>
               <Text style={styles.value}>{result.scenarios.noEVEMS.maxChargers}</Text>
             </View>
-            <View style={styles.gridItem3}>
+            <View style={styles.scenarioCol_notes}>
+              {result.scenarios.noEVEMS.notes.map((note, idx) => (
+                <Text key={idx} style={{ fontSize: 7, color: '#666', lineHeight: 1.25 }}>• {note}</Text>
+              ))}
+            </View>
+            <View style={styles.scenarioCol_statRight}>
               <Text style={styles.label}>UPGRADE REQUIRED</Text>
               <Text style={styles.value}>{result.scenarios.noEVEMS.requiresServiceUpgrade ? 'Yes' : 'No'}</Text>
             </View>
-            <View style={styles.gridItem3}>
-              <Text style={styles.label}>EST. COST</Text>
-              <Text style={styles.value}>
-                ${result.scenarios.noEVEMS.estimatedCostLow?.toLocaleString()} - ${result.scenarios.noEVEMS.estimatedCostHigh?.toLocaleString()}
-              </Text>
-            </View>
           </View>
-          {result.scenarios.noEVEMS.notes.length > 0 && (
-            <View style={{ marginTop: 5 }}>
-              {result.scenarios.noEVEMS.notes.map((note, idx) => (
-                <Text key={idx} style={{ fontSize: 8, color: '#666' }}>• {note}</Text>
-              ))}
-            </View>
-          )}
         </View>
 
         {/* Scenario B: With EVEMS */}
         <View style={[styles.scenarioBox, { borderColor: '#3b82f6', backgroundColor: '#eff6ff' }]}>
           <Text style={styles.scenarioTitle}>{result.scenarios.withEVEMS.name}</Text>
           <View style={styles.scenarioGrid}>
-            <View style={styles.gridItem3}>
+            <View style={styles.scenarioCol_stat}>
               <Text style={styles.label}>MAX CHARGERS</Text>
               <Text style={[styles.value, { color: '#1e40af' }]}>{result.scenarios.withEVEMS.maxChargers}</Text>
             </View>
-            <View style={styles.gridItem3}>
+            <View style={styles.scenarioCol_notes}>
+              {result.scenarios.withEVEMS.notes.map((note, idx) => (
+                <Text key={idx} style={{ fontSize: 7, color: '#1e3a8a', lineHeight: 1.25 }}>• {note}</Text>
+              ))}
+            </View>
+            <View style={styles.scenarioCol_statRight}>
               <Text style={styles.label}>POWER PER CHARGER</Text>
               <Text style={styles.value}>
                 {result.scenarios.withEVEMS.powerPerCharger_kW
@@ -437,72 +472,35 @@ export const MultiFamilyEVPages: React.FC<MultiFamilyEVDocumentProps> = ({
                   : 'Dynamic'}
               </Text>
             </View>
-            <View style={styles.gridItem3}>
-              <Text style={styles.label}>EST. COST</Text>
-              <Text style={styles.value}>
-                ${result.scenarios.withEVEMS.estimatedCostLow?.toLocaleString()} - ${result.scenarios.withEVEMS.estimatedCostHigh?.toLocaleString()}
-              </Text>
-            </View>
           </View>
-          {result.scenarios.withEVEMS.notes.length > 0 && (
-            <View style={{ marginTop: 5 }}>
-              {result.scenarios.withEVEMS.notes.map((note, idx) => (
-                <Text key={idx} style={{ fontSize: 8, color: '#1e3a8a' }}>• {note}</Text>
-              ))}
-            </View>
-          )}
         </View>
 
         {/* Scenario C: With Upgrade */}
         <View style={styles.scenarioBox}>
           <Text style={styles.scenarioTitle}>{result.scenarios.withUpgrade.name}</Text>
           <View style={styles.scenarioGrid}>
-            <View style={styles.gridItem3}>
+            <View style={styles.scenarioCol_stat}>
               <Text style={styles.label}>MAX CHARGERS</Text>
               <Text style={styles.value}>{result.scenarios.withUpgrade.maxChargers}</Text>
             </View>
-            <View style={styles.gridItem3}>
-              <Text style={styles.label}>NEW SERVICE SIZE</Text>
-              <Text style={styles.value}>{result.scenarios.withUpgrade.recommendedServiceAmps}A</Text>
+            <View style={styles.scenarioCol_notes}>
+              {result.scenarios.withUpgrade.notes.map((note, idx) => (
+                <Text key={idx} style={{ fontSize: 7, color: '#666', lineHeight: 1.25 }}>• {note}</Text>
+              ))}
             </View>
-            <View style={styles.gridItem3}>
-              <Text style={styles.label}>EST. COST</Text>
+            <View style={styles.scenarioCol_statRight}>
+              <Text style={styles.label}>NEW SERVICE SIZE</Text>
               <Text style={styles.value}>
-                ${result.scenarios.withUpgrade.estimatedCostLow?.toLocaleString()} - ${result.scenarios.withUpgrade.estimatedCostHigh?.toLocaleString()}
+                {result.scenarios.withUpgrade.recommendedServiceAmps
+                  ? `${result.scenarios.withUpgrade.recommendedServiceAmps}A`
+                  : 'N/A'}
               </Text>
             </View>
           </View>
-          {result.scenarios.withUpgrade.notes.length > 0 && (
-            <View style={{ marginTop: 5 }}>
-              {result.scenarios.withUpgrade.notes.map((note, idx) => (
-                <Text key={idx} style={{ fontSize: 8, color: '#666' }}>• {note}</Text>
-              ))}
-            </View>
-          )}
         </View>
 
-        {/* Cost Comparison Table */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Cost Comparison Summary</Text>
-          <View style={styles.costTable}>
-            <View style={styles.costTableHeader}>
-              <Text style={[styles.costTableHeaderCell, { width: '35%' }]}>Scenario</Text>
-              <Text style={[styles.costTableHeaderCell, { width: '20%', textAlign: 'center' }]}>Max Chargers</Text>
-              <Text style={[styles.costTableHeaderCell, { width: '45%', textAlign: 'right' }]}>Estimated Cost Range</Text>
-            </View>
-            {result.costComparison.map((item, idx) => (
-              <View key={idx} style={styles.costTableRow}>
-                <Text style={[styles.costTableCell, { width: '35%' }]}>{item.scenario}</Text>
-                <Text style={[styles.costTableCell, { width: '20%', textAlign: 'center' }]}>{item.maxChargers}</Text>
-                <Text style={[styles.costTableCell, { width: '45%', textAlign: 'right' }]}>
-                  ${item.estimatedCostLow.toLocaleString()} - ${item.estimatedCostHigh.toLocaleString()}
-                </Text>
-              </View>
-            ))}
-          </View>
-        </View>
-
-        {/* Transformer Check (if applicable) */}
+        {/* Transformer Check (if applicable) — inline strip matching the
+            Phase Balance pattern. */}
         {result.transformerCheck && (
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Transformer Capacity Check</Text>
@@ -511,46 +509,39 @@ export const MultiFamilyEVPages: React.FC<MultiFamilyEVDocumentProps> = ({
               result.transformerCheck.status === 'yellow' ? styles.complianceBoxWarning :
               styles.complianceBoxPass
             ]}>
-              <View style={styles.grid}>
-                <View style={styles.gridItem3}>
-                  <Text style={styles.label}>TRANSFORMER CAPACITY</Text>
-                  <Text style={styles.value}>{result.transformerCheck.transformerCapacityAmps}A</Text>
-                </View>
-                <View style={styles.gridItem3}>
-                  <Text style={styles.label}>TOTAL LOAD</Text>
-                  <Text style={styles.value}>{result.transformerCheck.totalLoadAmps}A</Text>
-                </View>
-                <View style={styles.gridItem3}>
-                  <Text style={styles.label}>UTILIZATION</Text>
-                  <Text style={styles.value}>{result.transformerCheck.utilizationPercent}%</Text>
-                </View>
+              <View style={styles.phaseStrip}>
+                <Text style={styles.phaseStripCell}>
+                  CAPACITY · {result.transformerCheck.transformerCapacityAmps}A
+                </Text>
+                <Text style={styles.phaseStripCell}>
+                  TOTAL LOAD · {result.transformerCheck.totalLoadAmps}A
+                </Text>
+                <Text style={styles.phaseStripCell}>
+                  UTILIZATION · {result.transformerCheck.utilizationPercent}%
+                </Text>
               </View>
               <Text style={styles.complianceText}>{result.transformerCheck.recommendation}</Text>
             </View>
           </View>
         )}
 
-        {/* Phase Balance (if applicable) */}
+        {/* Phase Balance (if applicable) — inline horizontal strip
+            (was a 3-column LABEL/value/subvalue stack which took ~3×
+            the vertical space for the same info). */}
         {result.phaseBalance && (
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>3-Phase Load Balance</Text>
             <View style={[styles.complianceBox, result.phaseBalance.isAcceptable ? styles.complianceBoxPass : styles.complianceBoxWarning]}>
-              <View style={styles.grid}>
-                <View style={styles.gridItem3}>
-                  <Text style={styles.label}>PHASE A</Text>
-                  <Text style={styles.value}>{result.phaseBalance.phaseLoads.phaseA}A</Text>
-                  <Text style={styles.subValue}>{result.phaseBalance.chargerDistribution.phaseA} chargers</Text>
-                </View>
-                <View style={styles.gridItem3}>
-                  <Text style={styles.label}>PHASE B</Text>
-                  <Text style={styles.value}>{result.phaseBalance.phaseLoads.phaseB}A</Text>
-                  <Text style={styles.subValue}>{result.phaseBalance.chargerDistribution.phaseB} chargers</Text>
-                </View>
-                <View style={styles.gridItem3}>
-                  <Text style={styles.label}>PHASE C</Text>
-                  <Text style={styles.value}>{result.phaseBalance.phaseLoads.phaseC}A</Text>
-                  <Text style={styles.subValue}>{result.phaseBalance.chargerDistribution.phaseC} chargers</Text>
-                </View>
+              <View style={styles.phaseStrip}>
+                <Text style={styles.phaseStripCell}>
+                  PHASE A · {result.phaseBalance.phaseLoads.phaseA}A · {result.phaseBalance.chargerDistribution.phaseA} chgr
+                </Text>
+                <Text style={styles.phaseStripCell}>
+                  PHASE B · {result.phaseBalance.phaseLoads.phaseB}A · {result.phaseBalance.chargerDistribution.phaseB} chgr
+                </Text>
+                <Text style={styles.phaseStripCell}>
+                  PHASE C · {result.phaseBalance.phaseLoads.phaseC}A · {result.phaseBalance.chargerDistribution.phaseC} chgr
+                </Text>
               </View>
               <Text style={styles.complianceText}>
                 Imbalance: {result.phaseBalance.imbalancePercent}% ({result.phaseBalance.isAcceptable ? 'Acceptable' : 'Exceeds 15% recommendation'})
@@ -563,13 +554,13 @@ export const MultiFamilyEVPages: React.FC<MultiFamilyEVDocumentProps> = ({
           projectName={buildingName || 'Building Analysis'}
           contractorName={contractorName}
           contractorLicense={contractorLicense}
-          sheetId={sheetIds?.[1]}
+          sheetId={sheetIds?.[0]}
         />
       </Page>
 
-      {/* Page 3: Compliance & Load Breakdown */}
+      {/* Page 2: Compliance & Load Breakdown */}
       <Page size="LETTER" style={themeStyles.page}>
-        <BrandBar pageLabel="MULTI-FAMILY EV READINESS" sheetId={sheetIds?.[2]} />
+        <BrandBar pageLabel="MULTI-FAMILY EV READINESS" sheetId={sheetIds?.[1]} />
         <View style={themeStyles.titleBlock}>
           <Text style={themeStyles.docTitle}>Compliance & Load Breakdown</Text>
           <Text style={themeStyles.docSubtitle}>{buildingName || 'Building Analysis'}</Text>
@@ -695,14 +686,16 @@ export const MultiFamilyEVPages: React.FC<MultiFamilyEVDocumentProps> = ({
           </Text>
         </View>
 
-        {/* Notes Box */}
+        {/* Notes Box — trimmed to the 3 notes that aren't already
+            visible in the tables above. Removed:
+              "EV demand factors per NEC Table 220.57…" (NEC 220.57 does
+              not provide demand factors for multi-EVSE — misleading)
+              "Per-EVSE load calculation uses NEC 220.57(A)…" (already
+              shown in the EV Load Calculation table on this page) */}
         <View style={styles.notesBox}>
           <Text style={styles.notesTitle}>Important Notes</Text>
           <Text style={styles.notesText}>
             • This analysis uses NEC 220.84 Optional Calculation for multi-family dwellings (3+ units)
-          </Text>
-          <Text style={styles.notesText}>
-            • EV demand factors per NEC Table 220.57 are applied based on the number of EVSE units
           </Text>
           <Text style={styles.notesText}>
             • EVEMS scenarios assume NEC 625.42 compliant Automatic Load Management System (ALMS)
@@ -710,19 +703,13 @@ export const MultiFamilyEVPages: React.FC<MultiFamilyEVDocumentProps> = ({
           <Text style={styles.notesText}>
             • Branch circuit conductors/OCPD must be sized at 125% per NEC 210.20(A) (continuous loads)
           </Text>
-          <Text style={styles.notesText}>
-            • Per-EVSE load calculation uses NEC 220.57(A): max(7,200 VA, nameplate rating)
-          </Text>
-          <Text style={styles.notesText}>
-            • Cost estimates are approximate and vary by location and conditions
-          </Text>
         </View>
 
         <BrandFooter
           projectName={buildingName || 'Building Analysis'}
           contractorName={contractorName}
           contractorLicense={contractorLicense}
-          sheetId={sheetIds?.[2]}
+          sheetId={sheetIds?.[1]}
         />
       </Page>
     </>

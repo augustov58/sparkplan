@@ -642,10 +642,9 @@ export const generatePermitPacket = async (data: PermitPacketData): Promise<void
       name: 'MultiFamilyEV',
       kind: 'multiFamilyEV',
       band: BAND_MULTIFAMILY,
-      pageCount: 3,
+      pageCount: 2,
       tocTitles: [
-        'Multi-Family EV Readiness — System Overview',
-        'Multi-Family EV Readiness — Capacity Scenarios',
+        'Multi-Family EV Readiness — Overview & Scenarios',
         'Multi-Family EV Readiness — Compliance & Load Breakdown',
       ],
       render: (sheetIds) => (
@@ -653,7 +652,7 @@ export const generatePermitPacket = async (data: PermitPacketData): Promise<void
           result={mfevData.result}
           buildingName={mfevData.buildingName || data.projectName}
           {...contractor}
-          sheetIds={sheetIds as [string, string, string]}
+          sheetIds={sheetIds as [string, string]}
         />
       ),
     });
