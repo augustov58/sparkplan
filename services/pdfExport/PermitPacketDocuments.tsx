@@ -180,6 +180,13 @@ interface CoverPageProps {
   codeReferences?: string[];
   // Sprint 2A H3: per-sheet ID (cover is conventionally '001')
   sheetId?: string;
+  // Sprint 2A PR 5 / H17: permit-packet lane (FL contractor exemption vs PE seal).
+  // When omitted, no exemption / PE-required line is rendered (legacy callers).
+  permitMode?: {
+    lane: 'exempt' | 'pe-required';
+    /** AHJ display name; "AHJ" placeholder used when not yet bound (Sprint 2C). */
+    ahjName?: string;
+  };
 }
 
 // FL pilot AHJs adopt NFPA-70 2020 via FBC 8th ed. NEC 220.84 demand-factor
@@ -207,6 +214,7 @@ export const CoverPage: React.FC<CoverPageProps> = ({
   necEdition = DEFAULT_NEC_EDITION,
   codeReferences = DEFAULT_CODE_REFERENCES,
   sheetId,
+  permitMode,
 }) => (
   <Page size="LETTER" style={themeStyles.page}>
     <BrandBar pageLabel="PERMIT APPLICATION" sheetId={sheetId} />
@@ -216,6 +224,17 @@ export const CoverPage: React.FC<CoverPageProps> = ({
       <Text style={themeStyles.docSubtitle}>
         {`NEC ${necEdition} Compliant Design Package`}
       </Text>
+      {permitMode && (
+        // Sprint 2A PR 5 / H17: lane-specific stamp under the title block.
+        // 'exempt' → FS 471.003(2)(h) contractor-exemption attestation.
+        // 'pe-required' → directs the AHJ to look for the PE seal on the
+        // following sheets. AHJ name fills in from Sprint 2C manifest.
+        <Text style={themeStyles.docSubtitle}>
+          {permitMode.lane === 'exempt'
+            ? 'Designed under FS 471.003(2)(h) contractor exemption'
+            : `PE-sealed plans required per ${permitMode.ahjName ?? 'AHJ'}`}
+        </Text>
+      )}
     </View>
 
     <Text style={themeStyles.sectionTitle}>PROJECT INFORMATION</Text>
