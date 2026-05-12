@@ -32,6 +32,7 @@ import {
   type ArtifactType,
   type CoverMode,
 } from '../hooks/useProjectAttachments';
+import { DISCIPLINE_OVERRIDE_OPTIONS } from '../services/pdfExport/packetSections';
 import { showToast, toastMessages } from '../lib/toast';
 
 /**
@@ -207,6 +208,70 @@ const SheetIdEditor: React.FC<{
   );
 };
 
+/**
+ * DisciplineOverrideSelector — small native select for the per-upload
+ * discipline letter override (v5 commit 17). Default value "" maps to
+ * null = auto-determine from artifact_type. Selecting a letter forces
+ * that prefix into the sheet ID (e.g., "A-201" instead of "C-201") on
+ * the next packet build.
+ *
+ * Native <select> rather than a custom popover because the option list
+ * is short (7 entries including Auto) and we want native keyboard +
+ * mobile-friendly behavior. The pill styling stays consistent with the
+ * SheetIdEditor and CoverModeSelector siblings in the row.
+ *
+ * `E` is intentionally absent from the options — that's reserved for
+ * SparkPlan-generated content. If a DB row ever carries `E` as an
+ * override (e.g., manual edit), the orchestrator still honors it and
+ * the select shows it via the rendered current-value option.
+ */
+const DisciplineOverrideSelector: React.FC<{
+  value: string | null;
+  disabled?: boolean;
+  onChange: (next: string | null) => void;
+}> = ({ value, disabled = false, onChange }) => {
+  const currentValue = value ?? '';
+  // If the DB carries an unexpected letter (manual edit / Sprint 3
+  // expansion), surface it as an extra option so the user sees it
+  // selected rather than silently switching back to Auto.
+  const extraOptions = (
+    value && !DISCIPLINE_OVERRIDE_OPTIONS.includes(value as never)
+      ? [value]
+      : []
+  ) as string[];
+  return (
+    <select
+      value={currentValue}
+      disabled={disabled}
+      onChange={(e) => {
+        const v = e.target.value;
+        onChange(v === '' ? null : v);
+      }}
+      title={
+        value
+          ? `Discipline prefix forced to "${value}-". Choose Auto to revert to the default (civil for site plans/surveys, manufacturer for everything else).`
+          : 'Discipline auto-determined from file type. Pick a letter to override (e.g., "A" so this upload prints as "A-201" inside the architect plan set).'
+      }
+      aria-label="Discipline prefix override"
+      className={`appearance-none rounded border border-gray-300 bg-white px-1.5 py-0.5 text-[11px] font-mono text-gray-700 focus:outline-none focus:ring-1 focus:ring-electric-500 focus:border-electric-500 ${
+        disabled ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'
+      } ${value ? 'bg-electric-500/15 text-[#2d3b2d]' : ''}`}
+    >
+      <option value="">Auto</option>
+      {DISCIPLINE_OVERRIDE_OPTIONS.map((d) => (
+        <option key={d} value={d}>
+          {d}
+        </option>
+      ))}
+      {extraOptions.map((d) => (
+        <option key={d} value={d}>
+          {d}
+        </option>
+      ))}
+    </select>
+  );
+};
+
 interface AttachmentUploadCardProps {
   projectId: string;
   artifactType: ArtifactType;
@@ -255,6 +320,7 @@ export const AttachmentUploadCard: React.FC<AttachmentUploadCardProps> = ({
     remove,
     updateCoverMode,
     updateCustomSheetId,
+    updateDisciplineOverride,
   } = useProjectAttachments(projectId);
 
   // Filter the global list down to this card's slot.
@@ -453,6 +519,16 @@ export const AttachmentUploadCard: React.FC<AttachmentUploadCardProps> = ({
                       : ''}
                     uploaded {formatDate(a.uploaded_at)}
                   </p>
+                </div>
+                <div className="flex items-center gap-1.5 flex-shrink-0">
+                  <span className="text-[10px] text-gray-500 select-none">
+                    Disc
+                  </span>
+                  <DisciplineOverrideSelector
+                    value={a.discipline_override}
+                    disabled={isDeleting}
+                    onChange={(next) => updateDisciplineOverride(a.id, next)}
+                  />
                 </div>
                 <div className="flex items-center gap-1.5 flex-shrink-0">
                   <span className="text-[10px] text-gray-500 select-none">

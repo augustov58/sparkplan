@@ -246,6 +246,27 @@ export interface PermitPacketAttachment {
    * that path; the contractor's own title block carries the identifier).
    */
   customSheetId?: string | null;
+  /**
+   * Optional per-upload discipline letter override (Sprint 2B PR-3 v5).
+   *
+   * When set, this single letter replaces the auto-determined discipline
+   * prefix (the 'C' in 'C-201') for this upload. Auto-determination
+   * (when this field is null/undefined) maps:
+   *   site_plan / survey / hvhz_anchoring → 'C' (civil)
+   *   everything else                     → 'X' (manufacturer)
+   *
+   * Override values are expected to be a single uppercase letter A-Z
+   * — typically one of `A` (architectural), `C`, `M`, `P`, `S`, `X`.
+   * `E` is reserved for SparkPlan-generated content and isn't offered
+   * in the UI, but the orchestrator accepts whatever letter is passed
+   * (the column has no DB-level CHECK constraint — feedback_validation_advisory).
+   *
+   * Overrides do NOT change the band counter; the band counter keeps
+   * advancing normally so neighboring auto-allocated uploads stay
+   * continuous in their own discipline numbering. Only the letter
+   * prefix on this upload's sheet IDs flips.
+   */
+  disciplineOverride?: string | null;
 }
 
 const downloadBlob = (blob: Blob, fileName: string): void => {
@@ -1126,7 +1147,15 @@ export const generatePermitPacket = async (data: PermitPacketData): Promise<void
     }> = [];
 
     for (const att of sortedAttachments) {
-      const discipline = disciplineOf(att.artifactType);
+      // v5 commit 17: per-upload discipline letter override. When set,
+      // the contractor-supplied letter replaces the auto-determined
+      // value but the band counter keeps advancing normally so adjacent
+      // auto-allocated sheets stay continuous. When NULL, falls back to
+      // disciplineOf(artifactType) (the v3 behavior).
+      const overrideLetter = att.disciplineOverride?.trim().toUpperCase();
+      const discipline: SheetDiscipline = overrideLetter
+        ? (overrideLetter as SheetDiscipline)
+        : disciplineOf(att.artifactType);
       // v4 commit 15: 3-state cover mode (separate / overlay / none).
       // Default 'separate' preserves existing behavior for callers / DB
       // rows that pre-date the cover_mode column.

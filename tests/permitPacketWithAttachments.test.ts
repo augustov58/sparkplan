@@ -454,6 +454,72 @@ describe('generatePermitPacket — Sprint 2B PR-3 attachment wiring', () => {
     expect(await docContainsDrawnText(bytes, 'C-201')).toBe(false);
   });
 
+  // ---------------------------------------------------------------------
+  // v5 commit 17 — disciplineOverride per-upload letter.
+  // ---------------------------------------------------------------------
+
+  it('disciplineOverride flips the title-sheet ID prefix', async () => {
+    const data = baseData();
+    // site_plan would default to discipline 'C' → "C-201". Setting the
+    // override to 'A' should make the title sheet land at "A-201" (the
+    // band-counter slot is the same, only the letter changes).
+    const uploadBytes = await renderFakeUpload('LETTER', 1, 'arch-site');
+    data.attachments = [
+      {
+        artifactType: 'site_plan',
+        filename: 'arch-site.pdf',
+        uploadBytes,
+        disciplineOverride: 'A',
+      },
+    ];
+
+    await generatePermitPacket(data);
+    const bytes = new Uint8Array(await capturedBlob!.arrayBuffer());
+
+    // Title sheet should carry the A- prefix.
+    expect(await docContainsDrawnText(bytes, 'A-201')).toBe(true);
+    // Auto-default C- prefix should NOT appear for this upload.
+    expect(await docContainsDrawnText(bytes, 'C-201')).toBe(false);
+  });
+
+  it('disciplineOverride does not reset the band counter', async () => {
+    const data = baseData();
+    // Three single-page site_plans, all civil-discipline by default.
+    // The middle one carries an 'A' override — but the band counter is
+    // shared across discipline letters, so neighboring auto-allocated
+    // uploads continue advancing slot numbers (no reset).
+    //
+    // Each cover-ON site_plan burns 2 slots (title sheet + 1 upload page).
+    // So with 3 uploads in insertion order, the allocator emits:
+    //   site1 (auto C):     C-201 (title) + C-202 (page)
+    //   site2 (override A): A-203 (title) + A-204 (page)
+    //   site3 (auto C):     C-205 (title) + C-206 (page)
+    //
+    // Critical assertion: C-205 exists on the third upload. If the
+    // override had reset the counter, the third upload would be back
+    // at C-201 / C-202 and C-205 would be absent.
+    const u1 = await renderFakeUpload('LETTER', 1, 'site1');
+    const u2 = await renderFakeUpload('LETTER', 1, 'site2-arch');
+    const u3 = await renderFakeUpload('LETTER', 1, 'site3');
+    data.attachments = [
+      { artifactType: 'site_plan', filename: 'site1.pdf', uploadBytes: u1 },
+      {
+        artifactType: 'site_plan',
+        filename: 'site2-arch.pdf',
+        uploadBytes: u2,
+        disciplineOverride: 'A',
+      },
+      { artifactType: 'site_plan', filename: 'site3.pdf', uploadBytes: u3 },
+    ];
+
+    await generatePermitPacket(data);
+    const bytes = new Uint8Array(await capturedBlob!.arrayBuffer());
+
+    expect(await docContainsDrawnText(bytes, 'C-201')).toBe(true); // first title
+    expect(await docContainsDrawnText(bytes, 'A-203')).toBe(true); // override title
+    expect(await docContainsDrawnText(bytes, 'C-205')).toBe(true); // third title — proves counter advanced through override
+  });
+
   it('continues with remaining attachments when one upload is corrupted', async () => {
     const data = baseData();
     const goodBytes = await renderFakeUpload('LETTER', 1, 'good');

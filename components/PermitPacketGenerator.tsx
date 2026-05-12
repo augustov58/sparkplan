@@ -574,6 +574,9 @@ export const PermitPacketGenerator: React.FC<PermitPacketGeneratorProps> = ({ pr
             uploadBytes: bytes,
             coverMode: a.cover_mode ?? 'separate',
             customSheetId: a.custom_sheet_id ?? null,
+            // v5 commit 17: per-upload discipline letter override. When
+            // null, the orchestrator auto-determines from artifact_type.
+            disciplineOverride: a.discipline_override ?? null,
           });
         }
         if (fetched.length > 0) {
