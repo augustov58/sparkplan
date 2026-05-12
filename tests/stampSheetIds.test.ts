@@ -252,4 +252,78 @@ describe('buildStampMaps', () => {
     expect(maps.sheetIdMap).toEqual(['']);
     expect(maps.shouldStamp).toEqual([false]);
   });
+
+  // ---------------------------------------------------------------------------
+  // Cover-OFF (Sprint 2B PR-3 commit 8): hasCover=false attachments contribute
+  // upload-only pages with NO stamping. Mixed with cover-ON attachments in a
+  // single packet, only the cover-ON pages should get stamped.
+  // ---------------------------------------------------------------------------
+
+  it('hasCover=false produces all-false stamps with no title page', () => {
+    const maps = buildStampMaps({
+      sparkplanPageCount: 2,
+      attachments: [
+        // Cover-OFF: 3 upload pages, no title, no stamps.
+        { sheetIdRange: ['', '', ''], hasCover: false },
+      ],
+    });
+    expect(maps.sheetIdMap).toHaveLength(5); // 2 spark + 3 upload
+    expect(maps.shouldStamp).toEqual([false, false, false, false, false]);
+  });
+
+  it('mixed cover-ON + cover-OFF: only the cover-ON uploads get stamped', () => {
+    const maps = buildStampMaps({
+      sparkplanPageCount: 1,
+      attachments: [
+        // Cover-ON: 1 title + 2 upload pages — uploads get stamped.
+        { sheetIdRange: ['C-201', 'C-202', 'C-203'], hasCover: true },
+        // Cover-OFF: 4 upload pages — none stamped.
+        { sheetIdRange: ['', '', '', ''], hasCover: false },
+      ],
+    });
+
+    // Total = 1 spark + 3 first-attach + 4 second-attach = 8
+    expect(maps.sheetIdMap).toHaveLength(8);
+
+    // Sparkplan: no stamp
+    expect(maps.shouldStamp.slice(0, 1)).toEqual([false]);
+
+    // First attachment: title (no stamp) + 2 upload pages (stamp)
+    expect(maps.sheetIdMap.slice(1, 4)).toEqual(['C-201', 'C-202', 'C-203']);
+    expect(maps.shouldStamp.slice(1, 4)).toEqual([false, true, true]);
+
+    // Second attachment: 4 upload pages, none stamped
+    expect(maps.sheetIdMap.slice(4)).toEqual(['', '', '', '']);
+    expect(maps.shouldStamp.slice(4)).toEqual([false, false, false, false]);
+  });
+
+  it('end-to-end stamping respects cover-OFF: cover-OFF pages not stamped', async () => {
+    // Build a 5-page merged document:
+    //   page 0 = spark, page 1 = cover-ON upload, page 2 = cover-ON upload,
+    //   page 3 = cover-OFF upload (no stamp), page 4 = cover-OFF upload (no stamp).
+    // (We skip rendering an actual title page here — the test verifies the
+    // stamp mask, not the merge step. The merge step is covered separately.)
+    const bytes = await renderFakePdf('LETTER', 5, 'mixed');
+
+    const maps = buildStampMaps({
+      sparkplanPageCount: 1,
+      attachments: [
+        // Cover-ON with no title (test simplification — sheetIdRange[0] is
+        // skipped just like the title would be, so we use a placeholder).
+        { sheetIdRange: ['PLACEHOLDER', 'STAMPED-1', 'STAMPED-2'], hasCover: true },
+        { sheetIdRange: ['', ''], hasCover: false },
+      ],
+    });
+
+    const result = await stampSheetIds({
+      merged: bytes,
+      sheetIdMap: maps.sheetIdMap,
+      shouldStamp: maps.shouldStamp,
+    });
+
+    expect(result.stampedCount).toBe(2); // STAMPED-1 + STAMPED-2 only
+    expect(await docContainsDrawnText(result.bytes, 'STAMPED-1')).toBe(true);
+    expect(await docContainsDrawnText(result.bytes, 'STAMPED-2')).toBe(true);
+    expect(await docContainsDrawnText(result.bytes, 'PLACEHOLDER')).toBe(false);
+  });
 });

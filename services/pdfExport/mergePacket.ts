@@ -72,7 +72,13 @@ export interface AttachmentInput {
 
   /**
    * SparkPlan-themed title sheet rendered via `AttachmentTitleSheet` +
-   * react-pdf. Always exactly one page (per AttachmentTitleSheet contract).
+   * react-pdf. Exactly one page when present.
+   *
+   * Pass a zero-byte `Uint8Array` (or any non-parseable bytes) to skip
+   * the title sheet entirely — the upload is appended to the merged
+   * output as-is. This is the cover-OFF path: contractor flagged the
+   * upload as pre-bordered (architect title block already on the
+   * drawing) and doesn't want SparkPlan injecting its own cover.
    */
   titleSheetBytes: Uint8Array;
 
@@ -84,15 +90,35 @@ export interface AttachmentInput {
   uploadBytes: Uint8Array;
 
   /**
-   * Sheet IDs assigned to this attachment's pages, ordered:
-   *   [0]      → title sheet ID (e.g., "C-201")
-   *   [1..N]   → IDs for upload page 1, 2, ..., N (e.g., "C-202", "C-203")
+   * Sheet IDs assigned to this attachment's pages. Layout depends on
+   * `hasCover`:
+   *
+   *   hasCover === true / undefined:
+   *     [0]      → title sheet ID (e.g., "C-201")
+   *     [1..N]   → IDs for upload page 1, 2, ..., N (e.g., "C-202", "C-203")
+   *
+   *   hasCover === false:
+   *     [0..N-1] → IDs for upload page 1, 2, ..., N (typically all '' —
+   *                no stamping)
    *
    * Not used during merge — the merge pass concatenates pages, the stamp
    * pass writes the IDs onto those pages. Carried here so the orchestrator
    * has a single contract object to pass through both passes.
    */
   sheetIdRange: string[];
+
+  /**
+   * Per-upload SparkPlan cover toggle. Default TRUE — same as omitting.
+   *
+   * - TRUE: insert the rendered `titleSheetBytes` page first, then append
+   *   the upload pages. Downstream stamping draws sheet IDs on every
+   *   upload page.
+   * - FALSE: skip the title sheet (titleSheetBytes is ignored), append
+   *   the upload pages directly. Downstream stamping skips this
+   *   attachment entirely — the architect's own title block / numbering
+   *   is the only visible identifier.
+   */
+  hasCover?: boolean;
 }
 
 export interface MergePacketResult {
@@ -211,13 +237,10 @@ export async function mergePacket(
   let mergedAttachmentCount = 0;
 
   for (const att of attachments) {
-    const titleDoc = await safeLoad(att.titleSheetBytes);
-    if (!titleDoc) {
-      warnings.push(
-        `Skipped attachment '${att.label}': could not generate title sheet.`,
-      );
-      continue;
-    }
+    // Default: cover ON. The orchestrator can flip this off for
+    // pre-bordered uploads (architect's title block already present).
+    const wantsCover = att.hasCover !== false;
+
     const uploadDoc = await safeLoad(att.uploadBytes);
     if (!uploadDoc) {
       warnings.push(
@@ -232,9 +255,20 @@ export async function mergePacket(
       continue;
     }
 
-    // Copy + append title sheet (always exactly 1 page by AttachmentTitleSheet's contract).
-    const titlePages = await out.copyPages(titleDoc, [0]);
-    titlePages.forEach((p) => out.addPage(p));
+    if (wantsCover) {
+      const titleDoc = await safeLoad(att.titleSheetBytes);
+      if (!titleDoc) {
+        warnings.push(
+          `Skipped attachment '${att.label}': could not generate title sheet.`,
+        );
+        continue;
+      }
+      // Copy + append title sheet (always exactly 1 page by AttachmentTitleSheet's contract).
+      const titlePages = await out.copyPages(titleDoc, [0]);
+      titlePages.forEach((p) => out.addPage(p));
+    }
+    // hasCover === false → skip title sheet insertion. `titleSheetBytes`
+    // is allowed to be empty (orchestrator may pass `new Uint8Array(0)`).
 
     // Copy + append every page of the upload, preserving original dimensions.
     const uploadPages = await out.copyPages(uploadDoc, uploadDoc.getPageIndices());

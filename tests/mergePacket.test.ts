@@ -224,6 +224,66 @@ describe('mergePacket', () => {
     expect(result.warnings[0]).toContain('empty.pdf');
   });
 
+  // -------------------------------------------------------------------------
+  // Cover-OFF (Sprint 2B PR-3 commit 8) — per-upload toggle. Pre-bordered
+  // uploads (architect title block already on the drawing) skip the
+  // SparkPlan title sheet entirely.
+  // -------------------------------------------------------------------------
+
+  it('appends an upload as-is when hasCover=false (no SparkPlan title sheet)', async () => {
+    const sp = await renderFakePdf('LETTER', 2, 'spark');
+    const upload = await renderFakePdf('LETTER', 3, 'arch-prepared');
+
+    const result = await mergePacket(sp, [
+      {
+        label: 'A100.pdf',
+        // titleSheetBytes is ignored when hasCover=false; pass an empty
+        // Uint8Array to match the orchestrator's actual behavior.
+        titleSheetBytes: new Uint8Array(0),
+        uploadBytes: upload,
+        // All blanks — orchestrator emits these so buildStampMaps marks
+        // every upload page shouldStamp=false.
+        sheetIdRange: ['', '', ''],
+        hasCover: false,
+      },
+    ]);
+
+    // 2 sparkplan + 3 upload = 5 (no title sheet inserted).
+    expect(result.pageCount).toBe(5);
+    expect(result.sparkplanPageCount).toBe(2);
+    expect(result.mergedAttachmentCount).toBe(1);
+    expect(result.warnings).toHaveLength(0);
+  });
+
+  it('mixes cover-ON and cover-OFF attachments in order', async () => {
+    const sp = await renderFakePdf('LETTER', 1, 'spark');
+    const coverOnUpload = await renderFakePdf('LETTER', 2, 'bare');
+    const coverOffUpload = await renderFakePdf('LETTER', 4, 'archd');
+    const ts = await renderTitleSheet('C-201', [612, 792]);
+
+    const result = await mergePacket(sp, [
+      {
+        label: 'site-plan.pdf',
+        titleSheetBytes: ts,
+        uploadBytes: coverOnUpload,
+        sheetIdRange: ['C-201', 'C-202', 'C-203'],
+        hasCover: true,
+      },
+      {
+        label: 'architect-A100.pdf',
+        titleSheetBytes: new Uint8Array(0),
+        uploadBytes: coverOffUpload,
+        sheetIdRange: ['', '', '', ''],
+        hasCover: false,
+      },
+    ]);
+
+    // 1 spark + (1 title + 2 upload) + (4 upload, no title) = 8
+    expect(result.pageCount).toBe(8);
+    expect(result.sparkplanPageCount).toBe(1);
+    expect(result.mergedAttachmentCount).toBe(2);
+  });
+
   it('continues merging remaining attachments when one fails', async () => {
     const sp = await renderFakePdf('LETTER', 1, 'spark');
     const good = await renderFakePdf('LETTER', 2, 'good');

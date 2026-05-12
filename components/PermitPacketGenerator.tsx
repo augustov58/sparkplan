@@ -570,6 +570,11 @@ export const PermitPacketGenerator: React.FC<PermitPacketGeneratorProps> = ({ pr
             filename: a.filename,
             uploadedAt: a.uploaded_at,
             uploadBytes: bytes,
+            // Per-upload cover toggle (Sprint 2B PR-3 commit 8). Rows that
+            // pre-date the migration return `undefined`, which the
+            // orchestrator treats as cover-ON (default). Once the DB
+            // migration is applied, this carries the contractor's choice.
+            includeSparkplanCover: a.include_sparkplan_cover ?? true,
           });
         }
         if (fetched.length > 0) {

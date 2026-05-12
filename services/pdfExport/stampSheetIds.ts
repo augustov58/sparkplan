@@ -229,18 +229,36 @@ export async function stampSheetIds(
  * pages are SparkPlan vs. which pages are uploads), build the boolean
  * mask + sheet-ID array that `stampSheetIds` expects.
  *
- * Each attachment contributes `1 + uploadPageCount` entries to the maps:
- *   [titlePage, ...uploadPages]
+ * Each attachment contributes entries depending on its cover mode:
  *
- * SparkPlan pages get `false` (react-pdf already stamped them).
- * Title sheet pages get `false` (AttachmentTitleSheet BrandBar already stamped).
- * Upload pages get `true` (need stamping by this pass).
+ *   - `hasCover === true` (default) — `1 + uploadPageCount` entries:
+ *       [titlePage, ...uploadPages]
+ *     The title page is not stamped (AttachmentTitleSheet's BrandBar
+ *     already drew the sheet ID there); the upload pages are stamped.
+ *
+ *   - `hasCover === false` — `uploadPageCount` entries, all
+ *     upload-page slots with empty sheet IDs and shouldStamp=false.
+ *     The merge engine doesn't insert a title page for this attachment;
+ *     the upload is appended as-is, carrying only the architect's own
+ *     numbering. No SparkPlan stamp is drawn anywhere.
+ *
+ * SparkPlan pages get `false` everywhere (already stamped by react-pdf).
  */
 export function buildStampMaps(args: {
   sparkplanPageCount: number;
   attachments: Array<{
-    /** Sheet IDs aligned to [title, ...upload pages] for one attachment. */
+    /**
+     * Sheet IDs. For cover-ON, aligned to `[title, ...upload pages]`.
+     * For cover-OFF, length equals uploadPageCount and every entry is
+     * `''` (no stamp anywhere on this attachment's pages).
+     */
     sheetIdRange: string[];
+    /**
+     * Optional flag — when false, this attachment contributes only
+     * upload pages (no title page, no stamping). Default true preserves
+     * the original PR-3 behavior.
+     */
+    hasCover?: boolean;
   }>;
 }): { sheetIdMap: string[]; shouldStamp: boolean[] } {
   const sheetIdMap: string[] = [];
@@ -253,15 +271,24 @@ export function buildStampMaps(args: {
     shouldStamp.push(false);
   }
 
-  // Each attachment: title page (don't stamp; AttachmentTitleSheet already
-  // did) + upload pages (stamp).
   for (const att of args.attachments) {
     if (att.sheetIdRange.length === 0) continue;
-    sheetIdMap.push(att.sheetIdRange[0]);
-    shouldStamp.push(false);
-    for (let j = 1; j < att.sheetIdRange.length; j++) {
-      sheetIdMap.push(att.sheetIdRange[j]);
-      shouldStamp.push(true);
+
+    if (att.hasCover === false) {
+      // Cover-OFF: every entry maps to an upload page, no stamping.
+      for (const id of att.sheetIdRange) {
+        sheetIdMap.push(id);
+        shouldStamp.push(false);
+      }
+    } else {
+      // Cover-ON (default): first entry is the title page (no stamp),
+      // remaining entries are upload pages (stamp each).
+      sheetIdMap.push(att.sheetIdRange[0]);
+      shouldStamp.push(false);
+      for (let j = 1; j < att.sheetIdRange.length; j++) {
+        sheetIdMap.push(att.sheetIdRange[j]);
+        shouldStamp.push(true);
+      }
     }
   }
 

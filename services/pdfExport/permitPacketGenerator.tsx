@@ -211,6 +211,18 @@ export interface PermitPacketAttachment {
   uploadedAt?: string;
   /** The user's PDF, fetched from Supabase Storage by the caller. */
   uploadBytes: Uint8Array;
+  /**
+   * Per-upload SparkPlan cover toggle. TRUE (default) → SparkPlan renders
+   * a title sheet + stamps sheet IDs onto every page of the upload. FALSE
+   * → upload is appended to the merged packet as-is, with no SparkPlan
+   * title sheet and no bottom-right sheet-ID stamp.
+   *
+   * Set to FALSE for pre-bordered uploads (e.g., architect-prepared sheet
+   * with its own title block). The merge engine still allocates the
+   * sheet-ID counter to leave room for the architect's existing numbering
+   * to coexist with the SparkPlan-stamped sheets.
+   */
+  includeSparkplanCover?: boolean;
 }
 
 const downloadBlob = (blob: Blob, fileName: string): void => {
@@ -1075,15 +1087,24 @@ export const generatePermitPacket = async (data: PermitPacketData): Promise<void
       nextSheetId(uploadCounters, BAND_DIAGRAMS, discipline);
 
     // Render title sheets + allocate sheet IDs per attachment.
+    // `hasCover === false` means: no SparkPlan title sheet, no sheet-ID
+    // stamps — the upload is appended as-is. We still process it through
+    // the merge engine so it lands in the merged output in the right
+    // discipline order; mergePacket recognizes a zero-byte titleSheetBytes
+    // as "skip title page" and stampSheetIds skips empty sheet IDs.
     const mergeInputs: Array<{
       label: string;
       titleSheetBytes: Uint8Array;
       uploadBytes: Uint8Array;
       sheetIdRange: string[];
+      hasCover: boolean;
     }> = [];
 
     for (const att of sortedAttachments) {
       const discipline = disciplineOf(att.artifactType);
+      // Default TRUE preserves existing behavior for callers / DB rows
+      // that pre-date the include_sparkplan_cover toggle.
+      const hasCover = att.includeSparkplanCover !== false;
 
       // Pre-flight: parse the upload to (a) detect first-page dimensions
       // for the size-aware title sheet and (b) count pages so we allocate
@@ -1119,37 +1140,58 @@ export const generatePermitPacket = async (data: PermitPacketData): Promise<void
         continue;
       }
 
-      // Allocate sheet IDs for the title sheet + each upload page.
-      const titleSheetId = allocateId(discipline);
-      const uploadPageIds: string[] = [];
-      for (let i = 0; i < uploadPageCount; i++) {
-        uploadPageIds.push(allocateId(discipline));
+      if (hasCover) {
+        // Default behavior: allocate a title-sheet ID + IDs for every
+        // upload page, render the SparkPlan title sheet, stamp all upload
+        // pages. The architect's existing sheet number (if any) coexists
+        // with the SparkPlan stamp because the stamp goes in the bottom
+        // corner, off the architect's title block.
+        const titleSheetId = allocateId(discipline);
+        const uploadPageIds: string[] = [];
+        for (let i = 0; i < uploadPageCount; i++) {
+          uploadPageIds.push(allocateId(discipline));
+        }
+
+        const titleSheetBlob = await pdf(
+          <Document>
+            <AttachmentTitleSheet
+              sheetId={titleSheetId}
+              artifactType={att.artifactType}
+              displayTitle={att.displayTitle}
+              contractorName={data.contractorName ?? data.preparedBy}
+              contractorLicense={data.contractorLicense}
+              projectName={data.projectName}
+              projectAddress={data.projectAddress}
+              permitNumber={data.permitNumber}
+              dateReceived={att.uploadedAt}
+              pageSize={pageSize}
+            />
+          </Document>,
+        ).toBlob();
+        const titleSheetBytes = new Uint8Array(await titleSheetBlob.arrayBuffer());
+
+        mergeInputs.push({
+          label: att.filename,
+          titleSheetBytes,
+          uploadBytes: att.uploadBytes,
+          sheetIdRange: [titleSheetId, ...uploadPageIds],
+          hasCover: true,
+        });
+      } else {
+        // Cover-OFF: no SparkPlan title sheet, no sheet-ID stamps. The
+        // upload's architect-supplied numbering remains the only visible
+        // sheet identifier. Empty titleSheetBytes signals mergePacket to
+        // skip the title-sheet insertion step; sheetIdRange is all empty
+        // strings so buildStampMaps marks every page shouldStamp=false.
+        const blankIds = new Array(uploadPageCount).fill('');
+        mergeInputs.push({
+          label: att.filename,
+          titleSheetBytes: new Uint8Array(0),
+          uploadBytes: att.uploadBytes,
+          sheetIdRange: blankIds,
+          hasCover: false,
+        });
       }
-
-      const titleSheetBlob = await pdf(
-        <Document>
-          <AttachmentTitleSheet
-            sheetId={titleSheetId}
-            artifactType={att.artifactType}
-            displayTitle={att.displayTitle}
-            contractorName={data.contractorName ?? data.preparedBy}
-            contractorLicense={data.contractorLicense}
-            projectName={data.projectName}
-            projectAddress={data.projectAddress}
-            permitNumber={data.permitNumber}
-            dateReceived={att.uploadedAt}
-            pageSize={pageSize}
-          />
-        </Document>,
-      ).toBlob();
-      const titleSheetBytes = new Uint8Array(await titleSheetBlob.arrayBuffer());
-
-      mergeInputs.push({
-        label: att.filename,
-        titleSheetBytes,
-        uploadBytes: att.uploadBytes,
-        sheetIdRange: [titleSheetId, ...uploadPageIds],
-      });
     }
 
     // Run the merge.

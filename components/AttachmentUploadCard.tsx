@@ -30,6 +30,46 @@ import {
 } from '../hooks/useProjectAttachments';
 import { showToast, toastMessages } from '../lib/toast';
 
+/**
+ * Per-row toggle: "Add SparkPlan cover". Default ON. Off for pre-bordered
+ * uploads where the architect's title block is already on the drawing,
+ * so SparkPlan should NOT inject its own title sheet or stamp sheet IDs.
+ *
+ * Visually a small Tailwind switch — yellow when on (matches brand
+ * `electric-500` / `#FFCC00`), gray when off. Hover tooltip explains the
+ * use case so the contractor doesn't have to guess.
+ */
+const CoverToggle: React.FC<{
+  value: boolean;
+  onChange: (next: boolean) => void;
+  disabled?: boolean;
+}> = ({ value, onChange, disabled = false }) => {
+  return (
+    <button
+      type="button"
+      role="switch"
+      aria-checked={value}
+      aria-label={value ? 'SparkPlan cover ON' : 'SparkPlan cover OFF'}
+      title={
+        value
+          ? 'SparkPlan cover ON — title sheet + sheet ID stamp will be added in front of and onto this upload.\n\nTurn OFF if the upload already has its own architect-style title block (e.g., HOK-prepared sheet).'
+          : 'SparkPlan cover OFF — upload appended as-is.\n\nTurn ON to have SparkPlan insert a title sheet + stamp sheet IDs (default behavior).'
+      }
+      onClick={() => !disabled && onChange(!value)}
+      disabled={disabled}
+      className={`relative inline-flex h-4 w-7 flex-shrink-0 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-electric-500 focus:ring-offset-1 ${
+        disabled ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'
+      } ${value ? 'bg-electric-500' : 'bg-gray-300'}`}
+    >
+      <span
+        className={`inline-block h-3 w-3 transform rounded-full bg-white transition-transform ${
+          value ? 'translate-x-3.5' : 'translate-x-0.5'
+        }`}
+      />
+    </button>
+  );
+};
+
 interface AttachmentUploadCardProps {
   projectId: string;
   artifactType: ArtifactType;
@@ -71,7 +111,13 @@ export const AttachmentUploadCard: React.FC<AttachmentUploadCardProps> = ({
   multiple = true,
   maxSizeMB = 25,
 }) => {
-  const { attachments, loading, upload, remove } = useProjectAttachments(projectId);
+  const {
+    attachments,
+    loading,
+    upload,
+    remove,
+    updateIncludeSparkplanCover,
+  } = useProjectAttachments(projectId);
 
   // Filter the global list down to this card's slot.
   const ownAttachments = attachments.filter((a) => a.artifact_type === artifactType);
@@ -233,6 +279,10 @@ export const AttachmentUploadCard: React.FC<AttachmentUploadCardProps> = ({
         <ul className="space-y-1.5">
           {ownAttachments.map((a) => {
             const isDeleting = deletingId === a.id;
+            // Default TRUE for legacy rows where the column doesn't exist
+            // yet (the DB migration applies at first use; until then the
+            // hook returns rows without the field).
+            const coverOn = a.include_sparkplan_cover !== false;
             return (
               <li
                 key={a.id}
@@ -249,6 +299,18 @@ export const AttachmentUploadCard: React.FC<AttachmentUploadCardProps> = ({
                       : ''}
                     uploaded {formatDate(a.uploaded_at)}
                   </p>
+                </div>
+                <div className="flex items-center gap-1.5 flex-shrink-0">
+                  <span className="text-[10px] text-gray-500 select-none">
+                    Cover
+                  </span>
+                  <CoverToggle
+                    value={coverOn}
+                    disabled={isDeleting}
+                    onChange={(next) =>
+                      updateIncludeSparkplanCover(a.id, next)
+                    }
+                  />
                 </div>
                 <button
                   type="button"
