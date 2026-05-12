@@ -1677,6 +1677,7 @@ export type Database = {
       project_attachments: {
         Row: {
           artifact_type: string
+          custom_sheet_id: string | null
           display_title: string | null
           filename: string
           id: string
@@ -1689,6 +1690,7 @@ export type Database = {
         }
         Insert: {
           artifact_type: string
+          custom_sheet_id?: string | null
           display_title?: string | null
           filename: string
           id?: string
@@ -1701,6 +1703,7 @@ export type Database = {
         }
         Update: {
           artifact_type?: string
+          custom_sheet_id?: string | null
           display_title?: string | null
           filename?: string
           id?: string

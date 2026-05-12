@@ -132,6 +132,36 @@ export interface UseProjectAttachmentsReturn {
     attachmentId: string,
     value: boolean,
   ) => Promise<void>;
+
+  /**
+   * Update the `custom_sheet_id` override on an attachment (v4 commit 9).
+   *
+   * - `value` is the contractor-supplied sheet ID (e.g., "A-100", "SP-1").
+   * - Pass `null` (or empty string) to clear the override — the merge
+   *   orchestrator will resume auto-allocating from the band+discipline
+   *   counter.
+   *
+   * Format validation is **advisory** (per the
+   * `feedback_validation_advisory` MEMORY entry): if the value doesn't
+   * match the recommended `^[A-Z][A-Za-z0-9]*-[A-Za-z0-9-]+$` pattern,
+   * the hook still saves but surfaces a toast asking the user to confirm.
+   *
+   * Optimistic update + rollback on Supabase failure.
+   */
+  updateCustomSheetId: (
+    attachmentId: string,
+    value: string | null,
+  ) => Promise<void>;
+}
+
+/**
+ * Recommended sheet ID format. Advisory only — saved values that don't
+ * match still go through. Pattern accepts architect/plan-set conventions
+ * like "A-100", "C-201", "SP-1", "E-001a", "M-1.1".
+ */
+export const SHEET_ID_PATTERN = /^[A-Z][A-Za-z0-9]*-[A-Za-z0-9.-]+$/;
+export function isLikelyValidSheetId(value: string): boolean {
+  return SHEET_ID_PATTERN.test(value.trim());
 }
 
 /**
@@ -401,6 +431,63 @@ export function useProjectAttachments(
     }
   };
 
+  const updateCustomSheetId = async (
+    attachmentId: string,
+    value: string | null,
+  ): Promise<void> => {
+    const target = attachments.find((a) => a.id === attachmentId);
+    if (!target) return;
+
+    // Normalize: empty string → null (clear override). Trim incidental
+    // whitespace so " C-201 " saves as "C-201".
+    const trimmed = value === null ? null : value.trim();
+    const normalized = trimmed === '' || trimmed === null ? null : trimmed;
+
+    // Advisory validation — warn but still save (per feedback_validation_advisory).
+    // We surface it as an info-style toast (`success` channel) rather than
+    // an error since the value is still saved; the message itself makes
+    // the "format looks unusual" caveat explicit.
+    if (normalized && !isLikelyValidSheetId(normalized)) {
+      showToast.success(toastMessages.attachment.customSheetIdInvalid);
+    }
+
+    // Optimistic update.
+    const previous = target.custom_sheet_id;
+    setAttachments((prev) =>
+      prev.map((a) =>
+        a.id === attachmentId ? { ...a, custom_sheet_id: normalized } : a,
+      ),
+    );
+
+    try {
+      const { error: updateError } = await supabase
+        .from('project_attachments')
+        .update({ custom_sheet_id: normalized })
+        .eq('id', attachmentId);
+
+      if (updateError) {
+        // Rollback.
+        setAttachments((prev) =>
+          prev.map((a) =>
+            a.id === attachmentId ? { ...a, custom_sheet_id: previous } : a,
+          ),
+        );
+        throw updateError;
+      }
+
+      showToast.success(toastMessages.attachment.customSheetIdSaved);
+      dataRefreshEvents.emit('project_attachments');
+    } catch (err) {
+      const message =
+        err instanceof Error
+          ? err.message
+          : 'Failed to update custom sheet ID';
+      setError(message);
+      showToast.error(toastMessages.attachment.customSheetIdFailed);
+      console.error('[useProjectAttachments] updateCustomSheetId failed', err);
+    }
+  };
+
   return {
     attachments,
     loading,
@@ -408,6 +495,7 @@ export function useProjectAttachments(
     upload,
     remove,
     updateIncludeSparkplanCover,
+    updateCustomSheetId,
   };
 }
 

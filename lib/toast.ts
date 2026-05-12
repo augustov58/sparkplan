@@ -272,6 +272,9 @@ export const toastMessages = {
     fileTooLarge: (maxMB: number) => `File is larger than ${maxMB}MB — please upload a smaller PDF`,
     invalidFileType: 'Only PDF files are accepted',
     coverToggleFailed: 'Could not update SparkPlan cover setting',
+    customSheetIdSaved: 'Custom sheet ID saved',
+    customSheetIdFailed: 'Could not update custom sheet ID',
+    customSheetIdInvalid: 'Sheet ID format looks unusual — expected e.g. "C-201", "A-100", "SP-1". Saved anyway.',
   },
 
   // Generic
