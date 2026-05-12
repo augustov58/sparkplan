@@ -802,6 +802,16 @@ export const PermitPacketGenerator: React.FC<PermitPacketGeneratorProps> = ({ pr
             description="Required for multi-family / association-governed properties (one file)"
             multiple={false}
           />
+          {/* Sprint 2B PR-3 / Sprint 2C H19: HVHZ wind-anchoring documentation.
+              Applies to ANY outdoor pedestal/bollard EVSE statewide — cross-
+              validated Miami-Dade + Pompano Beach (Pompano enforces despite
+              being outside HVHZ proper). */}
+          <AttachmentUploadCard
+            projectId={projectId}
+            artifactType="hvhz_anchoring"
+            title="HVHZ / Outdoor Anchoring Detail"
+            description="Florida Product Approval, Miami-Dade NOA tie-down, or signed-and-sealed structural plans for outdoor pedestal/bollard EVSE statewide"
+          />
         </div>
       </div>
 

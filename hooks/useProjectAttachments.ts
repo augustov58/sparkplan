@@ -45,8 +45,12 @@ import { dataRefreshEvents } from '@/lib/dataRefreshEvents';
 type ProjectAttachment = Database['public']['Tables']['project_attachments']['Row'];
 
 /**
- * Allowed artifact_type values. Mirrors the CHECK constraint in the
- * `20260512_project_attachments.sql` migration.
+ * Allowed artifact_type values. Mirrors the CHECK constraint in
+ * `20260512_project_attachments.sql` + `20260513_attachment_hvhz_anchoring.sql`.
+ *
+ * Sprint 2B PR-3 added `hvhz_anchoring` (Sprint 2C H19 finding) — FL Product
+ * Approval / MD-NOA tie-down / signed-sealed structural plans for outdoor
+ * pedestal/bollard EVSE statewide.
  */
 export type ArtifactType =
   | 'site_plan'
@@ -55,7 +59,8 @@ export type ArtifactType =
   | 'noc'
   | 'hoa_letter'
   | 'survey'
-  | 'manufacturer_data';
+  | 'manufacturer_data'
+  | 'hvhz_anchoring';
 
 export const ARTIFACT_TYPES: readonly ArtifactType[] = [
   'site_plan',
@@ -65,6 +70,7 @@ export const ARTIFACT_TYPES: readonly ArtifactType[] = [
   'hoa_letter',
   'survey',
   'manufacturer_data',
+  'hvhz_anchoring',
 ] as const;
 
 const STORAGE_BUCKET = 'permit-attachments';

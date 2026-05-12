@@ -118,12 +118,14 @@ describe('useProjectAttachments — countPdfPages', () => {
 describe('useProjectAttachments — module exports', () => {
   it('exposes the full ARTIFACT_TYPES enum matching the migration CHECK', () => {
     // Migration: site_plan, cut_sheet, fire_stopping, noc, hoa_letter,
-    // survey, manufacturer_data. Any drift here = guaranteed RLS reject.
+    // survey, manufacturer_data, hvhz_anchoring (Sprint 2B PR-3). Any
+    // drift here = guaranteed RLS reject.
     expect([...ARTIFACT_TYPES].sort()).toEqual(
       [
         'cut_sheet',
         'fire_stopping',
         'hoa_letter',
+        'hvhz_anchoring',
         'manufacturer_data',
         'noc',
         'site_plan',
