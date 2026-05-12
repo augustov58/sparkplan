@@ -31,7 +31,7 @@ Cold-read cost for typical sessions: index (~5k) + 1 sprint file = **~7–17k to
 ## Status snapshot
 
 - **Sprint 1** — ✅ COMPLETE 2026-05-07 (10 calc-engine fixes)
-- **Sprint 2A** — 🟡 14/19 done; 2 PRs remaining (PR 4 + PR 5)
+- **Sprint 2A** — ✅ COMPLETE 2026-05-10 (19/19; PR #40 diagrams + PR #41 H17 open for merge)
 - **Sprint 2B / 2C / 3** — ⚪ Not started
 - **Sprint 4** — 🔵 Deferred
 
@@ -48,13 +48,13 @@ For details on each sprint's open work, dependencies, and architectural patterns
 | Required artifact | Orlando | Miami-Dade | Pompano | Davie | Hillsborough | Currently in packet | Closes |
 |---|---|---|---|---|---|---|---|
 | Permit application cover | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | C3 |
-| One-line / riser diagram | ✓ | ✓ | ✓ | ✓ | ✓ | ⚠️ | M6 + H9 AIC overlay (PR 4) |
+| One-line / riser diagram | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | M6 + H9 AIC overlay (PR #40) |
 | Load calculation (NEC 220) | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | C1 |
 | Panel schedules | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | C4, C6 (M5 still open) |
-| Grounding plan | ✓ | ✓ | ✓ | ✓ | ✓ | ⚠️ | M3 (PR 4) |
-| Equipment specs (mfr / AIC / UL) | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ post-H15; AIC overlay PR 4 | H15 + H9 AIC overlay |
+| Grounding plan | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | M3 (PR #40) |
+| Equipment specs (mfr / AIC / UL) | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | H15 + H9 AIC overlay (PR #40) |
 | Voltage drop / feeder sizing | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | C2 |
-| Available fault current / SCS | ✓ | ✓ | – | – | ✓ | ✓ post-H9 page; AIC overlay PR 4 | H9 page + H9 AIC overlay |
+| Available fault current / SCS | ✓ | ✓ | – | – | ✓ | ✓ | H9 page (PR #31) + H9 AIC overlay (PR #40) |
 | Sheet ID (`E-###`) | – | ✓ | – | – | – | ✓ | H3 |
 | FBC + NFPA-70 references | – | ✓ | ✓ | ✓ | ✓ | ✓ | C7 + H4 |
 | Notice of Commencement (>$5k) | ✓ | ✓ | – | – | – | ❌ | H5 (Sprint 2B) |
@@ -70,7 +70,7 @@ For details on each sprint's open work, dependencies, and architectural patterns
 | **PE-signed + sealed plans (≥277V or commercial)** | ✓ | ✓ | ✓ | ✓ | ✓ | 🔴 | C5 (Sprint 3) |
 | Revision log | – | ✓ | – | – | – | ✓ | H2 |
 | Cover sheet TOC | – | ✓ | – | – | – | ✓ | H1 |
-| FS 471.003(2)(h) exemption screening | – | – | – | – | – | ❌ | H17 (Sprint 2A PR 5) |
+| FS 471.003(2)(h) exemption screening | – | – | – | – | – | ✓ | H17 (PR #41) |
 | Jurisdiction checklist engine | – | – | – | – | – | ❌ | M1 (Sprint 2C) |
 
 ### Orlando — line-by-line validated matrix (sourced 2026-05-08)
@@ -83,11 +83,11 @@ Orlando's official "EV Charging Station Permit Checklist" forks based on whether
 | #1b — Engineered plans required if equipment is 277/480V | Conditional | Conditional | 🔴 no PE seal infrastructure | Sprint 3 (C5) |
 | #2 — General note of compliance with NEC 2020 | Required | Required | ✓ | done (H12 + C7) |
 | #3 — General note: VD ≤ 3% feeder, 3% branch, 5% combined | Required | Required | ✓ | done (H13) |
-| #4 — One-line: raceways, conductors, OCPD + voltage/phase/amperage/AIC labels per node | Required (existing path) | Required (new-service path) | ⚠️ M6 layout + H9 AIC overlay pending | **Sprint 2A PR 4** |
+| #4 — One-line: raceways, conductors, OCPD + voltage/phase/amperage/AIC labels per node | Required (existing path) | Required (new-service path) | ✓ M6 paginated + H9 AIC overlay per node | done (PR #40) |
 | #5 (existing) — Revised existing panel schedule with demand load | Required | n/a | ✓ post-C1 — could add explicit "Revised" label + delta narrative | 2A enhancement (small) |
 | #5 (new-service) — Available fault current calculation at service main breaker | n/a | Required | ✓ | done (H9 page) |
 | #6 (existing) — Site plan with existing electrical panel + new EV charger locations | Required | rolls into #7 | ❌ | Sprint 2B (H7) |
-| #6 (new-service) — Grounding detail with applicable electrodes + GEC size | n/a | Required | 🟡 generic grounding present, project-specific detail pending | **Sprint 2A PR 4 (M3)** |
+| #6 (new-service) — Grounding detail with applicable electrodes + GEC size | n/a | Required | ✓ project-specific GEC sized per NEC 250.66 | done (PR #40, M3) |
 | #7 — EVSE specs: UL-2202 + UL-2594 listing/label | Required | Required | ✓ specs; 🔴 H8 manufacturer cut sheet upload still 2B | done specs (H15); 2B cut sheet (H8) |
 | #8 — Approved fire stopping system for fire-rated penetrations | Required | Required | ❌ | Sprint 2B (H16) |
 | 220.87 conditions narrative (when claimed) | Required (existing path) | n/a | ✓ | done (H14) |

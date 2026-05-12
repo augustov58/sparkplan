@@ -4,6 +4,36 @@ All notable changes to SparkPlan.
 
 ---
 
+## 2026-05-10: Permit packet — Sprint 2A complete (PR #40 diagrams + PR #41 H17)
+
+Closes the final 4 findings in Sprint 2A (M6 + H9 AIC overlay + M3 in PR #40; H17 + settings JSON in PR #41). Sprint 2A now ✅ COMPLETE at 19/19 findings shipped across 5 themed PRs (PR 1, #23, #31, #40, #41).
+
+**User-facing changes (PR #40):**
+
+- **Riser diagram now paginates on multi-meter projects.** Pre-fix, the audit fixture (15 meters / 14 panels) collapsed labels to 6pt and wrapped meter labels mid-character because the renderer was scaling 14×(150+18)=2352pt of nodes into 720pt of horizontal space. The riser now paginates every >6 siblings — each page renders labels at 7-9pt with a "Sheet N of M — Branches a-b of c" subtitle and per-page footer. Small projects still render on a single page.
+- **AIC chips overlay every panel glyph** on both the in-app one-line viewer and the permit-packet riser. Required by Orlando's "EV Charging Station Permit Checklist" item #4 new-service path: *"voltage / phase / amperage / AIC labels per node."* Auto-disables when a panel has no `aic_rating` set.
+- **Project-specific grounding detail** replaces the generic boilerplate on packet pages 9-10. The new card shows the GEC size from NEC Table 250.66 sized to the actual service-conductor area (audit fixture's 1000 A service → 2/0 AWG Cu), the assumed/known service conductor, the standard NEC 250.52(A) electrode list (water pipe / building steel / Ufer / ground ring / ground rod / plate), and NEC 250.92/94/104 bonding requirements. Required by Orlando new-service item #6.
+
+**User-facing changes (PR #41):**
+
+- **FL contractor-exemption screening.** New "Permit Scope (FL Contractor Exemption)" card in Project Setup capturing 3 inputs: service modification type (existing / service-upgrade / new-service), estimated project value (USD), and scope flags (service upgrade, CT cabinet, meter stack, switchgear, multi-tenant feeder, EVEMS used). The packet generator reads these into the FS 471.003(2)(h) screening engine and stamps the cover sheet with the appropriate language: *"Designed under FS 471.003(2)(h) contractor exemption"* (lane = exempt) or *"PE-sealed plans required per [AHJ]"* (lane = pe-required). Without this engine, contractors couldn't tell which submission lane applied and risked paying for unnecessary PE review.
+
+**Why this matters:** PR #40 closes the last two systemic AHJ-rejection vectors that affect every Orlando submittal (broken riser layout for multi-meter projects + missing AIC labels per node + generic grounding). PR #41 unlocks the dual-path packet workflow (exempt vs PE-required) that gates Sprint 3's PE seal upsell offering. Combined with the prior 3 themed PRs (PR 1, #23, #31), Sprint 2A delivers a permit packet that intake-passes Orlando's checklist on both EV-from-existing and EV-from-new-service paths, with the exemption-screening foundation Sprint 2C and Sprint 3 will build on.
+
+**Technical:**
+
+- 8 commits across 2 PRs (3 commits Agent 1 → PR #40 ; 4 commits Agent 2 → PR #40 ; 3 commits Agent 3 → PR #41 ; 3 reviewer-fix commits H1 / H2+M1 / M3 across the 3 branches).
+- Built via 3 worktree-isolated parallel agents + parallel code-reviewer + security-reviewer pass on the combined diff.
+- 50 net new tests (363 baseline → 413 on combined branch). PR #40: +31 (4 pagination boundary + 27 GEC/grounding). PR #41: +19 (12 lane scenarios + 7 H2/M1 regression).
+- New `data/nec/table-250-66.ts` (NEC 2017/2020/2023 — values unchanged across editions, FL adopts NEC 2020 via FBC 8th ed.).
+- New `services/calculations/groundingElectrodeConductor.ts` pure function following `data/nec/table-250-122.ts` pattern.
+- New `services/permitMode/exemptionScreening.ts` pure function with fail-safe defaults (NaN / negative inputs → pe-required + WARNING; calc-service contract extended for compliance logic).
+- Settings JSON additions to `projects.settings` (no migration — JSON column). Typed in `types.ts` via extended `ProjectSettings` (matches existing PR 1 / #23 pattern; `lib/database.types.ts` left untouched per CLAUDE.md "Stable Modules" rule).
+- Latent bug fix piggybacked: `serviceAmperage` fallback in `permitPacketGenerator.tsx` was silently treating 480 V as 480 A; fixed to `main_breaker_amps ?? bus_rating ?? 200`.
+- CLAUDE.md "OneLineDiagram.tsx" section corrected to distinguish in-app viewer (`components/OneLineDiagram.tsx`) from permit-packet PDF render path (`services/pdfExport/PermitPacketDocuments.tsx::RiserDiagram` ~L1150). Stale line numbers (2340 / 3290) removed.
+
+---
+
 ## 2026-05-10: Permit packet — Sprint 2A engineering content additions (PR #31)
 
 Closes 5 systemic AHJ-rejection vectors documented in `docs/AHJ_COMPLIANCE_AUDIT_2026-05-04.md`. All 5 findings ride into the existing permit-packet generator as new sheets in the band-100 (calculations) and band-600 (specialty) ranges, with section toggles + auto-disable predicates so they don't render with placeholder content for projects that don't need them.
