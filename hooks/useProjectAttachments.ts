@@ -376,3 +376,31 @@ export function validateAttachmentFile(
 }
 
 export { buildStoragePath, countPdfPages, STORAGE_BUCKET };
+
+/**
+ * Fetch the raw PDF bytes for an uploaded attachment from Supabase Storage.
+ *
+ * The merge orchestrator (Sprint 2B PR-3) calls this for each attachment
+ * before invoking `mergePacket`. Kept as a free function (not a hook
+ * method) so it can be invoked imperatively from the
+ * "Generate packet" button handler without coupling to a React render
+ * cycle.
+ *
+ * Returns null on failure so callers can surface a warning and continue
+ * with the remaining attachments rather than aborting the whole packet.
+ */
+export async function downloadAttachmentBytes(
+  storagePath: string,
+): Promise<Uint8Array | null> {
+  try {
+    const { data, error } = await supabase.storage
+      .from(STORAGE_BUCKET)
+      .download(storagePath);
+    if (error || !data) return null;
+    const buf = await data.arrayBuffer();
+    return new Uint8Array(buf);
+  } catch (err) {
+    console.warn('[useProjectAttachments] downloadAttachmentBytes failed', err);
+    return null;
+  }
+}

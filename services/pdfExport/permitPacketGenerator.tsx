@@ -52,6 +52,7 @@ import { MeterStackScheduleDocument } from './MeterStackSchedulePDF';
 import {
   type PacketSections,
   type SheetBand,
+  type SheetDiscipline,
   resolveSections,
   newBandCounters,
   nextSheetId,
@@ -62,7 +63,13 @@ import {
   BAND_MULTIFAMILY,
   BAND_COMPLIANCE,
   BAND_SPECIALTY,
+  SHEET_DISCIPLINE_CIVIL,
+  SHEET_DISCIPLINE_MANUFACTURER,
 } from './packetSections';
+import { AttachmentTitleSheet } from './AttachmentTitleSheet';
+import { mergePacket } from './mergePacket';
+import { stampSheetIds, buildStampMaps } from './stampSheetIds';
+import type { ArtifactType } from '../../hooks/useProjectAttachments';
 
 export interface PermitPacketData {
   projectId: string;
@@ -172,6 +179,38 @@ export interface PermitPacketData {
     lane: 'exempt' | 'pe-required';
     ahjName?: string;
   };
+  /**
+   * Sprint 2B PR-3: user-uploaded PDF artifacts to splice into the packet.
+   *
+   * Storage fetch happens at the React layer (Supabase auth context lives
+   * there); this generator accepts the bytes already in memory so it can
+   * remain testable without a browser/Supabase context.
+   *
+   * Each attachment becomes a SparkPlan title sheet (size-matched to the
+   * upload's first page) followed by the user's PDF pages. Order is
+   * preserved — uploads with discipline 'C' (site_plan/survey/hvhz_anchoring)
+   * are emitted first, then 'X' (everything else), so reviewers see civil
+   * before manufacturer documents.
+   */
+  attachments?: PermitPacketAttachment[];
+}
+
+/**
+ * In-memory representation of one user-uploaded artifact. The React layer
+ * fetches the bytes from Supabase Storage; this generator never talks to
+ * Storage directly.
+ */
+export interface PermitPacketAttachment {
+  /** Discriminates the title sheet's discipline prefix + display title. */
+  artifactType: ArtifactType;
+  /** Human-readable name shown on the title sheet (falls back per ArtifactType). */
+  displayTitle?: string;
+  /** Original filename — surfaced in warning messages if merge fails. */
+  filename: string;
+  /** ISO timestamp when the user uploaded the file (drives "Date Received"). */
+  uploadedAt?: string;
+  /** The user's PDF, fetched from Supabase Storage by the caller. */
+  uploadBytes: Uint8Array;
 }
 
 const downloadBlob = (blob: Blob, fileName: string): void => {
@@ -981,12 +1020,169 @@ export const generatePermitPacket = async (data: PermitPacketData): Promise<void
         {pages.map((p, i) => React.cloneElement(p.element, { key: `${p.name}-${i}` }))}
       </Document>
     );
-    const blob = await pdf(<FullDoc />).toBlob();
-    if (!blob || blob.size === 0) {
+    const sparkplanBlob = await pdf(<FullDoc />).toBlob();
+    if (!sparkplanBlob || sparkplanBlob.size === 0) {
       throw new Error('PDF blob was empty');
     }
-    downloadBlob(blob, fileName);
-    console.log('[permit-packet] SUCCESS', { bytes: blob.size, fileName });
+
+    // ====================================================================
+    // SPRINT 2B PR-3: merge user-uploaded artifacts behind title sheets.
+    // ====================================================================
+    // If the caller supplied attachments, we (a) render a size-matched
+    // title sheet per upload, (b) call mergePacket to splice them in
+    // behind the SparkPlan electrical portion, and (c) stamp continuous
+    // sheet IDs onto the upload pages. When no attachments are present,
+    // download the SparkPlan portion as-is (legacy behavior).
+    if (!data.attachments || data.attachments.length === 0) {
+      downloadBlob(sparkplanBlob, fileName);
+      console.log('[permit-packet] SUCCESS (no attachments)', {
+        bytes: sparkplanBlob.size,
+        fileName,
+      });
+      return;
+    }
+
+    const sparkplanBytes = new Uint8Array(await sparkplanBlob.arrayBuffer());
+    // mergePacket re-loads the SparkPlan bytes via pdf-lib and reads the
+    // actual page count off the rendered output — that's authoritative.
+    // We don't need to sum builders.pageCount manually here.
+
+    // Sort attachments: civil first (site_plan, survey, hvhz_anchoring),
+    // then manufacturer (cut_sheet, fire_stopping, manufacturer_data, noc,
+    // hoa_letter). Within each discipline, preserve insertion order.
+    const CIVIL_TYPES: ReadonlySet<ArtifactType> = new Set([
+      'site_plan',
+      'survey',
+      'hvhz_anchoring',
+    ]);
+    const disciplineOf = (t: ArtifactType): SheetDiscipline =>
+      CIVIL_TYPES.has(t) ? SHEET_DISCIPLINE_CIVIL : SHEET_DISCIPLINE_MANUFACTURER;
+
+    const sortedAttachments = [...data.attachments].sort((a, b) => {
+      const da = disciplineOf(a.artifactType);
+      const db = disciplineOf(b.artifactType);
+      if (da === db) return 0;
+      return da === SHEET_DISCIPLINE_CIVIL ? -1 : 1;
+    });
+
+    // Per-discipline counters for sheet ID allocation, starting at band 200.
+    // Civil + manufacturer share the BAND_DIAGRAMS (200-299) band — the
+    // discipline letter (C vs X) distinguishes them so AHJs can reference
+    // "C-201 site plan" or "X-203 cut sheet" without ambiguity.
+    // Per-AHJ band-specific assignments are deferred to Sprint 2C / PR-4.
+    const uploadCounters = newBandCounters();
+    const allocateId = (discipline: SheetDiscipline): string =>
+      nextSheetId(uploadCounters, BAND_DIAGRAMS, discipline);
+
+    // Render title sheets + allocate sheet IDs per attachment.
+    const mergeInputs: Array<{
+      label: string;
+      titleSheetBytes: Uint8Array;
+      uploadBytes: Uint8Array;
+      sheetIdRange: string[];
+    }> = [];
+
+    for (const att of sortedAttachments) {
+      const discipline = disciplineOf(att.artifactType);
+
+      // Pre-flight: parse the upload to (a) detect first-page dimensions
+      // for the size-aware title sheet and (b) count pages so we allocate
+      // the right number of stamp IDs. If pdf-lib can't parse the upload
+      // here, we skip the whole attachment now — that keeps the
+      // sheet-ID counter aligned with what actually ends up in the
+      // merged output (no IDs allocated for attachments that won't be
+      // merged anyway).
+      let pageSize: [number, number] = [612, 792];
+      let uploadPageCount = 0;
+      try {
+        const { PDFDocument } = await import('pdf-lib');
+        const probe = await PDFDocument.load(att.uploadBytes, {
+          ignoreEncryption: true,
+          throwOnInvalidObject: false,
+        });
+        if (probe.getPageCount() === 0) {
+          console.warn(
+            '[permit-packet] skipping attachment with zero pages:',
+            att.filename,
+          );
+          continue;
+        }
+        const first = probe.getPage(0).getSize();
+        pageSize = [first.width, first.height];
+        uploadPageCount = probe.getPageCount();
+      } catch (probeErr) {
+        console.warn(
+          '[permit-packet] could not parse attachment, skipping:',
+          att.filename,
+          probeErr,
+        );
+        continue;
+      }
+
+      // Allocate sheet IDs for the title sheet + each upload page.
+      const titleSheetId = allocateId(discipline);
+      const uploadPageIds: string[] = [];
+      for (let i = 0; i < uploadPageCount; i++) {
+        uploadPageIds.push(allocateId(discipline));
+      }
+
+      const titleSheetBlob = await pdf(
+        <Document>
+          <AttachmentTitleSheet
+            sheetId={titleSheetId}
+            artifactType={att.artifactType}
+            displayTitle={att.displayTitle}
+            contractorName={data.contractorName ?? data.preparedBy}
+            contractorLicense={data.contractorLicense}
+            projectName={data.projectName}
+            projectAddress={data.projectAddress}
+            permitNumber={data.permitNumber}
+            dateReceived={att.uploadedAt}
+            pageSize={pageSize}
+          />
+        </Document>,
+      ).toBlob();
+      const titleSheetBytes = new Uint8Array(await titleSheetBlob.arrayBuffer());
+
+      mergeInputs.push({
+        label: att.filename,
+        titleSheetBytes,
+        uploadBytes: att.uploadBytes,
+        sheetIdRange: [titleSheetId, ...uploadPageIds],
+      });
+    }
+
+    // Run the merge.
+    const merge = await mergePacket(sparkplanBytes, mergeInputs);
+    if (merge.warnings.length > 0) {
+      console.warn('[permit-packet] merge warnings:', merge.warnings);
+    }
+
+    // Build the stamp maps + run the stamp pass. `mergeInputs` already
+    // contains only the attachments that probed successfully above, so
+    // it aligns with the merged output 1:1.
+    const maps = buildStampMaps({
+      sparkplanPageCount: merge.sparkplanPageCount,
+      attachments: mergeInputs,
+    });
+    const stamped = await stampSheetIds({
+      merged: merge.bytes,
+      sheetIdMap: maps.sheetIdMap,
+      shouldStamp: maps.shouldStamp,
+    });
+    if (stamped.warnings.length > 0) {
+      console.warn('[permit-packet] stamp warnings:', stamped.warnings);
+    }
+
+    const finalBlob = new Blob([stamped.bytes], { type: 'application/pdf' });
+    downloadBlob(finalBlob, fileName);
+    console.log('[permit-packet] SUCCESS (with attachments)', {
+      bytes: finalBlob.size,
+      fileName,
+      sparkplanPages: merge.sparkplanPageCount,
+      mergedAttachments: merge.mergedAttachmentCount,
+      stampedPages: stamped.stampedCount,
+    });
     return;
   } catch (fullErr) {
     console.error('[permit-packet] full-document render failed, bisecting...', fullErr);

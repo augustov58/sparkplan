@@ -22,7 +22,6 @@ import {
   FileText,
   Trash2,
   Loader2,
-  AlertCircle,
 } from 'lucide-react';
 import {
   useProjectAttachments,
@@ -270,18 +269,6 @@ export const AttachmentUploadCard: React.FC<AttachmentUploadCardProps> = ({
         </ul>
       )}
 
-      {/* PR-2 reminder: the attachments aren't yet merged into the generated
-          packet — flag this clearly so testers don't expect the file to
-          appear in the downloaded PDF until PR-3 ships. */}
-      {ownAttachments.length > 0 && (
-        <div className="flex items-start gap-1.5 text-[10px] text-amber-700 bg-amber-50 border border-amber-200 rounded px-2 py-1.5">
-          <AlertCircle className="w-3 h-3 mt-0.5 flex-shrink-0" />
-          <span>
-            Uploaded files are stored but not yet spliced into the generated
-            packet PDF — that ships in the next release.
-          </span>
-        </div>
-      )}
     </div>
   );
 };
