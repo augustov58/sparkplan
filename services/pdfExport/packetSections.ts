@@ -109,21 +109,67 @@ export function newBandCounters(): BandCounters {
   return { 0: 0, 100: 0, 200: 0, 300: 0, 400: 0, 500: 0, 600: 0 };
 }
 
-/** Discipline prefix on every sheet ID — `E-` denotes electrical (standard plan-set convention). */
-export const SHEET_ID_PREFIX = 'E-';
+/**
+ * Sheet ID discipline prefixes (Sprint 2B PR-1).
+ *
+ * Sheet IDs carry a single-letter discipline prefix in addition to the band-
+ * based numbering. Standard plan-set convention:
+ *   E   electrical  — SparkPlan-generated sheets (default; existing Sprint 2A behavior)
+ *   C   civil       — contractor-supplied site plans, surveys
+ *   X   manufacturer — contractor-supplied cut sheets, fire stopping schedules,
+ *                     manufacturer installation data
+ *
+ * The discipline prefix is orthogonal to the band — a civil site plan still
+ * uses the appropriate numeric band; only the letter changes. The merge engine
+ * (PR-3) will assign `C-` / `X-` IDs to uploaded artifacts via their title
+ * sheets while electrical content keeps `E-`.
+ */
+export type SheetDiscipline = 'E' | 'C' | 'X';
+
+export const SHEET_DISCIPLINE_ELECTRICAL: SheetDiscipline = 'E';
+export const SHEET_DISCIPLINE_CIVIL: SheetDiscipline = 'C';
+export const SHEET_DISCIPLINE_MANUFACTURER: SheetDiscipline = 'X';
+
+/**
+ * Legacy single-prefix export retained for backward compatibility with any
+ * pre-Sprint 2B callers. New code should use `formatDisciplinePrefix(...)`
+ * or pass a `SheetDiscipline` to `nextSheetId` / `formatSheetId`.
+ */
+export const SHEET_ID_PREFIX = `${SHEET_DISCIPLINE_ELECTRICAL}-`;
+
+/** Render a discipline as the leading `X-` portion of a sheet ID. */
+export function formatDisciplinePrefix(discipline: SheetDiscipline): string {
+  return `${discipline}-`;
+}
 
 /**
  * Allocate the next sheet ID in a band. Caller mutates the counter map in place.
- * Returns a discipline-prefixed string (e.g., 'E-001', 'E-301', 'E-405').
+ * Returns a discipline-prefixed string (e.g., 'E-001', 'C-201', 'X-205').
+ *
+ * `discipline` defaults to `'E'` (electrical) — every Sprint 2A caller passes
+ * just `(counters, band)` and keeps the original behavior. Sprint 2B's merge
+ * engine passes `'C'` for site plans / surveys and `'X'` for cut sheets /
+ * fire-stopping / manufacturer data.
  */
-export function nextSheetId(counters: BandCounters, band: SheetBand): string {
+export function nextSheetId(
+  counters: BandCounters,
+  band: SheetBand,
+  discipline: SheetDiscipline = SHEET_DISCIPLINE_ELECTRICAL,
+): string {
   counters[band] += 1;
-  return `${SHEET_ID_PREFIX}${String(band + counters[band]).padStart(3, '0')}`;
+  return `${formatDisciplinePrefix(discipline)}${String(band + counters[band]).padStart(3, '0')}`;
 }
 
 /**
  * Format a sheet ID directly without mutating a counter — useful in tests.
+ *
+ * `discipline` defaults to `'E'` for backward compatibility with Sprint 2A
+ * tests that pre-date the Sprint 2B discipline extension.
  */
-export function formatSheetId(band: SheetBand, slot: number): string {
-  return `${SHEET_ID_PREFIX}${String(band + slot).padStart(3, '0')}`;
+export function formatSheetId(
+  band: SheetBand,
+  slot: number,
+  discipline: SheetDiscipline = SHEET_DISCIPLINE_ELECTRICAL,
+): string {
+  return `${formatDisciplinePrefix(discipline)}${String(band + slot).padStart(3, '0')}`;
 }

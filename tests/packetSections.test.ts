@@ -11,6 +11,7 @@ import {
   newBandCounters,
   nextSheetId,
   formatSheetId,
+  formatDisciplinePrefix,
   DEFAULT_SECTIONS,
   BAND_FRONT_MATTER,
   BAND_CALCULATIONS,
@@ -18,6 +19,9 @@ import {
   BAND_PANELS,
   BAND_MULTIFAMILY,
   BAND_COMPLIANCE,
+  SHEET_DISCIPLINE_CIVIL,
+  SHEET_DISCIPLINE_MANUFACTURER,
+  SHEET_DISCIPLINE_ELECTRICAL,
 } from '../services/pdfExport/packetSections';
 
 describe('resolveSections', () => {
@@ -113,5 +117,45 @@ describe('nextSheetId + newBandCounters', () => {
     // TOC skipped (sections.tableOfContents = false)
     expect(nextSheetId(counters, BAND_FRONT_MATTER)).toBe('E-002'); // revision log (was E-003)
     expect(nextSheetId(counters, BAND_FRONT_MATTER)).toBe('E-003'); // general notes (was E-004)
+  });
+});
+
+// Sprint 2B PR-1 — discipline prefix support for uploaded-artifact sheets.
+describe('sheet ID discipline prefixes (Sprint 2B)', () => {
+  it('formatDisciplinePrefix renders each discipline as letter + dash', () => {
+    expect(formatDisciplinePrefix(SHEET_DISCIPLINE_ELECTRICAL)).toBe('E-');
+    expect(formatDisciplinePrefix(SHEET_DISCIPLINE_CIVIL)).toBe('C-');
+    expect(formatDisciplinePrefix(SHEET_DISCIPLINE_MANUFACTURER)).toBe('X-');
+  });
+
+  it('formatSheetId defaults to E- when discipline omitted (Sprint 2A compat)', () => {
+    expect(formatSheetId(BAND_DIAGRAMS, 1)).toBe('E-201');
+  });
+
+  it('formatSheetId honors civil + manufacturer disciplines, keeping the band scheme', () => {
+    // C- and X- sheets reuse the existing band numbers — the discipline prefix
+    // is orthogonal to the band. A civil site plan in the diagrams band still
+    // gets a 2xx number, just with a C- prefix.
+    expect(formatSheetId(BAND_DIAGRAMS, 1, SHEET_DISCIPLINE_CIVIL)).toBe('C-201');
+    expect(formatSheetId(BAND_DIAGRAMS, 5, SHEET_DISCIPLINE_MANUFACTURER)).toBe('X-205');
+    expect(formatSheetId(BAND_FRONT_MATTER, 2, SHEET_DISCIPLINE_CIVIL)).toBe('C-002');
+  });
+
+  it('nextSheetId defaults to E- when discipline omitted (Sprint 2A compat)', () => {
+    const counters = newBandCounters();
+    expect(nextSheetId(counters, BAND_FRONT_MATTER)).toBe('E-001');
+    expect(nextSheetId(counters, BAND_FRONT_MATTER)).toBe('E-002');
+  });
+
+  it('nextSheetId emits C- and X- IDs when an explicit discipline is passed', () => {
+    const counters = newBandCounters();
+
+    // Allocate one electrical diagram, then a civil site plan + a manufacturer
+    // cut sheet from the same diagrams band. All three share the band counter,
+    // so the numeric slot advances regardless of discipline.
+    expect(nextSheetId(counters, BAND_DIAGRAMS, SHEET_DISCIPLINE_ELECTRICAL)).toBe('E-201');
+    expect(nextSheetId(counters, BAND_DIAGRAMS, SHEET_DISCIPLINE_CIVIL)).toBe('C-202');
+    expect(nextSheetId(counters, BAND_DIAGRAMS, SHEET_DISCIPLINE_MANUFACTURER)).toBe('X-203');
+    expect(nextSheetId(counters, BAND_DIAGRAMS, SHEET_DISCIPLINE_ELECTRICAL)).toBe('E-204');
   });
 });
