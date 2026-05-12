@@ -22,6 +22,8 @@ type RefreshEventType =
   | 'project_billing_settings'
   | 'invoices'
   | 'payments'
+  // Sprint 2B PR-2: user-supplied PDF artifacts (site plans, cut sheets, etc.)
+  | 'project_attachments'
   | 'all';
 type RefreshCallback = () => void;
 

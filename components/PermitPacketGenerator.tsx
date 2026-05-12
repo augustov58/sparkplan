@@ -4,8 +4,9 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import { FileText, Download, Loader2, AlertCircle, CheckCircle, Info, Building2, AlertTriangle, ListChecks } from 'lucide-react';
+import { FileText, Download, Loader2, AlertCircle, CheckCircle, Info, Building2, AlertTriangle, ListChecks, Paperclip } from 'lucide-react';
 import { generatePermitPacket, generateLightweightPermitPacket, type PermitPacketData } from '../services/pdfExport/permitPacketGenerator';
+import { AttachmentUploadCard } from './AttachmentUploadCard';
 import type { NEC22087NarrativeData, NEC22087Method } from '../services/pdfExport/PermitPacketDocuments';
 import {
   DEFAULT_SECTIONS,
@@ -734,6 +735,73 @@ export const PermitPacketGenerator: React.FC<PermitPacketGeneratorProps> = ({ pr
               })}
             </div>
           ))}
+        </div>
+      </div>
+
+      {/* Sprint 2B PR-2: User-supplied PDF artifacts (site plans, cut sheets,
+          NOC, HOA letter, fire stopping, survey, manufacturer data). These are
+          uploaded to Supabase Storage; the PR-3 merge engine will splice them
+          into the generated permit packet behind SparkPlan title sheets. */}
+      <div className="bg-white border border-gray-200 rounded-lg p-6 space-y-4">
+        <div className="flex items-start gap-3">
+          <Paperclip className="w-5 h-5 text-[#2d3b2d] mt-0.5" />
+          <div>
+            <h3 className="font-bold text-gray-900">User-supplied Artifacts</h3>
+            <p className="text-sm text-gray-600 mt-1">
+              Upload PDFs that SparkPlan cannot generate (site plan, equipment
+              cut sheets, fire stopping schedule, NOC, HOA letter, survey,
+              manufacturer data). These are required by most AHJs for intake;
+              the next release splices them into the generated packet behind
+              themed title sheets.
+            </p>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <AttachmentUploadCard
+            projectId={projectId}
+            artifactType="site_plan"
+            title="Site Plan / Survey"
+            description="Property layout, equipment locations, utility connections (required by all 5 FL AHJs)"
+          />
+          <AttachmentUploadCard
+            projectId={projectId}
+            artifactType="cut_sheet"
+            title="Equipment Cut Sheets"
+            description="Manufacturer spec sheets for panels, breakers, EVSE — UL listings, ratings"
+          />
+          <AttachmentUploadCard
+            projectId={projectId}
+            artifactType="fire_stopping"
+            title="Fire Stopping Schedule"
+            description="UL-listed firestop assemblies for rated-wall penetrations (Orlando intake)"
+          />
+          <AttachmentUploadCard
+            projectId={projectId}
+            artifactType="manufacturer_data"
+            title="Manufacturer Installation Data"
+            description="Vendor-supplied installation manuals or technical bulletins"
+          />
+          <AttachmentUploadCard
+            projectId={projectId}
+            artifactType="survey"
+            title="Property Survey"
+            description="Stamped survey when separate from the site plan"
+          />
+          <AttachmentUploadCard
+            projectId={projectId}
+            artifactType="noc"
+            title="Notice of Commencement"
+            description="FL Statute 713 — required for jobs > $5,000 (one file)"
+            multiple={false}
+          />
+          <AttachmentUploadCard
+            projectId={projectId}
+            artifactType="hoa_letter"
+            title="HOA / Condo Approval Letter"
+            description="Required for multi-family / association-governed properties (one file)"
+            multiple={false}
+          />
         </div>
       </div>
 

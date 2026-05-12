@@ -263,6 +263,16 @@ export const toastMessages = {
     error: 'Failed to save payment',
   },
 
+  // Sprint 2B PR-2: User-supplied PDF artifacts (site plans, cut sheets, NOC, etc.)
+  attachment: {
+    uploaded: 'Attachment uploaded',
+    uploadFailed: 'Failed to upload attachment',
+    deleted: 'Attachment removed',
+    deleteFailed: 'Failed to delete attachment',
+    fileTooLarge: (maxMB: number) => `File is larger than ${maxMB}MB — please upload a smaller PDF`,
+    invalidFileType: 'Only PDF files are accepted',
+  },
+
   // Generic
   saved: 'Changes saved',
   copied: 'Copied to clipboard',
