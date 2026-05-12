@@ -223,7 +223,7 @@ export const AttachmentUploadCard: React.FC<AttachmentUploadCardProps> = ({
     loading,
     upload,
     remove,
-    updateIncludeSparkplanCover,
+    updateCoverMode,
     updateCustomSheetId,
   } = useProjectAttachments(projectId);
 
@@ -406,10 +406,10 @@ export const AttachmentUploadCard: React.FC<AttachmentUploadCardProps> = ({
         <ul className="space-y-1.5">
           {ownAttachments.map((a) => {
             const isDeleting = deletingId === a.id;
-            // Default TRUE for legacy rows where the column doesn't exist
-            // yet (the DB migration applies at first use; until then the
-            // hook returns rows without the field).
-            const coverOn = a.include_sparkplan_cover !== false;
+            // v4 commit 12: cover_mode replaces the boolean include_sparkplan_cover.
+            // For now this card still renders a 2-state toggle (separate vs none);
+            // commit 15 will introduce the 3-state UI exposing overlay too.
+            const coverOn = (a.cover_mode ?? 'separate') !== 'none';
             return (
               <li
                 key={a.id}
@@ -449,7 +449,7 @@ export const AttachmentUploadCard: React.FC<AttachmentUploadCardProps> = ({
                     value={coverOn}
                     disabled={isDeleting}
                     onChange={(next) =>
-                      updateIncludeSparkplanCover(a.id, next)
+                      updateCoverMode(a.id, next ? 'separate' : 'none')
                     }
                   />
                 </div>

@@ -564,20 +564,19 @@ export const PermitPacketGenerator: React.FC<PermitPacketGeneratorProps> = ({ pr
             console.warn('[permit-packet] could not download attachment', a.filename);
             continue;
           }
+          // v4 commit 12: cover_mode supersedes include_sparkplan_cover.
+          // For the transitional API we still pass the boolean
+          // includeSparkplanCover (true = separate, false = none); commit
+          // 15 replaces the bool with a tri-state coverMode field once
+          // the orchestrator + merge engine know how to overlay.
+          const mode = a.cover_mode ?? 'separate';
           fetched.push({
             artifactType: a.artifact_type as ArtifactType,
             displayTitle: a.display_title ?? undefined,
             filename: a.filename,
             uploadedAt: a.uploaded_at,
             uploadBytes: bytes,
-            // Per-upload cover toggle (Sprint 2B PR-3 commit 8). Rows that
-            // pre-date the migration return `undefined`, which the
-            // orchestrator treats as cover-ON (default). Once the DB
-            // migration is applied, this carries the contractor's choice.
-            includeSparkplanCover: a.include_sparkplan_cover ?? true,
-            // v4 commit 11: pass through the contractor's optional
-            // custom sheet ID override. Null/undefined keeps the merge
-            // orchestrator on the auto-allocation path.
+            includeSparkplanCover: mode !== 'none',
             customSheetId: a.custom_sheet_id ?? null,
           });
         }

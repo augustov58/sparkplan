@@ -1677,11 +1677,11 @@ export type Database = {
       project_attachments: {
         Row: {
           artifact_type: string
+          cover_mode: 'separate' | 'overlay' | 'none'
           custom_sheet_id: string | null
           display_title: string | null
           filename: string
           id: string
-          include_sparkplan_cover: boolean
           page_count: number | null
           project_id: string
           storage_path: string
@@ -1690,11 +1690,11 @@ export type Database = {
         }
         Insert: {
           artifact_type: string
+          cover_mode?: 'separate' | 'overlay' | 'none'
           custom_sheet_id?: string | null
           display_title?: string | null
           filename: string
           id?: string
-          include_sparkplan_cover?: boolean
           page_count?: number | null
           project_id: string
           storage_path: string
@@ -1703,11 +1703,11 @@ export type Database = {
         }
         Update: {
           artifact_type?: string
+          cover_mode?: 'separate' | 'overlay' | 'none'
           custom_sheet_id?: string | null
           display_title?: string | null
           filename?: string
           id?: string
-          include_sparkplan_cover?: boolean
           page_count?: number | null
           project_id?: string
           storage_path?: string

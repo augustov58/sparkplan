@@ -62,6 +62,29 @@ export type ArtifactType =
   | 'manufacturer_data'
   | 'hvhz_anchoring';
 
+/**
+ * 3-mode cover behavior (v4 commit 12). Replaces the boolean
+ * include_sparkplan_cover column from PR-3 commit 7.
+ *
+ * - 'separate' (default): SparkPlan title sheet as its own page
+ *    preceding the upload. AHJ-canonical layout for legal docs,
+ *    cut sheets, NOC, HOA.
+ * - 'overlay': SparkPlan title block composited onto the upload
+ *    page itself. One sheet, not two — designed for bare drawings
+ *    (Bluebeam markups, Google Earth printouts) that have no
+ *    existing title block.
+ * - 'none': upload appended as-is, no SparkPlan ceremony, no
+ *    stamping. For uploads that already carry a complete architect
+ *    title block (e.g., HOK A100).
+ */
+export type CoverMode = 'separate' | 'overlay' | 'none';
+
+export const COVER_MODES: readonly CoverMode[] = [
+  'separate',
+  'overlay',
+  'none',
+] as const;
+
 export const ARTIFACT_TYPES: readonly ArtifactType[] = [
   'site_plan',
   'cut_sheet',
@@ -117,20 +140,23 @@ export interface UseProjectAttachmentsReturn {
   remove: (attachmentId: string) => Promise<void>;
 
   /**
-   * Toggle the `include_sparkplan_cover` flag on an attachment.
+   * Update the `cover_mode` enum on an attachment (Sprint 2B PR-3 v4).
    *
-   * - TRUE = SparkPlan renders a title sheet + stamps sheet IDs (default).
-   * - FALSE = upload is appended to the merged packet as-is, with no
-   *   SparkPlan title sheet and no bottom-right sheet-ID stamp — used for
-   *   pre-bordered uploads (e.g., architect-prepared A100 with its own
-   *   title block).
+   * - `separate` (default): SparkPlan title sheet as its OWN page
+   *   preceding the upload. Current cover-ON behavior.
+   * - `overlay`: SparkPlan title block composited ONTO the upload
+   *   page itself. One sheet, not two — for bare drawings (Bluebeam
+   *   markups, Google Earth printouts) without their own title block.
+   * - `none`: upload appended as-is, no SparkPlan ceremony, no
+   *   stamping. For pre-bordered drawings with their own architect
+   *   title block.
    *
    * Optimistic update + realtime broadcast — same pattern as `upload` /
    * `remove`. Surfaces a toast on failure; never throws.
    */
-  updateIncludeSparkplanCover: (
+  updateCoverMode: (
     attachmentId: string,
-    value: boolean,
+    mode: CoverMode,
   ) => Promise<void>;
 
   /**
@@ -385,35 +411,34 @@ export function useProjectAttachments(
     }
   };
 
-  const updateIncludeSparkplanCover = async (
+  const updateCoverMode = async (
     attachmentId: string,
-    value: boolean,
+    mode: CoverMode,
   ): Promise<void> => {
     const target = attachments.find((a) => a.id === attachmentId);
     if (!target) return;
 
-    // Optimistic update — flip locally first so the switch animates
-    // immediately. The realtime subscription reconciles on the next tick.
-    const previous = target.include_sparkplan_cover;
+    // Optimistic update — swap locally so the radio/select reflects
+    // the choice immediately. Realtime subscription reconciles on the
+    // next tick.
+    const previous = target.cover_mode;
     setAttachments((prev) =>
       prev.map((a) =>
-        a.id === attachmentId ? { ...a, include_sparkplan_cover: value } : a,
+        a.id === attachmentId ? { ...a, cover_mode: mode } : a,
       ),
     );
 
     try {
       const { error: updateError } = await supabase
         .from('project_attachments')
-        .update({ include_sparkplan_cover: value })
+        .update({ cover_mode: mode })
         .eq('id', attachmentId);
 
       if (updateError) {
-        // Roll back the optimistic update.
+        // Rollback.
         setAttachments((prev) =>
           prev.map((a) =>
-            a.id === attachmentId
-              ? { ...a, include_sparkplan_cover: previous }
-              : a,
+            a.id === attachmentId ? { ...a, cover_mode: previous } : a,
           ),
         );
         throw updateError;
@@ -422,12 +447,10 @@ export function useProjectAttachments(
       dataRefreshEvents.emit('project_attachments');
     } catch (err) {
       const message =
-        err instanceof Error
-          ? err.message
-          : 'Failed to update attachment';
+        err instanceof Error ? err.message : 'Failed to update attachment';
       setError(message);
-      showToast.error(toastMessages.attachment.coverToggleFailed);
-      console.error('[useProjectAttachments] updateIncludeSparkplanCover failed', err);
+      showToast.error(toastMessages.attachment.coverModeFailed);
+      console.error('[useProjectAttachments] updateCoverMode failed', err);
     }
   };
 
@@ -494,7 +517,7 @@ export function useProjectAttachments(
     error,
     upload,
     remove,
-    updateIncludeSparkplanCover,
+    updateCoverMode,
     updateCustomSheetId,
   };
 }
