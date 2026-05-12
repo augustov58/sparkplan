@@ -74,6 +74,11 @@ Per CLAUDE.md "Calculation Service Rules" — no DB calls, no hooks, no side eff
 
 - ≥277/480V (per Orlando manifest) → PE-required stub page renders as part of the manifest's `requirements`. This is the gate that **triggers Sprint 3 workflow** when a project crosses the threshold.
 - Sprint 2A H17 lane logic threads in — `manifest.requirements` filter on `lane`.
+- **`building_type ∈ { single_family_residential, multi_family, commercial }`** is a first-class top-level discriminator, **orthogonal to `lane`**. Surfaced by Sprint 2C parallel research (2026-05-12). Examples:
+  - Pompano Fire Review Application excludes `single_family_residential` (H22).
+  - Davie's Knox-box / bollard / multi-dispenser shunt block applies only when `building_type = 'commercial'` (H27–H29).
+  - Hillsborough's "residential trade-permit only" lane bypasses plan review entirely when `building_type = 'single_family_residential'` (H31) — the packet is over-spec there.
+  - The manifest schema must model `building_type` alongside `lane` and `service_modification_type` — not bury it in per-requirement predicates. Sprint 2B PR-4's Orlando scaffold should include this field even though Orlando's matrix doesn't yet vary on it.
 
 ### Renderer
 
