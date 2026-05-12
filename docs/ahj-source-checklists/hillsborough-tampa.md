@@ -105,8 +105,65 @@ Hillsborough's commercial path optionally accepts "Private Provider" plan review
 
 ## Confidence level
 
-**Medium.**
-- *High* for the Hillsborough Commercial Electrical Permit Requirements page (fetched directly from `hcfl.gov`, verbatim quoted).
-- *Medium-Low* for Tampa residential because the City of Tampa publishes minimal up-front documentation — most of the procedural info comes from a third-party guide (evprosolutions.com) cross-referenced against the official Accela portal and Tampa's construction services landing page. The official Tampa residential electrical landing (`tampa.gov/construction-services/residential-permits/electric-plumbing`) is sparse.
-- *Lower* for Hillsborough Residential & Mobile Home Checklists — the index page exists at `hcfl.gov/businesses/hillsgovhub/residential-and-mobile-home-checklists` but individual checklist PDFs were not accessible during this research pass. Recommend a follow-up research ping before M1 manifest implementation to grab the residential-specific PDF(s) if they exist.
-- The biggest unknown: **does Hillsborough or Tampa have any commercial Knox-box / emergency-shutoff requirement enforced by the fire department, even if not on the electrical checklist?** Davie's checklist names this explicitly. Hillsborough/Tampa might enforce it via the Fire Marshal independently of the electrical permit — worth confirming with a contractor or plans examiner before M1 manifest finalization.
+**Medium-High.** *(Upgraded from Medium on 2026-05-12 second pass — see Follow-up sourcing section below. Not full High because Tampa Fire Rescue Knox-box stance remains officially un-sourced.)*
+- *High* for the Hillsborough Commercial Electrical Permit Requirements page (verbatim from `hcfl.gov`).
+- *High* for **Hillsborough residential lane** after 2nd-pass confirmation that no dedicated electrical or EV residential checklist PDF exists — the County has fully migrated from PDF checklists to webpage-only content for residential, and the residential-alterations page makes no mention of a separate trade-permit lane (it instead requires sealed plans, which contradicts the third-party trade-permit-no-plan-review narrative). **See H35 below — narrative now needs revision.**
+- *Medium-Low* (unchanged) for Tampa residential procedural detail — `tampa.gov` publishes minimal up-front documentation.
+- *Medium* (unchanged) for Knox-box stance — Tampa Fire Rescue's official codes-in-use page lists wildly stale editions (1985–1997) and is clearly out of date; the operative code is FFPC 8th ed (NFPA 1, 2021) statewide. Knox-box is therefore **AHJ-discretionary** per NFPA 1 § 18.2.2, but no Tampa- or Hillsborough-specific ordinance text was discoverable via web search — confirming the per-AHJ stance requires a phone call.
+
+## Follow-up sourcing (2026-05-12, second pass)
+
+Three gaps from the first pass were investigated; two closed, one remains intractable without direct contact.
+
+### Gap 1 (partially closed → reframed as H35/H36): Hillsborough Residential Electrical & Mobile Home Checklist PDFs
+
+**Finding:** Hillsborough County has **migrated away from PDF-based residential checklists**. The index page `https://hcfl.gov/businesses/hillsgovhub/residential-and-mobile-home-checklists/residential-checklists` ("Other Residential Checklists - PDF Versions") returns **"No data available — 0-0 of 0"** as of 2026-05-12. The hub at `https://hcfl.gov/businesses/hillsgovhub/residential-and-mobile-home-checklists` lists ~14 webpage-only checklists (Accessory Structures, Backup Generators, Mobile Home Setup - Private Property, Pool Construction, Solar PV Checklist, etc.) — **none specifically electrical** and **none EV-specific**.
+
+**The two closest hits:**
+1. **Residential Backup Generators Requirements** (webpage) — closest electrical-adjacent webpage; cross-validates that residential electrical scope in unincorporated Hillsborough has its own webpage-only requirement page (https://hcfl.gov/businesses/hillsgovhub/residential-and-mobile-home-checklists/residential-backup-generators-requirements).
+2. **Mobile Home Setup - Private Property Checklist** (PDF — actual PDF found): https://www.hillsboroughcounty.org/library/hillsborough/media-center/documents/development-services/permits-and-records/permits/building-permits/checklists/mobile-home-private-property-checklist.pdf — this is the only true PDF checklist found in the residential category, and it covers mobile-home **setup** (zoning, NOC, sewer/water, mechanical, structural), **not** electrical scope.
+
+**Re-examination of "Residential Alterations (Renovations)":**
+Fetched `https://hcfl.gov/businesses/hillsgovhub/residential-and-mobile-home-checklists/residential-alterations-renovations` directly — verbatim: *"Building plans designed in accordance with the current Florida Building Code (FBC) and digitally signed and sealed by a State of Florida Registered Architect or Engineer"*. **This contradicts the third-party `evprosolutions.com` narrative that residential trade-permit work bypasses plan review.** It suggests that for any residential alteration in unincorporated Hillsborough — including an EV charger circuit addition that touches the panel — a sealed plan set may be required. Plain Level-2 EV charger circuit installs may still bypass via "Electric Trade Permit" type in HillsGovHub, but no `hcfl.gov` page confirms this lane verbatim.
+
+**Action:** See **H35** and **H36** below.
+
+### Gap 2 (closed via cross-validation): Tampa residential trade-permit details
+
+**Finding:** No verbatim City-of-Tampa source for "Residential Electric Trade Permit (no plan review)" was located on `tampa.gov`. The `tampa.gov/construction-services/residential-permits/electric-plumbing` page is sparse. The detailed narrative ("Apply online at Accela, upload contractor license/insurance + scope + panel rating + proposed load + drawings if requested, final inspection ELE-Final") is **only sourced from `evprosolutions.com`** — a third-party EV-installer blog.
+
+**Cross-validation that bumps confidence:** The procedural narrative is corroborated by:
+- TECO (Tampa Electric)'s "Installing a Charger" guide (`https://www.tampaelectric.com/electricvehicles/evsforhome/installingacharger/`) which references "permit and inspection" as a single-step process for residential EV charger installs.
+- The City of Tampa Accela portal exists (`https://aca-prod.accela.com/TAMPA/Default.aspx`) and is the operative residential intake portal.
+- Industry sources (permitmint.com, levin-electric.com) all describe Tampa Level-2 EV residential permits as a same-day single-trade permit pathway with no plan review required.
+
+**Conclusion:** The Tampa residential trade-permit-no-plan-review narrative is **cross-validated** but not officially documented by the City. Status: cross-validated **Medium-High** confidence; final verification requires a 5-min call to Tampa Construction Services (813-274-3100).
+
+### Gap 3 (intractable → flagged for direct contact): Fire Marshal Knox-box stance
+
+**Finding:** Both `hcfl.gov/businesses/permits-and-records/inspections/fire-marshal-inspection-services` and `hcfl.gov/businesses/permits-and-records/applications-and-forms/fire-marshal` were fetched directly — **neither page mentions Knox box, key box, rapid entry, emergency access, or EV/EVSE**. The Hillsborough County Code Chapter 26 (Fire Prevention and Protection) via Municode returned no body content via WebFetch (loads JS-only).
+
+The City of Tampa's `tampa.gov/fire-rescue/info/city-of-tampa-code` "Codes In Use" page is **demonstrably out of date** — it lists "National Fire Codes Adopted, 1997 edition" and "Life Safety Code, 1997 edition", which is decades behind the operative Florida Fire Prevention Code 8th edition (NFPA 1, 2021) — see `https://myfloridacfo.com/division/sfm/bfp/florida-fire-prevention-code`. This page is therefore not a reliable source for current Knox-box stance.
+
+**Operative statewide code:** NFPA 1, 2021 § 18.2.2.1 — *"The Authority Having Jurisdiction shall have the authority to require an access box(es) to be installed in an accessible location where access to or within a structure or area is difficult because of security."* This is **AHJ-discretionary** and the AHJ in this case is Hillsborough County Fire Marshal (unincorporated) or Tampa Fire Rescue (city). Davie's checklist names Knox-box explicitly for commercial EVSE; Hillsborough's commercial-electrical checklist does **not** — but the commercial-electrical checklist is the *electrical* trade reviewer's checklist, not the Fire Marshal's. The Fire Marshal review is a separate parallel track triggered by occupancy / sprinkler / alarm / commercial scope.
+
+**Conclusion:** No web-discoverable source confirms whether Hillsborough Fire Marshal or Tampa Fire Rescue requires Knox-box for commercial EVSE. Best-guess inference: Knox-box is **almost certainly required for any new commercial-occupancy building** in either jurisdiction (consistent with NFPA 1 18.2.2 broad adoption across FL), but whether a **standalone commercial EVSE retrofit** triggers a fresh Knox-box requirement (versus inheriting an existing one from the host building) requires a phone call.
+
+**Action items for next research pass:**
+1. **Hillsborough Fire Marshal:** (813) 744-5541 or `firemarshal@hcfl.gov` — ask: "Does a commercial parking-lot EVSE retrofit on an existing building with an existing Knox box trigger any new Knox-box requirement, or does it inherit?"
+2. **Tampa Fire Rescue:** (813) 274-7000 — same question.
+3. Both calls: ~15 min each; can be batched on a single day.
+
+## New findings from second pass
+
+**H35 — Hillsborough County has deprecated PDF-based residential checklists.**
+The "Other Residential Checklists - PDF Versions" page at `hcfl.gov/businesses/hillsgovhub/residential-and-mobile-home-checklists/residential-checklists` returns "0-0 of 0" data rows. Hillsborough has migrated residential checklists to webpage-only format. **Implication for SparkPlan:** the M1 manifest cannot rely on a "linked PDF checklist" pattern for Hillsborough residential — must instead use the webpage URL as the manifest source-of-truth pointer. **Severity: Low** for packet content; **Medium** for our internal manifest-build workflow (we may have other AHJs in pilot 2 / pilot 3 that follow the same migration pattern — Solar Forum's pattern shows several FL counties trending this way).
+
+**H36 — Hillsborough residential plan-review threshold ambiguity.**
+The `hcfl.gov` Residential Alterations page verbatim requires "Building plans designed in accordance with the current FBC and digitally signed and sealed by a State of Florida Registered Architect or Engineer". This **contradicts** the third-party `evprosolutions.com` claim that residential Level-2 EV chargers can bypass plan review via Electric Trade Permit. The likely reconciliation: an *Electric Trade Permit* (no alteration scope) DOES bypass plans, but a *Residential Alteration* (different permit type) does NOT. **The intake category the contractor picks in HillsGovHub determines the lane.** SparkPlan's M1 manifest must:
+- Either prescribe `permit_type = 'electric_trade_permit'` in the generated cover letter / application form to lock the lane,
+- Or surface this distinction explicitly in the contractor-facing UI so they pick the right intake category.
+**Severity: Medium UX** — picking the wrong intake category at HillsGovHub triggers a plan-review requirement that's avoidable. Compounds H31's residential-trade-permit lane downgrade. Worth a contractor-facing tooltip in M1.
+
+**H37 — Tampa Fire Rescue's published "Codes In Use" page is stale.**
+The `tampa.gov/fire-rescue/info/city-of-tampa-code` page lists 1985–1997 editions of fire codes. The operative code is FFPC 8th ed (NFPA 1, 2021) per Florida statute 633.202 (since 2023-12-31). SparkPlan should NOT cite Tampa's published code edition list — it is unreliable. Instead, reference the statewide FFPC 8th ed citation. **Severity: Low** for packet (most contractors know not to trust this); **Medium informational** flag for SparkPlan's "Code references" rendering — should default to FFPC 8th / NFPA 1 2021 for all FL AHJs unless a specific AHJ has authoritative documentation otherwise.
