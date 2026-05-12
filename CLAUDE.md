@@ -83,6 +83,12 @@ There are **TWO independent render paths** for the same logical diagram, in **di
 
 When a diagram visual changes, decide which path needs updating: in-app viewer → `OneLineDiagram.tsx`; permit-packet PDF page → `PermitPacketDocuments.tsx`. Often **both** need updating for parity (e.g., AIC overlay was added to both in PR #40). Use the Sprint 1 diagnostic shortcut: in-app correct vs PDF wrong → look at the PDF call site (i.e., `PermitPacketDocuments.tsx`), not the in-app viewer.
 
+### Permit packet merge engine (Sprint 2B PR #49, `fce6275`, 2026-05-12)
+
+User-uploaded PDFs (site plans, cut sheets, NOC, HOA, fire-stopping, manufacturer data, HVHZ wind-anchoring) splice into the SparkPlan-generated packet via three **pure pdf-lib services** in `services/pdfExport/`: `mergePacket.ts` (bytes-in/bytes-out merge), `stampSheetIds.ts` (continuous sheet-ID stamping in bottom-right of upload pages), and `compositeTitleBlock.ts` (overlay title-block onto upload's first page via `embedPdf` + `drawPage` + `/ca 0` ExtGState for transparency). All follow the calc-service contract: **pure / no DB / no hooks / never throw / return `warnings[]`**.
+
+Two react-pdf title-sheet components in the same folder: `AttachmentTitleSheet.tsx` (size-aware full cover; matches upload's first-page dimensions Letter → ARCH D) and `AttachmentTitleBlock.tsx` (title-block strip only, used by the overlay path). The orchestrator in `permitPacketGenerator.tsx` branches per attachment on the `cover_mode` enum (`'separate'` / `'overlay'` / `'none'`). When adding a new artifact type, extend the `artifact_type` CHECK in a migration + add the upload card to `PermitPacketGenerator.tsx`; the merge pipeline picks it up generically.
+
 ---
 
 ## Calculation Service Rules
