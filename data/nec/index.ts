@@ -6,6 +6,7 @@
 export * from './table-220-42';
 export * from './table-220-55';
 export * from './table-250-122';
+export * from './table-250-66';
 export * from './table-310-16';
 export * from './table-310-15-b1';
 export * from './table-310-15-c1';

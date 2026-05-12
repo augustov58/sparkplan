@@ -589,8 +589,18 @@ export const generatePermitPacket = async (data: PermitPacketData): Promise<void
     });
   }
 
-  if (sections.grounding && data.groundingSystem) {
-    const groundingDetail = data.groundingSystem;
+  if (sections.grounding) {
+    // Sprint 2A PR 4 / M3: render the grounding page even when no
+    // grounding_details DB row exists. The PDF derives a project-specific
+    // GEC size from service ampacity via NEC Table 250.66 + standard
+    // electrode/bonding catalogue, instead of falling back to generic
+    // Article 250 boilerplate. When a DB row exists it is the source of
+    // truth (preserves user-entered electrode/bonding selections + any
+    // installed GEC override).
+    const groundingDetail = data.groundingSystem ?? null;
+    const mainPanel = sortedPanels.find(p => p.is_main);
+    const serviceAmperage =
+      mainPanel?.main_breaker_amps ?? mainPanel?.bus_rating ?? 200;
     builders.push({
       name: 'GroundingPlan',
       kind: 'grounding',
@@ -602,7 +612,7 @@ export const generatePermitPacket = async (data: PermitPacketData): Promise<void
           projectName={data.projectName}
           projectAddress={data.projectAddress}
           grounding={groundingDetail}
-          serviceAmperage={sortedPanels.find(p => p.is_main)?.bus_rating || data.serviceVoltage}
+          serviceAmperage={serviceAmperage}
           conductorMaterial="Cu"
           {...contractor}
           sheetId={sheetIds[0]}
