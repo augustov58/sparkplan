@@ -271,6 +271,7 @@ export const toastMessages = {
     deleteFailed: 'Failed to delete attachment',
     fileTooLarge: (maxMB: number) => `File is larger than ${maxMB}MB — please upload a smaller PDF`,
     invalidFileType: 'Only PDF files are accepted',
+    coverToggleFailed: 'Could not update SparkPlan cover setting',
   },
 
   // Generic

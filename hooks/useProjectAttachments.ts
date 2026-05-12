@@ -115,6 +115,23 @@ export interface UseProjectAttachmentsReturn {
    *   the user retries delete).
    */
   remove: (attachmentId: string) => Promise<void>;
+
+  /**
+   * Toggle the `include_sparkplan_cover` flag on an attachment.
+   *
+   * - TRUE = SparkPlan renders a title sheet + stamps sheet IDs (default).
+   * - FALSE = upload is appended to the merged packet as-is, with no
+   *   SparkPlan title sheet and no bottom-right sheet-ID stamp — used for
+   *   pre-bordered uploads (e.g., architect-prepared A100 with its own
+   *   title block).
+   *
+   * Optimistic update + realtime broadcast — same pattern as `upload` /
+   * `remove`. Surfaces a toast on failure; never throws.
+   */
+  updateIncludeSparkplanCover: (
+    attachmentId: string,
+    value: boolean,
+  ) => Promise<void>;
 }
 
 /**
@@ -338,12 +355,59 @@ export function useProjectAttachments(
     }
   };
 
+  const updateIncludeSparkplanCover = async (
+    attachmentId: string,
+    value: boolean,
+  ): Promise<void> => {
+    const target = attachments.find((a) => a.id === attachmentId);
+    if (!target) return;
+
+    // Optimistic update — flip locally first so the switch animates
+    // immediately. The realtime subscription reconciles on the next tick.
+    const previous = target.include_sparkplan_cover;
+    setAttachments((prev) =>
+      prev.map((a) =>
+        a.id === attachmentId ? { ...a, include_sparkplan_cover: value } : a,
+      ),
+    );
+
+    try {
+      const { error: updateError } = await supabase
+        .from('project_attachments')
+        .update({ include_sparkplan_cover: value })
+        .eq('id', attachmentId);
+
+      if (updateError) {
+        // Roll back the optimistic update.
+        setAttachments((prev) =>
+          prev.map((a) =>
+            a.id === attachmentId
+              ? { ...a, include_sparkplan_cover: previous }
+              : a,
+          ),
+        );
+        throw updateError;
+      }
+
+      dataRefreshEvents.emit('project_attachments');
+    } catch (err) {
+      const message =
+        err instanceof Error
+          ? err.message
+          : 'Failed to update attachment';
+      setError(message);
+      showToast.error(toastMessages.attachment.coverToggleFailed);
+      console.error('[useProjectAttachments] updateIncludeSparkplanCover failed', err);
+    }
+  };
+
   return {
     attachments,
     loading,
     error,
     upload,
     remove,
+    updateIncludeSparkplanCover,
   };
 }
 

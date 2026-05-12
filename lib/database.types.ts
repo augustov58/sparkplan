@@ -1680,6 +1680,7 @@ export type Database = {
           display_title: string | null
           filename: string
           id: string
+          include_sparkplan_cover: boolean
           page_count: number | null
           project_id: string
           storage_path: string
@@ -1691,6 +1692,7 @@ export type Database = {
           display_title?: string | null
           filename: string
           id?: string
+          include_sparkplan_cover?: boolean
           page_count?: number | null
           project_id: string
           storage_path: string
@@ -1702,6 +1704,7 @@ export type Database = {
           display_title?: string | null
           filename?: string
           id?: string
+          include_sparkplan_cover?: boolean
           page_count?: number | null
           project_id?: string
           storage_path?: string
