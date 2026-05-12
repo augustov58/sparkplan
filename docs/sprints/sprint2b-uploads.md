@@ -1,6 +1,7 @@
 # Sprint 2B — Uploads + Merge Engine + Title Sheet Pattern
 
-**Status:** ⚪ Not started
+**Status:** ✅ COMPLETE 2026-05-12 (3 PRs merged: PR #45 foundation + PR #47 upload UI + PR #49 merge engine). PR-4 manifest scaffold on deck.
+**Last Updated:** 2026-05-12
 **Hard prerequisites:** Sprint 2A schema additions (`service_modification_type` enum) — needed for the Orlando manifest fork
 **Inherits from:** [`sprint2a-form-factor.md`](./sprint2a-form-factor.md) — sheet ID category bands (`packetSections.ts`), section toggle UI + `projects.settings` persistence, generator builder pattern
 **Index:** [`docs/sprints/README.md`](./README.md)
@@ -20,13 +21,50 @@ Sprint 2A closed all the systemic-rejection vectors that come from generated con
 
 ### Findings closed by this sprint
 
-| ID | Finding | AHJ source |
-|---|---|---|
-| **H5** | Notice of Commencement (NOC) placeholder for projects > $5,000 | Orlando |
-| **H6** | HOA / condo approval letter placeholder | Pompano (multi-family) |
-| **H7** | Site plan / survey | All 5 AHJs; Orlando #6 (existing-service) + #6/#7 (new-service) |
-| **H8** | Equipment cut sheets / installation manuals | Pompano; Orlando #7 (both paths) for EVSE specs |
-| **H16** | Fire stopping schedule for fire-rated penetrations | Orlando #8 (both paths) |
+| ID | Finding | AHJ source | Closed by |
+|---|---|---|---|
+| **H5** | Notice of Commencement (NOC) placeholder for projects > $5,000 | Orlando | Upload slot enabled by PR #49 (`fce6275`, 2026-05-12); per-AHJ wiring → PR-4 |
+| **H6** | HOA / condo approval letter placeholder | Pompano (multi-family) | Upload slot enabled by PR #49 (`fce6275`, 2026-05-12); per-AHJ wiring → PR-4 |
+| **H7** | Site plan / survey | All 5 AHJs; Orlando #6 (existing-service) + #6/#7 (new-service) | Upload slot enabled by PR #49 (`fce6275`, 2026-05-12); per-AHJ wiring → PR-4 |
+| **H8** | Equipment cut sheets / installation manuals | Pompano; Orlando #7 (both paths) for EVSE specs | Upload slot enabled by PR #49 (`fce6275`, 2026-05-12); per-AHJ wiring → PR-4 |
+| **H16** | Fire stopping schedule for fire-rated penetrations | Orlando #8 (both paths) | Upload slot enabled by PR #49 (`fce6275`, 2026-05-12); per-AHJ wiring → PR-4 |
+| **H19** | HVHZ wind-anchoring documentation for outdoor pedestal/bollard EVSE | Miami-Dade + Pompano (statewide for outdoor EVSE) | `artifact_type='hvhz_anchoring'` added by PR #49 (`fce6275`, 2026-05-12); per-AHJ wiring → Sprint 2C M1 |
+
+---
+
+## What landed (PR #49 — squash `fce6275`, merged 2026-05-12)
+
+17 commits, 5,580 LOC, iterative v1 → v5 review cycle (user is FL-licensed PE + platform owner, drove feature scope). PR-3 of the Sprint 2B series — closes the merge engine half of the sprint. Pairs with PR #45 (foundation) + PR #47 (upload UI).
+
+**Merge engine** (`services/pdfExport/`)
+- `mergePacket.ts` — pure pdf-lib function. SparkPlan portion + (title sheet + upload) × N → merged `Uint8Array`. Never throws (per CLAUDE.md calc-service contract); returns `warnings[]` for corrupted/encrypted/zero-byte/zero-page uploads. Skipped attachments don't block the merge — output always includes everything that succeeded.
+- `stampSheetIds.ts` — pure pdf-lib function. Stamps continuous IDs (e.g., `C-201`, `X-203`) in bottom-right of upload pages after merge.
+- `compositeTitleBlock.ts` — pure pdf-lib function. Overlays SparkPlan title block onto upload's own page via `embedPdf` + `drawPage`. Transparent background verified via `/ca 0` ExtGState.
+- `permitPacketGenerator.tsx` — orchestrator branches on `cover_mode` per attachment.
+
+**Title sheets** (`services/pdfExport/`)
+- `AttachmentTitleSheet.tsx` — size-aware react-pdf cover matching each upload's first-page dimensions (Letter portrait/landscape, Tabloid, ARCH C, ARCH D). Full architectural title-block layout: perimeter rule, right-margin vertical title-block strip with labeled cells (Project / Address / Prepared For / Permit-Job-No. / FL Reg/Seal / Seal Area / NOT FOR CONSTRUCTION / Revisions), centered drawing title, bottom-right Sheet block, bottom-left "Original sheet size" boilerplate. Sprint 2A `wrap={false}` pattern applied to central content card.
+- `AttachmentTitleBlock.tsx` — title-block-only variant used by the overlay path.
+
+**3-mode cover behavior**
+- `cover_mode` enum: `'separate'` (own preceding page, default), `'overlay'` (composited onto upload's first page), `'none'` (upload as-is for HOK-style pre-bordered drawings). UI is a 3-segment radio on each `AttachmentUploadCard`.
+
+**Per-upload overrides**
+- `custom_sheet_id` (nullable) — inline pill `SheetIdEditor`, advisory format validation `^[A-Z][A-Za-z0-9]*-[A-Za-z0-9.-]+$`, cross-project duplicate detection. Doesn't burn the discipline counter.
+- `discipline_override` (nullable) — A / C / E / M / P / S / X dropdown. Widens `SheetDiscipline` type; band counter still advances normally.
+- `artifact_type='hvhz_anchoring'` — Sprint 2C H19 slot; 8th upload card in `PermitPacketGenerator`.
+
+**Migrations applied to live Supabase (verified)**
+- `20260513_attachment_hvhz_anchoring.sql` — extends `artifact_type` CHECK to 8 values.
+- `20260514_attachment_include_sparkplan_cover.sql` — boolean column (later replaced).
+- `20260514_attachment_cover_mode.sql` — adds `cover_mode` enum (3 values), backfills from boolean, drops boolean.
+- `20260514_attachment_custom_sheet_id.sql` — nullable column.
+- `20260514_attachment_discipline_override.sql` — nullable column.
+
+**Tests** — 491 (post-PR-2) → 522 passing across 35 test files (+31 new tests). 4 new test files: `attachmentTitleSheet`, `attachmentTitleBlock`, `compositeTitleBlock`, `stampSheetIds`, `mergePacket`.
+
+**Surfaced for follow-up**
+- **F8** — Enable RLS on `public.jurisdictions` before Sprint 2C M1 populates it (currently 0 rows; Supabase advisor flagged 2026-05-12).
 
 ---
 
