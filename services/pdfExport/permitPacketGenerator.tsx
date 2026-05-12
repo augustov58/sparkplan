@@ -67,9 +67,11 @@ import {
   SHEET_DISCIPLINE_MANUFACTURER,
 } from './packetSections';
 import { AttachmentTitleSheet } from './AttachmentTitleSheet';
+import { AttachmentTitleBlock } from './AttachmentTitleBlock';
+import { compositeTitleBlock } from './compositeTitleBlock';
 import { mergePacket } from './mergePacket';
 import { stampSheetIds, buildStampMaps } from './stampSheetIds';
-import type { ArtifactType } from '../../hooks/useProjectAttachments';
+import type { ArtifactType, CoverMode } from '../../hooks/useProjectAttachments';
 
 export interface PermitPacketData {
   projectId: string;
@@ -212,17 +214,22 @@ export interface PermitPacketAttachment {
   /** The user's PDF, fetched from Supabase Storage by the caller. */
   uploadBytes: Uint8Array;
   /**
-   * Per-upload SparkPlan cover toggle. TRUE (default) → SparkPlan renders
-   * a title sheet + stamps sheet IDs onto every page of the upload. FALSE
-   * → upload is appended to the merged packet as-is, with no SparkPlan
-   * title sheet and no bottom-right sheet-ID stamp.
+   * Per-upload cover behavior (Sprint 2B PR-3 v4). Replaces the
+   * v3 boolean `includeSparkplanCover`.
    *
-   * Set to FALSE for pre-bordered uploads (e.g., architect-prepared sheet
-   * with its own title block). The merge engine still allocates the
-   * sheet-ID counter to leave room for the architect's existing numbering
-   * to coexist with the SparkPlan-stamped sheets.
+   * - 'separate' (default) — SparkPlan title sheet as its own page
+   *    preceding the upload. Upload pages stamped with sheet IDs.
+   * - 'overlay' — SparkPlan title block composited ONTO the upload
+   *    page itself. Each upload page becomes a composite (drawing +
+   *    title block) and receives a sheet-ID stamp.
+   * - 'none' — upload appended as-is, no SparkPlan ceremony, no
+   *    stamping. For pre-bordered drawings with their own architect
+   *    title block.
+   *
+   * Omitting this field is equivalent to 'separate' (preserves the
+   * v3 default behavior for legacy callers).
    */
-  includeSparkplanCover?: boolean;
+  coverMode?: CoverMode;
   /**
    * Optional contractor-supplied sheet ID override (Sprint 2B PR-3 v4).
    * When set, used verbatim as the title sheet ID (cover-ON path) instead
@@ -1114,21 +1121,23 @@ export const generatePermitPacket = async (data: PermitPacketData): Promise<void
       uploadBytes: Uint8Array;
       sheetIdRange: string[];
       hasCover: boolean;
+      /** v4 commit 15: overlay-mode flag — composite pages get stamped. */
+      overlay?: boolean;
     }> = [];
 
     for (const att of sortedAttachments) {
       const discipline = disciplineOf(att.artifactType);
-      // Default TRUE preserves existing behavior for callers / DB rows
-      // that pre-date the include_sparkplan_cover toggle.
-      const hasCover = att.includeSparkplanCover !== false;
+      // v4 commit 15: 3-state cover mode (separate / overlay / none).
+      // Default 'separate' preserves existing behavior for callers / DB
+      // rows that pre-date the cover_mode column.
+      const coverMode: CoverMode = att.coverMode ?? 'separate';
 
       // Pre-flight: parse the upload to (a) detect first-page dimensions
-      // for the size-aware title sheet and (b) count pages so we allocate
-      // the right number of stamp IDs. If pdf-lib can't parse the upload
-      // here, we skip the whole attachment now — that keeps the
+      // for the size-aware title sheet/block and (b) count pages so we
+      // allocate the right number of stamp IDs. If pdf-lib can't parse
+      // the upload here, skip the attachment now — that keeps the
       // sheet-ID counter aligned with what actually ends up in the
-      // merged output (no IDs allocated for attachments that won't be
-      // merged anyway).
+      // merged output.
       let pageSize: [number, number] = [612, 792];
       let uploadPageCount = 0;
       try {
@@ -1156,19 +1165,13 @@ export const generatePermitPacket = async (data: PermitPacketData): Promise<void
         continue;
       }
 
-      if (hasCover) {
-        // Default behavior: allocate a title-sheet ID + IDs for every
-        // upload page, render the SparkPlan title sheet, stamp all upload
-        // pages. The architect's existing sheet number (if any) coexists
-        // with the SparkPlan stamp because the stamp goes in the bottom
-        // corner, off the architect's title block.
-        //
-        // v4 commit 11: when the contractor supplied a `customSheetId`,
-        // honor it verbatim for the title sheet (no allocator call —
-        // keeps the band counter continuous for the next auto-allocated
-        // upload). Upload-page IDs (for multi-page uploads) still come
-        // from the allocator since each one needs a unique identifier.
-        const customTitle = att.customSheetId?.trim() || null;
+      const customTitle = att.customSheetId?.trim() || null;
+
+      if (coverMode === 'separate') {
+        // SparkPlan title sheet as its own page preceding the upload.
+        // Custom ID honors the contractor override; counter slot stays
+        // untouched when honored so the next upload's auto-allocation
+        // remains continuous.
         const titleSheetId = customTitle ?? allocateId(discipline);
         const uploadPageIds: string[] = [];
         for (let i = 0; i < uploadPageCount; i++) {
@@ -1200,12 +1203,73 @@ export const generatePermitPacket = async (data: PermitPacketData): Promise<void
           sheetIdRange: [titleSheetId, ...uploadPageIds],
           hasCover: true,
         });
+      } else if (coverMode === 'overlay') {
+        // SparkPlan title block composited ONTO each upload page. We
+        // allocate ONE sheet ID per upload page (the composite page IS
+        // the only page) — the contractor's custom ID (if supplied)
+        // is applied to the first composite page only. Subsequent
+        // composite pages auto-allocate.
+        const firstCompositeId = customTitle ?? allocateId(discipline);
+        const compositePageIds: string[] = [firstCompositeId];
+        for (let i = 1; i < uploadPageCount; i++) {
+          compositePageIds.push(allocateId(discipline));
+        }
+
+        // Render the title block at the upload's first-page size, then
+        // composite onto every page of the upload.
+        const titleBlockBlob = await pdf(
+          <Document>
+            <AttachmentTitleBlock
+              sheetId={firstCompositeId}
+              artifactType={att.artifactType}
+              displayTitle={att.displayTitle}
+              contractorName={data.contractorName ?? data.preparedBy}
+              contractorLicense={data.contractorLicense}
+              projectName={data.projectName}
+              projectAddress={data.projectAddress}
+              permitNumber={data.permitNumber}
+              dateReceived={att.uploadedAt}
+              pageSize={pageSize}
+            />
+          </Document>,
+        ).toBlob();
+        const titleBlockBytes = new Uint8Array(await titleBlockBlob.arrayBuffer());
+
+        const composite = await compositeTitleBlock({
+          uploadBytes: att.uploadBytes,
+          titleBlockBytes,
+          sheetId: firstCompositeId,
+          label: att.filename,
+        });
+        if (composite.warnings.length > 0) {
+          console.warn(
+            '[permit-packet] overlay warnings for',
+            att.filename,
+            composite.warnings,
+          );
+        }
+
+        // Push as a no-title-sheet merge input. The composite IS the
+        // upload pages; stampSheetIds will stamp each composite page
+        // with its sheet ID. Use the overlay sentinel by passing
+        // hasCover=false (no title-sheet insertion) AND a non-empty
+        // sheet ID range — the stamp map builder treats a non-empty ID
+        // with hasCover=false as a stamp-on-upload signal.
+        mergeInputs.push({
+          label: att.filename,
+          titleSheetBytes: new Uint8Array(0),
+          uploadBytes: composite.composedPdf,
+          sheetIdRange: compositePageIds,
+          hasCover: false,
+          // v4 commit 15: overlay mode flag — overrides the
+          // shouldStamp=false default for cover-OFF attachments so
+          // composite pages get a sheet ID stamp.
+          overlay: true,
+        });
       } else {
-        // Cover-OFF: no SparkPlan title sheet, no sheet-ID stamps. The
-        // upload's architect-supplied numbering remains the only visible
-        // sheet identifier. Empty titleSheetBytes signals mergePacket to
-        // skip the title-sheet insertion step; sheetIdRange is all empty
-        // strings so buildStampMaps marks every page shouldStamp=false.
+        // coverMode === 'none' — upload appended as-is, no title sheet,
+        // no stamping. Architect's own title block / numbering carries
+        // the identifier.
         const blankIds = new Array(uploadPageCount).fill('');
         mergeInputs.push({
           label: att.filename,

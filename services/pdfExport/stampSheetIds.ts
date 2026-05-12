@@ -231,16 +231,19 @@ export async function stampSheetIds(
  *
  * Each attachment contributes entries depending on its cover mode:
  *
- *   - `hasCover === true` (default) — `1 + uploadPageCount` entries:
- *       [titlePage, ...uploadPages]
- *     The title page is not stamped (AttachmentTitleSheet's BrandBar
- *     already drew the sheet ID there); the upload pages are stamped.
+ *   - separate (`hasCover === true`, default) — `1 + uploadPageCount`
+ *       entries: [titlePage, ...uploadPages]. Title page is not stamped
+ *       (AttachmentTitleSheet's BrandBar already drew the sheet ID);
+ *       upload pages are stamped.
  *
- *   - `hasCover === false` — `uploadPageCount` entries, all
- *     upload-page slots with empty sheet IDs and shouldStamp=false.
- *     The merge engine doesn't insert a title page for this attachment;
- *     the upload is appended as-is, carrying only the architect's own
- *     numbering. No SparkPlan stamp is drawn anywhere.
+ *   - none (`hasCover === false`, `overlay !== true`) —
+ *       `uploadPageCount` entries, all upload-page slots with empty
+ *       sheet IDs and shouldStamp=false. Architect's own numbering
+ *       carries the identifier.
+ *
+ *   - overlay (`hasCover === false`, `overlay === true`) —
+ *       `uploadPageCount` entries (composite pages). Each gets its
+ *       assigned sheet ID AND a stamp draw. v4 commit 15.
  *
  * SparkPlan pages get `false` everywhere (already stamped by react-pdf).
  */
@@ -248,17 +251,25 @@ export function buildStampMaps(args: {
   sparkplanPageCount: number;
   attachments: Array<{
     /**
-     * Sheet IDs. For cover-ON, aligned to `[title, ...upload pages]`.
-     * For cover-OFF, length equals uploadPageCount and every entry is
-     * `''` (no stamp anywhere on this attachment's pages).
+     * Sheet IDs. Layout depends on cover mode:
+     * - separate (cover-ON): `[title, ...upload pages]`
+     * - none (cover-OFF, no overlay): length === uploadPageCount,
+     *   typically all `''`
+     * - overlay (cover-OFF + overlay=true): length === uploadPageCount,
+     *   each entry is the composite page's ID (stamped)
      */
     sheetIdRange: string[];
     /**
      * Optional flag — when false, this attachment contributes only
-     * upload pages (no title page, no stamping). Default true preserves
-     * the original PR-3 behavior.
+     * upload pages (no title page, no stamping unless `overlay=true`).
+     * Default true preserves the original PR-3 cover-ON behavior.
      */
     hasCover?: boolean;
+    /**
+     * v4 commit 15: overlay-mode flag. When true (only meaningful with
+     * `hasCover=false`), every upload-page slot gets shouldStamp=true.
+     */
+    overlay?: boolean;
   }>;
 }): { sheetIdMap: string[]; shouldStamp: boolean[] } {
   const sheetIdMap: string[] = [];
@@ -275,14 +286,18 @@ export function buildStampMaps(args: {
     if (att.sheetIdRange.length === 0) continue;
 
     if (att.hasCover === false) {
-      // Cover-OFF: every entry maps to an upload page, no stamping.
+      // No title page in the merged output. Stamp behavior depends on
+      // whether this is overlay mode or 'none'.
+      const stampOnUpload = att.overlay === true;
       for (const id of att.sheetIdRange) {
         sheetIdMap.push(id);
-        shouldStamp.push(false);
+        // Empty IDs are never stamped regardless of mode.
+        shouldStamp.push(stampOnUpload && id !== '');
       }
     } else {
-      // Cover-ON (default): first entry is the title page (no stamp),
-      // remaining entries are upload pages (stamp each).
+      // Cover-ON (separate): first entry is the title page (no stamp,
+      // BrandBar already painted), remaining entries are upload pages
+      // (stamp each).
       sheetIdMap.push(att.sheetIdRange[0]);
       shouldStamp.push(false);
       for (let j = 1; j < att.sheetIdRange.length; j++) {

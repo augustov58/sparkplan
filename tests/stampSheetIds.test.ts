@@ -297,6 +297,99 @@ describe('buildStampMaps', () => {
     expect(maps.shouldStamp.slice(4)).toEqual([false, false, false, false]);
   });
 
+  // -------------------------------------------------------------------------
+  // Overlay mode (v4 commit 15) — hasCover=false + overlay=true. Composite
+  // pages get their assigned sheet IDs AND are stamped (unlike the
+  // cover-OFF / 'none' path where stamping is suppressed).
+  // -------------------------------------------------------------------------
+
+  it('overlay=true: composite upload pages get stamped', () => {
+    const maps = buildStampMaps({
+      sparkplanPageCount: 1,
+      attachments: [
+        // Overlay: 3 composite pages, each stamped.
+        {
+          sheetIdRange: ['A-100', 'A-101', 'A-102'],
+          hasCover: false,
+          overlay: true,
+        },
+      ],
+    });
+    expect(maps.sheetIdMap).toHaveLength(4); // 1 spark + 3 composite
+    expect(maps.shouldStamp[0]).toBe(false); // SparkPlan page
+    expect(maps.shouldStamp.slice(1)).toEqual([true, true, true]);
+    expect(maps.sheetIdMap.slice(1)).toEqual(['A-100', 'A-101', 'A-102']);
+  });
+
+  it('overlay mode + custom ID: first composite page uses the custom ID', () => {
+    const maps = buildStampMaps({
+      sparkplanPageCount: 0,
+      attachments: [
+        {
+          sheetIdRange: ['SP-1', 'C-201'],
+          hasCover: false,
+          overlay: true,
+        },
+      ],
+    });
+    expect(maps.sheetIdMap).toEqual(['SP-1', 'C-201']);
+    expect(maps.shouldStamp).toEqual([true, true]);
+  });
+
+  it('mixes separate + overlay + none attachments', () => {
+    const maps = buildStampMaps({
+      sparkplanPageCount: 1,
+      attachments: [
+        // separate: 1 title + 2 upload pages — uploads stamped.
+        { sheetIdRange: ['C-201', 'C-202', 'C-203'], hasCover: true },
+        // overlay: 2 composite pages — both stamped.
+        {
+          sheetIdRange: ['OVR-1', 'OVR-2'],
+          hasCover: false,
+          overlay: true,
+        },
+        // none: 2 upload pages — none stamped.
+        { sheetIdRange: ['', ''], hasCover: false },
+      ],
+    });
+    expect(maps.sheetIdMap).toEqual([
+      '',           // spark
+      'C-201',      // separate title (no stamp)
+      'C-202',      // separate upload (stamp)
+      'C-203',      // separate upload (stamp)
+      'OVR-1',      // overlay composite (stamp)
+      'OVR-2',      // overlay composite (stamp)
+      '',           // none upload (no stamp)
+      '',           // none upload (no stamp)
+    ]);
+    expect(maps.shouldStamp).toEqual([
+      false, // spark
+      false, // separate title
+      true,  // separate upload
+      true,  // separate upload
+      true,  // overlay composite
+      true,  // overlay composite
+      false, // none upload
+      false, // none upload
+    ]);
+  });
+
+  it('overlay-mode composite pages with empty ID skip stamping', () => {
+    // Belt-and-suspenders: even with overlay=true, empty IDs shouldn't
+    // be stamped (otherwise stampSheetIds would emit zero-width text).
+    const maps = buildStampMaps({
+      sparkplanPageCount: 0,
+      attachments: [
+        {
+          sheetIdRange: ['A-1', ''],
+          hasCover: false,
+          overlay: true,
+        },
+      ],
+    });
+    expect(maps.shouldStamp).toEqual([true, false]);
+  });
+
   it('end-to-end stamping respects cover-OFF: cover-OFF pages not stamped', async () => {
     // Build a 5-page merged document:
     //   page 0 = spark, page 1 = cover-ON upload, page 2 = cover-ON upload,

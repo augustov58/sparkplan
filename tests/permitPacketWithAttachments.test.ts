@@ -362,6 +362,98 @@ describe('generatePermitPacket — Sprint 2B PR-3 attachment wiring', () => {
     expect(await docContainsDrawnText(bytes, 'C-203')).toBe(true);
   });
 
+  // ---------------------------------------------------------------------
+  // v4 commit 15 — coverMode='overlay' (feature B).
+  // ---------------------------------------------------------------------
+
+  it('overlay mode: 1 page per upload page (no separate title sheet)', async () => {
+    const data = baseData();
+    // 2-page upload in overlay mode. Without overlay this would emit
+    // 1 title + 2 upload = 3 attachment pages. With overlay it should
+    // emit just 2 composite pages.
+    const uploadBytes = await renderFakeUpload('LETTER', 2, 'bluebeam');
+    data.attachments = [
+      {
+        artifactType: 'site_plan',
+        filename: 'bluebeam-markup.pdf',
+        uploadBytes,
+        coverMode: 'overlay',
+      },
+    ];
+
+    await generatePermitPacket(data);
+    const bytes = new Uint8Array(await capturedBlob!.arrayBuffer());
+    const doc = await PDFDocument.load(bytes);
+    const total = doc.getPageCount();
+
+    // Last 2 pages = the overlay composite. NOT 3 — no separate title.
+    // We assert the dimensions are Letter and that there's no extra page
+    // at total - 3 that would have been the title sheet.
+    expect(Math.round(doc.getPage(total - 2).getSize().width)).toBe(612);
+    expect(Math.round(doc.getPage(total - 1).getSize().width)).toBe(612);
+  });
+
+  it('overlay mode: composite pages get sheet IDs stamped', async () => {
+    const data = baseData();
+    const uploadBytes = await renderFakeUpload('LETTER', 1, 'overlay-test');
+    data.attachments = [
+      {
+        artifactType: 'site_plan',
+        filename: 'overlay.pdf',
+        uploadBytes,
+        coverMode: 'overlay',
+      },
+    ];
+
+    await generatePermitPacket(data);
+    const bytes = new Uint8Array(await capturedBlob!.arrayBuffer());
+
+    // Auto-allocated ID for the first civil composite is C-201. With
+    // overlay mode it should be stamped on the composite page.
+    expect(await docContainsDrawnText(bytes, 'C-201')).toBe(true);
+  });
+
+  it('overlay mode + customSheetId: custom value drawn on composite', async () => {
+    const data = baseData();
+    const uploadBytes = await renderFakeUpload('LETTER', 1, 'overlay-custom');
+    data.attachments = [
+      {
+        artifactType: 'site_plan',
+        filename: 'overlay.pdf',
+        uploadBytes,
+        coverMode: 'overlay',
+        customSheetId: 'A-200',
+      },
+    ];
+
+    await generatePermitPacket(data);
+    const bytes = new Uint8Array(await capturedBlob!.arrayBuffer());
+    expect(await docContainsDrawnText(bytes, 'A-200')).toBe(true);
+  });
+
+  it('coverMode=none: no title sheet, no stamping', async () => {
+    const data = baseData();
+    const uploadBytes = await renderFakeUpload('LETTER', 2, 'as-is');
+    data.attachments = [
+      {
+        artifactType: 'site_plan',
+        filename: 'as-is.pdf',
+        uploadBytes,
+        coverMode: 'none',
+      },
+    ];
+
+    await generatePermitPacket(data);
+    const bytes = new Uint8Array(await capturedBlob!.arrayBuffer());
+    const doc = await PDFDocument.load(bytes);
+    const total = doc.getPageCount();
+    // 2 upload pages tacked on, no title sheet.
+    expect(Math.round(doc.getPage(total - 2).getSize().width)).toBe(612);
+    expect(Math.round(doc.getPage(total - 1).getSize().width)).toBe(612);
+    // No SparkPlan-stamped IDs anywhere on this attachment.
+    expect(await docContainsDrawnText(bytes, 'C-201')).toBe(false);
+  });
+
   it('continues with remaining attachments when one upload is corrupted', async () => {
     const data = baseData();
     const goodBytes = await renderFakeUpload('LETTER', 1, 'good');

@@ -30,46 +30,76 @@ import {
   useProjectAttachments,
   validateAttachmentFile,
   type ArtifactType,
+  type CoverMode,
 } from '../hooks/useProjectAttachments';
 import { showToast, toastMessages } from '../lib/toast';
 
 /**
- * Per-row toggle: "Add SparkPlan cover". Default ON. Off for pre-bordered
- * uploads where the architect's title block is already on the drawing,
- * so SparkPlan should NOT inject its own title sheet or stamp sheet IDs.
+ * Per-row 3-state cover selector (v4 commit 15). Replaces the 2-state
+ * CoverToggle from commit 8.
  *
- * Visually a small Tailwind switch — yellow when on (matches brand
- * `electric-500` / `#FFCC00`), gray when off. Hover tooltip explains the
- * use case so the contractor doesn't have to guess.
+ *   separate  → SparkPlan title sheet as its own page preceding the
+ *               upload (current default — for legal docs, cut sheets,
+ *               NOC, HOA).
+ *   overlay   → SparkPlan title block composited ONTO the upload page
+ *               itself. For bare drawings (Bluebeam markups, Google
+ *               Earth printouts) without their own title block.
+ *   none      → upload appended as-is. For uploads that already carry
+ *               an architect title block (e.g., HOK A100).
+ *
+ * Visually a 3-segment radio strip — small enough to fit alongside the
+ * SheetIdEditor and the delete button in the row layout. Each segment
+ * carries a tooltip explaining when to pick that mode.
  */
-const CoverToggle: React.FC<{
-  value: boolean;
-  onChange: (next: boolean) => void;
+const COVER_MODE_LABELS: Record<CoverMode, string> = {
+  separate: 'Cover',
+  overlay: 'Overlay',
+  none: 'As-is',
+};
+
+const COVER_MODE_TOOLTIPS: Record<CoverMode, string> = {
+  separate:
+    'Separate cover sheet — SparkPlan title sheet as its own page preceding the upload. Default for legal docs, cut sheets, NOC, HOA.',
+  overlay:
+    'Overlay title block — SparkPlan title block composited onto the upload page. For bare drawings with no existing title block (Bluebeam markups, Google Earth printouts).',
+  none:
+    'Add as-is — upload appended as-is. For pre-bordered drawings with their own architect title block.',
+};
+
+const CoverModeSelector: React.FC<{
+  value: CoverMode;
+  onChange: (next: CoverMode) => void;
   disabled?: boolean;
 }> = ({ value, onChange, disabled = false }) => {
+  const modes: CoverMode[] = ['separate', 'overlay', 'none'];
   return (
-    <button
-      type="button"
-      role="switch"
-      aria-checked={value}
-      aria-label={value ? 'SparkPlan cover ON' : 'SparkPlan cover OFF'}
-      title={
-        value
-          ? 'SparkPlan cover ON — title sheet + sheet ID stamp will be added in front of and onto this upload.\n\nTurn OFF if the upload already has its own architect-style title block (e.g., HOK-prepared sheet).'
-          : 'SparkPlan cover OFF — upload appended as-is.\n\nTurn ON to have SparkPlan insert a title sheet + stamp sheet IDs (default behavior).'
-      }
-      onClick={() => !disabled && onChange(!value)}
-      disabled={disabled}
-      className={`relative inline-flex h-4 w-7 flex-shrink-0 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-electric-500 focus:ring-offset-1 ${
-        disabled ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'
-      } ${value ? 'bg-electric-500' : 'bg-gray-300'}`}
+    <div
+      role="radiogroup"
+      aria-label="SparkPlan cover mode"
+      className="inline-flex rounded border border-gray-300 overflow-hidden bg-white"
     >
-      <span
-        className={`inline-block h-3 w-3 transform rounded-full bg-white transition-transform ${
-          value ? 'translate-x-3.5' : 'translate-x-0.5'
-        }`}
-      />
-    </button>
+      {modes.map((m) => {
+        const active = value === m;
+        return (
+          <button
+            key={m}
+            type="button"
+            role="radio"
+            aria-checked={active}
+            disabled={disabled}
+            title={COVER_MODE_TOOLTIPS[m]}
+            onClick={() => !disabled && !active && onChange(m)}
+            className={`px-1.5 py-0.5 text-[10px] transition-colors border-r last:border-r-0 border-gray-300 focus:outline-none focus:ring-1 focus:ring-electric-500 ${
+              active
+                ? 'bg-electric-500 text-[#2d3b2d] font-medium'
+                : 'bg-white text-gray-600 hover:bg-gray-100'
+            } ${disabled ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'}`}
+          >
+            {COVER_MODE_LABELS[m]}
+          </button>
+        );
+      })}
+    </div>
   );
 };
 
@@ -406,10 +436,7 @@ export const AttachmentUploadCard: React.FC<AttachmentUploadCardProps> = ({
         <ul className="space-y-1.5">
           {ownAttachments.map((a) => {
             const isDeleting = deletingId === a.id;
-            // v4 commit 12: cover_mode replaces the boolean include_sparkplan_cover.
-            // For now this card still renders a 2-state toggle (separate vs none);
-            // commit 15 will introduce the 3-state UI exposing overlay too.
-            const coverOn = (a.cover_mode ?? 'separate') !== 'none';
+            const mode: CoverMode = a.cover_mode ?? 'separate';
             return (
               <li
                 key={a.id}
@@ -441,18 +468,11 @@ export const AttachmentUploadCard: React.FC<AttachmentUploadCardProps> = ({
                     onSave={(next) => updateCustomSheetId(a.id, next)}
                   />
                 </div>
-                <div className="flex items-center gap-1.5 flex-shrink-0">
-                  <span className="text-[10px] text-gray-500 select-none">
-                    Cover
-                  </span>
-                  <CoverToggle
-                    value={coverOn}
-                    disabled={isDeleting}
-                    onChange={(next) =>
-                      updateCoverMode(a.id, next ? 'separate' : 'none')
-                    }
-                  />
-                </div>
+                <CoverModeSelector
+                  value={mode}
+                  disabled={isDeleting}
+                  onChange={(next) => updateCoverMode(a.id, next)}
+                />
                 <button
                   type="button"
                   onClick={() => handleDelete(a.id, a.display_title)}

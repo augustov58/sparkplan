@@ -284,6 +284,36 @@ describe('mergePacket', () => {
     expect(result.mergedAttachmentCount).toBe(2);
   });
 
+  // -------------------------------------------------------------------------
+  // Overlay (v4 commit 15) — composite upload bytes (already title-block-
+  // composited) feed in as `uploadBytes` with no separate titleSheetBytes.
+  // mergePacket just appends them.
+  // -------------------------------------------------------------------------
+
+  it('overlay mode: appends composite pages with no separate title sheet', async () => {
+    // Simulate the orchestrator pre-compositing: the "uploadBytes" already
+    // contains the title block painted on each page. mergePacket only sees
+    // a bare upload to append.
+    const sp = await renderFakePdf('LETTER', 1, 'spark');
+    const compositeUpload = await renderFakePdf('LETTER', 3, 'composite');
+
+    const result = await mergePacket(sp, [
+      {
+        label: 'overlay-site.pdf',
+        titleSheetBytes: new Uint8Array(0), // overlay → no separate title
+        uploadBytes: compositeUpload,
+        sheetIdRange: ['A-100', 'A-101', 'A-102'],
+        hasCover: false, // signals no title-sheet insertion
+      },
+    ]);
+
+    // 1 spark + 3 composite = 4 (NOT 5 — no separate title sheet).
+    expect(result.pageCount).toBe(4);
+    expect(result.sparkplanPageCount).toBe(1);
+    expect(result.mergedAttachmentCount).toBe(1);
+    expect(result.warnings).toHaveLength(0);
+  });
+
   it('continues merging remaining attachments when one fails', async () => {
     const sp = await renderFakePdf('LETTER', 1, 'spark');
     const good = await renderFakePdf('LETTER', 2, 'good');

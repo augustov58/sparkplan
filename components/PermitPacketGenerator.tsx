@@ -564,19 +564,15 @@ export const PermitPacketGenerator: React.FC<PermitPacketGeneratorProps> = ({ pr
             console.warn('[permit-packet] could not download attachment', a.filename);
             continue;
           }
-          // v4 commit 12: cover_mode supersedes include_sparkplan_cover.
-          // For the transitional API we still pass the boolean
-          // includeSparkplanCover (true = separate, false = none); commit
-          // 15 replaces the bool with a tri-state coverMode field once
-          // the orchestrator + merge engine know how to overlay.
-          const mode = a.cover_mode ?? 'separate';
+          // v4 commit 15: pass the 3-state cover_mode through to the
+          // orchestrator. Maps directly to PermitPacketAttachment.coverMode.
           fetched.push({
             artifactType: a.artifact_type as ArtifactType,
             displayTitle: a.display_title ?? undefined,
             filename: a.filename,
             uploadedAt: a.uploaded_at,
             uploadBytes: bytes,
-            includeSparkplanCover: mode !== 'none',
+            coverMode: a.cover_mode ?? 'separate',
             customSheetId: a.custom_sheet_id ?? null,
           });
         }
