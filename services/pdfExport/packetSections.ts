@@ -110,18 +110,21 @@ export function newBandCounters(): BandCounters {
 }
 
 /**
- * Sheet ID discipline prefixes (Sprint 2B PR-1; widened in PR-3 v5).
+ * Sheet ID discipline prefixes (Sprint 2B PR-1; widened in PR-3 v5; widened
+ * again in Sprint 2C M1 for `EL` / `ES` multi-letter electrical disciplines).
  *
- * Sheet IDs carry a single-letter discipline prefix in addition to the band-
- * based numbering. Standard plan-set convention:
- *   E   electrical  — SparkPlan-generated sheets (default; existing Sprint 2A behavior)
- *   C   civil       — contractor-supplied site plans, surveys
- *   X   manufacturer — contractor-supplied cut sheets, fire stopping schedules,
- *                     manufacturer installation data
- *   A   architectural — contractor-supplied (v5, via discipline_override)
- *   S   structural    — contractor-supplied (v5)
- *   M   mechanical    — contractor-supplied (v5)
- *   P   plumbing      — contractor-supplied (v5)
+ * Sheet IDs carry a discipline prefix in addition to the band-based numbering.
+ * Standard plan-set convention:
+ *   E    electrical  — SparkPlan-generated sheets (default; existing Sprint 2A behavior)
+ *   EL   electrical-lighting — used by some AHJs (e.g., Miami-Dade per Sprint 2C H20)
+ *   ES   electrical-systems  — reserved for future AHJ requirements
+ *   C    civil       — contractor-supplied site plans, surveys
+ *   X    manufacturer — contractor-supplied cut sheets, fire stopping schedules,
+ *                      manufacturer installation data
+ *   A    architectural — contractor-supplied (v5, via discipline_override)
+ *   S    structural    — contractor-supplied (v5)
+ *   M    mechanical    — contractor-supplied (v5)
+ *   P    plumbing      — contractor-supplied (v5)
  *
  * The discipline prefix is orthogonal to the band — a civil site plan still
  * uses the appropriate numeric band; only the letter changes. The merge engine
@@ -130,8 +133,22 @@ export function newBandCounters(): BandCounters {
  * `discipline_override` per-upload column so contractors can flip the letter
  * (e.g., a Bluebeam markup landing in the architect's set wants `A-201`
  * rather than the default `C-201`).
+ *
+ * `EL` / `ES` are SparkPlan-generated-only — they're NOT in
+ * `DISCIPLINE_OVERRIDE_OPTIONS` because the contractor-upload path uses
+ * the single-letter discipline letters (C/X/A/S/M/P) and would collide
+ * with the electrical band counter otherwise.
  */
-export type SheetDiscipline = 'E' | 'C' | 'X' | 'A' | 'S' | 'M' | 'P';
+export type SheetDiscipline =
+  | 'E'
+  | 'EL'
+  | 'ES'
+  | 'C'
+  | 'X'
+  | 'A'
+  | 'S'
+  | 'M'
+  | 'P';
 
 export const SHEET_DISCIPLINE_ELECTRICAL: SheetDiscipline = 'E';
 export const SHEET_DISCIPLINE_CIVIL: SheetDiscipline = 'C';
@@ -199,4 +216,31 @@ export function formatSheetId(
   discipline: SheetDiscipline = SHEET_DISCIPLINE_ELECTRICAL,
 ): string {
   return `${formatDisciplinePrefix(discipline)}${String(band + slot).padStart(3, '0')}`;
+}
+
+/**
+ * Sprint 2C M1 — derive the SparkPlan-generated discipline letter from an
+ * `AHJManifest.sheetIdPrefix` value. The manifest declares a prefix like
+ * `'E-'`, `'EL-'`, or `'ES-'`; this strips the trailing `-` and returns
+ * the discipline letter ready to pass to `nextSheetId`. Unrecognized
+ * prefixes fall back to `'E'` (the Sprint 2A default) so a malformed
+ * manifest doesn't break electrical-sheet allocation.
+ *
+ * NOTE: only consumed by SparkPlan-generated electrical sheet allocation.
+ * User-uploaded attachment sheet IDs (C/X/A/S/M/P) are independent — they
+ * come from `disciplineOf(artifactType)` in the upload path, not from the
+ * manifest's prefix.
+ */
+export function disciplineFromSheetIdPrefix(
+  prefix: string | null | undefined,
+): SheetDiscipline {
+  if (typeof prefix !== 'string') return SHEET_DISCIPLINE_ELECTRICAL;
+  const trimmed = prefix.trim().toUpperCase();
+  // Strip the optional trailing dash (manifest declares 'E-' / 'EL-' / 'ES-').
+  const letter = trimmed.endsWith('-') ? trimmed.slice(0, -1) : trimmed;
+  if (letter === 'E' || letter === 'EL' || letter === 'ES') {
+    return letter;
+  }
+  // Unknown prefix → fall back to electrical default rather than break.
+  return SHEET_DISCIPLINE_ELECTRICAL;
 }
