@@ -42,6 +42,7 @@ import { usePanels } from './hooks/usePanels';
 import { useCircuits } from './hooks/useCircuits';
 import { useFeeders } from './hooks/useFeeders';
 import { useTransformers } from './hooks/useTransformers';
+import { useShortCircuitCalculations } from './hooks/useShortCircuitCalculations';
 import { Send, MessageSquare, Info, Copy, Check, User, Sparkles, Maximize2, Minimize2, Trash2, Square, RotateCw, Lock, ChevronDown, ChevronRight } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -369,6 +370,7 @@ const NecAssistant = () => {
     const { circuits } = useCircuits(projectId);
     const { feeders } = useFeeders(projectId);
     const { transformers } = useTransformers(projectId);
+    const { calculations: shortCircuitCalculations } = useShortCircuitCalculations(projectId);
 
     const { projects } = useProjects();
     const currentProject = projectId ? projects.find(p => p.id === projectId) : undefined;
@@ -385,7 +387,11 @@ const NecAssistant = () => {
             circuits,
             feeders,
             transformers,
-            currentProject.settings?.residential
+            currentProject.settings?.residential,
+            undefined, // estimates - not yet wired into Copilot
+            undefined, // permits
+            undefined, // inspections
+            shortCircuitCalculations
           )
         : null;
 

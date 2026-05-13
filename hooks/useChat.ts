@@ -16,6 +16,7 @@ import { usePanels } from './usePanels';
 import { useCircuits } from './useCircuits';
 import { useFeeders } from './useFeeders';
 import { useTransformers } from './useTransformers';
+import { useShortCircuitCalculations } from './useShortCircuitCalculations';
 
 export interface UseChatOptions {
   /** Maximum number of messages to keep in history */
@@ -95,6 +96,7 @@ export function useChat(
   const { circuits } = useCircuits(projectId);
   const { feeders } = useFeeders(projectId);
   const { transformers } = useTransformers(projectId);
+  const { calculations: shortCircuitCalculations } = useShortCircuitCalculations(projectId);
 
   /**
    * Generates a unique message ID
@@ -121,7 +123,12 @@ export function useChat(
         panels as any,
         circuits as any,
         feeders as any,
-        transformers as any
+        transformers as any,
+        undefined, // residentialSettings - not threaded into this hook yet
+        undefined, // estimates
+        undefined, // permits
+        undefined, // inspections
+        shortCircuitCalculations
       );
       return formatContextForAI(context);
     } catch (err) {
@@ -139,6 +146,7 @@ export function useChat(
     circuits,
     feeders,
     transformers,
+    shortCircuitCalculations,
   ]);
 
   /**
