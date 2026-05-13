@@ -1174,7 +1174,8 @@ export const FeederManager: React.FC<FeederManagerProps> = ({
                 className="w-full border-gray-200 rounded-md focus:border-[#2d3b2d] focus:ring-[#2d3b2d]/20 text-sm py-2"
               />
               <p className="text-xs text-gray-500 mt-1">
-                Parallel conductors per phase (NEC 310.10(G)). Required for services &gt; 545A Cu / 1Φ. Calc auto-bumps if needed.
+                Parallel conductors per phase (NEC 310.10(G)). Project policy caps single conductors at 500 kcmil
+                (≈ 380A Cu / 310A Al @ 75°C); calc auto-bumps for larger loads.
               </p>
             </div>
 

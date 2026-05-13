@@ -106,10 +106,19 @@ export function calculateFeederSizing(
 
   // STEP 3: Size phase conductors using conductor sizing service
   // Note: We pass isContinuous=false because we already factored in 125% in design_load_va
-  // NEC 310.10(G) - parallel conductors per phase. Start from user-specified count (≥1)
-  // and auto-bump if a single set cannot carry the per-conductor load (e.g. >545A on Cu@75°C).
-  // We never return the N/A sentinel for "load too large" — instead we surface a sized
-  // result with parallel sets, plus a CRITICAL warning the contractor can review.
+  //
+  // NEC 310.10(G) + project policy:
+  //   (a) Never return the 'N/A' sentinel for "load too large" — bump parallel sets instead.
+  //   (b) Hard cap individual conductor at 500 kcmil. Anything that would otherwise pick
+  //       600/750/1000 kcmil triggers another parallel-set bump. Rationale: above 500 kcmil
+  //       cables become impractical to handle, skin effect reduces ampacity-per-kcmil, and
+  //       contractors prefer parallel sets in separate raceways for cable management,
+  //       per-set VD monitoring, and easier troubleshooting.
+  //
+  // Bundling assumption: num_current_carrying is per-raceway. Parallel sets are presumed
+  // to run in separate raceways (typical practice), so we do NOT multiply by parallelSets.
+  // If a contractor stuffs all parallel sets into one raceway, they must manually set
+  // num_current_carrying to the total (e.g. parallelSets × CCCs-per-set).
   const settingsForSizing = {
     serviceVoltage: input.source_voltage,
     servicePhase: input.source_phase,
@@ -118,42 +127,56 @@ export function calculateFeederSizing(
     temperatureRating: (input.temperature_rating || 75) as 60 | 75 | 90,
   };
 
-  const MAX_PARALLEL_SETS = 10;
-  let parallelSets = Math.max(1, Math.floor(input.sets_in_parallel ?? 1));
+  const MAX_PARALLEL_SETS = 12;
+  const SIZES_EXCEEDING_500_KCMIL = new Set(['600 kcmil', '750 kcmil', '1000 kcmil']);
+  const exceedsCap = (size: string) => SIZES_EXCEEDING_500_KCMIL.has(size);
+  const sizingFailed = (size: string) => size === 'N/A';
+  const needsBump = (size: string) => sizingFailed(size) || exceedsCap(size);
+
+  const userRequestedSets = Math.max(1, Math.floor(input.sets_in_parallel ?? 1));
+  let parallelSets = userRequestedSets;
   let perConductorAmps = design_current_amps / parallelSets;
 
   let phaseConductor = sizeConductor(
     perConductorAmps,
     settingsForSizing,
     input.ambient_temperature_c,
-    input.num_current_carrying * parallelSets, // bundle penalty applies to total CCCs
+    input.num_current_carrying, // per-raceway, not multiplied by parallelSets
     false, // Continuous factor already applied in design_load_va
     undefined // Let conductor sizing calculate appropriate OCPD
   );
 
-  if (phaseConductor.conductorSize === 'N/A' && parallelSets === 1) {
-    // Single conductor can't carry this load. Auto-bump parallel count until it fits.
-    while (phaseConductor.conductorSize === 'N/A' && parallelSets < MAX_PARALLEL_SETS) {
-      parallelSets += 1;
-      perConductorAmps = design_current_amps / parallelSets;
-      phaseConductor = sizeConductor(
-        perConductorAmps,
-        settingsForSizing,
-        input.ambient_temperature_c,
-        input.num_current_carrying * parallelSets,
-        false,
-        undefined
-      );
-    }
-    if (phaseConductor.conductorSize !== 'N/A') {
+  // Auto-bump until (a) the per-conductor load fits a table entry AND (b) that entry is ≤ 500 kcmil.
+  while (needsBump(phaseConductor.conductorSize) && parallelSets < MAX_PARALLEL_SETS) {
+    parallelSets += 1;
+    perConductorAmps = design_current_amps / parallelSets;
+    phaseConductor = sizeConductor(
+      perConductorAmps,
+      settingsForSizing,
+      input.ambient_temperature_c,
+      input.num_current_carrying,
+      false,
+      undefined
+    );
+  }
+
+  if (parallelSets > userRequestedSets) {
+    // We bumped past the caller's request. Distinguish "load too large for ANY single
+    // conductor" (overload) from "would have picked >500 kcmil" (policy cap).
+    if (sizingFailed(phaseConductor.conductorSize)) {
       warnings.push(
-        `⚠️ CRITICAL: ${design_current_amps.toFixed(0)}A exceeds single-conductor capacity. ` +
-        `Auto-sized to ${parallelSets} sets in parallel (per-conductor ${perConductorAmps.toFixed(0)}A). ` +
-        `NEC 310.10(G) — parallel conductors must be same length, material, size, and insulation. ` +
-        `Review the design with the EOR before issuing for construction.`
+        `⚠️ CRITICAL: ${design_current_amps.toFixed(0)}A exceeds capacity even at ${MAX_PARALLEL_SETS} parallel sets. ` +
+        `Manual sizing required — consider larger service equipment or busway.`
       );
-      necReferences.push('NEC 310.10(G) - Conductors in Parallel');
+    } else {
+      warnings.push(
+        `ℹ️ Auto-sized to ${parallelSets} sets in parallel ` +
+        `(per-conductor ${perConductorAmps.toFixed(0)}A → ${phaseConductor.conductorSize}). ` +
+        `Project policy caps single conductors at 500 kcmil; loads requiring more capacity use ` +
+        `additional parallel sets per NEC 310.10(G).`
+      );
     }
+    necReferences.push('NEC 310.10(G) - Conductors in Parallel');
   } else if (parallelSets > 1) {
     warnings.push(
       `ℹ️ Using ${parallelSets} sets in parallel (per-conductor ${perConductorAmps.toFixed(0)}A). ` +
