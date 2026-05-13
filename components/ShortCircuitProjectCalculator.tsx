@@ -21,14 +21,17 @@ import {
   calculateDownstreamFaultCurrent,
   estimateUtilityTransformer,
 } from '../services/calculations/shortCircuit';
-import { useShortCircuitCalculations } from '../hooks/useShortCircuitCalculations';
 import { useFeeders } from '../hooks/useFeeders';
-import type { Database } from '../lib/database.types';
+import type { Database, ShortCircuitCalculationInsert } from '../lib/database.types';
 
 type Project = Database['public']['Tables']['projects']['Row'];
 type Panel = Database['public']['Tables']['panels']['Row'];
 type Feeder = Database['public']['Tables']['feeders']['Row'];
 type ShortCircuitCalculation = Database['public']['Tables']['short_circuit_calculations']['Row'];
+
+export type CreateCalculationFn = (
+  calc: Omit<ShortCircuitCalculationInsert, 'id' | 'user_id'>,
+) => Promise<ShortCircuitCalculation | null>;
 
 export interface PanelFormState {
   feederLength: number;
@@ -77,6 +80,10 @@ interface Props {
   project: Project;
   panels: Panel[];
   existingCalculations: ShortCircuitCalculation[];
+  // Hoisted from the parent's useShortCircuitCalculations instance so saves
+  // update the parent's calc list immediately (single source of truth) instead
+  // of relying on the realtime channel to round-trip.
+  createCalculation: CreateCalculationFn;
 }
 
 const CONDUCTOR_SIZES = [
@@ -103,8 +110,8 @@ export const ShortCircuitProjectCalculator: React.FC<Props> = ({
   project,
   panels,
   existingCalculations,
+  createCalculation,
 }) => {
-  const { createCalculation } = useShortCircuitCalculations(project.id);
   const { getSupplyingFeeder } = useFeeders(project.id);
 
   const [open, setOpen] = useState(false);
@@ -119,8 +126,13 @@ export const ShortCircuitProjectCalculator: React.FC<Props> = ({
     () => new Set(existingCalculations.map((c) => c.panel_id).filter((id): id is string => !!id)),
     [existingCalculations],
   );
+  // Exclude (a) panels already calculated, and (b) the MDP — the MDP is
+  // covered by the service-entrance calc (calc_type='service', panel_id=null),
+  // not by a panel-level row, so it would never appear in calculatedPanelIds.
+  // Filtering by is_main prevents the user from accidentally double-calculating
+  // it as a downstream panel.
   const availablePanels = useMemo(
-    () => panels.filter((p) => !calculatedPanelIds.has(p.id)),
+    () => panels.filter((p) => !calculatedPanelIds.has(p.id) && !p.is_main),
     [panels, calculatedPanelIds],
   );
 

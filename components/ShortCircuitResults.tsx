@@ -28,7 +28,7 @@ export const ShortCircuitResults: React.FC = () => {
   const { id: projectId } = useParams<{ id: string }>();
   const { projects } = useProjects();
   const project = projects.find(p => p.id === projectId);
-  const { calculations, loading, deleteCalculation } = useShortCircuitCalculations(projectId);
+  const { calculations, loading, deleteCalculation, createCalculation } = useShortCircuitCalculations(projectId);
   const { panels } = usePanels(projectId);
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
 
@@ -59,7 +59,7 @@ export const ShortCircuitResults: React.FC = () => {
 
   if (loading) {
     return (
-      <div className="animate-in fade-in duration-500 max-w-6xl">
+      <div className="animate-in fade-in duration-500 max-w-7xl">
         <div className="flex items-center justify-center py-12">
           <div className="text-gray-400">Loading calculations...</div>
         </div>
@@ -68,7 +68,7 @@ export const ShortCircuitResults: React.FC = () => {
   }
 
   return (
-    <div className="animate-in fade-in duration-500 max-w-6xl space-y-6">
+    <div className="animate-in fade-in duration-500 max-w-7xl space-y-6">
       {/* Header */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
         <div>
@@ -104,6 +104,7 @@ export const ShortCircuitResults: React.FC = () => {
           project={project}
           panels={panels}
           existingCalculations={calculations}
+          createCalculation={createCalculation}
         />
       )}
 
