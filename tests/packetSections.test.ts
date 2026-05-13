@@ -12,6 +12,7 @@ import {
   nextSheetId,
   formatSheetId,
   formatDisciplinePrefix,
+  disciplineFromSheetIdPrefix,
   DEFAULT_SECTIONS,
   BAND_FRONT_MATTER,
   BAND_CALCULATIONS,
@@ -157,5 +158,78 @@ describe('sheet ID discipline prefixes (Sprint 2B)', () => {
     expect(nextSheetId(counters, BAND_DIAGRAMS, SHEET_DISCIPLINE_CIVIL)).toBe('C-202');
     expect(nextSheetId(counters, BAND_DIAGRAMS, SHEET_DISCIPLINE_MANUFACTURER)).toBe('X-203');
     expect(nextSheetId(counters, BAND_DIAGRAMS, SHEET_DISCIPLINE_ELECTRICAL)).toBe('E-204');
+  });
+});
+
+// Sprint 2C M1 — manifest.sheetIdPrefix → SheetDiscipline plumbing
+// (follow-up #8 from PR #51). The orchestrator picks the SparkPlan-generated
+// discipline letter off the active AHJManifest's `sheetIdPrefix` field;
+// this lets Miami-Dade (H20 — `'EL-'`) emit `EL-001 / EL-101 / ...` while
+// Orlando stays on the Sprint 2A `'E-'` default.
+describe('disciplineFromSheetIdPrefix (Sprint 2C M1)', () => {
+  it("defaults to 'E' when prefix is undefined (Sprint 2A compat)", () => {
+    expect(disciplineFromSheetIdPrefix(undefined)).toBe('E');
+    expect(disciplineFromSheetIdPrefix(null)).toBe('E');
+  });
+
+  it("returns 'E' for the Orlando default prefix 'E-'", () => {
+    expect(disciplineFromSheetIdPrefix('E-')).toBe('E');
+  });
+
+  it("returns 'EL' for the Miami-Dade prefix 'EL-' (H20)", () => {
+    expect(disciplineFromSheetIdPrefix('EL-')).toBe('EL');
+  });
+
+  it("returns 'ES' for the reserved 'ES-' prefix", () => {
+    expect(disciplineFromSheetIdPrefix('ES-')).toBe('ES');
+  });
+
+  it('tolerates dash-less + mixed-case prefix forms', () => {
+    expect(disciplineFromSheetIdPrefix('e-')).toBe('E');
+    expect(disciplineFromSheetIdPrefix('el-')).toBe('EL');
+    expect(disciplineFromSheetIdPrefix('E')).toBe('E');
+    expect(disciplineFromSheetIdPrefix('EL')).toBe('EL');
+  });
+
+  it("falls back to 'E' on unknown prefixes (defensive)", () => {
+    // Sanity: we don't want a malformed manifest to break sheet allocation.
+    expect(disciplineFromSheetIdPrefix('Z-')).toBe('E');
+    expect(disciplineFromSheetIdPrefix('XYZ-')).toBe('E');
+    expect(disciplineFromSheetIdPrefix('')).toBe('E');
+  });
+
+  it("nextSheetId emits 'EL-NNN' when called with the EL discipline", () => {
+    // End-to-end: feed the derived discipline back into nextSheetId to
+    // confirm the Miami-Dade lane produces 'EL-101 / EL-102 / ...' as
+    // declared in the manifest contract.
+    const discipline = disciplineFromSheetIdPrefix('EL-');
+    const counters = newBandCounters();
+    expect(nextSheetId(counters, BAND_FRONT_MATTER, discipline)).toBe('EL-001');
+    expect(nextSheetId(counters, BAND_CALCULATIONS, discipline)).toBe('EL-101');
+    expect(nextSheetId(counters, BAND_DIAGRAMS, discipline)).toBe('EL-201');
+  });
+
+  it("preserves 'E-' default when the manifest doesn't override the prefix", () => {
+    // Regression: the Orlando manifest declares 'E-' (Sprint 2A default).
+    // The full allocation walk MUST still emit 'E-001 / E-101 / ...' so
+    // existing Orlando fixtures + audit packets keep their sheet IDs.
+    const discipline = disciplineFromSheetIdPrefix('E-');
+    const counters = newBandCounters();
+    expect(nextSheetId(counters, BAND_FRONT_MATTER, discipline)).toBe('E-001');
+    expect(nextSheetId(counters, BAND_CALCULATIONS, discipline)).toBe('E-101');
+    expect(nextSheetId(counters, BAND_DIAGRAMS, discipline)).toBe('E-201');
+  });
+
+  it('does not affect contractor-upload C-/X- allocation (independent path)', () => {
+    // The upload-merge code in permitPacketGenerator uses its own
+    // `disciplineOf(artifactType)` for C-/X- IDs; the manifest's sheetIdPrefix
+    // is for SparkPlan-GENERATED sheets only. This test asserts the two
+    // paths share the band counter only via the explicit `discipline`
+    // argument — there's no global mutation.
+    const counters = newBandCounters();
+    expect(nextSheetId(counters, BAND_DIAGRAMS, 'EL')).toBe('EL-201');
+    // Contractor upload (civil) — still 'C-' regardless of the AHJ's
+    // electrical prefix.
+    expect(nextSheetId(counters, BAND_DIAGRAMS, SHEET_DISCIPLINE_CIVIL)).toBe('C-202');
   });
 });

@@ -65,6 +65,8 @@ import {
   BAND_SPECIALTY,
   SHEET_DISCIPLINE_CIVIL,
   SHEET_DISCIPLINE_MANUFACTURER,
+  SHEET_DISCIPLINE_ELECTRICAL,
+  disciplineFromSheetIdPrefix,
 } from './packetSections';
 import { AttachmentTitleSheet } from './AttachmentTitleSheet';
 import { AttachmentTitleBlock } from './AttachmentTitleBlock';
@@ -72,7 +74,14 @@ import { compositeTitleBlock } from './compositeTitleBlock';
 import { mergePacket } from './mergePacket';
 import { stampSheetIds, buildStampMaps } from './stampSheetIds';
 import type { ArtifactType, CoverMode } from '../../hooks/useProjectAttachments';
-import type { AHJManifest, BuildingType } from '../../data/ahj/types';
+import type {
+  AHJContext,
+  AHJManifest,
+  AttachmentSummary,
+  BuildingType,
+  PacketAST,
+  SectionKey,
+} from '../../data/ahj/types';
 
 export interface PermitPacketData {
   projectId: string;
@@ -401,6 +410,42 @@ export const generatePermitPacket = async (data: PermitPacketData): Promise<void
   // Sprint 2A H1+H2+H3: resolve section toggles. Cover is always-on (not in
   // the config). Default is all-on.
   const sections = resolveSections(data.sections);
+
+  // Sprint 2C M1: assemble the AHJContext the checklist engine consumes
+  // (`required(ctx)` forks on these axes). We derive scope from
+  // `data.nec22087Narrative` presence (the existing-service narrative is
+  // opt-in and gates the existing-service path) and lane from
+  // `data.permitMode` (Sprint 2A H17 contractor-exemption screening). When
+  // either upstream field is absent, conservative defaults keep the engine
+  // running — predicates can detect via ctx.buildingType regardless.
+  const ahjCtx: AHJContext = {
+    scope: data.nec22087Narrative ? 'existing-service' : 'new-service',
+    lane:
+      data.permitMode?.lane === 'pe-required'
+        ? 'pe_required'
+        : 'contractor_exemption',
+    buildingType: manifestBuildingType,
+    subjurisdiction: data.manifest?.subjurisdiction,
+  };
+
+  // Sprint 2C M1: project attachments → AttachmentSummary[] for the engine.
+  // The engine doesn't need the bytes; it only inspects artifactType (for
+  // detect predicates) + displayTitle + sheetId. Sheet IDs aren't allocated
+  // for uploads yet at this phase — the engine tolerates `sheetId: null`,
+  // and the locator path uses packet.sheetIds to find sheets instead.
+  const attachmentSummaries: AttachmentSummary[] = (data.attachments ?? []).map(
+    (a) => ({
+      artifactType: a.artifactType,
+      displayTitle: a.displayTitle ?? null,
+      sheetId: a.customSheetId ?? null,
+    }),
+  );
+
+  // The jurisdiction builder's render lambda needs the packet AST, which
+  // can only be assembled AFTER sheet-ID allocation walks every builder
+  // once. Capture a mutable ref here; populate it post-allocation, then
+  // the render lambda reads the populated value via closure.
+  const packetAstRef: { current: PacketAST } = { current: {} };
 
   // ============================================================================
   // PAGE BUILDERS — declarative description of every page that COULD render.
@@ -869,6 +914,15 @@ export const generatePermitPacket = async (data: PermitPacketData): Promise<void
           projectName={data.projectName}
           {...contractor}
           sheetId={sheetIds[0]}
+          // Sprint 2C M1: engine-driven checklist. When `manifest` is
+          // supplied, the renderer calls evaluatePacket() and groups the
+          // result by category. When absent (legacy callers), falls back
+          // to the pre-M1 decorative jurisdiction.required_documents
+          // listing — see JurisdictionDocuments.tsx for the branch.
+          manifest={data.manifest}
+          ahjContext={ahjCtx}
+          packet={packetAstRef.current}
+          attachments={attachmentSummaries}
         />
       ),
     });
@@ -1096,12 +1150,21 @@ export const generatePermitPacket = async (data: PermitPacketData): Promise<void
   // implicit. Finally, render each builder into its React element with the
   // allocated sheet IDs and the populated TOC entries injected.
 
+  // Sprint 2C M1: SparkPlan-generated electrical sheets use the manifest's
+  // sheetIdPrefix when supplied (Miami-Dade declares 'EL-' per H20; Orlando
+  // sticks with 'E-'). Backward compat: when no manifest, falls back to 'E'
+  // (Sprint 2A default). User-uploaded attachment discipline letters
+  // (C/X/A/S/M/P) are handled separately downstream and are NOT affected.
+  const generatedDiscipline = data.manifest?.sheetIdPrefix
+    ? disciplineFromSheetIdPrefix(data.manifest.sheetIdPrefix)
+    : SHEET_DISCIPLINE_ELECTRICAL;
+
   const counters = newBandCounters();
   const allocatedIds: string[][] = builders.map((b) => {
     if (b.band === undefined) return [];
     const ids: string[] = [];
     for (let i = 0; i < b.pageCount; i++) {
-      ids.push(nextSheetId(counters, b.band));
+      ids.push(nextSheetId(counters, b.band, generatedDiscipline));
     }
     return ids;
   });
@@ -1116,6 +1179,26 @@ export const generatePermitPacket = async (data: PermitPacketData): Promise<void
       });
     });
   });
+
+  // Sprint 2C M1: assemble the read-only PacketAST the checklist engine
+  // consumes. `sheetIds` is the flattened list of every allocated ID in
+  // render order (engine locators walk this to find specific sheets);
+  // `sectionKeys` is the list of section toggles currently ON (engine
+  // detect predicates use this to check "is the load-calc section in the
+  // packet?"). We compute this AFTER allocation so it's authoritative,
+  // then mutate `packetAstRef.current` so the jurisdiction builder's
+  // render lambda (which closed over the ref above) sees the populated
+  // value when invoked below.
+  const allSheetIds: string[] = allocatedIds.flat();
+  const enabledSectionKeys: SectionKey[] = (
+    Object.entries(sections) as Array<[SectionKey, boolean]>
+  )
+    .filter(([, on]) => on === true)
+    .map(([key]) => key);
+  packetAstRef.current = {
+    sheetIds: allSheetIds,
+    sectionKeys: enabledSectionKeys,
+  };
 
   const pages: Array<{ name: string; element: React.ReactElement }> = builders.map((b, i) => ({
     name: b.name,
