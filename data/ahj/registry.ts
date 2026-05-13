@@ -1,13 +1,13 @@
 /**
- * Sprint 2B PR-4 — AHJ manifest registry.
+ * Sprint 2B PR-4 + Sprint 2C M1 — AHJ manifest registry.
  *
  * Lookup table mapping jurisdiction identifiers/names to their canonical
  * `AHJManifest`. The registry exists so the UI layer (and Sprint 2C M1's
  * checklist engine) can look up an active manifest without hard-coding
  * imports across multiple call sites.
  *
- * PR-4 ships only the Orlando manifest. Sprint 2C M1 adds 4 more:
- * Pompano → Miami-Dade → Davie → Hillsborough/Tampa.
+ * Sprint 2C M1 adds Pompano, Miami-Dade, Davie, Hillsborough/Tampa
+ * (PR-4 shipped Orlando alone).
  *
  * Lookup strategy:
  *   1. `getManifestById('orlando')` — direct ID lookup (canonical).
@@ -21,18 +21,25 @@
 
 import type { AHJManifest } from './types';
 import { orlandoManifest } from './orlando';
+import { pompanoManifest } from './pompano';
+import { miamiDadeManifest } from './miami-dade';
+import { davieManifest } from './davie';
+import { hillsboroughTampaManifest } from './hillsborough-tampa';
 
 // ============================================================================
 // REGISTRY
 // ============================================================================
 
 /**
- * Canonical manifests keyed by `AHJManifest.id`. Order doesn't matter for
- * lookup, but visually mirrors the Sprint 2C M1 build order:
- *   Pompano → Miami-Dade → Davie → Hillsborough/Tampa.
+ * Canonical manifests keyed by `AHJManifest.id`. Order mirrors Sprint 2C M1
+ * build order: Pompano → Miami-Dade → Davie → Hillsborough/Tampa.
  */
 const MANIFEST_REGISTRY: Readonly<Record<string, AHJManifest>> = {
   orlando: orlandoManifest,
+  pompano: pompanoManifest,
+  'miami-dade': miamiDadeManifest,
+  davie: davieManifest,
+  'hillsborough-tampa': hillsboroughTampaManifest,
 };
 
 // ============================================================================
