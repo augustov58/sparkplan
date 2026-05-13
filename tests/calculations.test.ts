@@ -900,6 +900,86 @@ describe('Feeder Sizing (NEC Article 215)', () => {
       // Aluminum conductors are typically larger for same ampacity
     });
   });
+
+  describe('Parallel Sets (NEC 310.10(G))', () => {
+    // Regression: 240 kVA at 120/240V 1Φ = 1000A design current. Largest single
+    // Cu @ 75°C is 1000 kcmil = 545A — a single conductor cannot carry it. The
+    // calc must auto-bump sets_in_parallel and produce a valid sized result
+    // instead of silently returning the 'N/A' sentinel.
+    it('auto-bumps parallel count when single conductor cannot carry the load (240 kVA / 240V 1Φ service)', () => {
+      const input: FeederCalculationInput = {
+        source_voltage: 240,
+        source_phase: 1,
+        destination_voltage: 240,
+        destination_phase: 1,
+        total_load_va: 240_000,
+        continuous_load_va: 0,
+        noncontinuous_load_va: 240_000, // matches service-entrance branch (capacity sizing)
+        distance_ft: 100,
+        conductor_material: 'Cu',
+        ambient_temperature_c: 30,
+        num_current_carrying: 3,
+        max_voltage_drop_percent: 3,
+        sets_in_parallel: 1,
+      };
+
+      const result = calculateFeederSizing(input);
+
+      expect(result.phase_conductor_size).not.toBe('N/A');
+      expect(result.neutral_conductor_size).not.toBe('N/A');
+      expect(result.egc_size).not.toBe('N/A');
+      expect(result.sets_in_parallel).toBeGreaterThanOrEqual(2);
+      expect(result.necReferences).toContain('NEC 310.10(G) - Conductors in Parallel');
+      expect(result.warnings.some((w) => w.includes('exceeds single-conductor capacity'))).toBe(true);
+    });
+
+    it('honors user-specified sets_in_parallel and sizes per-conductor current', () => {
+      const input: FeederCalculationInput = {
+        source_voltage: 208,
+        source_phase: 3,
+        destination_voltage: 208,
+        destination_phase: 3,
+        total_load_va: 200_000,
+        continuous_load_va: 0,
+        noncontinuous_load_va: 200_000,
+        distance_ft: 100,
+        conductor_material: 'Cu',
+        ambient_temperature_c: 30,
+        num_current_carrying: 4,
+        sets_in_parallel: 2,
+      };
+
+      const result = calculateFeederSizing(input);
+
+      // 200 kVA / (208 × √3) ≈ 555A total → 278A per conductor with 2 sets
+      expect(result.design_current_amps).toBeCloseTo(555, 0);
+      expect(result.sets_in_parallel).toBe(2);
+      expect(result.phase_conductor_size).not.toBe('N/A');
+      expect(result.necReferences).toContain('NEC 310.10(G) - Conductors in Parallel');
+      expect(result.warnings.some((w) => w.includes('2 sets in parallel'))).toBe(true);
+    });
+
+    it('returns sets_in_parallel = 1 for normal loads that fit a single conductor', () => {
+      const input: FeederCalculationInput = {
+        source_voltage: 208,
+        source_phase: 3,
+        destination_voltage: 208,
+        destination_phase: 3,
+        total_load_va: 50_000,
+        continuous_load_va: 30_000,
+        noncontinuous_load_va: 20_000,
+        distance_ft: 100,
+        conductor_material: 'Cu',
+        ambient_temperature_c: 30,
+        num_current_carrying: 4,
+      };
+
+      const result = calculateFeederSizing(input);
+
+      expect(result.sets_in_parallel).toBe(1);
+      expect(result.phase_conductor_size).not.toBe('N/A');
+    });
+  });
 });
 
 // ============================================================================

@@ -353,6 +353,7 @@ export interface FeederCalculationInput {
   num_current_carrying: number;
   max_voltage_drop_percent?: number;
   temperature_rating?: 60 | 75 | 90; // Conductor insulation temperature rating
+  sets_in_parallel?: number; // NEC 310.10(G) - parallel conductors per phase (default 1)
   // Transformer-specific parameters (for feeders feeding transformers)
   transformer_kva?: number; // If feeding a transformer, use this for sizing per NEC 450.3(B)
   transformer_primary_voltage?: number;
@@ -370,6 +371,7 @@ export interface FeederCalculationResult {
   voltage_drop_percent: number;
   voltage_drop_volts: number;
   meets_voltage_drop: boolean;
+  sets_in_parallel: number; // Effective parallel count used (>=1). May exceed input when auto-bumped.
   warnings: string[];
   necReferences: string[];
 }

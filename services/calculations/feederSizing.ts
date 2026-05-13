@@ -106,31 +106,75 @@ export function calculateFeederSizing(
 
   // STEP 3: Size phase conductors using conductor sizing service
   // Note: We pass isContinuous=false because we already factored in 125% in design_load_va
-  const phaseConductor = sizeConductor(
-    design_current_amps,
-    {
-      serviceVoltage: input.source_voltage,
-      servicePhase: input.source_phase,
-      occupancyType: 'commercial', // Feeders typically use commercial/industrial ratings
-      conductorMaterial: input.conductor_material,
-      temperatureRating: input.temperature_rating || 75 // Use specified temp rating or default to 75°C
-    },
+  // NEC 310.10(G) - parallel conductors per phase. Start from user-specified count (≥1)
+  // and auto-bump if a single set cannot carry the per-conductor load (e.g. >545A on Cu@75°C).
+  // We never return the N/A sentinel for "load too large" — instead we surface a sized
+  // result with parallel sets, plus a CRITICAL warning the contractor can review.
+  const settingsForSizing = {
+    serviceVoltage: input.source_voltage,
+    servicePhase: input.source_phase,
+    occupancyType: 'commercial' as const,
+    conductorMaterial: input.conductor_material,
+    temperatureRating: (input.temperature_rating || 75) as 60 | 75 | 90,
+  };
+
+  const MAX_PARALLEL_SETS = 10;
+  let parallelSets = Math.max(1, Math.floor(input.sets_in_parallel ?? 1));
+  let perConductorAmps = design_current_amps / parallelSets;
+
+  let phaseConductor = sizeConductor(
+    perConductorAmps,
+    settingsForSizing,
     input.ambient_temperature_c,
-    input.num_current_carrying,
+    input.num_current_carrying * parallelSets, // bundle penalty applies to total CCCs
     false, // Continuous factor already applied in design_load_va
     undefined // Let conductor sizing calculate appropriate OCPD
   );
+
+  if (phaseConductor.conductorSize === 'N/A' && parallelSets === 1) {
+    // Single conductor can't carry this load. Auto-bump parallel count until it fits.
+    while (phaseConductor.conductorSize === 'N/A' && parallelSets < MAX_PARALLEL_SETS) {
+      parallelSets += 1;
+      perConductorAmps = design_current_amps / parallelSets;
+      phaseConductor = sizeConductor(
+        perConductorAmps,
+        settingsForSizing,
+        input.ambient_temperature_c,
+        input.num_current_carrying * parallelSets,
+        false,
+        undefined
+      );
+    }
+    if (phaseConductor.conductorSize !== 'N/A') {
+      warnings.push(
+        `⚠️ CRITICAL: ${design_current_amps.toFixed(0)}A exceeds single-conductor capacity. ` +
+        `Auto-sized to ${parallelSets} sets in parallel (per-conductor ${perConductorAmps.toFixed(0)}A). ` +
+        `NEC 310.10(G) — parallel conductors must be same length, material, size, and insulation. ` +
+        `Review the design with the EOR before issuing for construction.`
+      );
+      necReferences.push('NEC 310.10(G) - Conductors in Parallel');
+    }
+  } else if (parallelSets > 1) {
+    warnings.push(
+      `ℹ️ Using ${parallelSets} sets in parallel (per-conductor ${perConductorAmps.toFixed(0)}A). ` +
+      `NEC 310.10(G) — parallel conductors must be same length, material, size, and insulation.`
+    );
+    necReferences.push('NEC 310.10(G) - Conductors in Parallel');
+  }
 
   necReferences.push(...phaseConductor.necReferences);
   warnings.push(...phaseConductor.warnings);
 
   // STEP 4: Calculate voltage drop using AC impedance method
+  // For N parallel conductors, per-conductor current is I_total/N. Voltage across each
+  // parallel path is identical, so VD computed with per-conductor current and per-conductor
+  // impedance is the correct system VD.
   const vdResult = calculateVoltageDropAC(
     phaseConductor.conductorSize,
     input.conductor_material,
     'PVC', // Default to PVC conduit
     input.distance_ft,
-    design_current_amps,
+    perConductorAmps,
     input.source_voltage,
     input.source_phase
   );
@@ -194,6 +238,7 @@ export function calculateFeederSizing(
     voltage_drop_percent: vdResult.voltageDropPercent,
     voltage_drop_volts: vdResult.voltageDropVolts,
     meets_voltage_drop: meets_vd,
+    sets_in_parallel: parallelSets,
     warnings,
     necReferences
   };
