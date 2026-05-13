@@ -129,6 +129,14 @@ const SidebarItem: React.FC<SidebarItemProps> = ({
   );
 };
 
+// Routes that prefer a narrower content area — keeps the white background
+// card from extending past the visible content. Add a pathname suffix here
+// to opt a route into compact layout.
+const COMPACT_ROUTE_SUFFIXES = ['/short-circuit'];
+function isCompactRoute(pathname: string): boolean {
+  return COMPACT_ROUTE_SUFFIXES.some((suffix) => pathname.endsWith(suffix));
+}
+
 export const Layout: React.FC<LayoutProps> = ({ children, title, showBack, onSignOut, projectType }) => {
   const navigate = useNavigate();
   const location = useLocation();
@@ -379,8 +387,11 @@ export const Layout: React.FC<LayoutProps> = ({ children, title, showBack, onSig
              {/* Header Actions Could Go Here */}
           </div>
         </header>
-        <div className="p-4 md:p-8 max-w-[1600px] mx-auto">
-          {/* Content Panel - white paper with subtle border */}
+        <div className={`p-4 md:p-8 mx-auto ${isCompactRoute(location.pathname) ? 'max-w-6xl' : 'max-w-[1600px]'}`}>
+          {/* Content Panel - white paper with subtle border. Routes registered
+              in COMPACT_ROUTES get a narrower outer container so the white
+              card hugs the content (the SC Analysis tab has lots of left-
+              aligned cards that look stranded inside the full-width card). */}
           <div className="bg-white border border-[#e8e6e3] rounded-xl p-3 sm:p-4 md:p-6 shadow-sm">
             {children}
           </div>

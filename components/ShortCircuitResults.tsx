@@ -75,7 +75,7 @@ export const ShortCircuitResults: React.FC = () => {
 
   if (loading) {
     return (
-      <div className="animate-in fade-in duration-500 max-w-7xl">
+      <div className="animate-in fade-in duration-500 max-w-6xl">
         <div className="flex items-center justify-center py-12">
           <div className="text-gray-400">Loading calculations...</div>
         </div>
@@ -84,7 +84,7 @@ export const ShortCircuitResults: React.FC = () => {
   }
 
   return (
-    <div className="animate-in fade-in duration-500 max-w-7xl space-y-6">
+    <div className="animate-in fade-in duration-500 max-w-6xl space-y-6">
       {/* Header */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
         <div>
