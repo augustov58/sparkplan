@@ -1,11 +1,13 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { useParams } from 'react-router-dom';
-import { Zap, Trash2, FileText, AlertTriangle, CheckCircle } from 'lucide-react';
+import { Zap, Trash2, FileText, AlertTriangle, CheckCircle, RefreshCw } from 'lucide-react';
 import { useShortCircuitCalculations } from '../hooks/useShortCircuitCalculations';
 import { usePanels } from '../hooks/usePanels';
+import { useTransformers } from '../hooks/useTransformers';
 import { useProjects } from '../hooks/useProjects';
 import { exportSingleCalculation, exportSystemReport } from '../services/pdfExport/shortCircuitPDF';
 import { ShortCircuitProjectCalculator } from './ShortCircuitProjectCalculator';
+import { detectStaleCalculations } from '../services/calculations/shortCircuitHierarchy';
 
 interface ShortCircuitResult {
   faultCurrent: number;
@@ -30,11 +32,25 @@ export const ShortCircuitResults: React.FC = () => {
   const project = projects.find(p => p.id === projectId);
   const { calculations, loading, deleteCalculation, createCalculation } = useShortCircuitCalculations(projectId);
   const { panels } = usePanels(projectId);
+  const { transformers } = useTransformers(projectId);
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
 
   // Group calculations
   const serviceCalculation = calculations.find(c => c.calculation_type === 'service' && !c.panel_id);
   const panelCalculations = calculations.filter(c => c.calculation_type === 'panel' || c.panel_id);
+
+  // Stale-detection: any saved panel calc whose stored source_fault_current
+  // disagrees with the currently-resolvable upstream value (because the
+  // upstream calc was changed since this one was saved).
+  const staleMap = useMemo(() => {
+    if (!project) return new Map();
+    return detectStaleCalculations({
+      project,
+      panels,
+      transformers,
+      calculations,
+    });
+  }, [project, panels, transformers, calculations]);
 
   const handleDelete = async (id: string) => {
     await deleteCalculation(id);
@@ -103,6 +119,7 @@ export const ShortCircuitResults: React.FC = () => {
         <ShortCircuitProjectCalculator
           project={project}
           panels={panels}
+          transformers={transformers}
           existingCalculations={calculations}
           createCalculation={createCalculation}
         />
@@ -141,6 +158,7 @@ export const ShortCircuitResults: React.FC = () => {
                   panel={panel}
                   projectName={project?.name || ''}
                   projectAddress={project?.address}
+                  staleInfo={staleMap.get(calc.id)}
                   onDelete={() => setDeleteConfirmId(calc.id)}
                 />
               );
@@ -188,10 +206,11 @@ interface CalculationCardProps {
   panel?: any;
   projectName: string;
   projectAddress?: string;
+  staleInfo?: { storedIf: number; expectedIf: number; reason: string };
   onDelete: () => void;
 }
 
-const CalculationCard: React.FC<CalculationCardProps> = ({ calculation, panel, projectName, projectAddress, onDelete }) => {
+const CalculationCard: React.FC<CalculationCardProps> = ({ calculation, panel, projectName, projectAddress, staleInfo, onDelete }) => {
   const [expanded, setExpanded] = useState(false);
   const results = calculation.results as ShortCircuitResult;
 
@@ -210,7 +229,16 @@ const CalculationCard: React.FC<CalculationCardProps> = ({ calculation, panel, p
   };
 
   return (
-    <div className="bg-white border border-gray-100 rounded-lg shadow-sm hover:shadow-md transition-shadow">
+    <div className={`bg-white border rounded-lg shadow-sm hover:shadow-md transition-shadow ${staleInfo ? 'border-amber-300' : 'border-gray-100'}`}>
+      {staleInfo && (
+        <div className="bg-amber-50 border-b border-amber-200 px-3 py-2 text-xs text-amber-900 flex items-start gap-2 rounded-t-lg">
+          <RefreshCw className="w-3.5 h-3.5 mt-0.5 shrink-0" />
+          <div>
+            <span className="font-semibold">Stale — upstream chain changed.</span>{' '}
+            {staleInfo.reason}. Delete this calc and re-add it to pick up the new source value.
+          </div>
+        </div>
+      )}
       {/* Header + Metrics - Compact single section */}
       <div className="p-3">
         <div className="flex items-center justify-between mb-2">

@@ -8,11 +8,11 @@
  * (`deriveSourceFaultCurrent`).
  */
 
+// Note: `deriveSourceFaultCurrent` was removed when this component switched
+// to the hierarchy resolver (services/calculations/shortCircuitHierarchy.ts).
+// Its behavior is now covered by tests/shortCircuitHierarchy.test.ts.
 import { describe, it, expect } from 'vitest';
-import {
-  derivePanelFormState,
-  deriveSourceFaultCurrent,
-} from '../components/ShortCircuitProjectCalculator';
+import { derivePanelFormState } from '../components/ShortCircuitProjectCalculator';
 
 // Loose factories — only the fields the helpers actually touch are populated.
 // Cast through `any` to keep the test setup terse; the helpers are typed
@@ -108,31 +108,3 @@ describe('derivePanelFormState', () => {
   });
 });
 
-describe('deriveSourceFaultCurrent', () => {
-  it('prefers the saved service-calc faultCurrent when present', () => {
-    const serviceCalc = { results: { faultCurrent: 18500 } } as any;
-    const project = makeProject({ utility_available_fault_current_a: 5000 });
-
-    expect(deriveSourceFaultCurrent(serviceCalc, project as any)).toBe(18500);
-  });
-
-  it('falls back to project utility AFC when no service-calc exists', () => {
-    const project = makeProject({ utility_available_fault_current_a: 22000 });
-    expect(deriveSourceFaultCurrent(undefined, project as any)).toBe(22000);
-  });
-
-  it('falls back to 10 kA when neither source is available', () => {
-    expect(deriveSourceFaultCurrent(undefined, makeProject() as any)).toBe(10000);
-  });
-
-  it('ignores zero or negative service-calc results (treats as missing)', () => {
-    const serviceCalc = { results: { faultCurrent: 0 } } as any;
-    const project = makeProject({ utility_available_fault_current_a: 12500 });
-    expect(deriveSourceFaultCurrent(serviceCalc, project as any)).toBe(12500);
-  });
-
-  it('handles a malformed results blob without crashing', () => {
-    const serviceCalc = { results: null } as any;
-    expect(deriveSourceFaultCurrent(serviceCalc, makeProject() as any)).toBe(10000);
-  });
-});

@@ -22,10 +22,12 @@ import {
   estimateUtilityTransformer,
 } from '../services/calculations/shortCircuit';
 import { useFeeders } from '../hooks/useFeeders';
+import { resolveUpstreamSourceIf, type UpstreamSourceResolution } from '../services/calculations/shortCircuitHierarchy';
 import type { Database, ShortCircuitCalculationInsert } from '../lib/database.types';
 
 type Project = Database['public']['Tables']['projects']['Row'];
 type Panel = Database['public']['Tables']['panels']['Row'];
+type Transformer = Database['public']['Tables']['transformers']['Row'];
 type Feeder = Database['public']['Tables']['feeders']['Row'];
 type ShortCircuitCalculation = Database['public']['Tables']['short_circuit_calculations']['Row'];
 
@@ -62,23 +64,10 @@ export function derivePanelFormState(
   };
 }
 
-// Source If used as input for downstream calcs: prefer the saved service-calc
-// result, then the project's recorded utility AFC, then a 10 kA default.
-export function deriveSourceFaultCurrent(
-  serviceCalculation: ShortCircuitCalculation | undefined,
-  project: Pick<Project, 'utility_available_fault_current_a'>,
-): number {
-  const fromService = (serviceCalculation?.results as any)?.faultCurrent;
-  if (typeof fromService === 'number' && fromService > 0) return fromService;
-  if (project.utility_available_fault_current_a && project.utility_available_fault_current_a > 0) {
-    return project.utility_available_fault_current_a;
-  }
-  return 10000;
-}
-
 interface Props {
   project: Project;
   panels: Panel[];
+  transformers: Transformer[];
   existingCalculations: ShortCircuitCalculation[];
   // Hoisted from the parent's useShortCircuitCalculations instance so saves
   // update the parent's calc list immediately (single source of truth) instead
@@ -109,6 +98,7 @@ function normalizeMaterial(raw: string | null | undefined): 'Cu' | 'Al' {
 export const ShortCircuitProjectCalculator: React.FC<Props> = ({
   project,
   panels,
+  transformers,
   existingCalculations,
   createCalculation,
 }) => {
@@ -182,10 +172,22 @@ export const ShortCircuitProjectCalculator: React.FC<Props> = ({
     setFeederPhase(next.feederPhase);
   };
 
-  const sourceFaultCurrent = useMemo(
-    () => deriveSourceFaultCurrent(serviceCalculation, project),
-    [serviceCalculation, project],
-  );
+  // Walk the feed chain for the currently-selected panel (panel mode only).
+  // The resolver returns { sourceFaultCurrent, upstreamChain, isComplete,
+  // warnings } so the UI can show the chain and gate Save when incomplete.
+  const upstream: UpstreamSourceResolution | null = useMemo(() => {
+    if (mode !== 'panel') return null;
+    const target = panels.find((p) => p.id === selectedPanelId);
+    if (!target) return null;
+    return resolveUpstreamSourceIf(target, {
+      project,
+      panels,
+      transformers,
+      calculations: existingCalculations,
+    });
+  }, [mode, selectedPanelId, panels, transformers, existingCalculations, project]);
+
+  const sourceFaultCurrent = upstream?.sourceFaultCurrent ?? 10000;
 
   // -- Live calc preview ---------------------------------------------------
   const result = useMemo(() => {
@@ -357,6 +359,7 @@ export const ShortCircuitProjectCalculator: React.FC<Props> = ({
               selectedPanelId={selectedPanelId}
               onPanelSelect={handlePanelSelect}
               sourceFaultCurrent={sourceFaultCurrent}
+              upstream={upstream}
               feederLength={feederLength} setFeederLength={setFeederLength}
               feederSize={feederSize} setFeederSize={setFeederSize}
               feederMaterial={feederMaterial} setFeederMaterial={setFeederMaterial}
@@ -492,6 +495,7 @@ interface PanelFormProps {
   selectedPanelId: string;
   onPanelSelect: (id: string) => void;
   sourceFaultCurrent: number;
+  upstream: UpstreamSourceResolution | null;
   feederLength: number; setFeederLength: (n: number) => void;
   feederSize: string; setFeederSize: (s: string) => void;
   feederMaterial: 'Cu' | 'Al'; setFeederMaterial: (m: 'Cu' | 'Al') => void;
@@ -525,9 +529,23 @@ const PanelForm: React.FC<PanelFormProps> = (p) => (
       </select>
     </div>
 
-    {p.selectedPanelId && (
-      <div className="bg-green-50 border border-green-200 rounded p-2 text-xs text-green-900">
-        Feeder geometry auto-filled from feeder record. Source If: <strong>{(p.sourceFaultCurrent / 1000).toFixed(1)} kA</strong>. Override below if needed.
+    {p.selectedPanelId && p.upstream && (
+      <div
+        className={`border rounded p-2 text-xs ${
+          p.upstream.isComplete
+            ? 'bg-green-50 border-green-200 text-green-900'
+            : 'bg-amber-50 border-amber-200 text-amber-900'
+        }`}
+      >
+        <div>
+          Source: <strong>{p.upstream.upstreamChain.join(' → ')}</strong>{' '}
+          ({(p.upstream.sourceFaultCurrent / 1000).toFixed(1)} kA)
+        </div>
+        {p.upstream.warnings.length > 0 && (
+          <ul className="mt-1 list-disc list-inside space-y-0.5">
+            {p.upstream.warnings.map((w, i) => <li key={i}>{w}</li>)}
+          </ul>
+        )}
       </div>
     )}
 
