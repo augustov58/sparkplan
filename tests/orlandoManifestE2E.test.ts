@@ -214,7 +214,7 @@ describe('Manifest registry', () => {
   });
 
   it('returns null for unknown / null / undefined id', () => {
-    expect(getManifestById('miami-dade')).toBeNull();
+    expect(getManifestById('jacksonville')).toBeNull();
     expect(getManifestById(null)).toBeNull();
     expect(getManifestById(undefined)).toBeNull();
     expect(getManifestById('')).toBeNull();
