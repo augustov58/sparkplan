@@ -19,6 +19,7 @@ type Feeder = Database['public']['Tables']['feeders']['Row'];
 type Transformer = Database['public']['Tables']['transformers']['Row'];
 type Permit = Database['public']['Tables']['permits']['Row'];
 type PermitInspection = Database['public']['Tables']['permit_inspections']['Row'];
+type ShortCircuitCalculation = Database['public']['Tables']['short_circuit_calculations']['Row'];
 
 export interface ProjectContext {
   projectId: string;
@@ -49,6 +50,13 @@ export interface ProjectContext {
       total: number;
     };
   };
+  /**
+   * Saved short-circuit / available-fault-current calculations. Lets the
+   * chatbot answer NEC 110.9 (interrupting rating) and AIC-shopping
+   * questions from any tab without the user having to navigate to the SC
+   * tab and read numbers off the cards.
+   */
+  shortCircuits?: ShortCircuitSummary[];
 }
 
 interface PanelSummary {
@@ -104,6 +112,25 @@ interface TransformerSummary {
   fedFromPanel?: string;
 }
 
+interface ShortCircuitSummary {
+  id: string;
+  locationName: string;
+  /** 'service' = service-entrance calc, 'panel' = downstream panel calc. */
+  calculationType: string;
+  /** Panel name (omitted when calculation_type === 'service'). */
+  panelName?: string;
+  /** Bus fault current at this location, in amperes RMS symmetrical. */
+  faultCurrentA: number;
+  /** Recommended next-standard AIC rating, in kA (NEC 110.9). */
+  requiredAicKa?: number;
+  /** Upstream If used as input to this calc — encodes the chain context. */
+  sourceFaultCurrentA?: number;
+  /** NEC compliance summary string from the engine. */
+  compliance?: string;
+  /** ISO timestamp — lets the chatbot say "this was calculated 3 days ago". */
+  updatedAt?: string;
+}
+
 /**
  * Builds a comprehensive project context for AI assistant
  */
@@ -148,6 +175,12 @@ export function buildProjectContext(
   // checking the Permits tab. Phase 3 will add full per-permit detail.
   permits?: Permit[],
   inspections?: PermitInspection[],
+  /**
+   * Saved short-circuit calculations for this project. When provided, the
+   * chatbot gets per-location fault currents + AIC ratings + NEC 110.9
+   * compliance status in its first-message context.
+   */
+  shortCircuitCalculations?: ShortCircuitCalculation[],
 ): ProjectContext {
   // Build panel summaries with hierarchy information
   const panelSummaries: PanelSummary[] = panels.map(panel => {
@@ -391,6 +424,39 @@ ${feeders.length > 0 ? `Feeders: ${feeders.length}` : ''}
 ${transformers.length > 0 ? `Transformers: ${transformers.length}` : ''}${permitsText}${multiFamilyText}${hierarchyText}
   `.trim();
 
+  // ---- Short-circuit calculations (per-location fault currents) ----
+  // We extract only the audit-trail fields the chatbot needs: fault current,
+  // required AIC, source If (chain context), and NEC 110.9 compliance.
+  // The full breakdown stays in the DB — the chatbot can re-fetch if needed.
+  let shortCircuits: ShortCircuitSummary[] | undefined;
+  if (shortCircuitCalculations && shortCircuitCalculations.length > 0) {
+    shortCircuits = shortCircuitCalculations.map((calc) => {
+      const results = (calc.results ?? {}) as {
+        faultCurrent?: number;
+        requiredAIC?: number;
+        compliance?: { message?: string };
+      };
+      const panel = calc.panel_id
+        ? panels.find((p) => p.id === calc.panel_id)
+        : undefined;
+      return {
+        id: calc.id,
+        locationName: calc.location_name,
+        calculationType: calc.calculation_type,
+        panelName: panel?.name,
+        faultCurrentA: typeof results.faultCurrent === 'number' ? results.faultCurrent : 0,
+        requiredAicKa:
+          typeof results.requiredAIC === 'number' ? results.requiredAIC : undefined,
+        sourceFaultCurrentA:
+          typeof calc.source_fault_current === 'number' && calc.source_fault_current > 0
+            ? calc.source_fault_current
+            : undefined,
+        compliance: results.compliance?.message,
+        updatedAt: calc.updated_at,
+      };
+    });
+  }
+
   // ---- Estimating summary (Phase 1: count + most-recent only) ----
   let estimatingSummary: ProjectContext['estimating'];
   if (estimates && estimates.length > 0) {
@@ -427,6 +493,7 @@ ${transformers.length > 0 ? `Transformers: ${transformers.length}` : ''}${permit
       demandVA: totalDemandVA,
     },
     estimating: estimatingSummary,
+    shortCircuits,
   };
 }
 
@@ -511,6 +578,43 @@ export function formatContextForAI(context: ProjectContext): string {
       prompt += `- ${xfmr.name}: ${xfmr.kvaRating}kVA, ${xfmr.primaryVoltage}V → ${xfmr.secondaryVoltage}V`;
       if (xfmr.fedFromPanel) prompt += `, fed from ${xfmr.fedFromPanel}`;
       prompt += `\n`;
+    });
+    prompt += `\n`;
+  }
+
+  // Add saved short-circuit / available-fault-current calculations.
+  // The chatbot needs these to reason about NEC 110.9 (interrupting rating
+  // selection) and to answer "what's the fault current at X?" from any tab.
+  if (context.shortCircuits && context.shortCircuits.length > 0) {
+    prompt += `SHORT CIRCUIT ANALYSIS (saved fault-current calculations):\n`;
+
+    // Service-entrance calc first (root of the chain), then panel calcs.
+    const ordered = [...context.shortCircuits].sort((a, b) => {
+      if (a.calculationType === 'service' && b.calculationType !== 'service') return -1;
+      if (a.calculationType !== 'service' && b.calculationType === 'service') return 1;
+      return a.locationName.localeCompare(b.locationName);
+    });
+
+    ordered.forEach((sc) => {
+      const ifKa = (sc.faultCurrentA / 1000).toFixed(1);
+      const label =
+        sc.calculationType === 'service'
+          ? `${sc.locationName} [SERVICE ENTRANCE]`
+          : sc.panelName
+            ? `${sc.panelName} (${sc.locationName})`
+            : sc.locationName;
+      prompt += `- ${label}: ${ifKa} kA available fault current`;
+      if (sc.requiredAicKa !== undefined) {
+        prompt += `, required AIC ${sc.requiredAicKa} kA (NEC 110.9)`;
+      }
+      if (sc.sourceFaultCurrentA !== undefined) {
+        const srcKa = (sc.sourceFaultCurrentA / 1000).toFixed(1);
+        prompt += `, calculated from ${srcKa} kA upstream`;
+      }
+      prompt += `\n`;
+      if (sc.compliance) {
+        prompt += `  └─ ${sc.compliance}\n`;
+      }
     });
     prompt += `\n`;
   }
