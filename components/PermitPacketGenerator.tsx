@@ -14,6 +14,20 @@ import {
   resolveSections,
   type PacketSections,
 } from '../services/pdfExport/packetSections';
+import { findManifestForJurisdiction } from '../data/ahj/registry';
+import {
+  computeDefaultVisibility,
+  applyUserOverrides,
+  toPacketSectionsPartial,
+  type VisibilityOverrides,
+} from '../data/ahj/visibility';
+import type {
+  AHJContext,
+  AHJManifest,
+  BuildingType,
+  ServiceModificationType,
+  ContractorLane,
+} from '../data/ahj/types';
 import { usePanels } from '../hooks/usePanels';
 import { useCircuits } from '../hooks/useCircuits';
 import { useFeeders } from '../hooks/useFeeders';
@@ -300,10 +314,118 @@ export const PermitPacketGenerator: React.FC<PermitPacketGeneratorProps> = ({ pr
     hasScope &&
     !dataLoading;
 
-  // Sprint 2A H1+H2+H3: section toggle helpers.
-  // Resolves the effective on/off state by merging current preferences with
-  // DEFAULT_SECTIONS (all-on). UI controls render from the resolved value.
-  const effectiveSections = resolveSections(sectionPrefs);
+  // Sprint 2B PR-4: AHJ-aware visibility resolution.
+  // Two-layer model: (Layer 1) manifest defaults via predicates on AHJContext;
+  // (Layer 2) user overrides from projects.settings.section_overrides.
+  //
+  // Backward-compat: when no manifest can be resolved (project has no
+  // jurisdiction_id, or jurisdiction doesn't map to a registered manifest),
+  // we fall through to Sprint 2A's resolveSections(sectionPrefs) — same
+  // shape, same generator API.
+  const jurisdictionForManifest = currentProject?.jurisdiction_id
+    ? getJurisdictionById(currentProject.jurisdiction_id)
+    : undefined;
+  const activeManifest: AHJManifest | null = findManifestForJurisdiction(
+    jurisdictionForManifest,
+  );
+
+  // Build AHJContext from project fields. Defaults are conservative so
+  // projects in partial-data state still resolve to something sensible.
+  const ahjContext: AHJContext = (() => {
+    // Map ProjectSettings.service_modification_type ('existing' |
+    // 'service-upgrade' | 'new-service') into the manifest's
+    // ServiceModificationType axis ('existing-service' | 'new-service').
+    // 'service-upgrade' folds into 'existing-service' because Orlando's
+    // EV-fed-from-existing path requires the NEC 220.87 narrative; new-service
+    // is the only path that triggers the available-fault-current calc.
+    const rawScope = currentProject?.settings?.service_modification_type;
+    const scope: ServiceModificationType =
+      rawScope === 'new-service' ? 'new-service' : 'existing-service';
+
+    // Map exemption-screening lane ('exempt' | 'pe-required') into the
+    // manifest's ContractorLane axis. Defaults to 'contractor_exemption' for
+    // legacy projects without scope_flags filled in.
+    const rawLane = currentProject?.settings?.scope_flags
+      ? screenContractorExemption({
+          estimatedValueUsd:
+            currentProject.settings.estimated_value_usd ?? 0,
+          occupancyType:
+            currentProject.settings.occupancyType === 'commercial'
+            || currentProject.settings.occupancyType === 'industrial'
+              ? 'commercial'
+              : 'residential',
+          serviceCapacityAmps:
+            currentProject.serviceAmps
+            ?? panels.find(p => p.is_main)?.main_breaker_amps
+            ?? 200,
+          serviceVoltageV: currentProject.serviceVoltage ?? 240,
+          scopeFlags: currentProject.settings.scope_flags,
+        }).lane
+      : 'exempt';
+    const lane: ContractorLane =
+      rawLane === 'pe-required' ? 'pe_required' : 'contractor_exemption';
+
+    // Map ProjectSettings.occupancyType into BuildingType. The setting has
+    // legacy values 'dwelling' / 'commercial' / 'industrial' / 'office';
+    // multi-family is detected via the multi_family_units or building_units
+    // count when present.
+    const occ = currentProject?.settings?.occupancyType;
+    const isMultiFamily =
+      (currentProject?.settings?.residential?.multi_family_units ?? 0) >= 3;
+    let buildingType: BuildingType;
+    if (isMultiFamily) {
+      buildingType = 'multi_family';
+    } else if (occ === 'commercial' || occ === 'industrial') {
+      buildingType = 'commercial';
+    } else {
+      buildingType = 'single_family_residential';
+    }
+
+    return { scope, lane, buildingType, subjurisdiction: undefined };
+  })();
+
+  // Compute visibility: manifest defaults + user overrides. When no
+  // manifest is active, this whole block falls back to the Sprint 2A path
+  // (manifestVisibility is null → effectiveSections uses resolveSections
+  // on the raw sectionPrefs).
+  const userOverrides: VisibilityOverrides | undefined = currentProject
+    ?.settings?.section_overrides as VisibilityOverrides | undefined;
+
+  const manifestVisibility = activeManifest
+    ? applyUserOverrides(
+        computeDefaultVisibility(activeManifest, ahjContext),
+        userOverrides,
+      )
+    : null;
+
+  // Sprint 2A H1+H2+H3 + 2B PR-4: section toggle helpers.
+  // When a manifest is active, the manifest+overrides resolution is the
+  // source of truth — we project it through toPacketSectionsPartial to
+  // get the same shape the Sprint 2A generator accepts. When no manifest
+  // is active, fall back to the original Sprint 2A path.
+  const effectiveSections = manifestVisibility
+    ? resolveSections(toPacketSectionsPartial(manifestVisibility))
+    : resolveSections(sectionPrefs);
+
+  /**
+   * Sprint 2B PR-4: AttachmentUploadCard slot visibility. When a manifest
+   * is active, hide slots the manifest+overrides resolve to OFF. When no
+   * manifest is active, show ALL slots (Sprint 2A backward compat — the
+   * UI used to show every slot unconditionally).
+   *
+   * Note: the slot HTML is still rendered in the DOM for the active set;
+   * inactive slots are conditionally skipped. This avoids the case where
+   * the user can't see a slot they need but the manifest didn't list it,
+   * because the user-override layer can still toggle artifact_type ON via
+   * a future UI (not implemented in PR-4 — for now contractors who need
+   * an off-by-manifest artifact toggle it on by adding `section_overrides.
+   * artifactTypes.{key}: true` directly, or via the Sprint 2C M1
+   * manifest-aware UI when it ships).
+   */
+  const shouldShowArtifactSlot = (key: ArtifactType): boolean => {
+    if (!manifestVisibility) return true;
+    return manifestVisibility.artifactTypes[key] === true;
+  };
 
   // Auto-disable predicate: returns a reason string when the toggle should
   // be greyed out because the underlying data isn't present (or, for
@@ -363,18 +485,39 @@ export const PermitPacketGenerator: React.FC<PermitPacketGeneratorProps> = ({ pr
     }
   };
 
-  // Persist a single toggle change to projects.settings.sectionPreferences.
-  // Optimistic update happens locally in setSectionPrefs; the underlying
-  // updateProject hook handles its own optimistic update + rollback.
+  // Persist a single toggle change. Sprint 2B PR-4: when a manifest is
+  // active, writes to projects.settings.section_overrides (Layer 2 of the
+  // visibility model). Otherwise falls back to the Sprint 2A
+  // projects.settings.sectionPreferences key. Both keys are kept in sync
+  // so projects can flip between manifest-aware and legacy modes safely.
   const handleToggleSection = async (key: keyof PacketSections, next: boolean) => {
     const updated = { ...sectionPrefs, [key]: next };
     setSectionPrefs(updated);
     if (!currentProject) return;
+
+    const settingsPatch: Partial<typeof currentProject.settings> = {
+      sectionPreferences: updated,
+    };
+
+    if (activeManifest) {
+      const existing = (currentProject.settings.section_overrides ?? {}) as {
+        sections?: Record<string, boolean>;
+        artifactTypes?: Record<string, boolean>;
+      };
+      settingsPatch.section_overrides = {
+        ...existing,
+        sections: {
+          ...(existing.sections ?? {}),
+          [key]: next,
+        },
+      };
+    }
+
     await updateProject({
       ...currentProject,
       settings: {
         ...currentProject.settings,
-        sectionPreferences: updated,
+        ...settingsPatch,
       },
     });
   };
@@ -387,6 +530,9 @@ export const PermitPacketGenerator: React.FC<PermitPacketGeneratorProps> = ({ pr
       settings: {
         ...currentProject.settings,
         sectionPreferences: undefined,
+        // Reset clears BOTH layers — user is asking for "back to defaults",
+        // which under Sprint 2B PR-4 means "let the manifest decide".
+        section_overrides: undefined,
       },
     });
   };
@@ -496,10 +642,32 @@ export const PermitPacketGenerator: React.FC<PermitPacketGeneratorProps> = ({ pr
         jurisdiction: jurisdiction,
         // NEC 220.84 multifamily Optional Method context (undefined for non-MF projects)
         multiFamilyContext,
-        // Sprint 2A H1+H2+H3: per-section toggles. Empty object = use defaults.
-        sections: sectionPrefs,
+        // Sprint 2A H1+H2+H3 + 2B PR-4: per-section toggles. When a manifest
+        // is active, the manifest+overrides resolution wins; project it
+        // through toPacketSectionsPartial (emits ONLY false keys so
+        // resolveSections falls back to all-on for true keys, preserving
+        // Sprint 2A backward-compat). Otherwise pass the raw sectionPrefs.
+        sections: manifestVisibility
+          ? toPacketSectionsPartial(manifestVisibility)
+          : sectionPrefs,
         // Sprint 2A PR 5 / H17: FL contractor-exemption lane stamp on cover sheet.
         permitMode,
+        // Sprint 2B PR-4: when an AHJ manifest is active, thread it through
+        // to the orchestrator AND populate the convenience top-level fields
+        // (generalNotes, codeReferences, necEdition) so the existing page
+        // components don't need to know about the manifest. Building type
+        // is computed once from AHJContext.
+        manifest: activeManifest ?? undefined,
+        buildingType: ahjContext.buildingType,
+        generalNotes: activeManifest?.generalNotes,
+        codeReferences: activeManifest?.codeReferences,
+        necEdition: (() => {
+          if (!activeManifest) return currentProject.necEdition;
+          const ed = activeManifest.necEdition[ahjContext.buildingType];
+          if (ed?.includes('2023')) return '2023';
+          if (ed?.includes('2020')) return '2020';
+          return currentProject.necEdition;
+        })(),
       };
 
       // Sprint 2A H14: NEC 220.87 narrative — only attached when the user
@@ -793,60 +961,135 @@ export const PermitPacketGenerator: React.FC<PermitPacketGeneratorProps> = ({ pr
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <AttachmentUploadCard
-            projectId={projectId}
-            artifactType="site_plan"
-            title="Site Plan / Survey"
-            description="Property layout, equipment locations, utility connections (required by all 5 FL AHJs)"
-          />
-          <AttachmentUploadCard
-            projectId={projectId}
-            artifactType="cut_sheet"
-            title="Equipment Cut Sheets"
-            description="Manufacturer spec sheets for panels, breakers, EVSE — UL listings, ratings"
-          />
-          <AttachmentUploadCard
-            projectId={projectId}
-            artifactType="fire_stopping"
-            title="Fire Stopping Schedule"
-            description="UL-listed firestop assemblies for rated-wall penetrations (Orlando intake)"
-          />
-          <AttachmentUploadCard
-            projectId={projectId}
-            artifactType="manufacturer_data"
-            title="Manufacturer Installation Data"
-            description="Vendor-supplied installation manuals or technical bulletins"
-          />
-          <AttachmentUploadCard
-            projectId={projectId}
-            artifactType="survey"
-            title="Property Survey"
-            description="Stamped survey when separate from the site plan"
-          />
-          <AttachmentUploadCard
-            projectId={projectId}
-            artifactType="noc"
-            title="Notice of Commencement"
-            description="FL Statute 713 — required for jobs > $5,000 (one file)"
-            multiple={false}
-          />
-          <AttachmentUploadCard
-            projectId={projectId}
-            artifactType="hoa_letter"
-            title="HOA / Condo Approval Letter"
-            description="Required for multi-family / association-governed properties (one file)"
-            multiple={false}
-          />
+          {shouldShowArtifactSlot('site_plan') && (
+            <AttachmentUploadCard
+              projectId={projectId}
+              artifactType="site_plan"
+              title="Site Plan / Survey"
+              description="Property layout, equipment locations, utility connections (required by all 5 FL AHJs)"
+            />
+          )}
+          {shouldShowArtifactSlot('cut_sheet') && (
+            <AttachmentUploadCard
+              projectId={projectId}
+              artifactType="cut_sheet"
+              title="Equipment Cut Sheets"
+              description="Manufacturer spec sheets for panels, breakers, EVSE — UL listings, ratings"
+            />
+          )}
+          {shouldShowArtifactSlot('fire_stopping') && (
+            <AttachmentUploadCard
+              projectId={projectId}
+              artifactType="fire_stopping"
+              title="Fire Stopping Schedule"
+              description="UL-listed firestop assemblies for rated-wall penetrations (Orlando intake)"
+            />
+          )}
+          {shouldShowArtifactSlot('manufacturer_data') && (
+            <AttachmentUploadCard
+              projectId={projectId}
+              artifactType="manufacturer_data"
+              title="Manufacturer Installation Data"
+              description="Vendor-supplied installation manuals or technical bulletins"
+            />
+          )}
+          {shouldShowArtifactSlot('survey') && (
+            <AttachmentUploadCard
+              projectId={projectId}
+              artifactType="survey"
+              title="Property Survey"
+              description="Stamped survey when separate from the site plan"
+            />
+          )}
+          {shouldShowArtifactSlot('noc') && (
+            <AttachmentUploadCard
+              projectId={projectId}
+              artifactType="noc"
+              title="Notice of Commencement"
+              description="FL Statute 713 — required for jobs > $5,000 (one file)"
+              multiple={false}
+            />
+          )}
+          {shouldShowArtifactSlot('hoa_letter') && (
+            <AttachmentUploadCard
+              projectId={projectId}
+              artifactType="hoa_letter"
+              title="HOA / Condo Approval Letter"
+              description="Required for multi-family / association-governed properties (one file)"
+              multiple={false}
+            />
+          )}
           {/* Sprint 2B PR-3 / Sprint 2C H19: HVHZ wind-anchoring documentation.
               Applies to ANY outdoor pedestal/bollard EVSE statewide — cross-
               validated Miami-Dade + Pompano Beach (Pompano enforces despite
               being outside HVHZ proper). */}
-          <AttachmentUploadCard
-            projectId={projectId}
-            artifactType="hvhz_anchoring"
-            title="HVHZ / Outdoor Anchoring Detail"
-            description="Florida Product Approval, Miami-Dade NOA tie-down, or signed-and-sealed structural plans for outdoor pedestal/bollard EVSE statewide"
-          />
+          {shouldShowArtifactSlot('hvhz_anchoring') && (
+            <AttachmentUploadCard
+              projectId={projectId}
+              artifactType="hvhz_anchoring"
+              title="HVHZ / Outdoor Anchoring Detail"
+              description="Florida Product Approval, Miami-Dade NOA tie-down, or signed-and-sealed structural plans for outdoor pedestal/bollard EVSE statewide"
+            />
+          )}
+          {/* Sprint 2B PR-4 — 6 new artifact slots for Sprint 2C AHJ manifests.
+              Visibility is controlled by the AHJ-aware visibility layer
+              (data/ahj/visibility.ts) — Orlando manifest does NOT default
+              these ON, but contractors can still toggle them on per project
+              via the override layer. */}
+          {shouldShowArtifactSlot('zoning_application') && (
+            <AttachmentUploadCard
+              projectId={projectId}
+              artifactType="zoning_application"
+              title="Zoning Compliance Permit Application"
+              description="Required by Pompano Beach for EV charging stations (Sprint 2C H21)"
+              multiple={false}
+            />
+          )}
+          {shouldShowArtifactSlot('fire_review_application') && (
+            <AttachmentUploadCard
+              projectId={projectId}
+              artifactType="fire_review_application"
+              title="Fire Review Application"
+              description="Required by Pompano + Davie for non-single-family EVSE (Sprint 2C H22)"
+              multiple={false}
+            />
+          )}
+          {shouldShowArtifactSlot('notarized_addendum') && (
+            <AttachmentUploadCard
+              projectId={projectId}
+              artifactType="notarized_addendum"
+              title="Notarized Addendum Form"
+              description="Required by Davie (contractor + owner notarized signatures) (Sprint 2C H25)"
+              multiple={false}
+            />
+          )}
+          {shouldShowArtifactSlot('property_ownership_search') && (
+            <AttachmentUploadCard
+              projectId={projectId}
+              artifactType="property_ownership_search"
+              title="Property Ownership Search (BCPA.NET)"
+              description="Required by Davie — printout from Broward County Property Appraiser (Sprint 2C H26)"
+              multiple={false}
+            />
+          )}
+          {shouldShowArtifactSlot('flood_elevation_certificate') && (
+            <AttachmentUploadCard
+              projectId={projectId}
+              artifactType="flood_elevation_certificate"
+              title="Design Flood Elevation"
+              description="Required by Hillsborough for flood-zone projects per FBC (Sprint 2C H30)"
+              multiple={false}
+            />
+          )}
+          {shouldShowArtifactSlot('private_provider_documentation') && (
+            <AttachmentUploadCard
+              projectId={projectId}
+              artifactType="private_provider_documentation"
+              title="Private Provider Documentation (FS 553.791)"
+              description="Optional Hillsborough — alternative to County plan review (Sprint 2C H33)"
+              multiple={false}
+            />
+          )}
         </div>
       </div>
 

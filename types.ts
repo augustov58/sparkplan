@@ -199,6 +199,23 @@ export interface ProjectSettings {
   sectionPreferences?: Record<string, boolean>;
 
   /**
+   * Sprint 2B PR-4: AHJ-aware visibility user overrides. Layer 2 of the
+   * two-layer visibility model (Layer 1 = AHJ manifest defaults; Layer 2
+   * = these per-project user overrides). Persists to the
+   * `projects.settings` JSON column alongside the legacy
+   * `sectionPreferences` (which Sprint 2C M1 will migrate into this
+   * structure).
+   *
+   * Sparse maps: keys not present fall through to manifest defaults.
+   * Shape mirrors `VisibilityOverrides` in `data/ahj/visibility.ts` —
+   * intentionally typed loosely here to avoid a circular import.
+   */
+  section_overrides?: {
+    sections?: Record<string, boolean>;
+    artifactTypes?: Record<string, boolean>;
+  };
+
+  /**
    * Sprint 2A PR 5 / H17: scope inputs that drive the FL contractor-exemption
    * screening engine in `services/permitMode/exemptionScreening.ts`. All
    * three keys are persisted in the `projects.settings` JSON column (no DB

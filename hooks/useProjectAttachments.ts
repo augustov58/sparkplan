@@ -46,13 +46,21 @@ type ProjectAttachment = Database['public']['Tables']['project_attachments']['Ro
 
 /**
  * Allowed artifact_type values. Mirrors the CHECK constraint in
- * `20260512_project_attachments.sql` + `20260513_attachment_hvhz_anchoring.sql`.
+ * `20260512_project_attachments.sql` + `20260513_attachment_hvhz_anchoring.sql`
+ * + `20260514_attachment_types_pr4.sql`.
  *
- * Sprint 2B PR-3 added `hvhz_anchoring` (Sprint 2C H19 finding) — FL Product
- * Approval / MD-NOA tie-down / signed-sealed structural plans for outdoor
- * pedestal/bollard EVSE statewide.
+ * Sprint 2B PR-3 added `hvhz_anchoring` (Sprint 2C H19) — FL Product Approval
+ * / MD-NOA tie-down / signed-sealed structural for outdoor pedestal/bollard
+ * EVSE statewide.
+ *
+ * Sprint 2B PR-4 added 6 more (H21/H22/H25/H26/H30/H33) for Sprint 2C
+ * per-AHJ manifests (Pompano / Davie / Hillsborough). The Orlando manifest
+ * does NOT list these in its relevantArtifactTypes — they exist at the
+ * DB+UI layer so Sprint 2C M1 can route them via per-AHJ visibility
+ * predicates without another schema migration.
  */
 export type ArtifactType =
+  // PR-1 originals
   | 'site_plan'
   | 'cut_sheet'
   | 'fire_stopping'
@@ -60,7 +68,15 @@ export type ArtifactType =
   | 'hoa_letter'
   | 'survey'
   | 'manufacturer_data'
-  | 'hvhz_anchoring';
+  // PR-3 (H19 statewide HVHZ)
+  | 'hvhz_anchoring'
+  // PR-4 (Sprint 2C AHJ manifests — Pompano / Davie / Hillsborough)
+  | 'zoning_application'
+  | 'fire_review_application'
+  | 'notarized_addendum'
+  | 'property_ownership_search'
+  | 'flood_elevation_certificate'
+  | 'private_provider_documentation';
 
 /**
  * 3-mode cover behavior (v4 commit 12). Replaces the boolean
@@ -94,6 +110,12 @@ export const ARTIFACT_TYPES: readonly ArtifactType[] = [
   'survey',
   'manufacturer_data',
   'hvhz_anchoring',
+  'zoning_application',
+  'fire_review_application',
+  'notarized_addendum',
+  'property_ownership_search',
+  'flood_elevation_certificate',
+  'private_provider_documentation',
 ] as const;
 
 const STORAGE_BUCKET = 'permit-attachments';
