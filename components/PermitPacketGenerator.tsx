@@ -847,6 +847,54 @@ export const PermitPacketGenerator: React.FC<PermitPacketGeneratorProps> = ({ pr
             title="HVHZ / Outdoor Anchoring Detail"
             description="Florida Product Approval, Miami-Dade NOA tie-down, or signed-and-sealed structural plans for outdoor pedestal/bollard EVSE statewide"
           />
+          {/* Sprint 2B PR-4 — 6 new artifact slots for Sprint 2C AHJ manifests.
+              Visibility is controlled by the AHJ-aware visibility layer
+              (data/ahj/visibility.ts) — Orlando manifest does NOT default
+              these ON, but contractors can still toggle them on per project
+              via the override layer. The slots remain in the DOM so the
+              upload UI is consistent regardless of which AHJ is active. */}
+          <AttachmentUploadCard
+            projectId={projectId}
+            artifactType="zoning_application"
+            title="Zoning Compliance Permit Application"
+            description="Required by Pompano Beach for EV charging stations (Sprint 2C H21)"
+            multiple={false}
+          />
+          <AttachmentUploadCard
+            projectId={projectId}
+            artifactType="fire_review_application"
+            title="Fire Review Application"
+            description="Required by Pompano + Davie for non-single-family EVSE (Sprint 2C H22)"
+            multiple={false}
+          />
+          <AttachmentUploadCard
+            projectId={projectId}
+            artifactType="notarized_addendum"
+            title="Notarized Addendum Form"
+            description="Required by Davie (contractor + owner notarized signatures) (Sprint 2C H25)"
+            multiple={false}
+          />
+          <AttachmentUploadCard
+            projectId={projectId}
+            artifactType="property_ownership_search"
+            title="Property Ownership Search (BCPA.NET)"
+            description="Required by Davie — printout from Broward County Property Appraiser (Sprint 2C H26)"
+            multiple={false}
+          />
+          <AttachmentUploadCard
+            projectId={projectId}
+            artifactType="flood_elevation_certificate"
+            title="Design Flood Elevation"
+            description="Required by Hillsborough for flood-zone projects per FBC (Sprint 2C H30)"
+            multiple={false}
+          />
+          <AttachmentUploadCard
+            projectId={projectId}
+            artifactType="private_provider_documentation"
+            title="Private Provider Documentation (FS 553.791)"
+            description="Optional Hillsborough — alternative to County plan review (Sprint 2C H33)"
+            multiple={false}
+          />
         </div>
       </div>
 
