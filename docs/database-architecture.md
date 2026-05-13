@@ -1,9 +1,9 @@
 # Database Architecture
 ## SparkPlan Application
 
-**Last Updated**: 2026-05-09
+**Last Updated**: 2026-05-12
 **Database**: Supabase PostgreSQL 15
-**Schema Version**: 2.2
+**Schema Version**: 2.3
 **Location**: `/supabase/schema.sql` and migration files
 
 ---
@@ -948,6 +948,78 @@ Index `(invoice_id, payment_date DESC)`. Standard RLS.
 - **Per-table trigger function** (`update_billing_updated_at`) instead of a global helper. Matches existing project convention; every prior migration defines its own per-table trigger function.
 - **Atomic invoice generation via RPC, not multi-statement client logic.** Two failure modes the RPC prevents: (a) invoice row created but line entries not linked, leaving an empty invoice with stranded unbilled rows; (b) line entries linked but invoice insert failed, stranding rows pointing at a non-existent invoice. The RPC's transaction boundary closes both gaps.
 - **Stripe is Phase 4, not Phase 1.** Manual payments (check / ACH / wire / cash / other) cover the immediate contractor workflow. Stripe integration adds payment-intent creation, webhook handling, and refunds — too much surface area for Phase 1.
+
+---
+
+### `project_attachments` Table + `permit-attachments` Storage Bucket (Phase 3.9 — Sprint 2B Uploads + Merge Engine, May 2026)
+
+Migrations (applied via Supabase MCP, in order):
+- `20260512_project_attachments.sql` (PR #45) — base table + `permit-attachments` Storage bucket + RLS.
+- `20260513_attachment_hvhz_anchoring.sql` (PR #49) — extends `artifact_type` CHECK to 8 values.
+- `20260514_attachment_include_sparkplan_cover.sql` (PR #49) — boolean column, superseded same day.
+- `20260514_attachment_cover_mode.sql` (PR #49) — replaces boolean with 3-value enum (idempotent backfill).
+- `20260514_attachment_custom_sheet_id.sql` (PR #49) — nullable per-upload sheet ID override.
+- `20260514_attachment_discipline_override.sql` (PR #49) — nullable per-upload discipline override.
+
+**Purpose**: User-supplied PDF artifacts (site plans, equipment cut sheets, NOC, HOA letters, fire-stopping schedules, surveys, manufacturer data, HVHZ wind-anchoring documentation) that the permit-packet generator splices into the composed packet behind SparkPlan-themed title sheets. The merge engine (PR #49) is the orchestrator; this table holds the metadata snapshot, and the `permit-attachments` Storage bucket holds the actual PDF objects.
+
+**Schema** (post-PR-#49 state):
+
+```sql
+CREATE TABLE public.project_attachments (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  project_id UUID NOT NULL REFERENCES public.projects(id) ON DELETE CASCADE,
+  user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+
+  artifact_type TEXT NOT NULL,        -- 8-value CHECK constraint
+  filename TEXT NOT NULL,
+  storage_path TEXT NOT NULL,         -- {user_id}/{project_id}/{artifact_type}/{filename}
+  page_count INTEGER,                 -- nullable; cached so merge engine doesn't reparse
+
+  display_title TEXT,                 -- human-friendly title for the SparkPlan title sheet
+  cover_mode TEXT NOT NULL DEFAULT 'separate',   -- 3-value CHECK constraint
+  custom_sheet_id TEXT,               -- nullable; overrides auto-assigned sheet ID
+  discipline_override TEXT,           -- nullable; overrides artifact_type-derived discipline
+
+  uploaded_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+
+  CONSTRAINT project_attachments_artifact_type_check
+    CHECK (artifact_type IN (
+      'site_plan', 'cut_sheet', 'fire_stopping', 'noc',
+      'hoa_letter', 'survey', 'manufacturer_data', 'hvhz_anchoring'
+    )),
+  CONSTRAINT project_attachments_cover_mode_check
+    CHECK (cover_mode IN ('separate', 'overlay', 'none')),
+  CONSTRAINT project_attachments_page_count_pos
+    CHECK (page_count IS NULL OR page_count > 0)
+);
+
+CREATE INDEX idx_project_attachments_project_type
+  ON public.project_attachments(project_id, artifact_type);
+
+ALTER TABLE public.project_attachments ENABLE ROW LEVEL SECURITY;
+```
+
+**RLS**: 4 standard `auth.uid() = user_id` policies (SELECT / INSERT / UPDATE / DELETE). Same pattern as `project_billing_settings`, `time_entries`, `project_photos`.
+
+**Storage bucket `permit-attachments`** (private, not public):
+- Path scheme: `{user_id}/{project_id}/{artifact_type}/{filename}`
+- Object-level RLS on `storage.objects` enforces per-user isolation via `auth.uid()::text = (storage.foldername(name))[1]`
+- Same convention as the existing `site-visit-photos` bucket (`20251220000001`)
+
+**Design Decisions**:
+
+- **`artifact_type` as TEXT CHECK, not Postgres ENUM.** Matches existing migration style (`20260106045201_subscriptions.sql`, `20260510_permits_and_inspections.sql`). No Postgres ENUM types in the codebase. Adding a new value (like `hvhz_anchoring` in PR #49) is a DROP + recreate of the CHECK, not an `ALTER TYPE`.
+- **`cover_mode` evolution: boolean → 3-state enum, same day.** Initial PR #49 v3 shipped `include_sparkplan_cover` as a boolean (cover or no cover). v4 review caught that a Bluebeam markup PDF wants the title-block *overlaid onto* its first page rather than as a standalone preceding sheet. v5 dropped the boolean and added the 3-state enum (`separate` / `overlay` / `none`) with an idempotent backfill — the cover_mode migration's DO block checks for the boolean column before backfilling, so the migration is re-runnable.
+- **`page_count` cached**, not derived on the fly. Merge engine reads page count to pre-allocate sheet IDs before opening the actual PDF bytes. Saves a re-parse for the band allocator.
+- **`storage_path` snapshot**, not computed. Avoids an `auth.uid()` lookup at SELECT time and keeps the row self-describing in admin queries.
+- **`custom_sheet_id` and `discipline_override` are advisory.** Both are nullable; UI does soft validation (format regex `^[A-Z][A-Za-z0-9]*-[A-Za-z0-9.-]+$` + cross-project duplicate detection) but never blocks generation. Aligns with the project's "validation: advisory not blocking" convention for user-supplied data.
+- **No `sheet_id` column** — the merge engine assigns sheet IDs at packet-generation time using the Sprint 2A `nextSheetId` allocator. `custom_sheet_id` is the override slot; the auto-assigned ID isn't persisted because it changes when section toggles change.
+
+**Merge engine consumes this table** via three pure pdf-lib services in `services/pdfExport/`:
+- `mergePacket.ts` — splices SparkPlan portion + (title sheet + upload) × N into final `Uint8Array`. Never throws; returns warnings for corrupted / encrypted / zero-byte / zero-page uploads.
+- `stampSheetIds.ts` — stamps continuous sheet IDs in bottom-right of upload pages.
+- `compositeTitleBlock.ts` — overlays title block onto upload's own page (used by `cover_mode = 'overlay'`).
 
 ---
 

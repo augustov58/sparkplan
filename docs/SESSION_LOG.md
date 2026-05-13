@@ -3,7 +3,46 @@
 **Purpose**: Tracks recent work for seamless handoff between Claude instances.
 **Maintenance Rule**: Keep only the last 2 sessions. At the start of a new session, delete older entries — git history preserves everything.
 
-**Last Updated**: 2026-05-10
+**Last Updated**: 2026-05-12
+
+---
+
+### Session: 2026-05-12 — Sprint 2B PR-3 (merge engine) shipped via 5-round iterative review cycle
+
+**Focus**: Closed the merge-engine half of Sprint 2B. Built and shipped PR #49 over 17 commits / 5,580 LOC against `feat/sprint2b-merge-engine`, merged at squash hash `fce6275` 2026-05-12. Bundled with the PR #45 (foundation, merged 2026-05-11) and PR #47 (upload UI, merged 2026-05-11) work that landed earlier in the week, Sprint 2B's merge-engine deliverable is now complete; PR-4 (Orlando manifest scaffold) and Sprint 2C M1 wiring remain.
+
+**Status**: ✅ PR #49 merged. Sprint 2B: 3 of 4 planned PRs shipped (PR #45 + PR #47 + PR #49). Test suite at 522 passing across 35 test files (was 491 post-PR-2; +31 new tests across 4 new test files: `attachmentTitleSheet`, `attachmentTitleBlock`, `compositeTitleBlock`, `stampSheetIds`, `mergePacket`). 5 DB migrations applied to live Supabase. Build green.
+
+**Architecture decisions worth carrying forward**:
+
+- **Pure pdf-lib functions follow the same contract as calc services.** CLAUDE.md's calc-service rule ("pure functions / never throw / return warnings") extends cleanly to PDF post-processing. `mergePacket`, `stampSheetIds`, and `compositeTitleBlock` are all bytes-in / bytes-out, hold no Supabase imports, take no hooks, and return warnings instead of throwing. This makes them testable without a browser/Supabase context AND lets Sprint 3 PAdES signing reuse the same wiring shape. Lesson: when a service is going to be reused by a future sprint, write it pure from day one — refactoring around side effects is more expensive than getting the shape right up front.
+- **The merge engine never blocks the merge when individual attachments fail.** Encrypted / corrupted / zero-byte / zero-page uploads surface as warnings but the merge proceeds with everything that succeeded. Wrong-direction failure here would be "block the entire packet because one cut sheet was corrupted" — that creates a hostage situation where the contractor can't submit at all. Right-direction: skip the bad upload, emit a warning, let the contractor see what failed and re-upload. Memory-worthy pattern for any future "compose N artifacts" pipeline (Sprint 3 multi-sheet PE seal will hit the same shape).
+- **Cover-mode evolution: boolean → 3-state enum, same day.** PR #49 v3 shipped `include_sparkplan_cover` (boolean: cover or no cover). v4 review caught the gap — a Bluebeam markup PNG-on-PDF wants the title-block overlaid ONTO its page, not as a standalone preceding sheet. v5 dropped the boolean, added `cover_mode` enum (`separate` / `overlay` / `none`) with idempotent backfill. Lesson: when a boolean flag captures a binary distinction but the real-world axis is 3-way, the binary always gets refactored within a few iterations. If you smell the third option (even speculatively), reach for the enum first.
+- **Size-aware title sheets matter more than expected.** First v1 used hardcoded Letter dimensions for all title sheets, so a contractor's ARCH D site plan (1728 × 2592 pt) was preceded by an 8.5 × 11 cover that looked wildly out of scale next to the plan. v2 added detection via pdf-lib (`getPage(0).getSize()`) and forwarded the dimensions into the react-pdf title sheet via an explicit `pageSize` prop. Lesson: when generating a "cover for X," size-match X — even if it adds a detection step to the pipeline.
+- **Augusto-as-PE drives feature scope.** The user is FL-licensed PE + platform owner (memory: `user_role_pe.md`). Sprint 2B's title-block layout (perimeter rule, right-margin labeled cells, FL Reg/Seal cell, Seal Area, "NOT FOR CONSTRUCTION" cell, Revisions cell) is the layout a Florida AHJ plan reviewer expects to see on architectural drawings. Building it generically would have missed the FL-specific cells. Lesson: when the user has domain authority, ask them what the artifact should look like before sketching v1 from generic references.
+
+**Process gotchas worth remembering**:
+
+- **17 commits is a lot for one PR.** PR #49 reviewed cleanly because each commit was small and self-contained (one feature, one test file, builds + tests pass). The iterative v1 → v5 cycle would have been a nightmare to review as a single squash commit. Lesson: when iterating on a feature, lean into per-feature commits inside the PR — the squash commit at merge captures the final shape, and the per-commit history makes the review surface tractable.
+- **Migrations stack tight.** PR #49 applied 5 migrations to live Supabase in the order: `20260513_attachment_hvhz_anchoring.sql` → `20260514_attachment_include_sparkplan_cover.sql` → `20260514_attachment_cover_mode.sql` (which drops the prior boolean) → `20260514_attachment_custom_sheet_id.sql` → `20260514_attachment_discipline_override.sql`. Same-day cover_mode supersedes the boolean — the cover_mode migration is idempotent (uses DO block to check for the boolean column before backfilling). Lesson: when refactoring a column same-day, the second migration should be idempotent against either "boolean exists" or "boolean dropped" states.
+- **Supabase advisor surfaces F-tier work.** While reviewing PR #49's schema additions, the Supabase advisor flagged `public.jurisdictions` as having RLS disabled. Currently 0 rows so no exposure, but Sprint 2C M1 will populate it. Captured as F8 in the parent audit doc — fix before Sprint 2C M1 lands.
+- **Docs sync convention extends to Sprint 2B.** PR #24 (after Sprint 2A PRs 1 + #23) + PR #42 (after Sprint 2A PRs #40 + #41) set the precedent — docs-only PR off main after feature PRs merge. This session's docs-sync PR (#50) follows the same pattern for Sprint 2B PR #49. Stays consistent.
+
+**Deliverables**:
+
+| PR | Branch | Files | Result |
+|---|---|---|---|
+| **#49 (merged)** | `feat/sprint2b-merge-engine` | 17 commits, 5 new pdf-lib services + 2 new react-pdf components + 5 migrations + 4 test files (~5,580 LOC) | ✅ MERGED `fce6275` 2026-05-12 |
+| **this PR (local)** | `docs/sprint-2b-docs-sync` | parent audit + sprint2b + README + ROADMAP + CHANGELOG + SESSION_LOG + database-architecture + CLAUDE.md | (this commit set) |
+
+**Worktrees in play at session end**: none on disk for PR #49 (was a single-agent run, no parallel worktrees).
+
+**Pending / follow-ups**:
+
+1. **PR-4: Orlando manifest scaffold** — `data/ahj/orlando.ts` defines two scopes (`'existing-service'` and `'new-service'`) as `PacketSection[]`. M1 engine in Sprint 2C extends this to 4 more AHJs. Unblocks per-AHJ wiring of H5/H6/H7/H8/H16.
+2. **F8: Enable RLS on `public.jurisdictions`** — one-line migration before Sprint 2C M1 populates the table. Supabase advisor flagged 2026-05-12.
+3. **H19 per-AHJ wiring** — `artifact_type='hvhz_anchoring'` slot exists; Miami-Dade + Pompano enforcement wiring lands in Sprint 2C M1 alongside the manifest scaffold.
+4. **Sprint 3 unblocked at the pdf-lib layer** — PAdES PE seal signing now has the same library + integration pattern that PR #49 established. Cert vendor selection + FBPE business-entity registration are the remaining hard prerequisites.
 
 ---
 
@@ -30,52 +69,19 @@
 
 | PR | Branch | Files | Result |
 |---|---|---|---|
-| **#40 (open)** | `fix/sprint2a-pr4-diagrams` (Agents 1 + 2 + H1 + M3 fixes) | 14 changed, +1886 / -201 | M6 + H9 overlay + M3 grounding |
-| **#41 (open)** | `fix/sprint2a-pr5-h17-schema` (Agent 3 + H2 + M1 fixes) | 7 changed, +782 / -2 | H17 screening + settings JSON |
-| **this PR (open)** | `docs/sprint2a-pr4-pr5-sync` | audit + sprint2a + README + CHANGELOG + SESSION_LOG + CLAUDE.md | (this commit) |
+| **#40 (merged)** | `fix/sprint2a-pr4-diagrams` (Agents 1 + 2 + H1 + M3 fixes) | 14 changed, +1886 / -201 | M6 + H9 overlay + M3 grounding |
+| **#41 (merged)** | `fix/sprint2a-pr5-h17-schema` (Agent 3 + H2 + M1 fixes) | 7 changed, +782 / -2 | H17 screening + settings JSON |
+| **#42 (merged)** | `docs/sprint2a-pr4-pr5-sync` | audit + sprint2a + README + CHANGELOG + SESSION_LOG + CLAUDE.md | docs sync |
 
 **Worktrees in play at session end**: none (3 agent worktrees auto-removed after their branches merged into the review scratch branch). Standard worktrees from other features still on disk.
 
-**Pending / follow-ups**:
+**Pending / follow-ups (resolved by Sprint 2B work)**:
 
-1. **Merge PR #40 + PR #41** (separate review surfaces; can merge in either order — they have no cross-dependencies).
-2. **Pre-existing `(panel as any).aic_rating` cast at `components/OneLineDiagram.tsx:1136`** — left in place during PR #40's H1 fix (outside its scope). Clean up in a separate refactor PR or next time the file is touched.
+1. **Merge PR #40 + PR #41** — done.
+2. **Pre-existing `(panel as any).aic_rating` cast at `components/OneLineDiagram.tsx:1136`** — still in place; clean up next time the file is touched.
 3. **Sprint 2C is now unblocked** — H17 lane logic + settings JSON + AHJ-name placeholder are all in place. Sprint 2C wires per-AHJ manifests into `ahjOverride` and replaces the AHJ placeholder. M2/M3 (security) deferred items (enum whitelist on read, scope_flags runtime coercion) belong in Sprint 2C when those code paths get wired in.
-4. **Pre-existing 480V `(panel as any)` casts** can be cleaned up generically next time the panel-data load path is touched.
+4. **Pre-existing 480V `(panel as any)` casts** — still pending.
 
 ---
 
-### Session: 2026-05-10 — Sprint 2A PR #31 (engineering content additions) shipped + post-merge docs sync
-
-**Focus**: Continued the AHJ compliance audit Sprint 2A in a fresh worktree off `origin/main`, branched as `feat/sprint-2a-pr3-content`. Built and shipped the third themed PR of Sprint 2A — engineering content additions H14 + H9 (page only) + H15 + H10 + H11 — across 4 commits in `/home/augusto/projects/sparkplan-pr3`. Merged as PR #31 (`dacaab2`). Followed the merge with this docs-sync PR matching the precedent set by PR #24 (audit notes + ROADMAP + CHANGELOG + SESSION_LOG).
-
-**Status**: ✅ PR #31 merged. 14 of the original ~16 Sprint 2A findings now ✅ RESOLVED on main. Test suite at 229/229 (was 213 post-PR-#23, +21 new PDF render tests across 4 new test files). Build clean. No DB migrations.
-
-**Architecture decisions worth carrying forward**:
-
-- **H9 split was deliberate.** The audit doc lists H9 as a single finding but the work has two physically separate landing zones: a new band-100 "Available Fault Current Calculation" page (PR #31), and AIC labels overlaid on the existing OneLineDiagram (deferred to PR 4). The latter touches the stable `OneLineDiagram.tsx` module — TWO SVG renderings (interactive ~line 2340 + print/export ~line 3290 per CLAUDE.md) — and pairs naturally with M6 (riser landscape mode for ≥10 panels). Adding labels in PR #31 without M6 would risk regressions on a stable module; bundling them into PR 4 is safer. Documented in the H9-row of the audit doc as the carryover.
-- **Per-finding commits inside a themed PR.** Sprint 2A pattern is one themed PR per category boundary (Strategy C). PR #31 had 4 commits, one per finding (H14 / H9+H15 / H10 / H11), each with self-contained build + tests. This is finer-grained than per-PR-merge but coarser than per-line. Review velocity was high because each commit's diff was scoped to one finding's files.
-- **Detection regex is now in 3 call sites.** PR #31 introduced `/\b(ev|evse|charger|charging|level\s*2|l2)\b/i` in `EquipmentSpecsDocuments.tsx` (H15), `permitPacketGenerator.tsx` (H11 builder), and `PermitPacketGenerator.tsx` UI (auto-disable predicate). Captured in memory as a DRY follow-up: extract to `isLikelyEVPanel(panel, circuits)` paired with the existing `isEVEMSManagedPanel` next time `upstreamLoadAggregation.ts` is touched. Three call sites is the threshold per the Sprint 1 diagnostic shortcut #3 ("when a calc is right at one layer but wrong at another, look for bypass / inline reimplementation").
-- **Post-merge docs-sync PR is part of the convention.** PR #24 set the precedent (audit notes + ROADMAP + CHANGELOG + SESSION_LOG for PRs 1 + #23). PR #31 needed the same treatment. **Lesson**: at PR-merge time the orchestrator must explicitly check "are the four sibling docs synced?" and fire a docs-sync PR if not. Skipping leaves audit doc rows showing ❌ for findings that are actually shipped — and the next session that opens the doc gets confused about what's pending.
-
-**Process gotchas worth remembering**:
-
-- **`.env.local` is not copied into worktrees.** Tests at `services/api/pythonBackend.ts` / `services/ai/chatTools.ts` throw at module-load time when `VITE_SUPABASE_URL` + `VITE_SUPABASE_ANON_KEY` are absent. Fix: invoke vitest with inline stub env vars: `VITE_SUPABASE_URL=http://localhost:54321 VITE_SUPABASE_ANON_KEY=test-stub-key npm test --run`. Don't copy real secrets into the worktree (auto mode classifier blocks that).
-- **PR base verification.** Sprint 2A pattern #7 from prior memory: when GitHub UI creates a PR, verify base is `main` before review. PR #31 created cleanly off `main` but worth confirming on every new PR.
-- **Concurrent main churn.** While PR #31 was open, three other PRs landed (#32 Permits, #33 Estimating, #34/#35 T&M Phase 1a/1b, plus a #36 docs rollout for v1b). Lessons: each themed PR must branch off latest `origin/main` after the previous merges (don't stack), and the docs-sync PR must `git fetch + rebase` right before push to absorb concurrent merges cleanly.
-
-**Deliverables**:
-
-| PR | Branch | Files | Result |
-|---|---|---|---|
-| **#31 (merged)** | `feat/sprint-2a-pr3-content` | 4 commits, 5 new PDF components, 4 new test files (~1.2k LOC) | ✅ MERGED `dacaab2` |
-| **this PR (open)** | `docs/sprint-2a-pr3-sync` | audit + ROADMAP + CHANGELOG + SESSION_LOG | (this commit) |
-
-**Worktrees in play at session end**:
-- `/home/augusto/projects/sparkplan-pr3` on `feat/sprint-2a-pr3-content` (post-merge — can be removed)
-- `/home/augusto/projects/sparkplan-docs-pr3` on `docs/sprint-2a-pr3-sync` (active)
-
----
-
-<!-- Earlier sessions (2026-05-06/07 Sprint 1 close-out, 2026-05-08/09 Sprint 2A early phases, 2026-05-09 Permits + Estimating + T&M Phase 1 parallel-agent session) rotated out per "keep last 2 sessions" rule. Git history preserves them. -->
-
+<!-- Earlier sessions (2026-05-09 contractor-pivot + T&M Phase 1, 2026-05-10 Sprint 2A PR #31) rotated out per "keep last 2 sessions" rule. Git history preserves them. -->

@@ -1,10 +1,42 @@
 # SparkPlan - Roadmap
 
-## Current Phase: 3.8 (T&M Billing Beta v1) - PHASE 1 IMPLEMENTED (May 2026)
+**Last Updated:** 2026-05-12
 
-## Latest Completed Phase: 3.7 (Estimating Beta v1) - PHASE 1 IMPLEMENTED (May 2026)
-## Also Just Shipped: 3.6 (Permits Beta v1) - PHASE 1 IMPLEMENTED (May 2026)
-## Active Sprint: 3.4 (AHJ Compliance Audit Sprint 2A) - 3 themed PRs merged, 2 still planned (PR 4 diagrams + PR 5 engine/schema)
+## Current Phase: 3.9 (AHJ Compliance Audit Sprint 2B) - MERGE-ENGINE HALF COMPLETE (May 2026)
+
+## Latest Completed Phase: 3.8 (T&M Billing Beta v1) - PHASE 1 IMPLEMENTED (May 2026)
+## Also Just Shipped: 3.7 (Estimating Beta v1) + 3.6 (Permits Beta v1) - PHASE 1 IMPLEMENTED (May 2026)
+## Sprint 2A: ✅ COMPLETE (19/19 findings; 5 themed PRs merged)
+## Sprint 2B: ✅ COMPLETE merge-engine half (3 PRs merged); PR-4 Orlando manifest scaffold on deck
+
+---
+
+## Phase 3.9: AHJ Compliance Audit Sprint 2B - MERGE-ENGINE COMPLETE (May 2026)
+
+User-supplied artifacts (site plans, cut sheets, NOC, HOA letters, fire-stopping schedules, manufacturer data, HVHZ wind-anchoring) now upload through the SparkPlan UI and splice into the generated permit packet behind SparkPlan-themed title sheets, with continuous sheet-ID stamping across the merged document. This is also the architectural foundation Sprint 3 needs — `pdf-lib` is the same library that does PAdES digital signing for PE seals.
+
+| PR | Status | Closes |
+|---|---|---|
+| **PR #45** (foundation) | ✅ MERGED 2026-05-11 | `pdf-lib` dependency + `project_attachments` table + sheet ID discipline prefixes (E / C / X / M / P / S / A) + `nextSheetId` allocator |
+| **PR #47** (upload UI) | ✅ MERGED 2026-05-11 | `useProjectAttachments` hook + `AttachmentUploadCard` + `PermitPacketGenerator` integration (8 upload slots) |
+| **PR #49** (merge engine) | ✅ MERGED 2026-05-12 (`fce6275`) | `mergePacket` + `stampSheetIds` + `compositeTitleBlock` (pure pdf-lib functions); `AttachmentTitleSheet` + `AttachmentTitleBlock` (size-aware react-pdf, Letter→ARCH D); 3-mode cover (`separate` / `overlay` / `none`); per-upload `custom_sheet_id` + `discipline_override`; H19 HVHZ artifact_type |
+| **PR-4** (planned) | ⏳ PENDING | `data/ahj/orlando.ts` manifest scaffold — per-AHJ wiring of H5/H6/H7/H8/H16 (Sprint 2C M1 then extends to 4 more AHJs) |
+
+**Findings closed (upload slot enabled):** H5 (NOC), H6 (HOA letter), H7 (site plan / survey), H8 (equipment cut sheets), H16 (fire stopping schedule), H19 (HVHZ wind-anchoring). Full AHJ-specific closure depends on PR-4 manifest scaffold + Sprint 2C M1 per-AHJ wiring.
+
+**Migrations applied** (via Supabase MCP, project `ioarszhzltpisxsxrsgl`):
+- `20260512_project_attachments.sql` (PR #45) — table + `permit-attachments` Storage bucket + RLS.
+- `20260513_attachment_hvhz_anchoring.sql` (PR #49) — extends `artifact_type` CHECK to 8 values.
+- `20260514_attachment_include_sparkplan_cover.sql` (PR #49) — boolean (superseded same day).
+- `20260514_attachment_cover_mode.sql` (PR #49) — replaces boolean with 3-value enum.
+- `20260514_attachment_custom_sheet_id.sql` (PR #49) — nullable per-upload override.
+- `20260514_attachment_discipline_override.sql` (PR #49) — nullable per-upload override.
+
+**Test count (post-Sprint-2B):** 522 passing across 35 test files (+31 from PR #49; 491 baseline post-PR-2).
+
+**Surfaced F-tier follow-up:** F8 — Enable RLS on `public.jurisdictions` before Sprint 2C M1 populates it.
+
+---
 
 ---
 
@@ -96,17 +128,17 @@ Three-PR cluster spawned by verifying PR #25 (riser SE label + cumulative VD on 
 
 ---
 
-## Phase 3.4: AHJ Compliance Audit Sprint 2A - IN PROGRESS (May 2026)
+## Phase 3.4: AHJ Compliance Audit Sprint 2A - ✅ COMPLETE (May 2026)
 
-Form-factor and content-gap sweep on top of Sprint 1's engine-correctness fixes. Closes systemic intake-rejection vectors that affect every Florida AHJ — packet identification (cover edition stamp), per-sheet contractor signature, navigation (TOC, revision log, sheet IDs), and required content pages (general notes, EVEMS narrative, EVSE labeling, grounding detail, AIC labels). Work split into themed PRs ("Strategy C" — by category boundary, not per-commit).
+Form-factor and content-gap sweep on top of Sprint 1's engine-correctness fixes. Closes systemic intake-rejection vectors that affect every Florida AHJ — packet identification (cover edition stamp), per-sheet contractor signature, navigation (TOC, revision log, sheet IDs), and required content pages (general notes, EVEMS narrative, EVSE labeling, grounding detail, AIC labels). Work split into themed PRs ("Strategy C" — by category boundary, not per-commit). All 19 findings shipped.
 
 | PR | Status | Closes |
 |---|---|---|
 | **PR 1** (merged `92126eb`) | ✅ MERGED 2026-05-08 | C7 (NEC edition selector), H4 (FBC + NFPA-70 reference), C8 (per-sheet contractor block), M8 (meter stack theme parity), H12 (general notes page), H13 (3/3/5 voltage drop convention), LOW (edition-stamp polish) |
 | **PR #23** (merged `6859328`) | ✅ MERGED 2026-05-09 | H1 (cover TOC), H2 (revision log page), H3 (sheet IDs with `E-` prefix and category bands) — plus section toggle UI + projects.settings persistence + sheet ID styling fix + 42-circuit panel schedule overflow fix |
 | **PR #31** (merged `dacaab2`) | ✅ MERGED 2026-05-10 | H14 (NEC 220.87 conditions narrative — opt-in 3-condition checklist sheet), H9 partial (Available Fault Current Calculation page sourced from service-level short-circuit calc; AIC overlay on one-line deferred to PR 4), H15 (UL-2202 + UL-2594 listings card on Equipment Specs), H10 (EVEMS operational narrative — device, setpoint, monitoring, failure mode, NEC 750 tamper), H11 (EVSE labeling page per NEC 625.43 — disconnect labels + breaker locking + commercial-only emergency shutoff) |
-| **PR 4** (planned) | ⏳ PENDING | M3 (project-specific grounding detail with GEC sizing per NEC 250.66 / 250.122), M6 (riser diagram landscape mode for ≥10 panels OR pagination), **H9 AIC overlay** on `OneLineDiagram.tsx` (carryover from PR #31 — pairs with M6 since both edit the same SVG render paths) |
-| **PR 5** (planned) | ⏳ PENDING | H17 (FS 471.003(2)(h) contractor-exemption screening engine — pure function returning `{ lane, reason, ahjOverride? }`), schema additions to `projects.settings` (service_modification_type, scope_flags, estimated_value_usd) |
+| **PR #40** (merged 2026-05-10) | ✅ MERGED | M3 (project-specific grounding detail with GEC sizing per NEC 250.66 / 250.122), M6 (riser diagram pagination for ≥10 panels), **H9 AIC overlay** on `OneLineDiagram.tsx` + permit-packet riser |
+| **PR #41** (merged 2026-05-10) | ✅ MERGED | H17 (FS 471.003(2)(h) contractor-exemption screening engine — pure function returning `{ lane, reason, ahjOverride? }`), schema additions to `projects.settings` (service_modification_type, scope_flags, estimated_value_usd) |
 
 **Net packet structure (post-Sprint-2A target):**
 

@@ -31,8 +31,10 @@ Cold-read cost for typical sessions: index (~5k) + 1 sprint file = **~7–17k to
 ## Status snapshot
 
 - **Sprint 1** — ✅ COMPLETE 2026-05-07 (10 calc-engine fixes)
-- **Sprint 2A** — ✅ COMPLETE 2026-05-10 (19/19; PR #40 diagrams + PR #41 H17 open for merge)
-- **Sprint 2B / 2C / 3** — ⚪ Not started
+- **Sprint 2A** — ✅ COMPLETE 2026-05-10 (19/19; 5 themed PRs)
+- **Sprint 2B** — ✅ COMPLETE 2026-05-12 (PR #45 foundation + PR #47 upload UI + PR #49 merge engine merged); PR-4 manifest scaffold on deck
+- **Sprint 2C** — ⚪ Not started (research already landed via PR #46 + PR #48)
+- **Sprint 3** — ⚪ Not started
 - **Sprint 4** — 🔵 Deferred
 
 For details on each sprint's open work, dependencies, and architectural patterns, follow the links in the table above.
@@ -57,11 +59,12 @@ For details on each sprint's open work, dependencies, and architectural patterns
 | Available fault current / SCS | ✓ | ✓ | – | – | ✓ | ✓ | H9 page (PR #31) + H9 AIC overlay (PR #40) |
 | Sheet ID (`E-###`) | – | ✓ | – | – | – | ✓ | H3 |
 | FBC + NFPA-70 references | – | ✓ | ✓ | ✓ | ✓ | ✓ | C7 + H4 |
-| Notice of Commencement (>$5k) | ✓ | ✓ | – | – | – | ❌ | H5 (Sprint 2B) |
-| HOA / condo approval letter | – | – | ✓ | – | – | ❌ | H6 (Sprint 2B) |
-| Site plan / survey | ✓ | ✓ | ✓ | ✓ | ✓ | ❌ | H7 (Sprint 2B) |
-| Equipment cut sheets / manuals | ✓ | – | ✓ | ✓ | – | ❌ | H8 (Sprint 2B) |
-| Fire stopping schedule | ✓ | ? | ? | ? | ? | ❌ | H16 (Sprint 2B) |
+| Notice of Commencement (>$5k) | ✓ | ✓ | – | – | – | ✓ upload slot (enabled by PR #49) | H5 (Sprint 2B; per-AHJ wiring → PR-4) |
+| HOA / condo approval letter | – | – | ✓ | – | – | ✓ upload slot (enabled by PR #49) | H6 (Sprint 2B; per-AHJ wiring → PR-4) |
+| Site plan / survey | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ upload slot (enabled by PR #49) | H7 (Sprint 2B; per-AHJ wiring → PR-4) |
+| Equipment cut sheets / manuals | ✓ | – | ✓ | ✓ | – | ✓ upload slot (enabled by PR #49) | H8 (Sprint 2B; per-AHJ wiring → PR-4) |
+| Fire stopping schedule | ✓ | ? | ? | ? | ? | ✓ upload slot (enabled by PR #49) | H16 (Sprint 2B; per-AHJ wiring → PR-4) |
+| HVHZ wind-anchoring (outdoor pedestal/bollard) | – | ✓ | ✓ | ? | ? | ✓ upload slot (enabled by PR #49) | H19 (Sprint 2B upload; per-AHJ wiring → Sprint 2C M1) |
 | General Notes page (NEC + VD) | ✓ | ? | ? | ? | ? | ✓ | H12 + H13 |
 | Per-sheet contractor signature | ✓ | ? | ? | ? | ? | ✓ | C8 |
 | EVEMS narrative (NEC 625.42) | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | H10 |
@@ -105,6 +108,7 @@ These touch multiple sprints' code and don't fit cleanly inside one sprint file.
 - **F5** — `addEVInfrastructure` orphan-cleanup pattern may apply to House Panel and Unit Panel meters when regenerated. Audit and apply if so. (Originated Sprint 1 C4 review.)
 - **F6** — Rename `services/calculations/residentialLoad.ts:calculateSingleFamilyLoad` → `calculateSingleFamilyLoadStandard` (it implements NEC 220.40 Standard Method despite header saying 220.82); add proper `calculateSingleFamilyLoadOptional` (NEC 220.82) and unify autogen + display layer on it. (Originated Sprint 1 C4.)
 - **F7** — **Acceptance evidence capture** (per `FL_PILOT_REVISED_REPORT.md` §7 #2). After packet is submitted to AHJ and approved, capture metadata: AHJ name + jurisdiction code, packet version hash, submission/approval dates, plan-reviewer comments. Surface as "Passed in [Orlando]" badge on subsequent packets to the same AHJ + as a rollup ("87 packets passed in 5 FL AHJs since 2026-Q3"). **Moat-compounder** — the data flywheel that locks contractors in over time. New `packet_submissions` table.
+- **F8** — **Enable RLS on `public.jurisdictions`** before Sprint 2C M1 populates it. Currently 0 rows so no exposure, but Supabase advisor flagged it 2026-05-12 during the PR #49 schema review. Should land alongside the first M1 manifest seed (or earlier as a one-line migration).
 
 ---
 
