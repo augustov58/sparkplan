@@ -95,6 +95,13 @@ export const ARTIFACT_DISPLAY_TITLES: Record<ArtifactType, string> = {
   survey: 'Property Survey',
   manufacturer_data: 'Manufacturer Installation Data',
   hvhz_anchoring: 'HVHZ / Outdoor Anchoring Detail',
+  // Sprint 2B PR-4 — new artifact types for Sprint 2C AHJ manifests
+  zoning_application: 'Zoning Compliance Permit Application',
+  fire_review_application: 'Fire Review Application',
+  notarized_addendum: 'Notarized Addendum Form',
+  property_ownership_search: 'Property Ownership Search',
+  flood_elevation_certificate: 'Flood Elevation Certificate',
+  private_provider_documentation: 'Private Provider Documentation',
 };
 
 /**
@@ -118,6 +125,19 @@ export const ARTIFACT_DESCRIPTIONS: Record<ArtifactType, string> = {
     'Vendor-supplied installation manuals and technical bulletins',
   hvhz_anchoring:
     'FL Product Approval / Miami-Dade NOA / signed-sealed structural plans for outdoor pedestal/bollard EVSE',
+  // Sprint 2B PR-4 — new artifact types for Sprint 2C AHJ manifests
+  zoning_application:
+    'Zoning Compliance Permit Application — required by Pompano Beach for EV charging stations (Sprint 2C H21)',
+  fire_review_application:
+    'Fire Review Application — required by Pompano + Davie for non-single-family EVSE (Sprint 2C H22)',
+  notarized_addendum:
+    'Notarized Addendum Form (contractor + owner signatures) — required by Davie (Sprint 2C H25)',
+  property_ownership_search:
+    'Property Ownership Search printout from BCPA.NET — required by Davie (Sprint 2C H26)',
+  flood_elevation_certificate:
+    'Design Flood Elevation per FBC — required by Hillsborough for flood-zone projects (Sprint 2C H30)',
+  private_provider_documentation:
+    'Private Provider Documentation per FS 553.791 — alternative to Hillsborough County plan review (Sprint 2C H33)',
 };
 
 // ---------------------------------------------------------------------------

@@ -117,19 +117,31 @@ describe('useProjectAttachments — countPdfPages', () => {
 
 describe('useProjectAttachments — module exports', () => {
   it('exposes the full ARTIFACT_TYPES enum matching the migration CHECK', () => {
-    // Migration: site_plan, cut_sheet, fire_stopping, noc, hoa_letter,
-    // survey, manufacturer_data, hvhz_anchoring (Sprint 2B PR-3). Any
-    // drift here = guaranteed RLS reject.
+    // Migration trail (any drift here = guaranteed RLS reject):
+    //   PR-1 originals (7): site_plan, cut_sheet, fire_stopping, noc,
+    //                       hoa_letter, survey, manufacturer_data
+    //   PR-3 (H19):         hvhz_anchoring
+    //   PR-4 (H21/H22/H25/H26/H30/H33): zoning_application,
+    //                       fire_review_application, notarized_addendum,
+    //                       property_ownership_search,
+    //                       flood_elevation_certificate,
+    //                       private_provider_documentation
     expect([...ARTIFACT_TYPES].sort()).toEqual(
       [
         'cut_sheet',
+        'fire_review_application',
         'fire_stopping',
+        'flood_elevation_certificate',
         'hoa_letter',
         'hvhz_anchoring',
         'manufacturer_data',
         'noc',
+        'notarized_addendum',
+        'private_provider_documentation',
+        'property_ownership_search',
         'site_plan',
         'survey',
+        'zoning_application',
       ].sort(),
     );
   });
