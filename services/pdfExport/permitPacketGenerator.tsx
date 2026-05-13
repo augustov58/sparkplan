@@ -44,7 +44,7 @@ import {
 import { EquipmentSpecsPages } from './EquipmentSpecsDocuments';
 import { VoltageDropPages } from './VoltageDropDocuments';
 import { JurisdictionRequirementsPages } from './JurisdictionDocuments';
-import { ShortCircuitCalculationPages } from './ShortCircuitDocuments';
+import { ShortCircuitTablePages } from './ShortCircuitDocuments';
 import { ArcFlashPages } from './ArcFlashDocuments';
 import { GroundingPlanPages } from './GroundingPlanDocuments';
 import { MultiFamilyEVPages } from './MultiFamilyEVDocuments';
@@ -645,24 +645,23 @@ export const generatePermitPacket = async (data: PermitPacketData): Promise<void
   }
 
   if (sections.shortCircuit && data.shortCircuitCalculations && data.shortCircuitCalculations.length > 0) {
-    data.shortCircuitCalculations.forEach((calc, idx) => {
-      builders.push({
-        name: `ShortCircuit[${idx}:${calc.panel_name ?? calc.calculation_type ?? calc.id ?? '?'}]`,
-        kind: 'shortCircuit',
-        band: BAND_CALCULATIONS,
-        pageCount: 1,
-        tocTitles: [`Short Circuit Analysis — ${calc.panel_name ?? calc.calculation_type ?? 'System'}`],
-        render: (sheetIds) => (
-          <ShortCircuitCalculationPages
-            calculation={calc}
-            projectName={data.projectName}
-            projectAddress={data.projectAddress}
-            panelName={calc.calculation_type === 'panel' ? calc.panel_name : undefined}
-            {...contractor}
-            sheetId={sheetIds[0]}
-          />
-        ),
-      });
+    // Single page with a row per panel. Replaces the prior per-panel page-per-builder loop,
+    // which grew sheet count linearly with panel count. See PR description for rationale.
+    builders.push({
+      name: 'ShortCircuit',
+      kind: 'shortCircuit',
+      band: BAND_CALCULATIONS,
+      pageCount: 1,
+      tocTitles: ['Short Circuit Analysis'],
+      render: (sheetIds) => (
+        <ShortCircuitTablePages
+          calculations={data.shortCircuitCalculations ?? []}
+          projectName={data.projectName}
+          projectAddress={data.projectAddress}
+          {...contractor}
+          sheetId={sheetIds[0]}
+        />
+      ),
     });
   }
 
