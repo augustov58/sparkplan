@@ -360,6 +360,86 @@ export function estimateUtilityTransformer(
 }
 
 /**
+ * Calculate fault current at the secondary of a DOWNSTREAM transformer when
+ * the primary-side available fault current is known.
+ *
+ * This is the case where a transformer sits in the middle of the distribution
+ * chain (e.g., 480V switchgear → step-down transformer → 208V sub-panel). The
+ * primary-side fault current comes from the upstream panel's saved SC calc.
+ *
+ * Per Bussmann/Eaton SPD page 237, "Calculation of Short-Circuit Currents
+ * When Primary Available Short-Circuit Current is Known":
+ *
+ *   f = (I_sc_primary × V_primary × 1.732 × %Z) / (100,000 × kVA)   [3φ]
+ *   f = (I_sc_primary × V_primary × %Z) / (100,000 × kVA)            [1φ]
+ *   M = 1 / (1 + f)
+ *   I_sc_secondary = (V_primary / V_secondary) × M × I_sc_primary
+ *
+ * This is distinct from `calculateServiceFaultCurrent`, which derives the
+ * UTILITY transformer's letthrough from kVA/%Z/voltage using `kVA × 1000 / V`
+ * (the primary side is treated as an infinite bus).
+ *
+ * NEC reference: 110.9 (interrupting rating sufficient for available If at
+ * any point in the system, including downstream of step-down transformers).
+ */
+export function calculateDownstreamTransformerFaultCurrent(
+  transformer: TransformerData,
+  primaryFaultCurrent: number,
+  phase: 1 | 3,
+): ShortCircuitResult {
+  const { kva, primaryVoltage, secondaryVoltage, impedance } = transformer;
+
+  if (primaryFaultCurrent <= 0 || kva <= 0 || impedance <= 0) {
+    return {
+      faultCurrent: 0,
+      requiredAIC: STANDARD_AIC_RATINGS[STANDARD_AIC_RATINGS.length - 1],
+      details: {
+        sourceFaultCurrent: primaryFaultCurrent,
+        conductorImpedance: 0,
+        totalImpedance: 0,
+        faultCurrentAtPoint: 0,
+        safetyFactor: 1.25,
+      },
+      compliance: {
+        necArticle: 'NEC 110.9',
+        compliant: false,
+        message: 'Invalid transformer or primary fault current — cannot calculate secondary fault.',
+      },
+    };
+  }
+
+  const phaseMultiplier = phase === 3 ? Math.sqrt(3) : 1;
+  const f = (primaryFaultCurrent * primaryVoltage * phaseMultiplier * impedance) / (100_000 * kva);
+  const M = 1 / (1 + f);
+  const secondaryFaultCurrent = (primaryVoltage / secondaryVoltage) * M * primaryFaultCurrent;
+
+  const safetyFactor = 1.25;
+  const faultCurrentWithSafety = secondaryFaultCurrent * safetyFactor;
+  const faultCurrentKA = faultCurrentWithSafety / 1000;
+  const requiredAIC = STANDARD_AIC_RATINGS.find((rating) => rating >= faultCurrentKA) || 200;
+
+  return {
+    faultCurrent: secondaryFaultCurrent,
+    requiredAIC,
+    details: {
+      sourceFaultCurrent: primaryFaultCurrent,
+      conductorImpedance: 0, // The transformer itself is the impedance — no separate conductor in this segment
+      totalImpedance: (secondaryVoltage / phaseMultiplier) / secondaryFaultCurrent,
+      faultCurrentAtPoint: secondaryFaultCurrent,
+      safetyFactor,
+    },
+    compliance: {
+      necArticle: 'NEC 110.9 - Interrupting Rating',
+      compliant: requiredAIC <= 200,
+      message:
+        requiredAIC <= 200
+          ? `Equipment interrupting rating shall be sufficient for the current available. Use ${requiredAIC} kA AIC rated breakers or higher`
+          : 'Available fault current exceeds 200 kA — requires engineering analysis',
+    },
+  };
+}
+
+/**
  * Calculate series of fault currents through electrical distribution system
  * Starts at utility transformer, calculates through service, panels, and branch circuits
  */
