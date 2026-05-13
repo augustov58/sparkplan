@@ -900,6 +900,218 @@ describe('Feeder Sizing (NEC Article 215)', () => {
       // Aluminum conductors are typically larger for same ampacity
     });
   });
+
+  describe('Parallel Sets (NEC 310.10(G))', () => {
+    // Regression: 240 kVA at 120/240V 1Φ = 1000A design current. Per the 500 kcmil
+    // project policy, this should auto-bump to 3 parallel sets of 400 kcmil Cu
+    // (1000A / 3 = 334A per conductor → 400 kcmil @ 75°C = 335A).
+    it('auto-bumps parallel count when single conductor cannot carry the load (240 kVA / 240V 1Φ service)', () => {
+      const input: FeederCalculationInput = {
+        source_voltage: 240,
+        source_phase: 1,
+        destination_voltage: 240,
+        destination_phase: 1,
+        total_load_va: 240_000,
+        continuous_load_va: 0,
+        noncontinuous_load_va: 240_000, // matches service-entrance branch (capacity sizing)
+        distance_ft: 100,
+        conductor_material: 'Cu',
+        ambient_temperature_c: 30,
+        num_current_carrying: 3,
+        max_voltage_drop_percent: 3,
+        sets_in_parallel: 1,
+      };
+
+      const result = calculateFeederSizing(input);
+
+      expect(result.phase_conductor_size).toBe('400 kcmil');
+      expect(result.sets_in_parallel).toBe(3);
+      expect(result.necReferences).toContain('NEC 310.10(G) - Conductors in Parallel');
+      expect(result.warnings.some((w) => w.includes('Auto-sized to 3 sets'))).toBe(true);
+    });
+
+    it('honors user-specified sets_in_parallel and sizes per-conductor current', () => {
+      const input: FeederCalculationInput = {
+        source_voltage: 208,
+        source_phase: 3,
+        destination_voltage: 208,
+        destination_phase: 3,
+        total_load_va: 200_000,
+        continuous_load_va: 0,
+        noncontinuous_load_va: 200_000,
+        distance_ft: 100,
+        conductor_material: 'Cu',
+        ambient_temperature_c: 30,
+        num_current_carrying: 4,
+        sets_in_parallel: 2,
+      };
+
+      const result = calculateFeederSizing(input);
+
+      // 200 kVA / (208 × √3) ≈ 555A total → 278A per conductor with 2 sets
+      expect(result.design_current_amps).toBeCloseTo(555, 0);
+      expect(result.sets_in_parallel).toBe(2);
+      expect(result.phase_conductor_size).not.toBe('N/A');
+      expect(result.necReferences).toContain('NEC 310.10(G) - Conductors in Parallel');
+      expect(result.warnings.some((w) => w.includes('2 sets in parallel'))).toBe(true);
+    });
+
+    it('returns sets_in_parallel = 1 for normal loads that fit a single conductor', () => {
+      const input: FeederCalculationInput = {
+        source_voltage: 208,
+        source_phase: 3,
+        destination_voltage: 208,
+        destination_phase: 3,
+        total_load_va: 50_000,
+        continuous_load_va: 30_000,
+        noncontinuous_load_va: 20_000,
+        distance_ft: 100,
+        conductor_material: 'Cu',
+        ambient_temperature_c: 30,
+        num_current_carrying: 4,
+      };
+
+      const result = calculateFeederSizing(input);
+
+      expect(result.sets_in_parallel).toBe(1);
+      expect(result.phase_conductor_size).not.toBe('N/A');
+    });
+  });
+
+  // ============================================================================
+  // 500 kcmil cap + parallel-sets scenario table
+  // ============================================================================
+  //
+  // Project policy: never return a single conductor larger than 500 kcmil. Use parallel
+  // sets per NEC 310.10(G) instead. This table is the engineering ground truth at
+  // Cu @ 75°C, 30°C ambient, 3 CCCs per raceway, single-phase 240V, non-continuous load.
+  //
+  // Per-conductor cap (Cu @ 75°C, 500 kcmil) = 380A. Each scenario below was traced by
+  // hand against NEC Table 310.16; see PR #52 description for the full derivation.
+  describe('500 kcmil cap + parallel-sets scenario table', () => {
+    const SCENARIOS: Array<{
+      label: string;
+      loadA: number;
+      expectedSets: number;
+      expectedSize: string;
+    }> = [
+      // Below the cap — single set
+      { label: '200A — small service', loadA: 200, expectedSets: 1, expectedSize: '3/0 AWG' },
+      { label: '380A — at single-conductor cap', loadA: 380, expectedSets: 1, expectedSize: '500 kcmil' },
+      // Cap kicks in — 2 sets
+      { label: '400A — first cap-triggered bump', loadA: 400, expectedSets: 2, expectedSize: '3/0 AWG' },
+      { label: '500A — 2 sets, mid-range', loadA: 500, expectedSets: 2, expectedSize: '250 kcmil' },
+      { label: '600A — 2 sets', loadA: 600, expectedSets: 2, expectedSize: '350 kcmil' },
+      { label: '700A — 2 sets at edge', loadA: 700, expectedSets: 2, expectedSize: '500 kcmil' },
+      // 3 sets
+      { label: '800A — bumps to 3 sets', loadA: 800, expectedSets: 3, expectedSize: '300 kcmil' },
+      { label: '1000A — 3 sets (user bug scenario at 240V 1Φ / 240 kVA)', loadA: 1000, expectedSets: 3, expectedSize: '400 kcmil' },
+      // 4 sets
+      { label: '1200A — 4 sets', loadA: 1200, expectedSets: 4, expectedSize: '350 kcmil' },
+      // 5 sets
+      { label: '1600A — 5 sets', loadA: 1600, expectedSets: 5, expectedSize: '400 kcmil' },
+      // 6 sets
+      { label: '2000A — 6 sets', loadA: 2000, expectedSets: 6, expectedSize: '400 kcmil' },
+      // 7 sets
+      { label: '2500A — 7 sets', loadA: 2500, expectedSets: 7, expectedSize: '500 kcmil' },
+      // 8 sets
+      { label: '3000A — 8 sets', loadA: 3000, expectedSets: 8, expectedSize: '500 kcmil' },
+    ];
+
+    it.each(SCENARIOS)(
+      '$label → $expectedSets × $expectedSize',
+      ({ loadA, expectedSets, expectedSize }) => {
+        const totalVA = loadA * 240;
+        const result = calculateFeederSizing({
+          source_voltage: 240,
+          source_phase: 1,
+          destination_voltage: 240,
+          destination_phase: 1,
+          total_load_va: totalVA,
+          continuous_load_va: 0,
+          noncontinuous_load_va: totalVA, // non-continuous → design_load = total_load, no ×1.25
+          distance_ft: 100,
+          conductor_material: 'Cu',
+          ambient_temperature_c: 30,
+          num_current_carrying: 3,
+        });
+
+        expect(result.phase_conductor_size).toBe(expectedSize);
+        expect(result.sets_in_parallel).toBe(expectedSets);
+        // Sanity: never returns a single conductor > 500 kcmil
+        expect(['600 kcmil', '750 kcmil', '1000 kcmil']).not.toContain(result.phase_conductor_size);
+      }
+    );
+  });
+
+  // ============================================================================
+  // Aluminum + continuous + 3-phase coverage
+  // ============================================================================
+  describe('Cap policy — Al, continuous, 3-phase variants', () => {
+    it('400A continuous Cu (design ≈ 500A) → 2 sets of 250 kcmil', () => {
+      const result = calculateFeederSizing({
+        source_voltage: 240,
+        source_phase: 1,
+        destination_voltage: 240,
+        destination_phase: 1,
+        total_load_va: 96_000, // 400A × 240V
+        continuous_load_va: 96_000, // all continuous → ×1.25 = design 500A
+        noncontinuous_load_va: 0,
+        distance_ft: 100,
+        conductor_material: 'Cu',
+        ambient_temperature_c: 30,
+        num_current_carrying: 3,
+      });
+
+      expect(result.design_current_amps).toBeCloseTo(500, 0);
+      expect(result.sets_in_parallel).toBe(2);
+      expect(result.phase_conductor_size).toBe('250 kcmil');
+    });
+
+    // Al @ 75°C: 500 kcmil = 310A per conductor (vs 380A for Cu), so Al hits the cap earlier.
+    it('600A Al → 2 sets (Al 500 kcmil @ 75°C = 310A; 600/2 = 300A per cond fits 500 kcmil)', () => {
+      const result = calculateFeederSizing({
+        source_voltage: 240,
+        source_phase: 1,
+        destination_voltage: 240,
+        destination_phase: 1,
+        total_load_va: 144_000, // 600A × 240V
+        continuous_load_va: 0,
+        noncontinuous_load_va: 144_000,
+        distance_ft: 100,
+        conductor_material: 'Al',
+        ambient_temperature_c: 30,
+        num_current_carrying: 3,
+      });
+
+      expect(result.design_current_amps).toBeCloseTo(600, 0);
+      expect(result.sets_in_parallel).toBeGreaterThanOrEqual(2);
+      // No single conductor > 500 kcmil
+      expect(['600 kcmil', '750 kcmil', '1000 kcmil']).not.toContain(result.phase_conductor_size);
+    });
+
+    it('480V 3-phase 1000A commercial feeder honors the cap', () => {
+      // 1000A × 480 × √3 ≈ 831 kVA. Engine works backwards from VA, so we encode it.
+      const totalVA = 1000 * 480 * Math.sqrt(3);
+      const result = calculateFeederSizing({
+        source_voltage: 480,
+        source_phase: 3,
+        destination_voltage: 480,
+        destination_phase: 3,
+        total_load_va: totalVA,
+        continuous_load_va: 0,
+        noncontinuous_load_va: totalVA,
+        distance_ft: 150,
+        conductor_material: 'Cu',
+        ambient_temperature_c: 30,
+        num_current_carrying: 4,
+      });
+
+      expect(result.design_current_amps).toBeCloseTo(1000, 0);
+      expect(['600 kcmil', '750 kcmil', '1000 kcmil']).not.toContain(result.phase_conductor_size);
+      expect(result.sets_in_parallel).toBeGreaterThanOrEqual(3);
+    });
+  });
 });
 
 // ============================================================================

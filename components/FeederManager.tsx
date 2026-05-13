@@ -61,7 +61,8 @@ export const FeederManager: React.FC<FeederManagerProps> = ({
     conductor_material: 'Cu',
     conduit_type: 'PVC',
     ambient_temperature_c: 30,
-    num_current_carrying: 4
+    num_current_carrying: 4,
+    sets_in_parallel: 1
   });
   const [sourceType, setSourceType] = useState<'panel' | 'transformer' | 'service'>('panel'); // 'service' = synthetic UTIL→MDP feeder (is_service_entrance)
   const [destinationType, setDestinationType] = useState<'panel' | 'transformer'>('panel');
@@ -374,12 +375,14 @@ export const FeederManager: React.FC<FeederManagerProps> = ({
         ambient_temperature_c: feeder.ambient_temperature_c || 30,
         num_current_carrying: feeder.num_current_carrying || 3,
         max_voltage_drop_percent: 3,
+        sets_in_parallel: feeder.sets_in_parallel ?? 1,
       });
 
       const seFeeder: Partial<Feeder> = {
         ...feeder,
         is_service_entrance: true,
-        sets_in_parallel: feeder.sets_in_parallel ?? 1,
+        // Persist effective parallel count — may have been auto-bumped by the calc for large services
+        sets_in_parallel: result.sets_in_parallel,
         source_panel_id: null,
         source_transformer_id: null,
         project_id: projectId,
@@ -566,6 +569,7 @@ export const FeederManager: React.FC<FeederManagerProps> = ({
         num_current_carrying: feeder.num_current_carrying || 4,
         max_voltage_drop_percent: 3,
         temperature_rating: temperatureRating, // Use user-specified temperature rating
+        sets_in_parallel: feeder.sets_in_parallel ?? 1,
         // Add transformer parameters if feeding a transformer
         ...(destTransformer && {
           transformer_kva: destTransformer.kva_rating,
@@ -612,7 +616,8 @@ export const FeederManager: React.FC<FeederManagerProps> = ({
         conduit_size: result.recommended_conduit_size,
         voltage_drop_percent: result.voltage_drop_percent,
         is_service_entrance: false, // service-entrance path returned earlier
-        sets_in_parallel: feeder.sets_in_parallel ?? 1,
+        // Persist effective parallel count — may have been auto-bumped by the calc for large feeders
+        sets_in_parallel: result.sets_in_parallel,
       };
 
       if (editingId) {
@@ -642,7 +647,8 @@ export const FeederManager: React.FC<FeederManagerProps> = ({
       conductor_material: 'Cu',
       conduit_type: 'PVC',
       ambient_temperature_c: 30,
-      num_current_carrying: 4
+      num_current_carrying: 4,
+      sets_in_parallel: 1
     });
     setSourceType('panel');
     setDestinationType('panel');
@@ -1154,6 +1160,25 @@ export const FeederManager: React.FC<FeederManagerProps> = ({
               </p>
             </div>
 
+            {/* Sets in Parallel (NEC 310.10(G)) */}
+            <div>
+              <label className="block text-xs font-semibold text-gray-500 mb-1 uppercase tracking-wider">
+                Sets in Parallel
+              </label>
+              <input
+                type="number"
+                min={1}
+                max={10}
+                value={formData.sets_in_parallel || 1}
+                onChange={e => setFormData({ ...formData, sets_in_parallel: Math.max(1, Number(e.target.value) || 1) })}
+                className="w-full border-gray-200 rounded-md focus:border-[#2d3b2d] focus:ring-[#2d3b2d]/20 text-sm py-2"
+              />
+              <p className="text-xs text-gray-500 mt-1">
+                Parallel conductors per phase (NEC 310.10(G)). Project policy caps single conductors at 500 kcmil
+                (≈ 380A Cu / 310A Al @ 75°C); calc auto-bumps for larger loads.
+              </p>
+            </div>
+
             {/* Advanced Options Toggle */}
             <div className="md:col-span-2">
               <button
@@ -1374,8 +1399,12 @@ const FeederCard: React.FC<FeederCardProps> = ({
   const destPanel = panelsArray.find(p => p.id === feeder.destination_panel_id);
   const destTransformer = transformersArray.find(t => t.id === feeder.destination_transformer_id);
 
-  // Build source and destination labels
-  const sourceLabel = sourcePanel?.name || sourceTransformer?.name || 'Unknown';
+  // Build source and destination labels.
+  // Service-entrance feeders have NULL source IDs by schema constraint (utility is implicit),
+  // so fall back to "Utility" before "Unknown". Mirrors sourceLabel() in cumulativeVoltageDrop.ts.
+  const sourceLabel = feeder.is_service_entrance
+    ? 'Utility'
+    : sourcePanel?.name || sourceTransformer?.name || 'Unknown';
   const destLabel = destPanel?.name || destTransformer?.name || 'Unknown';
 
   const vdCompliant = (feeder.voltage_drop_percent || 0) <= 3.0;
@@ -1446,8 +1475,11 @@ const FeederCard: React.FC<FeederCardProps> = ({
         </div>
       </div>
 
-      {/* Results Grid - Compact inline */}
-      {feeder.phase_conductor_size && (
+      {/* Results Grid - Compact inline
+          Guard against the 'N/A' sentinel so we don't render misleading chips when conductor
+          sizing failed. The auto-bump in calculateFeederSizing should make this rare, but a
+          contractor who explicitly set sets_in_parallel too low can still land here. */}
+      {feeder.phase_conductor_size && feeder.phase_conductor_size !== 'N/A' && (
         <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs mb-2">
           <div className="flex items-center gap-1">
             <span className="text-gray-500">Phase:</span>
@@ -1472,12 +1504,26 @@ const FeederCard: React.FC<FeederCardProps> = ({
           <div className="flex items-center gap-1">
             <span className="text-gray-500">{feeder.conductor_material === 'Cu' ? 'Cu' : 'Al'}</span>
           </div>
+          {(feeder.sets_in_parallel ?? 1) > 1 && (
+            <div className="flex items-center gap-1">
+              <span className="text-gray-500">Sets:</span>
+              <span className="font-semibold text-gray-900">{feeder.sets_in_parallel}×</span>
+            </div>
+          )}
           {feeder.design_load_va && (
             <div className="flex items-center gap-1">
               <span className="text-gray-500">Load:</span>
               <span className="font-semibold text-gray-900">{(feeder.design_load_va / 1000).toFixed(1)} kVA</span>
             </div>
           )}
+        </div>
+      )}
+      {feeder.phase_conductor_size === 'N/A' && (
+        <div className="flex items-center gap-1.5 px-2 py-1.5 rounded text-xs bg-red-50 border border-red-200 mb-2">
+          <AlertTriangle className="w-3.5 h-3.5 text-red-600" />
+          <span className="text-red-900 font-medium">
+            Conductor sizing failed — load exceeds single-set capacity. Edit the feeder and increase "Sets in parallel".
+          </span>
         </div>
       )}
 
