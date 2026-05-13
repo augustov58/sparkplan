@@ -47,8 +47,7 @@ export const ShortCircuitResults: React.FC = () => {
       await exportSystemReport(
         calculations,
         project.name,
-        project.address || '',
-        panels
+        project.address || ''
       );
     } catch (error) {
       console.error('Error exporting system report:', error);

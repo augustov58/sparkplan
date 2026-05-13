@@ -4,9 +4,9 @@
  * Uses @react-pdf/renderer for PDF generation
  */
 
-import { pdf } from '@react-pdf/renderer';
+import { Document, pdf } from '@react-pdf/renderer';
 import type { ShortCircuitCalculation } from '../../lib/database.types';
-import { ShortCircuitCalculationDocument, ShortCircuitSystemReport } from './ShortCircuitDocuments';
+import { ShortCircuitCalculationDocument, ShortCircuitTablePages } from './ShortCircuitDocuments';
 
 /**
  * Export a single short circuit calculation to PDF
@@ -50,13 +50,16 @@ export const exportSingleCalculation = async (
 };
 
 /**
- * Export all short circuit calculations for a project to a single PDF
+ * Export all short circuit calculations for a project to a single PDF.
+ *
+ * Renders the tabular ShortCircuitTablePages (single page, all panels) — the
+ * same layout used in the permit-packet path. Replaces the legacy per-panel
+ * paged ShortCircuitSystemReport so the two surfaces stay in sync.
  */
 export const exportSystemReport = async (
   calculations: ShortCircuitCalculation[],
   projectName: string,
-  projectAddress: string,
-  panels?: any[]
+  projectAddress: string
 ) => {
   try {
     if (!calculations || calculations.length === 0) {
@@ -64,12 +67,14 @@ export const exportSystemReport = async (
     }
 
     const blob = await pdf(
-      <ShortCircuitSystemReport
-        calculations={calculations}
-        projectName={projectName}
-        projectAddress={projectAddress}
-        panels={panels}
-      />
+      <Document>
+        <ShortCircuitTablePages
+          calculations={calculations}
+          projectName={projectName}
+          projectAddress={projectAddress}
+          includeNECReferences={true}
+        />
+      </Document>
     ).toBlob();
 
     // Create download link
