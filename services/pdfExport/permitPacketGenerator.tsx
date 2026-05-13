@@ -72,6 +72,7 @@ import { compositeTitleBlock } from './compositeTitleBlock';
 import { mergePacket } from './mergePacket';
 import { stampSheetIds, buildStampMaps } from './stampSheetIds';
 import type { ArtifactType, CoverMode } from '../../hooks/useProjectAttachments';
+import type { AHJManifest, BuildingType } from '../../data/ahj/types';
 
 export interface PermitPacketData {
   projectId: string;
@@ -181,6 +182,28 @@ export interface PermitPacketData {
     lane: 'exempt' | 'pe-required';
     ahjName?: string;
   };
+  /**
+   * Sprint 2B PR-4: optional active AHJ manifest. When provided, the
+   * orchestrator pulls `sheetIdPrefix`, `generalNotes`, `codeReferences`,
+   * and `necEdition[buildingType]` from the manifest when the equivalent
+   * top-level fields aren't supplied. The UI layer typically passes both
+   * the manifest AND the resolved values for explicitness; the manifest
+   * here is for orchestrator-internal use (sheet-ID stamping uses
+   * `manifest.sheetIdPrefix`'s letter as the discipline override for
+   * electrical sheets) and for the future Sprint 2C M1 engine that runs
+   * inside the orchestrator's render path.
+   *
+   * Backward compat: when omitted, the orchestrator uses the existing
+   * top-level fields and hard-coded defaults exactly as Sprint 2A.
+   */
+  manifest?: AHJManifest;
+  /**
+   * Sprint 2B PR-4: building type used to pick the right NEC edition from
+   * `manifest.necEdition` when `necEdition` is not supplied directly.
+   * Defaults to `'single_family_residential'` when omitted. Sprint 2C M1
+   * uses this for `building_type`-gated requirements.
+   */
+  buildingType?: BuildingType;
   /**
    * Sprint 2B PR-3: user-uploaded PDF artifacts to splice into the packet.
    *
@@ -316,6 +339,42 @@ export const generatePermitPacket = async (data: PermitPacketData): Promise<void
   if (!data.projectName || !data.panels || data.panels.length === 0) {
     throw new Error('Invalid permit packet data. Project name and at least one panel are required.');
   }
+
+  // Sprint 2B PR-4: resolve manifest-derived overrides for the AHJ-aware
+  // narrative content. The UI typically passes these as top-level fields
+  // AND the manifest; this fallback ensures any caller that passes ONLY the
+  // manifest still gets the right strings on the cover sheet / general
+  // notes page. Backward compat: when no manifest, every value falls back
+  // to the existing top-level field (which itself defaults to Sprint 2A's
+  // FL-pilot stack inside each page component).
+  const manifestBuildingType: BuildingType =
+    data.buildingType ?? 'single_family_residential';
+  // NEC-edition fallback: prefer the explicit top-level field; otherwise
+  // ask the manifest. Map "NEC 2020" / "NEC 2014" strings down to the
+  // limited '2020' | '2023' union the page components accept (Sprint 2C
+  // M1 will widen this when Miami-Dade's NEC 2014 residential lane lands).
+  const necFromManifest =
+    data.manifest?.necEdition[manifestBuildingType] ?? null;
+  const resolvedNecEdition: '2020' | '2023' | undefined =
+    data.necEdition
+    ?? (necFromManifest && necFromManifest.includes('2023')
+      ? '2023'
+      : necFromManifest && necFromManifest.includes('2020')
+      ? '2020'
+      : undefined);
+  const resolvedGeneralNotes = data.generalNotes ?? data.manifest?.generalNotes;
+  const resolvedCodeReferences =
+    data.codeReferences ?? data.manifest?.codeReferences;
+
+  // Build a shadow `data` reference that uses the manifest-resolved values
+  // when the explicit top-level fields are missing. Keep the original
+  // `data` untouched so we don't surprise downstream callers.
+  data = {
+    ...data,
+    necEdition: resolvedNecEdition,
+    generalNotes: resolvedGeneralNotes,
+    codeReferences: resolvedCodeReferences,
+  };
 
   const circuitsByPanel = new Map<string, Circuit[]>();
   data.circuits.forEach(circuit => {
@@ -1396,6 +1455,28 @@ export const generatePermitPacket = async (data: PermitPacketData): Promise<void
 export const generateLightweightPermitPacket = async (data: PermitPacketData): Promise<void> => {
   try {
     console.log('Generating lightweight permit packet for project:', data.projectName);
+
+    // Sprint 2B PR-4: mirror the full generator's manifest-fallback logic so
+    // the lightweight path picks up Orlando general notes / code refs etc.
+    // when only the manifest is supplied. Same behavior as
+    // generatePermitPacket; kept here so the two paths stay aligned.
+    const lwBuildingType: BuildingType =
+      data.buildingType ?? 'single_family_residential';
+    const lwNecFromManifest =
+      data.manifest?.necEdition[lwBuildingType] ?? null;
+    const lwResolvedNecEdition: '2020' | '2023' | undefined =
+      data.necEdition
+      ?? (lwNecFromManifest && lwNecFromManifest.includes('2023')
+        ? '2023'
+        : lwNecFromManifest && lwNecFromManifest.includes('2020')
+        ? '2020'
+        : undefined);
+    data = {
+      ...data,
+      necEdition: lwResolvedNecEdition,
+      generalNotes: data.generalNotes ?? data.manifest?.generalNotes,
+      codeReferences: data.codeReferences ?? data.manifest?.codeReferences,
+    };
 
     const contractor = {
       contractorName: data.contractorName ?? data.preparedBy,

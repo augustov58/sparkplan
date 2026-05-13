@@ -652,6 +652,22 @@ export const PermitPacketGenerator: React.FC<PermitPacketGeneratorProps> = ({ pr
           : sectionPrefs,
         // Sprint 2A PR 5 / H17: FL contractor-exemption lane stamp on cover sheet.
         permitMode,
+        // Sprint 2B PR-4: when an AHJ manifest is active, thread it through
+        // to the orchestrator AND populate the convenience top-level fields
+        // (generalNotes, codeReferences, necEdition) so the existing page
+        // components don't need to know about the manifest. Building type
+        // is computed once from AHJContext.
+        manifest: activeManifest ?? undefined,
+        buildingType: ahjContext.buildingType,
+        generalNotes: activeManifest?.generalNotes,
+        codeReferences: activeManifest?.codeReferences,
+        necEdition: (() => {
+          if (!activeManifest) return currentProject.necEdition;
+          const ed = activeManifest.necEdition[ahjContext.buildingType];
+          if (ed?.includes('2023')) return '2023';
+          if (ed?.includes('2020')) return '2020';
+          return currentProject.necEdition;
+        })(),
       };
 
       // Sprint 2A H14: NEC 220.87 narrative — only attached when the user
