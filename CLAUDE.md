@@ -89,6 +89,19 @@ User-uploaded PDFs (site plans, cut sheets, NOC, HOA, fire-stopping, manufacture
 
 Two react-pdf title-sheet components in the same folder: `AttachmentTitleSheet.tsx` (size-aware full cover; matches upload's first-page dimensions Letter → ARCH D) and `AttachmentTitleBlock.tsx` (title-block strip only, used by the overlay path). The orchestrator in `permitPacketGenerator.tsx` branches per attachment on the `cover_mode` enum (`'separate'` / `'overlay'` / `'none'`). When adding a new artifact type, extend the `artifact_type` CHECK in a migration + add the upload card to `PermitPacketGenerator.tsx`; the merge pipeline picks it up generically.
 
+### AHJ manifest + AHJ-aware visibility (Sprint 2B PR #51, `18985e5`, 2026-05-13)
+
+Per-AHJ packet defaults live in `data/ahj/` as **pure data + pure predicates** — no DB, no React, no side effects:
+
+- `data/ahj/types.ts` — the `AHJManifest` interface + 4-axis `AHJContext` (`scope` / `lane` / `buildingType` / `subjurisdiction`). All 4 axes are baked in from day 1 even when a given manifest only uses a subset, so Sprint 2C M1 doesn't retrofit them across 5 AHJs.
+- `data/ahj/{id}.ts` — one literal `AHJManifest` per jurisdiction. `data/ahj/orlando.ts` is the reference shape. Captures `relevantSections` + `relevantArtifactTypes` (defaults) + optional `sectionPredicates` / `artifactTypePredicates` (`(ctx: AHJContext) => boolean`, pure) + `necEdition: Record<BuildingType, string>` (Miami-Dade H34 forks NEC 2014 vs 2020 by building type) + `sheetIdPrefix` (Miami-Dade H20 reserves `EL-`) + `generalNotes` + `codeReferences` + `requirements: AHJRequirement[]` (empty on Orlando; Sprint 2C M1 populates).
+- `data/ahj/visibility.ts` — `computeDefaultVisibility(manifest, ctx)` implements the **two-layer visibility model**: Layer 1 (manifest defaults from the arrays + predicates) overlaid with Layer 2 (user overrides from `projects.settings.section_overrides` jsonb). When no manifest is registered for a project's jurisdiction, returns `null` and Sprint 2A's `resolveSections(sectionPrefs)` path runs unchanged.
+- `data/ahj/registry.ts` — `getManifestById(id)` (case-insensitive) + `findManifestForJurisdiction(jurisdictionName, ahjName)` (case-insensitive substring on either field). Sprint 2C M1 will replace the registry with an explicit `jurisdictions.manifest_id` FK once that table is populated.
+
+The orchestrator threads `manifest?: AHJManifest` + `buildingType?: BuildingType` through `PermitPacketData`. Resolution chain for `generalNotes` / `codeReferences` / `necEdition`: explicit data field → manifest fallback → Sprint 2A baseline. Backward compat is preserved by null-coalescing — projects without a `jurisdiction_id`, or with one not in the registry, render exactly as they did pre-PR-#51.
+
+When adding a new AHJ: drop in `data/ahj/{newAhj}.ts` matching the manifest shape, register it in `registry.ts`, populate `requirements: []` if the M1 engine is wired. **No engine changes required** — Sprint 2C is pure-data + engine; manifest scaffold is done.
+
 ---
 
 ## Calculation Service Rules

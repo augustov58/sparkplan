@@ -1,6 +1,6 @@
 # AHJ Audit — Sprint Index
 
-**Last Updated:** 2026-05-12 (Sprint 2B merge-engine half complete with PR #45 + #47 + #49)
+**Last Updated:** 2026-05-13 (Sprint 2B ✅ COMPLETE with PR #45 + #47 + #49 + #51)
 **Parent doc:** [`docs/AHJ_COMPLIANCE_AUDIT_2026-05-04.md`](../AHJ_COMPLIANCE_AUDIT_2026-05-04.md)
 
 This directory contains one design doc per sprint. Each file is self-contained with a "Cross-references" section at the bottom for when its scope touches another sprint's work.
@@ -13,8 +13,8 @@ This directory contains one design doc per sprint. Each file is self-contained w
 |---|---|---|---|---|
 | 1 | [Sprint 1 — Engine fixes](./sprint1-engine-fixes.md) | ✅ COMPLETE 2026-05-07 | — | — |
 | 2A | [Sprint 2A — Form-factor + content](./sprint2a-form-factor.md) | ✅ COMPLETE 2026-05-10 (19/19; 5 themed PRs) | — | Sprint 1 ✅ |
-| 2B | [Sprint 2B — Uploads + merge engine](./sprint2b-uploads.md) | ✅ COMPLETE 2026-05-12 (PR #45 + PR #47 + PR #49 merged) | PR-4 Orlando manifest scaffold | Sprint 2A schema (`service_modification_type`) ✅ |
-| 2C | [Sprint 2C — Per-AHJ manifests + M1](./sprint2c-ahj-manifests.md) | ⚪ Not started; research already landed (PR #46 + #48) | M1 jurisdiction checklist engine + per-AHJ wiring of H5/H6/H7/H8/H16/H19 | Sprint 2A H17 lane logic ✅ + Sprint 2B manifest scaffold (PR-4 still open) |
+| 2B | [Sprint 2B — Uploads + merge engine](./sprint2b-uploads.md) | ✅ COMPLETE 2026-05-13 (PR #45 + PR #47 + PR #49 + PR #51 merged) | — | Sprint 2A schema (`service_modification_type`) ✅ |
+| 2C | [Sprint 2C — Per-AHJ manifests + M1](./sprint2c-ahj-manifests.md) | ⚪ Not started; research + manifest scaffold landed (PR #46 + #48 + #51) | M1 jurisdiction checklist engine + 4 more manifests (Pompano → MD → Davie → Hillsborough) + per-AHJ wiring of H5/H6/H7/H8/H16/H19 across them | Sprint 2A H17 lane logic ✅ + Sprint 2B manifest scaffold ✅ (PR #51, `18985e5`) |
 | 3 | [Sprint 3 — PE Seal Workflow](./sprint3-pe-seal.md) | ⚪ Architecture decided; not started | C5 + cert vendor + FBPE registration | Sprint 2B (`pdf-lib` PAdES) ✅; pricing decision; cert vendor selection; FBPE business-entity registration |
 | 4 | [Sprint 4 — Polish backlog](./sprint4-polish.md) | 🔵 Deferred until Sprints 2 + 3 done | M2, M3 sub-feature, M5, M7, LOW polish + canvas revisit trigger | Sprints 2 + 3 |
 

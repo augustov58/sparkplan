@@ -1,7 +1,7 @@
 # AHJ Compliance Audit — Multifamily Permit Packet
 
 **Date:** 2026-05-04
-**Last Updated:** 2026-05-12
+**Last Updated:** 2026-05-13
 **Audited artifact:** `example_reports/Permit_Packet_Multifamily_Test_2026-05-05.pdf` (27 pages, react-pdf, 124 KB)
 **Audit basis:** FL AHJ requirements per `business/STRATEGIC_ANALYSIS.md` + Obsidian `SparkPlan Analysis/` (FL Pilot Revised Feb 2026, Competitive Landscape Apr 2026, OAI Market Viability May 2026) + **City of Orlando "EV Charging Station Permit Checklist"** (sourced 2026-05-08, both EV-from-existing and EV-from-new-service paths)
 **Scope:** 5 FL pilot AHJs — Orlando (Orange), Miami-Dade, Pompano Beach (Broward), Davie (Broward), Hillsborough/Tampa
@@ -32,8 +32,8 @@ Cold-read cost for typical sessions: index (~5k) + 1 sprint file = **~7–17k to
 
 - **Sprint 1** — ✅ COMPLETE 2026-05-07 (10 calc-engine fixes)
 - **Sprint 2A** — ✅ COMPLETE 2026-05-10 (19/19; 5 themed PRs)
-- **Sprint 2B** — ✅ COMPLETE 2026-05-12 (PR #45 foundation + PR #47 upload UI + PR #49 merge engine merged); PR-4 manifest scaffold on deck
-- **Sprint 2C** — ⚪ Not started (research already landed via PR #46 + PR #48)
+- **Sprint 2B** — ✅ COMPLETE 2026-05-13 (PR #45 foundation + PR #47 upload UI + PR #49 merge engine + PR #51 Orlando manifest scaffold merged)
+- **Sprint 2C** — ⚪ Not started (research + manifest scaffold landed via PR #46 + PR #48 + PR #51)
 - **Sprint 3** — ⚪ Not started
 - **Sprint 4** — 🔵 Deferred
 
@@ -59,12 +59,12 @@ For details on each sprint's open work, dependencies, and architectural patterns
 | Available fault current / SCS | ✓ | ✓ | – | – | ✓ | ✓ | H9 page (PR #31) + H9 AIC overlay (PR #40) |
 | Sheet ID (`E-###`) | – | ✓ | – | – | – | ✓ | H3 |
 | FBC + NFPA-70 references | – | ✓ | ✓ | ✓ | ✓ | ✓ | C7 + H4 |
-| Notice of Commencement (>$5k) | ✓ | ✓ | – | – | – | ✓ upload slot (enabled by PR #49) | H5 (Sprint 2B; per-AHJ wiring → PR-4) |
-| HOA / condo approval letter | – | – | ✓ | – | – | ✓ upload slot (enabled by PR #49) | H6 (Sprint 2B; per-AHJ wiring → PR-4) |
-| Site plan / survey | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ upload slot (enabled by PR #49) | H7 (Sprint 2B; per-AHJ wiring → PR-4) |
-| Equipment cut sheets / manuals | ✓ | – | ✓ | ✓ | – | ✓ upload slot (enabled by PR #49) | H8 (Sprint 2B; per-AHJ wiring → PR-4) |
-| Fire stopping schedule | ✓ | ? | ? | ? | ? | ✓ upload slot (enabled by PR #49) | H16 (Sprint 2B; per-AHJ wiring → PR-4) |
-| HVHZ wind-anchoring (outdoor pedestal/bollard) | – | ✓ | ✓ | ? | ? | ✓ upload slot (enabled by PR #49) | H19 (Sprint 2B upload; per-AHJ wiring → Sprint 2C M1) |
+| Notice of Commencement (>$5k) | ✓ | ✓ | – | – | – | ✓ upload slot + Orlando per-AHJ wiring (non-SFR predicate) | H5 (Sprint 2B; Orlando ✅ PR #51; other AHJs → Sprint 2C M1) |
+| HOA / condo approval letter | – | – | ✓ | – | – | ✓ upload slot; Orlando defaults OFF | H6 (Sprint 2B; Orlando ✅ PR #51 (declared OFF); Pompano wiring → Sprint 2C M1) |
+| Site plan / survey | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ upload slot + Orlando per-AHJ wiring (ON) | H7 (Sprint 2B; Orlando ✅ PR #51; other AHJs → Sprint 2C M1) |
+| Equipment cut sheets / manuals | ✓ | – | ✓ | ✓ | – | ✓ upload slot + Orlando per-AHJ wiring (ON, #7 EVSE UL listings) | H8 (Sprint 2B; Orlando ✅ PR #51; Pompano wiring → Sprint 2C M1) |
+| Fire stopping schedule | ✓ | ? | ? | ? | ? | ✓ upload slot + Orlando per-AHJ wiring (ON, #8 both paths) | H16 (Sprint 2B; Orlando ✅ PR #51) |
+| HVHZ wind-anchoring (outdoor pedestal/bollard) | – | ✓ | ✓ | ? | ? | ✓ upload slot + Orlando manifest declares statewide ON | H19 (Sprint 2B upload + Orlando ✅ PR #51; MD + Pompano enforcement → Sprint 2C M1) |
 | General Notes page (NEC + VD) | ✓ | ? | ? | ? | ? | ✓ | H12 + H13 |
 | Per-sheet contractor signature | ✓ | ? | ? | ? | ? | ✓ | C8 |
 | EVEMS narrative (NEC 625.42) | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | H10 |

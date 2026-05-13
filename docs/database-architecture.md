@@ -1,7 +1,7 @@
 # Database Architecture
 ## SparkPlan Application
 
-**Last Updated**: 2026-05-12
+**Last Updated**: 2026-05-13
 **Database**: Supabase PostgreSQL 15
 **Schema Version**: 2.3
 **Location**: `/supabase/schema.sql` and migration files
@@ -960,10 +960,11 @@ Migrations (applied via Supabase MCP, in order):
 - `20260514_attachment_cover_mode.sql` (PR #49) — replaces boolean with 3-value enum (idempotent backfill).
 - `20260514_attachment_custom_sheet_id.sql` (PR #49) — nullable per-upload sheet ID override.
 - `20260514_attachment_discipline_override.sql` (PR #49) — nullable per-upload discipline override.
+- `20260514_attachment_types_pr4.sql` (PR #51, `18985e5`) — extends `artifact_type` CHECK from 8 to 14 values. Adds 6 new types reserved for Sprint 2C AHJ manifests: `zoning_application` (H21 Pompano), `fire_review_application` (H22 Pompano + Davie commercial), `notarized_addendum` (H25 Davie), `property_ownership_search` (H26 Davie BCPA.NET), `flood_elevation_certificate` (H30 Hillsborough flood zones), `private_provider_documentation` (H33 Hillsborough FS 553.791). CHECK is DROP + recreate (Postgres CHECK constraints don't support `ADD VALUE` like enums).
 
-**Purpose**: User-supplied PDF artifacts (site plans, equipment cut sheets, NOC, HOA letters, fire-stopping schedules, surveys, manufacturer data, HVHZ wind-anchoring documentation) that the permit-packet generator splices into the composed packet behind SparkPlan-themed title sheets. The merge engine (PR #49) is the orchestrator; this table holds the metadata snapshot, and the `permit-attachments` Storage bucket holds the actual PDF objects.
+**Purpose**: User-supplied PDF artifacts (site plans, equipment cut sheets, NOC, HOA letters, fire-stopping schedules, surveys, manufacturer data, HVHZ wind-anchoring documentation, plus 6 Sprint 2C AHJ-specific types) that the permit-packet generator splices into the composed packet behind SparkPlan-themed title sheets. The merge engine (PR #49) is the orchestrator; this table holds the metadata snapshot, and the `permit-attachments` Storage bucket holds the actual PDF objects. PR #51 adds the AHJ-manifest visibility layer that controls which `artifact_type` slots are surfaced to the contractor for a given project's AHJ (Orlando today; Pompano / Miami-Dade / Davie / Hillsborough in Sprint 2C M1).
 
-**Schema** (post-PR-#49 state):
+**Schema** (post-PR-#51 state):
 
 ```sql
 CREATE TABLE public.project_attachments (
@@ -971,7 +972,7 @@ CREATE TABLE public.project_attachments (
   project_id UUID NOT NULL REFERENCES public.projects(id) ON DELETE CASCADE,
   user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
 
-  artifact_type TEXT NOT NULL,        -- 8-value CHECK constraint
+  artifact_type TEXT NOT NULL,        -- 14-value CHECK constraint
   filename TEXT NOT NULL,
   storage_path TEXT NOT NULL,         -- {user_id}/{project_id}/{artifact_type}/{filename}
   page_count INTEGER,                 -- nullable; cached so merge engine doesn't reparse
@@ -985,8 +986,18 @@ CREATE TABLE public.project_attachments (
 
   CONSTRAINT project_attachments_artifact_type_check
     CHECK (artifact_type IN (
+      -- Sprint 2B PR-1 originals (7 values)
       'site_plan', 'cut_sheet', 'fire_stopping', 'noc',
-      'hoa_letter', 'survey', 'manufacturer_data', 'hvhz_anchoring'
+      'hoa_letter', 'survey', 'manufacturer_data',
+      -- Sprint 2B PR-3 H19 statewide HVHZ
+      'hvhz_anchoring',
+      -- Sprint 2B PR-4 (PR #51) — 6 new for Sprint 2C AHJ manifests
+      'zoning_application',            -- H21 Pompano
+      'fire_review_application',       -- H22 Pompano + Davie commercial
+      'notarized_addendum',            -- H25 Davie
+      'property_ownership_search',     -- H26 Davie BCPA.NET
+      'flood_elevation_certificate',   -- H30 Hillsborough flood zones
+      'private_provider_documentation' -- H33 Hillsborough FS 553.791
     )),
   CONSTRAINT project_attachments_cover_mode_check
     CHECK (cover_mode IN ('separate', 'overlay', 'none')),
@@ -1009,7 +1020,7 @@ ALTER TABLE public.project_attachments ENABLE ROW LEVEL SECURITY;
 
 **Design Decisions**:
 
-- **`artifact_type` as TEXT CHECK, not Postgres ENUM.** Matches existing migration style (`20260106045201_subscriptions.sql`, `20260510_permits_and_inspections.sql`). No Postgres ENUM types in the codebase. Adding a new value (like `hvhz_anchoring` in PR #49) is a DROP + recreate of the CHECK, not an `ALTER TYPE`.
+- **`artifact_type` as TEXT CHECK, not Postgres ENUM.** Matches existing migration style (`20260106045201_subscriptions.sql`, `20260510_permits_and_inspections.sql`). No Postgres ENUM types in the codebase. Adding a new value (like `hvhz_anchoring` in PR #49 or the 6 Sprint 2C-reserved values in PR #51) is a DROP + recreate of the CHECK, not an `ALTER TYPE`. The 6 PR-#51 values are enum-valid but only surfaced to the contractor when a registered AHJ manifest lists them in `relevantArtifactTypes` (Orlando declares none of them; Sprint 2C M1's Pompano / Miami-Dade / Davie / Hillsborough manifests will).
 - **`cover_mode` evolution: boolean → 3-state enum, same day.** Initial PR #49 v3 shipped `include_sparkplan_cover` as a boolean (cover or no cover). v4 review caught that a Bluebeam markup PDF wants the title-block *overlaid onto* its first page rather than as a standalone preceding sheet. v5 dropped the boolean and added the 3-state enum (`separate` / `overlay` / `none`) with an idempotent backfill — the cover_mode migration's DO block checks for the boolean column before backfilling, so the migration is re-runnable.
 - **`page_count` cached**, not derived on the fly. Merge engine reads page count to pre-allocate sheet IDs before opening the actual PDF bytes. Saves a re-parse for the band allocator.
 - **`storage_path` snapshot**, not computed. Avoids an `auth.uid()` lookup at SELECT time and keeps the row self-describing in admin queries.
