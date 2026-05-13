@@ -22,6 +22,7 @@ import { describe, it, expect } from 'vitest';
 import {
   calculateTransformerFaultCurrent,
   calculateDownstreamFaultCurrent,
+  calculateDownstreamTransformerFaultCurrent,
   calculateServiceFaultCurrent,
   estimateUtilityTransformer,
   type TransformerData,
@@ -156,6 +157,79 @@ describe('Short Circuit (NEC 110.9)', () => {
       });
       // Conductor impedance should reduce fault current
       expect(withConductor.faultCurrent).toBeLessThan(withoutConductor.faultCurrent);
+    });
+  });
+
+  describe('calculateDownstreamTransformerFaultCurrent (SPD page 237 formula)', () => {
+    // Validates against the Bussmann/Eaton SPD-2014 reference, System B
+    // Fault X4 example on page 238. Primary If = 32,937 A from upstream calc;
+    // 225 kVA 480→208V 3φ transformer at 1.2%Z with ±10% UL tolerance
+    // (×0.9 → 1.08%Z worst case). SPD's hand-calc lands at 32,842 A.
+    it('matches the SPD Fault X4 worked example within 100 A', () => {
+      const xfmr: TransformerData = {
+        kva: 225,
+        primaryVoltage: 480,
+        secondaryVoltage: 208,
+        impedance: 1.08, // 1.2% × 0.9 (UL worst-case tolerance multiplier)
+      };
+      const result = calculateDownstreamTransformerFaultCurrent(xfmr, 32_937, 3);
+      // SPD hand-calc result: 32,842 A. Allow ±100 A for rounding.
+      expect(result.faultCurrent).toBeGreaterThan(32_700);
+      expect(result.faultCurrent).toBeLessThan(33_000);
+    });
+
+    it('produces lower secondary fault current as transformer impedance grows', () => {
+      const lowZ: TransformerData = {
+        kva: 225,
+        primaryVoltage: 480,
+        secondaryVoltage: 208,
+        impedance: 1.2,
+      };
+      const highZ: TransformerData = { ...lowZ, impedance: 5.75 };
+      const lowResult = calculateDownstreamTransformerFaultCurrent(lowZ, 32_937, 3);
+      const highResult = calculateDownstreamTransformerFaultCurrent(highZ, 32_937, 3);
+      expect(highResult.faultCurrent).toBeLessThan(lowResult.faultCurrent);
+    });
+
+    it('produces higher secondary fault current at lower secondary voltage (turns ratio)', () => {
+      // Same primary, same kVA/%Z, but stepping 480→120 vs 480→240 puts a
+      // larger turns-ratio multiplier on the secondary side.
+      const xfmr120: TransformerData = {
+        kva: 75,
+        primaryVoltage: 480,
+        secondaryVoltage: 120,
+        impedance: 2.0,
+      };
+      const xfmr240: TransformerData = { ...xfmr120, secondaryVoltage: 240 };
+      const result120 = calculateDownstreamTransformerFaultCurrent(xfmr120, 20_000, 3);
+      const result240 = calculateDownstreamTransformerFaultCurrent(xfmr240, 20_000, 3);
+      expect(result120.faultCurrent).toBeGreaterThan(result240.faultCurrent);
+    });
+
+    it('returns the result-with-warnings contract (never throws) on invalid input', () => {
+      const xfmr: TransformerData = {
+        kva: 0, // invalid
+        primaryVoltage: 480,
+        secondaryVoltage: 208,
+        impedance: 1.2,
+      };
+      const result = calculateDownstreamTransformerFaultCurrent(xfmr, 32_937, 3);
+      expect(result.faultCurrent).toBe(0);
+      expect(result.compliance.compliant).toBe(false);
+      expect(result.compliance.message).toContain('Invalid');
+    });
+
+    it('attaches the correct AIC tier and NEC reference', () => {
+      const xfmr: TransformerData = {
+        kva: 225,
+        primaryVoltage: 480,
+        secondaryVoltage: 208,
+        impedance: 1.08,
+      };
+      const result = calculateDownstreamTransformerFaultCurrent(xfmr, 32_937, 3);
+      expect(result.compliance.necArticle).toContain('110.9');
+      expect([10, 14, 22, 25, 42, 65, 100, 200]).toContain(result.requiredAIC);
+      expect(result.details.safetyFactor).toBe(1.25);
     });
   });
 
