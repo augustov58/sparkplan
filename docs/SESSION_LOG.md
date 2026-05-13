@@ -3,7 +3,45 @@
 **Purpose**: Tracks recent work for seamless handoff between Claude instances.
 **Maintenance Rule**: Keep only the last 2 sessions. At the start of a new session, delete older entries — git history preserves everything.
 
-**Last Updated**: 2026-05-12
+**Last Updated**: 2026-05-13
+
+---
+
+### Session: 2026-05-13 — Sprint 2B PR-4 (Orlando manifest + AHJ-aware visibility) shipped via single-agent run
+
+**Focus**: Closed Sprint 2B. Built and shipped PR #51 over 8 commits / ~2,066 LOC against `feat/sprint2b-orlando-manifest`, merged at squash hash `18985e5` 2026-05-13. Adds the first-ever AHJ manifest (`data/ahj/orlando.ts`), the AHJManifest type system with a 4-axis `AHJContext`, a two-layer visibility model (manifest defaults + user overrides), an AHJ registry with case-insensitive lookup, the orchestrator plumbing to consume an optional manifest, and 6 new `artifact_type` enum values reserved for Sprint 2C AHJs. Sprint 2B is now complete at 4/4 PRs (PR #45 foundation + PR #47 upload UI + PR #49 merge engine + PR #51 manifest scaffold).
+
+**Status**: ✅ PR #51 merged. Sprint 2B: ✅ COMPLETE. Test suite at 572 passing across 37 test files (was 522 post-PR-#49; +50 new tests across 2 new test files: `tests/visibility.test.ts` (22) + `tests/orlandoManifestE2E.test.ts` (28)). 1 DB migration applied to live Supabase (`20260514_attachment_types_pr4.sql` — extends `artifact_type` CHECK from 8 to 14 values). Build green.
+
+**Architecture decisions worth carrying forward**:
+
+- **Bake the manifest's hardest axes into the type system on day 1, not on day N.** PR-4's `AHJContext` declares all 4 cross-AHJ discriminators (`scope`, `lane`, `buildingType`, `subjurisdiction`) even though Orlando uses only 2 of them (`scope` + `buildingType`). The temptation was to ship Orlando first and add `buildingType` / `subjurisdiction` when Miami-Dade / Pompano / Davie / Hillsborough land in Sprint 2C M1. Wrong call — that would force a retrofit across 5 manifests + their predicate functions. Cost of adding the field upfront: ~10 LOC + one comment per field explaining when it's used. Cost of retrofitting: rewriting every predicate. Lesson: when you can predict the axes of variation from research that already landed (Sprint 2C parallel-research PRs #46 + #48), declare them all on the day-1 interface even if today's only consumer uses a subset.
+- **Two-layer visibility (manifest defaults + user overrides) is the right shape for cross-AHJ work.** Sprint 2A's `DEFAULT_SECTIONS = { panelSchedule: true, ... }` assumed every project of every AHJ has the same defaults. That's wrong as soon as you have >1 AHJ. The two-layer model gets 90% right automatically (manifest declares what the AHJ wants by default; predicates refine per-project context) while letting the contractor override the last 10% (project-specific reality, e.g., "Davie commercial usually wants Knox-box but this 80A project doesn't have a switchboard"). Pattern memory-worthy for any future "system has opinionated defaults + power-user overrides" problem.
+- **Predicates over enums for conditional relevance.** Orlando's NEC 220.87 narrative is relevant on existing-service path / irrelevant on new-service path. Available Fault Current calc is the opposite. The temptation is to enumerate ('existing-service-only', 'new-service-only', 'always', 'never'). Predicates win: pure `(ctx: AHJContext) => boolean`, composable with future axes (`ctx.scope === 'existing-service' && ctx.lane === 'pe_required'` falls out naturally), and they survive new context axes without enum migration. The manifest's `sectionPredicates` + `artifactTypePredicates` maps are the abstraction surface — Sprint 2C M1's per-AHJ manifests just add more predicate keys.
+- **Reserve enum values in advance when downstream PRs need them.** PR #51 added 6 `artifact_type` values that Orlando's manifest doesn't surface (zoning_application, fire_review_application, notarized_addendum, property_ownership_search, flood_elevation_certificate, private_provider_documentation). Why? Sprint 2C M1's Pompano / Miami-Dade / Davie / Hillsborough manifests need them. Splitting the migration across 4 PRs would cost 4 migrations + 4 testing windows; bundling them with PR-4 costs 1 migration. The Orlando manifest just doesn't list any of them in `relevantArtifactTypes` — they're enum-valid but visibility-OFF. Lesson: when the next sprint's research is already done (and `data/ahj/orlando.ts` references the H21/H22/H25/H26/H30/H33 findings in comments), pre-allocate the schema values during the current PR.
+- **Backward-compat via fallback chains, not feature flags.** Resolution logic in the orchestrator: `generalNotes = data.generalNotes ?? manifest?.generalNotes ?? Sprint2A_baseline`. Same shape for `codeReferences` and `necEdition`. No feature flag, no toggle, no opt-in — projects without a `jurisdiction_id` (or with one not in the registry) get exactly the Sprint 2A behavior they had pre-PR-#51. Lesson: when adding new defaults, prefer null-coalescing fallback chains over feature flags — the new path naturally degrades to the old path when its inputs aren't present.
+
+**Process gotchas worth remembering**:
+
+- **Manifest-as-pure-data continues to pay off.** `data/ahj/orlando.ts` is 208 LOC of literal data + predicate functions. No DB calls, no React, no side effects, no imports beyond `./types`. Tested via 28 E2E assertions against the visibility-math output. When a sprint produces pure-data artifacts, the test surface collapses (no async, no mocks, no setup teardown) and the next-sprint's review burden collapses with it. Sprint 2C M1 reviews will be N more `data/ahj/{ahj}.ts` files + an engine — both reviewable on the same shape.
+- **8 commits in one PR is the right size.** PR #51 reviewed cleanly: 1 commit per architectural surface (types → manifest → registry → visibility math → orchestrator integration → UI plumbing → E2E tests + 1 supporting commit). Compare to PR #49's 17-commit iterative v1 → v5 cycle (which was the right call given the design-by-review nature of title-block UX). When a sprint is "implement against an already-decided spec," lean toward fewer-but-cohesive commits; when it's "iterate to discover the shape," lean toward more-but-finer-grained commits.
+- **Docs-sync convention extends to Sprint 2B closure.** Same pattern as PR #50 (post-PR #49) and PR #42 (post-Sprint 2A PRs #40 + #41). Docs-only PR off main after the feature PR merges. This session's docs-sync PR follows the precedent.
+
+**Deliverables**:
+
+| PR | Branch | Files | Result |
+|---|---|---|---|
+| **#51 (merged)** | `feat/sprint2b-orlando-manifest` | 13 files, 8 commits, ~2,066 LOC (5 new `data/ahj/` modules + 2 new test files + 1 migration + 4 modified files including orchestrator) | ✅ MERGED `18985e5` 2026-05-13 |
+| **this PR (local)** | `feat/sprint2b-orlando-manifest` worktree (docs-sync) | parent audit + sprint2b + README + ROADMAP + CHANGELOG + SESSION_LOG + database-architecture + CLAUDE.md | (this commit set) |
+
+**Worktrees in play at session end**: `worktree-agent-a2bc0abf949ed1035` (this docs-sync worktree, part of a 7-agent parallel orchestration for PR #51).
+
+**Pending / follow-ups**:
+
+1. **Sprint 2C M1 — per-AHJ manifest engine** — declare Pompano → Miami-Dade → Davie → Hillsborough manifests against the same `AHJManifest` shape. Populate their `requirements: AHJRequirement[]` arrays. Build the engine that walks `requirements[]` and emits a per-project conformance checklist. All schema work is done; Sprint 2C is now a pure-data + engine exercise.
+2. **F8: Enable RLS on `public.jurisdictions`** — one-line migration before Sprint 2C M1 populates the table. Supabase advisor flagged 2026-05-12; still open.
+3. **Sprint 3 unblocked** — `pdf-lib` PAdES integration shape established by Sprint 2B PR #49; H17 lane logic (Sprint 2A PR #41) gates the PE-seal upsell offering; manifest's `lane: 'pe_required'` predicate flows naturally into seal-required determination. Cert vendor selection + FBPE business-entity registration remain as hard prerequisites.
+4. **Sheet-ID prefix plumbing (H20 Miami-Dade `EL-`)** — `AHJManifest.sheetIdPrefix` is declared but the orchestrator still uses the Sprint 2B PR-3 discipline-letter system. Wire `manifest.sheetIdPrefix` into the band allocator when Miami-Dade's manifest lands in Sprint 2C M1.
 
 ---
 
@@ -33,55 +71,17 @@
 | PR | Branch | Files | Result |
 |---|---|---|---|
 | **#49 (merged)** | `feat/sprint2b-merge-engine` | 17 commits, 5 new pdf-lib services + 2 new react-pdf components + 5 migrations + 4 test files (~5,580 LOC) | ✅ MERGED `fce6275` 2026-05-12 |
-| **this PR (local)** | `docs/sprint-2b-docs-sync` | parent audit + sprint2b + README + ROADMAP + CHANGELOG + SESSION_LOG + database-architecture + CLAUDE.md | (this commit set) |
+| **#50 (merged)** | `docs/sprint-2b-docs-sync` | parent audit + sprint2b + README + ROADMAP + CHANGELOG + SESSION_LOG + database-architecture + CLAUDE.md | docs sync |
 
 **Worktrees in play at session end**: none on disk for PR #49 (was a single-agent run, no parallel worktrees).
 
-**Pending / follow-ups**:
+**Pending / follow-ups (resolved by Sprint 2B PR-4 work the next day)**:
 
-1. **PR-4: Orlando manifest scaffold** — `data/ahj/orlando.ts` defines two scopes (`'existing-service'` and `'new-service'`) as `PacketSection[]`. M1 engine in Sprint 2C extends this to 4 more AHJs. Unblocks per-AHJ wiring of H5/H6/H7/H8/H16.
-2. **F8: Enable RLS on `public.jurisdictions`** — one-line migration before Sprint 2C M1 populates the table. Supabase advisor flagged 2026-05-12.
-3. **H19 per-AHJ wiring** — `artifact_type='hvhz_anchoring'` slot exists; Miami-Dade + Pompano enforcement wiring lands in Sprint 2C M1 alongside the manifest scaffold.
+1. **PR-4: Orlando manifest scaffold** — resolved by PR #51 (`18985e5`, 2026-05-13). Ships AHJManifest type system + Orlando manifest + two-layer visibility model + 6 new artifact_types.
+2. **F8: Enable RLS on `public.jurisdictions`** — still open; one-line migration before Sprint 2C M1 populates the table.
+3. **H19 per-AHJ wiring** — Orlando wired in PR #51 (statewide outdoor EVSE predicate). Miami-Dade + Pompano enforcement wiring lands in Sprint 2C M1 alongside their manifests.
 4. **Sprint 3 unblocked at the pdf-lib layer** — PAdES PE seal signing now has the same library + integration pattern that PR #49 established. Cert vendor selection + FBPE business-entity registration are the remaining hard prerequisites.
 
 ---
 
-### Session: 2026-05-10 — Sprint 2A final 2 PRs (PR #40 diagrams + PR #41 H17) shipped via 3 parallel worktree agents
-
-**Focus**: Closed Sprint 2A's last 4 open findings (M6 + H9 AIC overlay + M3 in PR #40; H17 + settings JSON in PR #41). Three worktree-isolated agents working concurrently from `main @ cbd132a`, then code-reviewer + security-reviewer in parallel on the combined diff, then 2 themed PRs opened. Sprint 2A is now ✅ COMPLETE at 19/19 findings across 5 themed PRs.
-
-**Status**: ✅ PR #40 + PR #41 open for review. Test suite at 413/413 on the combined branch (was 363 baseline at session start; +50 across the 3 agents + 7 reviewer-fix regression tests). Build green throughout. No DB migrations.
-
-**Architecture decisions worth carrying forward**:
-
-- **Worktree-isolated parallel agents safely co-edit a file** when their human-given scope assigns them to non-overlapping sections of it. PR #40 + PR #41 used 3 agents in worktrees; the 2 files with multi-agent edits (`PermitPacketDocuments.tsx` for Agent 1's RiserDiagram + Agent 3's CoverPage permitMode prop, `permitPacketGenerator.tsx` for Agent 2's grounding-section render + Agent 3's permitMode plumbing) auto-merged because each agent worked in distinct components/sections of the file. Git's "ort" merge strategy (default since 2.34) does smart hunk-level matching that handles this gracefully. Lesson: when fan-out parallelism is needed and shared files are inevitable, brief each agent on the specific *section* they own, not just the file.
-- **Spec line numbers decay; diagnostic shortcuts don't.** CLAUDE.md and the audit doc claimed `OneLineDiagram.tsx` had two SVG renderings at lines 2340 and 3290. Investigating during PR #40, those line numbers pointed at internal bus-bar geometry and an HTML `<select>`. Agent 1 correctly diagnosed via Sprint 1's diagnostic shortcut ("in-app correct vs PDF wrong → look at the PDF call site") that the actual permit-packet riser is in `services/pdfExport/PermitPacketDocuments.tsx::RiserDiagram` (~L1150). Lesson: when a CLAUDE.md instruction is invoked, do a one-line sanity check (does line X match the description?) before trusting it. Docs fix landed in the docs-sync PR.
-- **Fail-safe defaults are part of the calc-service contract for compliance logic.** CLAUDE.md's calc-service rule says "never throw, return warnings" — that handles the success path. PR #41's H2 + M1 reviewer findings showed that compliance functions (e.g., H17 lane screening) need to extend this to the failure path: malformed input gets a *safe-direction* default (fail-safe to pe-required, not silently exempt). Wrong direction creates regulatory risk; right direction errs toward over-requiring engineering review. Memory-worthy pattern for Sprint 3 PE seal logic and Sprint 2C AHJ overrides.
-- **Test-count arithmetic is a clean audit trail.** Combined branch: 363 baseline + 4 Agent 1 + 27 Agent 2 + 12 Agent 3 + 7 reviewer-fix regressions = 413. Every number ties to a specific finding. When the math doesn't add up, that signals a missing test or a regression silently swallowed. Worth running `git diff main..HEAD -- 'tests/**'` to validate at PR-time.
-
-**Process gotchas worth remembering**:
-
-- **Worktrees lack `.env.local`.** Agents 2 and 3 reported 250-test baselines in their worktrees vs the main-checkout 363 baseline. Cause: worktrees share the bare git directory but not the working-dir `.env.local` symlink, so Supabase-env-gated test files fail at import time and get excluded. Not a regression; the missing tests are present on main with proper env. When reconvening branches in the main checkout, expect the full test count. Lesson: don't trust worktree test counts as absolute — diff them to detect regressions but compare to a same-environment baseline when reporting "X/X passing."
-- **PRs need explicit conflict pre-validation when fanned out.** Before opening PR #40 I built a scratch `review/sprint2a-combined` branch merging all 3 agent branches to detect conflicts before reviewers saw the diff. Zero conflicts — but if there had been any, catching them pre-review would have been much cheaper than asking reviewers to re-run on a fixed combined branch. Lesson: always materialize the actual PR diff before review fan-out, not just review per-agent branches.
-- **Reviewer findings escalate based on direction-of-failure, not just rule violation.** Security-review and code-review both flagged M1 (NaN/negative inputs route to exempt). What made M1 high-priority wasn't that it failed — it's that it failed in the **wrong direction** for a compliance flag. Same-shape bug in a non-compliance context might be a defer-to-cleanup-PR. Lesson when triaging reviewer findings: check the *direction* of failure, not just the existence of failure.
-
-**Deliverables**:
-
-| PR | Branch | Files | Result |
-|---|---|---|---|
-| **#40 (merged)** | `fix/sprint2a-pr4-diagrams` (Agents 1 + 2 + H1 + M3 fixes) | 14 changed, +1886 / -201 | M6 + H9 overlay + M3 grounding |
-| **#41 (merged)** | `fix/sprint2a-pr5-h17-schema` (Agent 3 + H2 + M1 fixes) | 7 changed, +782 / -2 | H17 screening + settings JSON |
-| **#42 (merged)** | `docs/sprint2a-pr4-pr5-sync` | audit + sprint2a + README + CHANGELOG + SESSION_LOG + CLAUDE.md | docs sync |
-
-**Worktrees in play at session end**: none (3 agent worktrees auto-removed after their branches merged into the review scratch branch). Standard worktrees from other features still on disk.
-
-**Pending / follow-ups (resolved by Sprint 2B work)**:
-
-1. **Merge PR #40 + PR #41** — done.
-2. **Pre-existing `(panel as any).aic_rating` cast at `components/OneLineDiagram.tsx:1136`** — still in place; clean up next time the file is touched.
-3. **Sprint 2C is now unblocked** — H17 lane logic + settings JSON + AHJ-name placeholder are all in place. Sprint 2C wires per-AHJ manifests into `ahjOverride` and replaces the AHJ placeholder. M2/M3 (security) deferred items (enum whitelist on read, scope_flags runtime coercion) belong in Sprint 2C when those code paths get wired in.
-4. **Pre-existing 480V `(panel as any)` casts** — still pending.
-
----
-
-<!-- Earlier sessions (2026-05-09 contractor-pivot + T&M Phase 1, 2026-05-10 Sprint 2A PR #31) rotated out per "keep last 2 sessions" rule. Git history preserves them. -->
+<!-- Earlier sessions (2026-05-10 Sprint 2A final 2 PRs, 2026-05-09 contractor-pivot + T&M Phase 1, 2026-05-10 Sprint 2A PR #31) rotated out per "keep last 2 sessions" rule. Git history preserves them. -->

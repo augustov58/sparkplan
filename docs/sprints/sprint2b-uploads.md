@@ -1,7 +1,7 @@
 # Sprint 2B — Uploads + Merge Engine + Title Sheet Pattern
 
-**Status:** ✅ COMPLETE 2026-05-12 (3 PRs merged: PR #45 foundation + PR #47 upload UI + PR #49 merge engine). PR-4 manifest scaffold on deck.
-**Last Updated:** 2026-05-12
+**Status:** ✅ COMPLETE 2026-05-13 (4 PRs merged: PR #45 foundation + PR #47 upload UI + PR #49 merge engine + PR #51 Orlando manifest scaffold).
+**Last Updated:** 2026-05-13
 **Hard prerequisites:** Sprint 2A schema additions (`service_modification_type` enum) — needed for the Orlando manifest fork
 **Inherits from:** [`sprint2a-form-factor.md`](./sprint2a-form-factor.md) — sheet ID category bands (`packetSections.ts`), section toggle UI + `projects.settings` persistence, generator builder pattern
 **Index:** [`docs/sprints/README.md`](./README.md)
@@ -23,12 +23,12 @@ Sprint 2A closed all the systemic-rejection vectors that come from generated con
 
 | ID | Finding | AHJ source | Closed by |
 |---|---|---|---|
-| **H5** | Notice of Commencement (NOC) placeholder for projects > $5,000 | Orlando | Upload slot enabled by PR #49 (`fce6275`, 2026-05-12); per-AHJ wiring → PR-4 |
-| **H6** | HOA / condo approval letter placeholder | Pompano (multi-family) | Upload slot enabled by PR #49 (`fce6275`, 2026-05-12); per-AHJ wiring → PR-4 |
-| **H7** | Site plan / survey | All 5 AHJs; Orlando #6 (existing-service) + #6/#7 (new-service) | Upload slot enabled by PR #49 (`fce6275`, 2026-05-12); per-AHJ wiring → PR-4 |
-| **H8** | Equipment cut sheets / installation manuals | Pompano; Orlando #7 (both paths) for EVSE specs | Upload slot enabled by PR #49 (`fce6275`, 2026-05-12); per-AHJ wiring → PR-4 |
-| **H16** | Fire stopping schedule for fire-rated penetrations | Orlando #8 (both paths) | Upload slot enabled by PR #49 (`fce6275`, 2026-05-12); per-AHJ wiring → PR-4 |
-| **H19** | HVHZ wind-anchoring documentation for outdoor pedestal/bollard EVSE | Miami-Dade + Pompano (statewide for outdoor EVSE) | `artifact_type='hvhz_anchoring'` added by PR #49 (`fce6275`, 2026-05-12); per-AHJ wiring → Sprint 2C M1 |
+| **H5** | Notice of Commencement (NOC) placeholder for projects > $5,000 | Orlando | Upload slot enabled by PR #49 (`fce6275`, 2026-05-12); Orlando per-AHJ wiring (non-SFR predicate) closed by PR #51 (`18985e5`, 2026-05-13); Pompano/MD/Davie/Hillsborough wiring → Sprint 2C M1 |
+| **H6** | HOA / condo approval letter placeholder | Pompano (multi-family) | Upload slot enabled by PR #49 (`fce6275`, 2026-05-12); Orlando manifest declares OFF by default per PR #51 (`18985e5`, 2026-05-13); Pompano per-AHJ wiring → Sprint 2C M1 |
+| **H7** | Site plan / survey | All 5 AHJs; Orlando #6 (existing-service) + #6/#7 (new-service) | Upload slot enabled by PR #49 (`fce6275`, 2026-05-12); Orlando per-AHJ wiring closed by PR #51 (`18985e5`, 2026-05-13); other 4 AHJs → Sprint 2C M1 |
+| **H8** | Equipment cut sheets / installation manuals | Pompano; Orlando #7 (both paths) for EVSE specs | Upload slot enabled by PR #49 (`fce6275`, 2026-05-12); Orlando per-AHJ wiring closed by PR #51 (`18985e5`, 2026-05-13); Pompano wiring → Sprint 2C M1 |
+| **H16** | Fire stopping schedule for fire-rated penetrations | Orlando #8 (both paths) | Upload slot enabled by PR #49 (`fce6275`, 2026-05-12); Orlando per-AHJ wiring closed by PR #51 (`18985e5`, 2026-05-13) |
+| **H19** | HVHZ wind-anchoring documentation for outdoor pedestal/bollard EVSE | Miami-Dade + Pompano (statewide for outdoor EVSE) | `artifact_type='hvhz_anchoring'` added by PR #49 (`fce6275`, 2026-05-12); Orlando manifest declares statewide ON per PR #51 (`18985e5`, 2026-05-13); Miami-Dade + Pompano enforcement wiring → Sprint 2C M1 |
 
 ---
 
@@ -65,6 +65,47 @@ Sprint 2A closed all the systemic-rejection vectors that come from generated con
 
 **Surfaced for follow-up**
 - **F8** — Enable RLS on `public.jurisdictions` before Sprint 2C M1 populates it (currently 0 rows; Supabase advisor flagged 2026-05-12).
+
+---
+
+## What landed (PR #51 — squash `18985e5`, merged 2026-05-13)
+
+8 commits, ~2,066 LOC. PR-4 of the Sprint 2B series — closes the sprint by adding the first-ever AHJ manifest + the AHJ-aware visibility layer. Sprint 2C M1 extends this scaffold to 4 more AHJs (Pompano → Miami-Dade → Davie → Hillsborough) without touching the engine.
+
+**AHJ manifest type system** (`data/ahj/types.ts`, 354 LOC)
+- `AHJManifest` interface — captures everything that varies per-AHJ: code-basis references (`necEdition: Record<BuildingType, string>` for H34; `fbcEdition`), sheet-ID conventions (`sheetIdPrefix: 'E-' | 'EL-' | 'ES-'` for H20), narrative content (`generalNotes`, `codeReferences`), default section/artifact visibility (`relevantSections` + `relevantArtifactTypes`), conditional refinements (`sectionPredicates` + `artifactTypePredicates`), and Sprint 2C M1's `requirements: AHJRequirement[]` (declared empty on Orlando; populated by Sprint 2C M1).
+- `AHJContext` — 4 axes baked in from day 1: `scope` (Sprint 2A PR-5), `lane` (Sprint 2A H17), `buildingType` (Sprint 2C research; SFR / multi_family / commercial), `subjurisdiction` (optional; Miami-Dade discriminator).
+- `SectionPredicate` + `ArtifactTypePredicate` — pure `(ctx: AHJContext) => boolean`. Composable, mutation-free, no enum migration needed when new context axes land.
+- `AHJRequirement` — schema declared NOW so Sprint 2C M1's engine consumes the same shape across all 5 AHJ manifests without retrofitting.
+
+**Orlando manifest** (`data/ahj/orlando.ts`, 208 LOC)
+- Captures the City of Orlando "EV Charging Station Permit Checklist" as pure data (sourced 2026-05-08; validated High confidence).
+- `sectionPredicates`: `nec22087Narrative` ON existing-service only; `availableFaultCurrent` + `grounding` ON new-service only; `meterStack` + `multiFamilyEV` ON multi-family only.
+- `artifactTypePredicates`: `noc` ON non-SFR (FL Statute 713 / jobs >$5k); `hvhz_anchoring` ON always (statewide outdoor EVSE per H19).
+- `relevantArtifactTypes`: `site_plan`, `cut_sheet`, `fire_stopping`, `noc`, `manufacturer_data`, `hvhz_anchoring`. Sprint 2C-reserved types (`hoa_letter`, `survey`, plus the 6 new from this PR) default OFF; user can still toggle on.
+- Uniformly cites NEC 2020 across SFR / multi_family / commercial (no MD-style H34 fork).
+- `requirements: []` empty; Sprint 2C M1 populates line-by-line from the Orlando audit-doc matrix.
+
+**Visibility math** (`data/ahj/visibility.ts`, 259 LOC) — two-layer model
+- Layer 1 (manifest defaults): `computeDefaultVisibility(manifest, ctx)` walks `relevantSections` + `relevantArtifactTypes`, applies any matching predicate, returns the default ON/OFF map.
+- Layer 2 (user overrides): `applySectionOverrides(defaults, overrides)` overlays the user's per-project toggles from `projects.settings.section_overrides`. Contractor can turn off any default-ON section/slot or turn on any default-OFF entry.
+- Backward compat: when no manifest is registered for a project's jurisdiction, returns `null` — Sprint 2A's `resolveSections(sectionPrefs)` path runs unchanged.
+
+**AHJ registry** (`data/ahj/registry.ts`, 97 LOC)
+- `MANIFESTS: Record<string, AHJManifest>` keyed by lowercase manifest id (`'orlando'`).
+- `getManifestById(id)` — case-insensitive lookup; null on unknown.
+- `findManifestForJurisdiction(jurisdictionName, ahjName)` — case-insensitive substring match on both fields. Sprint 2C M1 will replace this with an explicit `jurisdictions.manifest_id` FK once the `jurisdictions` table is populated.
+
+**Orchestrator integration** (`services/pdfExport/permitPacketGenerator.tsx`, +81 LOC; `components/PermitPacketGenerator.tsx`, +363 LOC)
+- `PermitPacketData` additions: `manifest?: AHJManifest` + `buildingType?: BuildingType`.
+- Resolution chain: `generalNotes / codeReferences / necEdition = data.X ?? manifest?.X ?? Sprint2A_baseline`.
+- UI threads the active manifest + the resolved buildingType from `AHJContext` into `PermitPacketData` when a manifest is active. Without a manifest (project has no jurisdiction_id, or jurisdiction not in registry), every fallback chain ends at the pre-existing top-level fields.
+- Sheet-ID prefix override deferred to Sprint 2C M1 (Miami-Dade H20 `EL-`). Orlando default `E-` matches today's behavior, so this is a no-op for PR-4.
+
+**Migration applied to live Supabase**
+- `20260514_attachment_types_pr4.sql` — extends `project_attachments.artifact_type` CHECK from 8 → 14 values. Adds 6 new types reserved for Sprint 2C AHJs: `zoning_application` (H21 Pompano), `fire_review_application` (H22 Pompano + Davie commercial), `notarized_addendum` (H25 Davie), `property_ownership_search` (H26 Davie BCPA.NET), `flood_elevation_certificate` (H30 Hillsborough flood zones), `private_provider_documentation` (H33 Hillsborough FS 553.791). Orlando manifest doesn't list any of them in `relevantArtifactTypes`; they're enum-valid + visibility-OFF.
+
+**Tests** — 522 (post-PR-#49) → 572 passing across 37 test files (+50 new). 2 new test files: `tests/visibility.test.ts` (22 — two-layer visibility math, predicate fall-through, override application) + `tests/orlandoManifestE2E.test.ts` (28 — H5/H6/H7/H8/H16/H19 wiring + scope-fork assertions + registry lookup).
 
 ---
 

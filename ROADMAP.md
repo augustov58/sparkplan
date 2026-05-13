@@ -1,28 +1,28 @@
 # SparkPlan - Roadmap
 
-**Last Updated:** 2026-05-12
+**Last Updated:** 2026-05-13
 
-## Current Phase: 3.9 (AHJ Compliance Audit Sprint 2B) - MERGE-ENGINE HALF COMPLETE (May 2026)
+## Current Phase: 3.9 (AHJ Compliance Audit Sprint 2B) - ✅ COMPLETE (May 2026)
 
 ## Latest Completed Phase: 3.8 (T&M Billing Beta v1) - PHASE 1 IMPLEMENTED (May 2026)
 ## Also Just Shipped: 3.7 (Estimating Beta v1) + 3.6 (Permits Beta v1) - PHASE 1 IMPLEMENTED (May 2026)
 ## Sprint 2A: ✅ COMPLETE (19/19 findings; 5 themed PRs merged)
-## Sprint 2B: ✅ COMPLETE merge-engine half (3 PRs merged); PR-4 Orlando manifest scaffold on deck
+## Sprint 2B: ✅ COMPLETE (4 PRs merged — PR #45 + PR #47 + PR #49 + PR #51 Orlando manifest scaffold)
 
 ---
 
-## Phase 3.9: AHJ Compliance Audit Sprint 2B - MERGE-ENGINE COMPLETE (May 2026)
+## Phase 3.9: AHJ Compliance Audit Sprint 2B - ✅ COMPLETE (May 2026)
 
-User-supplied artifacts (site plans, cut sheets, NOC, HOA letters, fire-stopping schedules, manufacturer data, HVHZ wind-anchoring) now upload through the SparkPlan UI and splice into the generated permit packet behind SparkPlan-themed title sheets, with continuous sheet-ID stamping across the merged document. This is also the architectural foundation Sprint 3 needs — `pdf-lib` is the same library that does PAdES digital signing for PE seals.
+User-supplied artifacts (site plans, cut sheets, NOC, HOA letters, fire-stopping schedules, manufacturer data, HVHZ wind-anchoring) now upload through the SparkPlan UI and splice into the generated permit packet behind SparkPlan-themed title sheets, with continuous sheet-ID stamping across the merged document. PR #51 closes Sprint 2B by adding the Orlando manifest scaffold + AHJ-aware visibility (two-layer model: manifest defaults + user overrides) + 6 new artifact_types reserved for Sprint 2C AHJs. This is also the architectural foundation Sprint 3 needs — `pdf-lib` is the same library that does PAdES digital signing for PE seals.
 
 | PR | Status | Closes |
 |---|---|---|
 | **PR #45** (foundation) | ✅ MERGED 2026-05-11 | `pdf-lib` dependency + `project_attachments` table + sheet ID discipline prefixes (E / C / X / M / P / S / A) + `nextSheetId` allocator |
 | **PR #47** (upload UI) | ✅ MERGED 2026-05-11 | `useProjectAttachments` hook + `AttachmentUploadCard` + `PermitPacketGenerator` integration (8 upload slots) |
 | **PR #49** (merge engine) | ✅ MERGED 2026-05-12 (`fce6275`) | `mergePacket` + `stampSheetIds` + `compositeTitleBlock` (pure pdf-lib functions); `AttachmentTitleSheet` + `AttachmentTitleBlock` (size-aware react-pdf, Letter→ARCH D); 3-mode cover (`separate` / `overlay` / `none`); per-upload `custom_sheet_id` + `discipline_override`; H19 HVHZ artifact_type |
-| **PR-4** (planned) | ⏳ PENDING | `data/ahj/orlando.ts` manifest scaffold — per-AHJ wiring of H5/H6/H7/H8/H16 (Sprint 2C M1 then extends to 4 more AHJs) |
+| **PR #51** (PR-4 Orlando manifest scaffold) | ✅ MERGED 2026-05-13 (`18985e5`) | `data/ahj/types.ts` (AHJManifest + 4-axis AHJContext) + `data/ahj/orlando.ts` (City of Orlando manifest) + `data/ahj/visibility.ts` (two-layer visibility math) + `data/ahj/registry.ts` (case-insensitive AHJ lookup) + 6 new artifact_types reserved for Sprint 2C; per-AHJ wiring of H5/H6/H7/H8/H16 against Orlando |
 
-**Findings closed (upload slot enabled):** H5 (NOC), H6 (HOA letter), H7 (site plan / survey), H8 (equipment cut sheets), H16 (fire stopping schedule), H19 (HVHZ wind-anchoring). Full AHJ-specific closure depends on PR-4 manifest scaffold + Sprint 2C M1 per-AHJ wiring.
+**Findings closed:** H5 (NOC — Orlando wired for non-SFR via FL Statute 713 predicate), H6 (HOA letter — OFF for Orlando per manifest, ON for Pompano in Sprint 2C), H7 (site plan / survey — ON for Orlando, all 5 AHJs), H8 (equipment cut sheets — ON for Orlando per #7 EVSE UL listings), H16 (fire stopping schedule — ON for Orlando per #8 both paths), H19 (HVHZ wind-anchoring — statewide outdoor EVSE per predicate). Sprint 2C M1 extends manifest coverage to Pompano → Miami-Dade → Davie → Hillsborough.
 
 **Migrations applied** (via Supabase MCP, project `ioarszhzltpisxsxrsgl`):
 - `20260512_project_attachments.sql` (PR #45) — table + `permit-attachments` Storage bucket + RLS.
@@ -31,8 +31,9 @@ User-supplied artifacts (site plans, cut sheets, NOC, HOA letters, fire-stopping
 - `20260514_attachment_cover_mode.sql` (PR #49) — replaces boolean with 3-value enum.
 - `20260514_attachment_custom_sheet_id.sql` (PR #49) — nullable per-upload override.
 - `20260514_attachment_discipline_override.sql` (PR #49) — nullable per-upload override.
+- `20260514_attachment_types_pr4.sql` (PR #51) — extends `artifact_type` CHECK from 8 → 14 values (adds `zoning_application` H21, `fire_review_application` H22, `notarized_addendum` H25, `property_ownership_search` H26, `flood_elevation_certificate` H30, `private_provider_documentation` H33 — all reserved for Sprint 2C AHJ manifests).
 
-**Test count (post-Sprint-2B):** 522 passing across 35 test files (+31 from PR #49; 491 baseline post-PR-2).
+**Test count (post-Sprint-2B):** 572 passing across 37 test files (+50 from PR #51; 522 baseline post-PR #49). 28 Orlando E2E tests + 22 visibility-math tests new.
 
 **Surfaced F-tier follow-up:** F8 — Enable RLS on `public.jurisdictions` before Sprint 2C M1 populates it.
 

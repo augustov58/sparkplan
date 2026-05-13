@@ -4,6 +4,35 @@ All notable changes to SparkPlan.
 
 ---
 
+## 2026-05-13: Permit packet — Sprint 2B PR-4 Orlando manifest + AHJ-aware visibility (PR #51)
+
+Closes Sprint 2B. Adds the first-ever AHJ manifest (`data/ahj/orlando.ts`) capturing the City of Orlando's "EV Charging Station Permit Checklist" as pure data, plus a two-layer visibility model (manifest defaults + user overrides) that drives which packet sections and upload slots are surfaced for a given project. Reserves 6 new `artifact_type` values for Sprint 2C AHJs (Pompano / Miami-Dade / Davie / Hillsborough) so the M1 engine can wire them up without another migration. Squash hash `18985e5`, 8 commits, ~2,066 LOC.
+
+**User-facing changes:**
+
+- **Per-AHJ packet defaults.** When a project's `jurisdiction_id` points to an AHJ with a registered manifest (Orlando today; Pompano / Miami-Dade / Davie / Hillsborough in Sprint 2C M1), the Permit Packet Generator now defaults section visibility + upload-slot visibility to what that AHJ actually wants on intake — rather than the static Sprint 2A "all-on" baseline. Contractors can still toggle any section/slot on or off per project (the override layer); the manifest just sets smarter starting defaults.
+- **Orlando manifest live.** Projects keyed to Orlando now default to the line-by-line validated Orlando checklist: NEC 220.87 narrative on existing-service path / Available Fault Current calc + grounding detail on new-service path, EVSE UL-2202/UL-2594 cut-sheets surfaced, fire-stopping upload slot ON, NOC upload slot ON for non-SFR projects (FL Statute 713 / jobs >$5k threshold), HVHZ wind-anchoring slot ON statewide for outdoor EVSE. HOA letter slot defaults OFF (Pompano-only).
+- **AHJ-aware general notes + applicable codes.** Cover sheet's "APPLICABLE CODES" block and the General Notes page now pull from `manifest.codeReferences` + `manifest.generalNotes` when a manifest is active — replacing the Sprint 2A static FL pilot stack with Orlando-specific phrasing (NFPA-70 2020 NEC, FBC 8th ed (2023), Orlando City Code Ch. 14 (Electrical), NFPA-70E (2024)).
+- **6 new upload-slot types reserved.** The `artifact_type` enum now accepts 14 values total (was 8). The 6 added — `zoning_application` (H21 Pompano), `fire_review_application` (H22 Pompano + Davie commercial), `notarized_addendum` (H25 Davie), `property_ownership_search` (H26 Davie BCPA.NET), `flood_elevation_certificate` (H30 Hillsborough flood zones), `private_provider_documentation` (H33 Hillsborough FS 553.791) — are declared in the DB CHECK now so Sprint 2C M1 ships per-AHJ manifest visibility without a fresh migration. They're not surfaced in the Orlando UI (Orlando doesn't require them).
+- **Backward-compat preserved.** Projects without a `jurisdiction_id`, or with one that doesn't resolve to a registered manifest, render exactly as they did pre-PR-#51 (Sprint 2A all-on baseline + user toggles). Zero regression for non-Orlando users.
+
+**Why this matters:** Sprint 2A closed the systemic AHJ-rejection vectors that come from generated content. Sprint 2B PR #49 closed user-supplied artifact merge. PR #51 wires the two halves together — the manifest declares what Orlando wants by default; the merge engine + upload slots already handle the actual artifacts. This is the architectural prerequisite Sprint 2C M1 needs to extend coverage to 4 more AHJs (Pompano → Miami-Dade → Davie → Hillsborough) without touching the engine — Sprint 2C is now a pure-data exercise: declare 4 more manifests in the same shape, populate their `requirements: []` arrays, register them in `data/ahj/registry.ts`.
+
+**Technical:**
+
+- 8 commits, ~2,066 LOC across 13 files. New module: `data/ahj/` (5 files: `types.ts`, `orlando.ts`, `visibility.ts`, `registry.ts`).
+- **Four-axis `AHJContext`** baked into the manifest interface from day one so Sprint 2C M1 doesn't retrofit it across 5 AHJs: `scope` (Sprint 2A PR-5 service_modification_type), `lane` (Sprint 2A H17 contractor_exemption / pe_required), `buildingType` (`single_family_residential` / `multi_family` / `commercial` — Sprint 2C research finding, orthogonal to `lane`), `subjurisdiction` (optional string — Miami-Dade splits 34 munis + unincorporated; Orlando passes `undefined`).
+- **Two-layer visibility model.** Layer 1 (manifest defaults): `relevantSections: SectionKey[]` + `relevantArtifactTypes: ArtifactTypeKey[]` + optional `sectionPredicates` / `artifactTypePredicates` map (each predicate is a pure `(ctx: AHJContext) => boolean`). Layer 2 (user overrides): persisted to `projects.settings.section_overrides` (jsonb); contractor can toggle off any default-ON entry or toggle on any default-OFF entry. `computeDefaultVisibility(manifest, ctx)` resolves the intersection.
+- **`necEdition: Record<BuildingType, string>`** (Sprint 2C H34 finding) — Miami-Dade Residential PRG cites NEC 2014 / Commercial PRG cites NEC 2020, so the code-basis block renderer reads per building type from the manifest. Orlando uniformly cites NEC 2020 across SFR / multi-family / commercial.
+- **`sheetIdPrefix: 'E-' | 'EL-' | 'ES-'`** declared (Sprint 2C H20 reserved for Miami-Dade `EL-`); orchestrator still uses Sprint 2B PR-3 discipline-letter system. Sprint 2C M1 will plumb `EL-` into the band allocator when MD's manifest lands.
+- **`AHJRequirement` schema declared NOW**, `requirements: []` empty on Orlando. Sprint 2C M1 populates the list and ships the engine that walks it (`required(ctx)` + `detect(packet, attachments)` predicates).
+- Orchestrator additions: `PermitPacketData.manifest?: AHJManifest` + `PermitPacketData.buildingType?: BuildingType` thread through `permitPacketGenerator.tsx`. Resolution chain for `generalNotes` / `codeReferences` / `necEdition`: explicit data field → manifest fallback → Sprint 2A baseline.
+- New migration applied to live Supabase: `20260514_attachment_types_pr4.sql` — drops + recreates the `project_attachments.artifact_type` CHECK constraint to add the 6 new values (CHECK constraints don't support `ADD VALUE` like enums).
+- **572 tests passing** across 37 test files (+50 new since PR #49: 22 in `tests/visibility.test.ts` covering the two-layer math, 28 in `tests/orlandoManifestE2E.test.ts` covering H5/H6/H7/H8/H16/H19 + scope-fork wiring).
+- Squash hash `18985e5`.
+
+---
+
 ## 2026-05-12: Permit packet — Sprint 2B merge engine (PR #49)
 
 Closes the merge-engine half of Sprint 2B. User-supplied PDF artifacts (site plans, equipment cut sheets, NOC, HOA letters, fire-stopping schedules, manufacturer data, HVHZ wind-anchoring) now upload through the SparkPlan UI and splice into the generated permit packet behind SparkPlan-themed title sheets, with continuous sheet-ID stamping across the merged document. Squash hash `fce6275`, 17 commits, 5,580 LOC.
