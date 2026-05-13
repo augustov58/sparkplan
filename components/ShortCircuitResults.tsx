@@ -5,6 +5,7 @@ import { useShortCircuitCalculations } from '../hooks/useShortCircuitCalculation
 import { usePanels } from '../hooks/usePanels';
 import { useProjects } from '../hooks/useProjects';
 import { exportSingleCalculation, exportSystemReport } from '../services/pdfExport/shortCircuitPDF';
+import { ShortCircuitProjectCalculator } from './ShortCircuitProjectCalculator';
 
 interface ShortCircuitResult {
   faultCurrent: number;
@@ -88,19 +89,22 @@ export const ShortCircuitResults: React.FC = () => {
       </div>
 
       {calculations.length === 0 && (
-        <div className="bg-white border border-gray-100 rounded-lg p-12 text-center">
+        <div className="bg-white border border-gray-100 rounded-lg p-8 text-center">
           <Zap className="w-12 h-12 text-gray-300 mx-auto mb-4" />
           <h3 className="text-lg font-medium text-gray-900 mb-2">No Calculations Yet</h3>
           <p className="text-gray-500 mb-4">
-            Use the Short Circuit Calculator in the Tools section to create calculations.
+            Start with the service entrance — project params are pre-filled.
           </p>
-          <a
-            href={`#/project/${projectId}/tools`}
-            className="inline-flex items-center gap-2 bg-gray-900 hover:bg-black text-white px-4 py-2 rounded-md text-sm font-medium"
-          >
-            Go to Tools
-          </a>
         </div>
+      )}
+
+      {/* Project-aware calculator (inline) */}
+      {project && (
+        <ShortCircuitProjectCalculator
+          project={project}
+          panels={panels}
+          existingCalculations={calculations}
+        />
       )}
 
       {/* Service Calculation */}
