@@ -132,7 +132,7 @@ const SidebarItem: React.FC<SidebarItemProps> = ({
 // Routes that prefer a narrower content area — keeps the white background
 // card from extending past the visible content. Add a pathname suffix here
 // to opt a route into compact layout.
-const COMPACT_ROUTE_SUFFIXES = ['/short-circuit'];
+const COMPACT_ROUTE_SUFFIXES = ['/short-circuit', '/feeders'];
 function isCompactRoute(pathname: string): boolean {
   return COMPACT_ROUTE_SUFFIXES.some((suffix) => pathname.endsWith(suffix));
 }
