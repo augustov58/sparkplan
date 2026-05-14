@@ -387,34 +387,73 @@ export const DwellingLoadCalculator: React.FC<DwellingLoadCalculatorProps> = ({
         await deleteCircuitsByPanel(mainPanel.id);
       }
 
-      // Create new circuits
+      // Conductor sizing per NEC Table 310.16 (60C copper).
+      const getConductorSize = (amps: number): string => {
+        if (amps <= 15) return '14 AWG';
+        if (amps <= 20) return '12 AWG';
+        if (amps <= 30) return '10 AWG';
+        if (amps <= 40) return '8 AWG';
+        if (amps <= 50) return '6 AWG';
+        if (amps <= 60) return '6 AWG';
+        if (amps <= 100) return '3 AWG';
+        return '1 AWG';
+      };
+
+      // Slot allocation — respects pole continuations so a 2P breaker at
+      // slot N occupies N and N+2, and the next breaker is placed at the
+      // smallest slot S where every {S, S+2, ..., S+2(p-1)} is still free.
+      // Previously the generator assigned circuit_number = i+1 naively,
+      // which collided on continuation slots and produced cascading ↑2P
+      // markers (e.g. 2P range at slot 10 + 2P water heater at slot 12
+      // both fighting for slot 12).
+      const panelSpaces = (mainPanel as any).num_spaces ?? (mainPanel.is_main ? 30 : 42);
+      const occupied = new Set<number>();
+      const assignedSlots: number[] = [];
+      const skipped: number[] = [];
+      for (let i = 0; i < generatedCircuits.length; i++) {
+        const c = generatedCircuits[i];
+        if (!c) { assignedSlots.push(-1); continue; }
+        let placed = -1;
+        for (let s = 1; s <= panelSpaces; s++) {
+          const needed: number[] = [];
+          for (let p = 0; p < c.pole; p++) needed.push(s + p * 2);
+          if (needed.every(n => n <= panelSpaces && !occupied.has(n))) {
+            needed.forEach(n => occupied.add(n));
+            placed = s;
+            break;
+          }
+        }
+        assignedSlots.push(placed);
+        if (placed === -1) skipped.push(i);
+      }
+
+      // Create circuits at their allocated slots
       for (let i = 0; i < generatedCircuits.length; i++) {
         const circuit = generatedCircuits[i];
-        if (!circuit) continue; // Skip if undefined
-
-        // Calculate conductor size based on breaker amps (NEC Table 310.16)
-        const getConductorSize = (amps: number): string => {
-          if (amps <= 15) return '14 AWG';
-          if (amps <= 20) return '12 AWG';
-          if (amps <= 30) return '10 AWG';
-          if (amps <= 40) return '8 AWG';
-          if (amps <= 50) return '6 AWG';
-          if (amps <= 60) return '6 AWG';
-          if (amps <= 100) return '3 AWG';
-          return '1 AWG';
-        };
+        if (!circuit) continue;
+        const slot = assignedSlots[i];
+        if (slot === -1) continue; // Skipped — panel out of space; warn after loop
 
         await createCircuit({
           project_id: project.id,
           panel_id: mainPanel.id,
-          circuit_number: i + 1,
+          circuit_number: slot,
           description: circuit.description,
           breaker_amps: circuit.breakerAmps,
           pole: circuit.pole,
           load_watts: circuit.loadWatts,
-          conductor_size: getConductorSize(circuit.breakerAmps),  // Required field!
+          conductor_size: getConductorSize(circuit.breakerAmps),
           load_type: circuit.loadType
         });
+      }
+
+      if (skipped.length > 0) {
+        alert(
+          `Panel only has ${panelSpaces} slots — ${skipped.length} circuit(s) ` +
+          `could not be placed:\n` +
+          skipped.map(i => `  • ${generatedCircuits[i]?.description}`).join('\n') +
+          `\n\nIncrease panel size or split into a sub-panel.`
+        );
       }
       
       // Update recommended service in project AND sync the main panel's

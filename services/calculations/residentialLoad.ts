@@ -632,20 +632,25 @@ export function calculateSingleFamilyLoad(input: SingleFamilyInput): Residential
     totalDemand += dispVA;
   }
 
-  // EV Charger
+  // EV Charger — NEC 625.41 declares EVSE a continuous load, so per
+  // NEC 220.18(B) the service-demand contribution is the nameplate ×125%.
+  // (The branch-circuit 125% per 210.20(A) is applied separately in the
+  // circuit-generation path below.) Without this multiplier the calc
+  // underestimated service current by ~3.6 kVA per 32 A EV.
   if (appliances.evCharger?.enabled) {
-    const evVA = appliances.evCharger.kw * 1000;
+    const evNameplateVA = appliances.evCharger.kw * 1000;
+    const evDemandVA = evNameplateVA * 1.25;
     breakdown.push({
       category: 'EV Charger',
-      description: `Level ${appliances.evCharger.level} - ${appliances.evCharger.kw} kW`,
-      connectedVA: evVA,
-      demandVA: evVA,
-      demandFactor: 1.0,
-      necReference: 'NEC 625.42'
+      description: `Level ${appliances.evCharger.level} - ${appliances.evCharger.kw} kW (continuous ×1.25)`,
+      connectedVA: evNameplateVA,
+      demandVA: evDemandVA,
+      demandFactor: 1.25,
+      necReference: 'NEC 625.41 / 220.18(B) - Continuous Load ×1.25'
     });
-    totalConnected += evVA;
-    totalDemand += evVA;
-    necReferences.push('NEC Article 625 - EV Charging');
+    totalConnected += evNameplateVA;
+    totalDemand += evDemandVA;
+    necReferences.push('NEC 625.41 - EVSE Continuous Load');
   }
 
   // Pool Pump
@@ -1291,16 +1296,25 @@ export function generateResidentialPanelSchedule(input: SingleFamilyInput): Gene
     });
   }
 
-  // EV Charger
+  // EV Charger — branch-breaker sizing per NEC 210.20(A) for continuous
+  // load: rating >= 125% of load. Round up to the next standard breaker
+  // (15, 20, 30, 40, 50, 60, 70, 80, 90, 100). Previously this was
+  // hardcoded to 50 A for Level 2, which is correct for 32-40 A EVs but
+  // undersized 48 A+ chargers (need 60 A breaker minimum).
   if (appliances.evCharger?.enabled) {
-    const evAmps = Math.ceil((appliances.evCharger.kw * 1000) / 240);
+    const evAmps = (appliances.evCharger.kw * 1000) / 240;
+    const minBreaker = evAmps * 1.25;
+    const stdSizes = [15, 20, 30, 40, 50, 60, 70, 80, 90, 100];
+    const breakerAmps = appliances.evCharger.level === 1
+      ? 20
+      : (stdSizes.find(s => s >= minBreaker) ?? Math.ceil(minBreaker / 10) * 10);
     circuits.push({
-      description: `EV Charger Level ${appliances.evCharger.level}`,
-      breakerAmps: appliances.evCharger.level === 2 ? 50 : 20,
-      pole: 2,
+      description: `EV Charger Level ${appliances.evCharger.level} (${Math.ceil(evAmps)}A continuous)`,
+      breakerAmps,
+      pole: appliances.evCharger.level === 1 ? 1 : 2,
       loadWatts: appliances.evCharger.kw * 1000,
       loadType: 'O',
-      necReference: 'NEC 625.42'
+      necReference: 'NEC 625.41 / 210.20(A) - Continuous Load ×1.25'
     });
   }
 

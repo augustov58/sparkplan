@@ -537,6 +537,55 @@ describe('Residential Load (NEC 220.82 / 220.84)', () => {
     });
   });
 
+  // NEC 625.41 declares EVSE a continuous load; NEC 220.18(B) requires the
+  // service-demand contribution to be ×1.25. These tests pin the 125% factor
+  // on both the breakdown demandVA and the necReferences citation — a
+  // regression here means we're under-sizing service current for any
+  // EV-equipped dwelling.
+  describe('calculateSingleFamilyLoad — NEC 625.41 EV 125% continuous factor', () => {
+    it('applies 125% to EV demandVA (vs raw nameplate connectedVA)', () => {
+      const result = calculateSingleFamilyLoad({
+        squareFootage: 2000,
+        smallApplianceCircuits: 2,
+        laundryCircuit: true,
+        appliances: {
+          evCharger: { enabled: true, level: 2, kw: 11.5 }  // 48A L2 charger
+        }
+      });
+      const evRow = result.breakdown.find(b => b.category === 'EV Charger');
+      expect(evRow).toBeDefined();
+      expect(evRow!.connectedVA).toBe(11500);       // nameplate unchanged
+      expect(evRow!.demandVA).toBeCloseTo(14375, 0); // 11500 × 1.25 per 220.18(B)
+      expect(evRow!.demandFactor).toBe(1.25);
+      expect(evRow!.necReference).toContain('625.41');
+    });
+
+    it('cites NEC 625.41 in the result necReferences when EV is enabled', () => {
+      const result = calculateSingleFamilyLoad({
+        squareFootage: 2000,
+        smallApplianceCircuits: 2,
+        laundryCircuit: true,
+        appliances: {
+          evCharger: { enabled: true, level: 2, kw: 7.7 }
+        }
+      });
+      expect(result.necReferences.some(r => r.includes('625.41'))).toBe(true);
+    });
+
+    it('does NOT apply 125% when there is no EV charger', () => {
+      const result = calculateSingleFamilyLoad({
+        squareFootage: 2000,
+        smallApplianceCircuits: 2,
+        laundryCircuit: true,
+        appliances: {
+          range: { enabled: true, type: 'electric', kw: 12 }
+        }
+      });
+      expect(result.breakdown.find(b => b.category === 'EV Charger')).toBeUndefined();
+      expect(result.necReferences.every(r => !r.includes('625.41'))).toBe(true);
+    });
+  });
+
   describe('calculateMultiFamilyLoad (NEC 220.84)', () => {
     it('should apply NEC 220.84 demand factor to building total', () => {
       const result = calculateMultiFamilyLoad({
