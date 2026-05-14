@@ -584,6 +584,74 @@ describe('Residential Load (NEC 220.82 / 220.84)', () => {
       expect(result.breakdown.find(b => b.category === 'EV Charger')).toBeUndefined();
       expect(result.necReferences.every(r => !r.includes('625.41'))).toBe(true);
     });
+
+    // The 125% continuous factor must survive the 220.83 bucket post-processor.
+    // Before this fix, an EV added via otherAppliances (Proposed Loads path)
+    // had its ×1.25 erased when the bucket zeroed per-category demands and
+    // aggregated raw connectedVA. Now continuous-flagged rows enter the
+    // bucket at connectedVA × 1.25.
+    it('proposed EV via otherAppliances applies 1.25 inside the 220.83 bucket', () => {
+      const withEV = calculateSingleFamilyLoad({
+        squareFootage: 1000,
+        smallApplianceCircuits: 2,
+        laundryCircuit: true,
+        existingDwelling: true,
+        appliances: {
+          range: { enabled: true, type: 'electric', kw: 12 },
+          dryer: { enabled: true, type: 'electric', kw: 5.5 },
+          waterHeater: { enabled: true, type: 'electric', kw: 4.5 },
+          hvac: { enabled: true, type: 'ac_only', coolingKw: 5, heatingKw: 0 },
+          disposal: { enabled: true, kw: 0.5 },
+          poolPump: { enabled: true, hp: 1.5 },
+          otherAppliances: [
+            { description: 'EV Charger 48A', kw: 11.5, voltage: 240, continuous: true }
+          ]
+        }
+      });
+      const noEV = calculateSingleFamilyLoad({
+        squareFootage: 1000,
+        smallApplianceCircuits: 2,
+        laundryCircuit: true,
+        existingDwelling: true,
+        appliances: {
+          range: { enabled: true, type: 'electric', kw: 12 },
+          dryer: { enabled: true, type: 'electric', kw: 5.5 },
+          waterHeater: { enabled: true, type: 'electric', kw: 4.5 },
+          hvac: { enabled: true, type: 'ac_only', coolingKw: 5, heatingKw: 0 },
+          disposal: { enabled: true, kw: 0.5 },
+          poolPump: { enabled: true, hp: 1.5 },
+        }
+      });
+      // 220.83 with EV (continuous ×1.25): the EV's 11.5 kVA nameplate
+      // enters the bucket as 14.375 kVA (×1.25), so the bucket math sees
+      // ~3 kVA more general-loads pool than the no-EV case, producing
+      // ~5.5 kVA more service demand. Pool pump VA uses the NEC motor
+      // table value, not raw HP×1000, so we pin a wide range rather than
+      // an exact number.
+      expect(withEV.totalDemandVA).toBeGreaterThan(noEV.totalDemandVA + 4500);
+      expect(withEV.totalDemandVA).toBeLessThan(noEV.totalDemandVA + 7000);
+    });
+
+    it('General Loads Subtotal connectedVA stays additive (nameplate, not uplifted)', () => {
+      // Display sanity: the Subtotal row's connectedVA should equal the
+      // raw nameplate sum, NOT the continuous-uplifted bucket input.
+      const result = calculateSingleFamilyLoad({
+        squareFootage: 1000,
+        smallApplianceCircuits: 2,
+        laundryCircuit: true,
+        existingDwelling: true,
+        appliances: {
+          range: { enabled: true, type: 'electric', kw: 12 },
+          otherAppliances: [
+            { description: 'EV Charger', kw: 11.5, voltage: 240, continuous: true }
+          ]
+        }
+      });
+      const subtotal = result.breakdown.find(b => b.category === 'General Loads Subtotal');
+      expect(subtotal).toBeDefined();
+      // 3 (lighting) + 3 (SA) + 1.5 (laundry) + 12 (range) + 11.5 (EV nameplate) = 31 kVA
+      expect(subtotal!.connectedVA).toBeCloseTo(31000, -2);
+    });
   });
 
   describe('calculateMultiFamilyLoad (NEC 220.84)', () => {

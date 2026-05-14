@@ -109,6 +109,14 @@ export interface LoadBreakdown {
   demandVA: number;
   demandFactor: number;
   necReference: string;
+  /**
+   * NEC 100 continuous load — when true, the 220.83 / 220.82 bucket
+   * post-processor multiplies this row's connectedVA by 1.25 before
+   * bucketing so the service-sizing per NEC 220.18(B) is preserved
+   * even after per-category demands are zeroed and rolled into
+   * "General Loads Subtotal".
+   */
+  continuous?: boolean;
 }
 
 export interface ResidentialLoadResult {
@@ -646,7 +654,8 @@ export function calculateSingleFamilyLoad(input: SingleFamilyInput): Residential
       connectedVA: evNameplateVA,
       demandVA: evDemandVA,
       demandFactor: 1.25,
-      necReference: 'NEC 625.41 / 220.18(B) - Continuous Load ×1.25'
+      necReference: 'NEC 625.41 / 220.18(B) - Continuous Load ×1.25',
+      continuous: true,
     });
     totalConnected += evNameplateVA;
     totalDemand += evDemandVA;
@@ -732,7 +741,8 @@ export function calculateSingleFamilyLoad(input: SingleFamilyInput): Residential
         demandFactor: factor,
         necReference: continuous
           ? 'NEC 220.18(B) - Continuous Load ×1.25'
-          : 'NEC 220.82(B)(2)'
+          : 'NEC 220.82(B)(2)',
+        continuous,
       });
       totalConnected += otherVA;
       totalDemand += demandVA;
@@ -759,9 +769,19 @@ export function calculateSingleFamilyLoad(input: SingleFamilyInput): Residential
       : 'NEC 220.82(C) - HVAC at 100% (larger of heat/cool)';
     // Re-aggregate using CONNECTED VA so the 220.83 8 kVA / 40 % math is
     // applied to nameplate (not 220.82's already-discounted demand).
+    //
+    // CONTINUOUS-LOAD EXCEPTION (NEC 220.18(B) + 625.41): rows flagged
+    // `continuous: true` contribute connectedVA × 1.25 to the bucket math.
+    // Without this, a continuous EV at 11.5 kVA nameplate would enter the
+    // bucket at 11.5 (raw) — the 125 % applied at the per-category demand
+    // row gets erased by the bucket's per-category-demand zeroing below.
+    // We track raw vs bucketed separately so the displayed "General Loads
+    // Subtotal" stays additive (sum of nameplate rows) while the bucket
+    // math operates on the uplifted total.
     let hvacConnectedVA = 0;
     let hvacDemandVA = 0;
-    let generalConnectedVA = 0;
+    let generalConnectedVA_raw = 0;       // displayed on Subtotal row
+    let generalConnectedVA_bucketed = 0;  // fed into bucket math (continuous-uplifted)
 
     for (const row of breakdown) {
       // Skip the 'General Loads Subtotal' synthetic row to avoid double-counting
@@ -771,13 +791,15 @@ export function calculateSingleFamilyLoad(input: SingleFamilyInput): Residential
         hvacConnectedVA += row.connectedVA;
         hvacDemandVA += row.demandVA;
       } else {
-        generalConnectedVA += row.connectedVA;
+        const continuousFactor = row.continuous ? 1.25 : 1.0;
+        generalConnectedVA_raw += row.connectedVA;
+        generalConnectedVA_bucketed += row.connectedVA * continuousFactor;
       }
     }
 
     const REMAINDER_FACTOR = 0.4;
-    const firstTier = Math.min(generalConnectedVA, FIRST_TIER_VA);
-    const remainder = Math.max(0, generalConnectedVA - FIRST_TIER_VA);
+    const firstTier = Math.min(generalConnectedVA_bucketed, FIRST_TIER_VA);
+    const remainder = Math.max(0, generalConnectedVA_bucketed - FIRST_TIER_VA);
     const generalDemandVA = Math.round(firstTier + remainder * REMAINDER_FACTOR);
     const kneeKva = FIRST_TIER_VA / 1000;
     const bucketLabel = `${articleLabel} - General Loads (first ${kneeKva} kVA @ 100%, remainder @ 40%)`;
@@ -789,10 +811,13 @@ export function calculateSingleFamilyLoad(input: SingleFamilyInput): Residential
         row.necReference = hvacReference;
       } else if (row.category === 'General Loads Subtotal') {
         row.demandVA = generalDemandVA;
-        row.demandFactor = generalConnectedVA > 0 ? generalDemandVA / generalConnectedVA : 0;
+        row.demandFactor = generalConnectedVA_bucketed > 0 ? generalDemandVA / generalConnectedVA_bucketed : 0;
         row.description = `Lighting + Small Appliance + Laundry + Appliances (first ${kneeKva} kVA @ 100%, remainder @ 40%)`;
         row.necReference = `${articleLabel} - General Loads (${kneeKva} kVA / 40%)`;
-        row.connectedVA = generalConnectedVA; // Reflect the full general-loads pool, not just lighting+SA+laundry
+        // Display the raw nameplate sum on the Subtotal row so the
+        // breakdown stays additive against its component rows. Continuous
+        // uplift is internal to the bucket math (see _bucketed above).
+        row.connectedVA = generalConnectedVA_raw;
       } else {
         // Individual non-HVAC rows show their nameplate (connected) only;
         // the actual demand contribution is captured in the General Loads
@@ -803,8 +828,10 @@ export function calculateSingleFamilyLoad(input: SingleFamilyInput): Residential
       }
     }
 
-    // Rewrite totals to reflect bucket semantics
-    totalConnected = generalConnectedVA + hvacConnectedVA;
+    // Rewrite totals to reflect bucket semantics. Connected total displays
+    // raw nameplate (additive). Demand total uses bucketed math (which
+    // already accounts for continuous uplift via generalConnectedVA_bucketed).
+    totalConnected = generalConnectedVA_raw + hvacConnectedVA;
     totalDemand = generalDemandVA + hvacDemandVA;
 
     necReferences.push(bucketLabel);

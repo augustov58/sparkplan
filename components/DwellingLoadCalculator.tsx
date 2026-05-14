@@ -575,10 +575,30 @@ export const DwellingLoadCalculator: React.FC<DwellingLoadCalculatorProps> = ({
       }
       
       // Update recommended service in project AND sync the main panel's
-      // main_breaker_amps to the new recommended size. Without the panel-side
-      // update the user sees the previous main breaker (e.g. 200 A) even
-      // after the calc recommends a smaller service (e.g. 125 A under 220.83).
+      // main_breaker_amps. On EXISTING-CONSTRUCTION projects we respect the
+      // user-stated Existing Service Size whenever it holds (NEC 220.83
+      // demand <= existing); only override when the existing service is
+      // actually insufficient. Without this gate, the calc's
+      // "recommendedServiceSize" (which is the NEC new-install size, e.g.
+      // 113A demand → 150A min for continuous safety) would silently
+      // overwrite the user's stated 125A existing service, destroying
+      // their input on every Regenerate.
       if (loadResult) {
+        const isExisting = project.settings?.service_modification_type
+          && project.settings.service_modification_type !== 'new-service';
+        const existingAmps = project.settings?.residential?.existingServiceAmps
+          ?? mainPanel?.main_breaker_amps;
+        const existingHolds = isExisting
+          && typeof existingAmps === 'number'
+          && loadResult.serviceAmps <= existingAmps;
+
+        // Recommended-service stored in settings should reflect the final
+        // decision (existing wins when it holds), not the abstract
+        // new-install number.
+        const finalRecommendation = existingHolds
+          ? existingAmps as number
+          : loadResult.recommendedServiceSize;
+
         updateProject({
           ...project,
           settings: {
@@ -590,9 +610,9 @@ export const DwellingLoadCalculator: React.FC<DwellingLoadCalculatorProps> = ({
           }
         });
 
-        if (mainPanel && mainPanel.main_breaker_amps !== loadResult.recommendedServiceSize) {
+        if (mainPanel && mainPanel.main_breaker_amps !== finalRecommendation) {
           await updatePanel(mainPanel.id, {
-            main_breaker_amps: loadResult.recommendedServiceSize
+            main_breaker_amps: finalRecommendation
           });
         }
       }
@@ -1590,10 +1610,32 @@ export const DwellingLoadCalculator: React.FC<DwellingLoadCalculatorProps> = ({
                     <span className="text-[#888] text-sm">Service Current</span>
                     <span className="text-xl font-bold text-[#c9a227]">{loadResult.serviceAmps}A</span>
                   </div>
-                  <div className="flex justify-between items-center py-1">
-                    <span className="text-[#888] text-sm">Recommended Service</span>
-                    <span className="text-2xl font-bold text-[#c9a227]">{loadResult.recommendedServiceSize}A</span>
-                  </div>
+                  {(() => {
+                    // On existing-construction with a user-stated existing
+                    // service that holds, the "recommendation" IS the
+                    // existing service — surface that, not the abstract
+                    // NEC new-install number that would override it.
+                    const isExisting = project.settings?.service_modification_type
+                      && project.settings.service_modification_type !== 'new-service';
+                    const existing = project.settings?.residential?.existingServiceAmps
+                      ?? mainPanel?.main_breaker_amps;
+                    const existingHolds = isExisting
+                      && typeof existing === 'number'
+                      && loadResult.serviceAmps <= existing;
+                    return (
+                      <div className="flex justify-between items-center py-1">
+                        <span className="text-[#888] text-sm">Recommended Service</span>
+                        {existingHolds ? (
+                          <span className="text-right">
+                            <span className="text-2xl font-bold text-[#3d6b3d]">{existing}A</span>
+                            <span className="block text-[10px] text-[#3d6b3d] uppercase tracking-wide">existing holds</span>
+                          </span>
+                        ) : (
+                          <span className="text-2xl font-bold text-[#c9a227]">{loadResult.recommendedServiceSize}A</span>
+                        )}
+                      </div>
+                    );
+                  })()}
                 </div>
 
                 {/* Service Headroom card — only on existing-construction
