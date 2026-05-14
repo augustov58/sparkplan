@@ -610,7 +610,7 @@ export const DwellingLoadCalculator: React.FC<DwellingLoadCalculatorProps> = ({
                   ? 'NEC 220.83 - Optional Method for Existing Single-Family Dwellings'
                   : project.settings?.dwelling_calc_mode === 'true-optional'
                     ? 'NEC 220.82 - Optional Method for Single-Family Dwellings (10 kVA / 40% bucket)'
-                    : 'NEC 220.82 - Optional Method for Single-Family Dwellings (per-category)')
+                    : 'NEC 220 Standard Method - Per-Category Demand Factors (220.42 / 220.52 / 220.55 / 220.60)')
               : 'NEC 220.84 - Optional Method for Multi-Family Dwellings'
             }
           </p>
@@ -638,8 +638,14 @@ export const DwellingLoadCalculator: React.FC<DwellingLoadCalculatorProps> = ({
                   className="border-[#e8e6e3] rounded-md text-sm py-1 px-2 disabled:bg-gray-50 disabled:text-gray-400"
                   title={isExisting ? 'NEC 220.83 always uses the 8 kVA / 40% bucket method' : undefined}
                 >
-                  <option value="per-category">Per-Category (Conservative, legacy)</option>
-                  <option value="true-optional">True 220.82 Optional (10 kVA / 40%)</option>
+                  {isExisting ? (
+                    <option value="per-category">220.83 Optional (8 kVA / 40%)</option>
+                  ) : (
+                    <>
+                      <option value="per-category">Per-Category (NEC 220 Standard Method)</option>
+                      <option value="true-optional">220.82 Optional (10 kVA / 40%)</option>
+                    </>
+                  )}
                 </select>
                 {isExisting && (
                   <span className="text-xs text-[#888] italic">

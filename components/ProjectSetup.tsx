@@ -288,7 +288,7 @@ export const ProjectSetup: React.FC<ProjectSetupProps> = ({ project, updateProje
                 className="w-full border-[#e8e6e3] rounded-md text-sm"
               >
                 <option value="new-service">New Construction</option>
-                <option value="existing">Existing Structure</option>
+                <option value="existing">Existing Construction</option>
               </select>
               <p className="text-xs text-[#888] mt-1">
                 {isResidential
