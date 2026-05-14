@@ -417,7 +417,10 @@ export const DwellingLoadCalculator: React.FC<DwellingLoadCalculatorProps> = ({
         });
       }
       
-      // Update recommended service in project
+      // Update recommended service in project AND sync the main panel's
+      // main_breaker_amps to the new recommended size. Without the panel-side
+      // update the user sees the previous main breaker (e.g. 200 A) even
+      // after the calc recommends a smaller service (e.g. 125 A under 220.83).
       if (loadResult) {
         updateProject({
           ...project,
@@ -429,6 +432,12 @@ export const DwellingLoadCalculator: React.FC<DwellingLoadCalculatorProps> = ({
             } as any
           }
         });
+
+        if (mainPanel && mainPanel.main_breaker_amps !== loadResult.recommendedServiceSize) {
+          await updatePanel(mainPanel.id, {
+            main_breaker_amps: loadResult.recommendedServiceSize
+          });
+        }
       }
 
       setShowGenerated(false);

@@ -29,6 +29,7 @@ import {
 import {
   calculateDwellingUnitDemandVA,
   isDwellingUnitPanel,
+  calculateSingleFamilyLoad,
 } from '../services/calculations/residentialLoad';
 import type { LoadTypeCode } from '../types';
 
@@ -269,15 +270,47 @@ export const PanelSchedule: React.FC<PanelScheduleProps> = ({ project }) => {
     };
   }, [selectedPanel, panelCircuits, feederCircuits]);
 
-  // NEC 220.82 Optional Method demand for dwelling unit panels — used by
-  // the panel summary cards in lieu of the panel-local NEC 220.14 sum, which
-  // misleadingly reports raw connected current on a panel that's actually
-  // sized correctly per NEC 220.82 (e.g. 150 A "demand" on a 125 A panel
-  // when the real NEC 220.82 demand is ~95 A).
+  // NEC 220.82 / 220.83 Optional Method demand for dwelling-unit panels —
+  // used by the panel summary cards in lieu of the panel-local NEC 220.14
+  // sum, which misleadingly reports raw connected current on a panel that's
+  // actually sized correctly per the residential Optional Method.
+  //
+  // Two branches:
+  //  1. MDP of a single-family dwelling → run calculateSingleFamilyLoad
+  //     against the project's appliance toggles + service_modification_type
+  //     so the summary matches what the Dwelling Load Calculator displays.
+  //  2. Sub-panel of a multi-family dwelling unit → run
+  //     calculateDwellingUnitDemandVA over its circuits.
   const dwellingUnitDemand = useMemo(() => {
     if (!selectedPanel) return null;
     const occupancy = project.settings?.occupancyType;
     if (occupancy !== 'dwelling') return null;
+
+    const residential = project.settings?.residential;
+    const isSingleFamily = (residential?.dwellingType ?? 'single_family') === 'single_family';
+
+    // Branch 1: single-family MDP → defer to the Dwelling Load Calculator's
+    // input set so panel summary numbers match exactly.
+    if (selectedPanel.is_main && isSingleFamily && residential?.appliances) {
+      const existingDwelling = project.settings?.service_modification_type
+        ? project.settings.service_modification_type !== 'new-service'
+        : true;
+      const useTrueOptionalMethod = project.settings?.dwelling_calc_mode === 'true-optional';
+      const result = calculateSingleFamilyLoad({
+        squareFootage: residential.squareFootage || 2000,
+        smallApplianceCircuits: residential.smallApplianceCircuits || 2,
+        laundryCircuit: residential.laundryCircuit ?? true,
+        appliances: residential.appliances,
+        existingDwelling,
+        useTrueOptionalMethod,
+      });
+      return {
+        totalDemandVA: result.totalDemandVA,
+        necArticle: existingDwelling ? 'NEC 220.83' : 'NEC 220.82',
+      };
+    }
+
+    // Branch 2: sub-panel dwelling-unit detection (multi-family)
     if (selectedPanel.is_main) return null;
     const dwellingCircuits = panelCircuits.map(c => ({
       description: c.description,
@@ -285,7 +318,7 @@ export const PanelSchedule: React.FC<PanelScheduleProps> = ({ project }) => {
     }));
     if (!isDwellingUnitPanel(selectedPanel.name, dwellingCircuits)) return null;
     return calculateDwellingUnitDemandVA(dwellingCircuits);
-  }, [selectedPanel, panelCircuits, project.settings?.occupancyType]);
+  }, [selectedPanel, panelCircuits, project.settings]);
 
   // Calculate aggregated load including downstream panels
   // Uses occupancyType from project settings for correct demand factor selection
@@ -1656,7 +1689,9 @@ export const PanelSchedule: React.FC<PanelScheduleProps> = ({ project }) => {
                   <span className="text-[10px] uppercase text-gray-500 block">
                     Direct Demand Load
                     {dwellingUnitDemand && (
-                      <span className="ml-1 text-amber-700 normal-case">(NEC 220.82)</span>
+                      <span className="ml-1 text-amber-700 normal-case">
+                        ({(dwellingUnitDemand as any).necArticle ?? 'NEC 220.82'})
+                      </span>
                     )}
                     {!dwellingUnitDemand &&
                       aggregatedLoad &&
