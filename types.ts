@@ -96,6 +96,17 @@ export interface ResidentialSettings {
   // Service
   recommendedServiceAmps?: number;      // Calculated recommendation
   selectedServiceAmps?: number;
+
+  /**
+   * Existing service amperage for headroom analysis on existing-construction
+   * projects. Drives the Dwelling Load Calculator's Service Headroom card
+   * (compares NEC 220.83 demand vs this rating). Auto-populates from
+   * mainPanel.main_breaker_amps on first read; user can override to model
+   * "what if my existing service were 200A instead of 125A" scenarios.
+   *
+   * Meaningful only when service_modification_type !== 'new-service'.
+   */
+  existingServiceAmps?: number;
 }
 
 export enum ProjectStatus {

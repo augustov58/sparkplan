@@ -614,6 +614,45 @@ export const DwellingLoadCalculator: React.FC<DwellingLoadCalculatorProps> = ({
               : 'NEC 220.84 - Optional Method for Multi-Family Dwellings'
             }
           </p>
+          {/* Existing Service Size input — drives the Service Headroom card.
+              Only relevant on existing-construction single-family projects.
+              Defaults to the main panel's main_breaker_amps when no override
+              is stored, so the headroom card has a sensible value from
+              first paint. */}
+          {isSingleFamily
+            && project.settings?.service_modification_type
+            && project.settings.service_modification_type !== 'new-service'
+            && (
+              <div className="mt-3 flex flex-wrap items-center gap-2">
+                <label className="text-xs font-semibold text-[#888] uppercase">Existing Service Size</label>
+                <input
+                  type="number"
+                  min={0}
+                  step={5}
+                  value={project.settings?.residential?.existingServiceAmps ?? mainPanel?.main_breaker_amps ?? ''}
+                  onChange={e => {
+                    const v = e.target.value === '' ? undefined : Number(e.target.value);
+                    updateProject({
+                      ...project,
+                      settings: {
+                        ...project.settings,
+                        residential: {
+                          ...(project.settings?.residential ?? { dwellingType: 'single_family', smallApplianceCircuits: 2, laundryCircuit: true, bathroomCircuits: 0, garageCircuit: false, outdoorCircuit: false } as any),
+                          existingServiceAmps: v
+                        }
+                      }
+                    });
+                  }}
+                  className="w-24 border-[#e8e6e3] rounded-md text-sm py-1 px-2"
+                  placeholder="amps"
+                />
+                <span className="text-xs text-[#888]">A</span>
+                <span className="text-xs text-[#888] italic">
+                  (auto from main panel breaker; override to model upsize scenarios)
+                </span>
+              </div>
+            )}
+
           {/* Calculation Method toggle — only meaningful for new 220.82.
               220.83 is always bucket method by NEC definition, so we disable
               the control with a note when an existing dwelling is active. */}
@@ -1268,6 +1307,65 @@ export const DwellingLoadCalculator: React.FC<DwellingLoadCalculatorProps> = ({
                     <span className="text-2xl font-bold text-[#c9a227]">{loadResult.recommendedServiceSize}A</span>
                   </div>
                 </div>
+
+                {/* Service Headroom card — only on existing-construction
+                    single-family. Compares NEC 220.83 demand to the user's
+                    existing service rating so the EE can answer "can my
+                    125 A panel hold a new EV?" without leaving this page. */}
+                {isSingleFamily
+                  && project.settings?.service_modification_type
+                  && project.settings.service_modification_type !== 'new-service'
+                  && (() => {
+                    const existing = project.settings?.residential?.existingServiceAmps
+                      ?? mainPanel?.main_breaker_amps;
+                    if (!existing || !loadResult.serviceAmps) return null;
+                    const demand = loadResult.serviceAmps;
+                    const headroom = existing - demand;
+                    const utilization = demand / existing;
+                    const holds = headroom >= 0;
+                    const tight = holds && utilization >= 0.9;
+                    return (
+                      <div className={`mt-4 rounded-lg border p-3 ${
+                        holds
+                          ? (tight ? 'bg-amber-50 border-amber-200' : 'bg-green-50 border-green-200')
+                          : 'bg-red-50 border-red-200'
+                      }`}>
+                        <div className="flex items-center justify-between mb-1">
+                          <span className="text-xs font-semibold text-[#555] uppercase tracking-wide">
+                            Service Headroom (NEC 220.83 vs Existing)
+                          </span>
+                          <span className={`text-xs font-bold uppercase ${
+                            holds ? (tight ? 'text-amber-700' : 'text-green-700') : 'text-red-700'
+                          }`}>
+                            {holds ? (tight ? 'At Capacity' : 'Service Holds') : 'Upgrade Required'}
+                          </span>
+                        </div>
+                        <div className="flex justify-between items-baseline">
+                          <span className="text-sm text-[#555]">
+                            {demand.toFixed(0)}A demand &middot; {existing}A existing
+                          </span>
+                          <span className={`text-xl font-bold ${
+                            holds ? (tight ? 'text-amber-700' : 'text-green-700') : 'text-red-700'
+                          }`}>
+                            {holds ? '+' : ''}{headroom.toFixed(0)}A
+                          </span>
+                        </div>
+                        {!holds && (
+                          <p className="mt-2 text-xs text-red-700 leading-snug">
+                            Existing {existing}A service is undersized by {Math.abs(headroom).toFixed(0)}A.
+                            Either upgrade to {loadResult.recommendedServiceSize}A min, or apply an
+                            EVEMS / circuit-sharing scheme per NEC 750 to reduce setpoint.
+                          </p>
+                        )}
+                        {tight && (
+                          <p className="mt-2 text-xs text-amber-700 leading-snug">
+                            Less than 10% headroom remaining. Future load additions
+                            (EV, heat pump, range upgrade) will trigger a service upgrade.
+                          </p>
+                        )}
+                      </div>
+                    );
+                  })()}
               </div>
             </div>
           )}
