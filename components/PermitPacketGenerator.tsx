@@ -332,12 +332,11 @@ export const PermitPacketGenerator: React.FC<PermitPacketGeneratorProps> = ({ pr
   // Build AHJContext from project fields. Defaults are conservative so
   // projects in partial-data state still resolve to something sensible.
   const ahjContext: AHJContext = (() => {
-    // Map ProjectSettings.service_modification_type ('existing' |
-    // 'service-upgrade' | 'new-service') into the manifest's
-    // ServiceModificationType axis ('existing-service' | 'new-service').
-    // 'service-upgrade' folds into 'existing-service' because Orlando's
-    // EV-fed-from-existing path requires the NEC 220.87 narrative; new-service
-    // is the only path that triggers the available-fault-current calc.
+    // Map ProjectSettings.service_modification_type ('existing' | 'new-service')
+    // into the manifest's ServiceModificationType axis ('existing-service' |
+    // 'new-service'). The service-upgrade narrative is now expressed via the
+    // separate scope_flags.service_upgrade checkbox (Sprint 2A PR-5 simplification
+    // — service upgrade is by definition an existing-service modification).
     const rawScope = currentProject?.settings?.service_modification_type;
     const scope: ServiceModificationType =
       rawScope === 'new-service' ? 'new-service' : 'existing-service';

@@ -55,14 +55,21 @@ export interface LoadCalculationResult {
   };
 
   // Calculation method and references
-  method: 'NEC 220.82 Optional (Dwelling)' | 'NEC 220.40 Standard (Commercial/Industrial)';
+  method:
+    | 'NEC 220.82 Optional (Dwelling)'
+    | 'NEC 220.83 Optional (Existing Dwelling)'
+    | 'NEC 220.40 Standard (Commercial/Industrial)';
   necReferences: string[];
   notes: string[];
 }
 
 /**
  * Calculate total load with NEC demand factors
- * Routes to appropriate calculation method based on occupancy type
+ * Routes to appropriate calculation method based on occupancy type and project status.
+ *
+ * Dwelling routing:
+ *   - new construction → NEC 220.82 Optional (new dwelling)
+ *   - existing structure → NEC 220.83 Optional (existing dwelling, additional loads)
  *
  * @param loads - Array of load items
  * @param settings - Project electrical settings
@@ -70,10 +77,13 @@ export interface LoadCalculationResult {
  */
 export function calculateLoad(loads: LoadItem[], settings: ProjectSettings): LoadCalculationResult {
   if (settings.occupancyType === 'dwelling') {
-    return calculateDwellingLoad(loads, settings);
-  } else {
-    return calculateCommercialIndustrialLoad(loads, settings);
+    // 'existing' is the default — only 'new-service' routes to 220.82.
+    if (settings.service_modification_type === 'new-service') {
+      return calculateDwellingLoad(loads, settings);
+    }
+    return calculateExistingDwellingLoad(loads, settings);
   }
+  return calculateCommercialIndustrialLoad(loads, settings);
 }
 
 /**
@@ -221,6 +231,138 @@ function calculateDwellingLoad(loads: LoadItem[], settings: ProjectSettings): Lo
     method: 'NEC 220.82 Optional (Dwelling)',
     necReferences,
     notes
+  };
+}
+
+/**
+ * NEC 220.83 - Optional Calculation for Existing Dwelling Unit
+ *
+ * Used when adding loads (EV charger, heat pump, A/C, range, etc.) to an
+ * existing dwelling. The general-load demand split is 8 kVA / 40 % (vs.
+ * 220.82's 10 kVA / 40 %), and HVAC is added at the appropriate rate per
+ * 220.83(A) (no new HVAC) or 220.83(B) (new HVAC installed).
+ *
+ * Demand rules applied here:
+ *   - General loads (lighting + small appliance + laundry + range + dryer +
+ *     water heater + fixed appliances + receptacles + non-HVAC motors):
+ *       first 8 kVA at 100 %, remainder at 40 %.
+ *   - HVAC (220.83(B)): 100 % of A/C / heat-pump compressor; central electric
+ *     space heating or fewer-than-four separately-controlled units at 65 %;
+ *     four-or-more separately-controlled units at 40 %.
+ *     The simplified flow below takes the larger of heating/cooling at 100 %
+ *     and surfaces a note recommending the user verify the heating-control
+ *     scenario for 65 % / 40 % credits.
+ */
+function calculateExistingDwellingLoad(loads: LoadItem[], settings: ProjectSettings): LoadCalculationResult {
+  const necReferences: string[] = ['NEC 220.83 Optional Calculation for Existing Dwelling Unit'];
+  const notes: string[] = [];
+
+  const lightingLoads = loads.filter(l => l.type === 'lighting');
+  const rangeLoads = loads.filter(l => l.type === 'range');
+  const dryerLoads = loads.filter(l => l.type === 'dryer');
+  const waterHeaterLoads = loads.filter(l => l.type === 'water_heater');
+  const hvacLoads = loads.filter(l => l.type === 'hvac');
+  const motorLoads = loads.filter(l => l.type === 'motor');
+  const applianceLoads = loads.filter(l => l.type === 'appliance');
+  const receptacleLoads = loads.filter(l => l.type === 'receptacle');
+
+  // Aggregate everything that is NOT HVAC into the "general loads" bucket
+  // that gets the 8 kVA / 40 % treatment.
+  const lightingVA = lightingLoads.reduce((s, l) => s + l.watts, 0);
+  const rangeVA = rangeLoads.reduce((s, l) => s + l.watts, 0);
+  const dryerVA = dryerLoads.reduce((s, l) => s + l.watts, 0);
+  const waterHeaterVA = waterHeaterLoads.reduce((s, l) => s + l.watts, 0);
+  const applianceVA = applianceLoads.reduce((s, l) => s + l.watts, 0);
+  const receptacleVA = receptacleLoads.reduce((s, l) => s + l.watts, 0);
+  const motorVA = motorLoads.reduce((s, l) => s + l.watts, 0);
+
+  const generalConnectedVA =
+    lightingVA + rangeVA + dryerVA + waterHeaterVA + applianceVA + receptacleVA + motorVA;
+
+  // NEC 220.83: first 8 kVA at 100 %, remainder at 40 %.
+  const FIRST_TIER_VA = 8_000;
+  const REMAINDER_FACTOR = 0.4;
+  const firstTierVA = Math.min(generalConnectedVA, FIRST_TIER_VA);
+  const remainderVA = Math.max(0, generalConnectedVA - FIRST_TIER_VA);
+  const generalDemandVA = firstTierVA + remainderVA * REMAINDER_FACTOR;
+
+  if (generalConnectedVA > 0) {
+    necReferences.push('NEC 220.83 - General Loads (first 8 kVA @ 100%, remainder @ 40%)');
+  }
+
+  // HVAC: 220.83(B). Simplified to "larger of heating/cooling at 100 %".
+  // If the user has central electric heat or multi-unit heat, they may be
+  // entitled to the 65 % / 40 % credit — surface that as a note rather than
+  // guessing.
+  const totalHvacVA = hvacLoads.reduce((s, l) => s + l.watts, 0);
+  const hvacDemandVA = totalHvacVA; // 100% of the larger load by NEC 220.60 convention
+  if (hvacLoads.length > 0) {
+    necReferences.push('NEC 220.83(B) - HVAC (larger of heating/cooling at 100%)');
+    notes.push(
+      'NEC 220.83(B) allows 65% for central electric heating or fewer than four ' +
+      'separately-controlled space-heating units, and 40% for four or more separately-controlled units. ' +
+      'This calc applies 100% by default — adjust manually if the heating scenario qualifies for the credit.'
+    );
+  }
+
+  const totalConnectedVA = loads.reduce((sum, load) => sum + load.watts, 0);
+  const totalDemandVA = generalDemandVA + hvacDemandVA;
+
+  // Current and recommended service size
+  let totalAmps: number;
+  if (settings.servicePhase === 1) {
+    totalAmps = totalDemandVA / settings.serviceVoltage;
+  } else {
+    totalAmps = totalDemandVA / (Math.sqrt(3) * settings.serviceVoltage);
+  }
+  const recommendedServiceSize = getNextStandardBreakerSize(totalAmps);
+
+  const phaseBalance = analyzePhaseBalance(loads, settings);
+
+  // Largest motor for breakdown reporting (not used in demand math here — motors
+  // already fold into the general-loads bucket under 220.83's flat treatment).
+  const motorVAs = motorLoads.map(l => l.watts);
+  const largestMotorVA = motorVAs.length > 0 ? Math.max(...motorVAs) : 0;
+
+  notes.push(
+    'NEC 220.83 is the optional method for adding loads to an existing dwelling. ' +
+    'If this is new construction, switch Project Status to "New Construction" to use NEC 220.82.'
+  );
+
+  return {
+    totalConnectedVA,
+    totalDemandVA,
+    totalAmps,
+    recommendedServiceSize,
+    breakdown: {
+      lighting: {
+        connectedVA: lightingVA,
+        demandVA: generalConnectedVA > 0 ? generalDemandVA * (lightingVA / generalConnectedVA) : 0,
+        demandFactor: generalConnectedVA > 0 ? generalDemandVA / generalConnectedVA : 0,
+      },
+      appliances: {
+        connectedVA: rangeVA + dryerVA + waterHeaterVA + applianceVA + receptacleVA,
+        demandVA:
+          generalConnectedVA > 0
+            ? generalDemandVA *
+              ((rangeVA + dryerVA + waterHeaterVA + applianceVA + receptacleVA) / generalConnectedVA)
+            : 0,
+        demandFactor: generalConnectedVA > 0 ? generalDemandVA / generalConnectedVA : 0,
+      },
+      motors: {
+        connectedVA: motorVA,
+        demandVA: generalConnectedVA > 0 ? generalDemandVA * (motorVA / generalConnectedVA) : 0,
+        largestMotorVA,
+      },
+      other: {
+        connectedVA: totalHvacVA,
+        demandVA: hvacDemandVA,
+      },
+    },
+    phaseBalance,
+    method: 'NEC 220.83 Optional (Existing Dwelling)',
+    necReferences,
+    notes,
   };
 }
 

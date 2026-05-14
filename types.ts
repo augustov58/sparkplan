@@ -223,7 +223,7 @@ export interface ProjectSettings {
    * without these values continue to load; the screening engine's caller is
    * responsible for supplying defaults when a key is missing.
    */
-  service_modification_type?: 'existing' | 'service-upgrade' | 'new-service';
+  service_modification_type?: 'existing' | 'new-service';
   scope_flags?: ProjectScopeFlags;
   estimated_value_usd?: number;
 }

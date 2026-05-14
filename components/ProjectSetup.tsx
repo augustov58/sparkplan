@@ -280,6 +280,24 @@ export const ProjectSetup: React.FC<ProjectSetupProps> = ({ project, updateProje
                 </select>
                </div>
             </div>
+            <div>
+              <label className="block text-xs font-semibold text-[#888] uppercase mb-1">Project Status</label>
+              <select
+                value={localProject.settings.service_modification_type ?? 'existing'}
+                onChange={e => handleSettingChange('service_modification_type', e.target.value)}
+                className="w-full border-[#e8e6e3] rounded-md text-sm"
+              >
+                <option value="new-service">New Construction</option>
+                <option value="existing">Existing Structure</option>
+              </select>
+              <p className="text-xs text-[#888] mt-1">
+                {isResidential
+                  ? (localProject.settings.service_modification_type === 'new-service'
+                      ? 'Dwelling loads calculated per NEC 220.82 (Optional, New Dwelling).'
+                      : 'Dwelling loads calculated per NEC 220.83 (Optional, Existing Dwelling Adding Loads).')
+                  : 'Used by the permit packet to emit new-vs-existing narratives. Check the "Service upgrade" scope element below if this is an upsize.'}
+              </p>
+            </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                <div>
                   <label className="block text-xs font-semibold text-[#888] uppercase mb-1">Permit Number</label>
@@ -474,35 +492,19 @@ export const ProjectSetup: React.FC<ProjectSetupProps> = ({ project, updateProje
             Drives the cover-sheet exemption stamp on the permit packet. Per FS 471.003(2)(h), residential services ≤ 600 A @ 240 V, commercial ≤ 800 A @ 240 V, and project value ≤ $125,000 may be designed and signed by a licensed contractor without a PE seal. Anything above triggers the PE-required lane.
           </p>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div>
-              <label className="block text-xs font-semibold text-[#888] uppercase mb-1">Service Modification Type</label>
-              <select
-                value={localProject.settings.service_modification_type ?? 'existing'}
-                onChange={e => handleSettingChange('service_modification_type', e.target.value)}
-                className="w-full border-[#e8e6e3] rounded-md text-sm"
-              >
-                <option value="existing">Existing service (no change)</option>
-                <option value="service-upgrade">Service upgrade (NEC 220.87)</option>
-                <option value="new-service">New service installation</option>
-              </select>
-              <p className="text-xs text-[#888] mt-1">Determines which calc narratives the packet generator emits.</p>
-            </div>
-
-            <div>
-              <label className="block text-xs font-semibold text-[#888] uppercase mb-1 flex items-center gap-1">
-                <DollarSign className="w-3 h-3" /> Estimated Project Value (USD)
-              </label>
-              <input
-                type="number"
-                value={localProject.settings.estimated_value_usd ?? ''}
-                onChange={e => handleSettingChange('estimated_value_usd', e.target.value === '' ? undefined : Number(e.target.value))}
-                className="w-full border-[#e8e6e3] rounded-md text-sm font-mono"
-                placeholder="e.g. 75000"
-                min={0}
-              />
-              <p className="text-xs text-[#888] mt-1">FS 471.003(2)(h) cap: $125,000.</p>
-            </div>
+          <div>
+            <label className="block text-xs font-semibold text-[#888] uppercase mb-1 flex items-center gap-1">
+              <DollarSign className="w-3 h-3" /> Estimated Project Value (USD)
+            </label>
+            <input
+              type="number"
+              value={localProject.settings.estimated_value_usd ?? ''}
+              onChange={e => handleSettingChange('estimated_value_usd', e.target.value === '' ? undefined : Number(e.target.value))}
+              className="w-full border-[#e8e6e3] rounded-md text-sm font-mono"
+              placeholder="e.g. 75000"
+              min={0}
+            />
+            <p className="text-xs text-[#888] mt-1">FS 471.003(2)(h) cap: $125,000. New vs. Existing is captured in General Information above.</p>
           </div>
 
           <div className="mt-6 pt-6 border-t border-[#f0eeeb]">

@@ -34,7 +34,10 @@ describe('NEC Load Calculations', () => {
     servicePhase: 1,
     occupancyType: 'dwelling',
     conductorMaterial: 'Cu',
-    temperatureRating: 75
+    temperatureRating: 75,
+    // Pin to 'new-service' so this block exercises NEC 220.82.
+    // Default routing now sends `'existing'` (and unset) dwellings to 220.83.
+    service_modification_type: 'new-service'
   };
 
   describe('NEC 220.82 Optional Calculation for Dwelling Units', () => {
@@ -110,6 +113,61 @@ describe('NEC Load Calculations', () => {
       expect(result.breakdown.motors.largestMotorVA).toBe(2000);
       // Demand should be 125% of largest + 100% of others = (2000 * 1.25) + 1000 = 3500
       expect(result.breakdown.motors.demandVA).toBe(3500);
+    });
+  });
+
+  describe('NEC 220.83 Optional Calculation for Existing Dwelling Units', () => {
+    const existingDwellingSettings: ProjectSettings = {
+      ...dwellingSettings,
+      service_modification_type: 'existing'
+    };
+
+    it('should route existing dwellings to NEC 220.83', () => {
+      const loads: LoadItem[] = [
+        { id: '1', description: 'Lighting', watts: 3000, type: 'lighting', continuous: false, phase: 'A' },
+        { id: '2', description: 'Range', watts: 8000, type: 'range', continuous: false, phase: 'A' }
+      ];
+
+      const result = calculateLoad(loads, existingDwellingSettings);
+      expect(result.method).toBe('NEC 220.83 Optional (Existing Dwelling)');
+      expect(result.necReferences[0]).toBe('NEC 220.83 Optional Calculation for Existing Dwelling Unit');
+    });
+
+    it('should apply 8 kVA / 40% split to general loads', () => {
+      // 18 kVA of general loads → first 8 kVA @ 100% + 10 kVA @ 40% = 12 kVA demand
+      const loads: LoadItem[] = [
+        { id: '1', description: 'General Loads', watts: 18000, type: 'lighting', continuous: false, phase: 'A' }
+      ];
+
+      const result = calculateLoad(loads, existingDwellingSettings);
+      expect(result.totalConnectedVA).toBe(18000);
+      expect(result.totalDemandVA).toBe(12000);
+    });
+
+    it('should add HVAC at 100% on top of the general-loads demand', () => {
+      // 8 kVA general (100% kept) + 5 kVA HVAC (100%) = 13 kVA demand
+      const loads: LoadItem[] = [
+        { id: '1', description: 'General Loads', watts: 8000, type: 'lighting', continuous: false, phase: 'A' },
+        { id: '2', description: 'AC', watts: 5000, type: 'hvac', continuous: true, phase: 'A' }
+      ];
+
+      const result = calculateLoad(loads, existingDwellingSettings);
+      expect(result.totalConnectedVA).toBe(13000);
+      expect(result.totalDemandVA).toBe(13000);
+    });
+
+    it('should default unspecified dwellings to 220.83 (existing is the safer assumption)', () => {
+      const loads: LoadItem[] = [
+        { id: '1', description: 'Lighting', watts: 5000, type: 'lighting', continuous: false, phase: 'A' }
+      ];
+
+      const settingsWithoutStatus: ProjectSettings = {
+        ...dwellingSettings,
+        service_modification_type: undefined
+      };
+
+      const result = calculateLoad(loads, settingsWithoutStatus);
+      expect(result.method).toBe('NEC 220.83 Optional (Existing Dwelling)');
     });
   });
 
