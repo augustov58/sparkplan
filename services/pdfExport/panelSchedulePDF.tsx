@@ -16,7 +16,8 @@ export const exportPanelSchedulePDF = async (
   panel: Panel,
   circuits: Circuit[],
   projectName: string,
-  projectAddress?: string
+  projectAddress?: string,
+  showExistingNewMarkers: boolean = false
 ) => {
   try {
     // Validate panel data
@@ -32,6 +33,7 @@ export const exportPanelSchedulePDF = async (
         circuits={circuits}
         projectName={projectName}
         projectAddress={projectAddress}
+        showExistingNewMarkers={showExistingNewMarkers}
       />
     ).toBlob();
 
@@ -70,7 +72,8 @@ export const exportAllPanelsPDF = async (
   panels: Panel[],
   circuitsByPanel: Map<string, Circuit[]>,
   projectName: string,
-  projectAddress?: string
+  projectAddress?: string,
+  showExistingNewMarkers: boolean = false
 ) => {
   try {
     // Validate panels data
@@ -86,6 +89,7 @@ export const exportAllPanelsPDF = async (
         circuitsByPanel={circuitsByPanel}
         projectName={projectName}
         projectAddress={projectAddress}
+        showExistingNewMarkers={showExistingNewMarkers}
       />
     ).toBlob();
 

@@ -613,6 +613,7 @@ export const PermitPacketGenerator: React.FC<PermitPacketGeneratorProps> = ({ pr
         projectName: currentProject.name,
         projectAddress: currentProject.address || '',
         projectType: currentProject.type,
+        serviceModificationType: currentProject.settings?.service_modification_type,
         serviceVoltage: currentProject.serviceVoltage,
         servicePhase: currentProject.servicePhase,
         panels,

@@ -386,10 +386,26 @@ export const PanelSchedule: React.FC<PanelScheduleProps> = ({ project }) => {
     }
   }, [deleteCircuit]);
 
+  // Existing-construction gates the per-circuit Existing/New badge. On a
+  // new-construction project every circuit is implicitly new, so the toggle
+  // would just be noise.
+  const isExistingConstruction = project.settings?.service_modification_type
+    && project.settings.service_modification_type !== 'new-service';
+
+  const toggleProposed = useCallback(async (circuit: { id: string; is_proposed?: boolean }) => {
+    await updateCircuit(circuit.id, { is_proposed: !circuit.is_proposed });
+  }, [updateCircuit]);
+
   const handleExportPDF = async () => {
     if (!selectedPanel) return;
     try {
-      await exportPanelSchedulePDF(selectedPanel, panelCircuits, project.name, project.address);
+      await exportPanelSchedulePDF(
+        selectedPanel,
+        panelCircuits,
+        project.name,
+        project.address,
+        !!isExistingConstruction,
+      );
     } catch (error) {
       alert(`Failed to export PDF: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
@@ -402,7 +418,13 @@ export const PanelSchedule: React.FC<PanelScheduleProps> = ({ project }) => {
       panels.forEach(panel => {
         circuitsByPanel.set(panel.id, circuits.filter(c => c.panel_id === panel.id));
       });
-      await exportAllPanelsPDF(panels, circuitsByPanel, project.name, project.address);
+      await exportAllPanelsPDF(
+        panels,
+        circuitsByPanel,
+        project.name,
+        project.address,
+        !!isExistingConstruction,
+      );
     } catch (error) {
       alert(`Failed to export PDF: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
@@ -878,6 +900,19 @@ export const PanelSchedule: React.FC<PanelScheduleProps> = ({ project }) => {
                 {leftCkt.pole > 1 && (
                   <span className="text-[10px] font-bold text-[#2d3b2d]">{leftCkt.pole}P</span>
                 )}
+                {isExistingConstruction && (
+                  <button
+                    onClick={() => toggleProposed(leftCkt)}
+                    title={leftCkt.is_proposed ? 'Proposed new circuit — click to mark as existing' : 'Existing circuit — click to mark as proposed/new'}
+                    className={`px-1 py-0.5 text-[9px] font-bold rounded leading-none border ${
+                      leftCkt.is_proposed
+                        ? 'bg-electric-100 text-electric-700 border-electric-300'
+                        : 'bg-gray-100 text-gray-500 border-gray-200 hover:bg-gray-200'
+                    }`}
+                  >
+                    {leftCkt.is_proposed ? 'NEW' : 'EXIST'}
+                  </button>
+                )}
                 <span className="truncate max-w-[120px]">{leftCkt.description}</span>
               </div>
               <div className="flex gap-0.5 opacity-0 group-hover:opacity-100">
@@ -1043,6 +1078,19 @@ export const PanelSchedule: React.FC<PanelScheduleProps> = ({ project }) => {
               </div>
               <div className="flex items-center gap-1">
                 <span className="truncate max-w-[120px]">{rightCkt.description}</span>
+                {isExistingConstruction && (
+                  <button
+                    onClick={() => toggleProposed(rightCkt)}
+                    title={rightCkt.is_proposed ? 'Proposed new circuit — click to mark as existing' : 'Existing circuit — click to mark as proposed/new'}
+                    className={`px-1 py-0.5 text-[9px] font-bold rounded leading-none border ${
+                      rightCkt.is_proposed
+                        ? 'bg-electric-100 text-electric-700 border-electric-300'
+                        : 'bg-gray-100 text-gray-500 border-gray-200 hover:bg-gray-200'
+                    }`}
+                  >
+                    {rightCkt.is_proposed ? 'NEW' : 'EXIST'}
+                  </button>
+                )}
                 {rightCkt.pole > 1 && (
                   <span className="text-[10px] font-bold text-[#2d3b2d]">{rightCkt.pole}P</span>
                 )}

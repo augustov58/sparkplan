@@ -234,6 +234,13 @@ interface PanelSchedulePDFProps {
   contractorLicense?: string;
   // Sprint 2A H3: per-sheet ID
   sheetId?: string;
+  /**
+   * When true, circuits flagged `is_proposed` render with a trailing " *" and
+   * a "* = Proposed new circuit" legend appears below the title block. Caller
+   * gates this on Project Status = Existing Construction so new-construction
+   * packets stay visually unchanged.
+   */
+  showExistingNewMarkers?: boolean;
 }
 
 // Main PDF Component for single panel — page-level fragment for embedding.
@@ -246,7 +253,22 @@ export const PanelSchedulePages: React.FC<PanelSchedulePDFProps> = ({
   contractorName,
   contractorLicense,
   sheetId,
+  showExistingNewMarkers = false,
 }) => {
+  // Helper: append " *" to a description when (a) markers are enabled AND
+  // (b) the circuit is flagged as a proposed new addition. Returns the raw
+  // description otherwise.
+  const decorateDescription = (c: Circuit | undefined): string => {
+    if (!c) return '';
+    return showExistingNewMarkers && c.is_proposed
+      ? `${c.description} *`
+      : c.description;
+  };
+  // Whether to surface the legend below the title block. Only render the
+  // legend if markers are enabled AND at least one circuit is actually
+  // flagged — keeps existing-construction packets with zero proposed
+  // circuits visually clean.
+  const showLegend = showExistingNewMarkers && circuits.some(c => c.is_proposed);
   // Filter EVEMS metadata marker circuits — they convey the NEC 625.42
   // setpoint to the load aggregator but aren't physical branches; rendering
   // them on a "20A 2P" placeholder breaker with a 47 kVA load looks like a
@@ -343,6 +365,16 @@ export const PanelSchedulePages: React.FC<PanelSchedulePDFProps> = ({
           </View>
         </View>
 
+        {/* Existing/New legend — only when project is existing-construction
+            AND at least one circuit is flagged as proposed. */}
+        {showLegend && (
+          <View style={{ marginBottom: 4, marginTop: -4 }}>
+            <Text style={{ fontSize: 8, fontStyle: 'italic', color: '#555' }}>
+              * = Proposed new circuit (added under this permit)
+            </Text>
+          </View>
+        )}
+
         {/* Circuit Table - Two Column Format */}
         <View style={styles.tableContainer}>
           {/* Table Header */}
@@ -385,7 +417,7 @@ export const PanelSchedulePages: React.FC<PanelSchedulePDFProps> = ({
                 <View key={row} style={isAlt ? styles.tableRowAlt : styles.tableRow}>
                   {/* Left Circuit */}
                   <Text style={styles.colLeftCkt}>{leftNum}</Text>
-                  <Text style={styles.colLeftDescription}>{leftCkt?.description || ''}</Text>
+                  <Text style={styles.colLeftDescription}>{decorateDescription(leftCkt)}</Text>
                   <Text style={styles.colLeftLoad}>
                     {leftCkt ? (leftCkt.load_watts || 0).toLocaleString() : ''}
                   </Text>
@@ -401,7 +433,7 @@ export const PanelSchedulePages: React.FC<PanelSchedulePDFProps> = ({
                   <Text style={styles.colRightLoad}>
                     {rightCkt ? (rightCkt.load_watts || 0).toLocaleString() : ''}
                   </Text>
-                  <Text style={styles.colRightDescription}>{rightCkt?.description || ''}</Text>
+                  <Text style={styles.colRightDescription}>{decorateDescription(rightCkt)}</Text>
                   <Text style={styles.colRightCkt}>{rightNum}</Text>
                 </View>
               );
@@ -564,6 +596,8 @@ interface MultiPanelDocumentProps {
   // Sprint 2A C8: per-sheet contractor signature block
   contractorName?: string;
   contractorLicense?: string;
+  /** Mirrors PanelSchedulePDFProps.showExistingNewMarkers. */
+  showExistingNewMarkers?: boolean;
 }
 
 export const MultiPanelDocument: React.FC<MultiPanelDocumentProps> = ({
@@ -573,6 +607,7 @@ export const MultiPanelDocument: React.FC<MultiPanelDocumentProps> = ({
   projectAddress,
   contractorName,
   contractorLicense,
+  showExistingNewMarkers = false,
 }) => (
   <Document>
     {panels.map((panel) => {
@@ -634,6 +669,15 @@ export const MultiPanelDocument: React.FC<MultiPanelDocumentProps> = ({
             </View>
           </View>
 
+          {/* Existing/New legend — mirrors PanelSchedulePages above. */}
+          {showExistingNewMarkers && circuits.some(c => c.is_proposed) && (
+            <View style={{ marginBottom: 4, marginTop: -4 }}>
+              <Text style={{ fontSize: 8, fontStyle: 'italic', color: '#555' }}>
+                * = Proposed new circuit (added under this permit)
+              </Text>
+            </View>
+          )}
+
           {/* Circuit Table - Two Column Format */}
           <View style={styles.tableContainer}>
             <View style={styles.tableHeader}>
@@ -654,6 +698,10 @@ export const MultiPanelDocument: React.FC<MultiPanelDocumentProps> = ({
               const sortedCircuits = circuits.sort((a, b) => a.circuit_number - b.circuit_number);
               const maxSlots = panel.num_spaces ?? (panel.is_main ? 30 : 42);
               const numRows = maxSlots / 2;
+              const decorate = (c: Circuit | undefined): string => {
+                if (!c) return '';
+                return showExistingNewMarkers && c.is_proposed ? `${c.description} *` : c.description;
+              };
 
               const rows = [];
               for (let row = 1; row <= numRows; row++) {
@@ -669,7 +717,7 @@ export const MultiPanelDocument: React.FC<MultiPanelDocumentProps> = ({
                 rows.push(
                   <View key={row} style={isAlt ? styles.tableRowAlt : styles.tableRow}>
                     <Text style={styles.colLeftCkt}>{leftNum}</Text>
-                    <Text style={styles.colLeftDescription}>{leftCkt?.description || ''}</Text>
+                    <Text style={styles.colLeftDescription}>{decorate(leftCkt)}</Text>
                     <Text style={styles.colLeftLoad}>
                       {leftCkt ? (leftCkt.load_watts || 0).toLocaleString() : ''}
                     </Text>
@@ -683,7 +731,7 @@ export const MultiPanelDocument: React.FC<MultiPanelDocumentProps> = ({
                     <Text style={styles.colRightLoad}>
                       {rightCkt ? (rightCkt.load_watts || 0).toLocaleString() : ''}
                     </Text>
-                    <Text style={styles.colRightDescription}>{rightCkt?.description || ''}</Text>
+                    <Text style={styles.colRightDescription}>{decorate(rightCkt)}</Text>
                     <Text style={styles.colRightCkt}>{rightNum}</Text>
                   </View>
                 );

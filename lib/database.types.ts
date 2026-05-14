@@ -286,6 +286,7 @@ export type Database = {
           description: string
           egc_size: string | null
           id: string
+          is_proposed: boolean
           load_type: string | null
           load_watts: number
           panel_id: string | null
@@ -300,6 +301,7 @@ export type Database = {
           description: string
           egc_size?: string | null
           id?: string
+          is_proposed?: boolean
           load_type?: string | null
           load_watts: number
           panel_id?: string | null
@@ -314,6 +316,7 @@ export type Database = {
           description?: string
           egc_size?: string | null
           id?: string
+          is_proposed?: boolean
           load_type?: string | null
           load_watts?: number
           panel_id?: string | null
