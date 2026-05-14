@@ -734,7 +734,7 @@ export function calculateSingleFamilyLoad(input: SingleFamilyInput): Residential
       const factor = continuous ? 1.25 : 1.0;
       const demandVA = otherVA * factor;
       breakdown.push({
-        category: 'Other Appliance',
+        category: other.proposed ? 'Proposed Load' : 'Other Appliance',
         description: `${other.description} - ${other.kw} kW${continuous ? ' (continuous ×1.25)' : ''}`,
         connectedVA: otherVA,
         demandVA,

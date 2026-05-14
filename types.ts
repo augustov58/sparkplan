@@ -55,6 +55,14 @@ export interface ResidentialAppliances {
     kw: number;
     voltage?: 120 | 240;
     continuous?: boolean;
+    /**
+     * Tags this entry as originating from the Proposed New Loads section
+     * (vs a true existing "Other Fixed Appliance"). Flows through the
+     * residentialLoad calc as the breakdown row category so the EE can
+     * see "Proposed Load: EV Charger ..." instead of a generic
+     * "Other Appliance" row.
+     */
+    proposed?: boolean;
   }>;
 
   // Proposed new loads — staging area for additions on existing-construction

@@ -1682,9 +1682,64 @@ export const PanelSchedule: React.FC<PanelScheduleProps> = ({ project }) => {
       </div>
 
       {/* Demand Factor Summary */}
-      {demandResult && showDemandDetails && (
+      {demandResult && showDemandDetails && (() => {
+        // For a single-family dwelling MDP, the Standard Method per-circuit-type
+        // walk (220.42 lighting × 1.25, 220.56 kitchen × 0.9, etc.) is the
+        // wrong code section — these panels are sized per the Optional Method
+        // (NEC 220.83 for existing, 220.82 for new). Showing the Standard
+        // Method table here directly contradicts the Panel Summary's
+        // 220.83 demand on the same page (e.g. 52.7 kVA Standard vs 27 kVA
+        // Optional). Replace it with a 220.83 / 220.82 explainer card
+        // instead. Multi-family unit panels and commercial keep the
+        // per-circuit-type table since that's the correct calc for them.
+        const occupancy = project.settings?.occupancyType;
+        const residential = project.settings?.residential;
+        const isSingleFamilyMDP =
+          occupancy === 'dwelling' &&
+          (residential?.dwellingType ?? 'single_family') === 'single_family' &&
+          !!selectedPanel?.is_main;
+        return (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          {/* Demand Factors by Type */}
+          {isSingleFamilyMDP ? (
+            /* 220.83 / 220.82 explainer card replacing the Standard Method table */
+            <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
+              <div className="bg-gray-800 text-white px-4 py-2 flex items-center justify-between">
+                <span className="font-semibold text-sm">
+                  {dwellingUnitDemand?.necArticle ?? 'NEC 220.83'} OPTIONAL METHOD
+                </span>
+                <Calculator className="w-4 h-4" />
+              </div>
+              <div className="p-4 text-xs text-gray-700 space-y-2">
+                <p>
+                  Single-family dwelling MDPs are sized per the {dwellingUnitDemand?.necArticle ?? 'NEC 220.83'} Optional Method, not the per-circuit-type Standard Method walk (NEC 220.42 / 220.55 / 220.56).
+                </p>
+                <p className="text-gray-500 italic">
+                  Edit appliance toggles or proposed loads on the Dwelling Load Calculator to change the demand calc.
+                </p>
+                <div className="mt-3 pt-3 border-t border-gray-200 grid grid-cols-2 gap-2">
+                  <div>
+                    <div className="text-[10px] uppercase text-gray-500 tracking-wide">Total Connected (raw)</div>
+                    <div className="text-lg font-semibold text-gray-900 font-mono">
+                      {demandResult.totalConnectedLoad_kVA.toFixed(2)} kVA
+                    </div>
+                  </div>
+                  <div>
+                    <div className="text-[10px] uppercase text-gray-500 tracking-wide">
+                      {dwellingUnitDemand?.necArticle ?? 'NEC 220.83'} Demand
+                    </div>
+                    <div className="text-lg font-semibold text-[#2d3b2d] font-mono">
+                      {dwellingUnitDemand
+                        ? (dwellingUnitDemand.totalDemandVA / 1000).toFixed(2)
+                        : demandResult.totalDemandLoad_kVA.toFixed(2)} kVA
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          ) : (
+          /* Per-circuit-type Standard Method walk — for commercial /
+              industrial / multi-family unit sub-panels where the Standard
+              Method or the per-unit-panel cascade is the correct calc. */
           <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
             <div className="bg-gray-800 text-white px-4 py-2 flex items-center justify-between">
               <span className="font-semibold text-sm">DEMAND FACTOR CALCULATION (NEC ARTICLE 220)</span>
@@ -1727,6 +1782,7 @@ export const PanelSchedule: React.FC<PanelScheduleProps> = ({ project }) => {
               </tfoot>
             </table>
           </div>
+          )}
 
           {/* Summary Stats */}
           <div className="space-y-4">
@@ -1955,7 +2011,8 @@ export const PanelSchedule: React.FC<PanelScheduleProps> = ({ project }) => {
             </div>
           </div>
         </div>
-      )}
+        );
+      })()}
 
       {/* Photo Importer Modal */}
       {showPhotoImporter && selectedPanel && (
