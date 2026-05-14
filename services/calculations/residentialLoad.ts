@@ -147,6 +147,17 @@ export interface SingleFamilyInput {
   laundryCircuit: boolean;
   appliances: ResidentialAppliances;
   serviceVoltage?: number;  // Default 240V
+  /**
+   * When true, the result is post-processed through the NEC 220.83
+   * optional method for *existing* dwelling units adding loads:
+   *   - General-loads bucket (everything except HVAC): first 8 kVA at 100%,
+   *     remainder at 40%.
+   *   - HVAC contribution (larger of heating/cooling per 220.60) added at 100%.
+   *
+   * When false/undefined the canonical 220.82 standard method is used
+   * (per-category demand factors).
+   */
+  existingDwelling?: boolean;
 }
 
 export interface MultiFamilyInput {
@@ -380,16 +391,19 @@ function recommendGecSize(serviceConductorSize: string, material: 'Cu' | 'Al' = 
  * NEC 220.82 - Standard Method for Single-Family Dwellings
  */
 export function calculateSingleFamilyLoad(input: SingleFamilyInput): ResidentialLoadResult {
-  const { 
-    squareFootage, 
-    smallApplianceCircuits, 
-    laundryCircuit, 
+  const {
+    squareFootage,
+    smallApplianceCircuits,
+    laundryCircuit,
     appliances,
-    serviceVoltage = 240
+    serviceVoltage = 240,
+    existingDwelling = false
   } = input;
 
   const breakdown: LoadBreakdown[] = [];
-  const necReferences: string[] = ['NEC 220.82 - Standard Method'];
+  const necReferences: string[] = [
+    existingDwelling ? 'NEC 220.83 - Optional Method for Existing Dwelling Units' : 'NEC 220.82 - Standard Method'
+  ];
   const warnings: string[] = [];
 
   // =========================================
@@ -672,6 +686,78 @@ export function calculateSingleFamilyLoad(input: SingleFamilyInput): Residential
       totalConnected += otherVA;
       totalDemand += otherVA;
     }
+  }
+
+  // =========================================
+  // NEC 220.83 Adjustment — Existing Dwelling Unit Optional Method
+  // =========================================
+  // The 220.82 result above is per-category demand factored. For existing
+  // dwellings adding load, NEC 220.83 replaces the per-category factoring
+  // with a single bucket: all non-HVAC loads get first 8 kVA at 100 % +
+  // remainder at 40 %, then HVAC is added at 100 % of the larger of
+  // heating/cooling.
+  if (existingDwelling) {
+    // Re-aggregate using CONNECTED VA so the 220.83 8 kVA / 40 % math is
+    // applied to nameplate (not 220.82's already-discounted demand).
+    let hvacConnectedVA = 0;
+    let hvacDemandVA = 0;
+    let generalConnectedVA = 0;
+
+    for (const row of breakdown) {
+      // Skip the 'General Loads Subtotal' synthetic row to avoid double-counting
+      // with its component rows (General Lighting, Small Appliance, Laundry).
+      if (row.category === 'General Loads Subtotal') continue;
+      if (row.category === 'HVAC') {
+        hvacConnectedVA += row.connectedVA;
+        hvacDemandVA += row.demandVA;
+      } else {
+        generalConnectedVA += row.connectedVA;
+      }
+    }
+
+    const FIRST_TIER_VA = 8_000;
+    const REMAINDER_FACTOR = 0.4;
+    const firstTier = Math.min(generalConnectedVA, FIRST_TIER_VA);
+    const remainder = Math.max(0, generalConnectedVA - FIRST_TIER_VA);
+    const generalDemandVA = Math.round(firstTier + remainder * REMAINDER_FACTOR);
+
+    // Re-tag the per-category necReference so the breakdown reads as 220.83.
+    for (const row of breakdown) {
+      if (row.category === 'HVAC') {
+        row.necReference = 'NEC 220.83(B) - HVAC at 100% (larger of heat/cool)';
+      } else if (row.category === 'General Loads Subtotal') {
+        row.demandVA = generalDemandVA;
+        row.demandFactor = generalConnectedVA > 0 ? generalDemandVA / generalConnectedVA : 0;
+        row.description = `Lighting + Small Appliance + Laundry + Appliances (first 8 kVA @ 100%, remainder @ 40%)`;
+        row.necReference = 'NEC 220.83 - General Loads (8 kVA / 40%)';
+        row.connectedVA = generalConnectedVA; // Reflect the full general-loads pool, not just lighting+SA+laundry
+      } else if (row.category !== 'HVAC') {
+        // Individual non-HVAC rows show their nameplate (connected) only;
+        // the actual demand contribution is captured in the General Loads
+        // Subtotal row under 220.83. Zero their demand to avoid double-count.
+        row.demandVA = 0;
+        row.demandFactor = 0;
+        row.necReference = 'NEC 220.83 - rolled into General Loads bucket';
+      }
+    }
+
+    // Rewrite totals to reflect 220.83 semantics
+    totalConnected = generalConnectedVA + hvacConnectedVA;
+    totalDemand = generalDemandVA + hvacDemandVA;
+
+    necReferences.push('NEC 220.83 - General Loads (first 8 kVA @ 100%, remainder @ 40%)');
+    if (hvacConnectedVA > 0) {
+      necReferences.push('NEC 220.83(B) - HVAC at 100% of larger of heat/cool');
+      warnings.push(
+        'ℹ️ NEC 220.83(B) allows 65% for central electric heating or fewer than four ' +
+        'separately-controlled space-heating units, and 40% for four or more separately-controlled ' +
+        'units. This calc applies 100% — adjust manually if the heating scenario qualifies.'
+      );
+    }
+    warnings.push(
+      'ℹ️ Calculated per NEC 220.83 (Existing Dwelling, Optional Method). ' +
+      'Switch Project Status to "New Construction" on the Project Setup page to use NEC 220.82 instead.'
+    );
   }
 
   // =========================================

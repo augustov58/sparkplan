@@ -163,11 +163,18 @@ export const DwellingLoadCalculator: React.FC<DwellingLoadCalculatorProps> = ({
   const loadResult: ResidentialLoadResult | null = useMemo(() => {
     try {
       if (isSingleFamily) {
+        // Project Status (General Information) drives 220.82 vs 220.83.
+        // 'new-service' → 220.82 (new construction); anything else
+        // ('existing' or 'service-upgrade') → 220.83 (existing dwelling).
+        const existingDwelling = project.settings?.service_modification_type
+          ? project.settings.service_modification_type !== 'new-service'
+          : true; // default to existing — safer assumption for retrofit work
         return calculateSingleFamilyLoad({
           squareFootage: residentialSettings?.squareFootage || 2000,
           smallApplianceCircuits: residentialSettings?.smallApplianceCircuits || 2,
           laundryCircuit: residentialSettings?.laundryCircuit ?? true,
-          appliances
+          appliances,
+          existingDwelling
         });
       } else {
         return calculateMultiFamilyLoad({
@@ -585,8 +592,10 @@ export const DwellingLoadCalculator: React.FC<DwellingLoadCalculatorProps> = ({
             <span>Dwelling Load Calculator</span>
           </h2>
           <p className="text-gray-500 mt-1 text-sm sm:text-base">
-            {isSingleFamily 
-              ? 'NEC 220.82 - Standard Method for Single-Family Dwellings'
+            {isSingleFamily
+              ? (project.settings?.service_modification_type && project.settings.service_modification_type !== 'new-service'
+                  ? 'NEC 220.83 - Optional Method for Existing Single-Family Dwellings'
+                  : 'NEC 220.82 - Standard Method for Single-Family Dwellings')
               : 'NEC 220.84 - Optional Calculation for Multi-Family Dwellings'
             }
           </p>
