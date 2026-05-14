@@ -45,8 +45,39 @@ export interface ResidentialAppliances {
   sauna?: { enabled: boolean; kw: number };
   wellPump?: { enabled: boolean; hp: number };
   
-  // Custom/other appliances
-  otherAppliances?: Array<{ description: string; kw: number }>;
+  // Custom/other appliances. voltage defaults to 120 (1P); continuous to
+  // false. When voltage is 240 the generator emits a 2P breaker; when
+  // continuous is true the breaker sizing applies the NEC 210.20(A) 125%
+  // factor. Legacy entries without these fields keep the prior behavior
+  // (120V, non-continuous, 1P).
+  otherAppliances?: Array<{
+    description: string;
+    kw: number;
+    voltage?: 120 | 240;
+    continuous?: boolean;
+  }>;
+
+  // Proposed new loads — staging area for additions on existing-construction
+  // projects. Drives the Dwelling Load Calc "Proposed New Loads" section.
+  // These flow into the demand calc (with continuous ×1.25 applied) and on
+  // Generate Schedule become circuits with is_proposed=true so the permit
+  // packet's panel schedule renders them with the "* = Proposed" marker.
+  proposedLoads?: Array<{
+    /** Stable identifier for delete/update in the UI list. */
+    id: string;
+    /** Free-form label; auto-filled when picked from a LOAD_TEMPLATE. */
+    description: string;
+    /** Connected load in kW (nameplate). */
+    kw: number;
+    /** 120 → 1P breaker; 240 → 2P breaker. */
+    voltage: 120 | 240;
+    /** NEC 100 continuous load — triggers ×1.25 for breaker and demand. */
+    continuous: boolean;
+    /** Optional category tag from a template (EV / HVAC / Appliances). */
+    category?: 'EV' | 'HVAC' | 'Appliances' | 'Other';
+    /** NEC citation for the audit trail (e.g. "NEC 625.41"). */
+    necReference?: string;
+  }>;
 }
 
 /**
@@ -597,6 +628,18 @@ export interface LoadTemplate {
   continuous: boolean;
   category: 'EV' | 'HVAC' | 'Appliance' | 'Solar' | 'Other';
   description?: string;
+  /**
+   * Nominal voltage of the load — drives 1P (120V) vs 2P (240V) breaker
+   * selection when the Dwelling Calc materializes the template as a
+   * circuit. Defaults to 240 when omitted; nearly every common template
+   * (EV, HVAC, range, dryer, water heater) is 240V.
+   */
+  voltage?: 120 | 240;
+  /**
+   * Optional NEC citation surfaced in the proposed-loads UI and on the
+   * generated circuit row's necReference (e.g. "NEC 625.41").
+   */
+  necReference?: string;
 }
 
 // ==========================

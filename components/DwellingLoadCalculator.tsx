@@ -38,14 +38,16 @@ import {
   DwellingUnitTemplate,
   PanelCircuit
 } from '../types';
-import { 
-  calculateSingleFamilyLoad, 
+import {
+  calculateSingleFamilyLoad,
   calculateMultiFamilyLoad,
   generateResidentialPanelSchedule,
   ResidentialLoadResult,
   LoadBreakdown,
   GeneratedCircuit
 } from '../services/calculations/residentialLoad';
+import { LOAD_TEMPLATES } from '../services/calculations/serviceUpgrade';
+import type { LoadTemplate } from '../types';
 import { usePanels } from '../hooks/usePanels';
 import { useCircuits } from '../hooks/useCircuits';
 import {
@@ -126,6 +128,24 @@ export const DwellingLoadCalculator: React.FC<DwellingLoadCalculatorProps> = ({
     residentialSettings?.appliances || DEFAULT_APPLIANCES
   );
 
+  // Proposed New Loads — additions on existing-construction projects. Each
+  // entry is sized, demand-counted, and (on Generate Schedule) inserted as
+  // a circuit with is_proposed=true so the permit-packet panel schedule
+  // marks it with "* = Proposed new circuit".
+  type ProposedLoad = {
+    id: string;
+    description: string;
+    kw: number;
+    voltage: 120 | 240;
+    continuous: boolean;
+    category?: 'EV' | 'HVAC' | 'Appliance' | 'Other';
+    necReference?: string;
+  };
+  const [proposedLoads, setProposedLoads] = useState<ProposedLoad[]>(
+    (residentialSettings as any)?.proposedLoads || []
+  );
+  const [selectedTemplate, setSelectedTemplate] = useState('');
+
   // Multi-family state
   const [unitTemplates, setUnitTemplates] = useState<DwellingUnitTemplate[]>(
     residentialSettings?.unitTemplates || [{ ...DEFAULT_UNIT_TEMPLATE, id: crypto.randomUUID() }]
@@ -134,14 +154,22 @@ export const DwellingLoadCalculator: React.FC<DwellingLoadCalculatorProps> = ({
     () => (project.settings?.residential as any)?.multiFamilyLoadResult?.commonAreaLoadVA || 0
   );
 
-  // Sync appliances to project when they change (with value comparison to avoid infinite loop)
+  // Sync appliances + proposedLoads to project when they change (with value
+  // comparison to avoid infinite loop). Debounced so rapid edits don't
+  // thrash the project state.
   useEffect(() => {
     const stored = project.settings?.residential;
     const storedAppliances = JSON.stringify(stored?.appliances);
     const currentAppliances = JSON.stringify(appliances);
     const storedTemplates = JSON.stringify(stored?.unitTemplates);
     const currentTemplates = JSON.stringify(!isSingleFamily ? unitTemplates : undefined);
-    if (storedAppliances === currentAppliances && storedTemplates === currentTemplates) return;
+    const storedProposed = JSON.stringify((stored as any)?.proposedLoads ?? []);
+    const currentProposed = JSON.stringify(proposedLoads);
+    if (
+      storedAppliances === currentAppliances &&
+      storedTemplates === currentTemplates &&
+      storedProposed === currentProposed
+    ) return;
 
     const timer = setTimeout(() => {
       updateProject({
@@ -152,12 +180,33 @@ export const DwellingLoadCalculator: React.FC<DwellingLoadCalculatorProps> = ({
             ...project.settings.residential,
             appliances,
             unitTemplates: !isSingleFamily ? unitTemplates : undefined,
+            proposedLoads,
           } as any
         }
       });
     }, 500);
     return () => clearTimeout(timer);
-  }, [appliances, unitTemplates]);
+  }, [appliances, unitTemplates, proposedLoads]);
+
+  // Merge proposed loads into the appliance set as additional otherAppliances
+  // for demand-calc purposes. The calc engine treats them identically to
+  // user-added "other fixed appliances", which already honor voltage and
+  // continuous (×1.25). They retain their proposed identity in component
+  // state so handleApplyToPanelSchedule can flag them is_proposed=true at
+  // insert time without interfering with the demand math.
+  const appliancesForCalc = useMemo<ResidentialAppliances>(() => {
+    if (proposedLoads.length === 0) return appliances;
+    const proposedAsOther = proposedLoads.map(p => ({
+      description: p.description,
+      kw: p.kw,
+      voltage: p.voltage,
+      continuous: p.continuous,
+    }));
+    return {
+      ...appliances,
+      otherAppliances: [...(appliances.otherAppliances ?? []), ...proposedAsOther],
+    };
+  }, [appliances, proposedLoads]);
 
   // Calculate load
   const loadResult: ResidentialLoadResult | null = useMemo(() => {
@@ -176,13 +225,13 @@ export const DwellingLoadCalculator: React.FC<DwellingLoadCalculatorProps> = ({
           squareFootage: residentialSettings?.squareFootage || 2000,
           smallApplianceCircuits: residentialSettings?.smallApplianceCircuits || 2,
           laundryCircuit: residentialSettings?.laundryCircuit ?? true,
-          appliances,
+          appliances: appliancesForCalc,
           existingDwelling,
           useTrueOptionalMethod
         });
       } else {
         return calculateMultiFamilyLoad({
-          unitTemplates: unitTemplates.map(t => ({ ...t, appliances })),
+          unitTemplates: unitTemplates.map(t => ({ ...t, appliances: appliancesForCalc })),
           housePanelLoad
         });
       }
@@ -190,7 +239,7 @@ export const DwellingLoadCalculator: React.FC<DwellingLoadCalculatorProps> = ({
       console.error('Load calculation error:', error);
       return null;
     }
-  }, [isSingleFamily, residentialSettings, appliances, unitTemplates, housePanelLoad, project.settings?.service_modification_type, project.settings?.dwelling_calc_mode]);
+  }, [isSingleFamily, residentialSettings, appliancesForCalc, unitTemplates, housePanelLoad, project.settings?.service_modification_type, project.settings?.dwelling_calc_mode]);
 
   // Persist multi-family load result to project settings so MF EV Calculator can read it
   // Uses value comparison to avoid infinite re-render loop (updateProject changes project → loadResult recomputes → useEffect fires)
@@ -277,7 +326,7 @@ export const DwellingLoadCalculator: React.FC<DwellingLoadCalculatorProps> = ({
       ...prev,
       otherAppliances: [
         ...(prev.otherAppliances || []),
-        { description: 'New Appliance', kw: 1 }
+        { description: 'New Appliance', kw: 1, voltage: 240, continuous: false }
       ]
     }));
   };
@@ -290,14 +339,58 @@ export const DwellingLoadCalculator: React.FC<DwellingLoadCalculatorProps> = ({
     }));
   };
 
-  // Update custom appliance
-  const updateOtherAppliance = (index: number, field: 'description' | 'kw', value: any) => {
+  // Update custom appliance — field now includes voltage + continuous so
+  // EEs can mark a 240V continuous load (water heater, pool pump) properly.
+  const updateOtherAppliance = (index: number, field: 'description' | 'kw' | 'voltage' | 'continuous', value: any) => {
     setAppliances(prev => ({
       ...prev,
-      otherAppliances: prev.otherAppliances?.map((a, i) => 
+      otherAppliances: prev.otherAppliances?.map((a, i) =>
         i === index ? { ...a, [field]: value } : a
       )
     }));
+  };
+
+  // === Proposed New Loads helpers ===
+  const addProposedFromTemplate = (templateName: string) => {
+    const t = LOAD_TEMPLATES.find(x => x.name === templateName);
+    if (!t) return;
+    setProposedLoads(prev => [
+      ...prev,
+      {
+        id: crypto.randomUUID(),
+        description: t.name,
+        kw: t.kw,
+        voltage: t.voltage ?? 240,
+        continuous: t.continuous,
+        category: t.category === 'Solar' ? 'Other' : (t.category as ProposedLoad['category']),
+        necReference: t.necReference,
+      }
+    ]);
+    setSelectedTemplate('');
+  };
+
+  const addCustomProposed = () => {
+    setProposedLoads(prev => [
+      ...prev,
+      {
+        id: crypto.randomUUID(),
+        description: 'New Load',
+        kw: 1,
+        voltage: 240,
+        continuous: false,
+        category: 'Other',
+      }
+    ]);
+  };
+
+  const removeProposed = (id: string) => {
+    setProposedLoads(prev => prev.filter(p => p.id !== id));
+  };
+
+  const updateProposed = (id: string, field: keyof ProposedLoad, value: any) => {
+    setProposedLoads(prev =>
+      prev.map(p => p.id === id ? { ...p, [field]: value } : p)
+    );
   };
 
   // Add unit template (multi-family)
@@ -345,15 +438,39 @@ export const DwellingLoadCalculator: React.FC<DwellingLoadCalculatorProps> = ({
     
     setIsGenerating(true);
     try {
-      // Generate circuits (single-family only)
+      // Generate circuits for the existing appliance set. Proposed loads are
+      // synthesized separately below so each one can be tagged isProposed.
       const generated = generateResidentialPanelSchedule({
         squareFootage: residentialSettings?.squareFootage || 2000,
         smallApplianceCircuits: residentialSettings?.smallApplianceCircuits || 2,
         laundryCircuit: residentialSettings?.laundryCircuit ?? true,
         appliances
       });
-      
-      setGeneratedCircuits(generated);
+
+      // Append a circuit row per proposed load — same sizing logic as the
+      // otherAppliances generator (voltage → poles; continuous → ×1.25
+      // breaker per NEC 210.20(A)). Each entry carries isProposed=true so
+      // the DB column gets set at insert time.
+      const proposedCircuits: GeneratedCircuit[] = proposedLoads.map(p => {
+        const pole: 1 | 2 = p.voltage === 240 ? 2 : 1;
+        const baseAmps = (p.kw * 1000) / p.voltage;
+        const sizedAmps = p.continuous ? baseAmps * 1.25 : baseAmps;
+        const breakerAmps = Math.max(15, Math.ceil(sizedAmps / 5) * 5);
+        const loadType: GeneratedCircuit['loadType'] =
+          p.category === 'HVAC' ? 'C' :
+          p.category === 'EV' ? 'O' : 'O';
+        return {
+          description: p.description,
+          breakerAmps,
+          pole,
+          loadWatts: p.kw * 1000,
+          loadType,
+          necReference: p.necReference ?? 'NEC 220.83',
+          isProposed: true,
+        };
+      });
+
+      setGeneratedCircuits([...generated, ...proposedCircuits]);
       setShowGenerated(true);
     } finally {
       setIsGenerating(false);
@@ -443,7 +560,8 @@ export const DwellingLoadCalculator: React.FC<DwellingLoadCalculatorProps> = ({
           pole: circuit.pole,
           load_watts: circuit.loadWatts,
           conductor_size: getConductorSize(circuit.breakerAmps),
-          load_type: circuit.loadType
+          load_type: circuit.loadType,
+          is_proposed: !!circuit.isProposed,
         });
       }
 
@@ -1284,12 +1402,12 @@ export const DwellingLoadCalculator: React.FC<DwellingLoadCalculatorProps> = ({
                     </button>
                   </div>
                   {(appliances.otherAppliances || []).map((other, idx) => (
-                    <div key={idx} className="flex items-center gap-2 mb-2">
+                    <div key={idx} className="flex flex-wrap items-center gap-2 mb-2">
                       <input
                         type="text"
                         value={other.description}
                         onChange={e => updateOtherAppliance(idx, 'description', e.target.value)}
-                        className="flex-1 text-sm border-gray-200 rounded"
+                        className="flex-1 min-w-[140px] text-sm border-gray-200 rounded"
                         placeholder="Description"
                       />
                       <NumberInput
@@ -1300,6 +1418,24 @@ export const DwellingLoadCalculator: React.FC<DwellingLoadCalculatorProps> = ({
                         min={0}
                       />
                       <span className="text-xs text-gray-500">kW</span>
+                      <select
+                        value={other.voltage ?? (other.kw > 2 ? 240 : 120)}
+                        onChange={e => updateOtherAppliance(idx, 'voltage', Number(e.target.value) as 120 | 240)}
+                        className="text-xs border-gray-200 rounded py-1"
+                        title="Branch voltage — 120V → 1P breaker, 240V → 2P breaker"
+                      >
+                        <option value={120}>120V (1P)</option>
+                        <option value={240}>240V (2P)</option>
+                      </select>
+                      <label className="inline-flex items-center gap-1 text-xs text-gray-600" title="NEC 100 continuous load — operates 3+ hours. Applies ×1.25 per NEC 210.20(A) / 220.18(B).">
+                        <input
+                          type="checkbox"
+                          checked={!!other.continuous}
+                          onChange={e => updateOtherAppliance(idx, 'continuous', e.target.checked)}
+                          className="rounded border-gray-300"
+                        />
+                        Continuous
+                      </label>
                       <button
                         onClick={() => removeOtherAppliance(idx)}
                         className="p-1 text-gray-400 hover:text-red-500"
@@ -1309,6 +1445,119 @@ export const DwellingLoadCalculator: React.FC<DwellingLoadCalculatorProps> = ({
                     </div>
                   ))}
                 </div>
+
+                {/* Proposed New Loads — visible only on existing-construction
+                    single-family. Template dropdown sources from the same
+                    LOAD_TEMPLATES the Service Upgrade Wizard uses, each with
+                    NEC continuous-load flag baked in. Items flow into the
+                    demand calc (×1.25 when continuous) and become circuits
+                    with is_proposed=true on Generate Schedule. */}
+                {isSingleFamily
+                  && project.settings?.service_modification_type
+                  && project.settings.service_modification_type !== 'new-service'
+                  && (
+                  <div className="mt-4 pt-4 border-t border-gray-200">
+                    <div className="flex justify-between items-center mb-2">
+                      <h4 className="text-sm font-medium text-gray-700">
+                        Proposed New Loads
+                        <span className="ml-2 text-xs text-gray-500 font-normal">
+                          (additions under this permit — marked * on the schedule)
+                        </span>
+                      </h4>
+                      <button
+                        onClick={addCustomProposed}
+                        className="text-sm text-[#2d3b2d] hover:text-[#2d3b2d] flex items-center gap-1"
+                      >
+                        <Plus className="w-4 h-4" /> Add Custom
+                      </button>
+                    </div>
+
+                    <div className="flex flex-wrap items-center gap-2 mb-3">
+                      <label className="text-xs font-semibold text-[#888] uppercase">Select from Common Loads</label>
+                      <select
+                        value={selectedTemplate}
+                        onChange={e => {
+                          const v = e.target.value;
+                          if (v) addProposedFromTemplate(v);
+                        }}
+                        className="text-sm border-gray-200 rounded py-1 px-2 flex-1 min-w-[200px]"
+                      >
+                        <option value="">-- Select Load --</option>
+                        <optgroup label="EV Chargers (NEC 625.41 continuous)">
+                          {LOAD_TEMPLATES.filter(t => t.category === 'EV').map(t => (
+                            <option key={t.name} value={t.name}>{t.name}</option>
+                          ))}
+                        </optgroup>
+                        <optgroup label="HVAC">
+                          {LOAD_TEMPLATES.filter(t => t.category === 'HVAC').map(t => (
+                            <option key={t.name} value={t.name}>{t.name}</option>
+                          ))}
+                        </optgroup>
+                        <optgroup label="Appliances">
+                          {LOAD_TEMPLATES.filter(t => t.category === 'Appliance').map(t => (
+                            <option key={t.name} value={t.name}>{t.name}</option>
+                          ))}
+                        </optgroup>
+                      </select>
+                    </div>
+
+                    {proposedLoads.length === 0 ? (
+                      <p className="text-xs text-gray-400 italic">
+                        No proposed loads yet. Pick a template above or click "Add Custom".
+                      </p>
+                    ) : (
+                      proposedLoads.map(p => (
+                        <div key={p.id} className="flex flex-wrap items-center gap-2 mb-2">
+                          <span className="text-[10px] font-bold rounded px-1 py-0.5 bg-electric-100 text-electric-700 border border-electric-300">NEW</span>
+                          <input
+                            type="text"
+                            value={p.description}
+                            onChange={e => updateProposed(p.id, 'description', e.target.value)}
+                            className="flex-1 min-w-[140px] text-sm border-gray-200 rounded"
+                            placeholder="Description"
+                          />
+                          <NumberInput
+                            value={p.kw}
+                            onChange={v => updateProposed(p.id, 'kw', v)}
+                            className="w-20 text-sm border-gray-200 rounded"
+                            step={0.1}
+                            min={0}
+                          />
+                          <span className="text-xs text-gray-500">kW</span>
+                          <select
+                            value={p.voltage}
+                            onChange={e => updateProposed(p.id, 'voltage', Number(e.target.value) as 120 | 240)}
+                            className="text-xs border-gray-200 rounded py-1"
+                          >
+                            <option value={120}>120V (1P)</option>
+                            <option value={240}>240V (2P)</option>
+                          </select>
+                          <label
+                            className="inline-flex items-center gap-1 text-xs text-gray-600"
+                            title="NEC 100 continuous load — operates 3+ hours. Applies ×1.25 per NEC 210.20(A) / 220.18(B)."
+                          >
+                            <input
+                              type="checkbox"
+                              checked={p.continuous}
+                              onChange={e => updateProposed(p.id, 'continuous', e.target.checked)}
+                              className="rounded border-gray-300"
+                            />
+                            Continuous
+                          </label>
+                          {p.necReference && (
+                            <span className="text-[10px] text-gray-400 italic">{p.necReference}</span>
+                          )}
+                          <button
+                            onClick={() => removeProposed(p.id)}
+                            className="p-1 text-gray-400 hover:text-red-500"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                )}
               </div>
             )}
           </div>

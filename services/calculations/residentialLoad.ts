@@ -713,20 +713,29 @@ export function calculateSingleFamilyLoad(input: SingleFamilyInput): Residential
     totalDemand += wellPumpVA;
   }
 
-  // Other Custom Appliances
+  // Other Custom Appliances. Continuous loads (e.g. water-heating, pool
+  // pumps, EV chargers added through this path) get the NEC 220.18(B) ×1.25
+  // factor on the demand contribution; non-continuous loads contribute at
+  // nameplate (1.0×). Voltage is documentation here; it affects breaker
+  // poles in the circuit-generation path below, not the kVA math.
   if (appliances.otherAppliances?.length) {
     for (const other of appliances.otherAppliances) {
       const otherVA = other.kw * 1000;
+      const continuous = !!other.continuous;
+      const factor = continuous ? 1.25 : 1.0;
+      const demandVA = otherVA * factor;
       breakdown.push({
         category: 'Other Appliance',
-        description: `${other.description} - ${other.kw} kW`,
+        description: `${other.description} - ${other.kw} kW${continuous ? ' (continuous ×1.25)' : ''}`,
         connectedVA: otherVA,
-        demandVA: otherVA,
-        demandFactor: 1.0,
-        necReference: 'NEC 220.82(B)(2)'
+        demandVA,
+        demandFactor: factor,
+        necReference: continuous
+          ? 'NEC 220.18(B) - Continuous Load ×1.25'
+          : 'NEC 220.82(B)(2)'
       });
       totalConnected += otherVA;
-      totalDemand += otherVA;
+      totalDemand += demandVA;
     }
   }
 
@@ -1110,6 +1119,14 @@ export interface GeneratedCircuit {
   loadWatts: number;
   loadType: 'L' | 'R' | 'M' | 'K' | 'H' | 'C' | 'W' | 'D' | 'O';
   necReference: string;
+  /**
+   * Marks a circuit as a proposed new addition (post-existing-service).
+   * Flows into circuits.is_proposed at insert time, which the permit-packet
+   * panel-schedule renderer uses to add the "* = Proposed new circuit"
+   * marker. Default false (= existing) preserves prior behavior for
+   * callers that don't set it.
+   */
+  isProposed?: boolean;
 }
 
 /**
@@ -1372,17 +1389,27 @@ export function generateResidentialPanelSchedule(input: SingleFamilyInput): Gene
     });
   }
 
-  // Other appliances
+  // Other appliances — honor voltage (1P at 120V, 2P at 240V) and continuous
+  // (apply NEC 210.20(A) ×1.25 to the breaker rating). Legacy entries without
+  // these fields fall back to 240V/non-continuous via the kW>2 heuristic for
+  // backward compat.
   if (appliances.otherAppliances?.length) {
     for (const other of appliances.otherAppliances) {
-      const otherAmps = Math.ceil((other.kw * 1000) / 240);
+      const voltage = other.voltage ?? (other.kw > 2 ? 240 : 120);
+      const pole = voltage === 240 ? 2 : 1;
+      const continuous = !!other.continuous;
+      const baseAmps = (other.kw * 1000) / voltage;
+      const sizedAmps = continuous ? baseAmps * 1.25 : baseAmps;
+      const breakerAmps = Math.max(15, Math.ceil(sizedAmps / 5) * 5);
       circuits.push({
-        description: other.description,
-        breakerAmps: Math.ceil(otherAmps / 5) * 5,
-        pole: other.kw > 2 ? 2 : 1,
+        description: other.description + (continuous ? ' (continuous)' : ''),
+        breakerAmps,
+        pole,
         loadWatts: other.kw * 1000,
         loadType: 'O',
-        necReference: 'NEC 220.82(B)(2)'
+        necReference: continuous
+          ? 'NEC 210.20(A) - Continuous Load ×1.25'
+          : 'NEC 220.82(B)(2)'
       });
     }
   }
