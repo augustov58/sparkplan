@@ -158,6 +158,17 @@ export interface SingleFamilyInput {
    * (per-category demand factors).
    */
   existingDwelling?: boolean;
+  /**
+   * When true (and existingDwelling is false), post-process the per-category
+   * 220.82 result through the canonical NEC 220.82 Optional Method bucket:
+   *   - General loads: first 10 kVA at 100 %, remainder at 40 %.
+   *   - HVAC at 100 % of larger of heating/cooling (NEC 220.60).
+   *
+   * Reconciles the documented gap between calculateSingleFamilyLoad's 220.82
+   * label and its per-category implementation. Has no effect when
+   * existingDwelling is true (220.83 bucket method already applies).
+   */
+  useTrueOptionalMethod?: boolean;
 }
 
 export interface MultiFamilyInput {
@@ -408,14 +419,27 @@ export function calculateSingleFamilyLoad(input: SingleFamilyInput): Residential
     laundryCircuit,
     appliances,
     serviceVoltage = 240,
-    existingDwelling = false
+    existingDwelling = false,
+    useTrueOptionalMethod = false
   } = input;
+
+  // Resolve which bucket-method post-process (if any) applies.
+  // 220.83 (existing dwelling) always wins because it's the NEC-required
+  // method for that scenario; 220.82 true-optional applies only to new
+  // dwellings when the user has opted in.
+  const bucketMethod: 'none' | 'true-220-82' | '220-83' = existingDwelling
+    ? '220-83'
+    : useTrueOptionalMethod
+      ? 'true-220-82'
+      : 'none';
 
   const breakdown: LoadBreakdown[] = [];
   const necReferences: string[] = [
-    existingDwelling
+    bucketMethod === '220-83'
       ? 'NEC 220.83 - Optional Method for Existing Dwelling Units'
-      : 'NEC 220.82 - Optional Method for Dwelling Units'
+      : bucketMethod === 'true-220-82'
+        ? 'NEC 220.82 - Optional Method for Dwelling Units (10 kVA / 40% bucket)'
+        : 'NEC 220.82 - Optional Method for Dwelling Units'
   ];
   const warnings: string[] = [];
 
@@ -702,14 +726,23 @@ export function calculateSingleFamilyLoad(input: SingleFamilyInput): Residential
   }
 
   // =========================================
-  // NEC 220.83 Adjustment — Existing Dwelling Unit Optional Method
+  // NEC 220.82 / 220.83 Optional Method Bucket Post-Process
   // =========================================
-  // The 220.82 result above is per-category demand factored. For existing
-  // dwellings adding load, NEC 220.83 replaces the per-category factoring
-  // with a single bucket: all non-HVAC loads get first 8 kVA at 100 % +
-  // remainder at 40 %, then HVAC is added at 100 % of the larger of
-  // heating/cooling.
-  if (existingDwelling) {
+  // The per-category result above mirrors the Standard Method walk
+  // (220.40–220.61). Both Optional Methods (220.82 for new, 220.83 for
+  // existing) replace per-category factoring with a single general-loads
+  // bucket:
+  //   - 220.82 (new):       first 10 kVA at 100 %, remainder at 40 %
+  //   - 220.83 (existing):  first 8 kVA at 100 %, remainder at 40 %
+  // HVAC is added at 100 % of the larger of heating/cooling per 220.60 in
+  // both cases. The block below applies whichever knee is active and
+  // re-tags the breakdown citations accordingly.
+  if (bucketMethod !== 'none') {
+    const FIRST_TIER_VA = bucketMethod === '220-83' ? 8_000 : 10_000;
+    const articleLabel = bucketMethod === '220-83' ? 'NEC 220.83' : 'NEC 220.82';
+    const hvacReference = bucketMethod === '220-83'
+      ? 'NEC 220.83(B) - HVAC at 100% (larger of heat/cool)'
+      : 'NEC 220.82(C) - HVAC at 100% (larger of heat/cool)';
     // Re-aggregate using CONNECTED VA so the 220.83 8 kVA / 40 % math is
     // applied to nameplate (not 220.82's already-discounted demand).
     let hvacConnectedVA = 0;
@@ -728,49 +761,66 @@ export function calculateSingleFamilyLoad(input: SingleFamilyInput): Residential
       }
     }
 
-    const FIRST_TIER_VA = 8_000;
     const REMAINDER_FACTOR = 0.4;
     const firstTier = Math.min(generalConnectedVA, FIRST_TIER_VA);
     const remainder = Math.max(0, generalConnectedVA - FIRST_TIER_VA);
     const generalDemandVA = Math.round(firstTier + remainder * REMAINDER_FACTOR);
+    const kneeKva = FIRST_TIER_VA / 1000;
+    const bucketLabel = `${articleLabel} - General Loads (first ${kneeKva} kVA @ 100%, remainder @ 40%)`;
 
-    // Re-tag the per-category necReference so the breakdown reads as 220.83.
+    // Re-tag the per-category necReference so the breakdown reads as the
+    // active Optional Method article.
     for (const row of breakdown) {
       if (row.category === 'HVAC') {
-        row.necReference = 'NEC 220.83(B) - HVAC at 100% (larger of heat/cool)';
+        row.necReference = hvacReference;
       } else if (row.category === 'General Loads Subtotal') {
         row.demandVA = generalDemandVA;
         row.demandFactor = generalConnectedVA > 0 ? generalDemandVA / generalConnectedVA : 0;
-        row.description = `Lighting + Small Appliance + Laundry + Appliances (first 8 kVA @ 100%, remainder @ 40%)`;
-        row.necReference = 'NEC 220.83 - General Loads (8 kVA / 40%)';
+        row.description = `Lighting + Small Appliance + Laundry + Appliances (first ${kneeKva} kVA @ 100%, remainder @ 40%)`;
+        row.necReference = `${articleLabel} - General Loads (${kneeKva} kVA / 40%)`;
         row.connectedVA = generalConnectedVA; // Reflect the full general-loads pool, not just lighting+SA+laundry
-      } else if (row.category !== 'HVAC') {
+      } else {
         // Individual non-HVAC rows show their nameplate (connected) only;
         // the actual demand contribution is captured in the General Loads
-        // Subtotal row under 220.83. Zero their demand to avoid double-count.
+        // Subtotal row. Zero their demand to avoid double-counting.
         row.demandVA = 0;
         row.demandFactor = 0;
-        row.necReference = 'NEC 220.83 - rolled into General Loads bucket';
+        row.necReference = `${articleLabel} - rolled into General Loads bucket`;
       }
     }
 
-    // Rewrite totals to reflect 220.83 semantics
+    // Rewrite totals to reflect bucket semantics
     totalConnected = generalConnectedVA + hvacConnectedVA;
     totalDemand = generalDemandVA + hvacDemandVA;
 
-    necReferences.push('NEC 220.83 - General Loads (first 8 kVA @ 100%, remainder @ 40%)');
+    necReferences.push(bucketLabel);
     if (hvacConnectedVA > 0) {
-      necReferences.push('NEC 220.83(B) - HVAC at 100% of larger of heat/cool');
+      necReferences.push(hvacReference);
+      if (bucketMethod === '220-83') {
+        warnings.push(
+          'ℹ️ NEC 220.83(B) allows 65% for central electric heating or fewer than four ' +
+          'separately-controlled space-heating units, and 40% for four or more separately-controlled ' +
+          'units. This calc applies 100% — adjust manually if the heating scenario qualifies.'
+        );
+      } else {
+        warnings.push(
+          'ℹ️ NEC 220.82(C) applies 100% to the larger of A/C vs heat (non-coincident). ' +
+          'Central electric space heating with 4+ separately controlled units may qualify for 65%; ' +
+          'verify and adjust manually if applicable.'
+        );
+      }
+    }
+    if (bucketMethod === '220-83') {
       warnings.push(
-        'ℹ️ NEC 220.83(B) allows 65% for central electric heating or fewer than four ' +
-        'separately-controlled space-heating units, and 40% for four or more separately-controlled ' +
-        'units. This calc applies 100% — adjust manually if the heating scenario qualifies.'
+        'ℹ️ Calculated per NEC 220.83 (Existing Dwelling, Optional Method). ' +
+        'Switch Project Status to "New Construction" on the Project Setup page to use NEC 220.82 instead.'
+      );
+    } else {
+      warnings.push(
+        'ℹ️ Calculated per NEC 220.82 Optional Method (10 kVA / 40 % bucket). ' +
+        'Switch Calculation Method to "Per-Category" to use the legacy per-appliance demand factor walk.'
       );
     }
-    warnings.push(
-      'ℹ️ Calculated per NEC 220.83 (Existing Dwelling, Optional Method). ' +
-      'Switch Project Status to "New Construction" on the Project Setup page to use NEC 220.82 instead.'
-    );
   }
 
   // =========================================

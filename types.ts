@@ -224,6 +224,22 @@ export interface ProjectSettings {
    * responsible for supplying defaults when a key is missing.
    */
   service_modification_type?: 'existing' | 'service-upgrade' | 'new-service';
+  /**
+   * Controls how NEC 220.82 demand is computed for new single-family dwellings.
+   *
+   * - 'per-category' (default): legacy behavior — applies Table 220.42 lighting
+   *   tiers, Table 220.55 range demand, dryer/WH/appliance per-category factors.
+   *   Mirrors the Standard Method walk (NEC 220.40–220.61), tends to oversize
+   *   by ~30 % vs the true Optional Method but matches every existing project's
+   *   historical numbers.
+   * - 'true-optional': canonical NEC 220.82 Optional Method — collapses all
+   *   non-HVAC loads into a single bucket (first 10 kVA at 100 %, remainder at
+   *   40 %), then adds HVAC at 100 % of the larger of heating/cooling.
+   *
+   * Has no effect for existing dwellings (220.83 always uses a bucket method
+   * with an 8 kVA knee) or multi-family (220.84 uses Table 220.84 directly).
+   */
+  dwelling_calc_mode?: 'per-category' | 'true-optional';
   scope_flags?: ProjectScopeFlags;
   estimated_value_usd?: number;
 }

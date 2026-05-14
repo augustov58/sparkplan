@@ -480,6 +480,63 @@ describe('Residential Load (NEC 220.82 / 220.84)', () => {
     });
   });
 
+  describe('calculateSingleFamilyLoad — True 220.82 Optional vs 220.83', () => {
+    const baseInput = {
+      squareFootage: 2000,
+      smallApplianceCircuits: 2,
+      laundryCircuit: true,
+      appliances: {
+        range: { enabled: true, type: 'electric' as const, kw: 12 },
+        dryer: { enabled: true, type: 'electric' as const, kw: 5.5 },
+        waterHeater: { enabled: true, type: 'electric' as const, kw: 4.5 },
+        hvac: { enabled: true, type: 'ac_only' as const, coolingKw: 5, heatingKw: 0 }
+      }
+    };
+
+    it('per-category mode keeps the legacy Standard-Method-style citations', () => {
+      const result = calculateSingleFamilyLoad(baseInput);
+      expect(result.necReferences).toContain('NEC 220.82 - Optional Method for Dwelling Units');
+      // Per-category mode: individual rows retain their non-zero demand
+      const rangeRow = result.breakdown.find(b => b.category === 'Electric Range');
+      expect(rangeRow?.demandVA).toBeGreaterThan(0);
+    });
+
+    it('true-optional mode applies the 10 kVA / 40% bucket to general loads', () => {
+      const result = calculateSingleFamilyLoad({
+        ...baseInput,
+        useTrueOptionalMethod: true
+      });
+      expect(result.necReferences).toContain('NEC 220.82 - Optional Method for Dwelling Units (10 kVA / 40% bucket)');
+      // Non-HVAC rows roll into General Loads Subtotal — their own demand is zeroed
+      const rangeRow = result.breakdown.find(b => b.category === 'Electric Range');
+      expect(rangeRow?.demandVA).toBe(0);
+      // General Loads Subtotal is now the full pool minus HVAC
+      const generalRow = result.breakdown.find(b => b.category === 'General Loads Subtotal');
+      expect(generalRow).toBeDefined();
+      expect(generalRow!.connectedVA).toBeGreaterThan(8000); // includes lighting + SA + laundry + range + dryer + WH
+    });
+
+    it('true-optional yields a smaller demand than per-category for typical inputs', () => {
+      const perCategory = calculateSingleFamilyLoad(baseInput);
+      const trueOptional = calculateSingleFamilyLoad({
+        ...baseInput,
+        useTrueOptionalMethod: true
+      });
+      expect(trueOptional.totalDemandVA).toBeLessThan(perCategory.totalDemandVA);
+    });
+
+    it('existingDwelling overrides useTrueOptionalMethod — 220.83 always wins', () => {
+      const result = calculateSingleFamilyLoad({
+        ...baseInput,
+        existingDwelling: true,
+        useTrueOptionalMethod: true  // ignored — 220.83 is NEC-required for existing
+      });
+      expect(result.necReferences[0]).toContain('NEC 220.83');
+      // 220.83 uses 8 kVA knee, not 10
+      expect(result.necReferences.some(r => r.includes('8 kVA'))).toBe(true);
+    });
+  });
+
   describe('calculateMultiFamilyLoad (NEC 220.84)', () => {
     it('should apply NEC 220.84 demand factor to building total', () => {
       const result = calculateMultiFamilyLoad({

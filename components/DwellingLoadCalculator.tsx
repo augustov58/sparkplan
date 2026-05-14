@@ -169,12 +169,16 @@ export const DwellingLoadCalculator: React.FC<DwellingLoadCalculatorProps> = ({
         const existingDwelling = project.settings?.service_modification_type
           ? project.settings.service_modification_type !== 'new-service'
           : true; // default to existing — safer assumption for retrofit work
+        // Calculation Method (this page) only applies to 220.82 (new). 220.83
+        // is always a bucket method by NEC definition.
+        const useTrueOptionalMethod = project.settings?.dwelling_calc_mode === 'true-optional';
         return calculateSingleFamilyLoad({
           squareFootage: residentialSettings?.squareFootage || 2000,
           smallApplianceCircuits: residentialSettings?.smallApplianceCircuits || 2,
           laundryCircuit: residentialSettings?.laundryCircuit ?? true,
           appliances,
-          existingDwelling
+          existingDwelling,
+          useTrueOptionalMethod
         });
       } else {
         return calculateMultiFamilyLoad({
@@ -186,7 +190,7 @@ export const DwellingLoadCalculator: React.FC<DwellingLoadCalculatorProps> = ({
       console.error('Load calculation error:', error);
       return null;
     }
-  }, [isSingleFamily, residentialSettings, appliances, unitTemplates, housePanelLoad]);
+  }, [isSingleFamily, residentialSettings, appliances, unitTemplates, housePanelLoad, project.settings?.service_modification_type, project.settings?.dwelling_calc_mode]);
 
   // Persist multi-family load result to project settings so MF EV Calculator can read it
   // Uses value comparison to avoid infinite re-render loop (updateProject changes project → loadResult recomputes → useEffect fires)
@@ -595,10 +599,47 @@ export const DwellingLoadCalculator: React.FC<DwellingLoadCalculatorProps> = ({
             {isSingleFamily
               ? (project.settings?.service_modification_type && project.settings.service_modification_type !== 'new-service'
                   ? 'NEC 220.83 - Optional Method for Existing Single-Family Dwellings'
-                  : 'NEC 220.82 - Optional Method for Single-Family Dwellings')
+                  : project.settings?.dwelling_calc_mode === 'true-optional'
+                    ? 'NEC 220.82 - Optional Method for Single-Family Dwellings (10 kVA / 40% bucket)'
+                    : 'NEC 220.82 - Optional Method for Single-Family Dwellings (per-category)')
               : 'NEC 220.84 - Optional Method for Multi-Family Dwellings'
             }
           </p>
+          {/* Calculation Method toggle — only meaningful for new 220.82.
+              220.83 is always bucket method by NEC definition, so we disable
+              the control with a note when an existing dwelling is active. */}
+          {isSingleFamily && (() => {
+            const isExisting = project.settings?.service_modification_type
+              && project.settings.service_modification_type !== 'new-service';
+            return (
+              <div className="mt-3 flex flex-wrap items-center gap-2">
+                <label className="text-xs font-semibold text-[#888] uppercase">Calculation Method</label>
+                <select
+                  disabled={isExisting}
+                  value={project.settings?.dwelling_calc_mode ?? 'per-category'}
+                  onChange={e => {
+                    updateProject({
+                      ...project,
+                      settings: {
+                        ...project.settings,
+                        dwelling_calc_mode: e.target.value as 'per-category' | 'true-optional'
+                      }
+                    });
+                  }}
+                  className="border-[#e8e6e3] rounded-md text-sm py-1 px-2 disabled:bg-gray-50 disabled:text-gray-400"
+                  title={isExisting ? 'NEC 220.83 always uses the 8 kVA / 40% bucket method' : undefined}
+                >
+                  <option value="per-category">Per-Category (Conservative, legacy)</option>
+                  <option value="true-optional">True 220.82 Optional (10 kVA / 40%)</option>
+                </select>
+                {isExisting && (
+                  <span className="text-xs text-[#888] italic">
+                    Locked: NEC 220.83 always uses 8 kVA / 40% bucket
+                  </span>
+                )}
+              </div>
+            );
+          })()}
         </div>
         <div className="flex flex-wrap items-center gap-2 sm:gap-3 w-full lg:w-auto">
           {/* Show current panel status */}
