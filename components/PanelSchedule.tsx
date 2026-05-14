@@ -313,6 +313,7 @@ export const PanelSchedule: React.FC<PanelScheduleProps> = ({ project }) => {
         existingDwelling,
       });
       return {
+        totalConnectedVA: result.totalConnectedVA,
         totalDemandVA: result.totalDemandVA,
         necArticle: result.necArticle,
       };
@@ -1718,9 +1719,13 @@ export const PanelSchedule: React.FC<PanelScheduleProps> = ({ project }) => {
                 </p>
                 <div className="mt-3 pt-3 border-t border-gray-200 grid grid-cols-2 gap-2">
                   <div>
-                    <div className="text-[10px] uppercase text-gray-500 tracking-wide">Total Connected (raw)</div>
+                    <div className="text-[10px] uppercase text-gray-500 tracking-wide">
+                      {dwellingUnitDemand?.necArticle ?? 'NEC 220.83'} Connected
+                    </div>
                     <div className="text-lg font-semibold text-gray-900 font-mono">
-                      {demandResult.totalConnectedLoad_kVA.toFixed(2)} kVA
+                      {dwellingUnitDemand && (dwellingUnitDemand as any).totalConnectedVA != null
+                        ? ((dwellingUnitDemand as any).totalConnectedVA / 1000).toFixed(2)
+                        : demandResult.totalConnectedLoad_kVA.toFixed(2)} kVA
                     </div>
                   </div>
                   <div>
@@ -1794,8 +1799,20 @@ export const PanelSchedule: React.FC<PanelScheduleProps> = ({ project }) => {
               <div className="grid grid-cols-2 gap-4">
                 {/* Direct Circuits */}
                 <div className="bg-gray-50 rounded p-3">
-                  <span className="text-[10px] uppercase text-gray-500 block">Direct Circuits Load</span>
-                  <span className="text-xl font-bold text-gray-900">{demandResult.totalConnectedLoad_kVA.toFixed(1)} KVA</span>
+                  <span className="text-[10px] uppercase text-gray-500 block">
+                    Direct Circuits Load
+                    {dwellingUnitDemand && (dwellingUnitDemand as any).totalConnectedVA != null && (
+                      <span className="ml-1 text-amber-700 normal-case">
+                        ({(dwellingUnitDemand as any).necArticle ?? 'NEC 220.82'})
+                      </span>
+                    )}
+                  </span>
+                  <span className="text-xl font-bold text-gray-900">
+                    {(dwellingUnitDemand && (dwellingUnitDemand as any).totalConnectedVA != null
+                      ? (dwellingUnitDemand as any).totalConnectedVA / 1000
+                      : demandResult.totalConnectedLoad_kVA
+                    ).toFixed(1)} KVA
+                  </span>
                 </div>
                 <div className="bg-[#f0f5f0] rounded p-3">
                   <span className="text-[10px] uppercase text-gray-500 block">
