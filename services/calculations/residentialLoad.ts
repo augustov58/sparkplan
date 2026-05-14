@@ -1565,6 +1565,7 @@ export interface PanelDemandResult {
   generalConnectedVA: number;
   generalDemandVA: number;
   hvacVA: number;
+  totalConnectedVA: number;
   totalDemandVA: number;
   necArticle: 'NEC 220.82' | 'NEC 220.83';
   warnings: string[];
@@ -1599,19 +1600,24 @@ export function calculateDwellingPanelDemand(opts: {
   for (const c of circuits) {
     const watts = c.load_watts ?? 0;
     const type = (c.load_type ?? 'O').toUpperCase();
+    const desc = (c.description ?? '').toLowerCase();
     if (type === 'L' || type === 'R') continue; // Covered by NEC general lighting/SA/laundry
+    // Refrigerator on a dedicated 15/20A branch per NEC 210.52(B)(1) Ex 2
+    // is still subsumed in the 3 VA/sq ft general lighting allowance.
+    if (type === 'K' && /refrigerator|fridge/.test(desc)) continue;
     if (type === 'C') { acVA += watts; continue; }
     if (type === 'H') { heatVA += watts; continue; }
 
-    // Continuous-load heuristic — branch breaker sized to >=1.20× load
-    // amps suggests the original sizer treated it as continuous. The
-    // exact threshold 1.20 is below 1.25 to allow rounding to the next
-    // standard breaker (e.g. 48 A continuous → 60 A breaker = 1.25; 32 A
-    // continuous → 40 A = 1.25; 26 A AC → 30 A breaker = 1.15 ≈ NOT
-    // continuous per 440.32 motor branch — kept out of bucket uplift).
+    // Continuous-load uplift — only Other-type (load_type='O') circuits where
+    // the breaker is sized at >=1.20× the load amps qualify. NEC 625.41
+    // mandates EV continuous sizing (breaker = 1.25× load) which is the
+    // primary use-case here. Ordinary appliances (Range/Dryer/WH/Disposal/
+    // Pool) carry a generous breaker margin for inrush or rounding but are
+    // intermittent loads, so we keep them at 1.0×.
     const breaker = c.breaker_amps ?? 0;
     const loadAmps = voltage > 0 ? watts / voltage : 0;
-    const isContinuous = breaker > 0 && loadAmps > 0 && breaker / loadAmps >= 1.20;
+    const isContinuous =
+      type === 'O' && breaker > 0 && loadAmps > 0 && breaker / loadAmps >= 1.20;
     const factor = isContinuous ? 1.25 : 1.0;
 
     generalRawVA += watts;
@@ -1633,6 +1639,7 @@ export function calculateDwellingPanelDemand(opts: {
     generalConnectedVA: Math.round(generalRawVA),
     generalDemandVA,
     hvacVA: Math.round(hvacVA),
+    totalConnectedVA: Math.round(generalRawVA + hvacVA),
     totalDemandVA: Math.round(generalDemandVA + hvacVA),
     necArticle: existingDwelling ? 'NEC 220.83' : 'NEC 220.82',
     warnings: [],

@@ -670,6 +670,75 @@ describe('Residential Load (NEC 220.82 / 220.84)', () => {
       expect(result.totalDemandVA).toBeLessThan(30_000);
       // HVAC tracked separately
       expect(result.hvacVA).toBe(5000);
+
+      // Exact match with the Dwelling Load Calculator output (single source
+      // of truth). The Calc reports 48.0 kVA connected / 28.15 kVA demand
+      // for this scenario; the Panel Summary derivation must match.
+      // Connected: 12000 + 500 + 5500 + 4500 + 1500 + 11500 (EV) + 7500
+      //            (NEC structural: lighting+SA+laundry) + 5000 (HVAC) = 48000
+      expect(result.totalConnectedVA).toBe(48_000);
+      // Demand: bucket = 8000 + ((38375 + 7500) - 8000) × 0.4 = 23150
+      //         + HVAC 5000 = 28150
+      expect(result.totalDemandVA).toBe(28_150);
+    });
+
+    it('calculateDwellingPanelDemand: refrigerator on K-type circuit is subsumed in general allowance', async () => {
+      const { calculateDwellingPanelDemand } = await import('../services/calculations/residentialLoad');
+      // Without refrigerator
+      const noFridge = calculateDwellingPanelDemand({
+        circuits: [
+          { description: 'Electric Range', load_watts: 12000, load_type: 'K', breaker_amps: 50 },
+        ],
+        squareFootage: 1000,
+        smallApplianceCircuits: 2,
+        laundryCircuit: true,
+        voltage: 240,
+        existingDwelling: true,
+      });
+      // With refrigerator added as a separate dedicated K-type circuit
+      const withFridge = calculateDwellingPanelDemand({
+        circuits: [
+          { description: 'Electric Range', load_watts: 12000, load_type: 'K', breaker_amps: 50 },
+          { description: 'Refrigerator', load_watts: 600, load_type: 'K', breaker_amps: 20 },
+        ],
+        squareFootage: 1000,
+        smallApplianceCircuits: 2,
+        laundryCircuit: true,
+        voltage: 240,
+        existingDwelling: true,
+      });
+      // Refrigerator (NEC 210.52(B)(1) Ex 2) is covered by 3 VA/sq ft general
+      // lighting allowance — adding it should NOT change connected/demand.
+      expect(withFridge.totalConnectedVA).toBe(noFridge.totalConnectedVA);
+      expect(withFridge.totalDemandVA).toBe(noFridge.totalDemandVA);
+    });
+
+    it('calculateDwellingPanelDemand: tightened continuous heuristic — only Other-type loads get ×1.25 uplift', async () => {
+      const { calculateDwellingPanelDemand } = await import('../services/calculations/residentialLoad');
+      // Dryer/WH/Pool carry generous breaker margin (>1.20× load amps) but
+      // are intermittent loads per NEC — they must NOT receive the ×1.25
+      // uplift reserved for continuous loads. Only the EV (type 'O') does.
+      const intermittentOnly = calculateDwellingPanelDemand({
+        circuits: [
+          { description: 'Electric Dryer',   load_watts: 5500, load_type: 'D', breaker_amps: 30 }, // 30/22.9 = 1.31
+          { description: 'Water Heater',     load_watts: 4500, load_type: 'W', breaker_amps: 25 }, // 25/18.75 = 1.33
+          { description: 'Pool Pump',        load_watts: 1500, load_type: 'M', breaker_amps: 10 }, // 10/6.25 = 1.6
+          { description: 'Garbage Disposal', load_watts:  500, load_type: 'K', breaker_amps: 20 }, // 20/2.08 = 9.6
+        ],
+        squareFootage: 1000,
+        smallApplianceCircuits: 2,
+        laundryCircuit: true,
+        voltage: 240,
+        existingDwelling: true,
+      });
+      // With the bug (1.20 threshold on all types), bucket would inflate by
+      // ~3 kVA via false-positive uplifts → demand ~+1.2 kVA too high. The
+      // tightened heuristic keeps these at 1.0×, so connectedVA equals the
+      // raw nameplate sum (no inflation).
+      // generalRawVA = 5500 + 4500 + 1500 + 500 + 7500 (structural) = 19500
+      expect(intermittentOnly.totalConnectedVA).toBe(19_500);
+      // bucket = 8000 + (19500 - 8000) × 0.4 = 12600 demand
+      expect(intermittentOnly.totalDemandVA).toBe(12_600);
     });
 
     it('calculateDwellingPanelDemand: skips Lighting/Receptacle circuits (avoid double-count with NEC structural)', async () => {
