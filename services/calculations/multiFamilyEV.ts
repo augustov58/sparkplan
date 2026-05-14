@@ -1458,7 +1458,7 @@ export function calculateMultiFamilyEV(input: MultiFamilyEVInput): MultiFamilyEV
   // Add validation warnings
   if (dwellingUnits < 3) {
     warnings.push('NEC 220.84 requires minimum 3 dwelling units for optional calculation method');
-    necArticles.push('NEC 220.82 (Standard Method)');
+    necArticles.push('NEC 220.82 (Optional Method)');
   }
 
   if (utilizationPercent > 100) {

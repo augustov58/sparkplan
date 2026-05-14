@@ -595,8 +595,8 @@ export const DwellingLoadCalculator: React.FC<DwellingLoadCalculatorProps> = ({
             {isSingleFamily
               ? (project.settings?.service_modification_type && project.settings.service_modification_type !== 'new-service'
                   ? 'NEC 220.83 - Optional Method for Existing Single-Family Dwellings'
-                  : 'NEC 220.82 - Standard Method for Single-Family Dwellings')
-              : 'NEC 220.84 - Optional Calculation for Multi-Family Dwellings'
+                  : 'NEC 220.82 - Optional Method for Single-Family Dwellings')
+              : 'NEC 220.84 - Optional Method for Multi-Family Dwellings'
             }
           </p>
         </div>

@@ -2,9 +2,9 @@
  * Residential Load Calculation Service
  * Implements NEC Article 220 for Dwelling Units
  * 
- * NEC 220.82 - Standard Method for Single-Family Dwellings
- * NEC 220.83 - Existing Dwelling Units (not implemented)
- * NEC 220.84 - Multi-Family Dwellings
+ * NEC 220.82 - Optional Method for Single-Family Dwellings (new)
+ * NEC 220.83 - Optional Method for Existing Dwelling Units
+ * NEC 220.84 - Optional Method for Multi-Family Dwellings
  */
 
 import { ResidentialAppliances, DwellingUnitTemplate } from '../../types';
@@ -388,7 +388,18 @@ function recommendGecSize(serviceConductorSize: string, material: 'Cu' | 'Al' = 
 // ============================================================================
 
 /**
- * NEC 220.82 - Standard Method for Single-Family Dwellings
+ * NEC 220.82 - Optional Method for Single-Family Dwellings
+ *
+ * KNOWN LABELING vs IMPLEMENTATION GAP: This function emits `NEC 220.82`
+ * citations and is called the "Optional Method", but the per-category demand
+ * factoring below (Table 220.42 for lighting, Table 220.55 for range, etc.)
+ * actually mirrors the Standard Method walk in NEC 220.40–220.61. True 220.82
+ * Optional Method uses a single 10 kVA / 40 % split on the general-loads
+ * bucket. See `services/autogeneration/multiFamilyProjectGenerator.ts` for an
+ * inline true-Optional implementation that produces ~30 % smaller demand.
+ * Reconciling the two is a separate task; the breakdown citations below are
+ * accurate to what the code computes (per-category factoring under 220.82's
+ * Optional Method banner).
  */
 export function calculateSingleFamilyLoad(input: SingleFamilyInput): ResidentialLoadResult {
   const {
@@ -402,7 +413,9 @@ export function calculateSingleFamilyLoad(input: SingleFamilyInput): Residential
 
   const breakdown: LoadBreakdown[] = [];
   const necReferences: string[] = [
-    existingDwelling ? 'NEC 220.83 - Optional Method for Existing Dwelling Units' : 'NEC 220.82 - Standard Method'
+    existingDwelling
+      ? 'NEC 220.83 - Optional Method for Existing Dwelling Units'
+      : 'NEC 220.82 - Optional Method for Dwelling Units'
   ];
   const warnings: string[] = [];
 

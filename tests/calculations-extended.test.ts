@@ -427,7 +427,7 @@ describe('Residential Load (NEC 220.82 / 220.84)', () => {
       // Lighting connected = 2000 × 3 = 6000 VA
       const lightingEntry = result.breakdown.find(b => b.category === 'General Lighting');
       expect(lightingEntry?.connectedVA).toBe(6000);
-      expect(result.necReferences).toContain('NEC 220.82 - Standard Method');
+      expect(result.necReferences).toContain('NEC 220.82 - Optional Method for Dwelling Units');
     });
 
     it('should return a valid result with all standard appliances', () => {
