@@ -1515,6 +1515,131 @@ export function calculateDwellingUnitDemandVA(circuits: DwellingCircuitInput[]):
 }
 
 /**
+ * 220.83 / 220.82 bucket demand computed directly from a panel's circuit
+ * list — bridges the Panel Schedule view to the same NEC math the Dwelling
+ * Load Calculator runs from appliance toggles.
+ *
+ * Why this exists (the "two sources of truth" architectural issue):
+ *   `calculateSingleFamilyLoad` reads from a structured `appliances` object
+ *   (project.settings.residential). The Panel Schedule's summary used to
+ *   call that function too — which meant any circuit added directly to the
+ *   panel (manual + Add Circuit, photo import, multifamily-EV-calc bulk
+ *   insert, **or a proposed-load circuit generated from the Dwelling Calc**)
+ *   would NOT appear in the panel's demand calc because the appliance
+ *   toggle wasn't necessarily set.
+ *
+ *   This function instead reads the actual circuits and classifies them by
+ *   `load_type` code (L/R/K/W/D/C/H/M/O). The result reflects whatever is
+ *   physically on the panel, regardless of how those circuits got there.
+ *
+ * NEC structural loads (lighting / SA / laundry) still come from project
+ * settings — they're sq-ft-based NEC minimums, not panel-derivable. The
+ * circuit-list contributes everything else (appliances, HVAC, EV, etc.).
+ *
+ * Classification:
+ *   'L' Lighting        — SKIP (counted via squareFootage × 3 VA/sq ft)
+ *   'R' Receptacle      — SKIP (general 220.42 already covers them)
+ *   'C' Cooling         — HVAC bucket (NEC 220.60 larger-of)
+ *   'H' Heating         — HVAC bucket (NEC 220.60 larger-of)
+ *   'K' Kitchen / fixed — General loads pool
+ *   'W' Water Heater    — General loads pool (continuous heuristic: +25 %)
+ *   'D' Dryer           — General loads pool
+ *   'M' Motor           — General loads pool
+ *   'O' Other           — General loads pool (continuous heuristic on breaker / load × V)
+ *
+ * Continuous heuristic: if a circuit's breaker rating is >= 1.20× its
+ * load amperage (breaker_amps >= load_watts / voltage × 1.20), assume the
+ * branch was sized for a continuous load per NEC 210.20(A) — apply the
+ * 1.25 uplift to its contribution to the bucket input. This catches the
+ * generated EV circuit (60 A breaker on 48 A nameplate = 1.25×) without
+ * needing an explicit continuous flag on the circuit row.
+ */
+export interface PanelDemandCircuit {
+  description?: string;
+  load_watts?: number | null;
+  load_type?: string | null;
+  breaker_amps?: number | null;
+}
+
+export interface PanelDemandResult {
+  generalConnectedVA: number;
+  generalDemandVA: number;
+  hvacVA: number;
+  totalDemandVA: number;
+  necArticle: 'NEC 220.82' | 'NEC 220.83';
+  warnings: string[];
+}
+
+export function calculateDwellingPanelDemand(opts: {
+  circuits: PanelDemandCircuit[];
+  squareFootage: number;
+  smallApplianceCircuits: number;
+  laundryCircuit: boolean;
+  voltage: number;
+  existingDwelling: boolean;
+}): PanelDemandResult {
+  const {
+    circuits,
+    squareFootage,
+    smallApplianceCircuits,
+    laundryCircuit,
+    voltage,
+    existingDwelling,
+  } = opts;
+
+  const lightingVA = squareFootage * LIGHTING_LOAD_VA_PER_SQFT;
+  const saVA = smallApplianceCircuits * SMALL_APPLIANCE_VA_PER_CIRCUIT;
+  const laundryVA = laundryCircuit ? LAUNDRY_CIRCUIT_VA : 0;
+
+  let acVA = 0;
+  let heatVA = 0;
+  let generalRawVA = 0;
+  let generalBucketedVA = 0;
+
+  for (const c of circuits) {
+    const watts = c.load_watts ?? 0;
+    const type = (c.load_type ?? 'O').toUpperCase();
+    if (type === 'L' || type === 'R') continue; // Covered by NEC general lighting/SA/laundry
+    if (type === 'C') { acVA += watts; continue; }
+    if (type === 'H') { heatVA += watts; continue; }
+
+    // Continuous-load heuristic — branch breaker sized to >=1.20× load
+    // amps suggests the original sizer treated it as continuous. The
+    // exact threshold 1.20 is below 1.25 to allow rounding to the next
+    // standard breaker (e.g. 48 A continuous → 60 A breaker = 1.25; 32 A
+    // continuous → 40 A = 1.25; 26 A AC → 30 A breaker = 1.15 ≈ NOT
+    // continuous per 440.32 motor branch — kept out of bucket uplift).
+    const breaker = c.breaker_amps ?? 0;
+    const loadAmps = voltage > 0 ? watts / voltage : 0;
+    const isContinuous = breaker > 0 && loadAmps > 0 && breaker / loadAmps >= 1.20;
+    const factor = isContinuous ? 1.25 : 1.0;
+
+    generalRawVA += watts;
+    generalBucketedVA += watts * factor;
+  }
+
+  // Add NEC structural loads (these aren't categorized as continuous)
+  generalRawVA += lightingVA + saVA + laundryVA;
+  generalBucketedVA += lightingVA + saVA + laundryVA;
+
+  const KNEE_VA = existingDwelling ? 8_000 : 10_000;
+  const REMAINDER_FACTOR = 0.4;
+  const firstTier = Math.min(generalBucketedVA, KNEE_VA);
+  const remainder = Math.max(0, generalBucketedVA - KNEE_VA);
+  const generalDemandVA = Math.round(firstTier + remainder * REMAINDER_FACTOR);
+  const hvacVA = Math.max(acVA, heatVA);
+
+  return {
+    generalConnectedVA: Math.round(generalRawVA),
+    generalDemandVA,
+    hvacVA: Math.round(hvacVA),
+    totalDemandVA: Math.round(generalDemandVA + hvacVA),
+    necArticle: existingDwelling ? 'NEC 220.83' : 'NEC 220.82',
+    warnings: [],
+  };
+}
+
+/**
  * Heuristic — detect a dwelling unit panel from name + circuit shape.
  *
  * True iff the name matches a unit pattern ("Unit 101", "Apt 3B", etc.)

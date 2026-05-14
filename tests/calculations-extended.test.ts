@@ -632,6 +632,66 @@ describe('Residential Load (NEC 220.82 / 220.84)', () => {
       expect(withEV.totalDemandVA).toBeLessThan(noEV.totalDemandVA + 7000);
     });
 
+    it('calculateDwellingPanelDemand: includes EV from panel circuits (Panel Summary fix)', async () => {
+      const { calculateDwellingPanelDemand } = await import('../services/calculations/residentialLoad');
+      // Same project as the user's screenshot: 1000 sq ft, range/dryer/WH/AC/disposal/poolpump
+      // + a proposed Level 2 EV (48 A continuous) on slot 20 with 60 A breaker.
+      const result = calculateDwellingPanelDemand({
+        circuits: [
+          { description: 'Lighting Circuit 1', load_watts: 1500, load_type: 'L', breaker_amps: 15 },
+          { description: 'Lighting Circuit 2', load_watts: 1500, load_type: 'L', breaker_amps: 15 },
+          { description: 'Kitchen SA 1',       load_watts: 1500, load_type: 'R', breaker_amps: 20 },
+          { description: 'Kitchen SA 2',       load_watts: 1500, load_type: 'R', breaker_amps: 20 },
+          { description: 'Laundry',            load_watts: 1500, load_type: 'R', breaker_amps: 20 },
+          { description: 'Bathroom Recepta',   load_watts: 1500, load_type: 'R', breaker_amps: 20 },
+          { description: 'Garage Receptacles', load_watts: 1500, load_type: 'R', breaker_amps: 20 },
+          { description: 'Outdoor Recepta',    load_watts:  180, load_type: 'R', breaker_amps: 20 },
+          { description: 'Refrigerator',       load_watts:  600, load_type: 'K', breaker_amps: 20 },
+          { description: 'Electric Range',     load_watts:12000, load_type: 'K', breaker_amps: 50 },
+          { description: 'Electric Dryer',     load_watts: 5500, load_type: 'D', breaker_amps: 30 },
+          { description: 'Electric Water Heater', load_watts:4500, load_type: 'W', breaker_amps: 25 },
+          { description: 'Air Conditioning',   load_watts: 5000, load_type: 'C', breaker_amps: 30 },
+          { description: 'Garbage Disposal',   load_watts:  500, load_type: 'K', breaker_amps: 20 },
+          { description: 'Pool Pump',          load_watts: 1500, load_type: 'M', breaker_amps: 10 },
+          { description: 'Level 2 EV Charger (48A)', load_watts:11500, load_type: 'O', breaker_amps: 60 }, // breaker/load×V = 60 / 48 = 1.25 → continuous
+        ],
+        squareFootage: 1000,
+        smallApplianceCircuits: 2,
+        laundryCircuit: true,
+        voltage: 240,
+        existingDwelling: true,
+      });
+
+      // Demand should INCLUDE the EV (the bug was Panel Summary showing
+      // demand without the EV at 22.4 kVA). With EV uplift via continuous
+      // heuristic, expect ~28 kVA range.
+      expect(result.necArticle).toBe('NEC 220.83');
+      expect(result.totalDemandVA).toBeGreaterThan(26_000);
+      expect(result.totalDemandVA).toBeLessThan(30_000);
+      // HVAC tracked separately
+      expect(result.hvacVA).toBe(5000);
+    });
+
+    it('calculateDwellingPanelDemand: skips Lighting/Receptacle circuits (avoid double-count with NEC structural)', async () => {
+      const { calculateDwellingPanelDemand } = await import('../services/calculations/residentialLoad');
+      const justLightingAndReceptacles = calculateDwellingPanelDemand({
+        circuits: [
+          { description: 'Lighting 1', load_watts: 1500, load_type: 'L', breaker_amps: 15 },
+          { description: 'Recep 1',    load_watts: 1500, load_type: 'R', breaker_amps: 20 },
+        ],
+        squareFootage: 2000,  // → 6000 VA lighting per NEC
+        smallApplianceCircuits: 2,  // → 3000 VA SA
+        laundryCircuit: true,  // → 1500 VA laundry
+        voltage: 240,
+        existingDwelling: true,
+      });
+      // generalConnectedVA = 6000 + 3000 + 1500 = 10500 (L+R circuits skipped)
+      // bucket: 8000 + (10500 - 8000) × 0.4 = 9000 demand
+      expect(justLightingAndReceptacles.generalConnectedVA).toBe(10500);
+      expect(justLightingAndReceptacles.generalDemandVA).toBe(9000);
+      expect(justLightingAndReceptacles.totalDemandVA).toBe(9000); // no HVAC
+    });
+
     it('General Loads Subtotal connectedVA stays additive (nameplate, not uplifted)', () => {
       // Display sanity: the Subtotal row's connectedVA should equal the
       // raw nameplate sum, NOT the continuous-uplifted bucket input.

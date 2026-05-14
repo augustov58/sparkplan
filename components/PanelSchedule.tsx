@@ -27,9 +27,9 @@ import {
   type MultiFamilyContext,
 } from '../services/calculations/upstreamLoadAggregation';
 import {
+  calculateDwellingPanelDemand,
   calculateDwellingUnitDemandVA,
   isDwellingUnitPanel,
-  calculateSingleFamilyLoad,
 } from '../services/calculations/residentialLoad';
 import type { LoadTypeCode } from '../types';
 
@@ -276,9 +276,14 @@ export const PanelSchedule: React.FC<PanelScheduleProps> = ({ project }) => {
   // actually sized correctly per the residential Optional Method.
   //
   // Two branches:
-  //  1. MDP of a single-family dwelling → run calculateSingleFamilyLoad
-  //     against the project's appliance toggles + service_modification_type
-  //     so the summary matches what the Dwelling Load Calculator displays.
+  //  1. MDP of a single-family dwelling → compute 220.83 / 220.82 directly
+  //     from the panel's actual circuits via calculateDwellingPanelDemand.
+  //     This is the architectural fix for the "two sources of truth" bug:
+  //     the calc no longer reads project.settings.residential.appliances,
+  //     so it correctly reflects ALL circuits on the panel — including
+  //     proposed loads, manually-added circuits, and photo-imported ones.
+  //     The summary number now matches what's physically on the panel,
+  //     regardless of whether the appliance toggles were updated.
   //  2. Sub-panel of a multi-family dwelling unit → run
   //     calculateDwellingUnitDemandVA over its circuits.
   const dwellingUnitDemand = useMemo(() => {
@@ -289,24 +294,27 @@ export const PanelSchedule: React.FC<PanelScheduleProps> = ({ project }) => {
     const residential = project.settings?.residential;
     const isSingleFamily = (residential?.dwellingType ?? 'single_family') === 'single_family';
 
-    // Branch 1: single-family MDP → defer to the Dwelling Load Calculator's
-    // input set so panel summary numbers match exactly.
-    if (selectedPanel.is_main && isSingleFamily && residential?.appliances) {
+    // Branch 1: single-family MDP → compute from circuits, not from toggles.
+    if (selectedPanel.is_main && isSingleFamily) {
       const existingDwelling = project.settings?.service_modification_type
         ? project.settings.service_modification_type !== 'new-service'
         : true;
-      const useTrueOptionalMethod = project.settings?.dwelling_calc_mode === 'true-optional';
-      const result = calculateSingleFamilyLoad({
-        squareFootage: residential.squareFootage || 2000,
-        smallApplianceCircuits: residential.smallApplianceCircuits || 2,
-        laundryCircuit: residential.laundryCircuit ?? true,
-        appliances: residential.appliances,
+      const result = calculateDwellingPanelDemand({
+        circuits: panelCircuits.map(c => ({
+          description: c.description,
+          load_watts: c.load_watts,
+          load_type: c.load_type,
+          breaker_amps: c.breaker_amps,
+        })),
+        squareFootage: residential?.squareFootage || 2000,
+        smallApplianceCircuits: residential?.smallApplianceCircuits || 2,
+        laundryCircuit: residential?.laundryCircuit ?? true,
+        voltage: selectedPanel.voltage || 240,
         existingDwelling,
-        useTrueOptionalMethod,
       });
       return {
         totalDemandVA: result.totalDemandVA,
-        necArticle: existingDwelling ? 'NEC 220.83' : 'NEC 220.82',
+        necArticle: result.necArticle,
       };
     }
 
