@@ -13,6 +13,7 @@ import {
   type AggregatedLoad,
   type MultiFamilyContext,
 } from '../calculations/upstreamLoadAggregation';
+import { calculateDwellingPanelDemand } from '../calculations/residentialLoad';
 import { calculateAllCumulativeVoltageDrops } from '../calculations/cumulativeVoltageDrop';
 import {
   BrandBar,
@@ -1547,6 +1548,19 @@ interface LoadSummaryProps {
    * that is not a multi-family dwelling with 3+ units.
    */
   multiFamilyContext?: MultiFamilyContext;
+  /**
+   * NEC 220.82 / 220.83 single-family-dwelling context. When supplied AND
+   * the project is a residential single-family dwelling MDP, the page
+   * routes through `calculateDwellingPanelDemand` (Optional Method) instead
+   * of the per-load-type Standard Method cascade — keeping the AHJ-facing
+   * demand consistent with the in-app Dwelling Calculator / Panel Summary.
+   */
+  singleFamilyDwellingContext?: {
+    squareFootage: number;
+    smallApplianceCircuits: number;
+    laundryCircuit: boolean;
+    existingDwelling: boolean;
+  };
   // Sprint 2A C8: per-sheet contractor signature block
   contractorName?: string;
   contractorLicense?: string;
@@ -1563,6 +1577,7 @@ export const LoadCalculationSummary: React.FC<LoadSummaryProps> = ({
   servicePhase,
   projectType,
   multiFamilyContext,
+  singleFamilyDwellingContext,
   contractorName,
   contractorLicense,
   sheetId,
@@ -1585,17 +1600,77 @@ export const LoadCalculationSummary: React.FC<LoadSummaryProps> = ({
     };
   });
 
-  // Real NEC 220 aggregation on the MDP (entire system).
-  // multiFamilyContext flips this to the NEC 220.84 Optional Method when applicable.
-  const aggregate: AggregatedLoad | null = mdp
+  // Gate: when this is a single-family dwelling MDP, route through the NEC
+  // 220.82/220.83 Optional Method (`calculateDwellingPanelDemand`) instead of
+  // the standard per-load-type cascade. Mirrors the same gate used by the
+  // in-app Panel Summary, so the AHJ-facing PDF matches what the Dwelling
+  // Load Calculator displays.
+  const useDwellingOptional =
+    !!mdp &&
+    occupancy === 'dwelling' &&
+    !!singleFamilyDwellingContext &&
+    !multiFamilyContext;
+
+  const dwellingResult = useDwellingOptional && mdp && singleFamilyDwellingContext
+    ? calculateDwellingPanelDemand({
+        circuits: circuits
+          .filter(c => c.panel_id === mdp.id)
+          .map(c => ({
+            description: c.description,
+            load_watts: c.load_watts,
+            load_type: c.load_type,
+            breaker_amps: c.breaker_amps,
+          })),
+        squareFootage: singleFamilyDwellingContext.squareFootage,
+        smallApplianceCircuits: singleFamilyDwellingContext.smallApplianceCircuits,
+        laundryCircuit: singleFamilyDwellingContext.laundryCircuit,
+        voltage: mdp.voltage || 240,
+        existingDwelling: singleFamilyDwellingContext.existingDwelling,
+      })
+    : null;
+
+  // Real NEC 220 aggregation on the MDP (entire system). Only computed when
+  // the dwelling-optional gate did NOT fire (commercial, multi-family, or
+  // missing dwelling context) — single-family dwellings shouldn't use the
+  // per-load-type cascade at all per NEC 220.82/220.83.
+  const aggregate: AggregatedLoad | null = !useDwellingOptional && mdp
     ? calculateAggregatedLoad(mdp.id, panels, circuits, transformers, occupancy, multiFamilyContext)
     : null;
 
-  const totalConnectedVA = aggregate
+  // Synthesize a 220.82/220.83-shaped breakdown when the dwelling gate fired,
+  // so the demand table still renders meaningful rows for the AHJ.
+  const dwellingBreakdown = dwellingResult
+    ? [
+        {
+          loadType: 'General Loads (Lighting + SABC + Laundry + Appliances)',
+          connectedVA: dwellingResult.generalConnectedVA,
+          demandFactor: dwellingResult.generalConnectedVA > 0
+            ? dwellingResult.generalDemandVA / dwellingResult.generalConnectedVA
+            : 0,
+          demandVA: dwellingResult.generalDemandVA,
+          necReference: `${dwellingResult.necArticle}(A) — first 8 kVA @ 100%, remainder @ 40%`,
+        },
+        ...(dwellingResult.hvacVA > 0 ? [{
+          loadType: 'HVAC (non-coincident, larger of heat/cool)',
+          connectedVA: dwellingResult.hvacVA,
+          demandFactor: 1.0,
+          demandVA: dwellingResult.hvacVA,
+          necReference: `${dwellingResult.necArticle}(B) / NEC 220.60`,
+        }] : []),
+      ]
+    : null;
+
+  const totalConnectedVA = dwellingResult
+    ? dwellingResult.totalConnectedVA
+    : aggregate
     ? aggregate.totalConnectedVA
     : circuits.reduce((sum, c) => sum + (c.load_watts || 0), 0);
-  const totalDemandVA = aggregate ? aggregate.totalDemandVA : totalConnectedVA;
-  const overallDf = aggregate ? aggregate.overallDemandFactor : 1;
+  const totalDemandVA = dwellingResult
+    ? dwellingResult.totalDemandVA
+    : aggregate
+    ? aggregate.totalDemandVA
+    : totalConnectedVA;
+  const overallDf = totalConnectedVA > 0 ? totalDemandVA / totalConnectedVA : 1;
   const demandAmps =
     servicePhase === 3
       ? totalDemandVA / (serviceVoltage * Math.sqrt(3))
@@ -1673,10 +1748,13 @@ export const LoadCalculationSummary: React.FC<LoadSummaryProps> = ({
         </View>
       </View>
 
-      {aggregate && aggregate.demandBreakdown.length > 0 && (
+      {((dwellingBreakdown && dwellingBreakdown.length > 0)
+        || (aggregate && aggregate.demandBreakdown.length > 0)) && (
         <>
           <Text style={themeStyles.sectionTitle}>
-            DEMAND FACTOR BREAKDOWN (NEC ARTICLE 220)
+            {dwellingResult
+              ? `DEMAND FACTOR BREAKDOWN (${dwellingResult.necArticle} OPTIONAL METHOD)`
+              : 'DEMAND FACTOR BREAKDOWN (NEC ARTICLE 220)'}
           </Text>
           <View style={themeStyles.table}>
             <View style={themeStyles.tableHeaderRow}>
@@ -1692,7 +1770,7 @@ export const LoadCalculationSummary: React.FC<LoadSummaryProps> = ({
               </Text>
               <Text style={thCol('26%')}>NEC Reference</Text>
             </View>
-            {aggregate.demandBreakdown.map((d, idx) => (
+            {(dwellingBreakdown ?? aggregate!.demandBreakdown).map((d, idx) => (
               <View
                 key={`${d.loadType}-${idx}`}
                 style={idx % 2 === 0 ? themeStyles.tableRow : themeStyles.tableRowAlt}
@@ -1725,7 +1803,26 @@ export const LoadCalculationSummary: React.FC<LoadSummaryProps> = ({
               <Text style={[themeStyles.tdBold, { width: '26%' }]}> </Text>
             </View>
           </View>
-          {aggregate.necReferences.length > 0 && (
+          {dwellingResult ? (
+            <Text
+              style={{
+                fontSize: 8,
+                color: '#555',
+                marginTop: 2,
+                marginBottom: 4,
+                fontStyle: 'italic',
+              }}
+            >
+              Applied: {dwellingResult.necArticle} Optional Method for
+              {' '}
+              {singleFamilyDwellingContext?.existingDwelling
+                ? 'Existing Single-Family Dwelling Units'
+                : 'New Single-Family Dwelling Units'}
+              {' '}— bucket math at the dwelling MDP per NEC 220 Part III.
+              Receptacle / lighting / SABC / laundry are subsumed in the 3 VA/sq ft
+              + structural baseline rather than counted per circuit.
+            </Text>
+          ) : aggregate && aggregate.necReferences.length > 0 ? (
             <Text
               style={{
                 fontSize: 8,
@@ -1737,7 +1834,7 @@ export const LoadCalculationSummary: React.FC<LoadSummaryProps> = ({
             >
               Applied: {aggregate.necReferences.join('; ')}
             </Text>
-          )}
+          ) : null}
         </>
       )}
 
@@ -1771,7 +1868,7 @@ export const LoadCalculationSummary: React.FC<LoadSummaryProps> = ({
         ))}
       </View>
 
-      {!aggregate && (
+      {!aggregate && !dwellingResult && (
         <View style={themeStyles.warningBox}>
           <Text
             style={{
