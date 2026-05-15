@@ -576,77 +576,97 @@ export function shouldRecommendEVEMS(
  * Organized by category for easy selection in Quick Mode
  */
 export const LOAD_TEMPLATES: LoadTemplate[] = [
-  // === EV CHARGERS ===
+  // === EV CHARGERS — NEC 625.41 declares EVSE a continuous load → ×1.25 ===
   {
     name: 'Level 2 EV Charger (32A)',
     kw: 7.7,
+    voltage: 240,
     continuous: true,
     category: 'EV',
-    description: 'Most common residential EV charger (Tesla, ChargePoint, etc.) - requires 50A circuit'
+    necReference: 'NEC 625.41',
+    description: 'Most common residential EV charger (Tesla, ChargePoint, etc.) - requires 40A circuit'
   },
   {
     name: 'Level 2 EV Charger (40A)',
     kw: 9.6,
+    voltage: 240,
     continuous: true,
     category: 'EV',
-    description: 'High-power Level 2 charger - requires 60A circuit'
+    necReference: 'NEC 625.41',
+    description: 'High-power Level 2 charger - requires 50A circuit'
   },
   {
     name: 'Level 2 EV Charger (48A)',
     kw: 11.5,
+    voltage: 240,
     continuous: true,
     category: 'EV',
-    description: 'Max residential Level 2 charger (11.5kW) - requires 70A circuit'
+    necReference: 'NEC 625.41',
+    description: 'Max residential Level 2 charger (11.5kW) - requires 60A circuit'
   },
   {
     name: 'Level 2 EV Charger (80A)',
     kw: 19.2,
+    voltage: 240,
     continuous: true,
     category: 'EV',
+    necReference: 'NEC 625.41',
     description: 'Commercial/industrial high-power charger - requires 100A circuit'
   },
 
-  // === HVAC ===
+  // === HVAC — NEC 440.32 / 220.60 (motor-driven A/C; non-coincident) ===
   {
     name: 'Central A/C (2.5 Ton)',
     kw: 3.5,
+    voltage: 240,
     continuous: false,
     category: 'HVAC',
+    necReference: 'NEC 440.32',
     description: 'Small to medium home air conditioning'
   },
   {
     name: 'Central A/C (3 Ton)',
     kw: 4.5,
+    voltage: 240,
     continuous: false,
     category: 'HVAC',
+    necReference: 'NEC 440.32',
     description: 'Medium home air conditioning'
   },
   {
     name: 'Central A/C (5 Ton)',
     kw: 7.5,
+    voltage: 240,
     continuous: false,
     category: 'HVAC',
+    necReference: 'NEC 440.32',
     description: 'Large home air conditioning'
   },
   {
     name: 'Heat Pump (3 Ton)',
     kw: 5.0,
+    voltage: 240,
     continuous: false,
     category: 'HVAC',
+    necReference: 'NEC 440.32',
     description: 'Combined heating and cooling'
   },
   {
     name: 'Electric Furnace (10kW)',
     kw: 10.0,
+    voltage: 240,
     continuous: false,
     category: 'HVAC',
+    necReference: 'NEC 424.3',
     description: 'Electric resistance heating'
   },
   {
     name: 'Mini-Split Heat Pump',
     kw: 3.0,
+    voltage: 240,
     continuous: false,
     category: 'HVAC',
+    necReference: 'NEC 440.32',
     description: 'Ductless mini-split system'
   },
 
@@ -654,50 +674,64 @@ export const LOAD_TEMPLATES: LoadTemplate[] = [
   {
     name: 'Electric Range (8kW)',
     kw: 8.0,
+    voltage: 240,
     continuous: false,
     category: 'Appliance',
+    necReference: 'NEC 210.19(A)(3)',
     description: 'Standard electric range/cooktop'
   },
   {
     name: 'Electric Dryer (5kW)',
     kw: 5.0,
+    voltage: 240,
     continuous: false,
     category: 'Appliance',
+    necReference: 'NEC 220.54',
     description: 'Electric clothes dryer'
   },
   {
     name: 'Electric Water Heater (4.5kW)',
     kw: 4.5,
+    voltage: 240,
     continuous: true,
     category: 'Appliance',
-    description: 'Standard electric water heater'
+    necReference: 'NEC 422.13',
+    description: 'Standard electric water heater (continuous per 422.13)'
   },
   {
     name: 'Tankless Water Heater (18kW)',
     kw: 18.0,
+    voltage: 240,
     continuous: true,
     category: 'Appliance',
+    necReference: 'NEC 422.13',
     description: 'Whole-house tankless electric water heater'
   },
   {
     name: 'Pool Pump (1.5 HP)',
     kw: 1.5,
+    voltage: 240,
     continuous: true,
     category: 'Appliance',
+    necReference: 'NEC 680.21',
     description: 'Typical residential pool pump'
   },
   {
     name: 'Pool Heater (11kW)',
     kw: 11.0,
+    voltage: 240,
     continuous: false,
     category: 'Appliance',
+    necReference: 'NEC 680.9',
     description: 'Electric pool heater'
   },
   {
     name: 'Hot Tub/Spa (6kW)',
     kw: 6.0,
+    voltage: 240,
     continuous: true,
     category: 'Appliance',
+    necReference: 'NEC 680.42',
     description: 'Residential hot tub or spa'
   },
   {

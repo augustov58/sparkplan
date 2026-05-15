@@ -280,6 +280,24 @@ export const ProjectSetup: React.FC<ProjectSetupProps> = ({ project, updateProje
                 </select>
                </div>
             </div>
+            <div>
+              <label className="block text-xs font-semibold text-[#888] uppercase mb-1">Project Status</label>
+              <select
+                value={localProject.settings.service_modification_type ?? 'existing'}
+                onChange={e => handleSettingChange('service_modification_type', e.target.value)}
+                className="w-full border-[#e8e6e3] rounded-md text-sm"
+              >
+                <option value="new-service">New Construction</option>
+                <option value="existing">Existing Construction</option>
+              </select>
+              <p className="text-xs text-[#888] mt-1">
+                {isResidential
+                  ? (localProject.settings.service_modification_type === 'new-service'
+                      ? 'Dwelling loads calculated per NEC 220.82 (Optional, New Dwelling).'
+                      : 'Dwelling loads calculated per NEC 220.83 (Optional, Existing Dwelling Adding Loads).')
+                  : 'Used by the permit packet to emit new-vs-existing narratives. Check the "Service upgrade" scope element below if this is an upsize.'}
+              </p>
+            </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                <div>
                   <label className="block text-xs font-semibold text-[#888] uppercase mb-1">Permit Number</label>

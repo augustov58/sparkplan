@@ -2,9 +2,9 @@
  * Residential Load Calculation Service
  * Implements NEC Article 220 for Dwelling Units
  * 
- * NEC 220.82 - Standard Method for Single-Family Dwellings
- * NEC 220.83 - Existing Dwelling Units (not implemented)
- * NEC 220.84 - Multi-Family Dwellings
+ * NEC 220.82 - Optional Method for Single-Family Dwellings (new)
+ * NEC 220.83 - Optional Method for Existing Dwelling Units
+ * NEC 220.84 - Optional Method for Multi-Family Dwellings
  */
 
 import { ResidentialAppliances, DwellingUnitTemplate } from '../../types';
@@ -109,6 +109,14 @@ export interface LoadBreakdown {
   demandVA: number;
   demandFactor: number;
   necReference: string;
+  /**
+   * NEC 100 continuous load — when true, the 220.83 / 220.82 bucket
+   * post-processor multiplies this row's connectedVA by 1.25 before
+   * bucketing so the service-sizing per NEC 220.18(B) is preserved
+   * even after per-category demands are zeroed and rolled into
+   * "General Loads Subtotal".
+   */
+  continuous?: boolean;
 }
 
 export interface ResidentialLoadResult {
@@ -147,6 +155,28 @@ export interface SingleFamilyInput {
   laundryCircuit: boolean;
   appliances: ResidentialAppliances;
   serviceVoltage?: number;  // Default 240V
+  /**
+   * When true, the result is post-processed through the NEC 220.83
+   * optional method for *existing* dwelling units adding loads:
+   *   - General-loads bucket (everything except HVAC): first 8 kVA at 100%,
+   *     remainder at 40%.
+   *   - HVAC contribution (larger of heating/cooling per 220.60) added at 100%.
+   *
+   * When false/undefined the canonical 220.82 standard method is used
+   * (per-category demand factors).
+   */
+  existingDwelling?: boolean;
+  /**
+   * When true (and existingDwelling is false), post-process the per-category
+   * 220.82 result through the canonical NEC 220.82 Optional Method bucket:
+   *   - General loads: first 10 kVA at 100 %, remainder at 40 %.
+   *   - HVAC at 100 % of larger of heating/cooling (NEC 220.60).
+   *
+   * Reconciles the documented gap between calculateSingleFamilyLoad's 220.82
+   * label and its per-category implementation. Has no effect when
+   * existingDwelling is true (220.83 bucket method already applies).
+   */
+  useTrueOptionalMethod?: boolean;
 }
 
 export interface MultiFamilyInput {
@@ -377,19 +407,48 @@ function recommendGecSize(serviceConductorSize: string, material: 'Cu' | 'Al' = 
 // ============================================================================
 
 /**
- * NEC 220.82 - Standard Method for Single-Family Dwellings
+ * NEC 220.82 - Optional Method for Single-Family Dwellings
+ *
+ * KNOWN LABELING vs IMPLEMENTATION GAP: This function emits `NEC 220.82`
+ * citations and is called the "Optional Method", but the per-category demand
+ * factoring below (Table 220.42 for lighting, Table 220.55 for range, etc.)
+ * actually mirrors the Standard Method walk in NEC 220.40–220.61. True 220.82
+ * Optional Method uses a single 10 kVA / 40 % split on the general-loads
+ * bucket. See `services/autogeneration/multiFamilyProjectGenerator.ts` for an
+ * inline true-Optional implementation that produces ~30 % smaller demand.
+ * Reconciling the two is a separate task; the breakdown citations below are
+ * accurate to what the code computes (per-category factoring under 220.82's
+ * Optional Method banner).
  */
 export function calculateSingleFamilyLoad(input: SingleFamilyInput): ResidentialLoadResult {
-  const { 
-    squareFootage, 
-    smallApplianceCircuits, 
-    laundryCircuit, 
+  const {
+    squareFootage,
+    smallApplianceCircuits,
+    laundryCircuit,
     appliances,
-    serviceVoltage = 240
+    serviceVoltage = 240,
+    existingDwelling = false,
+    useTrueOptionalMethod = false
   } = input;
 
+  // Resolve which bucket-method post-process (if any) applies.
+  // 220.83 (existing dwelling) always wins because it's the NEC-required
+  // method for that scenario; 220.82 true-optional applies only to new
+  // dwellings when the user has opted in.
+  const bucketMethod: 'none' | 'true-220-82' | '220-83' = existingDwelling
+    ? '220-83'
+    : useTrueOptionalMethod
+      ? 'true-220-82'
+      : 'none';
+
   const breakdown: LoadBreakdown[] = [];
-  const necReferences: string[] = ['NEC 220.82 - Standard Method'];
+  const necReferences: string[] = [
+    bucketMethod === '220-83'
+      ? 'NEC 220.83 - Optional Method for Existing Dwelling Units'
+      : bucketMethod === 'true-220-82'
+        ? 'NEC 220.82 - Optional Method for Dwelling Units (10 kVA / 40% bucket)'
+        : 'NEC 220.82 - Optional Method for Dwelling Units'
+  ];
   const warnings: string[] = [];
 
   // =========================================
@@ -581,20 +640,26 @@ export function calculateSingleFamilyLoad(input: SingleFamilyInput): Residential
     totalDemand += dispVA;
   }
 
-  // EV Charger
+  // EV Charger — NEC 625.41 declares EVSE a continuous load, so per
+  // NEC 220.18(B) the service-demand contribution is the nameplate ×125%.
+  // (The branch-circuit 125% per 210.20(A) is applied separately in the
+  // circuit-generation path below.) Without this multiplier the calc
+  // underestimated service current by ~3.6 kVA per 32 A EV.
   if (appliances.evCharger?.enabled) {
-    const evVA = appliances.evCharger.kw * 1000;
+    const evNameplateVA = appliances.evCharger.kw * 1000;
+    const evDemandVA = evNameplateVA * 1.25;
     breakdown.push({
       category: 'EV Charger',
-      description: `Level ${appliances.evCharger.level} - ${appliances.evCharger.kw} kW`,
-      connectedVA: evVA,
-      demandVA: evVA,
-      demandFactor: 1.0,
-      necReference: 'NEC 625.42'
+      description: `Level ${appliances.evCharger.level} - ${appliances.evCharger.kw} kW (continuous ×1.25)`,
+      connectedVA: evNameplateVA,
+      demandVA: evDemandVA,
+      demandFactor: 1.25,
+      necReference: 'NEC 625.41 / 220.18(B) - Continuous Load ×1.25',
+      continuous: true,
     });
-    totalConnected += evVA;
-    totalDemand += evVA;
-    necReferences.push('NEC Article 625 - EV Charging');
+    totalConnected += evNameplateVA;
+    totalDemand += evDemandVA;
+    necReferences.push('NEC 625.41 - EVSE Continuous Load');
   }
 
   // Pool Pump
@@ -657,20 +722,145 @@ export function calculateSingleFamilyLoad(input: SingleFamilyInput): Residential
     totalDemand += wellPumpVA;
   }
 
-  // Other Custom Appliances
+  // Other Custom Appliances. Continuous loads (e.g. water-heating, pool
+  // pumps, EV chargers added through this path) get the NEC 220.18(B) ×1.25
+  // factor on the demand contribution; non-continuous loads contribute at
+  // nameplate (1.0×). Voltage is documentation here; it affects breaker
+  // poles in the circuit-generation path below, not the kVA math.
   if (appliances.otherAppliances?.length) {
     for (const other of appliances.otherAppliances) {
       const otherVA = other.kw * 1000;
+      const continuous = !!other.continuous;
+      const factor = continuous ? 1.25 : 1.0;
+      const demandVA = otherVA * factor;
       breakdown.push({
-        category: 'Other Appliance',
-        description: `${other.description} - ${other.kw} kW`,
+        category: other.proposed ? 'Proposed Load' : 'Other Appliance',
+        description: `${other.description} - ${other.kw} kW${continuous ? ' (continuous ×1.25)' : ''}`,
         connectedVA: otherVA,
-        demandVA: otherVA,
-        demandFactor: 1.0,
-        necReference: 'NEC 220.82(B)(2)'
+        demandVA,
+        demandFactor: factor,
+        necReference: continuous
+          ? 'NEC 220.18(B) - Continuous Load ×1.25'
+          : 'NEC 220.82(B)(2)',
+        continuous,
       });
       totalConnected += otherVA;
-      totalDemand += otherVA;
+      totalDemand += demandVA;
+    }
+  }
+
+  // =========================================
+  // NEC 220.82 / 220.83 Optional Method Bucket Post-Process
+  // =========================================
+  // The per-category result above mirrors the Standard Method walk
+  // (220.40–220.61). Both Optional Methods (220.82 for new, 220.83 for
+  // existing) replace per-category factoring with a single general-loads
+  // bucket:
+  //   - 220.82 (new):       first 10 kVA at 100 %, remainder at 40 %
+  //   - 220.83 (existing):  first 8 kVA at 100 %, remainder at 40 %
+  // HVAC is added at 100 % of the larger of heating/cooling per 220.60 in
+  // both cases. The block below applies whichever knee is active and
+  // re-tags the breakdown citations accordingly.
+  if (bucketMethod !== 'none') {
+    const FIRST_TIER_VA = bucketMethod === '220-83' ? 8_000 : 10_000;
+    const articleLabel = bucketMethod === '220-83' ? 'NEC 220.83' : 'NEC 220.82';
+    const hvacReference = bucketMethod === '220-83'
+      ? 'NEC 220.83(B) - HVAC at 100% (larger of heat/cool)'
+      : 'NEC 220.82(C) - HVAC at 100% (larger of heat/cool)';
+    // Re-aggregate using CONNECTED VA so the 220.83 8 kVA / 40 % math is
+    // applied to nameplate (not 220.82's already-discounted demand).
+    //
+    // CONTINUOUS-LOAD EXCEPTION (NEC 220.18(B) + 625.41): rows flagged
+    // `continuous: true` contribute connectedVA × 1.25 to the bucket math.
+    // Without this, a continuous EV at 11.5 kVA nameplate would enter the
+    // bucket at 11.5 (raw) — the 125 % applied at the per-category demand
+    // row gets erased by the bucket's per-category-demand zeroing below.
+    // We track raw vs bucketed separately so the displayed "General Loads
+    // Subtotal" stays additive (sum of nameplate rows) while the bucket
+    // math operates on the uplifted total.
+    let hvacConnectedVA = 0;
+    let hvacDemandVA = 0;
+    let generalConnectedVA_raw = 0;       // displayed on Subtotal row
+    let generalConnectedVA_bucketed = 0;  // fed into bucket math (continuous-uplifted)
+
+    for (const row of breakdown) {
+      // Skip the 'General Loads Subtotal' synthetic row to avoid double-counting
+      // with its component rows (General Lighting, Small Appliance, Laundry).
+      if (row.category === 'General Loads Subtotal') continue;
+      if (row.category === 'HVAC') {
+        hvacConnectedVA += row.connectedVA;
+        hvacDemandVA += row.demandVA;
+      } else {
+        const continuousFactor = row.continuous ? 1.25 : 1.0;
+        generalConnectedVA_raw += row.connectedVA;
+        generalConnectedVA_bucketed += row.connectedVA * continuousFactor;
+      }
+    }
+
+    const REMAINDER_FACTOR = 0.4;
+    const firstTier = Math.min(generalConnectedVA_bucketed, FIRST_TIER_VA);
+    const remainder = Math.max(0, generalConnectedVA_bucketed - FIRST_TIER_VA);
+    const generalDemandVA = Math.round(firstTier + remainder * REMAINDER_FACTOR);
+    const kneeKva = FIRST_TIER_VA / 1000;
+    const bucketLabel = `${articleLabel} - General Loads (first ${kneeKva} kVA @ 100%, remainder @ 40%)`;
+
+    // Re-tag the per-category necReference so the breakdown reads as the
+    // active Optional Method article.
+    for (const row of breakdown) {
+      if (row.category === 'HVAC') {
+        row.necReference = hvacReference;
+      } else if (row.category === 'General Loads Subtotal') {
+        row.demandVA = generalDemandVA;
+        row.demandFactor = generalConnectedVA_bucketed > 0 ? generalDemandVA / generalConnectedVA_bucketed : 0;
+        row.description = `Lighting + Small Appliance + Laundry + Appliances (first ${kneeKva} kVA @ 100%, remainder @ 40%)`;
+        row.necReference = `${articleLabel} - General Loads (${kneeKva} kVA / 40%)`;
+        // Display the raw nameplate sum on the Subtotal row so the
+        // breakdown stays additive against its component rows. Continuous
+        // uplift is internal to the bucket math (see _bucketed above).
+        row.connectedVA = generalConnectedVA_raw;
+      } else {
+        // Individual non-HVAC rows show their nameplate (connected) only;
+        // the actual demand contribution is captured in the General Loads
+        // Subtotal row. Zero their demand to avoid double-counting.
+        row.demandVA = 0;
+        row.demandFactor = 0;
+        row.necReference = `${articleLabel} - rolled into General Loads bucket`;
+      }
+    }
+
+    // Rewrite totals to reflect bucket semantics. Connected total displays
+    // raw nameplate (additive). Demand total uses bucketed math (which
+    // already accounts for continuous uplift via generalConnectedVA_bucketed).
+    totalConnected = generalConnectedVA_raw + hvacConnectedVA;
+    totalDemand = generalDemandVA + hvacDemandVA;
+
+    necReferences.push(bucketLabel);
+    if (hvacConnectedVA > 0) {
+      necReferences.push(hvacReference);
+      if (bucketMethod === '220-83') {
+        warnings.push(
+          'ℹ️ NEC 220.83(B) allows 65% for central electric heating or fewer than four ' +
+          'separately-controlled space-heating units, and 40% for four or more separately-controlled ' +
+          'units. This calc applies 100% — adjust manually if the heating scenario qualifies.'
+        );
+      } else {
+        warnings.push(
+          'ℹ️ NEC 220.82(C) applies 100% to the larger of A/C vs heat (non-coincident). ' +
+          'Central electric space heating with 4+ separately controlled units may qualify for 65%; ' +
+          'verify and adjust manually if applicable.'
+        );
+      }
+    }
+    if (bucketMethod === '220-83') {
+      warnings.push(
+        'ℹ️ Calculated per NEC 220.83 (Existing Dwelling, Optional Method). ' +
+        'Switch Project Status to "New Construction" on the Project Setup page to use NEC 220.82 instead.'
+      );
+    } else {
+      warnings.push(
+        'ℹ️ Calculated per NEC 220.82 Optional Method (10 kVA / 40 % bucket). ' +
+        'Switch Calculation Method to "Per-Category" to use the legacy per-appliance demand factor walk.'
+      );
     }
   }
 
@@ -956,6 +1146,14 @@ export interface GeneratedCircuit {
   loadWatts: number;
   loadType: 'L' | 'R' | 'M' | 'K' | 'H' | 'C' | 'W' | 'D' | 'O';
   necReference: string;
+  /**
+   * Marks a circuit as a proposed new addition (post-existing-service).
+   * Flows into circuits.is_proposed at insert time, which the permit-packet
+   * panel-schedule renderer uses to add the "* = Proposed new circuit"
+   * marker. Default false (= existing) preserves prior behavior for
+   * callers that don't set it.
+   */
+  isProposed?: boolean;
 }
 
 /**
@@ -1142,16 +1340,25 @@ export function generateResidentialPanelSchedule(input: SingleFamilyInput): Gene
     });
   }
 
-  // EV Charger
+  // EV Charger — branch-breaker sizing per NEC 210.20(A) for continuous
+  // load: rating >= 125% of load. Round up to the next standard breaker
+  // (15, 20, 30, 40, 50, 60, 70, 80, 90, 100). Previously this was
+  // hardcoded to 50 A for Level 2, which is correct for 32-40 A EVs but
+  // undersized 48 A+ chargers (need 60 A breaker minimum).
   if (appliances.evCharger?.enabled) {
-    const evAmps = Math.ceil((appliances.evCharger.kw * 1000) / 240);
+    const evAmps = (appliances.evCharger.kw * 1000) / 240;
+    const minBreaker = evAmps * 1.25;
+    const stdSizes = [15, 20, 30, 40, 50, 60, 70, 80, 90, 100];
+    const breakerAmps = appliances.evCharger.level === 1
+      ? 20
+      : (stdSizes.find(s => s >= minBreaker) ?? Math.ceil(minBreaker / 10) * 10);
     circuits.push({
-      description: `EV Charger Level ${appliances.evCharger.level}`,
-      breakerAmps: appliances.evCharger.level === 2 ? 50 : 20,
-      pole: 2,
+      description: `EV Charger Level ${appliances.evCharger.level} (${Math.ceil(evAmps)}A continuous)`,
+      breakerAmps,
+      pole: appliances.evCharger.level === 1 ? 1 : 2,
       loadWatts: appliances.evCharger.kw * 1000,
       loadType: 'O',
-      necReference: 'NEC 625.42'
+      necReference: 'NEC 625.41 / 210.20(A) - Continuous Load ×1.25'
     });
   }
 
@@ -1209,17 +1416,27 @@ export function generateResidentialPanelSchedule(input: SingleFamilyInput): Gene
     });
   }
 
-  // Other appliances
+  // Other appliances — honor voltage (1P at 120V, 2P at 240V) and continuous
+  // (apply NEC 210.20(A) ×1.25 to the breaker rating). Legacy entries without
+  // these fields fall back to 240V/non-continuous via the kW>2 heuristic for
+  // backward compat.
   if (appliances.otherAppliances?.length) {
     for (const other of appliances.otherAppliances) {
-      const otherAmps = Math.ceil((other.kw * 1000) / 240);
+      const voltage = other.voltage ?? (other.kw > 2 ? 240 : 120);
+      const pole = voltage === 240 ? 2 : 1;
+      const continuous = !!other.continuous;
+      const baseAmps = (other.kw * 1000) / voltage;
+      const sizedAmps = continuous ? baseAmps * 1.25 : baseAmps;
+      const breakerAmps = Math.max(15, Math.ceil(sizedAmps / 5) * 5);
       circuits.push({
-        description: other.description,
-        breakerAmps: Math.ceil(otherAmps / 5) * 5,
-        pole: other.kw > 2 ? 2 : 1,
+        description: other.description + (continuous ? ' (continuous)' : ''),
+        breakerAmps,
+        pole,
         loadWatts: other.kw * 1000,
         loadType: 'O',
-        necReference: 'NEC 220.82(B)(2)'
+        necReference: continuous
+          ? 'NEC 210.20(A) - Continuous Load ×1.25'
+          : 'NEC 220.82(B)(2)'
       });
     }
   }
@@ -1294,6 +1511,131 @@ export function calculateDwellingUnitDemandVA(circuits: DwellingCircuitInput[]):
     generalDemandVA: Math.round(generalDemand),
     climateDemandVA: Math.round(climateDemand),
     totalDemandVA: Math.round(generalDemand + climateDemand),
+  };
+}
+
+/**
+ * 220.83 / 220.82 bucket demand computed directly from a panel's circuit
+ * list — bridges the Panel Schedule view to the same NEC math the Dwelling
+ * Load Calculator runs from appliance toggles.
+ *
+ * Why this exists (the "two sources of truth" architectural issue):
+ *   `calculateSingleFamilyLoad` reads from a structured `appliances` object
+ *   (project.settings.residential). The Panel Schedule's summary used to
+ *   call that function too — which meant any circuit added directly to the
+ *   panel (manual + Add Circuit, photo import, multifamily-EV-calc bulk
+ *   insert, **or a proposed-load circuit generated from the Dwelling Calc**)
+ *   would NOT appear in the panel's demand calc because the appliance
+ *   toggle wasn't necessarily set.
+ *
+ *   This function instead reads the actual circuits and classifies them by
+ *   `load_type` code (L/R/K/W/D/C/H/M/O). The result reflects whatever is
+ *   physically on the panel, regardless of how those circuits got there.
+ *
+ * NEC structural loads (lighting / SA / laundry) still come from project
+ * settings — they're sq-ft-based NEC minimums, not panel-derivable. The
+ * circuit-list contributes everything else (appliances, HVAC, EV, etc.).
+ *
+ * Classification:
+ *   'L' Lighting        — SKIP (counted via squareFootage × 3 VA/sq ft)
+ *   'R' Receptacle      — SKIP (general 220.42 already covers them)
+ *   'C' Cooling         — HVAC bucket (NEC 220.60 larger-of)
+ *   'H' Heating         — HVAC bucket (NEC 220.60 larger-of)
+ *   'K' Kitchen / fixed — General loads pool
+ *   'W' Water Heater    — General loads pool (continuous heuristic: +25 %)
+ *   'D' Dryer           — General loads pool
+ *   'M' Motor           — General loads pool
+ *   'O' Other           — General loads pool (continuous heuristic on breaker / load × V)
+ *
+ * Continuous heuristic: if a circuit's breaker rating is >= 1.20× its
+ * load amperage (breaker_amps >= load_watts / voltage × 1.20), assume the
+ * branch was sized for a continuous load per NEC 210.20(A) — apply the
+ * 1.25 uplift to its contribution to the bucket input. This catches the
+ * generated EV circuit (60 A breaker on 48 A nameplate = 1.25×) without
+ * needing an explicit continuous flag on the circuit row.
+ */
+export interface PanelDemandCircuit {
+  description?: string;
+  load_watts?: number | null;
+  load_type?: string | null;
+  breaker_amps?: number | null;
+}
+
+export interface PanelDemandResult {
+  generalConnectedVA: number;
+  generalDemandVA: number;
+  hvacVA: number;
+  totalDemandVA: number;
+  necArticle: 'NEC 220.82' | 'NEC 220.83';
+  warnings: string[];
+}
+
+export function calculateDwellingPanelDemand(opts: {
+  circuits: PanelDemandCircuit[];
+  squareFootage: number;
+  smallApplianceCircuits: number;
+  laundryCircuit: boolean;
+  voltage: number;
+  existingDwelling: boolean;
+}): PanelDemandResult {
+  const {
+    circuits,
+    squareFootage,
+    smallApplianceCircuits,
+    laundryCircuit,
+    voltage,
+    existingDwelling,
+  } = opts;
+
+  const lightingVA = squareFootage * LIGHTING_LOAD_VA_PER_SQFT;
+  const saVA = smallApplianceCircuits * SMALL_APPLIANCE_VA_PER_CIRCUIT;
+  const laundryVA = laundryCircuit ? LAUNDRY_CIRCUIT_VA : 0;
+
+  let acVA = 0;
+  let heatVA = 0;
+  let generalRawVA = 0;
+  let generalBucketedVA = 0;
+
+  for (const c of circuits) {
+    const watts = c.load_watts ?? 0;
+    const type = (c.load_type ?? 'O').toUpperCase();
+    if (type === 'L' || type === 'R') continue; // Covered by NEC general lighting/SA/laundry
+    if (type === 'C') { acVA += watts; continue; }
+    if (type === 'H') { heatVA += watts; continue; }
+
+    // Continuous-load heuristic — branch breaker sized to >=1.20× load
+    // amps suggests the original sizer treated it as continuous. The
+    // exact threshold 1.20 is below 1.25 to allow rounding to the next
+    // standard breaker (e.g. 48 A continuous → 60 A breaker = 1.25; 32 A
+    // continuous → 40 A = 1.25; 26 A AC → 30 A breaker = 1.15 ≈ NOT
+    // continuous per 440.32 motor branch — kept out of bucket uplift).
+    const breaker = c.breaker_amps ?? 0;
+    const loadAmps = voltage > 0 ? watts / voltage : 0;
+    const isContinuous = breaker > 0 && loadAmps > 0 && breaker / loadAmps >= 1.20;
+    const factor = isContinuous ? 1.25 : 1.0;
+
+    generalRawVA += watts;
+    generalBucketedVA += watts * factor;
+  }
+
+  // Add NEC structural loads (these aren't categorized as continuous)
+  generalRawVA += lightingVA + saVA + laundryVA;
+  generalBucketedVA += lightingVA + saVA + laundryVA;
+
+  const KNEE_VA = existingDwelling ? 8_000 : 10_000;
+  const REMAINDER_FACTOR = 0.4;
+  const firstTier = Math.min(generalBucketedVA, KNEE_VA);
+  const remainder = Math.max(0, generalBucketedVA - KNEE_VA);
+  const generalDemandVA = Math.round(firstTier + remainder * REMAINDER_FACTOR);
+  const hvacVA = Math.max(acVA, heatVA);
+
+  return {
+    generalConnectedVA: Math.round(generalRawVA),
+    generalDemandVA,
+    hvacVA: Math.round(hvacVA),
+    totalDemandVA: Math.round(generalDemandVA + hvacVA),
+    necArticle: existingDwelling ? 'NEC 220.83' : 'NEC 220.82',
+    warnings: [],
   };
 }
 

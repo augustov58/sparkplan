@@ -66,11 +66,20 @@ export const ServiceUpgradeWizard: React.FC<ServiceUpgradeWizardProps> = ({ proj
       const dwellingType = residentialSettings.dwellingType || DwellingType.SINGLE_FAMILY;
 
       if (dwellingType === DwellingType.SINGLE_FAMILY) {
+        // Honor Project Status — existing-construction projects must route to
+        // NEC 220.83 (8 kVA / 40%), not 220.82. Previously this call
+        // hard-coded the per-category 220.82 path regardless of project
+        // settings, which underestimated demand on existing dwellings.
+        const isExistingDwelling = !!project?.settings?.service_modification_type
+          && project.settings.service_modification_type !== 'new-service';
+        const useTrueOptional = project?.settings?.dwelling_calc_mode === 'true-optional';
         return calculateSingleFamilyLoad({
           squareFootage: residentialSettings.squareFootage || 2000,
           smallApplianceCircuits: residentialSettings.smallApplianceCircuits || 2,
           laundryCircuit: residentialSettings.laundryCircuit ?? true,
-          appliances: residentialSettings.appliances
+          appliances: residentialSettings.appliances,
+          existingDwelling: isExistingDwelling,
+          useTrueOptionalMethod: useTrueOptional,
         });
       } else {
         // Multi-family
@@ -159,9 +168,29 @@ export const ServiceUpgradeWizard: React.FC<ServiceUpgradeWizardProps> = ({ proj
     }
   }, [useProjectData, circuits, project]);
 
+  // Whether the current project is a residential dwelling. Used to gate the
+  // raw-circuit-sum fallback below — that path bypasses NEC demand factors
+  // (e.g. 220.82 / 220.83 buckets), which underestimated dwelling current
+  // by ~30% (sum of all load_watts vs the actual demand-calculated amps).
+  const isDwellingProject = project?.settings?.occupancyType === 'dwelling';
+
   // Determine which current usage value to use based on method and data source
   const effectiveCurrentUsageAmps = useMemo(() => {
-    // Priority 1: If using project panel data, calculate directly from circuits
+    // Priority 1a: Dwelling projects with appliance data — always use the
+    // NEC 220.82 / 220.83 demand result, even when "Use project data" is on.
+    // The raw load_watts sum below ignores demand factors and is wrong for
+    // dwellings; we keep it only for non-dwelling occupancies where there's
+    // no structured appliance data to feed the demand calc.
+    if (isDwellingProject &&
+        dwellingLoadResult &&
+        dwellingLoadResult.serviceAmps) {
+      return Math.round(dwellingLoadResult.serviceAmps);
+    }
+
+    // Priority 1b: Non-dwelling occupancy with project panel data — sum the
+    // raw connected load. (Commercial / industrial don't have a residential
+    // demand bucket the way dwellings do; the per-circuit-type demand walk
+    // happens upstream of this widget.)
     if (useProjectData && circuits && circuits.length > 0) {
       let totalLoad_kVA = 0;
       for (const circuit of circuits) {
@@ -174,7 +203,9 @@ export const ServiceUpgradeWizard: React.FC<ServiceUpgradeWizardProps> = ({ proj
       return Math.round(loadAmps);
     }
 
-    // Priority 2: If method is CALCULATED and dwelling data exists, use dwelling calculator result
+    // Priority 2: Method is CALCULATED and dwelling data exists — fall through
+    // to the Dwelling Calc result. (Same as Priority 1a when residential
+    // settings populated; kept for the explicit-method case.)
     if (existingLoadMethod === ExistingLoadDeterminationMethod.CALCULATED &&
         dwellingLoadResult &&
         dwellingLoadResult.serviceAmps) {
@@ -184,7 +215,7 @@ export const ServiceUpgradeWizard: React.FC<ServiceUpgradeWizardProps> = ({ proj
     // Priority 3: For all other cases (UTILITY_BILL, LOAD_STUDY, MANUAL, or no dwelling data),
     // use the manual input value
     return currentUsageAmps;
-  }, [useProjectData, existingLoadMethod, dwellingLoadResult, currentUsageAmps, circuits, project]);
+  }, [useProjectData, existingLoadMethod, dwellingLoadResult, currentUsageAmps, circuits, project, isDwellingProject]);
 
   // Calculate result in real-time
   let result: QuickCheckResult | null = null;
@@ -223,6 +254,30 @@ export const ServiceUpgradeWizard: React.FC<ServiceUpgradeWizardProps> = ({ proj
           Determine if your existing service can handle additional loads (NEC 230.42)
         </p>
       </div>
+
+      {/* Residential notice — point dwelling-project users at the Service
+          Headroom card on the Dwelling Load Calculator, which is purpose-built
+          for NEC 220.83 (vs this wizard's 220.87 / utility-bill orientation). */}
+      {isDwellingProject && projectId && (
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 flex items-start gap-2">
+          <Info className="w-4 h-4 text-blue-600 mt-0.5 flex-shrink-0" />
+          <div className="text-sm flex-1">
+            <span className="font-semibold text-blue-900">Residential dwelling detected</span>
+            <p className="text-xs text-blue-700 mt-1">
+              For dwellings, the Dwelling Load Calculator&apos;s Service Headroom card
+              applies NEC 220.83 directly to your structured appliance list — usually
+              the right tool. This wizard is optimized for commercial loads and
+              utility-bill-driven NEC 220.87 Method 1 analyses.
+            </p>
+            <a
+              href={`/project/${projectId}/dwelling-calculator`}
+              className="text-xs text-blue-600 hover:text-blue-700 underline inline-block mt-1"
+            >
+              Open Dwelling Load Calculator &rarr;
+            </a>
+          </div>
+        </div>
+      )}
 
       {/* Mode Toggle (Phase 2: Add Detailed Analysis) */}
       <div className="flex items-center gap-4 bg-gray-50 p-3 rounded-lg border border-gray-200">
@@ -778,10 +833,20 @@ export const ServiceUpgradeWizard: React.FC<ServiceUpgradeWizardProps> = ({ proj
               </div>
 
               {/* Load Breakdown (if using dwelling data) */}
-              {usingDwellingData && dwellingLoadResult && (
+              {usingDwellingData && dwellingLoadResult && (() => {
+                // Drive the article label from necReferences[0] so existing
+                // dwellings show "NEC 220.83" instead of the hardcoded 220.82.
+                // necReferences[0] is shaped like "NEC 220.83 - Optional..."
+                // — extract the leading article token.
+                const firstRef = dwellingLoadResult.necReferences?.[0] ?? '';
+                const articleLabel = firstRef.includes('220.83') ? 'NEC 220.83'
+                  : firstRef.includes('220.84') ? 'NEC 220.84'
+                  : firstRef.includes('220.82') ? 'NEC 220.82'
+                  : 'NEC 220';
+                return (
                 <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
                   <h4 className="font-semibold text-gray-900 mb-2 text-sm flex items-center justify-between">
-                    <span>Load Breakdown (NEC 220.82)</span>
+                    <span>Load Breakdown ({articleLabel})</span>
                     <a
                       href={`/project/${projectId}/dwelling-calculator`}
                       className="text-xs text-[#2d3b2d] hover:text-[#2d3b2d] underline"
@@ -817,11 +882,12 @@ export const ServiceUpgradeWizard: React.FC<ServiceUpgradeWizardProps> = ({ proj
                       <div>• General Lighting: 3 VA/sq ft</div>
                       <div>• Small Appliances: 2 circuits @ 1,500 VA each</div>
                       <div>• Laundry: 1,500 VA</div>
-                      <div>• Demand factors applied per NEC 220.82</div>
+                      <div>• Demand factors applied per {articleLabel}</div>
                     </div>
                   </div>
                 </div>
-              )}
+                );
+              })()}
             </>
           )}
         </div>

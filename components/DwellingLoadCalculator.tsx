@@ -38,14 +38,16 @@ import {
   DwellingUnitTemplate,
   PanelCircuit
 } from '../types';
-import { 
-  calculateSingleFamilyLoad, 
+import {
+  calculateSingleFamilyLoad,
   calculateMultiFamilyLoad,
   generateResidentialPanelSchedule,
   ResidentialLoadResult,
   LoadBreakdown,
   GeneratedCircuit
 } from '../services/calculations/residentialLoad';
+import { LOAD_TEMPLATES } from '../services/calculations/serviceUpgrade';
+import type { LoadTemplate } from '../types';
 import { usePanels } from '../hooks/usePanels';
 import { useCircuits } from '../hooks/useCircuits';
 import {
@@ -126,6 +128,24 @@ export const DwellingLoadCalculator: React.FC<DwellingLoadCalculatorProps> = ({
     residentialSettings?.appliances || DEFAULT_APPLIANCES
   );
 
+  // Proposed New Loads — additions on existing-construction projects. Each
+  // entry is sized, demand-counted, and (on Generate Schedule) inserted as
+  // a circuit with is_proposed=true so the permit-packet panel schedule
+  // marks it with "* = Proposed new circuit".
+  type ProposedLoad = {
+    id: string;
+    description: string;
+    kw: number;
+    voltage: 120 | 240;
+    continuous: boolean;
+    category?: 'EV' | 'HVAC' | 'Appliance' | 'Other';
+    necReference?: string;
+  };
+  const [proposedLoads, setProposedLoads] = useState<ProposedLoad[]>(
+    (residentialSettings as any)?.proposedLoads || []
+  );
+  const [selectedTemplate, setSelectedTemplate] = useState('');
+
   // Multi-family state
   const [unitTemplates, setUnitTemplates] = useState<DwellingUnitTemplate[]>(
     residentialSettings?.unitTemplates || [{ ...DEFAULT_UNIT_TEMPLATE, id: crypto.randomUUID() }]
@@ -134,14 +154,22 @@ export const DwellingLoadCalculator: React.FC<DwellingLoadCalculatorProps> = ({
     () => (project.settings?.residential as any)?.multiFamilyLoadResult?.commonAreaLoadVA || 0
   );
 
-  // Sync appliances to project when they change (with value comparison to avoid infinite loop)
+  // Sync appliances + proposedLoads to project when they change (with value
+  // comparison to avoid infinite loop). Debounced so rapid edits don't
+  // thrash the project state.
   useEffect(() => {
     const stored = project.settings?.residential;
     const storedAppliances = JSON.stringify(stored?.appliances);
     const currentAppliances = JSON.stringify(appliances);
     const storedTemplates = JSON.stringify(stored?.unitTemplates);
     const currentTemplates = JSON.stringify(!isSingleFamily ? unitTemplates : undefined);
-    if (storedAppliances === currentAppliances && storedTemplates === currentTemplates) return;
+    const storedProposed = JSON.stringify((stored as any)?.proposedLoads ?? []);
+    const currentProposed = JSON.stringify(proposedLoads);
+    if (
+      storedAppliances === currentAppliances &&
+      storedTemplates === currentTemplates &&
+      storedProposed === currentProposed
+    ) return;
 
     const timer = setTimeout(() => {
       updateProject({
@@ -152,26 +180,59 @@ export const DwellingLoadCalculator: React.FC<DwellingLoadCalculatorProps> = ({
             ...project.settings.residential,
             appliances,
             unitTemplates: !isSingleFamily ? unitTemplates : undefined,
+            proposedLoads,
           } as any
         }
       });
     }, 500);
     return () => clearTimeout(timer);
-  }, [appliances, unitTemplates]);
+  }, [appliances, unitTemplates, proposedLoads]);
+
+  // Merge proposed loads into the appliance set as additional otherAppliances
+  // for demand-calc purposes. The calc engine treats them identically to
+  // user-added "other fixed appliances", which already honor voltage and
+  // continuous (×1.25). They retain their proposed identity in component
+  // state so handleApplyToPanelSchedule can flag them is_proposed=true at
+  // insert time without interfering with the demand math.
+  const appliancesForCalc = useMemo<ResidentialAppliances>(() => {
+    if (proposedLoads.length === 0) return appliances;
+    const proposedAsOther = proposedLoads.map(p => ({
+      description: p.description,
+      kw: p.kw,
+      voltage: p.voltage,
+      continuous: p.continuous,
+      proposed: true,
+    }));
+    return {
+      ...appliances,
+      otherAppliances: [...(appliances.otherAppliances ?? []), ...proposedAsOther],
+    };
+  }, [appliances, proposedLoads]);
 
   // Calculate load
   const loadResult: ResidentialLoadResult | null = useMemo(() => {
     try {
       if (isSingleFamily) {
+        // Project Status (General Information) drives 220.82 vs 220.83.
+        // 'new-service' → 220.82 (new construction); anything else
+        // ('existing' or 'service-upgrade') → 220.83 (existing dwelling).
+        const existingDwelling = project.settings?.service_modification_type
+          ? project.settings.service_modification_type !== 'new-service'
+          : true; // default to existing — safer assumption for retrofit work
+        // Calculation Method (this page) only applies to 220.82 (new). 220.83
+        // is always a bucket method by NEC definition.
+        const useTrueOptionalMethod = project.settings?.dwelling_calc_mode === 'true-optional';
         return calculateSingleFamilyLoad({
           squareFootage: residentialSettings?.squareFootage || 2000,
           smallApplianceCircuits: residentialSettings?.smallApplianceCircuits || 2,
           laundryCircuit: residentialSettings?.laundryCircuit ?? true,
-          appliances
+          appliances: appliancesForCalc,
+          existingDwelling,
+          useTrueOptionalMethod
         });
       } else {
         return calculateMultiFamilyLoad({
-          unitTemplates: unitTemplates.map(t => ({ ...t, appliances })),
+          unitTemplates: unitTemplates.map(t => ({ ...t, appliances: appliancesForCalc })),
           housePanelLoad
         });
       }
@@ -179,7 +240,7 @@ export const DwellingLoadCalculator: React.FC<DwellingLoadCalculatorProps> = ({
       console.error('Load calculation error:', error);
       return null;
     }
-  }, [isSingleFamily, residentialSettings, appliances, unitTemplates, housePanelLoad]);
+  }, [isSingleFamily, residentialSettings, appliancesForCalc, unitTemplates, housePanelLoad, project.settings?.service_modification_type, project.settings?.dwelling_calc_mode]);
 
   // Persist multi-family load result to project settings so MF EV Calculator can read it
   // Uses value comparison to avoid infinite re-render loop (updateProject changes project → loadResult recomputes → useEffect fires)
@@ -266,7 +327,7 @@ export const DwellingLoadCalculator: React.FC<DwellingLoadCalculatorProps> = ({
       ...prev,
       otherAppliances: [
         ...(prev.otherAppliances || []),
-        { description: 'New Appliance', kw: 1 }
+        { description: 'New Appliance', kw: 1, voltage: 240, continuous: false }
       ]
     }));
   };
@@ -279,14 +340,58 @@ export const DwellingLoadCalculator: React.FC<DwellingLoadCalculatorProps> = ({
     }));
   };
 
-  // Update custom appliance
-  const updateOtherAppliance = (index: number, field: 'description' | 'kw', value: any) => {
+  // Update custom appliance — field now includes voltage + continuous so
+  // EEs can mark a 240V continuous load (water heater, pool pump) properly.
+  const updateOtherAppliance = (index: number, field: 'description' | 'kw' | 'voltage' | 'continuous', value: any) => {
     setAppliances(prev => ({
       ...prev,
-      otherAppliances: prev.otherAppliances?.map((a, i) => 
+      otherAppliances: prev.otherAppliances?.map((a, i) =>
         i === index ? { ...a, [field]: value } : a
       )
     }));
+  };
+
+  // === Proposed New Loads helpers ===
+  const addProposedFromTemplate = (templateName: string) => {
+    const t = LOAD_TEMPLATES.find(x => x.name === templateName);
+    if (!t) return;
+    setProposedLoads(prev => [
+      ...prev,
+      {
+        id: crypto.randomUUID(),
+        description: t.name,
+        kw: t.kw,
+        voltage: t.voltage ?? 240,
+        continuous: t.continuous,
+        category: t.category === 'Solar' ? 'Other' : (t.category as ProposedLoad['category']),
+        necReference: t.necReference,
+      }
+    ]);
+    setSelectedTemplate('');
+  };
+
+  const addCustomProposed = () => {
+    setProposedLoads(prev => [
+      ...prev,
+      {
+        id: crypto.randomUUID(),
+        description: 'New Load',
+        kw: 1,
+        voltage: 240,
+        continuous: false,
+        category: 'Other',
+      }
+    ]);
+  };
+
+  const removeProposed = (id: string) => {
+    setProposedLoads(prev => prev.filter(p => p.id !== id));
+  };
+
+  const updateProposed = (id: string, field: keyof ProposedLoad, value: any) => {
+    setProposedLoads(prev =>
+      prev.map(p => p.id === id ? { ...p, [field]: value } : p)
+    );
   };
 
   // Add unit template (multi-family)
@@ -334,15 +439,39 @@ export const DwellingLoadCalculator: React.FC<DwellingLoadCalculatorProps> = ({
     
     setIsGenerating(true);
     try {
-      // Generate circuits (single-family only)
+      // Generate circuits for the existing appliance set. Proposed loads are
+      // synthesized separately below so each one can be tagged isProposed.
       const generated = generateResidentialPanelSchedule({
         squareFootage: residentialSettings?.squareFootage || 2000,
         smallApplianceCircuits: residentialSettings?.smallApplianceCircuits || 2,
         laundryCircuit: residentialSettings?.laundryCircuit ?? true,
         appliances
       });
-      
-      setGeneratedCircuits(generated);
+
+      // Append a circuit row per proposed load — same sizing logic as the
+      // otherAppliances generator (voltage → poles; continuous → ×1.25
+      // breaker per NEC 210.20(A)). Each entry carries isProposed=true so
+      // the DB column gets set at insert time.
+      const proposedCircuits: GeneratedCircuit[] = proposedLoads.map(p => {
+        const pole: 1 | 2 = p.voltage === 240 ? 2 : 1;
+        const baseAmps = (p.kw * 1000) / p.voltage;
+        const sizedAmps = p.continuous ? baseAmps * 1.25 : baseAmps;
+        const breakerAmps = Math.max(15, Math.ceil(sizedAmps / 5) * 5);
+        const loadType: GeneratedCircuit['loadType'] =
+          p.category === 'HVAC' ? 'C' :
+          p.category === 'EV' ? 'O' : 'O';
+        return {
+          description: p.description,
+          breakerAmps,
+          pole,
+          loadWatts: p.kw * 1000,
+          loadType,
+          necReference: p.necReference ?? 'NEC 220.83',
+          isProposed: true,
+        };
+      });
+
+      setGeneratedCircuits([...generated, ...proposedCircuits]);
       setShowGenerated(true);
     } finally {
       setIsGenerating(false);
@@ -376,38 +505,101 @@ export const DwellingLoadCalculator: React.FC<DwellingLoadCalculatorProps> = ({
         await deleteCircuitsByPanel(mainPanel.id);
       }
 
-      // Create new circuits
+      // Conductor sizing per NEC Table 310.16 (60C copper).
+      const getConductorSize = (amps: number): string => {
+        if (amps <= 15) return '14 AWG';
+        if (amps <= 20) return '12 AWG';
+        if (amps <= 30) return '10 AWG';
+        if (amps <= 40) return '8 AWG';
+        if (amps <= 50) return '6 AWG';
+        if (amps <= 60) return '6 AWG';
+        if (amps <= 100) return '3 AWG';
+        return '1 AWG';
+      };
+
+      // Slot allocation — respects pole continuations so a 2P breaker at
+      // slot N occupies N and N+2, and the next breaker is placed at the
+      // smallest slot S where every {S, S+2, ..., S+2(p-1)} is still free.
+      // Previously the generator assigned circuit_number = i+1 naively,
+      // which collided on continuation slots and produced cascading ↑2P
+      // markers (e.g. 2P range at slot 10 + 2P water heater at slot 12
+      // both fighting for slot 12).
+      const panelSpaces = (mainPanel as any).num_spaces ?? (mainPanel.is_main ? 30 : 42);
+      const occupied = new Set<number>();
+      const assignedSlots: number[] = [];
+      const skipped: number[] = [];
+      for (let i = 0; i < generatedCircuits.length; i++) {
+        const c = generatedCircuits[i];
+        if (!c) { assignedSlots.push(-1); continue; }
+        let placed = -1;
+        for (let s = 1; s <= panelSpaces; s++) {
+          const needed: number[] = [];
+          for (let p = 0; p < c.pole; p++) needed.push(s + p * 2);
+          if (needed.every(n => n <= panelSpaces && !occupied.has(n))) {
+            needed.forEach(n => occupied.add(n));
+            placed = s;
+            break;
+          }
+        }
+        assignedSlots.push(placed);
+        if (placed === -1) skipped.push(i);
+      }
+
+      // Create circuits at their allocated slots
       for (let i = 0; i < generatedCircuits.length; i++) {
         const circuit = generatedCircuits[i];
-        if (!circuit) continue; // Skip if undefined
-
-        // Calculate conductor size based on breaker amps (NEC Table 310.16)
-        const getConductorSize = (amps: number): string => {
-          if (amps <= 15) return '14 AWG';
-          if (amps <= 20) return '12 AWG';
-          if (amps <= 30) return '10 AWG';
-          if (amps <= 40) return '8 AWG';
-          if (amps <= 50) return '6 AWG';
-          if (amps <= 60) return '6 AWG';
-          if (amps <= 100) return '3 AWG';
-          return '1 AWG';
-        };
+        if (!circuit) continue;
+        const slot = assignedSlots[i];
+        if (slot === -1) continue; // Skipped — panel out of space; warn after loop
 
         await createCircuit({
           project_id: project.id,
           panel_id: mainPanel.id,
-          circuit_number: i + 1,
+          circuit_number: slot,
           description: circuit.description,
           breaker_amps: circuit.breakerAmps,
           pole: circuit.pole,
           load_watts: circuit.loadWatts,
-          conductor_size: getConductorSize(circuit.breakerAmps),  // Required field!
-          load_type: circuit.loadType
+          conductor_size: getConductorSize(circuit.breakerAmps),
+          load_type: circuit.loadType,
+          is_proposed: !!circuit.isProposed,
         });
       }
+
+      if (skipped.length > 0) {
+        alert(
+          `Panel only has ${panelSpaces} slots — ${skipped.length} circuit(s) ` +
+          `could not be placed:\n` +
+          skipped.map(i => `  • ${generatedCircuits[i]?.description}`).join('\n') +
+          `\n\nIncrease panel size or split into a sub-panel.`
+        );
+      }
       
-      // Update recommended service in project
+      // Update recommended service in project AND sync the main panel's
+      // main_breaker_amps. On EXISTING-CONSTRUCTION projects we respect the
+      // user-stated Existing Service Size whenever it holds (NEC 220.83
+      // demand <= existing); only override when the existing service is
+      // actually insufficient. Without this gate, the calc's
+      // "recommendedServiceSize" (which is the NEC new-install size, e.g.
+      // 113A demand → 150A min for continuous safety) would silently
+      // overwrite the user's stated 125A existing service, destroying
+      // their input on every Regenerate.
       if (loadResult) {
+        const isExisting = project.settings?.service_modification_type
+          && project.settings.service_modification_type !== 'new-service';
+        const existingAmps = project.settings?.residential?.existingServiceAmps
+          ?? mainPanel?.main_breaker_amps;
+        const existingHolds = isExisting
+          && typeof existingAmps === 'number'
+          && loadResult.serviceAmps <= existingAmps;
+
+        // Recommended-service stored in settings should reflect the final
+        // decision (existing wins when it holds), not the abstract
+        // new-install number.
+        const finalRecommendation = existingHolds
+          ? existingAmps as number
+          : loadResult.recommendedServiceSize;
+
         updateProject({
           ...project,
           settings: {
@@ -418,6 +610,12 @@ export const DwellingLoadCalculator: React.FC<DwellingLoadCalculatorProps> = ({
             } as any
           }
         });
+
+        if (mainPanel && mainPanel.main_breaker_amps !== finalRecommendation) {
+          await updatePanel(mainPanel.id, {
+            main_breaker_amps: finalRecommendation
+          });
+        }
       }
 
       setShowGenerated(false);
@@ -585,11 +783,95 @@ export const DwellingLoadCalculator: React.FC<DwellingLoadCalculatorProps> = ({
             <span>Dwelling Load Calculator</span>
           </h2>
           <p className="text-gray-500 mt-1 text-sm sm:text-base">
-            {isSingleFamily 
-              ? 'NEC 220.82 - Standard Method for Single-Family Dwellings'
-              : 'NEC 220.84 - Optional Calculation for Multi-Family Dwellings'
+            {isSingleFamily
+              ? (project.settings?.service_modification_type && project.settings.service_modification_type !== 'new-service'
+                  ? 'NEC 220.83 - Optional Method for Existing Single-Family Dwellings'
+                  : project.settings?.dwelling_calc_mode === 'true-optional'
+                    ? 'NEC 220.82 - Optional Method for Single-Family Dwellings (10 kVA / 40% bucket)'
+                    : 'NEC 220 Standard Method - Per-Category Demand Factors (220.42 / 220.52 / 220.55 / 220.60)')
+              : 'NEC 220.84 - Optional Method for Multi-Family Dwellings'
             }
           </p>
+          {/* Existing Service Size input — drives the Service Headroom card.
+              Only relevant on existing-construction single-family projects.
+              Defaults to the main panel's main_breaker_amps when no override
+              is stored, so the headroom card has a sensible value from
+              first paint. */}
+          {isSingleFamily
+            && project.settings?.service_modification_type
+            && project.settings.service_modification_type !== 'new-service'
+            && (
+              <div className="mt-3 flex flex-wrap items-center gap-2">
+                <label className="text-xs font-semibold text-[#888] uppercase">Existing Service Size</label>
+                <input
+                  type="number"
+                  min={0}
+                  step={5}
+                  value={project.settings?.residential?.existingServiceAmps ?? mainPanel?.main_breaker_amps ?? ''}
+                  onChange={e => {
+                    const v = e.target.value === '' ? undefined : Number(e.target.value);
+                    updateProject({
+                      ...project,
+                      settings: {
+                        ...project.settings,
+                        residential: {
+                          ...(project.settings?.residential ?? { dwellingType: 'single_family', smallApplianceCircuits: 2, laundryCircuit: true, bathroomCircuits: 0, garageCircuit: false, outdoorCircuit: false } as any),
+                          existingServiceAmps: v
+                        }
+                      }
+                    });
+                  }}
+                  className="w-24 border-[#e8e6e3] rounded-md text-sm py-1 px-2"
+                  placeholder="amps"
+                />
+                <span className="text-xs text-[#888]">A</span>
+                <span className="text-xs text-[#888] italic">
+                  (auto from main panel breaker; override to model upsize scenarios)
+                </span>
+              </div>
+            )}
+
+          {/* Calculation Method toggle — only meaningful for new 220.82.
+              220.83 is always bucket method by NEC definition, so we disable
+              the control with a note when an existing dwelling is active. */}
+          {isSingleFamily && (() => {
+            const isExisting = project.settings?.service_modification_type
+              && project.settings.service_modification_type !== 'new-service';
+            return (
+              <div className="mt-3 flex flex-wrap items-center gap-2">
+                <label className="text-xs font-semibold text-[#888] uppercase">Calculation Method</label>
+                <select
+                  disabled={isExisting}
+                  value={project.settings?.dwelling_calc_mode ?? 'per-category'}
+                  onChange={e => {
+                    updateProject({
+                      ...project,
+                      settings: {
+                        ...project.settings,
+                        dwelling_calc_mode: e.target.value as 'per-category' | 'true-optional'
+                      }
+                    });
+                  }}
+                  className="border-[#e8e6e3] rounded-md text-sm py-1 px-2 disabled:bg-gray-50 disabled:text-gray-400"
+                  title={isExisting ? 'NEC 220.83 always uses the 8 kVA / 40% bucket method' : undefined}
+                >
+                  {isExisting ? (
+                    <option value="per-category">220.83 Optional (8 kVA / 40%)</option>
+                  ) : (
+                    <>
+                      <option value="per-category">Per-Category (NEC 220 Standard Method)</option>
+                      <option value="true-optional">220.82 Optional (10 kVA / 40%)</option>
+                    </>
+                  )}
+                </select>
+                {isExisting && (
+                  <span className="text-xs text-[#888] italic">
+                    Locked: NEC 220.83 always uses 8 kVA / 40% bucket
+                  </span>
+                )}
+              </div>
+            );
+          })()}
         </div>
         <div className="flex flex-wrap items-center gap-2 sm:gap-3 w-full lg:w-auto">
           {/* Show current panel status */}
@@ -1141,12 +1423,12 @@ export const DwellingLoadCalculator: React.FC<DwellingLoadCalculatorProps> = ({
                     </button>
                   </div>
                   {(appliances.otherAppliances || []).map((other, idx) => (
-                    <div key={idx} className="flex items-center gap-2 mb-2">
+                    <div key={idx} className="flex flex-wrap items-center gap-2 mb-2">
                       <input
                         type="text"
                         value={other.description}
                         onChange={e => updateOtherAppliance(idx, 'description', e.target.value)}
-                        className="flex-1 text-sm border-gray-200 rounded"
+                        className="flex-1 min-w-[140px] text-sm border-gray-200 rounded"
                         placeholder="Description"
                       />
                       <NumberInput
@@ -1157,6 +1439,24 @@ export const DwellingLoadCalculator: React.FC<DwellingLoadCalculatorProps> = ({
                         min={0}
                       />
                       <span className="text-xs text-gray-500">kW</span>
+                      <select
+                        value={other.voltage ?? (other.kw > 2 ? 240 : 120)}
+                        onChange={e => updateOtherAppliance(idx, 'voltage', Number(e.target.value) as 120 | 240)}
+                        className="text-xs border-gray-200 rounded py-1"
+                        title="Branch voltage — 120V → 1P breaker, 240V → 2P breaker"
+                      >
+                        <option value={120}>120V (1P)</option>
+                        <option value={240}>240V (2P)</option>
+                      </select>
+                      <label className="inline-flex items-center gap-1 text-xs text-gray-600" title="NEC 100 continuous load — operates 3+ hours. Applies ×1.25 per NEC 210.20(A) / 220.18(B).">
+                        <input
+                          type="checkbox"
+                          checked={!!other.continuous}
+                          onChange={e => updateOtherAppliance(idx, 'continuous', e.target.checked)}
+                          className="rounded border-gray-300"
+                        />
+                        Continuous
+                      </label>
                       <button
                         onClick={() => removeOtherAppliance(idx)}
                         className="p-1 text-gray-400 hover:text-red-500"
@@ -1166,6 +1466,119 @@ export const DwellingLoadCalculator: React.FC<DwellingLoadCalculatorProps> = ({
                     </div>
                   ))}
                 </div>
+
+                {/* Proposed New Loads — visible only on existing-construction
+                    single-family. Template dropdown sources from the same
+                    LOAD_TEMPLATES the Service Upgrade Wizard uses, each with
+                    NEC continuous-load flag baked in. Items flow into the
+                    demand calc (×1.25 when continuous) and become circuits
+                    with is_proposed=true on Generate Schedule. */}
+                {isSingleFamily
+                  && project.settings?.service_modification_type
+                  && project.settings.service_modification_type !== 'new-service'
+                  && (
+                  <div className="mt-4 pt-4 border-t border-gray-200">
+                    <div className="flex justify-between items-center mb-2">
+                      <h4 className="text-sm font-medium text-gray-700">
+                        Proposed New Loads
+                        <span className="ml-2 text-xs text-gray-500 font-normal">
+                          (additions under this permit — marked * on the schedule)
+                        </span>
+                      </h4>
+                      <button
+                        onClick={addCustomProposed}
+                        className="text-sm text-[#2d3b2d] hover:text-[#2d3b2d] flex items-center gap-1"
+                      >
+                        <Plus className="w-4 h-4" /> Add Custom
+                      </button>
+                    </div>
+
+                    <div className="flex flex-wrap items-center gap-2 mb-3">
+                      <label className="text-xs font-semibold text-[#888] uppercase">Select from Common Loads</label>
+                      <select
+                        value={selectedTemplate}
+                        onChange={e => {
+                          const v = e.target.value;
+                          if (v) addProposedFromTemplate(v);
+                        }}
+                        className="text-sm border-gray-200 rounded py-1 px-2 flex-1 min-w-[200px]"
+                      >
+                        <option value="">-- Select Load --</option>
+                        <optgroup label="EV Chargers (NEC 625.41 continuous)">
+                          {LOAD_TEMPLATES.filter(t => t.category === 'EV').map(t => (
+                            <option key={t.name} value={t.name}>{t.name}</option>
+                          ))}
+                        </optgroup>
+                        <optgroup label="HVAC">
+                          {LOAD_TEMPLATES.filter(t => t.category === 'HVAC').map(t => (
+                            <option key={t.name} value={t.name}>{t.name}</option>
+                          ))}
+                        </optgroup>
+                        <optgroup label="Appliances">
+                          {LOAD_TEMPLATES.filter(t => t.category === 'Appliance').map(t => (
+                            <option key={t.name} value={t.name}>{t.name}</option>
+                          ))}
+                        </optgroup>
+                      </select>
+                    </div>
+
+                    {proposedLoads.length === 0 ? (
+                      <p className="text-xs text-gray-400 italic">
+                        No proposed loads yet. Pick a template above or click "Add Custom".
+                      </p>
+                    ) : (
+                      proposedLoads.map(p => (
+                        <div key={p.id} className="flex flex-wrap items-center gap-2 mb-2">
+                          <span className="text-[10px] font-bold rounded px-1 py-0.5 bg-electric-100 text-electric-700 border border-electric-300">NEW</span>
+                          <input
+                            type="text"
+                            value={p.description}
+                            onChange={e => updateProposed(p.id, 'description', e.target.value)}
+                            className="flex-1 min-w-[140px] text-sm border-gray-200 rounded"
+                            placeholder="Description"
+                          />
+                          <NumberInput
+                            value={p.kw}
+                            onChange={v => updateProposed(p.id, 'kw', v)}
+                            className="w-20 text-sm border-gray-200 rounded"
+                            step={0.1}
+                            min={0}
+                          />
+                          <span className="text-xs text-gray-500">kW</span>
+                          <select
+                            value={p.voltage}
+                            onChange={e => updateProposed(p.id, 'voltage', Number(e.target.value) as 120 | 240)}
+                            className="text-xs border-gray-200 rounded py-1"
+                          >
+                            <option value={120}>120V (1P)</option>
+                            <option value={240}>240V (2P)</option>
+                          </select>
+                          <label
+                            className="inline-flex items-center gap-1 text-xs text-gray-600"
+                            title="NEC 100 continuous load — operates 3+ hours. Applies ×1.25 per NEC 210.20(A) / 220.18(B)."
+                          >
+                            <input
+                              type="checkbox"
+                              checked={p.continuous}
+                              onChange={e => updateProposed(p.id, 'continuous', e.target.checked)}
+                              className="rounded border-gray-300"
+                            />
+                            Continuous
+                          </label>
+                          {p.necReference && (
+                            <span className="text-[10px] text-gray-400 italic">{p.necReference}</span>
+                          )}
+                          <button
+                            onClick={() => removeProposed(p.id)}
+                            className="p-1 text-gray-400 hover:text-red-500"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -1198,11 +1611,92 @@ export const DwellingLoadCalculator: React.FC<DwellingLoadCalculatorProps> = ({
                     <span className="text-[#888] text-sm">Service Current</span>
                     <span className="text-xl font-bold text-[#c9a227]">{loadResult.serviceAmps}A</span>
                   </div>
-                  <div className="flex justify-between items-center py-1">
-                    <span className="text-[#888] text-sm">Recommended Service</span>
-                    <span className="text-2xl font-bold text-[#c9a227]">{loadResult.recommendedServiceSize}A</span>
-                  </div>
+                  {(() => {
+                    // On existing-construction with a user-stated existing
+                    // service that holds, the "recommendation" IS the
+                    // existing service — surface that, not the abstract
+                    // NEC new-install number that would override it.
+                    const isExisting = project.settings?.service_modification_type
+                      && project.settings.service_modification_type !== 'new-service';
+                    const existing = project.settings?.residential?.existingServiceAmps
+                      ?? mainPanel?.main_breaker_amps;
+                    const existingHolds = isExisting
+                      && typeof existing === 'number'
+                      && loadResult.serviceAmps <= existing;
+                    return (
+                      <div className="flex justify-between items-center py-1">
+                        <span className="text-[#888] text-sm">Recommended Service</span>
+                        {existingHolds ? (
+                          <span className="text-right">
+                            <span className="text-2xl font-bold text-[#3d6b3d]">{existing}A</span>
+                            <span className="block text-[10px] text-[#3d6b3d] uppercase tracking-wide">existing holds</span>
+                          </span>
+                        ) : (
+                          <span className="text-2xl font-bold text-[#c9a227]">{loadResult.recommendedServiceSize}A</span>
+                        )}
+                      </div>
+                    );
+                  })()}
                 </div>
+
+                {/* Service Headroom card — only on existing-construction
+                    single-family. Compares NEC 220.83 demand to the user's
+                    existing service rating so the EE can answer "can my
+                    125 A panel hold a new EV?" without leaving this page. */}
+                {isSingleFamily
+                  && project.settings?.service_modification_type
+                  && project.settings.service_modification_type !== 'new-service'
+                  && (() => {
+                    const existing = project.settings?.residential?.existingServiceAmps
+                      ?? mainPanel?.main_breaker_amps;
+                    if (!existing || !loadResult.serviceAmps) return null;
+                    const demand = loadResult.serviceAmps;
+                    const headroom = existing - demand;
+                    const utilization = demand / existing;
+                    const holds = headroom >= 0;
+                    const tight = holds && utilization >= 0.9;
+                    return (
+                      <div className={`mt-4 rounded-lg border p-3 ${
+                        holds
+                          ? (tight ? 'bg-amber-50 border-amber-200' : 'bg-green-50 border-green-200')
+                          : 'bg-red-50 border-red-200'
+                      }`}>
+                        <div className="flex items-center justify-between mb-1">
+                          <span className="text-xs font-semibold text-[#555] uppercase tracking-wide">
+                            Service Headroom (NEC 220.83 vs Existing)
+                          </span>
+                          <span className={`text-xs font-bold uppercase ${
+                            holds ? (tight ? 'text-amber-700' : 'text-green-700') : 'text-red-700'
+                          }`}>
+                            {holds ? (tight ? 'At Capacity' : 'Service Holds') : 'Upgrade Required'}
+                          </span>
+                        </div>
+                        <div className="flex justify-between items-baseline">
+                          <span className="text-sm text-[#555]">
+                            {demand.toFixed(0)}A demand &middot; {existing}A existing
+                          </span>
+                          <span className={`text-xl font-bold ${
+                            holds ? (tight ? 'text-amber-700' : 'text-green-700') : 'text-red-700'
+                          }`}>
+                            {holds ? '+' : ''}{headroom.toFixed(0)}A
+                          </span>
+                        </div>
+                        {!holds && (
+                          <p className="mt-2 text-xs text-red-700 leading-snug">
+                            Existing {existing}A service is undersized by {Math.abs(headroom).toFixed(0)}A.
+                            Either upgrade to {loadResult.recommendedServiceSize}A min, or apply an
+                            EVEMS / circuit-sharing scheme per NEC 750 to reduce setpoint.
+                          </p>
+                        )}
+                        {tight && (
+                          <p className="mt-2 text-xs text-amber-700 leading-snug">
+                            Less than 10% headroom remaining. Future load additions
+                            (EV, heat pump, range upgrade) will trigger a service upgrade.
+                          </p>
+                        )}
+                      </div>
+                    );
+                  })()}
               </div>
             </div>
           )}

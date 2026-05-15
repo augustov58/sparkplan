@@ -45,8 +45,47 @@ export interface ResidentialAppliances {
   sauna?: { enabled: boolean; kw: number };
   wellPump?: { enabled: boolean; hp: number };
   
-  // Custom/other appliances
-  otherAppliances?: Array<{ description: string; kw: number }>;
+  // Custom/other appliances. voltage defaults to 120 (1P); continuous to
+  // false. When voltage is 240 the generator emits a 2P breaker; when
+  // continuous is true the breaker sizing applies the NEC 210.20(A) 125%
+  // factor. Legacy entries without these fields keep the prior behavior
+  // (120V, non-continuous, 1P).
+  otherAppliances?: Array<{
+    description: string;
+    kw: number;
+    voltage?: 120 | 240;
+    continuous?: boolean;
+    /**
+     * Tags this entry as originating from the Proposed New Loads section
+     * (vs a true existing "Other Fixed Appliance"). Flows through the
+     * residentialLoad calc as the breakdown row category so the EE can
+     * see "Proposed Load: EV Charger ..." instead of a generic
+     * "Other Appliance" row.
+     */
+    proposed?: boolean;
+  }>;
+
+  // Proposed new loads — staging area for additions on existing-construction
+  // projects. Drives the Dwelling Load Calc "Proposed New Loads" section.
+  // These flow into the demand calc (with continuous ×1.25 applied) and on
+  // Generate Schedule become circuits with is_proposed=true so the permit
+  // packet's panel schedule renders them with the "* = Proposed" marker.
+  proposedLoads?: Array<{
+    /** Stable identifier for delete/update in the UI list. */
+    id: string;
+    /** Free-form label; auto-filled when picked from a LOAD_TEMPLATE. */
+    description: string;
+    /** Connected load in kW (nameplate). */
+    kw: number;
+    /** 120 → 1P breaker; 240 → 2P breaker. */
+    voltage: 120 | 240;
+    /** NEC 100 continuous load — triggers ×1.25 for breaker and demand. */
+    continuous: boolean;
+    /** Optional category tag from a template (EV / HVAC / Appliances). */
+    category?: 'EV' | 'HVAC' | 'Appliances' | 'Other';
+    /** NEC citation for the audit trail (e.g. "NEC 625.41"). */
+    necReference?: string;
+  }>;
 }
 
 /**
@@ -96,6 +135,17 @@ export interface ResidentialSettings {
   // Service
   recommendedServiceAmps?: number;      // Calculated recommendation
   selectedServiceAmps?: number;
+
+  /**
+   * Existing service amperage for headroom analysis on existing-construction
+   * projects. Drives the Dwelling Load Calculator's Service Headroom card
+   * (compares NEC 220.83 demand vs this rating). Auto-populates from
+   * mainPanel.main_breaker_amps on first read; user can override to model
+   * "what if my existing service were 200A instead of 125A" scenarios.
+   *
+   * Meaningful only when service_modification_type !== 'new-service'.
+   */
+  existingServiceAmps?: number;
 }
 
 export enum ProjectStatus {
@@ -224,6 +274,22 @@ export interface ProjectSettings {
    * responsible for supplying defaults when a key is missing.
    */
   service_modification_type?: 'existing' | 'service-upgrade' | 'new-service';
+  /**
+   * Controls how NEC 220.82 demand is computed for new single-family dwellings.
+   *
+   * - 'per-category' (default): legacy behavior — applies Table 220.42 lighting
+   *   tiers, Table 220.55 range demand, dryer/WH/appliance per-category factors.
+   *   Mirrors the Standard Method walk (NEC 220.40–220.61), tends to oversize
+   *   by ~30 % vs the true Optional Method but matches every existing project's
+   *   historical numbers.
+   * - 'true-optional': canonical NEC 220.82 Optional Method — collapses all
+   *   non-HVAC loads into a single bucket (first 10 kVA at 100 %, remainder at
+   *   40 %), then adds HVAC at 100 % of the larger of heating/cooling.
+   *
+   * Has no effect for existing dwellings (220.83 always uses a bucket method
+   * with an 8 kVA knee) or multi-family (220.84 uses Table 220.84 directly).
+   */
+  dwelling_calc_mode?: 'per-category' | 'true-optional';
   scope_flags?: ProjectScopeFlags;
   estimated_value_usd?: number;
 }
@@ -570,6 +636,18 @@ export interface LoadTemplate {
   continuous: boolean;
   category: 'EV' | 'HVAC' | 'Appliance' | 'Solar' | 'Other';
   description?: string;
+  /**
+   * Nominal voltage of the load — drives 1P (120V) vs 2P (240V) breaker
+   * selection when the Dwelling Calc materializes the template as a
+   * circuit. Defaults to 240 when omitted; nearly every common template
+   * (EV, HVAC, range, dryer, water heater) is 240V.
+   */
+  voltage?: 120 | 240;
+  /**
+   * Optional NEC citation surfaced in the proposed-loads UI and on the
+   * generated circuit row's necReference (e.g. "NEC 625.41").
+   */
+  necReference?: string;
 }
 
 // ==========================

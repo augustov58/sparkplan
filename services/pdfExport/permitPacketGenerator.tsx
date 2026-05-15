@@ -88,6 +88,13 @@ export interface PermitPacketData {
   projectName: string;
   projectAddress: string;
   projectType: 'Residential' | 'Commercial' | 'Industrial';
+  /**
+   * Project Status — drives whether panel-schedule pages render the
+   * "* = Proposed new circuit" legend and asterisk markers. When the value
+   * is 'new-service' (or undefined), every circuit is implicitly new and the
+   * legend is suppressed to avoid visual noise.
+   */
+  serviceModificationType?: 'existing' | 'service-upgrade' | 'new-service';
   serviceVoltage: number;
   servicePhase: 1 | 3;
   panels: Panel[];
@@ -1134,6 +1141,9 @@ export const generatePermitPacket = async (data: PermitPacketData): Promise<void
             projectAddress={data.projectAddress}
             {...contractor}
             sheetId={sheetIds[0]}
+            showExistingNewMarkers={
+              !!data.serviceModificationType && data.serviceModificationType !== 'new-service'
+            }
           />
         ),
       });

@@ -101,12 +101,17 @@ export const EVPanelTemplates: React.FC<EVPanelTemplatesProps> = ({ project }) =
         throw new Error('Failed to create panel');
       }
 
-      // Create all circuits
+      // Create all circuits. EV-template circuits are post-existing-service
+      // additions by construction — flag them so the permit-packet panel
+      // schedule renders them with the "* = Proposed new circuit" marker
+      // when the project is existing-construction. (The flag is harmless on
+      // new-construction projects because the marker is gated upstream.)
       for (const circuit of circuits) {
         await createCircuit({
           ...circuit,
           panel_id: newPanel.id,
-          project_id: project.id
+          project_id: project.id,
+          is_proposed: true,
         });
       }
 

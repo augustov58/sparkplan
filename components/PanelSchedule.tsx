@@ -27,6 +27,7 @@ import {
   type MultiFamilyContext,
 } from '../services/calculations/upstreamLoadAggregation';
 import {
+  calculateDwellingPanelDemand,
   calculateDwellingUnitDemandVA,
   isDwellingUnitPanel,
 } from '../services/calculations/residentialLoad';
@@ -269,15 +270,55 @@ export const PanelSchedule: React.FC<PanelScheduleProps> = ({ project }) => {
     };
   }, [selectedPanel, panelCircuits, feederCircuits]);
 
-  // NEC 220.82 Optional Method demand for dwelling unit panels — used by
-  // the panel summary cards in lieu of the panel-local NEC 220.14 sum, which
-  // misleadingly reports raw connected current on a panel that's actually
-  // sized correctly per NEC 220.82 (e.g. 150 A "demand" on a 125 A panel
-  // when the real NEC 220.82 demand is ~95 A).
+  // NEC 220.82 / 220.83 Optional Method demand for dwelling-unit panels —
+  // used by the panel summary cards in lieu of the panel-local NEC 220.14
+  // sum, which misleadingly reports raw connected current on a panel that's
+  // actually sized correctly per the residential Optional Method.
+  //
+  // Two branches:
+  //  1. MDP of a single-family dwelling → compute 220.83 / 220.82 directly
+  //     from the panel's actual circuits via calculateDwellingPanelDemand.
+  //     This is the architectural fix for the "two sources of truth" bug:
+  //     the calc no longer reads project.settings.residential.appliances,
+  //     so it correctly reflects ALL circuits on the panel — including
+  //     proposed loads, manually-added circuits, and photo-imported ones.
+  //     The summary number now matches what's physically on the panel,
+  //     regardless of whether the appliance toggles were updated.
+  //  2. Sub-panel of a multi-family dwelling unit → run
+  //     calculateDwellingUnitDemandVA over its circuits.
   const dwellingUnitDemand = useMemo(() => {
     if (!selectedPanel) return null;
     const occupancy = project.settings?.occupancyType;
     if (occupancy !== 'dwelling') return null;
+
+    const residential = project.settings?.residential;
+    const isSingleFamily = (residential?.dwellingType ?? 'single_family') === 'single_family';
+
+    // Branch 1: single-family MDP → compute from circuits, not from toggles.
+    if (selectedPanel.is_main && isSingleFamily) {
+      const existingDwelling = project.settings?.service_modification_type
+        ? project.settings.service_modification_type !== 'new-service'
+        : true;
+      const result = calculateDwellingPanelDemand({
+        circuits: panelCircuits.map(c => ({
+          description: c.description,
+          load_watts: c.load_watts,
+          load_type: c.load_type,
+          breaker_amps: c.breaker_amps,
+        })),
+        squareFootage: residential?.squareFootage || 2000,
+        smallApplianceCircuits: residential?.smallApplianceCircuits || 2,
+        laundryCircuit: residential?.laundryCircuit ?? true,
+        voltage: selectedPanel.voltage || 240,
+        existingDwelling,
+      });
+      return {
+        totalDemandVA: result.totalDemandVA,
+        necArticle: result.necArticle,
+      };
+    }
+
+    // Branch 2: sub-panel dwelling-unit detection (multi-family)
     if (selectedPanel.is_main) return null;
     const dwellingCircuits = panelCircuits.map(c => ({
       description: c.description,
@@ -285,7 +326,7 @@ export const PanelSchedule: React.FC<PanelScheduleProps> = ({ project }) => {
     }));
     if (!isDwellingUnitPanel(selectedPanel.name, dwellingCircuits)) return null;
     return calculateDwellingUnitDemandVA(dwellingCircuits);
-  }, [selectedPanel, panelCircuits, project.settings?.occupancyType]);
+  }, [selectedPanel, panelCircuits, project.settings]);
 
   // Calculate aggregated load including downstream panels
   // Uses occupancyType from project settings for correct demand factor selection
@@ -353,10 +394,26 @@ export const PanelSchedule: React.FC<PanelScheduleProps> = ({ project }) => {
     }
   }, [deleteCircuit]);
 
+  // Existing-construction gates the per-circuit Existing/New badge. On a
+  // new-construction project every circuit is implicitly new, so the toggle
+  // would just be noise.
+  const isExistingConstruction = project.settings?.service_modification_type
+    && project.settings.service_modification_type !== 'new-service';
+
+  const toggleProposed = useCallback(async (circuit: { id: string; is_proposed?: boolean }) => {
+    await updateCircuit(circuit.id, { is_proposed: !circuit.is_proposed });
+  }, [updateCircuit]);
+
   const handleExportPDF = async () => {
     if (!selectedPanel) return;
     try {
-      await exportPanelSchedulePDF(selectedPanel, panelCircuits, project.name, project.address);
+      await exportPanelSchedulePDF(
+        selectedPanel,
+        panelCircuits,
+        project.name,
+        project.address,
+        !!isExistingConstruction,
+      );
     } catch (error) {
       alert(`Failed to export PDF: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
@@ -369,7 +426,13 @@ export const PanelSchedule: React.FC<PanelScheduleProps> = ({ project }) => {
       panels.forEach(panel => {
         circuitsByPanel.set(panel.id, circuits.filter(c => c.panel_id === panel.id));
       });
-      await exportAllPanelsPDF(panels, circuitsByPanel, project.name, project.address);
+      await exportAllPanelsPDF(
+        panels,
+        circuitsByPanel,
+        project.name,
+        project.address,
+        !!isExistingConstruction,
+      );
     } catch (error) {
       alert(`Failed to export PDF: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
@@ -845,6 +908,19 @@ export const PanelSchedule: React.FC<PanelScheduleProps> = ({ project }) => {
                 {leftCkt.pole > 1 && (
                   <span className="text-[10px] font-bold text-[#2d3b2d]">{leftCkt.pole}P</span>
                 )}
+                {isExistingConstruction && (
+                  <button
+                    onClick={() => toggleProposed(leftCkt)}
+                    title={leftCkt.is_proposed ? 'Proposed new circuit — click to mark as existing' : 'Existing circuit — click to mark as proposed/new'}
+                    className={`px-1 py-0.5 text-[9px] font-bold rounded leading-none border ${
+                      leftCkt.is_proposed
+                        ? 'bg-electric-100 text-electric-700 border-electric-300'
+                        : 'bg-gray-100 text-gray-500 border-gray-200 hover:bg-gray-200'
+                    }`}
+                  >
+                    {leftCkt.is_proposed ? 'NEW' : 'EXIST'}
+                  </button>
+                )}
                 <span className="truncate max-w-[120px]">{leftCkt.description}</span>
               </div>
               <div className="flex gap-0.5 opacity-0 group-hover:opacity-100">
@@ -1010,6 +1086,19 @@ export const PanelSchedule: React.FC<PanelScheduleProps> = ({ project }) => {
               </div>
               <div className="flex items-center gap-1">
                 <span className="truncate max-w-[120px]">{rightCkt.description}</span>
+                {isExistingConstruction && (
+                  <button
+                    onClick={() => toggleProposed(rightCkt)}
+                    title={rightCkt.is_proposed ? 'Proposed new circuit — click to mark as existing' : 'Existing circuit — click to mark as proposed/new'}
+                    className={`px-1 py-0.5 text-[9px] font-bold rounded leading-none border ${
+                      rightCkt.is_proposed
+                        ? 'bg-electric-100 text-electric-700 border-electric-300'
+                        : 'bg-gray-100 text-gray-500 border-gray-200 hover:bg-gray-200'
+                    }`}
+                  >
+                    {rightCkt.is_proposed ? 'NEW' : 'EXIST'}
+                  </button>
+                )}
                 {rightCkt.pole > 1 && (
                   <span className="text-[10px] font-bold text-[#2d3b2d]">{rightCkt.pole}P</span>
                 )}
@@ -1593,9 +1682,64 @@ export const PanelSchedule: React.FC<PanelScheduleProps> = ({ project }) => {
       </div>
 
       {/* Demand Factor Summary */}
-      {demandResult && showDemandDetails && (
+      {demandResult && showDemandDetails && (() => {
+        // For a single-family dwelling MDP, the Standard Method per-circuit-type
+        // walk (220.42 lighting × 1.25, 220.56 kitchen × 0.9, etc.) is the
+        // wrong code section — these panels are sized per the Optional Method
+        // (NEC 220.83 for existing, 220.82 for new). Showing the Standard
+        // Method table here directly contradicts the Panel Summary's
+        // 220.83 demand on the same page (e.g. 52.7 kVA Standard vs 27 kVA
+        // Optional). Replace it with a 220.83 / 220.82 explainer card
+        // instead. Multi-family unit panels and commercial keep the
+        // per-circuit-type table since that's the correct calc for them.
+        const occupancy = project.settings?.occupancyType;
+        const residential = project.settings?.residential;
+        const isSingleFamilyMDP =
+          occupancy === 'dwelling' &&
+          (residential?.dwellingType ?? 'single_family') === 'single_family' &&
+          !!selectedPanel?.is_main;
+        return (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          {/* Demand Factors by Type */}
+          {isSingleFamilyMDP ? (
+            /* 220.83 / 220.82 explainer card replacing the Standard Method table */
+            <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
+              <div className="bg-gray-800 text-white px-4 py-2 flex items-center justify-between">
+                <span className="font-semibold text-sm">
+                  {dwellingUnitDemand?.necArticle ?? 'NEC 220.83'} OPTIONAL METHOD
+                </span>
+                <Calculator className="w-4 h-4" />
+              </div>
+              <div className="p-4 text-xs text-gray-700 space-y-2">
+                <p>
+                  Single-family dwelling MDPs are sized per the {dwellingUnitDemand?.necArticle ?? 'NEC 220.83'} Optional Method, not the per-circuit-type Standard Method walk (NEC 220.42 / 220.55 / 220.56).
+                </p>
+                <p className="text-gray-500 italic">
+                  Edit appliance toggles or proposed loads on the Dwelling Load Calculator to change the demand calc.
+                </p>
+                <div className="mt-3 pt-3 border-t border-gray-200 grid grid-cols-2 gap-2">
+                  <div>
+                    <div className="text-[10px] uppercase text-gray-500 tracking-wide">Total Connected (raw)</div>
+                    <div className="text-lg font-semibold text-gray-900 font-mono">
+                      {demandResult.totalConnectedLoad_kVA.toFixed(2)} kVA
+                    </div>
+                  </div>
+                  <div>
+                    <div className="text-[10px] uppercase text-gray-500 tracking-wide">
+                      {dwellingUnitDemand?.necArticle ?? 'NEC 220.83'} Demand
+                    </div>
+                    <div className="text-lg font-semibold text-[#2d3b2d] font-mono">
+                      {dwellingUnitDemand
+                        ? (dwellingUnitDemand.totalDemandVA / 1000).toFixed(2)
+                        : demandResult.totalDemandLoad_kVA.toFixed(2)} kVA
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          ) : (
+          /* Per-circuit-type Standard Method walk — for commercial /
+              industrial / multi-family unit sub-panels where the Standard
+              Method or the per-unit-panel cascade is the correct calc. */
           <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
             <div className="bg-gray-800 text-white px-4 py-2 flex items-center justify-between">
               <span className="font-semibold text-sm">DEMAND FACTOR CALCULATION (NEC ARTICLE 220)</span>
@@ -1638,6 +1782,7 @@ export const PanelSchedule: React.FC<PanelScheduleProps> = ({ project }) => {
               </tfoot>
             </table>
           </div>
+          )}
 
           {/* Summary Stats */}
           <div className="space-y-4">
@@ -1656,7 +1801,9 @@ export const PanelSchedule: React.FC<PanelScheduleProps> = ({ project }) => {
                   <span className="text-[10px] uppercase text-gray-500 block">
                     Direct Demand Load
                     {dwellingUnitDemand && (
-                      <span className="ml-1 text-amber-700 normal-case">(NEC 220.82)</span>
+                      <span className="ml-1 text-amber-700 normal-case">
+                        ({(dwellingUnitDemand as any).necArticle ?? 'NEC 220.82'})
+                      </span>
                     )}
                     {!dwellingUnitDemand &&
                       aggregatedLoad &&
@@ -1864,7 +2011,8 @@ export const PanelSchedule: React.FC<PanelScheduleProps> = ({ project }) => {
             </div>
           </div>
         </div>
-      )}
+        );
+      })()}
 
       {/* Photo Importer Modal */}
       {showPhotoImporter && selectedPanel && (
