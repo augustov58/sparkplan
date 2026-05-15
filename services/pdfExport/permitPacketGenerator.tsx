@@ -142,6 +142,22 @@ export interface PermitPacketData {
    */
   multiFamilyContext?: MultiFamilyContext;
   /**
+   * NEC 220.82 / 220.83 single-family-dwelling context for the MDP
+   * load-calculation summary. When provided AND the project is a
+   * residential single-family dwelling, the load-calc page applies the
+   * Optional Method (8 kVA / 40% bucket for 220.83, 10 kVA for 220.82)
+   * instead of the per-load-type Standard Method cascade — keeping the
+   * AHJ-facing demand consistent with the in-app Dwelling Calculator.
+   * Pass `undefined` for projects that aren't single-family residential.
+   */
+  singleFamilyDwellingContext?: {
+    squareFootage: number;
+    smallApplianceCircuits: number;
+    laundryCircuit: boolean;
+    /** True when service_modification_type !== 'new-service' → routes to NEC 220.83 */
+    existingDwelling: boolean;
+  };
+  /**
    * Sprint 2A C7: NEC edition stamped on cover sheet + compliance summary.
    * Defaults to '2020' for the FL pilot AHJs (FBC 8th ed adopts NFPA-70 2020).
    * NEC 220.84 demand-factor table values are unchanged between 2020 and 2023.
@@ -596,6 +612,7 @@ export const generatePermitPacket = async (data: PermitPacketData): Promise<void
           servicePhase={data.servicePhase}
           projectType={data.projectType}
           multiFamilyContext={data.multiFamilyContext}
+          singleFamilyDwellingContext={data.singleFamilyDwellingContext}
           {...contractor}
           sheetId={sheetIds[0]}
         />
@@ -1605,6 +1622,7 @@ export const generateLightweightPermitPacket = async (data: PermitPacketData): P
           servicePhase={data.servicePhase}
           projectType={data.projectType}
           multiFamilyContext={data.multiFamilyContext}
+          singleFamilyDwellingContext={data.singleFamilyDwellingContext}
           {...contractor}
         />
         <ComplianceSummary

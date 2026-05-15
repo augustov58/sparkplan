@@ -576,6 +576,27 @@ export const PermitPacketGenerator: React.FC<PermitPacketGeneratorProps> = ({ pr
         currentProject.settings,
       );
 
+      // NEC 220.82 / 220.83 single-family-dwelling context — flips the
+      // Load Calculation Summary PDF page to the Optional Method when the
+      // project is a residential single-family dwelling MDP, so the AHJ
+      // number matches the Dwelling Calculator and Panel Summary in-app.
+      // Suppressed for multi-family (multiFamilyContext takes precedence),
+      // commercial, industrial, or projects without a residential block.
+      const residentialSettings = currentProject.settings?.residential;
+      const isSingleFamilyDwelling =
+        currentProject.settings?.occupancyType === 'dwelling'
+        && (residentialSettings?.dwellingType ?? 'single_family') === 'single_family'
+        && !multiFamilyContext;
+      const singleFamilyDwellingContext = isSingleFamilyDwelling && mdp
+        ? {
+            squareFootage: residentialSettings?.squareFootage ?? 2000,
+            smallApplianceCircuits: residentialSettings?.smallApplianceCircuits ?? 2,
+            laundryCircuit: residentialSettings?.laundryCircuit ?? true,
+            existingDwelling:
+              currentProject.settings?.service_modification_type !== 'new-service',
+          }
+        : undefined;
+
       // Sprint 2A PR 5 / H17: FL contractor-exemption screening. Lane drives
       // the cover-sheet stamp ("Designed under FS 471.003(2)(h)…" vs
       // "PE-sealed plans required per [AHJ]"). When the user hasn't filled
@@ -643,6 +664,11 @@ export const PermitPacketGenerator: React.FC<PermitPacketGeneratorProps> = ({ pr
         jurisdiction: jurisdiction,
         // NEC 220.84 multifamily Optional Method context (undefined for non-MF projects)
         multiFamilyContext,
+        // NEC 220.82 / 220.83 single-family Optional Method context — routes the
+        // Load Calculation Summary PDF page to the Dwelling Calculator's method
+        // so the AHJ-facing demand matches what the in-app Calc + Panel Summary
+        // display (undefined for multi-family / commercial / industrial).
+        singleFamilyDwellingContext,
         // Sprint 2A H1+H2+H3 + 2B PR-4: per-section toggles. When a manifest
         // is active, the manifest+overrides resolution wins; project it
         // through toPacketSectionsPartial (emits ONLY false keys so
