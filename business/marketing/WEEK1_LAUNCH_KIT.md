@@ -194,7 +194,7 @@ But that answer is wrong. NEC 220.84 demand factors and the 220.87 measurement p
 
 [Screen: Open SparkPlan Multi-Family EV Calculator]
 
-"Here's the scenario. 35-unit apartment building, California — so they're required to have EV-ready parking under the 2026 mandate. Existing service is 800 amps, 120/208V, 3-phase.
+"Here's the scenario. 35-unit condo building, Florida — a unit owner invoked FL §718.113(8) Right-to-Charge, so the board has to allow charger installation. Existing service is 800 amps, 120/208V, 3-phase.
 
 Let me plug in the building details:
 - 35 dwelling units

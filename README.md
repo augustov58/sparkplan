@@ -247,11 +247,7 @@ This is a private project. For questions or issues, contact the repository owner
 
 ## 🎯 Roadmap
 
-- [x] **Phase 0:** Basic project management (RFIs, site visits, calendar)
-- [x] **Phase 1:** AI agent infrastructure (Pydantic AI + FastAPI)
-- [x] **Phase 2:** EV niche domination (EVEMS, service upgrade wizard)
-- [ ] **Phase 3:** Design copilot (AI-powered auto-design)
-- [ ] **Phase 4:** Solar + storage expansion (battery systems)
+See [`ROADMAP.md`](./ROADMAP.md) for the live phase status, completed work, and upcoming features.
 
 ---
 

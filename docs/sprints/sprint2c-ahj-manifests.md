@@ -1,10 +1,10 @@
 # Sprint 2C — Per-AHJ Manifests + Checklist Engine M1
 
-**Status:** ⚪ Not started; **research can start in parallel with Sprint 2A** (non-coding work)
-**Hard prerequisites:**
-- Sprint 2A H17 lane logic ([`sprint2a-form-factor.md`](./sprint2a-form-factor.md)) — M1 engine reads `lane` to decide which requirements apply
-- Sprint 2B manifest scaffold ([`sprint2b-uploads.md`](./sprint2b-uploads.md)) — Sprint 2C extends Orlando-only to all 5 FL AHJs
-- 4-AHJ checklist sourcing (research, not code) — see "Parallel research task" below
+**Status:** ✅ COMPLETE 2026-05-14 — M1 jurisdiction-checklist engine shipped via PR #54 (`e6d9133`); Pompano + Miami-Dade + Davie + Hillsborough/Tampa manifests shipped via PR #56 (`a4bf21a`). All 5 FL pilot AHJs now have registered manifests; the engine walks the packet AST against each.
+**Hard prerequisites (all met):**
+- Sprint 2A H17 lane logic ✅
+- Sprint 2B manifest scaffold ✅ (PR #51)
+- 4-AHJ checklist sourcing ✅ (PR #46 + #48 research)
 
 **Inherits from:** Sprint 2A (general notes pattern, `<XxxPage>` builder pattern, schema), Sprint 2B (manifest data shape, `project_attachments` table)
 **Index:** [`docs/sprints/README.md`](./README.md)
