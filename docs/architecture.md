@@ -1,7 +1,7 @@
 # Software Architecture Documentation
 ## SparkPlan Application
 
-**Last Updated**: 2026-03-20
+**Last Updated**: 2026-05-16
 **Version**: 1.1
 **Technology Stack**: React 19.2.0 + TypeScript 5.8.3 + Supabase + Vite 6.4.1
 
