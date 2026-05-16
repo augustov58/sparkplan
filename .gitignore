@@ -34,3 +34,4 @@ dist-ssr
 # Playwright E2E auth state + output (may contain JWTs, test artifacts)
 tests/e2e/.auth/
 tests/e2e/__output__/
+.playwright-mcp/
