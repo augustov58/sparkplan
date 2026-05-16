@@ -1224,8 +1224,17 @@ export const PanelSchedule: React.FC<PanelScheduleProps> = ({ project }) => {
           </div>
           {(() => {
             // Show "<used> / <capacity>" so the user always sees the slot
-            // limit. Multi-pole breakers count their full pole count toward use.
-            const polesUsed = panelCircuits.reduce((sum, c) => sum + (c.pole || 1), 0);
+            // limit. Multi-pole breakers count their full pole count toward
+            // use, AND sub-panel feeders (breakers feeding downstream panels)
+            // count their pole footprint — those reservations live on
+            // `panels.fed_from_circuit_number` and have no row in `circuits`,
+            // so a circuits-only count under-reports occupancy.
+            const circuitPolesUsed = panelCircuits.reduce((sum, c) => sum + (c.pole || 1), 0);
+            const feederPolesUsed = breakerFedPanels.reduce(
+              (sum, f) => sum + (f.circuitNumber ? (f.pole || 1) : 0),
+              0,
+            );
+            const polesUsed = circuitPolesUsed + feederPolesUsed;
             const utilizationPct = totalSlots > 0 ? (polesUsed / totalSlots) * 100 : 0;
             const tone =
               polesUsed > totalSlots

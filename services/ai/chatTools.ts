@@ -273,6 +273,117 @@ function getNextServiceSize(amps: number): number {
   return 2000;
 }
 
+/**
+ * Fetch the authoritative set of occupied slot numbers for a panel.
+ *
+ * "Occupancy" has TWO sources in this codebase (see ADR-005):
+ *   1. Rows in the `circuits` table (with multi-pole expansion baseSlot+i*2).
+ *   2. Sub-panels fed from this panel via a breaker — recorded as
+ *      `panels.fed_from = this.id` + `panels.fed_from_circuit_number` + phase.
+ *      These claim slots but have NO row in the `circuits` table, so the
+ *      unique constraint on (panel_id, circuit_number) cannot protect them.
+ *
+ * The chat tools used to walk only source #1 (and from a 50-row token-capped
+ * summary at that), which let bulk-fill quietly insert rows on top of
+ * sub-panel feeder slots — silent corruption. This helper unions both sources
+ * from the live database so callers see the true slot footprint.
+ *
+ * @returns Set of every slot number that is unavailable for a new circuit,
+ *   plus an `occupantLabels` map for human-readable error messages.
+ */
+async function getPanelOccupiedSlots(
+  projectId: string,
+  panelId: string,
+): Promise<{
+  occupied: Set<number>;
+  occupantLabels: Map<number, string>;
+  error?: string;
+}> {
+  const occupied = new Set<number>();
+  const occupantLabels = new Map<number, string>();
+
+  // Source 1: real circuit rows
+  const { data: circuitRows, error: ckErr } = await supabase
+    .from('circuits')
+    .select('circuit_number, pole, description')
+    .eq('panel_id', panelId);
+  if (ckErr) {
+    return { occupied, occupantLabels, error: `Failed to read circuits: ${ckErr.message}` };
+  }
+  for (const c of circuitRows || []) {
+    const pole = c.pole || 1;
+    for (let i = 0; i < pole; i++) {
+      const slot = c.circuit_number + i * 2;
+      occupied.add(slot);
+      if (!occupantLabels.has(slot)) {
+        occupantLabels.set(
+          slot,
+          i === 0
+            ? `circuit "${c.description}" (${pole}P at slot ${c.circuit_number})`
+            : `continuation of ${pole}P circuit at slot ${c.circuit_number}`,
+        );
+      }
+    }
+  }
+
+  // Source 2: sub-panel feeders fed from this panel via a breaker
+  const { data: subPanels, error: spErr } = await supabase
+    .from('panels')
+    .select('name, fed_from_circuit_number, phase')
+    .eq('project_id', projectId)
+    .eq('fed_from', panelId)
+    .not('fed_from_circuit_number', 'is', null);
+  if (spErr) {
+    return { occupied, occupantLabels, error: `Failed to read sub-panels: ${spErr.message}` };
+  }
+  for (const sp of subPanels || []) {
+    if (!sp.fed_from_circuit_number) continue;
+    const feederPoles = sp.phase === 3 ? 3 : 2; // breakers feeding sub-panels are 2P or 3P
+    for (let i = 0; i < feederPoles; i++) {
+      const slot = sp.fed_from_circuit_number + i * 2;
+      occupied.add(slot);
+      if (!occupantLabels.has(slot)) {
+        occupantLabels.set(
+          slot,
+          i === 0
+            ? `feeder to sub-panel "${sp.name}" (${feederPoles}P at slot ${sp.fed_from_circuit_number})`
+            : `continuation of ${feederPoles}P feeder to "${sp.name}"`,
+        );
+      }
+    }
+  }
+
+  return { occupied, occupantLabels };
+}
+
+/**
+ * Load templates used by both the bulk-fill and single-add tools. Keeping a
+ * single source means a user saying "add a receptacle" via add_circuit and
+ * "fill the panel with receptacles" via fill_panel_with_test_loads get the
+ * same defaults.
+ */
+const LOAD_TEMPLATES = {
+  lighting:   { description: 'General Lighting',  breaker: 15, loadVA: 1200, pole: 1, loadTypeCode: 'L' },
+  receptacle: { description: 'General Receptacles', breaker: 20, loadVA: 1800, pole: 1, loadTypeCode: 'R' },
+  motor:      { description: 'Motor Load',        breaker: 20, loadVA: 2400, pole: 1, loadTypeCode: 'M' },
+  hvac:       { description: 'HVAC Unit',         breaker: 30, loadVA: 5000, pole: 2, loadTypeCode: 'H' },
+  ac:         { description: 'Condensing Unit',   breaker: 40, loadVA: 7200, pole: 2, loadTypeCode: 'C' },
+  water_heater: { description: 'Water Heater',    breaker: 30, loadVA: 4500, pole: 2, loadTypeCode: 'W' },
+  kitchen:    { description: 'Kitchen Equipment', breaker: 20, loadVA: 2400, pole: 1, loadTypeCode: 'K' },
+  other:      { description: 'General Load',      breaker: 20, loadVA: 1500, pole: 1, loadTypeCode: 'O' },
+} as const;
+
+type LoadTemplateKey = keyof typeof LOAD_TEMPLATES;
+
+function wireSizeForBreaker(amps: number): string {
+  if (amps <= 15) return '14 AWG';
+  if (amps <= 20) return '12 AWG';
+  if (amps <= 30) return '10 AWG';
+  if (amps <= 40) return '8 AWG';
+  if (amps <= 50) return '6 AWG';
+  return '4 AWG';
+}
+
 // ============================================================================
 // TOOL DEFINITIONS
 // ============================================================================
@@ -1025,33 +1136,58 @@ Returns predicted issues with likelihood, NEC references, and fix recommendation
   // -------------------------------------------------------------------------
   {
     name: 'add_circuit',
-    description: `Add a new circuit to a panel. Use this when the user wants to create a new circuit.
-Requires panel name, circuit description, breaker size, and load.`,
+    description: `Add a single circuit to a panel.
+
+Slot placement:
+- Omit circuit_number to auto-pick the next available slot that fits the pole count.
+- Pass circuit_number to place at a specific slot (e.g., "add a receptacle at slot 3").
+  The slot must be free of both real circuits AND sub-panel feeder reservations.
+
+Defaults from load_type:
+- Pass load_type (lighting | receptacle | motor | hvac | ac | water_heater | kitchen | other)
+  to inherit a sensible breaker size, load, pole count, and load-type code without
+  having to specify each. Explicit breaker_amps/load_watts/poles still override the template.
+- If neither load_type nor description is given, default load_type = "other".
+
+Examples:
+- "add a receptacle at slot 3" → load_type=receptacle, circuit_number=3
+- "add a 2-pole motor"        → load_type=motor, poles=2 (slot auto-picked)
+- "add a 30A HVAC"             → load_type=hvac (defaults 30A/2P)`,
     parameters: {
       type: 'object',
       properties: {
         panel_name: { type: 'string', description: 'Name of the panel to add circuit to' },
-        description: { type: 'string', description: 'Circuit description (e.g., "Kitchen receptacles", "HVAC unit")' },
-        breaker_amps: { type: 'number', description: 'Breaker size in amps (15, 20, 30, 40, 50, etc.)' },
-        load_watts: { type: 'number', description: 'Circuit load in watts' },
-        poles: { type: 'number', description: 'Number of poles (1, 2, or 3)' },
-        wire_size: { type: 'string', description: 'Conductor size (e.g., "12 AWG", "10 AWG")' },
+        description: { type: 'string', description: 'Circuit description. Optional if load_type is provided.' },
+        load_type: {
+          type: 'string',
+          description: 'Pre-set template: lighting, receptacle, motor, hvac, ac, water_heater, kitchen, other',
+          enum: ['lighting', 'receptacle', 'motor', 'hvac', 'ac', 'water_heater', 'kitchen', 'other'],
+        },
+        circuit_number: { type: 'number', description: 'Specific slot number to place at (1-N). Omit to auto-pick.' },
+        breaker_amps: { type: 'number', description: 'Breaker size in amps. Overrides load_type default.' },
+        load_watts: { type: 'number', description: 'Circuit load in watts. Overrides load_type default.' },
+        poles: { type: 'number', description: 'Number of poles (1, 2, or 3). Overrides load_type default.' },
+        wire_size: { type: 'string', description: 'Conductor size (e.g., "12 AWG"). Auto-sized from breaker if omitted.' },
       },
-      required: ['panel_name', 'description', 'breaker_amps'],
+      required: ['panel_name'],
     },
     requiresConfirmation: true,
     execute: async (params, context) => {
       const {
         panel_name,
         description,
+        load_type,
+        circuit_number,
         breaker_amps,
         load_watts,
-        poles = 1,
+        poles,
         wire_size,
       } = params as {
         panel_name: string;
-        description: string;
-        breaker_amps: number;
+        description?: string;
+        load_type?: LoadTemplateKey;
+        circuit_number?: number;
+        breaker_amps?: number;
         load_watts?: number;
         poles?: number;
         wire_size?: string;
@@ -1060,6 +1196,20 @@ Requires panel name, circuit description, breaker size, and load.`,
       if (!context.projectId) {
         return { success: false, error: 'No project selected.' };
       }
+
+      // Resolve template defaults. If neither load_type nor breaker_amps is
+      // provided, fall back to "other" so the tool can still complete with a
+      // reasonable shape (LLMs sometimes call us with only panel_name + slot).
+      const templateKey: LoadTemplateKey =
+        load_type ?? (breaker_amps == null && !description ? 'other' : 'other');
+      const template = LOAD_TEMPLATES[templateKey];
+
+      const finalBreakerAmps = breaker_amps ?? template.breaker;
+      const finalPoles = poles ?? template.pole;
+      const finalLoadVA = load_watts ?? template.loadVA;
+      const finalDescription = description ?? template.description;
+      const finalLoadTypeCode = template.loadTypeCode;
+      const finalWireSize = wire_size ?? wireSizeForBreaker(finalBreakerAmps);
 
       // Find the panel
       const panel = context.projectContext.panels.find(
@@ -1072,100 +1222,120 @@ Requires panel name, circuit description, breaker size, and load.`,
         };
       }
 
-      // Find the next circuit slot that can actually fit this breaker:
-      // - Must be within the panel's num_spaces bounds
-      // - Must not collide with any existing circuit (including multi-pole expansions)
-      // Mirrors the logic in fill_panel_with_test_loads so the single-add
-      // and bulk-fill paths pick slots the same way.
-      const existingCircuits = context.projectContext.circuits.filter(c => c.panelName === panel.name);
+      // Get panel ID from database
+      const { data: dbPanel, error: dbErr } = await supabase
+        .from('panels')
+        .select('id')
+        .eq('project_id', context.projectId)
+        .eq('name', panel.name)
+        .single();
+      if (dbErr || !dbPanel) {
+        return { success: false, error: `Database error finding panel: ${dbErr?.message ?? 'not found'}` };
+      }
+
       const totalSlots = panel.numSpaces ?? (panel.isMain ? 30 : 42);
 
-      const occupiedSlots = new Set<number>();
-      for (const ckt of existingCircuits) {
-        occupiedSlots.add(ckt.circuitNumber);
-        const pole = ckt.pole || 1;
-        for (let i = 1; i < pole; i++) {
-          occupiedSlots.add(ckt.circuitNumber + i * 2);
-        }
+      // Authoritative slot occupancy from DB (circuits + sub-panel feeders).
+      // projectContext.circuits is capped at 50 and ignores feeder reservations,
+      // which previously caused silent overlap onto sub-panel feeders.
+      const { occupied, occupantLabels, error: occErr } =
+        await getPanelOccupiedSlots(context.projectId, dbPanel.id);
+      if (occErr) {
+        return { success: false, error: occErr };
       }
 
       const canFitCircuit = (slotNum: number, pole: number): boolean => {
         for (let i = 0; i < pole; i++) {
           const slot = slotNum + i * 2;
-          if (slot > totalSlots || occupiedSlots.has(slot)) return false;
+          if (slot > totalSlots || occupied.has(slot)) return false;
         }
         return true;
       };
 
-      let nextCircuitNum: number | null = null;
-      for (let slot = 1; slot <= totalSlots; slot++) {
-        if (canFitCircuit(slot, poles)) {
-          nextCircuitNum = slot;
-          break;
+      // Resolve target slot: explicit or auto-picked.
+      let targetSlot: number | null = null;
+      if (circuit_number != null) {
+        if (circuit_number < 1 || circuit_number > totalSlots) {
+          return {
+            success: false,
+            error: `Slot ${circuit_number} is outside panel "${panel.name}" range (1–${totalSlots}).`,
+          };
+        }
+        if (!canFitCircuit(circuit_number, finalPoles)) {
+          const conflicts: string[] = [];
+          for (let i = 0; i < finalPoles; i++) {
+            const s = circuit_number + i * 2;
+            if (s > totalSlots) conflicts.push(`slot ${s} is past panel capacity (${totalSlots})`);
+            else if (occupied.has(s)) conflicts.push(`slot ${s} is occupied by ${occupantLabels.get(s) ?? 'an existing circuit'}`);
+          }
+          return {
+            success: false,
+            error: `Cannot place ${finalPoles}-pole circuit at slot ${circuit_number}: ${conflicts.join('; ')}.`,
+          };
+        }
+        targetSlot = circuit_number;
+      } else {
+        for (let slot = 1; slot <= totalSlots; slot++) {
+          if (canFitCircuit(slot, finalPoles)) {
+            targetSlot = slot;
+            break;
+          }
+        }
+        if (targetSlot === null) {
+          return {
+            success: false,
+            error: `Panel "${panel.name}" has no room for a ${finalPoles}-pole breaker ` +
+              `(${occupied.size}/${totalSlots} slots occupied). ` +
+              `Free a slot, reduce the pole count, or increase the panel's number of spaces.`,
+          };
         }
       }
-
-      if (nextCircuitNum === null) {
-        return {
-          success: false,
-          error: `Panel "${panel.name}" has no room for a ${poles}-pole breaker ` +
-            `(${existingCircuits.length} circuits already occupy its ${totalSlots} spaces). ` +
-            `Free a slot, reduce the pole count, or increase the panel's number of spaces.`,
-        };
-      }
-
-      // Default wire size based on breaker
-      const defaultWireSize = breaker_amps <= 15 ? '14 AWG' :
-                              breaker_amps <= 20 ? '12 AWG' :
-                              breaker_amps <= 30 ? '10 AWG' :
-                              breaker_amps <= 40 ? '8 AWG' :
-                              breaker_amps <= 50 ? '6 AWG' : '4 AWG';
 
       try {
-        // Get panel ID from database
-        const { data: dbPanel } = await supabase
-          .from('panels')
-          .select('id')
-          .eq('project_id', context.projectId)
-          .eq('name', panel.name)
-          .single();
-
-        if (!dbPanel) {
-          return { success: false, error: 'Panel not found in database.' };
-        }
-
-        const { data: newCircuit, error } = await supabase
+        const { error } = await supabase
           .from('circuits')
           .insert({
             project_id: context.projectId,
             panel_id: dbPanel.id,
-            circuit_number: nextCircuitNum,
-            description,
-            breaker_amps,
-            load_watts: load_watts || breaker_amps * 120 * 0.8,
-            pole: poles,
-            conductor_size: wire_size || defaultWireSize,
-            load_type: 'O', // O = Other (default for general circuits)
+            circuit_number: targetSlot,
+            description: finalDescription,
+            breaker_amps: finalBreakerAmps,
+            load_watts: finalLoadVA,
+            pole: finalPoles,
+            conductor_size: finalWireSize,
+            load_type: finalLoadTypeCode,
           } as any)
           .select()
           .single();
 
         if (error) {
+          // 23505 = Postgres unique_violation. Surface the colliding slot
+          // explicitly rather than the cryptic constraint name. This is the
+          // diagnostic message that was missing in the H4 / H7 incident.
+          if ((error as any).code === '23505') {
+            const occupant = occupantLabels.get(targetSlot!) ?? 'an existing circuit';
+            return {
+              success: false,
+              error: `Slot ${targetSlot} in "${panel.name}" is already occupied by ${occupant}. ` +
+                `Pick a different slot or remove the existing circuit first.`,
+            };
+          }
           return { success: false, error: `Failed to add circuit: ${error.message}` };
         }
 
-        // Notify UI to refresh circuit data
         notifyDataRefresh('circuits');
 
         return {
           success: true,
           data: {
-            message: `Circuit "${description}" added to ${panel.name}`,
-            circuitNumber: nextCircuitNum,
+            message: `Circuit "${finalDescription}" added to ${panel.name} at slot ${targetSlot}`,
+            circuitNumber: targetSlot,
             panelName: panel.name,
-            breakerAmps: breaker_amps,
-            conductorSize: wire_size || defaultWireSize,
-            poles,
+            breakerAmps: finalBreakerAmps,
+            conductorSize: finalWireSize,
+            poles: finalPoles,
+            loadVA: finalLoadVA,
+            loadType: finalLoadTypeCode,
           },
         };
       } catch (error) {
@@ -1341,27 +1511,34 @@ Can be fed from:
   // -------------------------------------------------------------------------
   {
     name: 'fill_panel_with_test_loads',
-    description: `Fill a panel with test/sample circuits. Use this when the user wants to quickly populate a panel with circuits for testing or demonstration purposes.
+    description: `Populate a panel with test/sample circuits.
 
-If the user says "fill the MDP" or references the main panel, it will find the main panel automatically.
-If no panel is specified, defaults to the main panel.
+Two stop conditions — both are active, whichever caps first:
+1. num_circuits (if provided) — hard cap on circuit count.
+2. target_utilization (default 60%) — stop when added load reaches that % of panel capacity.
 
-Can specify:
-- panel_name: The panel to fill (supports "MDP" for Main Distribution Panel)
-- num_circuits: Number of circuits to add
-- load_type: lighting, receptacle, motor, hvac, or mixed (default)
-- target_utilization: Target % (default 60%)`,
+Examples the user might say:
+- "fill panel H4"                              → defaults (mixed loads, 60% target)
+- "add 24 circuits to H4 and fill to 40%"     → num_circuits=24, target_utilization=40
+- "add 12 receptacles to H4"                  → num_circuits=12, load_type=receptacle
+- "fill the MDP to 80%"                        → target_utilization=80
+
+If no panel is specified, defaults to the main panel. "MDP" maps to the main panel.
+
+Slot placement respects BOTH real circuits AND sub-panel feeder reservations
+(slots claimed by panels whose fed_from points to this panel). Fixes the prior
+silent-overlap bug.`,
     parameters: {
       type: 'object',
       properties: {
         panel_name: { type: 'string', description: 'Name of the panel to fill with test loads' },
-        num_circuits: { type: 'number', description: 'Number of circuits to add (default: fill to 80% capacity)' },
+        num_circuits: { type: 'number', description: 'Hard cap on circuits to add. Combine with target_utilization to stop at whichever comes first.' },
         load_type: {
           type: 'string',
           description: 'Type of loads to add: lighting, receptacle, motor, hvac, mixed (default)',
           enum: ['lighting', 'receptacle', 'motor', 'hvac', 'mixed'],
         },
-        target_utilization: { type: 'number', description: 'Target panel utilization percentage (default: 60%)' },
+        target_utilization: { type: 'number', description: 'Target panel utilization percentage (default: 60%). Stops adding once new load reaches this share of capacity.' },
       },
       required: ['panel_name'],
     },
@@ -1496,28 +1673,23 @@ Can specify:
         };
       }
 
-      // Get existing circuits and calculate occupied slots
-      const existingCircuits = context.projectContext.circuits.filter(c => c.panelName === panel.name);
-
       // Panel slot count: MDP/Main = 30 slots, Branch panels = 42 slots
       const totalSlots = panel.numSpaces ?? (panel.isMain ? 30 : 42);
 
-      // Calculate occupied slots (including multi-pole circuit expansions)
-      const occupiedSlots = new Set<number>();
-      for (const ckt of existingCircuits) {
-        // Add the circuit's base slot
-        occupiedSlots.add(ckt.circuitNumber);
-        // Add slots occupied by multi-pole circuits
-        // 1-pole: occupies 1 slot (e.g., slot 1)
-        // 2-pole: occupies 2 slots (e.g., slots 1 and 3)
-        // 3-pole: occupies 3 slots (e.g., slots 1, 3, and 5)
-        const pole = ckt.pole || 1;
-        if (pole > 1) {
-          for (let i = 1; i < pole; i++) {
-            occupiedSlots.add(ckt.circuitNumber + (i * 2));
-          }
-        }
+      // Get authoritative slot occupancy from the database. This unions:
+      //   (a) real circuit rows in the `circuits` table, and
+      //   (b) sub-panel feeder reservations on `panels.fed_from_circuit_number`
+      //       for any panel whose fed_from points back to this one.
+      // The previous implementation read context.projectContext.circuits,
+      // which is (1) capped at 50 rows for token budget and (2) blind to
+      // sub-panel feeders entirely — causing silent slot overlap onto the
+      // breaker that feeds a downstream panel. See H4 / H7 incident.
+      const occupancy = await getPanelOccupiedSlots(context.projectId, dbPanel.id);
+      if (occupancy.error) {
+        return { success: false, error: occupancy.error };
       }
+      const occupiedSlots = occupancy.occupied;
+      const occupantLabels = occupancy.occupantLabels;
 
       // Helper function to check if a slot can fit a circuit with given pole count
       const canFitCircuit = (slotNum: number, pole: number): boolean => {
@@ -1594,16 +1766,23 @@ Can specify:
         load_type_code: string;
       }> = [];
 
-      // Calculate how many circuits to add (respecting both load and slot limits)
+      // Two independent stop conditions, both active. Loop exits at whichever
+      // caps first — explicit num_circuits (hard count cap) OR cumulative
+      // addedLoadVA reaching the target utilization.
       let addedLoadVA = 0;
       let templateIndex = 0;
-      const maxCircuitsByLoad = num_circuits || Math.ceil(remainingLoadVA / 1500); // Estimate ~1500VA per circuit
+      // When num_circuits is omitted, fall back to a generous bound that lets
+      // target_utilization be the effective limit (the loop will exit on load
+      // or on running out of slots whichever happens first). totalSlots is a
+      // hard upper bound since each circuit needs at least 1 slot.
+      const circuitCountCap = num_circuits != null ? num_circuits : totalSlots;
 
       console.log('[fill_panel_with_test_loads] Loop limits:', {
         num_circuits,
-        maxCircuitsByLoad,
+        circuitCountCap,
+        target_utilization,
+        remainingLoadVA,
         availableSlotsCount,
-        existingCircuitsCount: existingCircuits.length,
       });
 
       // Early exit if no slots available
@@ -1615,8 +1794,8 @@ Can specify:
         };
       }
 
-      // Early exit if no load capacity
-      if (maxCircuitsByLoad === 0) {
+      // Early exit if no load capacity and user didn't specify an explicit count
+      if (num_circuits == null && remainingLoadVA <= 0) {
         const currentUtilization = Math.round((currentLoadVA / panelCapacityVA) * 100);
         return {
           success: false,
@@ -1624,9 +1803,12 @@ Can specify:
         };
       }
 
-      // Add circuits until we hit load target, slot limit, or run out of available slots
+      // Add circuits until we hit count cap, load target, or slot exhaustion.
+      // BOTH limits are active — stop at whichever fires first. This is what
+      // the user means by "add 24 circuits and fill to 40%": 24 is a hard
+      // ceiling, 40% utilization is the load target.
       while (
-        circuitsToAdd.length < maxCircuitsByLoad &&
+        circuitsToAdd.length < circuitCountCap &&
         addedLoadVA < remainingLoadVA
       ) {
         const template = templates[templateIndex % templates.length];
@@ -1693,7 +1875,7 @@ Can specify:
         console.log('[fill_panel_with_test_loads] No circuits added after loop:', {
           currentUtilization,
           target_utilization,
-          maxCircuitsByLoad,
+          circuitCountCap,
           remainingLoadVA,
           addedLoadVA,
           availableSlotsCount,
@@ -1742,6 +1924,22 @@ Can specify:
 
         if (error) {
           console.error('[fill_panel_with_test_loads] Insert error:', error);
+          // 23505 = unique_violation on (panel_id, circuit_number). With the
+          // DB-driven occupancy helper this should be impossible, but if it
+          // ever fires (e.g., concurrent insert) surface the colliding slots
+          // by name rather than the raw Postgres constraint string.
+          if ((error as any).code === '23505') {
+            const attemptedSlots = circuitsToAdd
+              .map(c => c.circuit_number)
+              .filter(s => occupantLabels.has(s));
+            const detail = attemptedSlots.length
+              ? ` Conflicting slots: ${attemptedSlots.map(s => `${s} (${occupantLabels.get(s)})`).join(', ')}.`
+              : '';
+            return {
+              success: false,
+              error: `Slot conflict in "${panel.name}" — another process added a circuit between this tool's slot check and the insert.${detail} Try again.`,
+            };
+          }
           return { success: false, error: `Failed to add circuits: ${error.message}` };
         }
 
