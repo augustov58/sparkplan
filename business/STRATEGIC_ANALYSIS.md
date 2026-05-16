@@ -1,6 +1,6 @@
 # SparkPlan — Strategic Analysis
 
-**Last Updated:** 2026-05-04
+**Last Updated:** 2026-05-15
 **Status:** Pre-revenue. Product built. Entering Florida pilot.
 **Authoritative source:** This file summarizes the operational decisions derived from the deeper analyses in the personal Obsidian vault (`SparkPlan Analysis/` — Reconciliation Notes May 2 2026, OAI Market Viability May 2026, Competitive Landscape Apr 2026, FL Pilot Revised Feb 2026). Where this file disagrees with the Obsidian Reconciliation Notes, Reconciliation Notes win.
 
@@ -35,18 +35,19 @@ Florida is the pilot because:
 
 ---
 
-## Pricing — Open Decision
+## Current Pricing
 
-The Obsidian Reconciliation Notes flag this as the **#1 unresolved contradiction** across reports. We have not picked a lane:
+Live tier ladder, wired in `hooks/useSubscription.ts`:
 
-| Strategy | Tiers | Year-1 ARR implied | Best when… |
+| Tier | Price | Limit | Key feature gate |
 |---|---|---|---|
-| **Undercut Kopperfield (PLG)** | $29 / $49 / $149 | $50K–$150K | High-volume, self-serve, low-touch; relies on freemium funnel |
-| **Premium PE-led** | $249–$599/mo + per-seal upsell | $100K–$300K + $50K–$250K seal | Vertically-integrated PE service; lower volume, higher ARPU |
+| Free | $0 | 3 projects | NEC search + basic calculators |
+| **Starter** | $29/mo | 10 projects | Residential workflow + permit packet |
+| **Pro** | $49/mo | Unlimited projects | Service Upgrade Wizard + EVEMS |
+| **Business** | $149/mo | Unlimited projects | AI Copilot + Advanced Short Circuit + multi-seat |
+| Enterprise | Custom | Unlimited | Custom workflows |
 
-**Action required before any pitch copy or paid acquisition runs:** pick one. The Y1 revenue projection collapses to a different number under each.
-
-For pilot purposes we are **operating at $29 / $49 / $149** because that's what the product currently bills; this is a default, not a decision.
+Permits are unlimited within Starter+; **projects** are the meter, not permits. Per-seal PE upsell (Sprint 3) sits on top of any tier — that's the Premium-PE-led layer that resolves the prior open-decision between PLG-only and PE-led.
 
 ---
 
@@ -208,4 +209,4 @@ Most contractors don't know:
 
 **When to re-sync this file with Obsidian:** any time the Reconciliation Notes change, or any time a contradiction in the Obsidian reports gets resolved (Kopperfield NEC 2026 verification, Florida EV figure source-lock, Miami parking ordinance preemption check, FlashWorks acquisition vs compete decision).
 
-**Staleness flags:** Last Updated > 60 days, a Go/No-Go pilot milestone passed without assessment, a new direct competitor launches, or pricing strategy gets locked in (delete the "Pricing — Open Decision" section once decided).
+**Staleness flags:** Last Updated > 60 days, a Go/No-Go pilot milestone passed without assessment, a new direct competitor launches, or the live `hooks/useSubscription.ts` tier ladder diverges from the "Current Pricing" table above.

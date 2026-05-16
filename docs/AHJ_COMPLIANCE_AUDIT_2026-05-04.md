@@ -1,7 +1,7 @@
 # AHJ Compliance Audit — Multifamily Permit Packet
 
 **Date:** 2026-05-04
-**Last Updated:** 2026-05-13
+**Last Updated:** 2026-05-15
 **Audited artifact:** `example_reports/Permit_Packet_Multifamily_Test_2026-05-05.pdf` (27 pages, react-pdf, 124 KB)
 **Audit basis:** FL AHJ requirements per `business/STRATEGIC_ANALYSIS.md` + Obsidian `SparkPlan Analysis/` (FL Pilot Revised Feb 2026, Competitive Landscape Apr 2026, OAI Market Viability May 2026) + **City of Orlando "EV Charging Station Permit Checklist"** (sourced 2026-05-08, both EV-from-existing and EV-from-new-service paths)
 **Scope:** 5 FL pilot AHJs — Orlando (Orange), Miami-Dade, Pompano Beach (Broward), Davie (Broward), Hillsborough/Tampa
@@ -33,7 +33,7 @@ Cold-read cost for typical sessions: index (~5k) + 1 sprint file = **~7–17k to
 - **Sprint 1** — ✅ COMPLETE 2026-05-07 (10 calc-engine fixes)
 - **Sprint 2A** — ✅ COMPLETE 2026-05-10 (19/19; 5 themed PRs)
 - **Sprint 2B** — ✅ COMPLETE 2026-05-13 (PR #45 foundation + PR #47 upload UI + PR #49 merge engine + PR #51 Orlando manifest scaffold merged)
-- **Sprint 2C** — ⚪ Not started (research + manifest scaffold landed via PR #46 + PR #48 + PR #51)
+- **Sprint 2C** — ✅ COMPLETE 2026-05-14 (M1 engine via PR #54 `e6d9133` + 4 manifests Pompano/MD/Davie/Hillsborough via PR #56 `a4bf21a`)
 - **Sprint 3** — ⚪ Not started
 - **Sprint 4** — 🔵 Deferred
 

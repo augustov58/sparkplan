@@ -314,7 +314,7 @@ Screenshot of Service Upgrade Calculator showing:
 **Yes.** Free tier includes 3 permits/month and full access to the Service Upgrade Calculator. Upgrade to Pro ($49/mo) when you're ready for unlimited permits and the Permit Packet Generator.
 
 ### "What if I need help?"
-- **Email support:** support@necpro.com (24-hour response time)
+- **Email support:** support@sparkplan.app (24-hour response time)
 - **Live chat:** Monday-Friday 8am-6pm PT
 - **Video tutorials:** 15+ how-to videos for common workflows
 - **NEC AI Assistant:** Ask code questions 24/7 (included in Pro tier)
