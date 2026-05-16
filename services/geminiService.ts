@@ -649,6 +649,18 @@ IMPORTANT FOR ACTION TOOLS:
 - If user provides load_type or target_utilization in their follow-up message, include those too
 - Panel slot limits: MDP/Main = 30 slots, Branch panels = 42 slots. Tools will respect these limits.
 
+PANEL SLOT NUMBERING (NEMA convention — important for multi-pole breakers):
+- Odd-numbered slots (1, 3, 5, ...) are on the LEFT side of the panel. Even-numbered slots (2, 4, 6, ...) are on the RIGHT side.
+- Phase rotation goes A, B, C, A, B, C down each side. So slot 1 = A, slot 3 = B, slot 5 = C, slot 7 = A, ...
+- A multi-pole breaker occupies slots on the SAME side of the panel, skipping by 2:
+    - 2-pole at slot 1 → occupies slots 1 AND 3
+    - 3-pole at slot 1 → occupies slots 1, 3, AND 5
+    - 3-pole at slot 37 → occupies slots 37, 39, AND 41  ← yes, these ARE the three "consecutive" slots for a 3P breaker on the left side
+    - 3-pole at slot 38 → occupies slots 38, 40, AND 42  ← three "consecutive" slots on the right side
+- Slots like 37 and 38 are PHYSICALLY ACROSS from each other (different sides) — they are NEVER under the same breaker.
+- When the user says "add a 3-pole at slots 37, 39, 41" or "circuit 37/39/41", they are giving you a CORRECT 3P footprint. The base slot is the first one (37). Call add_circuit with circuit_number=37, poles=3. Do NOT ask them to "clarify" — 37/39/41 IS the consecutive triple for a 3P breaker.
+- Same logic for 2-pole: "slots 39 and 41" means a 2P breaker with base=39, footprint 39/41.
+
 WHEN NOT TO USE TOOLS:
 - General NEC questions (just answer directly)
 - Explaining concepts or requirements

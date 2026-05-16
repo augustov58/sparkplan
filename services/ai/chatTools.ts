@@ -1277,9 +1277,11 @@ Defaults from load_type:
 - If neither load_type nor description is given, default load_type = "other".
 
 Examples:
-- "add a receptacle at slot 3" → load_type=receptacle, circuit_number=3
-- "add a 2-pole motor"        → load_type=motor, poles=2 (slot auto-picked)
-- "add a 30A HVAC"             → load_type=hvac (defaults 30A/2P)`,
+- "add a receptacle at slot 3"          → load_type=receptacle, circuit_number=3
+- "add a 2-pole motor"                  → load_type=motor, poles=2 (slot auto-picked)
+- "add a 30A HVAC"                       → load_type=hvac (defaults 30A/2P)
+- "add a 3P pump at slots 37, 39, 41"   → circuit_number=37, poles=3 (the 3 numbers ARE the correct 3P footprint on the left side; pass the first as the base)
+- "add a 2P breaker at slots 38 and 40" → circuit_number=38, poles=2 (right-side 2P)`,
     parameters: {
       type: 'object',
       properties: {
@@ -1290,7 +1292,7 @@ Examples:
           description: 'Pre-set template: lighting, receptacle, motor, hvac, ac, water_heater, kitchen, other',
           enum: ['lighting', 'receptacle', 'motor', 'hvac', 'ac', 'water_heater', 'kitchen', 'other'],
         },
-        circuit_number: { type: 'number', description: 'Specific slot number to place at (1-N). Omit to auto-pick.' },
+        circuit_number: { type: 'number', description: 'BASE slot for the breaker (1-N). For multi-pole breakers, only pass the FIRST slot — the tool expands the footprint as baseSlot, baseSlot+2, baseSlot+4 because odd slots are on the left side and even on the right (NEMA convention). Example: 3-pole at slots 37/39/41 → circuit_number=37, poles=3. Omit to auto-pick the next free slot.' },
         breaker_amps: { type: 'number', description: 'Breaker size in amps. Overrides load_type default.' },
         load_watts: { type: 'number', description: 'Circuit load in watts. Overrides load_type default.' },
         poles: { type: 'number', description: 'Number of poles (1, 2, or 3). Overrides load_type default.' },
