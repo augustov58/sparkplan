@@ -185,6 +185,10 @@ const styles = StyleSheet.create({
   itemLocation: {
     fontSize: 8,
     color: '#6b7280',
+    // Reset family so the italic variant resolves against base Helvetica (Helvetica-Oblique exists).
+    // Without this, the rule nests inside `itemTextFail` (Helvetica-Bold) and react-pdf can't find
+    // a Helvetica-Bold italic variant, crashing the entire packet render.
+    fontFamily: 'Helvetica',
     fontStyle: 'italic',
     marginLeft: 4,
   },
