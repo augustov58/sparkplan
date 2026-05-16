@@ -1,6 +1,6 @@
 # SparkPlan — Strategic Analysis
 
-**Last Updated:** 2026-05-15
+**Last Updated:** 2026-05-16
 **Status:** Pre-revenue. Product built. Entering Florida pilot.
 **Authoritative source:** This file summarizes the operational decisions derived from the deeper analyses in the personal Obsidian vault (`SparkPlan Analysis/` — Reconciliation Notes May 2 2026, OAI Market Viability May 2026, Competitive Landscape Apr 2026, FL Pilot Revised Feb 2026). Where this file disagrees with the Obsidian Reconciliation Notes, Reconciliation Notes win.
 
@@ -18,6 +18,12 @@ Florida is the pilot because:
 - Right to Charge (FS §718.113(8)-(9)) forces condo associations to permit EV chargers, creating recurring multi-family permit volume in older buildings near electrical capacity.
 - The FS 471.003(2)(h) PE-licensure exemption (≤$125k system value, ≤600A residential / ≤800A commercial @ 240V) creates a **dual-path workflow** — contractor-exempt lane + PE-sealed lane — that no national competitor productizes.
 
+### PE-as-Service: the productized direction
+
+The dual-path workflow is a feature; **PE-as-service is the SKU**. Contractor-exempt is the **default lane** of every tier (free / Starter / Pro / Business) — the contractor self-screens against FS 471.003(2)(h), generates the packet, and submits unsealed for the jobs that qualify. **The PE seal is a paid upsell sitting on top of any tier** for the jobs that don't qualify (>$125k, >600A residential / >800A commercial @ 240V, or AHJs that demand a seal regardless).
+
+This is the differentiator no national competitor can replicate: SparkPlan is run by a FL-licensed PE (Augusto), so the seal/review workflow is **first-party**, not a marketplace stitched on top. Kopperfield, PowerCalc, Design Master would have to recruit and contract PEs in each state. We are the PE, in our pilot state, on our own platform.
+
 ### What's Validated vs Assumed
 
 | Item | Status | Evidence |
@@ -26,12 +32,28 @@ Florida is the pilot because:
 | No competitor unifies NEC calcs + permit packet + AHJ checklist + PE seal + EVEMS | **Validated** | Apr 2026 competitive matrix (Kopperfield, PermitFlow, PowerCalc, Design Master, FlashWorks) |
 | Product works end-to-end | **Validated** | Calculator → PDF → permit packet pipeline functional |
 | Florida AHJs explicitly demand riser + load calc + manuals + site plan + HOA letter | **Validated** | Pompano Beach EV checklist, Orlando engineering permit flow, Miami-Dade plan review guidelines |
+| AHJ manifest system is real, not vaporware | **Moat instantiated** | 5 FL AHJ manifests live in `data/ahj/` as of 2026-05-14 (Orlando, Pompano Beach, Miami-Dade RER, Town of Davie, Hillsborough/Tampa) — pure-data manifests + `evaluatePacket()` engine producing per-AHJ checklists (Sprint 2C M1, PR #54/#56) |
 | Contractors will pay $X/mo | **NOT VALIDATED** | Zero paying customers. Pricing is the open question (see below) |
 | First-pass acceptance rate improves measurably | **NOT VALIDATED** | Need 20–40 real packets through 2–3 AHJs in pilot |
 
 ### The Single Most Important Thing Right Now
 
 **Run the Florida pilot — 20–40 real permits across 2–3 AHJs.** The go-criterion is ≥70% first-pass acceptance in at least 2 AHJs (FL_PILOT_REVISED §9). Everything else is premature until that loop produces evidence.
+
+---
+
+## Shipped Since Last Update (2026-05-04 → 2026-05-16)
+
+Two weeks of focused shipping. Themes, not a changelog:
+
+- **AHJ Compliance Audit Sprint 2A** (Apr–early May, PRs #40, #41) — Riser/AIC parity between in-app viewer and packet PDF; FS 471.003(2)(h) **contractor-exemption screening** wired in (productizes the dual-path workflow).
+- **AHJ Compliance Audit Sprint 2B foundation** (May 11–12, PRs #45, #47, #49) — `pdf-lib` integration, `project_attachments` table, 8 upload slots, and three pure pdf-services: `mergePacket` (bytes-in/bytes-out), `stampSheetIds` (continuous bottom-right sheet IDs), `compositeTitleBlock` (transparent overlay). Size-aware title sheets (Letter → ARCH D). Contractor uploads now splice cleanly into the SparkPlan-generated packet.
+- **AHJ-aware visibility + Orlando manifest scaffold** (May 13, PR #51) — `data/ahj/` pure-data manifests + 4-axis `AHJContext` (scope / lane / buildingType / subjurisdiction) + two-layer visibility (manifest defaults overlaid with `projects.settings.section_overrides`). General notes, code references, NEC edition, and sheet-ID prefix (`E-` vs `EL-`) auto-tune per AHJ.
+- **AHJ Compliance Audit Sprint 2C M1 — 5 FL manifests live** (May 13–14, PRs #53, #54, #56) — Pure `evaluatePacket()` engine + Pompano Beach, Miami-Dade RER (unincorporated), Town of Davie, and Hillsborough/Tampa joint manifests. All 5 pilot AHJs (incl. Orlando) now produce engine-driven per-AHJ checklists. **Moat instantiated, not future.**
+- **NEC 220.83 routing for existing dwellings + Project Status UX** (May 15, PR #61) — Existing dwellings now correctly route to NEC 220.83. True 220.82 Optional Method available as an opt-in calc mode. NEC labels corrected (220.82 is *Optional*, not *Standard*).
+- **Contractor-pivot betas Phase 1** (May 9, PRs #32–#36) — Permits lifecycle (absorbed Inspection & Issues page); Estimating (`estimates` + `estimate_line_items` tables, auto-takeoff, Bid PDF — cost lives here, **not** in the permit packet); T&M Billing 1a/1b (`project_billing_settings`, `time_entries`, `material_entries`, invoices, payments, Invoice PDF).
+- **Chatbot context expansion + short-circuit consolidation** (May 14, PRs #57–#60) — Standalone SC export tabular layout matching the packet; chatbot now exposes saved short-circuit calculations to AI context (raw-rows passthrough channel).
+- **Doc-archive + pricing sync** (PR #63, May 15) — Tier ladder + dates synced from `hooks/useSubscription.ts`; superseded root docs archived. Sources the Current Pricing table below.
 
 ---
 
@@ -109,8 +131,8 @@ The benchmark customers will compare against. Verified Apr 2026:
 **No tool unifies:** NEC Art. 220 calcs + permit packet assembly + FL AHJ checklists + PE seal workflow + multi-family EV/EVEMS at ≤$150/mo. That's the entire product positioning in one sentence.
 
 **Moat sources, ranked:**
-1. **PE license** — vertically integrated calculation + review + seal. Cannot be replicated without hiring/partnering with PEs in each jurisdiction.
-2. **AHJ template accumulation** — every checklist learned, every passed packet, compounds. National tools cannot maintain this at our granularity.
+1. **PE license — productized as PE-as-service.** Vertically integrated calculation + review + seal under one platform-owner FL PE. Contractor exemption is the default lane; PE seal is a paid upsell SKU on top of any tier. Cannot be replicated without hiring/partnering with PEs in each jurisdiction.
+2. **AHJ manifest accumulation — moat instantiated.** As of 2026-05-14 (Sprint 2C M1, PRs #54 & #56), five FL AHJ manifests are live in `data/ahj/` (Orlando, Pompano Beach, Miami-Dade RER unincorporated, Town of Davie, Hillsborough/Tampa joint). Each manifest is pure-data + pure predicates (`AHJManifest` / `AHJContext` 4-axis: scope, lane, buildingType, subjurisdiction) and is consumed by a jurisdiction-checklist engine (`evaluatePacket()`) that emits per-AHJ requirement checks. No competitor has this — Kopperfield, PowerCalc, Design Master produce single national-template PDFs. Every additional AHJ we ship compounds the moat at near-zero marginal cost.
 3. **Multi-family EVEMS depth** — the EVEMS market is hardware-centric (Black Box Innovations, simpleSwitch, VariableGrid); no software produces the NEC-compliant engineering for it.
 
 ---

@@ -1,6 +1,6 @@
 # Distribution Playbook
 
-**Last Updated:** 2026-05-04
+**Last Updated:** 2026-05-16
 **Status:** Pre-revenue. Pilot phase.
 **Parent doc:** [STRATEGIC_ANALYSIS.md](STRATEGIC_ANALYSIS.md)
 **Authoritative source:** Obsidian `SparkPlan Analysis/` (Reconciliation Notes May 2 2026, Competitive Landscape Apr 2026).
@@ -30,6 +30,18 @@ The previous version of this playbook led with California because of the 2026 10
 
 ## Tier 1 — This Week (Free, High Intent)
 
+### The "wow" moment: pick a city, packet auto-tunes
+
+This is the strongest visual demo we have today (PR #51 + Sprint 2C M1, PRs #54 / #56, May 13–14). On the project setup screen, the contractor picks one of five FL pilot cities — **Orlando, Pompano Beach, Miami-Dade (unincorporated), Town of Davie, or Tampa (Hillsborough)** — and the AHJ manifest engine immediately retunes the packet:
+
+- **General notes** swap to the AHJ's required boilerplate.
+- **Code references** update (Florida Building Code edition, NFPA-70 edition — Miami-Dade forks NEC 2014 vs 2020 by building type).
+- **Sheet-ID prefix** flips between `E-` (most AHJs) and `EL-` (Miami-Dade).
+- **Upload slots** surface only what that AHJ asks for (HVHZ wind-anchoring shows up in Miami-Dade / Broward; HOA letter shows up where condo Right-to-Charge applies; NOC threshold shows up in Orlando).
+- **Per-AHJ checklist** is rendered into the packet as a Jurisdiction Requirements page — engine-driven, not a static template.
+
+Lead every demo (forum reply, DM, screen-recording) with this 60-second flow. It's the single visual that makes "no national tool does this" land in one breath. Pair with the **uploads UI** (PR #47, May 11): contractor drags in a site plan PDF, the merge engine (`mergePacket` + `stampSheetIds` + `compositeTitleBlock`) splices it behind a size-aware SparkPlan title sheet (Letter → ARCH D auto-match) with continuous sheet-ID stamping. That's the most contractor-visible feature shipped this month — the packet *looks* like a real engineered set the moment they hit Generate.
+
 ### 1. Mike Holt Forums — answer real FL multi-family EV / 220.84 questions
 
 **Why #1:** Customers are literally there asking "how do I size a 30-unit MF building with EV chargers?" and getting wrong answers like "there is no feasible answer." Every helpful answer creates an evergreen permanent landing for that search query.
@@ -51,13 +63,16 @@ The previous version of this playbook led with California because of the 2026 10
 Walk through:
 - Calculation path (220.87(B)) shows 80A available → 1–2 chargers → "impossible."
 - Measurement path (220.87(A)) using utility billing shows 450A available → 9–12 chargers → "feasible."
-- Run the FL-specific permit packet with cover sheet, riser, load calc, equipment cuts.
+- **Pick a FL city** (Pompano Beach) → packet auto-tunes general notes, code references, sheet-ID prefix, and applicable upload slots. Then switch to Miami-Dade → watch the prefix flip from `E-` to `EL-`, NEC edition recompute, HVHZ wind-anchoring slot appear.
+- **Drag in a contractor's site plan PDF** → merge engine splices it behind a size-aware SparkPlan title sheet with continuous sheet-ID stamping in the bottom-right of every page. No Bluebeam, no manual stitching.
+- Run the FL-specific permit packet with cover sheet, riser, load calc, jurisdiction requirements checklist, equipment cuts.
 - 5–10 minutes, screen-recording with narration. Don't overthink production.
 
 YouTube titles:
 - "NEC 220.84 Multi-Family EV Load Calculation — Step by Step"
 - "Florida EV Permit Packet: What Pompano / Davie / Miami-Dade Inspectors Want"
 - "The 220.87 Measurement Path Most Florida Electricians Don't Know About"
+- "Pick a Florida City, Get the Right Permit Packet — Live Demo"
 
 ---
 
@@ -67,12 +82,15 @@ YouTube titles:
 
 Find people who posted about MF EV problems in FL in the last 6 months. DM:
 
-> "Hey, I saw your post about the 24-unit building EV project in [Tampa/Miami/Orlando]. I built a tool that handles NEC 220.84 + the 220.87 measurement path — would you want me to run your numbers? Free, just want feedback. I'm a FL PE, so if it ends up needing a sealed permit I can probably help with that too."
+> "Hey, I saw your post about the 24-unit building EV project in [Tampa/Miami/Orlando]. I built a tool that handles NEC 220.84 + the 220.87 measurement path and generates the full Florida permit packet — would you want me to run your numbers? Free, just want feedback. I'm a FL PE, so if the job lands outside the FS 471.003(2)(h) exemption (over $125k system value, over 600A residential / 800A commercial), my seal is the upsell — you don't have to go shop for a PE."
+
+**The productized PE-as-service SKU:** contractor-exempt is the default lane on every tier (Free / Starter / Pro / Business — see `STRATEGIC_ANALYSIS.md` § Current Pricing). **The PE seal is a paid upsell that sits on top of any tier**, for the jobs where the contractor's self-screen against FS 471.003(2)(h) lands them in the "sealed" path. Lead with that — the seal is not a marketplace, it's a first-party SKU because Augusto IS the platform-owner PE. No national tool can offer this without recruiting state-by-state PE partnerships.
 
 **What you're testing:**
 - Do they engage? (pain real)
 - Do they use the output? (workflow fit)
 - Do they ask "how do I get more?" (WTP signal)
+- Do they ask about the seal upsell when they hit a >$125k job? (PE-as-service demand signal)
 
 **Success criteria:**
 - 5+ of 10 engage → pain confirmed
@@ -83,7 +101,7 @@ Find people who posted about MF EV problems in FL in the last 6 months. DM:
 
 Search: `"EV installation" + "Florida" + ("owner" OR "operations manager")` and `"property manager" + "condo" + "Florida"` (the Right to Charge law puts condo boards under pressure to permit chargers — they refer the work).
 
-Same offer: free first calculation. Position the FL PE credential up-front; that's the trust signal national tools can't match.
+Same offer: free first calculation. Position the FL PE credential up-front, and frame the seal as **an in-platform paid SKU**, not an outside referral — that's the trust signal national tools can't match.
 
 ### 6. Permit expediter partnerships (South Florida)
 
@@ -132,7 +150,7 @@ These rank for years.
 
 Florida has **four NECA chapters**: North Florida (41 FL + 13 GA counties), Florida West Coast (Tampa/St. Pete), Central Florida (Orlando), and Atlantic Coast. They host seminars, training events, vendor brand-building workshops, and offer Associate membership for vendors.
 
-**National NECA Convention 2026 (Oct 4–7, Las Vegas):** 350+ exhibitors; 52.8% of attendees highly likely to purchase products seen within 12 months; 67.8% sit on purchasing teams; **82% attend no other trade show.** "The Grid: Startup Lab" is exhibit space designed for emerging companies — apply early.
+**National NECA Convention 2026 (fall, exact dates / location TBV before any commitment):** historically 350+ exhibitors; published 2025-cycle attendee data (52.8% highly likely to purchase products seen within 12 months; 67.8% on purchasing teams; 82% attend no other trade show) make it the highest-leverage single contractor-facing event we could exhibit at. "The Grid: Startup Lab" is exhibit space designed for emerging companies — verify the 2026 application window from `necaconvention.org` before any spend.
 
 ### 10. SPAN installer program — possible OEM channel
 
@@ -172,7 +190,7 @@ Month 2: Start Google Ads if Wk 1–4 shows engagement
          First NECA FL chapter outreach (Central FL, Atlantic Coast)
 Month 3: Lock down which channel produced acceptance evidence;
          double down on whichever AHJs hit ≥70% first-pass.
-Month 4–6: Apply to NECA National "The Grid: Startup Lab" for Oct convention
+Month 4–6: Verify 2026 NECA National convention dates + "The Grid: Startup Lab" application window, then apply if pilot acceptance evidence supports it
 ```
 
 ---
@@ -215,7 +233,7 @@ The two **bold rows** are the only ones that decide whether the pilot passes the
 
 ## Expansion Order (Post-Pilot)
 
-1. **Replicate AHJ packs across Florida first** — most efficient (same state, same FBC/NEC reference).
+1. **Replicate AHJ packs across Florida first — IN FLIGHT.** Five FL AHJ manifests are live as of 2026-05-14 (Sprint 2C M1, PRs #54 / #56): Orlando, Pompano Beach, Miami-Dade RER (unincorporated), Town of Davie, and Hillsborough/Tampa joint. The jurisdiction-checklist engine (`evaluatePacket()`) is wired and producing per-AHJ requirement checks in the packet. This step is no longer "future" — it's the live moat. Next FL targets: Broward (Fort Lauderdale, Hollywood), Orange beyond Orlando (Winter Park, Apopka), Palm Beach, Lee/Collier (Naples / Fort Myers).
 2. **Adjacent niches in FL:** service-upgrade + load justification (#3 niche), multi-family meter stack / common area.
 3. **Then 1–2 neighboring states with similar permitting friction** — Georgia (NECA North FL chapter already covers 13 GA counties), Alabama, Texas.
 4. **California enters at Phase 3 only**, after AHJ playbook is repeatable. The CA mandate becomes a tailwind once the workflow is proven.
