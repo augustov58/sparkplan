@@ -3,7 +3,47 @@
 **Purpose**: Tracks recent work for seamless handoff between Claude instances.
 **Maintenance Rule**: Keep only the last 2 sessions. At the start of a new session, delete older entries — git history preserves everything.
 
-**Last Updated**: 2026-05-15
+**Last Updated**: 2026-05-16
+
+---
+
+### Session: 2026-05-15 to 2026-05-16 — Docs cleanup, JurisdictionRequirements font hotfix, and NEC 220.83 follow-up (PRs #63, #64, #65)
+
+**Focus**: Picked up mid-stream from a compacted prior session that had been mid-execution of the dwelling-load fixes. Three PRs landed: doc-debt cleanup (#63 `aa37d4b`), font crash hotfix on commercial packets (#64 `405c7b9`), and the 3-commit follow-up to PR #61's NEC 220.83 routing work (#65 in-flight, branch `feat/220-83-panel-summary-playwright-el101`). Mid-session discovered that PR #61 (also by the user) had shipped the core 220.83 routing in parallel — most of the original `feat/nec-220-83-existing-dwelling` branch's 17 commits were already on main via #61's squash, so PR #62 was closed and the genuinely-new 3 commits were cherry-picked onto a fresh branch as PR #65.
+
+**Status**: 2 PRs merged (`#63` docs cleanup, `#64` font fix); 1 PR open (`#65` dwelling follow-up). Test suite at 748/748 on main; 769/769 on the #65 branch (21 new in-process PDF tests). Build green across all three branches.
+
+**Architecture decisions worth carrying forward**:
+
+- **Code-anchored docs decay slower than free-floating decisions.** PR #63 deleted the STRATEGIC_ANALYSIS "Pricing — Open Decision" section (which the doc's own staleness rule flagged for deletion once pricing was locked in) and replaced it with a "Current Pricing" table that cites `hooks/useSubscription.ts` as the source of truth. The replacement decays only when the code does — not on its own timeline. Lesson: when a doc captures a decision, point at the code that implements the decision (or the artifact that proves it) so the doc's freshness is tied to a falsifiable thing, not to a calendar reminder.
+- **React-PDF style inheritance can compose unresolvable font tuples.** The JurisdictionRequirements crash (#64) came from `<Text style={itemLocation}>` (italic) nested inside `<Text style={itemTextFail}>` (Helvetica-Bold). React-pdf cascades fontFamily through nested Text, so the resolved style on the inner Text became `{ fontFamily: 'Helvetica-Bold', fontStyle: 'italic' }` — which has no registered variant (react-pdf treats `Helvetica-Bold` as a literal family with only normal weight; italic-bold has to come from `fontFamily: 'Helvetica' + fontWeight: 'bold' + fontStyle: 'italic'`). Fix is to *break* the inheritance on the child by explicitly setting fontFamily back to base Helvetica. Memory-worthy: **never use `fontFamily: 'Helvetica-Bold'` as a literal family in nested Text trees** — always use `fontWeight: 'bold'` so the variant resolver can compose with italic if the child needs it.
+- **`git cherry` lies when upstream squash-merged.** Trying to figure out whether PR #62's 17 commits were redundant with PR #61, the obvious tool was `git cherry origin/main feat/nec-220-83-existing-dwelling` — which reported all 17 commits as unmerged. The actual truth: 14 of them were already on main, just rolled into #61's squash. `git cherry` compares by patch-id, and a squash collapses N patch-ids into 1 with a different hash, so the individual-commit lookup always misses. The reliable test is **cherry-pick each commit onto a fresh main snapshot in a temp branch** and watch whether it produces an empty diff (already on main), a non-empty diff (genuinely new), or a conflict (overlap with #61's different implementation). Even for "CONFLICT" results, grepping main for the specific identifiers the commit introduced is the gold standard — every CONFLICT identifier from PR #62's tail commits was present on main, confirming #61's squash absorbed all of it.
+- **Parallel PRs converging on the same feature is fine — but resolving the convergence requires content-level diffing, not branch-level.** The instinct to "rebase the conflicted branch" would have replayed 14 already-shipped commits and forced 8 conflict resolutions to recover work that was already on main. Correct move: close #62, cherry-pick only the 3 genuinely-new commits into a clean branch. Resulting PR #65 is 3 commits / 13 files / +861 LOC instead of the rebased 17 commits / 26 files / +2676 LOC, with zero conflicts to resolve.
+
+**Process gotchas worth remembering**:
+
+- **Compacted sessions can drop mid-execution.** The session started with a system summary that established prior context (220.83 work mid-stream, EL-101 PDF bug, Playwright scaffold staged). The first action was a continuation message, but the actual state on disk was 5 commits ahead of main + 3 ahead of origin/feature-branch — work that had been committed but not pushed. Lesson: when resuming a compacted session, `git status` + `git log --oneline -n 10` + `git branch -vv` are the first three commands. They reconcile what the summary claims with what's actually on disk.
+- **Multi-branch work needs to fall off one at a time.** Three branches were active simultaneously this session: `feat/nec-220-83-existing-dwelling` (the WIP), `docs/cleanup-2026-05-15` (the audit fixes), and `fix/jurisdiction-pdf-font-crash` (the hotfix). All three pushed clean PRs to GitHub in one batch. The key was branching each new piece **off origin/main** rather than off the feature branch, so the docs and font fixes could merge independently without waiting on the 220.83 work. Memory-worthy: when a session generates >1 PR's worth of work, branching strategy matters more than implementation speed.
+- **gh CLI's "uncommitted changes" warning is mostly noise on this repo.** Every `gh pr create` call surfaced "Warning: 8 uncommitted changes" — those are the untracked PDFs in `example_reports/`, the `.playwright-mcp/` cache, and the `.claude/` lock files. All correctly gitignored from feature work; just not relevant to the PR. Safe to ignore; should not be confused with actual unsaved staging.
+
+**Deliverables**:
+
+| PR | Branch | Files | Result |
+|---|---|---|---|
+| **#63 (merged)** | `docs/cleanup-2026-05-15` | 15 files, +25 / -29 LOC (5 archives + 1 deletion + 9 content edits) | ✅ MERGED `aa37d4b` 2026-05-15 |
+| **#64 (merged)** | `fix/jurisdiction-pdf-font-crash` | 1 file, +4 LOC | ✅ MERGED `405c7b9` 2026-05-15 |
+| **#65 (open)** | `feat/220-83-panel-summary-playwright-el101` | 13 files, +861 / -23 LOC (3 cherry-picked commits: panel-summary alignment + Playwright + EL-101 PDF gate) | ⏳ Open against main |
+| **#62 (closed)** | `feat/nec-220-83-existing-dwelling` | 26 files, +2676 / -139 LOC | Closed as superseded by #61 + #65 |
+
+**Worktrees in play at session end**: none on disk (all branches are plain `git checkout -b`); the worktree directories listed in `.claude/worktrees/` are from prior sessions, untracked.
+
+**Pending / follow-ups (queue from doc audit)**:
+
+1. **Task A — Backfill ROADMAP / CHANGELOG / SESSION_LOG for PRs #52-#60**: ✅ **This commit** (and the new ROADMAP Phase 3.10 / 3.11 entries + CHANGELOG entries for PRs #52, #53, #54, #56, #57, #58, #59, #60, #61, #63, #64, #65).
+2. **Task B — Update STRATEGIC_ANALYSIS feature inventory**: pending. Inventory still silent on AHJ manifests (PR #51 + #54 + #56), permit-merge engine (PR #49), NEC 220.83 retrofit (PR #61), H17 contractor-exemption screening (PR #41), PE-as-service positioning, T&M Billing / Estimating / Permits Phase 1 (PRs #33-#36).
+3. **Task C — Update DISTRIBUTION_PLAYBOOK demo flow**: pending. Demo flow doesn't reference the uploads UI (PR #47), AHJ manifest pre-fill (PR #51 + #56), or the PE-as-service paid upsell positioning.
+4. **Tasks D + E + F + G — additional archival sweeps**: pending. Archive completed-plan docs in `/docs` (8 candidates), archive stale CA-era marketing assets, refresh "Last Updated" on `architecture.md` / `development-guide.md` / `security.md`, consolidate `docs/implementation-notes/` into archive.
+5. **JurisdictionRequirements design follow-up** (not on the queue): commercial vs residential fixture diversity in E2E tests would have caught #64 earlier. The smoke test fixture was a single-family residential happy path with zero fail-severity rows — exactly the path the bug hid on. Adding a commercial fixture to the Playwright suite is the highest-leverage addition.
 
 ---
 
@@ -45,43 +85,4 @@
 
 ---
 
-### Session: 2026-05-12 — Sprint 2B PR-3 (merge engine) shipped via 5-round iterative review cycle
-
-**Focus**: Closed the merge-engine half of Sprint 2B. Built and shipped PR #49 over 17 commits / 5,580 LOC against `feat/sprint2b-merge-engine`, merged at squash hash `fce6275` 2026-05-12. Bundled with the PR #45 (foundation, merged 2026-05-11) and PR #47 (upload UI, merged 2026-05-11) work that landed earlier in the week, Sprint 2B's merge-engine deliverable is now complete; PR-4 (Orlando manifest scaffold) and Sprint 2C M1 wiring remain.
-
-**Status**: ✅ PR #49 merged. Sprint 2B: 3 of 4 planned PRs shipped (PR #45 + PR #47 + PR #49). Test suite at 522 passing across 35 test files (was 491 post-PR-2; +31 new tests across 4 new test files: `attachmentTitleSheet`, `attachmentTitleBlock`, `compositeTitleBlock`, `stampSheetIds`, `mergePacket`). 5 DB migrations applied to live Supabase. Build green.
-
-**Architecture decisions worth carrying forward**:
-
-- **Pure pdf-lib functions follow the same contract as calc services.** CLAUDE.md's calc-service rule ("pure functions / never throw / return warnings") extends cleanly to PDF post-processing. `mergePacket`, `stampSheetIds`, and `compositeTitleBlock` are all bytes-in / bytes-out, hold no Supabase imports, take no hooks, and return warnings instead of throwing. This makes them testable without a browser/Supabase context AND lets Sprint 3 PAdES signing reuse the same wiring shape. Lesson: when a service is going to be reused by a future sprint, write it pure from day one — refactoring around side effects is more expensive than getting the shape right up front.
-- **The merge engine never blocks the merge when individual attachments fail.** Encrypted / corrupted / zero-byte / zero-page uploads surface as warnings but the merge proceeds with everything that succeeded. Wrong-direction failure here would be "block the entire packet because one cut sheet was corrupted" — that creates a hostage situation where the contractor can't submit at all. Right-direction: skip the bad upload, emit a warning, let the contractor see what failed and re-upload. Memory-worthy pattern for any future "compose N artifacts" pipeline (Sprint 3 multi-sheet PE seal will hit the same shape).
-- **Cover-mode evolution: boolean → 3-state enum, same day.** PR #49 v3 shipped `include_sparkplan_cover` (boolean: cover or no cover). v4 review caught the gap — a Bluebeam markup PNG-on-PDF wants the title-block overlaid ONTO its page, not as a standalone preceding sheet. v5 dropped the boolean, added `cover_mode` enum (`separate` / `overlay` / `none`) with idempotent backfill. Lesson: when a boolean flag captures a binary distinction but the real-world axis is 3-way, the binary always gets refactored within a few iterations. If you smell the third option (even speculatively), reach for the enum first.
-- **Size-aware title sheets matter more than expected.** First v1 used hardcoded Letter dimensions for all title sheets, so a contractor's ARCH D site plan (1728 × 2592 pt) was preceded by an 8.5 × 11 cover that looked wildly out of scale next to the plan. v2 added detection via pdf-lib (`getPage(0).getSize()`) and forwarded the dimensions into the react-pdf title sheet via an explicit `pageSize` prop. Lesson: when generating a "cover for X," size-match X — even if it adds a detection step to the pipeline.
-- **Augusto-as-PE drives feature scope.** The user is FL-licensed PE + platform owner (memory: `user_role_pe.md`). Sprint 2B's title-block layout (perimeter rule, right-margin labeled cells, FL Reg/Seal cell, Seal Area, "NOT FOR CONSTRUCTION" cell, Revisions cell) is the layout a Florida AHJ plan reviewer expects to see on architectural drawings. Building it generically would have missed the FL-specific cells. Lesson: when the user has domain authority, ask them what the artifact should look like before sketching v1 from generic references.
-
-**Process gotchas worth remembering**:
-
-- **17 commits is a lot for one PR.** PR #49 reviewed cleanly because each commit was small and self-contained (one feature, one test file, builds + tests pass). The iterative v1 → v5 cycle would have been a nightmare to review as a single squash commit. Lesson: when iterating on a feature, lean into per-feature commits inside the PR — the squash commit at merge captures the final shape, and the per-commit history makes the review surface tractable.
-- **Migrations stack tight.** PR #49 applied 5 migrations to live Supabase in the order: `20260513_attachment_hvhz_anchoring.sql` → `20260514_attachment_include_sparkplan_cover.sql` → `20260514_attachment_cover_mode.sql` (which drops the prior boolean) → `20260514_attachment_custom_sheet_id.sql` → `20260514_attachment_discipline_override.sql`. Same-day cover_mode supersedes the boolean — the cover_mode migration is idempotent (uses DO block to check for the boolean column before backfilling). Lesson: when refactoring a column same-day, the second migration should be idempotent against either "boolean exists" or "boolean dropped" states.
-- **Supabase advisor surfaces F-tier work.** While reviewing PR #49's schema additions, the Supabase advisor flagged `public.jurisdictions` as having RLS disabled. Currently 0 rows so no exposure, but Sprint 2C M1 will populate it. Captured as F8 in the parent audit doc — fix before Sprint 2C M1 lands.
-- **Docs sync convention extends to Sprint 2B.** PR #24 (after Sprint 2A PRs 1 + #23) + PR #42 (after Sprint 2A PRs #40 + #41) set the precedent — docs-only PR off main after feature PRs merge. This session's docs-sync PR (#50) follows the same pattern for Sprint 2B PR #49. Stays consistent.
-
-**Deliverables**:
-
-| PR | Branch | Files | Result |
-|---|---|---|---|
-| **#49 (merged)** | `feat/sprint2b-merge-engine` | 17 commits, 5 new pdf-lib services + 2 new react-pdf components + 5 migrations + 4 test files (~5,580 LOC) | ✅ MERGED `fce6275` 2026-05-12 |
-| **#50 (merged)** | `docs/sprint-2b-docs-sync` | parent audit + sprint2b + README + ROADMAP + CHANGELOG + SESSION_LOG + database-architecture + CLAUDE.md | docs sync |
-
-**Worktrees in play at session end**: none on disk for PR #49 (was a single-agent run, no parallel worktrees).
-
-**Pending / follow-ups (resolved by Sprint 2B PR-4 work the next day)**:
-
-1. **PR-4: Orlando manifest scaffold** — resolved by PR #51 (`18985e5`, 2026-05-13). Ships AHJManifest type system + Orlando manifest + two-layer visibility model + 6 new artifact_types.
-2. **F8: Enable RLS on `public.jurisdictions`** — still open; one-line migration before Sprint 2C M1 populates the table.
-3. **H19 per-AHJ wiring** — Orlando wired in PR #51 (statewide outdoor EVSE predicate). Miami-Dade + Pompano enforcement wiring lands in Sprint 2C M1 alongside their manifests.
-4. **Sprint 3 unblocked at the pdf-lib layer** — PAdES PE seal signing now has the same library + integration pattern that PR #49 established. Cert vendor selection + FBPE business-entity registration are the remaining hard prerequisites.
-
----
-
-<!-- Earlier sessions (2026-05-10 Sprint 2A final 2 PRs, 2026-05-09 contractor-pivot + T&M Phase 1, 2026-05-10 Sprint 2A PR #31) rotated out per "keep last 2 sessions" rule. Git history preserves them. -->
+<!-- Earlier sessions (2026-05-12 Sprint 2B PR-3 merge engine, 2026-05-10 Sprint 2A final 2 PRs, 2026-05-09 contractor-pivot + T&M Phase 1, 2026-05-10 Sprint 2A PR #31) rotated out per "keep last 2 sessions" rule. Git history preserves them. -->

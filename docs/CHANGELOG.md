@@ -4,6 +4,114 @@ All notable changes to SparkPlan.
 
 ---
 
+## 2026-05-15: Docs cleanup + JurisdictionRequirements font hotfix + dwelling-load follow-up (PRs #63, #64, #65 in-flight)
+
+Three small focused PRs landed in the same day, closing doc-debt and a packet-blocking PDF crash.
+
+**PR #63 `aa37d4b` — Docs cleanup**: archived 5 superseded root docs (`GEMINI.md`, `Permit_sync_spec.md`, `CODEBASE_EVALUATION.md`, `ISSUES.md`, `PROJECT_SPEC.md`) to `docs/archive/` via `git mv` (100% rename detection preserves history); deleted the one-line `DEV.md` stub; flipped Sprint 2C status flags ⚪ → ✅ across `docs/sprints/README.md`, `sprint2c-ahj-manifests.md`, and the AHJ audit's status snapshot; bumped "Last Updated" dates on ROADMAP / SESSION_LOG / AHJ audit / sprints index / STRATEGIC_ANALYSIS; replaced STRATEGIC_ANALYSIS "Pricing — Open Decision" section with a code-anchored 5-tier "Current Pricing" table sourced from `hooks/useSubscription.ts`; fixed marketing-copy drift in `business/marketing/` (`support@necpro.com` → `support@sparkplan.app`; CA mandate framing → FL §718.113(8) Right-to-Charge); replaced stale Phase 0-4 list in README.md with a link to ROADMAP.md. 15 files, +25 / -29 LOC.
+
+**PR #64 `405c7b9` — Font crash hotfix on JurisdictionRequirements page**: permit packet generation was aborting on commercial packets with *"Could not resolve font for Helvetica-Bold, fontWeight 400, fontStyle italic"*. Root cause: nested `<Text>` style inheritance in `services/pdfExport/JurisdictionDocuments.tsx`. Fail-severity rows render the outer `<Text>` with `styles.itemTextFail` (`fontFamily: 'Helvetica-Bold'`); inside them, location and "— MISSING" sub-strings render via `<Text style={styles.itemLocation}>` (`fontStyle: 'italic'`, no fontFamily set). React-pdf inherits the parent's fontFamily into the child, composing `Helvetica-Bold + italic` which has no registered variant — font resolution throws and aborts the entire 24-page render. Fix: explicit `fontFamily: 'Helvetica'` on `itemLocation` (4 LOC) so the italic variant resolves against the base Helvetica family (`Helvetica-Oblique` is a registered standard PDF font). The bug stayed dormant on residential because residential fixtures rarely produce fail-severity items with location strings; commercial packets surface them reliably. Build clean; 748/748 tests pass.
+
+**PR #65 (in-flight) — Panel Summary + Playwright + EL-101 follow-up to PR #61**: 3-commit cleanup landing what was originally PR #62 (closed after a content audit found 14 of its 17 commits were already on main via PR #61's squash). Panel Summary derives dwelling-MDP connected/demand from actual circuits, matching the Dwelling Calc 48.0 / 28.1 / 117 A instead of the stale 51.8 / 29.6 / 123.5 (skips refrigerator `load_type='K'` per NEC 210.52(B)(1) Exception 2; continuous heuristic tightened to `load_type === 'O'` so dryer/water heater/pool/disposal don't false-fire). Playwright scaffold + NEC 220.83 smoke spec + 4 new in-process PDF tests bring the count to 769 (was 748). EL-101 Load Calculation Summary PDF page now routes dwelling MDPs through `calculateDwellingPanelDemand` with a synthesized 2-row breakdown reading as "DEMAND FACTOR BREAKDOWN (NEC 220.83 OPTIONAL METHOD)" (previously rendered Standard Method walks contradicting the scope text on the same packet). 13 files, +861 / -23 LOC.
+
+---
+
+## 2026-05-15: NEC 220.83 routing for existing dwellings + Project Status UX (PR #61)
+
+Promotes new-vs-existing from the Permit Scope's three-option dropdown into a single **Project Status** field in General Information. Residential + existing now calculates per NEC 220.83 (8 kVA / 40% general-loads knee + HVAC additive); residential + new construction continues to use NEC 220.82. The `'service-upgrade'` union value collapses into the existing `scope_flags.service_upgrade` checkbox, which is what H17 exemption screening and the packet narrative already keyed off. Squash hash `a9d4c9a`, 4 commits, 19 files, +1996 / -113 LOC.
+
+**User-facing changes:**
+
+- **Project Status field**: New / Existing toggle in General Info that drives the dwelling load-calc method (220.82 vs 220.83) automatically. The Permit Scope dropdown is retained alongside for now (both surfaces share the same `service_modification_type` setting).
+- **NEC labels corrected**: 220.82, 220.83, and 220.84 are all *Optional* Methods under NEC Article 220 — the *Standard* Method lives in 220.40-220.61 (per-category demand-factor walk). Dwelling Calc subtitle, residentialLoad necReferences, and multiFamilyEV narrative all relabeled accordingly.
+- **True 220.82 Optional Method available as opt-in**: A new `dwelling_calc_mode` setting picks between `'per-category'` (default, preserves all existing project numbers) and `'true-optional'` (canonical 10 kVA / 40% split + HVAC at 100% of larger of heat/cool per NEC 220.60). Demand values shift ~30% when switched. Default is `'per-category'` to preserve backward-compat; new projects can opt in.
+- **Proposed New Loads workflow**: Dwelling Calc gains a "Proposed New Loads" section so EEs can model new additions on existing-construction projects from a single screen — pick from common load templates (EV chargers, HVAC, appliances) or define custom, watch the Service Headroom card flip, push them to the panel schedule as `is_proposed=true` circuits with the right NEC continuous-load factor applied.
+- **EV 125% preserved through 220.83 bucket**: a separate bug surfaced during regeneration of an existing-construction schedule with a Proposed EV addition — the per-category demand-row math correctly multiplied EV (NEC 625.41 continuous load) by 1.25, but the bucket post-processor then re-aggregated using `row.connectedVA` (nameplate), zeroing the per-category demands and erasing the 125%. Fix: `LoadBreakdown` gains an optional `continuous?: boolean` flag; the bucket post-processor reads it and applies 1.25× when true.
+
+**Technical:**
+
+- Bucket post-processor in `services/calculations/residentialLoad.ts` is parameterized so 220.82 (10 kVA knee) and 220.83 (8 kVA knee) share the same code path; 220.83 wins when both flags are set because it's the NEC-required method for existing dwellings.
+- `is_proposed` flag on circuits via `20260514_circuit_is_proposed.sql` — drives permit-packet existing/new circuit marking ("EXIST" / "NEW" badges on rows; legend on the panel-schedule page).
+- Multi-pole slot allocator rewritten in `DwellingLoadCalculator.tsx::handleApplyToPanelSchedule`: previously inserted circuits with `circuit_number = i+1`, ignoring pole continuations — a 2P Range at slot 10 (occupying 10 + 12) followed by a 2P Water Heater at slot 12 collided. New occupancy-aware allocator places each circuit at the smallest slot S where every `{S, S+2, ..., S+2(p-1)}` is free, then marks those slots occupied. Panel-full case surfaces a warning listing the skipped circuits.
+- 19 files, +1996 / -113 LOC. Test count: 748 (was 742 prior to PR #60).
+
+**Follow-up landing in PR #65** (in-flight): Panel Summary alignment with actual circuits; Playwright smoke spec + 4 in-process PDF E2E tests (769 total); EL-101 PDF routing through `calculateDwellingPanelDemand`.
+
+---
+
+## 2026-05-14: NEC Copilot exposes saved short-circuit calculations (PR #60)
+
+The NEC Copilot was blind to short-circuit data — switching to any tab other than SC Analysis meant the chatbot couldn't answer NEC 110.9 (interrupting rating) or AIC-shopping questions without users copy-pasting numbers manually. PR #60 (`9a8c5ee`) adds a `SHORT CIRCUIT ANALYSIS` block to the first-message project context, sorted with service-entrance calc first then panels alphabetical. Surfaces per location: available fault current (kA), required AIC (kA), upstream source If (chain context), and NEC 110.9 compliance message.
+
+- New `ShortCircuitSummary` interface in `services/ai/projectContextBuilder.ts`; optional `shortCircuitCalculations` param on `buildProjectContext()`; audit-trail field extraction from `results` JSON (safe against malformed JSON — degrades to "data unavailable" sub-bullet rather than throwing).
+- Backward compatible: callers that don't pass the param get exactly the previous behavior.
+- Wires into `App.tsx` (Copilot), `hooks/useChat.ts`, `components/PreInspection.tsx` via `useShortCircuitCalculations` hook.
+- 5 files, +365 / -3 LOC. Test count: 748 (was 742; +6 new pinning shape).
+
+---
+
+## 2026-05-14: Short Circuit consolidation + standalone export parity + in-tab project-aware calculator (PRs #57, #58, #59)
+
+Three coordinated PRs that close the short-circuit UX gaps surfaced during Sprint 2B review:
+
+**PR #57 `b5bc983` — Permit packet consolidation**: short-circuit section now renders one tabular sheet (mirrors the existing Voltage Drop Analysis E-102 layout) instead of one full page per panel. A project with 8 panels drops from 28-page packets to 20-page packets. Single `<Page>`, 9-column table, summary box at the top, NEC references at the bottom. All information (panel, source If, feeder, voltage/phase, total impedance, fault current at point, required AIC, NEC 110.9 compliance) survives in the row — the AHJ still sees every number, just compressed onto one page. Available Fault Current sheet (E-103, IEEE 141 service-main calc) unchanged. Per-panel components (`ShortCircuitCalculationPages`, `ShortCircuitSystemReport`) kept intact so standalone export and existing E2E tests keep working. New `ShortCircuitTablePages` component in `services/pdfExport/ShortCircuitDocuments.tsx`. Reuses `ShortCircuitResult` shape via `buildRow()` so both code paths read the same DB row format. 591/591 tests pass.
+
+**PR #58 `7ec5289` — Standalone export parity**: the "Export All to PDF" button on the Short Circuit Analysis tab still rendered the legacy paged-card-per-panel layout while the packet path used the new tabular layout. Two surfaces, two layouts, same data — exactly the divergence PR #57 was meant to close. PR #58 swaps `services/pdfExport/shortCircuitPDF.tsx::exportSystemReport` to render `ShortCircuitTablePages` wrapped in a `Document`, matching the packet path. Unused `panels` parameter dropped from the function signature and its sole caller in `ShortCircuitResults.tsx` (the tabular component reads everything off the calc rows themselves). 723/723 tests pass.
+
+**PR #59 `a2cb014` — In-tab project-aware calculator**: embeds a project-aware short-circuit calculator directly into the Short Circuit Analysis tab so users no longer bounce to Tools & Calculators, manually re-enter service params, click Save → pick panel from a modal, and repeat the lookup per downstream panel with the additional pain of having to remember the upstream If from the saved Service calc. New flow: 'Add Short Circuit Calculation' button on the Analysis tab. Service mode pre-fills from the project row (`service_amps` / `voltage` / `phase` + `utility_transformer_kva` / `impedance_pct`). Panel mode dropdown is filtered to panels not yet calculated and auto-fills:
+
+- Source If ← saved service calc's `results.faultCurrent` (chained)
+- Feeder length / size / material / conduit / sets ← `feeders` row where `destination_panel_id` matches the chosen panel
+
+User can override any field; pure calc engine is unchanged. Tools & Calculators path is left intact for ad-hoc preliminary-design work — two surfaces, two purposes. New `components/ShortCircuitProjectCalculator.tsx` (~450 LOC) with inline expandable card, Service / Downstream Panel mode toggle, live calc preview, inline Save to Project. Pure helpers `derivePanelFormState` + `deriveSourceFaultCurrent` exported for unit testing. 733/733 tests pass (+10 new).
+
+---
+
+## 2026-05-14: Sprint 2C M1 — jurisdiction-checklist engine + 4 AHJ manifests (PRs #54, #56)
+
+Closes Sprint 2C M1. The previously decorative page-12 jurisdiction checklist is now driven by a pure-function engine that walks an AHJ manifest's `requirements[]` against the packet AST and emits per-item `pass` / `warn` / `fail` / `na` severity with sheet-ID locators. 4 new AHJ manifests join Orlando in the registry; each exercises a different architectural axis baked into `AHJContext` at PR-4 time, validating the "no engine changes per new AHJ" extensibility property.
+
+**PR #54 `e6d9133` — Engine + renderer + sheetIdPrefix plumbing:**
+
+- Pure function `evaluatePacket(packet, manifest, ctx)` in `services/jurisdictionChecklist/checklistEngine.ts`. Walks `manifest.requirements[]`, calls each requirement's `required(ctx)` + `detect(packet, attachments)` + optional `locator(packet)` predicates, emits `ChecklistResult` with per-item severity, summary counters, warnings, and necReferences.
+- **Calc-service contract**: pure / no DB / no React / never throws. Predicate throws are caught and rolled into `warnings[]`; the item degrades to `severity: 'na'` rather than crashing packet render. Empty `manifest.requirements` (Orlando today) yields empty items + zeroed summary.
+- `JurisdictionRequirementsPages` renders engine output: severity glyphs (`[X]` pass green, `[ ]` MISSING fail red, `[+]` warn amber, `—` na dimmed), per-item sheet-ID locator, top-of-page summary banner ("X of Y required satisfied", green on 0 fails, red on ≥1), category grouping (plan / application / narrative / upload / inspection), engine-warnings footnote block.
+- **Backward compat**: when no manifest is supplied, the page falls back to the pre-M1 decorative `jurisdiction.required_documents` rendering.
+- `manifest.sheetIdPrefix` plumbing: `SheetDiscipline` widened to `'EL' | 'ES'` for Miami-Dade's multi-letter electrical convention (H20).
+- 22 new engine tests covering empty-requirements path, full severity matrix, locator wiring, predicate-throw fault paths (required/detect/locator), context-routing forks, defensive degradation.
+
+**PR #56 `a4bf21a` — 4 AHJ manifests populated:**
+
+- **Pompano Beach** (22 requirements): HOA letter + Fire Review (H22 SFR-excluded) + 3-form Broward intake + Zoning Compliance.
+- **Miami-Dade County RER unincorporated** (22 requirements): `subjurisdiction` axis (34 munis + unincorporated; RER handles only unincorporated) + NEC-edition-per-`buildingType` (H34: NEC 2014 residential / NEC 2020 multi-family + commercial — splits the code-basis block by building type) + `sheetIdPrefix: 'EL-'` (H20 plumbing now used).
+- **Town of Davie** (14 requirements): commercial-only Knox-box (H27) + bollard (H28) + multi-dispenser shutdown shunt (H29) — all gated on `buildingType === 'commercial'`.
+- **Hillsborough County + City of Tampa** joint (21 requirements): residential trade-permit lane (H31) — SFR + `contractor_exemption` bypasses full plan review.
+- Registered in `data/ahj/registry.ts`. `getManifestById('pompano' | 'miami-dade' | 'davie' | 'hillsborough-tampa')` now resolves; `findManifestForJurisdiction(...)` substring-matches them against project `jurisdiction_name`.
+- 4 new manifest files + 4 new test files (`pompanoManifest.test.ts`, `miamiDadeManifest.test.ts`, `davieManifest.test.ts`, `hillsboroughTampaManifest.test.ts`). ~101 new manifest tests, +3135 LOC.
+
+**Open research gaps** (none block manifest correctness): Hillsborough/Tampa Knox-box stance unresolved pending FM phone calls; H36 HillsGovHub intake-category ambiguity; Miami-Dade NEC-edition confirmation optional.
+
+---
+
+## 2026-05-13: F8 closed — RLS enabled on `public.jurisdictions` (PR #53)
+
+Follow-up to PR #51. Supabase advisor flagged `public.jurisdictions` as having RLS disabled while PR #49 was in review. Currently 0 rows so no exposure, but Sprint 2C M1 was about to populate it. PR #53 (`c86581c`) adds `20260513022548_enable_rls_on_jurisdictions.sql` (75 lines) — RLS enabled, SELECT policy for authenticated users, no INSERT/UPDATE/DELETE policies (jurisdictions are seed data, not user-mutable). F8 closed.
+
+---
+
+## 2026-05-13: Service feeder sizing — auto-bump to parallel sets per NEC 310.10(G) (PR #52)
+
+Closes a silent failure mode in feeder sizing: multifamily MDP service feeders silently produced `'N/A'` conductor sizes and 0% VD when design current exceeded the largest single conductor in NEC Table 310.16 (Cu @ 75°C tops out at 1000 kcmil = 545A). 240 kVA on a 120/240V 1Φ service ≈ 1000A, so `calculateFeederSizing`'s downstream `sizeConductor` lookup returned null and bailed to the `invalidConductorSizingResult` sentinel; the UI then rendered the literal "N/A" strings plus a fallback `3"` conduit, with "Unknown → MDP" in the header (the service-entrance branch has NULL source IDs by schema constraint and `FeederCard` had no `is_service_entrance` check).
+
+PR #52 (`40d941e`) wires NEC 310.10(G) end-to-end via the `sets_in_parallel` field that was already on the `Feeder` schema (and `sizeParallelConductors` that already existed in `conductorSizing.ts` — the calc path just never consumed either):
+
+- **Auto-bump 1 → 2…10**: when a single conductor cannot carry the load, the engine bumps `sets_in_parallel` and recomputes. Bundling penalty applies to total CCC count (`num_current_carrying × parallelSets`); VD computed on per-conductor current; effective set count returned in result.
+- **Cap added: no single conductor > 500 kcmil**. Anything that would otherwise pick 600 / 750 / 1000 kcmil triggers a parallel-sets bump regardless of user-supplied `sets_in_parallel` value. Per project policy: the 600+ kcmil sizes suffer diminishing-returns past skin-effect onset and aren't how contractors actually build feeders. Caller setting `sets_in_parallel = 1` for a 1200A load gets auto-bumped to 4 sets of 350 kcmil with an informational warning.
+- **UI fixes**: `FeederCard` returns 'Utility' for service-entrance rows instead of 'Unknown'; chip grid hidden when `phase_conductor_size === 'N/A'` with an inline remediation message; new "Sets in Parallel" form input.
+- 525/525 tests pass; new regression test for 240 kVA / 240V / 1Φ load auto-bumping to 2 sets.
+
+---
+
 ## 2026-05-13: Permit packet — Sprint 2B PR-4 Orlando manifest + AHJ-aware visibility (PR #51)
 
 Closes Sprint 2B. Adds the first-ever AHJ manifest (`data/ahj/orlando.ts`) capturing the City of Orlando's "EV Charging Station Permit Checklist" as pure data, plus a two-layer visibility model (manifest defaults + user overrides) that drives which packet sections and upload slots are surfaced for a given project. Reserves 6 new `artifact_type` values for Sprint 2C AHJs (Pompano / Miami-Dade / Davie / Hillsborough) so the M1 engine can wire them up without another migration. Squash hash `18985e5`, 8 commits, ~2,066 LOC.
