@@ -1,13 +1,52 @@
 # SparkPlan - Roadmap
 
-**Last Updated:** 2026-05-15
+**Last Updated:** 2026-05-16
 
-## Current Phase: 3.9 (AHJ Compliance Audit Sprint 2B) - ✅ COMPLETE (May 2026)
+## Current Phase: 3.11 (NEC 220.83 routing for existing dwellings) - ✅ COMPLETE (May 2026)
 
-## Latest Completed Phase: 3.8 (T&M Billing Beta v1) - PHASE 1 IMPLEMENTED (May 2026)
-## Also Just Shipped: 3.7 (Estimating Beta v1) + 3.6 (Permits Beta v1) - PHASE 1 IMPLEMENTED (May 2026)
+## Latest Completed Phase: 3.10 (AHJ Compliance Audit Sprint 2C M1) - ✅ COMPLETE (May 2026)
+## Also Just Shipped: 3.9 (Sprint 2B) + 3.8 (T&M Billing) + 3.7 (Estimating) + 3.6 (Permits) - all PHASE 1 IMPLEMENTED (May 2026)
 ## Sprint 2A: ✅ COMPLETE (19/19 findings; 5 themed PRs merged)
 ## Sprint 2B: ✅ COMPLETE (4 PRs merged — PR #45 + PR #47 + PR #49 + PR #51 Orlando manifest scaffold)
+## Sprint 2C M1: ✅ COMPLETE 2026-05-14 (PR #54 engine + PR #56 4 manifests — Pompano / Miami-Dade / Davie / Hillsborough-Tampa)
+
+---
+
+## Phase 3.11: NEC 220.83 routing for existing dwellings - ✅ COMPLETE (May 2026)
+
+Residential dwelling load calculations now route through **NEC 220.83** (Optional Method for Existing Dwelling Units — 8 kVA / 40% general-loads knee + HVAC additive) when the project's Project Status is set to *Existing Construction*. New construction continues to use NEC 220.82. The previously confusing three-option Permit Scope dropdown is promoted into a single **Project Status** field in General Information; the `'service-upgrade'` union value collapses into the existing `scope_flags.service_upgrade` checkbox, which is what H17 exemption screening and the packet narrative already keyed off.
+
+| PR | Status | Closes |
+|---|---|---|
+| **PR #61** (220.83 routing + Project Status UX) | ✅ MERGED 2026-05-15 (`a9d4c9a`) | `existingDwelling` flag on `SingleFamilyInput`; bucket post-processor handles both 220.82 (10 kVA knee) and 220.83 (8 kVA knee) with shared code; NEC labels corrected (220.82 is Optional, not Standard); true 220.82 Optional Method opt-in via `dwelling_calc_mode` setting; `is_proposed` flag on circuits; Proposed New Loads workflow with voltage/continuous on `LoadTemplate` + `otherAppliances` |
+| **PR #64** (JurisdictionRequirements PDF font fix) | ✅ MERGED 2026-05-15 (`405c7b9`) | Permit packet generation crashed on commercial packets — react-pdf inheritance composed `Helvetica-Bold + italic` (no registered variant) when fail-severity rows nested an italic location string. Fix: explicit `fontFamily: 'Helvetica'` on `itemLocation` |
+| **PR #65** (Panel Summary + Playwright + EL-101 follow-up) | ⏳ Open | Panel Summary derives dwelling-MDP connected/demand from actual circuits (matches Dwelling Calc 48.0 / 28.1 / 117 A instead of the stale 51.8 / 29.6 / 123.5); Playwright scaffold + NEC 220.83 smoke spec + 4 in-process PDF tests (769 total, was 748); EL-101 Load Calculation Summary PDF routes dwelling MDPs through `calculateDwellingPanelDemand` |
+
+**Migrations applied** (via Supabase MCP, project `ioarszhzltpisxsxrsgl`):
+- `20260514_circuit_is_proposed.sql` (PR #61) — adds `is_proposed BOOLEAN DEFAULT false` to `circuits`; drives permit-packet existing/new circuit marking.
+
+**Test count:** 748 passing post-PR #61; 769 once PR #65 merges. Build green.
+
+---
+
+## Phase 3.10: AHJ Compliance Audit Sprint 2C M1 - ✅ COMPLETE (May 2026)
+
+Closes Sprint 2C M1. The previously decorative page-12 jurisdiction checklist is now driven by a **pure-function engine** that walks an AHJ manifest's `requirements[]` against the packet AST and emits per-item `pass` / `warn` / `fail` / `na` severity with sheet-ID locators. **4 new AHJ manifests** (Pompano Beach, Miami-Dade County RER unincorporated, Town of Davie, Hillsborough County + City of Tampa joint) join Orlando in the registry; each exercises a different architectural axis baked into `AHJContext` at PR-4 time, validating the "no engine changes per new AHJ" extensibility property.
+
+| PR | Status | Closes |
+|---|---|---|
+| **PR #54** (engine + renderer + sheetIdPrefix plumbing) | ✅ MERGED 2026-05-14 (`e6d9133`) | `services/jurisdictionChecklist/checklistEngine.ts::evaluatePacket()` (pure; never throws; predicate throws degrade to `severity: 'na'`); engine-driven `JurisdictionRequirementsPages` renderer with summary banner + per-category grouping + sheet-ID locators; `manifest.sheetIdPrefix` plumbing with `SheetDiscipline` widened to `'EL' \| 'ES'` for Miami-Dade |
+| **PR #56** (4 AHJ manifests populated) | ✅ MERGED 2026-05-14 (`a4bf21a`) | Pompano Beach (22 reqs — HOA + Fire Review SFR-excluded H22 + 3-form Broward intake + Zoning Compliance); Miami-Dade RER unincorporated (22 reqs — `subjurisdiction` axis + NEC-edition-per-buildingType H34 + `sheetIdPrefix: 'EL-'` H20); Town of Davie (14 reqs — commercial-only Knox-box H27 + bollard H28 + shutdown shunt H29); Hillsborough/Tampa joint (21 reqs — residential trade-permit lane H31 bypasses full plan review for SFR + contractor_exemption) |
+| **PR #53** (F8 — RLS on jurisdictions) | ✅ MERGED 2026-05-13 (`c86581c`) | `20260513022548_enable_rls_on_jurisdictions.sql` enables RLS before Sprint 2C M1 populates the table. F8 closed. |
+
+**Findings closed:** M1 (jurisdiction-checklist engine ships), H20 (Miami-Dade `EL-` sheetIdPrefix plumbing), H22 (Pompano Fire Review SFR-excluded), H27/H28/H29 (Davie commercial Knox-box / bollard / shutdown shunt), H31 (Hillsborough residential trade-permit lane), H34 (Miami-Dade NEC-edition-per-buildingType). F8 closed (RLS on jurisdictions).
+
+**Open research gaps** (none block manifest correctness):
+- Hillsborough/Tampa Knox-box stance unresolved pending FM phone calls
+- H36 HillsGovHub intake-category ambiguity
+- Miami-Dade NEC-edition confirmation optional
+
+**Test count:** 22 new engine tests in PR #54; ~101 new manifest tests across 4 new test files in PR #56 (`pompanoManifest.test.ts`, `miamiDadeManifest.test.ts`, `davieManifest.test.ts`, `hillsboroughTampaManifest.test.ts`). Build green.
 
 ---
 
