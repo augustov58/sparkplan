@@ -1,7 +1,7 @@
 # Development Guide
 ## SparkPlan Application
 
-**Last Updated**: 2026-03-20
+**Last Updated**: 2026-05-16
 **For**: Developers, LLMs continuing development
 **Prerequisites**: TypeScript, React, PostgreSQL basics
 
@@ -1160,7 +1160,7 @@ npm run type-check
 
 ## Testing Strategy
 
-**Last Updated**: 2026-03-20
+**Last Updated**: 2026-05-16
 **Current Coverage**: ~20% (calculation services only)
 **Target Coverage**: 75%
 **Framework**: Vitest 4.0.14 + React Testing Library
