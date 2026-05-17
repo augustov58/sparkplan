@@ -28,6 +28,7 @@ import { hillsboroughTampaManifest } from './hillsborough-tampa';
 import { cityOfMiamiManifest } from './city-of-miami';
 import { orangeCountyManifest } from './orange-county';
 import { stPetersburgManifest } from './st-petersburg';
+import { jacksonvilleDuvalManifest } from './jacksonville-duval';
 
 // ============================================================================
 // REGISTRY
@@ -60,6 +61,12 @@ const MANIFEST_REGISTRY: Readonly<Record<string, AHJManifest>> = {
   // `hillsborough-tampa` (which is Hillsborough County only). Closes the
   // Tampa Bay metro gap.
   'st-petersburg': stPetersburgManifest,
+  // Consolidated City of Jacksonville / Duval County (merged 1968 — one
+  // government, one AHJ). Largest FL city not previously covered. The
+  // four retained "Beaches" munis (Jax Beach / Atlantic Beach / Neptune
+  // Beach / Baldwin) are independent AHJs and would need separate
+  // manifests for future coverage.
+  'jacksonville-duval': jacksonvilleDuvalManifest,
 };
 
 // ============================================================================
