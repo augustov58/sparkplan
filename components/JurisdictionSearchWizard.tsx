@@ -22,7 +22,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
-import { MapPin, CheckCircle, Calculator, AlertCircle, FileText } from 'lucide-react';
+import { MapPin, CheckCircle, Calculator, AlertCircle, FileText, X } from 'lucide-react';
 import { useProjects } from '../hooks/useProjects';
 import { useJurisdictions } from '../hooks/useJurisdictions';
 import type { Jurisdiction } from '../types';
@@ -91,6 +91,29 @@ export const JurisdictionSearchWizard: React.FC<JurisdictionSearchWizardProps> =
     setSelectedJurisdiction(jurisdiction);
     setSearchQuery('');
     setSearchResults([]);
+  };
+
+  // Clear jurisdiction from project (lets contractors test the unmodeled-city
+  // flow: with `jurisdiction_id` cleared, the AHJ-aware renderer falls back
+  // to `manifest_template_id` from settings, or to the Sprint 2A defaults
+  // when no template is picked). Also useful for re-picking when a wrong
+  // jurisdiction was saved.
+  const handleClearJurisdiction = async () => {
+    if (!project) return;
+    setSaveStatus('saving');
+    try {
+      await updateProject({
+        ...project,
+        jurisdiction_id: null,
+      });
+      setSelectedJurisdiction(null);
+      setSaveStatus('saved');
+      setTimeout(() => setSaveStatus('idle'), 3000);
+    } catch (error) {
+      console.error('Error clearing jurisdiction:', error);
+      setSaveStatus('error');
+      setTimeout(() => setSaveStatus('idle'), 3000);
+    }
   };
 
   return (
@@ -202,18 +225,28 @@ export const JurisdictionSearchWizard: React.FC<JurisdictionSearchWizardProps> =
 
             {/* Current Selection Info */}
             {project?.jurisdiction_id && selectedJurisdiction && (
-              <div className="bg-green-50 border border-green-200 rounded-lg p-3">
+              <div className="bg-green-50 border border-green-200 rounded-lg p-3 space-y-3">
                 <div className="flex items-start gap-2">
                   <CheckCircle className="w-4 h-4 text-green-600 mt-0.5 flex-shrink-0" />
-                  <div>
+                  <div className="flex-1">
                     <div className="font-semibold text-sm text-green-900">
                       Project Jurisdiction Set
                     </div>
                     <div className="text-xs text-green-700 mt-1">
-                      This jurisdiction will be included in your permit packet
+                      {selectedJurisdiction.jurisdiction_name}
                     </div>
                   </div>
                 </div>
+                <button
+                  type="button"
+                  onClick={handleClearJurisdiction}
+                  disabled={saveStatus === 'saving'}
+                  className="w-full flex items-center justify-center gap-2 border border-green-300 hover:border-red-400 hover:bg-red-50 hover:text-red-700 text-green-800 text-xs font-medium py-1.5 rounded transition-colors disabled:opacity-50"
+                  title="Remove this jurisdiction so you can pick a different one or test the unmodeled-city flow"
+                >
+                  <X className="w-3 h-3" />
+                  Clear jurisdiction
+                </button>
               </div>
             )}
           </div>
