@@ -53,6 +53,30 @@ export const styles = StyleSheet.create({
     justifyContent: 'space-between',
     marginTop: 5,
   },
+  // PROPOSED — NEW INSTALLATION banner (Sprint 2C M3 follow-on, 2026-05-17).
+  // Amber palette matches the in-app warning treatment and stands out
+  // against the otherwise-neutral schedule cover so AHJ reviewers can't
+  // miss it. Only renders when panel.is_proposed && showExistingNewMarkers.
+  proposedBanner: {
+    backgroundColor: '#fef3c7',
+    borderWidth: 1,
+    borderColor: '#d97706',
+    borderStyle: 'solid',
+    borderRadius: 3,
+    padding: 6,
+    marginBottom: 8,
+  },
+  proposedBannerText: {
+    fontSize: 10,
+    fontFamily: 'Helvetica-Bold',
+    color: '#78350f',
+    letterSpacing: 0.5,
+  },
+  proposedBannerSub: {
+    fontSize: 8,
+    color: '#92400e',
+    marginTop: 2,
+  },
   infoColumn: {
     width: '48%',
   },
@@ -325,6 +349,23 @@ export const PanelSchedulePages: React.FC<PanelSchedulePDFProps> = ({
         </Text>
       </View>
       <View style={styles.header}>
+
+          {/* Sprint 2C M3 follow-on (2026-05-17): NEW INSTALLATION banner.
+              Surfaces at the top of the title block (above the spec grid) so
+              an AHJ reviewer flipping to this panel's schedule cover knows
+              instantly it represents a new (proposed) installation rather
+              than an existing field panel being modified. Suppressed when
+              showExistingNewMarkers is off (new-construction projects). */}
+          {showExistingNewMarkers && panel.is_proposed && (
+            <View style={styles.proposedBanner}>
+              <Text style={styles.proposedBannerText}>
+                PROPOSED &mdash; NEW INSTALLATION
+              </Text>
+              <Text style={styles.proposedBannerSub}>
+                This panel does not yet exist in the field. Install per this schedule.
+              </Text>
+            </View>
+          )}
 
           <View style={styles.infoGrid}>
             <View style={styles.infoColumn}>
@@ -629,6 +670,19 @@ export const MultiPanelDocument: React.FC<MultiPanelDocumentProps> = ({
             </Text>
           </View>
           <View style={styles.header}>
+
+            {/* PROPOSED — NEW INSTALLATION banner (Sprint 2C M3 follow-on,
+                2026-05-17). Mirrors the banner on PanelSchedulePages above. */}
+            {showExistingNewMarkers && panel.is_proposed && (
+              <View style={styles.proposedBanner}>
+                <Text style={styles.proposedBannerText}>
+                  PROPOSED &mdash; NEW INSTALLATION
+                </Text>
+                <Text style={styles.proposedBannerSub}>
+                  This panel does not yet exist in the field. Install per this schedule.
+                </Text>
+              </View>
+            )}
 
             <View style={styles.infoGrid}>
               <View style={styles.infoColumn}>
