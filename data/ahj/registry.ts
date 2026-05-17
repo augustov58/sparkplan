@@ -27,6 +27,7 @@ import { davieManifest } from './davie';
 import { hillsboroughTampaManifest } from './hillsborough-tampa';
 import { cityOfMiamiManifest } from './city-of-miami';
 import { orangeCountyManifest } from './orange-county';
+import { stPetersburgManifest } from './st-petersburg';
 import { jacksonvilleDuvalManifest } from './jacksonville-duval';
 
 // ============================================================================
@@ -56,6 +57,10 @@ const MANIFEST_REGISTRY: Readonly<Record<string, AHJManifest>> = {
   // (NOT City of Orlando, which is independent and registered above).
   // Closes the Orlando-metro gap from Sprint 2C M2.
   'orange-county': orangeCountyManifest,
+  // City of St. Petersburg (Pinellas County). Distinct from
+  // `hillsborough-tampa` (which is Hillsborough County only). Closes the
+  // Tampa Bay metro gap.
+  'st-petersburg': stPetersburgManifest,
   // Consolidated City of Jacksonville / Duval County (merged 1968 — one
   // government, one AHJ). Largest FL city not previously covered. The
   // four retained "Beaches" munis (Jax Beach / Atlantic Beach / Neptune
