@@ -14,8 +14,13 @@ import {
   resolveSections,
   type PacketSections,
 } from '../services/pdfExport/packetSections';
-import { findManifestForJurisdiction } from '../data/ahj/registry';
 import {
+  ALL_MANIFESTS,
+  findManifestForJurisdiction,
+  getManifestById,
+} from '../data/ahj/registry';
+import {
+  ALL_ARTIFACT_TYPE_KEYS,
   computeDefaultVisibility,
   applyUserOverrides,
   toPacketSectionsPartial,
@@ -24,6 +29,8 @@ import {
 import type {
   AHJContext,
   AHJManifest,
+  AHJSheetIdPrefix,
+  ArtifactTypeKey,
   BuildingType,
   ServiceModificationType,
   ContractorLane,
@@ -73,6 +80,31 @@ interface SectionToggleConfig {
    */
   offWarning?: string;
 }
+
+/**
+ * Gap 2 (2026-05-16): display labels + short helper text for each artifact
+ * upload slot. Mirrors the title/description copy already used on the
+ * AttachmentUploadCard grid below so the toggle grid stays consistent with
+ * the slots it controls. Keys are exhaustive over `ALL_ARTIFACT_TYPE_KEYS`;
+ * if a new ArtifactType is added without updating this map, the toggle row
+ * falls back to the raw key.
+ */
+const ARTIFACT_TYPE_LABELS: Record<ArtifactType, { label: string; description: string }> = {
+  site_plan: { label: 'Site Plan / Survey', description: 'Property layout, equipment locations' },
+  cut_sheet: { label: 'Equipment Cut Sheets', description: 'Manufacturer spec sheets' },
+  fire_stopping: { label: 'Fire Stopping Schedule', description: 'UL-listed firestop assemblies' },
+  noc: { label: 'Notice of Commencement', description: 'FL Statute 713 — jobs > $5,000' },
+  hoa_letter: { label: 'HOA / Condo Approval Letter', description: 'Multi-family / association-governed' },
+  survey: { label: 'Property Survey', description: 'Stamped survey when separate from site plan' },
+  manufacturer_data: { label: 'Manufacturer Installation Data', description: 'Vendor installation manuals' },
+  hvhz_anchoring: { label: 'HVHZ / Outdoor Anchoring Detail', description: 'Florida Product Approval / NOA tie-down' },
+  zoning_application: { label: 'Zoning Compliance Permit', description: 'Pompano Beach EV charging' },
+  fire_review_application: { label: 'Fire Review Application', description: 'Pompano + Davie non-SFR EVSE' },
+  notarized_addendum: { label: 'Notarized Addendum Form', description: 'Davie contractor + owner notarized' },
+  property_ownership_search: { label: 'Property Ownership Search', description: 'Davie BCPA.NET printout' },
+  flood_elevation_certificate: { label: 'Design Flood Elevation', description: 'Hillsborough flood-zone' },
+  private_provider_documentation: { label: 'Private Provider Documentation', description: 'FS 553.791 alternative review' },
+};
 
 const SECTION_TOGGLE_CONFIG: SectionToggleConfig[] = [
   {
@@ -322,12 +354,20 @@ export const PermitPacketGenerator: React.FC<PermitPacketGeneratorProps> = ({ pr
   // jurisdiction_id, or jurisdiction doesn't map to a registered manifest),
   // we fall through to Sprint 2A's resolveSections(sectionPrefs) — same
   // shape, same generator API.
+  //
+  // Gap 1 (2026-05-16): `projects.settings.manifest_template_id` lets a
+  // contractor in an unmodeled FL city reuse another AHJ's manifest as a
+  // starting template WITHOUT misrepresenting the AHJ identity on the
+  // cover sheet (the AHJ name still comes from `jurisdiction_id`). When
+  // set, it overrides the jurisdiction-derived lookup.
   const jurisdictionForManifest = currentProject?.jurisdiction_id
     ? getJurisdictionById(currentProject.jurisdiction_id)
     : undefined;
-  const activeManifest: AHJManifest | null = findManifestForJurisdiction(
-    jurisdictionForManifest,
+  const templateManifest = getManifestById(
+    currentProject?.settings?.manifest_template_id,
   );
+  const activeManifest: AHJManifest | null =
+    templateManifest ?? findManifestForJurisdiction(jurisdictionForManifest);
 
   // Build AHJContext from project fields. Defaults are conservative so
   // projects in partial-data state still resolve to something sensible.
@@ -537,6 +577,87 @@ export const PermitPacketGenerator: React.FC<PermitPacketGeneratorProps> = ({ pr
     });
   };
 
+  // Gap 1 (2026-05-16): persist the contractor's manifest-template pick.
+  // Passing '' (the empty <option>) clears the override so the renderer
+  // falls back to the jurisdiction-derived manifest lookup.
+  const handleSelectManifestTemplate = async (templateId: string) => {
+    if (!currentProject) return;
+    await updateProject({
+      ...currentProject,
+      settings: {
+        ...currentProject.settings,
+        manifest_template_id: templateId.length > 0 ? templateId : undefined,
+      },
+    });
+  };
+
+  // Gap 2 (2026-05-16): persist a single artifact-slot user override.
+  // Writes to projects.settings.section_overrides.artifactTypes — the
+  // existing `applyUserOverrides` consumer already reads from this map.
+  const handleToggleArtifactSlot = async (
+    key: ArtifactTypeKey,
+    next: boolean,
+  ) => {
+    if (!currentProject) return;
+    const existing = (currentProject.settings.section_overrides ?? {}) as {
+      sections?: Record<string, boolean>;
+      artifactTypes?: Record<string, boolean>;
+    };
+    await updateProject({
+      ...currentProject,
+      settings: {
+        ...currentProject.settings,
+        section_overrides: {
+          ...existing,
+          artifactTypes: {
+            ...(existing.artifactTypes ?? {}),
+            [key]: next,
+          },
+        },
+      },
+    });
+  };
+
+  // Gap 3 (2026-05-16): persist the per-project AHJ-string overrides.
+  // Empty arrays / empty strings clear the override so the renderer falls
+  // back to the manifest default (or the Sprint 2A baseline).
+  const handleSetGeneralNotesOverride = async (lines: string[] | undefined) => {
+    if (!currentProject) return;
+    await updateProject({
+      ...currentProject,
+      settings: {
+        ...currentProject.settings,
+        general_notes_override:
+          lines && lines.length > 0 ? lines : undefined,
+      },
+    });
+  };
+  const handleSetCodeReferencesOverride = async (
+    lines: string[] | undefined,
+  ) => {
+    if (!currentProject) return;
+    await updateProject({
+      ...currentProject,
+      settings: {
+        ...currentProject.settings,
+        code_references_override:
+          lines && lines.length > 0 ? lines : undefined,
+      },
+    });
+  };
+  const handleSetSheetIdPrefixOverride = async (
+    prefix: AHJSheetIdPrefix | undefined,
+  ) => {
+    if (!currentProject) return;
+    await updateProject({
+      ...currentProject,
+      settings: {
+        ...currentProject.settings,
+        sheet_id_prefix_override: prefix,
+      },
+    });
+  };
+
   // Group toggle configs for the rendered grid.
   const toggleGroups = SECTION_TOGGLE_CONFIG.reduce<Record<string, SectionToggleConfig[]>>(
     (acc, cfg) => {
@@ -695,7 +816,31 @@ export const PermitPacketGenerator: React.FC<PermitPacketGeneratorProps> = ({ pr
           if (ed?.includes('2020')) return '2020';
           return currentProject.necEdition;
         })(),
+        // Gap 3 (2026-05-16): per-project AHJ-string overrides. Render-time
+        // resolution chain inside permitPacketGenerator.tsx:
+        //   data.X ?? data.XOverride ?? data.manifest?.X
+        // The explicit top-level fields above (generalNotes / codeReferences)
+        // are populated from the manifest for the Sprint 2B baseline, so when
+        // a per-project override is present we intentionally pass it via the
+        // *Override fields and clear the top-level field so the override
+        // chain takes effect. When the override is unset, the manifest
+        // defaults flow through the top-level fields unchanged.
+        generalNotesOverride: currentProject.settings?.general_notes_override,
+        codeReferencesOverride: currentProject.settings?.code_references_override,
+        sheetIdPrefixOverride: currentProject.settings?.sheet_id_prefix_override,
       };
+
+      // Gap 3: when a per-project override is present, suppress the
+      // manifest-derived top-level value so the *Override field wins the
+      // ?? chain inside the generator. Without this, the manifest value
+      // already in `generalNotes` / `codeReferences` would short-circuit
+      // the override.
+      if (currentProject.settings?.general_notes_override) {
+        packetData.generalNotes = undefined;
+      }
+      if (currentProject.settings?.code_references_override) {
+        packetData.codeReferences = undefined;
+      }
 
       // Sprint 2A H14: NEC 220.87 narrative — only attached when the user
       // has opted in AND filled the minimum-required citation + max-demand
@@ -870,6 +1015,32 @@ export const PermitPacketGenerator: React.FC<PermitPacketGeneratorProps> = ({ pr
         </div>
       </div>
 
+      {/* Gap 1 (2026-05-16): manifest-template picker for contractors in
+          unmodeled FL cities. Lets them inherit Orlando / Pompano /
+          Miami-Dade / Davie / Hillsborough's section + artifact defaults +
+          narrative content WITHOUT changing the AHJ name on the cover
+          sheet (which still comes from the jurisdiction field).
+          Gap 3 collapsible below the dropdown overrides cover-sheet
+          identity strings on a per-project basis. */}
+      <AHJTemplateAndOverridesPanel
+        currentTemplateId={currentProject.settings?.manifest_template_id}
+        currentManifest={activeManifest}
+        jurisdictionName={
+          jurisdictionForManifest?.jurisdiction_name
+          ?? jurisdictionForManifest?.ahj_name
+          ?? null
+        }
+        generalNotesOverride={currentProject.settings?.general_notes_override}
+        codeReferencesOverride={
+          currentProject.settings?.code_references_override
+        }
+        sheetIdPrefixOverride={currentProject.settings?.sheet_id_prefix_override}
+        onSelectTemplate={handleSelectManifestTemplate}
+        onSetGeneralNotesOverride={handleSetGeneralNotesOverride}
+        onSetCodeReferencesOverride={handleSetCodeReferencesOverride}
+        onSetSheetIdPrefixOverride={handleSetSheetIdPrefixOverride}
+      />
+
       {/* Sprint 2A H1+H2+H3: Section Toggle Panel */}
       <div className="bg-white border border-gray-200 rounded-lg p-6 space-y-4">
         <div className="flex items-start justify-between gap-4">
@@ -986,6 +1157,19 @@ export const PermitPacketGenerator: React.FC<PermitPacketGeneratorProps> = ({ pr
             </p>
           </div>
         </div>
+
+        {/* Gap 2 (2026-05-16): per-slot toggle grid. When an AHJ manifest is
+            active, this lets contractors turn off-by-default artifact slots
+            ON (e.g., enabling 'survey' when reusing Orlando's manifest in a
+            jurisdiction that does require a separate survey). When no
+            manifest is active, every slot is shown unconditionally
+            (matching pre-Gap-2 behavior) and the grid is suppressed. */}
+        {manifestVisibility && (
+          <ArtifactSlotToggleGrid
+            visibility={manifestVisibility.artifactTypes}
+            onToggle={handleToggleArtifactSlot}
+          />
+        )}
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {shouldShowArtifactSlot('site_plan') && (
@@ -1636,6 +1820,295 @@ export const PermitPacketGenerator: React.FC<PermitPacketGeneratorProps> = ({ pr
           </div>
         </div>
       )}
+    </div>
+  );
+};
+
+// ============================================================================
+// Gap 1 + Gap 3 — manifest template picker + AHJ string overrides panel
+// ============================================================================
+
+interface AHJTemplateAndOverridesPanelProps {
+  currentTemplateId: string | undefined;
+  currentManifest: AHJManifest | null;
+  jurisdictionName: string | null;
+  generalNotesOverride: string[] | undefined;
+  codeReferencesOverride: string[] | undefined;
+  sheetIdPrefixOverride: AHJSheetIdPrefix | undefined;
+  onSelectTemplate: (templateId: string) => void;
+  onSetGeneralNotesOverride: (lines: string[] | undefined) => void;
+  onSetCodeReferencesOverride: (lines: string[] | undefined) => void;
+  onSetSheetIdPrefixOverride: (prefix: AHJSheetIdPrefix | undefined) => void;
+}
+
+/**
+ * Unmodeled-city flexibility panel (Gap 1 + Gap 3, 2026-05-16).
+ *
+ * Closes two gaps for contractors working in FL cities without their own
+ * AHJManifest (Winter Park, Sanford, Cape Coral, Lake Mary, etc.):
+ *
+ *   Gap 1 — manifest template dropdown so an unmodeled-city contractor can
+ *   reuse Orlando / Pompano / Miami-Dade / Davie / Hillsborough defaults as
+ *   a starting template. AHJ identity on the cover sheet remains the
+ *   project's actual `jurisdiction_id` — the template only seeds section /
+ *   artifact / narrative defaults.
+ *
+ *   Gap 3 — collapsible override panel for the three AHJ-identity strings
+ *   that aren't otherwise editable: general notes, code references, sheet
+ *   ID prefix. Empty fields fall through to the manifest default. Render
+ *   chain: explicit data → these overrides → manifest fallback.
+ */
+const AHJTemplateAndOverridesPanel: React.FC<AHJTemplateAndOverridesPanelProps> = ({
+  currentTemplateId,
+  currentManifest,
+  jurisdictionName,
+  generalNotesOverride,
+  codeReferencesOverride,
+  sheetIdPrefixOverride,
+  onSelectTemplate,
+  onSetGeneralNotesOverride,
+  onSetCodeReferencesOverride,
+  onSetSheetIdPrefixOverride,
+}) => {
+  const [showOverrides, setShowOverrides] = useState(
+    !!generalNotesOverride
+    || !!codeReferencesOverride
+    || !!sheetIdPrefixOverride,
+  );
+  // Local textarea state mirrors the persisted arrays but allows the user
+  // to type free-form lines (blank lines stripped on save).
+  const [generalNotesText, setGeneralNotesText] = useState(
+    (generalNotesOverride ?? []).join('\n'),
+  );
+  const [codeRefsText, setCodeRefsText] = useState(
+    (codeReferencesOverride ?? []).join('\n'),
+  );
+
+  // Keep textareas in sync when the persisted value changes from elsewhere
+  // (e.g., another tab edited the project).
+  useEffect(() => {
+    setGeneralNotesText((generalNotesOverride ?? []).join('\n'));
+  }, [generalNotesOverride?.join('\n')]);
+  useEffect(() => {
+    setCodeRefsText((codeReferencesOverride ?? []).join('\n'));
+  }, [codeReferencesOverride?.join('\n')]);
+
+  const parseLines = (raw: string): string[] | undefined => {
+    const lines = raw
+      .split('\n')
+      .map((l) => l.trim())
+      .filter((l) => l.length > 0);
+    return lines.length > 0 ? lines : undefined;
+  };
+
+  return (
+    <div className="bg-white border border-gray-200 rounded-lg p-6 space-y-4">
+      <div>
+        <h3 className="font-bold text-gray-900 flex items-center gap-2">
+          <Building2 className="w-5 h-5 text-[#2d3b2d]" />
+          AHJ Template &amp; Overrides
+        </h3>
+        <p className="text-sm text-gray-600 mt-1">
+          Reuse another AHJ's manifest as a starting template (sections,
+          artifact slots, narrative defaults). The AHJ identity on the
+          cover sheet stays your project's jurisdiction
+          {jurisdictionName ? <> — <span className="font-medium">{jurisdictionName}</span></> : null}
+          .
+        </p>
+      </div>
+
+      <div>
+        <label
+          htmlFor="manifestTemplate"
+          className="block text-sm font-medium text-gray-700 mb-2"
+        >
+          Use defaults from
+        </label>
+        <select
+          id="manifestTemplate"
+          value={currentTemplateId ?? ''}
+          onChange={(e) => onSelectTemplate(e.target.value)}
+          className="w-full md:w-1/2 border border-gray-200 rounded px-3 py-2 text-sm focus:border-[#2d3b2d] focus:ring-2 focus:ring-[#2d3b2d]/20 outline-none"
+        >
+          <option value="">None — use jurisdiction default or all-on fallback</option>
+          {ALL_MANIFESTS.map((m) => (
+            <option key={m.id} value={m.id}>
+              {m.name}
+            </option>
+          ))}
+        </select>
+        <p className="text-xs text-gray-500 mt-1">
+          Affects which sections + upload slots default ON and which
+          narrative content the AHJ-aware renderer pulls in. Does NOT
+          change the AHJ name shown on the cover sheet.
+        </p>
+        {currentManifest && (
+          <p className="text-xs text-[#2d3b2d] mt-2">
+            Active manifest: <span className="font-medium">{currentManifest.name}</span>
+            {currentTemplateId ? ' (template override)' : ' (from jurisdiction)'}
+          </p>
+        )}
+      </div>
+
+      <div className="border-t border-gray-100 pt-3">
+        <button
+          type="button"
+          onClick={() => setShowOverrides((v) => !v)}
+          className="text-sm text-[#2d3b2d] hover:text-[#1f291f] underline"
+        >
+          {showOverrides ? 'Hide' : 'Override'} AHJ details (general notes, code refs, sheet prefix)
+        </button>
+
+        {showOverrides && (
+          <div className="mt-4 space-y-4">
+            <div>
+              <label
+                htmlFor="generalNotesOverride"
+                className="block text-sm font-medium text-gray-700 mb-1"
+              >
+                General notes
+                <span className="text-gray-500 font-normal ml-2">
+                  (one per line — empty = use manifest default)
+                </span>
+              </label>
+              <textarea
+                id="generalNotesOverride"
+                value={generalNotesText}
+                onChange={(e) => setGeneralNotesText(e.target.value)}
+                onBlur={() => onSetGeneralNotesOverride(parseLines(generalNotesText))}
+                rows={5}
+                placeholder={
+                  currentManifest
+                    ? `Defaulting to ${currentManifest.name}'s general notes — paste your own here to override.`
+                    : 'Paste your AHJ general notes, one per line.'
+                }
+                className="w-full font-mono text-xs border border-gray-200 rounded px-3 py-2 focus:border-[#2d3b2d] focus:ring-2 focus:ring-[#2d3b2d]/20 outline-none"
+              />
+            </div>
+
+            <div>
+              <label
+                htmlFor="codeReferencesOverride"
+                className="block text-sm font-medium text-gray-700 mb-1"
+              >
+                Code references
+                <span className="text-gray-500 font-normal ml-2">
+                  (one per line — empty = use manifest default)
+                </span>
+              </label>
+              <textarea
+                id="codeReferencesOverride"
+                value={codeRefsText}
+                onChange={(e) => setCodeRefsText(e.target.value)}
+                onBlur={() => onSetCodeReferencesOverride(parseLines(codeRefsText))}
+                rows={4}
+                placeholder={
+                  currentManifest
+                    ? `Defaulting to ${currentManifest.name}'s code references — paste your own here to override.`
+                    : 'e.g., NFPA-70 (2020 NEC), FBC 8th ed (2023), Local Code Ch. 14'
+                }
+                className="w-full font-mono text-xs border border-gray-200 rounded px-3 py-2 focus:border-[#2d3b2d] focus:ring-2 focus:ring-[#2d3b2d]/20 outline-none"
+              />
+            </div>
+
+            <div>
+              <label
+                htmlFor="sheetIdPrefixOverride"
+                className="block text-sm font-medium text-gray-700 mb-1"
+              >
+                Sheet ID prefix
+              </label>
+              <select
+                id="sheetIdPrefixOverride"
+                value={sheetIdPrefixOverride ?? ''}
+                onChange={(e) => {
+                  const v = e.target.value;
+                  if (v === '') onSetSheetIdPrefixOverride(undefined);
+                  else
+                    onSetSheetIdPrefixOverride(v as AHJSheetIdPrefix);
+                }}
+                className="w-full md:w-1/3 border border-gray-200 rounded px-3 py-2 text-sm focus:border-[#2d3b2d] focus:ring-2 focus:ring-[#2d3b2d]/20 outline-none"
+              >
+                <option value="">
+                  Use manifest default
+                  {currentManifest ? ` (${currentManifest.sheetIdPrefix})` : ''}
+                </option>
+                <option value="E-">E-</option>
+                <option value="EL-">EL-</option>
+                <option value="ES-">ES-</option>
+              </select>
+              <p className="text-xs text-gray-500 mt-1">
+                Prefix applied to SparkPlan-generated electrical sheets. User-uploaded
+                artifacts keep their own discipline letters (C, X, A, …).
+              </p>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
+// ============================================================================
+// Gap 2 — artifact-slot toggle grid
+// ============================================================================
+
+interface ArtifactSlotToggleGridProps {
+  visibility: Record<ArtifactTypeKey, boolean>;
+  onToggle: (key: ArtifactTypeKey, next: boolean) => void;
+}
+
+/**
+ * Per-artifact-type toggle grid (Gap 2, 2026-05-16). Mirrors the section
+ * toggle grid pattern but for upload slots. Renders only when a manifest is
+ * active (otherwise every slot is shown unconditionally — matching the
+ * pre-Gap-2 fallback). Toggle writes through to
+ * `projects.settings.section_overrides.artifactTypes.{key}` which
+ * `applyUserOverrides` already consumes.
+ */
+const ArtifactSlotToggleGrid: React.FC<ArtifactSlotToggleGridProps> = ({
+  visibility,
+  onToggle,
+}) => {
+  return (
+    <div className="border border-gray-200 rounded-md p-3 bg-gray-50/50 space-y-2">
+      <div>
+        <p className="text-xs uppercase tracking-wider font-medium text-gray-500">
+          Upload slot visibility
+        </p>
+        <p className="text-xs text-gray-500 mt-1">
+          Toggle which upload slots are shown for this project. Default
+          state comes from the active AHJ manifest; toggles persist as
+          per-project overrides.
+        </p>
+      </div>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-x-4 gap-y-1">
+        {ALL_ARTIFACT_TYPE_KEYS.map((key) => {
+          const meta = ARTIFACT_TYPE_LABELS[key] ?? {
+            label: key,
+            description: '',
+          };
+          return (
+            <label
+              key={key}
+              className="flex items-start gap-2 cursor-pointer py-1"
+            >
+              <input
+                type="checkbox"
+                checked={visibility[key] === true}
+                onChange={(e) => onToggle(key, e.target.checked)}
+                className="mt-1 text-[#2d3b2d] focus:ring-[#2d3b2d]/20 rounded"
+              />
+              <div className="text-sm flex-1">
+                <span className="font-medium text-gray-900">{meta.label}</span>
+                {meta.description && (
+                  <p className="text-xs text-gray-500">{meta.description}</p>
+                )}
+              </div>
+            </label>
+          );
+        })}
+      </div>
     </div>
   );
 };

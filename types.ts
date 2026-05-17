@@ -266,6 +266,42 @@ export interface ProjectSettings {
   };
 
   /**
+   * Manifest-template selection (Gap 1, 2026-05-16). Lets a contractor in
+   * an unmodeled city (Sanford, Lake Mary, Winter Park…) reuse an existing
+   * AHJ's manifest as a starting template — section defaults, artifact
+   * defaults, narrative content — WITHOUT misrepresenting the AHJ name on
+   * the cover sheet (the AHJ identity still comes from `jurisdiction_id`).
+   *
+   * Resolution chain: when set, the renderer prefers
+   * `getManifestById(manifest_template_id)` over
+   * `findManifestForJurisdiction(project.jurisdiction)`. When unset
+   * (default), behavior is identical to pre-Gap-1: the manifest is
+   * resolved from the project's jurisdiction.
+   *
+   * Stored alongside the other `projects.settings` JSON keys — no DB
+   * migration needed; the column is freeform jsonb.
+   */
+  manifest_template_id?: string;
+
+  /**
+   * Per-project string overrides for cover-sheet identity (Gap 3,
+   * 2026-05-16). Render-time resolution chain mirrors the `necEdition`
+   * fallback pattern already used in `services/pdfExport/permitPacketGenerator.tsx`:
+   *   explicit data field → project_setting_override → manifest fallback
+   *
+   * Use case: a contractor reusing Orlando's manifest in Lake Mary can
+   * override the code-references list / general-notes / sheet ID prefix
+   * to reflect the actual AHJ on the packet. Empty / undefined means
+   * "use whatever the manifest provides".
+   *
+   * Stored as freeform jsonb keys on `projects.settings` — no DB
+   * migration required.
+   */
+  code_references_override?: string[];
+  general_notes_override?: string[];
+  sheet_id_prefix_override?: 'E-' | 'EL-' | 'ES-';
+
+  /**
    * Sprint 2A PR 5 / H17: scope inputs that drive the FL contractor-exemption
    * screening engine in `services/permitMode/exemptionScreening.ts`. All
    * three keys are persisted in the `projects.settings` JSON column (no DB
