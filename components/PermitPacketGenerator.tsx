@@ -301,6 +301,56 @@ export const PermitPacketGenerator: React.FC<PermitPacketGeneratorProps> = ({ pr
     setSectionPrefs(stored ?? {});
   }, [currentProject?.id, currentProject?.settings?.sectionPreferences]);
 
+  // Sprint 2C M3 follow-on (2026-05-17): hydrate the per-project permit-
+  // packet form defaults (preparedBy, contractor license, scope, etc.) on
+  // mount so the user doesn't re-enter them on every visit. Profile-based
+  // auto-fill at the useEffects above still works for users who haven't
+  // explicitly saved an override — stored values take precedence because
+  // they fire later and set `!preparedBy` to false.
+  const packetDefaultsHydratedRef = React.useRef(false);
+  useEffect(() => {
+    const stored = currentProject?.settings?.permitPacketDefaults;
+    if (!stored) {
+      packetDefaultsHydratedRef.current = true;
+      return;
+    }
+    if (stored.preparedBy != null) setPreparedBy(stored.preparedBy);
+    if (stored.permitNumber != null) setPermitNumber(stored.permitNumber);
+    if (stored.contractorLicense != null) setContractorLicense(stored.contractorLicense);
+    if (stored.scopeOfWork != null) setScopeOfWork(stored.scopeOfWork);
+    if (stored.serviceType) setServiceType(stored.serviceType);
+    if (stored.meterLocation != null) setMeterLocation(stored.meterLocation);
+    if (stored.serviceConductorRouting != null) setServiceConductorRouting(stored.serviceConductorRouting);
+    packetDefaultsHydratedRef.current = true;
+  }, [currentProject?.id]);
+
+  // Debounced persist back. 750ms — enough to coalesce typing bursts but
+  // fast enough that the user sees their last edit survive a quick reload.
+  useEffect(() => {
+    if (!currentProject || !packetDefaultsHydratedRef.current) return;
+    const next = {
+      preparedBy,
+      permitNumber,
+      contractorLicense,
+      scopeOfWork,
+      serviceType,
+      meterLocation,
+      serviceConductorRouting,
+    };
+    const stored = currentProject.settings?.permitPacketDefaults;
+    if (JSON.stringify(next) === JSON.stringify(stored ?? {})) return;
+    const timer = setTimeout(() => {
+      updateProject({
+        ...currentProject,
+        settings: {
+          ...currentProject.settings,
+          permitPacketDefaults: next,
+        },
+      });
+    }, 750);
+    return () => clearTimeout(timer);
+  }, [preparedBy, permitNumber, contractorLicense, scopeOfWork, serviceType, meterLocation, serviceConductorRouting]);
+
   // Sprint 2C M3 (2026-05-17): hydrate NEC 220.87 narrative inputs from
   // project settings on project load so they survive a reload. Skipped if
   // no persisted block (defaults remain blank). Tracks restoration via a

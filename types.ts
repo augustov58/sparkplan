@@ -347,6 +347,23 @@ export interface ProjectSettings {
     maxDemandKVA?: string;
     proposedNewLoadKVA?: string;
   };
+
+  /**
+   * Sprint 2C M3 follow-on (2026-05-17): persisted permit-packet form
+   * defaults. Saves the user from re-entering contractor license, scope of
+   * work, meter location, and routing details every time they regenerate a
+   * packet. Survives reloads + tab nav. Loaded into the PermitPacketGenerator
+   * form state on mount; persisted back debounced on field changes.
+   */
+  permitPacketDefaults?: {
+    preparedBy?: string;
+    permitNumber?: string;
+    contractorLicense?: string;
+    scopeOfWork?: string;
+    serviceType?: 'overhead' | 'underground';
+    meterLocation?: string;
+    serviceConductorRouting?: string;
+  };
 }
 
 /**
