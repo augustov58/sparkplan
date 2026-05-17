@@ -7,7 +7,9 @@ import {
   CheckCircle,
   Info,
   Plus,
-  Trash2
+  Trash2,
+  FileText,
+  Save
 } from 'lucide-react';
 import {
   quickServiceCheck,
@@ -33,8 +35,11 @@ interface ServiceUpgradeWizardProps {
 export const ServiceUpgradeWizard: React.FC<ServiceUpgradeWizardProps> = ({ projectId: propProjectId }) => {
   const { projectId: urlProjectId } = useParams();
   const projectId = propProjectId || urlProjectId;
-  const { getProjectById } = useProjects();
+  const { getProjectById, updateProject } = useProjects();
   const project = projectId ? getProjectById(projectId) : undefined;
+
+  // Sprint 2C M3 (2026-05-17): "Save to Packet" feedback state.
+  const [savedToPacket, setSavedToPacket] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
   const { panels } = usePanels(projectId);
 
   // Mode toggle (Quick Check for Phase 1 MVP)
@@ -240,6 +245,67 @@ export const ServiceUpgradeWizard: React.FC<ServiceUpgradeWizardProps> = ({ proj
     const amps = templateToQuickAmps(template);
     setProposedLoadAmps(amps);
     setSelectedTemplate(''); // Reset dropdown
+  };
+
+  // Sprint 2C M3 (2026-05-17): persist the wizard's current inputs into
+  // project.settings.nec22087Narrative so the Permit Packet Generator
+  // auto-populates the "NEC 220.87 Existing-Service Narrative" section.
+  // Bridges the amp-based Quick Check (this wizard) to the kVA-based
+  // narrative shape (the packet expects).
+  const saveToPacketNarrative = async () => {
+    if (!project || !projectId) return;
+    setSavedToPacket('saving');
+
+    // Amps → kVA conversion. 3-phase uses √3 line-to-line.
+    const voltage = project.serviceVoltage || 240;
+    const isThreePhase = project.servicePhase === 3;
+    const ampsToKVA = (amps: number) =>
+      Math.round(((amps * voltage * (isThreePhase ? Math.sqrt(3) : 1)) / 1000) * 100) / 100;
+
+    // Map enum → packet's narrative method string.
+    const methodMap: Record<ExistingLoadDeterminationMethod, 'utility_bill' | 'load_study' | 'calculated' | 'manual'> = {
+      [ExistingLoadDeterminationMethod.UTILITY_BILL]: 'utility_bill',
+      [ExistingLoadDeterminationMethod.LOAD_STUDY]: 'load_study',
+      [ExistingLoadDeterminationMethod.CALCULATED]: 'calculated',
+      [ExistingLoadDeterminationMethod.MANUAL]: 'manual',
+    };
+    const narrativeMethod = methodMap[existingLoadMethod];
+
+    // Auto-generate dataSourceCitation when none exists. User can override
+    // in the PermitPacketGenerator UI later if they have a more specific
+    // utility-bill reference number.
+    const citationByMethod: Record<typeof narrativeMethod, string> = {
+      utility_bill: `12-month utility billing data${project.settings?.utilityProvider ? ` from ${project.settings.utilityProvider}` : ''}`,
+      load_study: '30-day continuous load recording (NEC 220.87)',
+      calculated: panelDataSource
+        ? `Calculated from panel schedule (${panelDataSource})`
+        : 'Calculated from panel schedule per NEC 220.84/220.87',
+      manual: 'Manual entry (engineering judgment)',
+    };
+
+    try {
+      await updateProject({
+        ...project,
+        settings: {
+          ...project.settings,
+          nec22087Narrative: {
+            include: true,
+            method: narrativeMethod,
+            dataSourceCitation: citationByMethod[narrativeMethod],
+            dateRangeFrom: '',
+            dateRangeTo: '',
+            maxDemandKVA: String(ampsToKVA(effectiveCurrentUsageAmps)),
+            proposedNewLoadKVA: String(ampsToKVA(proposedLoadAmps)),
+          },
+        },
+      });
+      setSavedToPacket('saved');
+      setTimeout(() => setSavedToPacket('idle'), 4000);
+    } catch (err) {
+      console.error('[ServiceUpgradeWizard] save to packet failed:', err);
+      setSavedToPacket('error');
+      setTimeout(() => setSavedToPacket('idle'), 4000);
+    }
   };
 
   return (
@@ -831,6 +897,43 @@ export const ServiceUpgradeWizard: React.FC<ServiceUpgradeWizardProps> = ({ proj
                   )}
                 </div>
               </div>
+
+              {/* Sprint 2C M3 (2026-05-17): Save to Packet 220.87 Narrative.
+                  Bridges the wizard → permit packet so commercial users
+                  don't re-enter the same numbers in two places. Method 1
+                  (utility_bill, load_study) skips the 125% multiplier in the
+                  packet renderer; Method 2 (calculated) applies it. */}
+              {projectId && (
+                <div className="bg-white border border-gray-200 rounded-lg p-4">
+                  <div className="flex items-start gap-3">
+                    <FileText className="w-5 h-5 text-[#2d3b2d] flex-shrink-0 mt-0.5" />
+                    <div className="flex-1">
+                      <h4 className="font-semibold text-gray-900 mb-1 text-sm">
+                        Include in Permit Packet
+                      </h4>
+                      <p className="text-xs text-gray-600 mb-3">
+                        Persists these inputs to the project's NEC 220.87 narrative — the Permit Packet Generator auto-populates the existing-service narrative page (Method {existingLoadMethod === ExistingLoadDeterminationMethod.UTILITY_BILL || existingLoadMethod === ExistingLoadDeterminationMethod.LOAD_STUDY ? '1: measured demand, no 125% multiplier' : '2: calculated demand × 125%'}).
+                      </p>
+                      <button
+                        onClick={saveToPacketNarrative}
+                        disabled={savedToPacket === 'saving'}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-[#2d3b2d] text-white text-xs font-medium rounded-md hover:bg-[#1f291f] transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+                      >
+                        <Save className="w-3.5 h-3.5" />
+                        {savedToPacket === 'saving' ? 'Saving…' :
+                         savedToPacket === 'saved' ? 'Saved to Packet ✓' :
+                         savedToPacket === 'error' ? 'Save failed — retry' :
+                         'Save to Packet 220.87 Narrative'}
+                      </button>
+                      {savedToPacket === 'saved' && (
+                        <p className="text-xs text-green-700 mt-2">
+                          Open the Permit Packet Generator and toggle "NEC 220.87 Existing-Service Narrative" on — the inputs are pre-filled.
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
 
               {/* Load Breakdown (if using dwelling data) */}
               {usingDwellingData && dwellingLoadResult && (() => {
