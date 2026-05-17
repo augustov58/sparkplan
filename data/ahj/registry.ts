@@ -26,6 +26,7 @@ import { miamiDadeManifest } from './miami-dade';
 import { davieManifest } from './davie';
 import { hillsboroughTampaManifest } from './hillsborough-tampa';
 import { cityOfMiamiManifest } from './city-of-miami';
+import { orangeCountyManifest } from './orange-county';
 
 // ============================================================================
 // REGISTRY
@@ -50,6 +51,10 @@ const MANIFEST_REGISTRY: Readonly<Record<string, AHJManifest>> = {
   // City of Miami name is "City of Miami" which does NOT contain
   // "miami-dade", so order is documentation-only here).
   'city-of-miami': cityOfMiamiManifest,
+  // Orange County Division of Building Safety — unincorporated areas only
+  // (NOT City of Orlando, which is independent and registered above).
+  // Closes the Orlando-metro gap from Sprint 2C M2.
+  'orange-county': orangeCountyManifest,
 };
 
 // ============================================================================
