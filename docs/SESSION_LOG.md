@@ -7,6 +7,48 @@
 
 ---
 
+### Session: 2026-05-16 — Sprint 2C M2 (AHJ coverage expansion + manifest reuse flexibility, PRs #70–#75 in-flight)
+
+**Focus**: One-shot expansion from the post-2C-M1 audit. User asked whether the packet was flexible enough for contractors in unmodeled FL cities (Winter Park, Sanford, Cape Coral, Lake Mary, etc.) to reuse an existing AHJ's defaults without misrepresenting their actual AHJ on the cover sheet. Answered yes-but-with-3-gaps; user said "do both (a) Tier 1 manifest expansion and (b) close those gaps. Use parallel agents." Six PRs landed in-flight against main: PR #70 Orlando-populate (sequential, foreground), then 5 PRs from 5 parallel agents in worktree isolation — 4 Tier 1 manifests (City of Miami, Orange County unincorporated, City of St. Petersburg, Jacksonville/Duval) + 1 flexibility-gaps PR.
+
+**Status**: 6 PRs open (#70 Orlando-populate, #71 Gaps, #72 Miami, #73 Orange, #74 St. Pete, #75 Jacksonville). None merged yet. Full test suite at 960/960 passing in local pre-merge verification (vs ~797 baseline). Build green. AHJ count when all 6 merge: 5 → 9 registered; FL metro population served: ~2.3M → ~3.5M directly.
+
+**Architecture decisions worth carrying forward**:
+
+- **Two-layer visibility model paid off.** Sprint 2B PR #51 designed the AHJ-aware visibility module with Layer 1 (manifest defaults) + Layer 2 (user overrides), and put `section_overrides.artifactTypes` on the schema even though there was no UI for it at the time. PR #71 Gap 2 only needed to add the UI — `applyUserOverrides` already consumed the artifact-types branch. Lesson: when you build a layered model, plumb the bottom layer even before the UI exists. Adding the UI later is one PR; adding the persistence shape later would have required a migration + a backward-compat retrofit.
+- **Manifest-template reuse is a higher-leverage move than adding more manifests.** Adding 4 Tier 1 AHJs (#72–#75) directly covers ~1.2M additional FL population. PR #71's Gap 1 (`manifest_template_id` separation from `jurisdiction_id`) unblocks every OTHER unmodeled FL city in one dropdown click. Per the audit, that's the entire long tail — Winter Park / Sanford / Cape Coral / Lake Mary / Naples etc. — all served via "pick the nearest covered AHJ's defaults" rather than waiting for individual manifest research. The architecture made Gap 1 a ~½-day fix; the marginal cost of more manifests is ~1–2 days each. Always prefer the leverage move.
+- **Pure-function manifests with named research artifacts scale to many AHJs.** Each agent followed the Pompano template (best exemplar at 22 reqs / 5 categories) and produced 4 deliverables: `data/ahj/<id>.ts` + `tests/<id>Manifest.test.ts` + `docs/ahj-source-checklists/<id>.md` + registry.ts addition. 4 agents in 4 parallel worktrees took ~11 minutes wall-clock and produced 9 files / ~3000 LOC / 172 new tests. The architecture's data-only contract (no engine changes per AHJ) is what made parallelization clean.
+
+**Process gotchas worth remembering**:
+
+- **Sequential merges of agent branches can leak orphan conflict markers past Git.** Resolving the 4 `registry.ts` conflicts during local sequential merges, one Edit's `old_string` captured the `=======/>>>>>>>` markers but not the corresponding `<<<<<<< HEAD` higher up. Git accepts commits containing literal `<<<<<<<` text once the file is `git add`-ed — it only blocks unmerged paths, not conflict-marker patterns. The orphan only surfaced at `npm run build` via esbuild's `Transform failed: Expected identifier but found "<<"`. Fixed forward with a 1-line cleanup commit. A pre-commit hook (`grep -E '^(<<<<<<<|=======|>>>>>>>)' --include='*.{ts,tsx,js,jsx}'`) would catch it next time — added to follow-ups.
+- **Worktree CWD doesn't always survive Bash calls across an agent's session.** The gaps-closure agent's report mentioned it had to revert "accidental edits" to `/home/augusto/projects/sparkplan` (the main repo) after `cd` jumped it out of its worktree. Resulted in `tests/visibility.test.ts` being modified in the main repo working tree (NOT committed in the agent's branch), plus St. Pete files leaking from the St. Pete agent's worktree into the main repo as untracked files. All correctly preserved on the respective agent branches; the floating state in main was safely discarded with `git restore` + `rm`. **Lesson for future parallel-agent prompts: include "always use absolute paths or `git -C $WORKTREE_PATH` for git commands" explicitly.**
+- **Agent confidence ratings are honest signal.** All 4 manifest agents reported MEDIUM confidence on EV-specific scope because none of the new AHJs publish dedicated EV checklists (verified by direct fetches). Each agent documented the specific phone-call follow-up that would close the gap. Trusting MEDIUM is better than asking for HIGH-or-nothing — the manifests work today; the phone-call closure is a Sprint 2C+ task.
+- **Local merges can be "verification only" rather than "ship".** I merged all 5 agent branches into local main, ran full tests, then `git reset --hard origin/main` and opened 5 PRs targeting main. This preserves the PR-per-feature review workflow while letting me verify integration locally. Trade-off: each PR will re-hit the same `registry.ts` conflicts on merge (user resolves in GitHub UI). Worth it for the granular review surface; not worth it if the user wanted single-PR bulk merge.
+
+**Deliverables**:
+
+| PR | Branch | Files | Result |
+|---|---|---|---|
+| **#70** | `feat/orlando-manifest-requirements` | 4 files, +592 / -11 LOC, 28 new tests | ⏳ Open against main |
+| **#71** | `feat/manifest-flexibility-gaps` | 4 files, +815 / -9 LOC, 19 new tests | ⏳ Open against main |
+| **#72** | `feat/ahj-city-of-miami` | 4 files, +1092 / 0 LOC, 44 new tests | ⏳ Open against main |
+| **#73** | `feat/ahj-orange-county` | 4 files, +1051 / 0 LOC, 33 new tests | ⏳ Open against main |
+| **#74** | `feat/ahj-st-petersburg` | 4 files, ~+1200 LOC, 51 new tests | ⏳ Open against main |
+| **#75** | `feat/ahj-jacksonville-duval` | 4 files, ~+1100 LOC, 44 new tests | ⏳ Open against main |
+
+**Worktrees in play at session end**: 5 agent worktrees in `.claude/worktrees/agent-*` are still on disk (locked branches). Safe to `git worktree remove` after PRs merge.
+
+**Pending / follow-ups**:
+
+1. **Merge sequence**: PR #71 (Gaps) first — no `registry.ts` conflict. Then PRs #72/73/74/75 in any order — each hits a deterministic 2-line `registry.ts` conflict that resolves mechanically via GitHub's UI conflict editor (each adds 1 import + 1 entry to non-overlapping spots).
+2. **Pre-commit hook for conflict markers**: small `grep -E '^(<<<<<<<|=======|>>>>>>>)' --include='*.{ts,tsx,js,jsx,md}'` in `.husky/pre-commit` (or `.git/hooks/pre-commit` if no husky) to catch the failure mode that bit this sprint.
+3. **Beaches munis (Jax)** + **Pinellas surrounding munis (Clearwater, Largo, Dunedin)** — flagged in PR #75 / #74 research docs.
+4. **Tier 2 AHJs**: Fort Lauderdale, Miami Beach, Coral Gables, Hialeah, Sanford / Seminole County, Naples / Cape Coral — per the audit's coverage matrix.
+5. **Phone-call research closures** — each new manifest's research doc lists 1–5 short calls to close MEDIUM-confidence research gaps.
+
+---
+
 ### Session: 2026-05-15 to 2026-05-16 — Docs cleanup, JurisdictionRequirements font hotfix, and NEC 220.83 follow-up (PRs #63, #64, #65)
 
 **Focus**: Picked up mid-stream from a compacted prior session that had been mid-execution of the dwelling-load fixes. Three PRs landed: doc-debt cleanup (#63 `aa37d4b`), font crash hotfix on commercial packets (#64 `405c7b9`), and the 3-commit follow-up to PR #61's NEC 220.83 routing work (#65 in-flight, branch `feat/220-83-panel-summary-playwright-el101`). Mid-session discovered that PR #61 (also by the user) had shipped the core 220.83 routing in parallel — most of the original `feat/nec-220-83-existing-dwelling` branch's 17 commits were already on main via #61's squash, so PR #62 was closed and the genuinely-new 3 commits were cherry-picked onto a fresh branch as PR #65.
@@ -45,44 +87,7 @@
 4. **Tasks D + E + F + G — additional archival sweeps**: pending. Archive completed-plan docs in `/docs` (8 candidates), archive stale CA-era marketing assets, refresh "Last Updated" on `architecture.md` / `development-guide.md` / `security.md`, consolidate `docs/implementation-notes/` into archive.
 5. **JurisdictionRequirements design follow-up** (not on the queue): commercial vs residential fixture diversity in E2E tests would have caught #64 earlier. The smoke test fixture was a single-family residential happy path with zero fail-severity rows — exactly the path the bug hid on. Adding a commercial fixture to the Playwright suite is the highest-leverage addition.
 
----
-
-### Session: 2026-05-13 — Sprint 2B PR-4 (Orlando manifest + AHJ-aware visibility) shipped via single-agent run
-
-**Focus**: Closed Sprint 2B. Built and shipped PR #51 over 8 commits / ~2,066 LOC against `feat/sprint2b-orlando-manifest`, merged at squash hash `18985e5` 2026-05-13. Adds the first-ever AHJ manifest (`data/ahj/orlando.ts`), the AHJManifest type system with a 4-axis `AHJContext`, a two-layer visibility model (manifest defaults + user overrides), an AHJ registry with case-insensitive lookup, the orchestrator plumbing to consume an optional manifest, and 6 new `artifact_type` enum values reserved for Sprint 2C AHJs. Sprint 2B is now complete at 4/4 PRs (PR #45 foundation + PR #47 upload UI + PR #49 merge engine + PR #51 manifest scaffold).
-
-**Status**: ✅ PR #51 merged. Sprint 2B: ✅ COMPLETE. Test suite at 572 passing across 37 test files (was 522 post-PR-#49; +50 new tests across 2 new test files: `tests/visibility.test.ts` (22) + `tests/orlandoManifestE2E.test.ts` (28)). 1 DB migration applied to live Supabase (`20260514_attachment_types_pr4.sql` — extends `artifact_type` CHECK from 8 to 14 values). Build green.
-
-**Architecture decisions worth carrying forward**:
-
-- **Bake the manifest's hardest axes into the type system on day 1, not on day N.** PR-4's `AHJContext` declares all 4 cross-AHJ discriminators (`scope`, `lane`, `buildingType`, `subjurisdiction`) even though Orlando uses only 2 of them (`scope` + `buildingType`). The temptation was to ship Orlando first and add `buildingType` / `subjurisdiction` when Miami-Dade / Pompano / Davie / Hillsborough land in Sprint 2C M1. Wrong call — that would force a retrofit across 5 manifests + their predicate functions. Cost of adding the field upfront: ~10 LOC + one comment per field explaining when it's used. Cost of retrofitting: rewriting every predicate. Lesson: when you can predict the axes of variation from research that already landed (Sprint 2C parallel-research PRs #46 + #48), declare them all on the day-1 interface even if today's only consumer uses a subset.
-- **Two-layer visibility (manifest defaults + user overrides) is the right shape for cross-AHJ work.** Sprint 2A's `DEFAULT_SECTIONS = { panelSchedule: true, ... }` assumed every project of every AHJ has the same defaults. That's wrong as soon as you have >1 AHJ. The two-layer model gets 90% right automatically (manifest declares what the AHJ wants by default; predicates refine per-project context) while letting the contractor override the last 10% (project-specific reality, e.g., "Davie commercial usually wants Knox-box but this 80A project doesn't have a switchboard"). Pattern memory-worthy for any future "system has opinionated defaults + power-user overrides" problem.
-- **Predicates over enums for conditional relevance.** Orlando's NEC 220.87 narrative is relevant on existing-service path / irrelevant on new-service path. Available Fault Current calc is the opposite. The temptation is to enumerate ('existing-service-only', 'new-service-only', 'always', 'never'). Predicates win: pure `(ctx: AHJContext) => boolean`, composable with future axes (`ctx.scope === 'existing-service' && ctx.lane === 'pe_required'` falls out naturally), and they survive new context axes without enum migration. The manifest's `sectionPredicates` + `artifactTypePredicates` maps are the abstraction surface — Sprint 2C M1's per-AHJ manifests just add more predicate keys.
-- **Reserve enum values in advance when downstream PRs need them.** PR #51 added 6 `artifact_type` values that Orlando's manifest doesn't surface (zoning_application, fire_review_application, notarized_addendum, property_ownership_search, flood_elevation_certificate, private_provider_documentation). Why? Sprint 2C M1's Pompano / Miami-Dade / Davie / Hillsborough manifests need them. Splitting the migration across 4 PRs would cost 4 migrations + 4 testing windows; bundling them with PR-4 costs 1 migration. The Orlando manifest just doesn't list any of them in `relevantArtifactTypes` — they're enum-valid but visibility-OFF. Lesson: when the next sprint's research is already done (and `data/ahj/orlando.ts` references the H21/H22/H25/H26/H30/H33 findings in comments), pre-allocate the schema values during the current PR.
-- **Backward-compat via fallback chains, not feature flags.** Resolution logic in the orchestrator: `generalNotes = data.generalNotes ?? manifest?.generalNotes ?? Sprint2A_baseline`. Same shape for `codeReferences` and `necEdition`. No feature flag, no toggle, no opt-in — projects without a `jurisdiction_id` (or with one not in the registry) get exactly the Sprint 2A behavior they had pre-PR-#51. Lesson: when adding new defaults, prefer null-coalescing fallback chains over feature flags — the new path naturally degrades to the old path when its inputs aren't present.
-
-**Process gotchas worth remembering**:
-
-- **Manifest-as-pure-data continues to pay off.** `data/ahj/orlando.ts` is 208 LOC of literal data + predicate functions. No DB calls, no React, no side effects, no imports beyond `./types`. Tested via 28 E2E assertions against the visibility-math output. When a sprint produces pure-data artifacts, the test surface collapses (no async, no mocks, no setup teardown) and the next-sprint's review burden collapses with it. Sprint 2C M1 reviews will be N more `data/ahj/{ahj}.ts` files + an engine — both reviewable on the same shape.
-- **8 commits in one PR is the right size.** PR #51 reviewed cleanly: 1 commit per architectural surface (types → manifest → registry → visibility math → orchestrator integration → UI plumbing → E2E tests + 1 supporting commit). Compare to PR #49's 17-commit iterative v1 → v5 cycle (which was the right call given the design-by-review nature of title-block UX). When a sprint is "implement against an already-decided spec," lean toward fewer-but-cohesive commits; when it's "iterate to discover the shape," lean toward more-but-finer-grained commits.
-- **Docs-sync convention extends to Sprint 2B closure.** Same pattern as PR #50 (post-PR #49) and PR #42 (post-Sprint 2A PRs #40 + #41). Docs-only PR off main after the feature PR merges. This session's docs-sync PR follows the precedent.
-
-**Deliverables**:
-
-| PR | Branch | Files | Result |
-|---|---|---|---|
-| **#51 (merged)** | `feat/sprint2b-orlando-manifest` | 13 files, 8 commits, ~2,066 LOC (5 new `data/ahj/` modules + 2 new test files + 1 migration + 4 modified files including orchestrator) | ✅ MERGED `18985e5` 2026-05-13 |
-| **this PR (local)** | `feat/sprint2b-orlando-manifest` worktree (docs-sync) | parent audit + sprint2b + README + ROADMAP + CHANGELOG + SESSION_LOG + database-architecture + CLAUDE.md | (this commit set) |
-
-**Worktrees in play at session end**: `worktree-agent-a2bc0abf949ed1035` (this docs-sync worktree, part of a 7-agent parallel orchestration for PR #51).
-
-**Pending / follow-ups**:
-
-1. **Sprint 2C M1 — per-AHJ manifest engine** — declare Pompano → Miami-Dade → Davie → Hillsborough manifests against the same `AHJManifest` shape. Populate their `requirements: AHJRequirement[]` arrays. Build the engine that walks `requirements[]` and emits a per-project conformance checklist. All schema work is done; Sprint 2C is now a pure-data + engine exercise.
-2. **F8: Enable RLS on `public.jurisdictions`** — one-line migration before Sprint 2C M1 populates the table. Supabase advisor flagged 2026-05-12; still open.
-3. **Sprint 3 unblocked** — `pdf-lib` PAdES integration shape established by Sprint 2B PR #49; H17 lane logic (Sprint 2A PR #41) gates the PE-seal upsell offering; manifest's `lane: 'pe_required'` predicate flows naturally into seal-required determination. Cert vendor selection + FBPE business-entity registration remain as hard prerequisites.
-4. **Sheet-ID prefix plumbing (H20 Miami-Dade `EL-`)** — `AHJManifest.sheetIdPrefix` is declared but the orchestrator still uses the Sprint 2B PR-3 discipline-letter system. Wire `manifest.sheetIdPrefix` into the band allocator when Miami-Dade's manifest lands in Sprint 2C M1.
 
 ---
 
-<!-- Earlier sessions (2026-05-12 Sprint 2B PR-3 merge engine, 2026-05-10 Sprint 2A final 2 PRs, 2026-05-09 contractor-pivot + T&M Phase 1, 2026-05-10 Sprint 2A PR #31) rotated out per "keep last 2 sessions" rule. Git history preserves them. -->
+<!-- Earlier sessions (2026-05-13 Sprint 2B PR-4 Orlando manifest scaffold + AHJ-aware visibility, 2026-05-12 Sprint 2B PR-3 merge engine, 2026-05-10 Sprint 2A final 2 PRs, 2026-05-09 contractor-pivot + T&M Phase 1) rotated out per "keep last 2 sessions" rule. Git history preserves them. -->
