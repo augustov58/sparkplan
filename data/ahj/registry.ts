@@ -25,6 +25,7 @@ import { pompanoManifest } from './pompano';
 import { miamiDadeManifest } from './miami-dade';
 import { davieManifest } from './davie';
 import { hillsboroughTampaManifest } from './hillsborough-tampa';
+import { orangeCountyManifest } from './orange-county';
 
 // ============================================================================
 // REGISTRY
@@ -40,6 +41,7 @@ const MANIFEST_REGISTRY: Readonly<Record<string, AHJManifest>> = {
   'miami-dade': miamiDadeManifest,
   davie: davieManifest,
   'hillsborough-tampa': hillsboroughTampaManifest,
+  'orange-county': orangeCountyManifest,
 };
 
 // ============================================================================
