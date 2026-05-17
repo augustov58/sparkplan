@@ -77,6 +77,7 @@ import type { ArtifactType, CoverMode } from '../../hooks/useProjectAttachments'
 import type {
   AHJContext,
   AHJManifest,
+  AHJSheetIdPrefix,
   AttachmentSummary,
   BuildingType,
   PacketAST,
@@ -237,6 +238,20 @@ export interface PermitPacketData {
    */
   buildingType?: BuildingType;
   /**
+   * Per-project string overrides for cover-sheet identity (Gap 3,
+   * 2026-05-16). When set, these win over the manifest fallback but lose
+   * to an explicit top-level `generalNotes` / `codeReferences` /
+   * `sheetIdPrefix`. Resolution chain:
+   *   data.X ?? data.XOverride ?? data.manifest?.X
+   *
+   * Use case: Lake Mary contractor reuses Orlando manifest as template but
+   * the cover sheet must reflect Lake Mary's actual code basis. Empty /
+   * undefined means "fall through to manifest default".
+   */
+  generalNotesOverride?: string[];
+  codeReferencesOverride?: string[];
+  sheetIdPrefixOverride?: AHJSheetIdPrefix;
+  /**
    * Sprint 2B PR-3: user-uploaded PDF artifacts to splice into the packet.
    *
    * Storage fetch happens at the React layer (Supabase auth context lives
@@ -394,9 +409,17 @@ export const generatePermitPacket = async (data: PermitPacketData): Promise<void
       : necFromManifest && necFromManifest.includes('2020')
       ? '2020'
       : undefined);
-  const resolvedGeneralNotes = data.generalNotes ?? data.manifest?.generalNotes;
+  // Gap 3 (2026-05-16): three-step fallback so per-project overrides win
+  // over the manifest default but lose to an explicit top-level field.
+  // Empty arrays in the override fields count as "set" (intentional — the
+  // contractor may want to suppress every general note); use ?? so only
+  // null/undefined falls through.
+  const resolvedGeneralNotes =
+    data.generalNotes ?? data.generalNotesOverride ?? data.manifest?.generalNotes;
   const resolvedCodeReferences =
-    data.codeReferences ?? data.manifest?.codeReferences;
+    data.codeReferences
+    ?? data.codeReferencesOverride
+    ?? data.manifest?.codeReferences;
 
   // Build a shadow `data` reference that uses the manifest-resolved values
   // when the explicit top-level fields are missing. Keep the original
@@ -1182,8 +1205,14 @@ export const generatePermitPacket = async (data: PermitPacketData): Promise<void
   // sticks with 'E-'). Backward compat: when no manifest, falls back to 'E'
   // (Sprint 2A default). User-uploaded attachment discipline letters
   // (C/X/A/S/M/P) are handled separately downstream and are NOT affected.
-  const generatedDiscipline = data.manifest?.sheetIdPrefix
-    ? disciplineFromSheetIdPrefix(data.manifest.sheetIdPrefix)
+  //
+  // Gap 3 (2026-05-16): per-project `sheetIdPrefixOverride` wins over the
+  // manifest default so an unmodeled-city contractor reusing a template
+  // can still stamp their AHJ's actual prefix on the sheets.
+  const resolvedSheetIdPrefix: AHJSheetIdPrefix | undefined =
+    data.sheetIdPrefixOverride ?? data.manifest?.sheetIdPrefix;
+  const generatedDiscipline = resolvedSheetIdPrefix
+    ? disciplineFromSheetIdPrefix(resolvedSheetIdPrefix)
     : SHEET_DISCIPLINE_ELECTRICAL;
 
   const counters = newBandCounters();
@@ -1580,11 +1609,19 @@ export const generateLightweightPermitPacket = async (data: PermitPacketData): P
         : lwNecFromManifest && lwNecFromManifest.includes('2020')
         ? '2020'
         : undefined);
+    // Gap 3 (2026-05-16): per-project overrides win over manifest defaults
+    // on the lightweight path too (kept aligned with the full generator).
     data = {
       ...data,
       necEdition: lwResolvedNecEdition,
-      generalNotes: data.generalNotes ?? data.manifest?.generalNotes,
-      codeReferences: data.codeReferences ?? data.manifest?.codeReferences,
+      generalNotes:
+        data.generalNotes
+        ?? data.generalNotesOverride
+        ?? data.manifest?.generalNotes,
+      codeReferences:
+        data.codeReferences
+        ?? data.codeReferencesOverride
+        ?? data.manifest?.codeReferences,
     };
 
     const contractor = {
