@@ -82,8 +82,12 @@ describe('Orlando manifest — narrative content', () => {
     expect(orlandoManifest.subjurisdiction).toBeUndefined();
   });
 
-  it('has requirements: [] (Sprint 2C M1 will populate)', () => {
-    expect(orlandoManifest.requirements).toEqual([]);
+  it('has a populated requirements[] list (post Sprint 2C M1 Orlando backport)', () => {
+    // PR-4 originally shipped this empty; the M1 follow-up populated it
+    // line-by-line from the audit doc's Orlando matrix. Detailed assertions
+    // about IDs / categories / predicate behavior live in
+    // tests/orlandoManifest.test.ts.
+    expect(orlandoManifest.requirements.length).toBeGreaterThan(0);
   });
 });
 

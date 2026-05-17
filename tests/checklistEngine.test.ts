@@ -113,11 +113,13 @@ describe('evaluatePacket — empty requirements (Orlando today)', () => {
     ]);
   });
 
-  it('handles the real Orlando manifest (ships with requirements: [])', () => {
+  it('handles the real Orlando manifest (now populated post-M1 backport)', () => {
+    // Orlando's requirements[] was empty when this test was first written
+    // (PR #51 scaffold); the M1 follow-up populated it. The engine should
+    // emit items for every requirement and still surface NEC references.
     const result = evaluatePacket({}, [], orlandoManifest, ctxExistingSFR);
-    expect(result.items).toEqual([]);
-    expect(result.summary.total).toBe(0);
-    expect(result.warnings).toEqual([]);
+    expect(result.items.length).toBe(orlandoManifest.requirements.length);
+    expect(result.summary.total).toBe(orlandoManifest.requirements.length);
     expect(result.necReferences.length).toBeGreaterThan(0);
   });
 });
