@@ -1,6 +1,6 @@
 # AHJ Audit — Sprint Index
 
-**Last Updated:** 2026-05-15 (Sprint 2C M1 ✅ COMPLETE with PR #54 engine + PR #56 four manifests)
+**Last Updated:** 2026-05-16 (Sprint 2C M2 ⏳ IN-FLIGHT — 6 PRs open #70–#75: Orlando-populate + 4 Tier 1 AHJs + flexibility gaps)
 **Parent doc:** [`docs/AHJ_COMPLIANCE_AUDIT_2026-05-04.md`](../AHJ_COMPLIANCE_AUDIT_2026-05-04.md)
 
 This directory contains one design doc per sprint. Each file is self-contained with a "Cross-references" section at the bottom for when its scope touches another sprint's work.
@@ -15,6 +15,7 @@ This directory contains one design doc per sprint. Each file is self-contained w
 | 2A | [Sprint 2A — Form-factor + content](./sprint2a-form-factor.md) | ✅ COMPLETE 2026-05-10 (19/19; 5 themed PRs) | — | Sprint 1 ✅ |
 | 2B | [Sprint 2B — Uploads + merge engine](./sprint2b-uploads.md) | ✅ COMPLETE 2026-05-13 (PR #45 + PR #47 + PR #49 + PR #51 merged) | — | Sprint 2A schema (`service_modification_type`) ✅ |
 | 2C | [Sprint 2C — Per-AHJ manifests + M1](./sprint2c-ahj-manifests.md) | ✅ COMPLETE 2026-05-14 (M1 engine via PR #54 `e6d9133` + 4 manifests via PR #56 `a4bf21a`) | — | Sprint 2A H17 lane logic ✅ + Sprint 2B manifest scaffold ✅ (PR #51, `18985e5`) |
+| 2C-M2 | [Sprint 2C M2 — Coverage expansion + reuse flexibility](./sprint2c-m2-coverage-expansion.md) | ⏳ IN-FLIGHT 2026-05-16 — 6 PRs open against main (#70 Orlando-populate, #71 Gaps, #72 Miami, #73 Orange, #74 St. Pete, #75 Jax) | Merge sequence (Gaps first, then 4 manifests in any order — each hits a mechanical 2-line registry.ts conflict) | Sprint 2C M1 ✅ |
 | 3 | [Sprint 3 — PE Seal Workflow](./sprint3-pe-seal.md) | ⚪ Architecture decided; not started | C5 + cert vendor + FBPE registration | Sprint 2B (`pdf-lib` PAdES) ✅; pricing decision; cert vendor selection; FBPE business-entity registration |
 | 4 | [Sprint 4 — Polish backlog](./sprint4-polish.md) | 🔵 Deferred until Sprints 2 + 3 done | M2, M3 sub-feature, M5, M7, LOW polish + canvas revisit trigger | Sprints 2 + 3 |
 

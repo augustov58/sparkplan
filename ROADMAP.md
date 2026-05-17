@@ -2,13 +2,35 @@
 
 **Last Updated:** 2026-05-16
 
-## Current Phase: 3.11 (NEC 220.83 routing for existing dwellings) - ✅ COMPLETE (May 2026)
+## Current Phase: 3.12 (AHJ Coverage Expansion + Manifest Reuse Flexibility — Sprint 2C M2) - ⏳ IN-FLIGHT (May 2026)
 
-## Latest Completed Phase: 3.10 (AHJ Compliance Audit Sprint 2C M1) - ✅ COMPLETE (May 2026)
-## Also Just Shipped: 3.9 (Sprint 2B) + 3.8 (T&M Billing) + 3.7 (Estimating) + 3.6 (Permits) - all PHASE 1 IMPLEMENTED (May 2026)
+## Latest Completed Phase: 3.11 (NEC 220.83 routing for existing dwellings) - ✅ COMPLETE (May 2026)
+## Also Recently Shipped: 3.10 (Sprint 2C M1) + 3.9 (Sprint 2B) + 3.8 (T&M Billing) + 3.7 (Estimating) + 3.6 (Permits) - all complete or Phase 1 implemented (May 2026)
 ## Sprint 2A: ✅ COMPLETE (19/19 findings; 5 themed PRs merged)
 ## Sprint 2B: ✅ COMPLETE (4 PRs merged — PR #45 + PR #47 + PR #49 + PR #51 Orlando manifest scaffold)
 ## Sprint 2C M1: ✅ COMPLETE 2026-05-14 (PR #54 engine + PR #56 4 manifests — Pompano / Miami-Dade / Davie / Hillsborough-Tampa)
+## Sprint 2C M2: ⏳ IN-FLIGHT 2026-05-16 (6 PRs open #70–#75 — Orlando-populate + 4 Tier 1 AHJs + flexibility gaps)
+
+---
+
+## Phase 3.12: AHJ Coverage Expansion + Manifest Reuse Flexibility (Sprint 2C M2) - ⏳ IN-FLIGHT (May 2026)
+
+Closes two gaps that surfaced once Sprint 2C M1 landed: (1) the FL pilot AHJs only covered ~30% of the metro populations they're in (Orlando-metro alone has 30+ AHJs; we'd modeled 1), and (2) contractors in unmodeled cities could fall back to all-on defaults but couldn't reuse an existing manifest as a starting template without misrepresenting their AHJ on the cover sheet. M2 ships 4 new AHJ manifests (Tier 1 from the audit) **plus** 3 UX flexibility gaps so every unmodeled FL city is one dropdown click away from a workable packet. After M2, ~9 AHJs cover ~3.5M FL population directly; the unmodeled tail is unblocked by template reuse.
+
+| PR | Status | Closes |
+|---|---|---|
+| **PR #70** (Orlando manifest populate) | ⏳ Open | Backports Sprint 2C M1's requirements[] schema onto Orlando's manifest (PR #56 missed it). 17 reqs + 28 tests. |
+| **PR #71** (Manifest flexibility gaps) | ⏳ Open | Gap 1: `manifest_template_id` separation from `jurisdiction_id`. Gap 2: artifact-slot toggle UI. Gap 3: per-project string overrides for `general_notes` / `code_references` / `sheet_id_prefix`. 19 tests. |
+| **PR #72** (City of Miami manifest) | ⏳ Open | Biggest single-AHJ gap in FL (~440k pop). Independent of Miami-Dade County RER. HVHZ ON. 17 reqs + 44 tests. |
+| **PR #73** (Orange County unincorporated manifest) | ⏳ Open | Closes Orlando-metro gap. NOC threshold = $2,500 (lower than statewide $5k). NOT in HVHZ. 15 reqs + 33 tests. |
+| **PR #74** (City of St. Petersburg manifest) | ⏳ Open | Closes Tampa Bay gap. NOT in HVHZ, IS in Wind-Borne Debris Region 140 mph. 24 reqs + 51 tests. |
+| **PR #75** (Jacksonville/Duval consolidated manifest) | ⏳ Open | Largest untouched FL market (~920k pop). First North-FL AHJ. NOT in HVHZ. 25 reqs + 44 tests. |
+
+**Coverage delta when merged**: 5 → 9 AHJs registered; ~2.3M → ~3.5M FL population served directly; every other FL city unblocked via Gap 1's manifest-template dropdown. Net new tests across all 6 PRs: **191** (28 + 44 + 33 + 51 + 44 + 19 - the 11 stale-assertion edits in #70 = ~208 add, ~17 remove).
+
+**No DB migrations.** Sprint 2C M2 is pure data + UI extensions on existing jsonb. Backward compat preserved — projects without manifest_template_id or string-overrides behave IDENTICALLY to today.
+
+**Open follow-ups** (non-blocking, documented in per-AHJ research docs + sprint doc): 4 Beaches munis around Jacksonville; Pinellas surrounding munis (Clearwater / Largo / Dunedin); Tier 2 AHJs (Fort Lauderdale, Miami Beach, Coral Gables, Hialeah, Sanford, Naples/Cape Coral); ~10 phone-call research-gap closures; pre-commit conflict-marker hook (one orphan marker leaked through to build during this sprint's sequential merges).
 
 ---
 

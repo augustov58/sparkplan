@@ -1,6 +1,7 @@
 # Sprint 2C — Per-AHJ Manifests + Checklist Engine M1
 
 **Status:** ✅ COMPLETE 2026-05-14 — M1 jurisdiction-checklist engine shipped via PR #54 (`e6d9133`); Pompano + Miami-Dade + Davie + Hillsborough/Tampa manifests shipped via PR #56 (`a4bf21a`). All 5 FL pilot AHJs now have registered manifests; the engine walks the packet AST against each.
+**Successor:** Sprint 2C M2 ⏳ IN-FLIGHT 2026-05-16 — see [`sprint2c-m2-coverage-expansion.md`](./sprint2c-m2-coverage-expansion.md). Adds 4 Tier 1 AHJs (City of Miami / Orange County unincorp / St. Petersburg / Jacksonville-Duval) + closes 3 UX flexibility gaps for unmodeled-city manifest reuse. Backports Orlando's `requirements[]` (which this sprint's PR #56 missed). 6 PRs open against main (#70–#75).
 **Hard prerequisites (all met):**
 - Sprint 2A H17 lane logic ✅
 - Sprint 2B manifest scaffold ✅ (PR #51)
