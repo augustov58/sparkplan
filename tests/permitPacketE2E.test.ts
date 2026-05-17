@@ -578,6 +578,19 @@ describe('Permit packet: full generator E2E (mirrors button click)', () => {
     const buf = new Uint8Array(await dl.blob.arrayBuffer());
     const head = String.fromCharCode(...buf.slice(0, 5));
     expect(head).toBe('%PDF-');
+
+    // Sprint 2C M3 (2026-05-17): opt-in disk dump to example_reports/ so
+    // the user can visually verify the MF-EV + NEC 220.87 narrative pages
+    // render end-to-end. Set E2E_DUMP_PDFS=1 to enable.
+    if (process.env.E2E_DUMP_PDFS === '1') {
+      const fs = await import('fs');
+      const path = await import('path');
+      const outDir = path.resolve(__dirname, '..', 'example_reports');
+      fs.mkdirSync(outDir, { recursive: true });
+      const outPath = path.join(outDir, 'Permit_Packet_MF_EV_Existing_2026-05-17.pdf');
+      fs.writeFileSync(outPath, Buffer.from(await dl.blob.arrayBuffer()));
+      console.log(`[e2e dump] wrote ${outPath} (${dl.bytes} bytes)`);
+    }
   }, 60_000);
 
   it('generates full packet WITH arc flash (not reachable from UI today)', async () => {
