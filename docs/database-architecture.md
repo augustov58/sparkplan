@@ -1,7 +1,7 @@
 # Database Architecture
 ## SparkPlan Application
 
-**Last Updated**: 2026-05-13
+**Last Updated**: 2026-05-17
 **Database**: Supabase PostgreSQL 15
 **Schema Version**: 2.3
 **Location**: `/supabase/schema.sql` and migration files
@@ -183,6 +183,7 @@ CREATE TABLE panels (
   project_id UUID NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
   name TEXT NOT NULL,
   is_main BOOLEAN NOT NULL DEFAULT FALSE,
+  is_proposed BOOLEAN NOT NULL DEFAULT FALSE,  -- Sprint 2C M3 (migration 20260517) — new (proposed) panel vs existing-in-field
 
   -- Panel electrical characteristics
   voltage INTEGER NOT NULL,

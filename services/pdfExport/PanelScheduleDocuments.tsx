@@ -281,12 +281,17 @@ export const PanelSchedulePages: React.FC<PanelSchedulePDFProps> = ({
 }) => {
   // Helper: append " *" to a description when (a) markers are enabled AND
   // (b) the circuit is flagged as a proposed new addition. Returns the raw
-  // description otherwise.
-  const decorateDescription = (c: Circuit | undefined): string => {
+  // description otherwise. Sprint 2C M3 follow-on (2026-05-17): when the
+  // circuit is proposed, render the whole description in Helvetica-Bold
+  // so new circuits visually pop on a dense schedule with 30-42 rows.
+  const decorateDescription = (c: Circuit | undefined): React.ReactNode => {
     if (!c) return '';
-    return showExistingNewMarkers && c.is_proposed
-      ? `${c.description} *`
-      : c.description;
+    if (!(showExistingNewMarkers && c.is_proposed)) return c.description;
+    return (
+      <Text style={{ fontFamily: 'Helvetica-Bold' }}>
+        {`${c.description} *`}
+      </Text>
+    );
   };
   // Whether to surface the legend below the title block. Only render the
   // legend if markers are enabled AND at least one circuit is actually
@@ -411,7 +416,7 @@ export const PanelSchedulePages: React.FC<PanelSchedulePDFProps> = ({
         {showLegend && (
           <View style={{ marginBottom: 4, marginTop: -4 }}>
             <Text style={{ fontSize: 8, fontStyle: 'italic', color: '#555' }}>
-              * = Proposed new circuit (added under this permit)
+              * = Proposed new circuit
             </Text>
           </View>
         )}
@@ -727,7 +732,7 @@ export const MultiPanelDocument: React.FC<MultiPanelDocumentProps> = ({
           {showExistingNewMarkers && circuits.some(c => c.is_proposed) && (
             <View style={{ marginBottom: 4, marginTop: -4 }}>
               <Text style={{ fontSize: 8, fontStyle: 'italic', color: '#555' }}>
-                * = Proposed new circuit (added under this permit)
+                * = Proposed new circuit
               </Text>
             </View>
           )}
@@ -752,9 +757,14 @@ export const MultiPanelDocument: React.FC<MultiPanelDocumentProps> = ({
               const sortedCircuits = circuits.sort((a, b) => a.circuit_number - b.circuit_number);
               const maxSlots = panel.num_spaces ?? (panel.is_main ? 30 : 42);
               const numRows = maxSlots / 2;
-              const decorate = (c: Circuit | undefined): string => {
+              const decorate = (c: Circuit | undefined): React.ReactNode => {
                 if (!c) return '';
-                return showExistingNewMarkers && c.is_proposed ? `${c.description} *` : c.description;
+                if (!(showExistingNewMarkers && c.is_proposed)) return c.description;
+                return (
+                  <Text style={{ fontFamily: 'Helvetica-Bold' }}>
+                    {`${c.description} *`}
+                  </Text>
+                );
               };
 
               const rows = [];
