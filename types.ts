@@ -369,7 +369,7 @@ export interface Project {
   utilityTransformerKva?: number | null;          // Optional override; estimateUtilityTransformer() fills gaps
   utilityTransformerImpedancePct?: number | null; // Optional override
   // Jurisdiction Requirements (Tier 3 Permit Packet)
-  jurisdiction_id?: string;  // FK to jurisdictions table
+  jurisdiction_id?: string | null;  // FK to jurisdictions table; null = explicitly cleared
 }
 
 // ============================================================================
