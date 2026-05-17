@@ -1128,7 +1128,26 @@ export const generatePermitPacket = async (data: PermitPacketData): Promise<void
       }
     };
 
-    return downstreamPanels.map(dp => {
+    // Dedup: if the downstream panel already has an explicit feeder circuit
+    // on this parent (matching fed_from_circuit_number to an existing
+    // circuit_number on the parent), skip synthesis. Otherwise the panel
+    // schedule shows the same feeder twice — once as the user-created circuit
+    // ("Feed to H1") and once as the auto-synthesized row ("→ PANEL H1").
+    // 2026-05-17 user feedback.
+    const parentCircuitNumbers = new Set<number>(
+      existing.map(c => c.circuit_number),
+    );
+
+    return downstreamPanels.flatMap(dp => {
+      // Skip synthesis if the user has already created a circuit at the slot
+      // the downstream panel is fed from.
+      const fedFromSlot = dp.fed_from_circuit_number;
+      if (
+        typeof fedFromSlot === 'number'
+        && parentCircuitNumbers.has(fedFromSlot)
+      ) {
+        return [];
+      }
       const dpLoad = calculateAggregatedLoad(
         dp.id,
         data.panels,
@@ -1139,7 +1158,7 @@ export const generatePermitPacket = async (data: PermitPacketData): Promise<void
       const breakerAmps = dp.feeder_breaker_amps || dp.main_breaker_amps || 100;
       const pole = (dp.phase === 3 ? 3 : 2) as 1 | 2 | 3;
       const slot = findFreeSlot(pole);
-      return {
+      return [{
         id: `synth-feeder-${panel.id}-${dp.id}`,
         project_id: panel.project_id,
         panel_id: panel.id,
@@ -1157,7 +1176,7 @@ export const generatePermitPacket = async (data: PermitPacketData): Promise<void
         notes: 'Synthesized feeder row — represents downstream panel demand (NEC 408)',
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
-      } as unknown as Circuit;
+      } as unknown as Circuit];
     });
   };
 
