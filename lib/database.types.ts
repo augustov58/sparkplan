@@ -1319,6 +1319,7 @@ export type Database = {
           feeder_length: number | null
           id: string
           is_main: boolean | null
+          is_proposed: boolean
           location: string | null
           main_breaker_amps: number | null
           manufacturer: string | null
@@ -1349,6 +1350,7 @@ export type Database = {
           feeder_length?: number | null
           id?: string
           is_main?: boolean | null
+          is_proposed?: boolean
           location?: string | null
           main_breaker_amps?: number | null
           manufacturer?: string | null
@@ -1379,6 +1381,7 @@ export type Database = {
           feeder_length?: number | null
           id?: string
           is_main?: boolean | null
+          is_proposed?: boolean
           location?: string | null
           main_breaker_amps?: number | null
           manufacturer?: string | null

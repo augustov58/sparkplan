@@ -819,6 +819,12 @@ interface RiserNode {
   // voltage / phase / amperage / AIC labels per node on the riser. line2 already
   // covers V / phase / bus rating; line4 carries the AIC interrupting rating.
   line4?: string;
+  // Sprint 2C M3 follow-on (2026-05-17): equipment-level existing/new
+  // differentiation. When true and showExistingNewMarkers is enabled, the
+  // node renders with a dashed border + corner "NEW" badge so AHJ reviewers
+  // can see at a glance which panels/transformers in the riser are new
+  // installations vs existing field equipment.
+  isProposed?: boolean;
   feederLabel?: string;
   children: RiserNode[];
   subtreeWidth?: number;
@@ -883,6 +889,7 @@ const buildPanelSubtree = (
     // node on the one-line must carry voltage / phase / amperage / AIC. Pull
     // from the panel's stored aic_rating; omitted when unset.
     line4: formatAic(panel.aic_rating),
+    isProposed: panel.is_proposed === true,
     feederLabel,
     children: [],
   };
@@ -1175,6 +1182,9 @@ const buildRiserDraw = (node: RiserNode, draw: RiserDraw): void => {
   const fill = NODE_FILL[node.kind];
   const stroke = NODE_STROKE[node.kind];
 
+  // Sprint 2C M3 follow-on (2026-05-17): proposed (new) panels render with
+  // a dashed border + small "NEW" corner badge so the riser visually
+  // differentiates new installations from existing field equipment.
   draw.geometry.push(
     <Rect
       key={`rect-${node.id}`}
@@ -1183,10 +1193,43 @@ const buildRiserDraw = (node: RiserNode, draw: RiserDraw): void => {
       width={NODE_W}
       height={NODE_H}
       fill={fill}
-      stroke={stroke}
-      strokeWidth={1.2}
+      stroke={node.isProposed ? '#d97706' : stroke}
+      strokeWidth={node.isProposed ? 1.5 : 1.2}
+      strokeDasharray={node.isProposed ? '4 2' : undefined}
     />
   );
+
+  if (node.isProposed) {
+    // Small amber chip in the top-right of the node so the marking survives
+    // both the in-app render and the PDF print.
+    const badgeW = 28;
+    const badgeH = 11;
+    const badgeX = x + NODE_W - badgeW - 3;
+    const badgeY = y + 3;
+    draw.geometry.push(
+      <Rect
+        key={`new-badge-${node.id}`}
+        x={badgeX}
+        y={badgeY}
+        width={badgeW}
+        height={badgeH}
+        fill="#d97706"
+        stroke="#d97706"
+        strokeWidth={0.5}
+      />
+    );
+    draw.labels.push({
+      key: `new-badge-text-${node.id}`,
+      x: badgeX,
+      y: badgeY + 1.5,
+      width: badgeW,
+      content: 'NEW',
+      fontSize: 7,
+      bold: true,
+      color: '#ffffff',
+      align: 'center',
+    });
+  }
 
   draw.labels.push({
     key: `l1-${node.id}`,
