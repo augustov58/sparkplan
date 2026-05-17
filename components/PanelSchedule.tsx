@@ -32,6 +32,7 @@ import {
   isDwellingUnitPanel,
 } from '../services/calculations/residentialLoad';
 import type { LoadTypeCode } from '../types';
+import { formatPanelVoltageDisplay } from '../lib/electricalDisplay';
 
 // Load type options for dropdown
 const LOAD_TYPES: { code: LoadTypeCode; label: string }[] = [
@@ -1220,7 +1221,7 @@ export const PanelSchedule: React.FC<PanelScheduleProps> = ({ project }) => {
           </div>
           <div>
             <span className="text-[10px] uppercase text-gray-500 font-semibold">Voltage</span>
-            <div className="text-sm font-bold">{selectedPanel.voltage}V / {selectedPanel.phase === 3 ? '120V' : '120V'}</div>
+            <div className="text-sm font-bold">{formatPanelVoltageDisplay(selectedPanel.voltage, selectedPanel.phase)}</div>
           </div>
           <div>
             <span className="text-[10px] uppercase text-gray-500 font-semibold">Bus Rating</span>

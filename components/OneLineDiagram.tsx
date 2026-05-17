@@ -143,6 +143,7 @@ import {
 import { DiagramPanZoom } from './DiagramPanZoom';
 import { exportDiagram, DiagramExportOptions } from '../services/pdfExport/oneLineDiagramExport';
 import { calculateTreeLayout, getDescendantIds } from '../services/diagram/treeLayoutCalculator';
+import { SYSTEM_TYPE_OPTIONS, systemTypeFromVP, vpFromSystemType } from '../lib/electricalDisplay';
 import {
   getPanelDownstream,
   getTransformerDownstream,
@@ -2793,32 +2794,30 @@ export const OneLineDiagram: React.FC<OneLineDiagramProps> = ({ project, updateP
                     className="w-full border-gray-200 rounded text-sm py-2 focus:border-[#2d3b2d] focus:ring-[#2d3b2d]/20"
                  />
                </div>
-               <div className="grid grid-cols-2 gap-3">
-                 <div>
-                   <label className="text-xs font-semibold text-gray-500 uppercase">Voltage (V)</label>
-                   <select
-                      value={newPanel.voltage}
-                      onChange={e => setNewPanel({...newPanel, voltage: Number(e.target.value)})}
-                      className="w-full border-gray-200 rounded text-sm py-2"
-                   >
-                     <option value="120">120V</option>
-                     <option value="208">208V</option>
-                     <option value="240">240V</option>
-                     <option value="277">277V</option>
-                     <option value="480">480V</option>
-                   </select>
-                 </div>
-                 <div>
-                   <label className="text-xs font-semibold text-gray-500 uppercase">Phase</label>
-                   <select
-                      value={newPanel.phase}
-                      onChange={e => setNewPanel({...newPanel, phase: Number(e.target.value) as 1 | 3})}
-                      className="w-full border-gray-200 rounded text-sm py-2"
-                   >
-                     <option value="1">Single-Phase</option>
-                     <option value="3">Three-Phase</option>
-                   </select>
-                 </div>
+               {/* Sprint 2C M3 follow-on (2026-05-17): system-type selector
+                   replaces the two-cascade voltage+phase dropdowns. The old
+                   form let users pick electrically-invalid combinations
+                   (e.g., 480V single-phase, 277V three-phase) — this
+                   constrains the choice to the 3 canonical service
+                   configurations. Mirrors ProjectSetup.tsx's selector
+                   pattern. */}
+               <div>
+                 <label className="text-xs font-semibold text-gray-500 uppercase">System Type</label>
+                 <select
+                    value={systemTypeFromVP(newPanel.voltage, newPanel.phase)}
+                    onChange={e => {
+                      const { voltage, phase } = vpFromSystemType(e.target.value);
+                      setNewPanel({...newPanel, voltage, phase});
+                    }}
+                    className="w-full border-gray-200 rounded text-sm py-2 font-mono"
+                 >
+                   {SYSTEM_TYPE_OPTIONS.map(opt => (
+                     <option key={opt.key} value={opt.key}>{opt.label}</option>
+                   ))}
+                 </select>
+                 <p className="text-xs text-gray-400 mt-1">
+                   Most common configurations. Line-to-neutral derives automatically (e.g. 480V 3Ø → 277V L-N).
+                 </p>
                </div>
                <div className="grid grid-cols-2 gap-3">
                  <div>
