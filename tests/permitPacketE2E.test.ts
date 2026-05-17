@@ -985,73 +985,108 @@ describe('Permit packet: NEC 220.83 existing dwelling — proposed loads on PDF'
 // button and the PermitPacketGenerator's 220.87 narrative inputs.
 // ============================================================================
 describe('Permit packet: Commercial Existing 220.87 scenarios (visual proof)', () => {
-  // 2026-05-17 user feedback: the prior fixture had ZERO is_proposed:true
-  // circuits, so the EXIST/NEW differentiation was invisible on the rendered
-  // packet. Add four NEW EVSE circuits on H1 (representing 4 of the 8 EVSE
-  // the scope describes) tagged is_proposed:true so the PanelSchedule
-  // renderer fires its "*" markers + "EXIST/NEW legend".
-  const newEvseCircuits: any[] = [
-    {
-      id: 'c-new-evse-1',
-      project_id: projectId,
-      panel_id: 'pnl-h1',
-      circuit_number: 7,
-      pole: 2,
-      breaker_amps: 40,
-      load_watts: 8320, // 208V × 40A
-      conductor_size: '8',
-      description: 'NEW — EVSE Charger Space 2 (Level 2, 40A)',
-      load_type: 'ev',
-      egc_size: '10',
-      is_proposed: true,
-      created_at: '2026-05-17T00:00:00Z',
-    },
-    {
-      id: 'c-new-evse-2',
-      project_id: projectId,
-      panel_id: 'pnl-h1',
-      circuit_number: 11,
-      pole: 2,
-      breaker_amps: 40,
-      load_watts: 8320,
-      conductor_size: '8',
-      description: 'NEW — EVSE Charger Space 3 (Level 2, 40A)',
-      load_type: 'ev',
-      egc_size: '10',
-      is_proposed: true,
-      created_at: '2026-05-17T00:00:00Z',
-    },
-    {
-      id: 'c-new-evse-3',
-      project_id: projectId,
-      panel_id: 'pnl-h1',
-      circuit_number: 15,
-      pole: 2,
-      breaker_amps: 40,
-      load_watts: 8320,
-      conductor_size: '8',
-      description: 'NEW — EVSE Charger Space 4 (Level 2, 40A)',
-      load_type: 'ev',
-      egc_size: '10',
-      is_proposed: true,
-      created_at: '2026-05-17T00:00:00Z',
-    },
-    {
-      id: 'c-new-evse-4',
-      project_id: projectId,
-      panel_id: 'pnl-h1',
-      circuit_number: 19,
-      pole: 2,
-      breaker_amps: 40,
-      load_watts: 8320,
-      conductor_size: '8',
-      description: 'NEW — EVSE Charger Space 5 (Level 2, 40A)',
-      load_type: 'ev',
-      egc_size: '10',
-      is_proposed: true,
-      created_at: '2026-05-17T00:00:00Z',
-    },
-  ];
+  // 2026-05-17 user feedback round 2: prior fixture had EVSE circuits on H1
+  // (which is itself existing), so the panel-level EXIST/NEW distinction
+  // was invisible. Restructure: add a NEW EVSE-1 sub-panel fed from H1,
+  // with the 4 new EVSE circuits inside EVSE-1. Plus an explicit
+  // "Feed to EVSE-1" feeder circuit on H1 tagged NEW. This demonstrates
+  // the full end-to-end Existing/New differentiation story across:
+  //   - Existing panel (H1) with one NEW circuit on it (the feeder)
+  //   - NEW sub-panel (EVSE-1) that does not yet exist in the field
+  //   - NEW circuits inside the new sub-panel
+  const evsePanel: any = {
+    id: 'pnl-evse-1',
+    project_id: projectId,
+    name: 'EVSE-1',
+    voltage: 208,
+    phase: 3,
+    bus_rating: 400,
+    main_breaker_amps: 400,
+    is_main: false,
+    is_proposed: true, // ← the new equipment-level flag from this PR
+    aic_rating: 22000,
+    location: 'Parking Garage Level 1 (new)',
+    manufacturer: 'Square D',
+    model_number: 'NQOD',
+    ul_listing: 'UL-67',
+    nema_enclosure_type: '3R',
+    series_rating: false,
+    num_spaces: 30,
+    fed_from: 'pnl-h1',
+    fed_from_type: 'panel',
+    fed_from_transformer_id: null,
+    fed_from_meter_stack_id: null,
+    fed_from_circuit_number: 21, // explicit feeder slot on H1
+    feeder_breaker_amps: 400,
+    feeder_conductor_size: '500',
+    feeder_conduit: 'EMT',
+    feeder_length: 80,
+    supplied_by_feeder_id: null,
+    notes: null,
+    created_at: '2026-05-17T00:00:00Z',
+  };
+
+  const newFeederCircuit: any = {
+    // Explicit "Feed to EVSE-1" circuit on H1 — paired with EVSE-1's
+    // fed_from_circuit_number=21 so the dedup in synthesizeFeederCircuits
+    // (PR #79 fix) suppresses the auto-generated "→ PANEL EVSE-1" row.
+    id: 'c-feed-evse-1',
+    project_id: projectId,
+    panel_id: 'pnl-h1',
+    circuit_number: 21,
+    pole: 3,
+    breaker_amps: 400,
+    load_watts: 33000, // sum of 4 EVSE @ 8.3 kVA each
+    conductor_size: '500',
+    description: 'NEW — Feed to EVSE-1 sub-panel',
+    load_type: 'other',
+    egc_size: '3',
+    is_proposed: true,
+    created_at: '2026-05-17T00:00:00Z',
+  };
+
+  // 4 NEW EVSE circuits, now on the NEW EVSE-1 sub-panel (not H1).
+  const newEvseCircuits: any[] = [1, 5, 9, 13].map((slot, idx) => ({
+    id: `c-new-evse-${idx + 1}`,
+    project_id: projectId,
+    panel_id: 'pnl-evse-1',
+    circuit_number: slot,
+    pole: 2,
+    breaker_amps: 40,
+    load_watts: 8320, // 208V × 40A
+    conductor_size: '8',
+    description: `NEW — EVSE Charger Space ${idx + 2} (Level 2, 40A)`,
+    load_type: 'ev',
+    egc_size: '10',
+    is_proposed: true,
+    created_at: '2026-05-17T00:00:00Z',
+  }));
+
+  // Mirror the new EVSE-1 feeder relationship in the feeders array so the
+  // riser actually draws the line between H1 and EVSE-1.
+  const newEvseFeeder: any = {
+    id: 'f-evse-1',
+    project_id: projectId,
+    name: 'F-H1-to-EVSE1',
+    source_panel_id: 'pnl-h1',
+    destination_panel_id: 'pnl-evse-1',
+    destination_transformer_id: null,
+    conductor_material: 'Cu',
+    phase_conductor_size: '500',
+    neutral_conductor_size: '500',
+    egc_size: '3',
+    distance_ft: 80,
+    total_load_va: 33000,
+    continuous_load_va: 33000,
+    noncontinuous_load_va: 0,
+    design_load_va: 33000,
+    voltage_drop_percent: 1.8,
+    conduit_type: 'EMT',
+    conduit_size: '3',
+    num_current_carrying: 3,
+    ambient_temperature_c: 30,
+    created_at: '2026-05-17T00:00:00Z',
+  };
 
   const baseCommercialPacket: PermitPacketData = {
     ...fullPacket,
@@ -1063,9 +1098,12 @@ describe('Permit packet: Commercial Existing 220.87 scenarios (visual proof)', (
     // Existing service being modified — gates the EXIST/NEW badges and the
     // 220.87 narrative requirement.
     serviceModificationType: 'service-upgrade',
-    // Merge the new EVSE circuits with the existing fixture circuits so the
-    // panel schedule actually demonstrates EXIST/NEW differentiation.
-    circuits: [...fullPacket.circuits, ...newEvseCircuits],
+    // Panels: existing MDP + existing H1 + NEW EVSE-1
+    panels: [...fullPacket.panels, evsePanel],
+    // Circuits: existing fixture set + new feeder on H1 + 4 new circuits on EVSE-1
+    circuits: [...fullPacket.circuits, newFeederCircuit, ...newEvseCircuits],
+    // Feeders: existing MDP→H1 + new H1→EVSE-1
+    feeders: [...fullPacket.feeders, newEvseFeeder],
     // Suppress the multi-family analysis on commercial scenarios.
     multiFamilyEVAnalysis: undefined,
     meterStacks: [],
