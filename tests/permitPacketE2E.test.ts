@@ -985,6 +985,74 @@ describe('Permit packet: NEC 220.83 existing dwelling — proposed loads on PDF'
 // button and the PermitPacketGenerator's 220.87 narrative inputs.
 // ============================================================================
 describe('Permit packet: Commercial Existing 220.87 scenarios (visual proof)', () => {
+  // 2026-05-17 user feedback: the prior fixture had ZERO is_proposed:true
+  // circuits, so the EXIST/NEW differentiation was invisible on the rendered
+  // packet. Add four NEW EVSE circuits on H1 (representing 4 of the 8 EVSE
+  // the scope describes) tagged is_proposed:true so the PanelSchedule
+  // renderer fires its "*" markers + "EXIST/NEW legend".
+  const newEvseCircuits: any[] = [
+    {
+      id: 'c-new-evse-1',
+      project_id: projectId,
+      panel_id: 'pnl-h1',
+      circuit_number: 7,
+      pole: 2,
+      breaker_amps: 40,
+      load_watts: 8320, // 208V × 40A
+      conductor_size: '8',
+      description: 'NEW — EVSE Charger Space 2 (Level 2, 40A)',
+      load_type: 'ev',
+      egc_size: '10',
+      is_proposed: true,
+      created_at: '2026-05-17T00:00:00Z',
+    },
+    {
+      id: 'c-new-evse-2',
+      project_id: projectId,
+      panel_id: 'pnl-h1',
+      circuit_number: 11,
+      pole: 2,
+      breaker_amps: 40,
+      load_watts: 8320,
+      conductor_size: '8',
+      description: 'NEW — EVSE Charger Space 3 (Level 2, 40A)',
+      load_type: 'ev',
+      egc_size: '10',
+      is_proposed: true,
+      created_at: '2026-05-17T00:00:00Z',
+    },
+    {
+      id: 'c-new-evse-3',
+      project_id: projectId,
+      panel_id: 'pnl-h1',
+      circuit_number: 15,
+      pole: 2,
+      breaker_amps: 40,
+      load_watts: 8320,
+      conductor_size: '8',
+      description: 'NEW — EVSE Charger Space 4 (Level 2, 40A)',
+      load_type: 'ev',
+      egc_size: '10',
+      is_proposed: true,
+      created_at: '2026-05-17T00:00:00Z',
+    },
+    {
+      id: 'c-new-evse-4',
+      project_id: projectId,
+      panel_id: 'pnl-h1',
+      circuit_number: 19,
+      pole: 2,
+      breaker_amps: 40,
+      load_watts: 8320,
+      conductor_size: '8',
+      description: 'NEW — EVSE Charger Space 5 (Level 2, 40A)',
+      load_type: 'ev',
+      egc_size: '10',
+      is_proposed: true,
+      created_at: '2026-05-17T00:00:00Z',
+    },
+  ];
+
   const baseCommercialPacket: PermitPacketData = {
     ...fullPacket,
     projectName: 'Riverside Office Park – Tenant Buildout',
@@ -995,6 +1063,9 @@ describe('Permit packet: Commercial Existing 220.87 scenarios (visual proof)', (
     // Existing service being modified — gates the EXIST/NEW badges and the
     // 220.87 narrative requirement.
     serviceModificationType: 'service-upgrade',
+    // Merge the new EVSE circuits with the existing fixture circuits so the
+    // panel schedule actually demonstrates EXIST/NEW differentiation.
+    circuits: [...fullPacket.circuits, ...newEvseCircuits],
     // Suppress the multi-family analysis on commercial scenarios.
     multiFamilyEVAnalysis: undefined,
     meterStacks: [],
