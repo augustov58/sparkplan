@@ -25,6 +25,7 @@ import { pompanoManifest } from './pompano';
 import { miamiDadeManifest } from './miami-dade';
 import { davieManifest } from './davie';
 import { hillsboroughTampaManifest } from './hillsborough-tampa';
+import { cityOfMiamiManifest } from './city-of-miami';
 
 // ============================================================================
 // REGISTRY
@@ -40,6 +41,15 @@ const MANIFEST_REGISTRY: Readonly<Record<string, AHJManifest>> = {
   'miami-dade': miamiDadeManifest,
   davie: davieManifest,
   'hillsborough-tampa': hillsboroughTampaManifest,
+  // Independent municipality inside Miami-Dade County. Distinct from
+  // `miami-dade` (which is County RER unincorporated-only). Listed after
+  // `miami-dade` because the substring lookup in `findManifestForJurisdiction`
+  // iterates in insertion order — putting `city-of-miami` later avoids any
+  // ambiguity between "City of Miami" jurisdiction strings and the
+  // "miami-dade" name needle (in practice the haystacks don't collide; the
+  // City of Miami name is "City of Miami" which does NOT contain
+  // "miami-dade", so order is documentation-only here).
+  'city-of-miami': cityOfMiamiManifest,
 };
 
 // ============================================================================
