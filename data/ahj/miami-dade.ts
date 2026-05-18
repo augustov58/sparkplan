@@ -83,8 +83,8 @@ const MIAMI_DADE_GENERAL_NOTES: string[] = [
  * "APPLICABLE CODES" section. Dual NEC cite reflects the H34 PRG split.
  */
 const MIAMI_DADE_CODE_REFERENCES: string[] = [
-  'NFPA-70 (2020 NEC) — Miami-Dade Commercial Electrical Plan Review Guidelines',
-  'NFPA-70 (2014 NEC) — Miami-Dade Residential Electrical Plan Review Guidelines',
+  'NFPA-70 (2020 NEC), commercial scope (per Miami-Dade Plan Review Guidelines)',
+  'NFPA-70 (2014 NEC), single-family residential scope (per Miami-Dade Plan Review Guidelines)',
   'Florida Building Code, 8th edition (2023) — HVHZ provisions',
   'Miami-Dade County Code, Chapter 8 (Building Code)',
   'Miami-Dade Digital Signing & Sealing policy',
