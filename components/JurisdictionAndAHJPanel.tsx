@@ -295,6 +295,30 @@ export const JurisdictionAndAHJPanel: React.FC<JurisdictionAndAHJPanelProps> = (
                 </div>
               )}
 
+              {/* "No results" — fallback path for unmodeled AHJs (Cape Coral,
+                  Sanford, Winter Park, etc.). Lets the contractor proceed
+                  WITHOUT a jurisdiction_id by manually picking a template
+                  from a similar AHJ in the Advanced section below. The
+                  packet generates with the template's defaults; the cover
+                  sheet's AHJ name remains blank unless typed in via the
+                  override panel. */}
+              {searchQuery.length >= 2 && searchResults.length === 0 && (
+                <div className="bg-amber-50 border border-amber-300 rounded-md p-3 mt-2 flex items-start gap-2">
+                  <AlertTriangle className="w-4 h-4 text-amber-700 mt-0.5 flex-shrink-0" />
+                  <div className="text-sm text-amber-900">
+                    <span className="font-semibold">
+                      No results for &ldquo;{searchQuery}&rdquo;.
+                    </span>{' '}
+                    SparkPlan only has the major FL + TX AHJs in its search
+                    index today. Don't worry — you can still proceed:
+                    use <span className="font-medium">Advanced &middot; Use defaults from another AHJ</span>{' '}
+                    below to borrow a similar AHJ's manifest. The cover sheet's
+                    AHJ name will be blank unless you also fill in the override
+                    fields.
+                  </div>
+                </div>
+              )}
+
               {/* In-flight pick (chosen, not yet saved) */}
               {selectedJurisdiction && !isSelectionSaved && (
                 <div className="border border-[#2d3b2d]/30 bg-[#f0f5f0] rounded p-3 mt-2 space-y-2">
@@ -439,9 +463,15 @@ export const JurisdictionAndAHJPanel: React.FC<JurisdictionAndAHJPanelProps> = (
             </div>
           )}
 
-          {/* ADVANCED SECTION --------------------------------------------- */}
-          {selectedJurisdiction && isSelectionSaved && (
-            <div className="border-t border-gray-100 pt-3">
+          {/* ADVANCED SECTION ---------------------------------------------
+              ALWAYS accessible (Sprint 2C M4 fix-up 2026-05-18): users
+              whose AHJ isn't in the search index (Cape Coral, Sanford,
+              Winter Park…) need to be able to pick a template + set
+              overrides WITHOUT a saved jurisdiction. The previous gating
+              on `selectedJurisdiction && isSelectionSaved` blocked that
+              path; restoring the always-on behavior the original
+              AHJTemplateAndOverridesPanel had. */}
+          <div className="border-t border-gray-100 pt-3">
               <button
                 type="button"
                 onClick={() => setShowAdvanced((v) => !v)}
@@ -453,6 +483,11 @@ export const JurisdictionAndAHJPanel: React.FC<JurisdictionAndAHJPanelProps> = (
                   <ChevronRight className="w-4 h-4" />
                 )}
                 Advanced: customize AHJ defaults
+                {!selectedJurisdiction && (
+                  <span className="ml-2 text-xs text-gray-500">
+                    (pick a template manually if your AHJ isn't listed)
+                  </span>
+                )}
                 {(hasTemplateManifest || hasOverrides) && (
                   <span className="ml-2 text-xs bg-blue-100 text-blue-800 px-2 py-0.5 rounded-full">
                     customized
@@ -612,7 +647,6 @@ export const JurisdictionAndAHJPanel: React.FC<JurisdictionAndAHJPanelProps> = (
                 </div>
               )}
             </div>
-          )}
 
           {/* AHJ WEBSITE LINK (footer) ----------------------------------- */}
           {selectedJurisdiction && isSelectionSaved && selectedJurisdiction.ahj_website && (
@@ -630,8 +664,10 @@ export const JurisdictionAndAHJPanel: React.FC<JurisdictionAndAHJPanelProps> = (
         </>
       )}
 
-      {/* Visual indicator when nothing is picked */}
-      {!loading && !selectedJurisdiction && (
+      {/* Visual indicator when nothing is picked AND no template/overrides
+          set. Suppressed once any Advanced field is configured, since the
+          packet then has manifest-aware defaults via the template path. */}
+      {!loading && !selectedJurisdiction && !hasTemplateManifest && !hasOverrides && (
         <div className="text-center py-4 text-gray-500 text-xs flex items-center justify-center gap-2 border-t border-gray-100">
           <CheckCircle className="w-3 h-3 opacity-30" />
           No jurisdiction selected — packet will use Sprint 2A generic defaults
