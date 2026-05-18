@@ -619,8 +619,12 @@ export const PermitPacketGenerator: React.FC<PermitPacketGeneratorProps> = ({ pr
           ? 'Provide NEC 220.87 narrative inputs below (source citation + max demand) to enable'
           : undefined;
       case 'jurisdiction':
-        return !currentProject?.jurisdiction_id
-          ? 'No jurisdiction selected for this project'
+        // Page can render from either a jurisdictions-table row OR an active
+        // AHJ manifest (template). Enable the toggle when either source is
+        // available so users picking just a template don't get a stuck
+        // disabled toggle for content the renderer could happily produce.
+        return !currentProject?.jurisdiction_id && !activeManifest
+          ? 'No jurisdiction or AHJ template selected for this project'
           : undefined;
       case 'evemsNarrative':
         return panels.some(p => isEVEMSManagedPanel(p.id, circuits))
@@ -783,9 +787,16 @@ export const PermitPacketGenerator: React.FC<PermitPacketGeneratorProps> = ({ pr
   );
 
   // Sections that are toggled off AND have an offWarning to show.
-  const activeOffWarnings = SECTION_TOGGLE_CONFIG.filter(
-    (c) => c.offWarning && effectiveSections[c.key] === false,
-  );
+  // Suppress when the manifest's predicate intentionally turned the section
+  // off (the AHJ doesn't need it for this project's lane/scope, so warning
+  // about "most AHJs reject this" would contradict the manifest). Only fire
+  // when the user manually overrode an otherwise-on section.
+  const activeOffWarnings = SECTION_TOGGLE_CONFIG.filter((c) => {
+    if (!c.offWarning) return false;
+    if (effectiveSections[c.key] !== false) return false;
+    if (manifestVisibility?.sections[c.key] === false) return false;
+    return true;
+  });
 
   const handleGenerate = async () => {
     if (!canGenerate || !currentProject) return;
