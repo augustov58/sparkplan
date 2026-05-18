@@ -188,6 +188,11 @@ interface CoverPageProps {
     /** AHJ display name; "AHJ" placeholder used when not yet bound (Sprint 2C). */
     ahjName?: string;
   };
+  // Sprint 2C M4 fix-up: AHJ identity surfaced on the cover. When provided,
+  // renders a JURISDICTION cell in the PROJECT INFORMATION block. Caller
+  // resolves the 3-tier chain (settings override → jurisdiction row → undefined).
+  jurisdictionName?: string;
+  authorityName?: string;
 }
 
 // FL pilot AHJs adopt NFPA-70 2020 via FBC 8th ed. NEC 220.84 demand-factor
@@ -216,6 +221,8 @@ export const CoverPage: React.FC<CoverPageProps> = ({
   codeReferences = DEFAULT_CODE_REFERENCES,
   sheetId,
   permitMode,
+  jurisdictionName,
+  authorityName,
 }) => (
   <Page size="LETTER" style={themeStyles.page}>
     <BrandBar pageLabel="PERMIT APPLICATION" sheetId={sheetId} />
@@ -264,6 +271,20 @@ export const CoverPage: React.FC<CoverPageProps> = ({
         <View style={themeStyles.projectCell}>
           <Text style={themeStyles.projectLabel}>Permit Number</Text>
           <Text style={themeStyles.projectValue}>{permitNumber}</Text>
+        </View>
+      )}
+      {/* Sprint 2C M4 fix-up: AHJ identity on the cover for at-a-glance
+          verification + unmodeled-AHJ support. When jurisdictionName is
+          undefined, the cell is hidden (Sprint 2A behavior preserved). */}
+      {jurisdictionName && (
+        <View style={themeStyles.projectCellWide}>
+          <Text style={themeStyles.projectLabel}>Jurisdiction</Text>
+          <Text style={themeStyles.projectValue}>{jurisdictionName}</Text>
+          {authorityName && (
+            <Text style={[themeStyles.projectValue, { fontSize: 8, marginTop: 1, fontWeight: 'normal' }]}>
+              {authorityName}
+            </Text>
+          )}
         </View>
       )}
     </View>

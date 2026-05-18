@@ -302,6 +302,19 @@ export interface ProjectSettings {
   sheet_id_prefix_override?: 'E-' | 'EL-' | 'ES-';
 
   /**
+   * Sprint 2C M4 fix-up (2026-05-18): cover-sheet AHJ identity for
+   * projects whose AHJ isn't in the legacy `jurisdictions` search index
+   * (Cape Coral, Sanford, Winter Park, etc.). When set, populates the
+   * cover sheet's JURISDICTION cell + Authority sub-line. Used in the
+   * 3-tier resolution:
+   *   custom_jurisdiction_name → jurisdiction.jurisdiction_name → undefined
+   *
+   * Per-project (stored in settings JSONB), no DB migration needed.
+   */
+  custom_jurisdiction_name?: string;
+  custom_authority_name?: string;
+
+  /**
    * Sprint 2A PR 5 / H17: scope inputs that drive the FL contractor-exemption
    * screening engine in `services/permitMode/exemptionScreening.ts`. All
    * three keys are persisted in the `projects.settings` JSON column (no DB

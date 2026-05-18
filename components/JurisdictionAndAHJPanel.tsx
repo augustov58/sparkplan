@@ -63,12 +63,20 @@ interface JurisdictionAndAHJPanelProps {
   generalNotesOverride: string[] | undefined;
   codeReferencesOverride: string[] | undefined;
   sheetIdPrefixOverride: AHJSheetIdPrefix | undefined;
+  /** Sprint 2C M4 fix-up (2026-05-18): AHJ display name + authority
+      sub-line. Used when the AHJ isn't in the search index (Cape Coral /
+      Sanford / Winter Park…). Rendered on the cover sheet's JURISDICTION
+      cell via packetData resolution chain. */
+  customJurisdictionName: string | undefined;
+  customAuthorityName: string | undefined;
   /** Handlers that persist to `projects.settings.*`. The parent owns
       these writes so the visibility resolution stays authoritative. */
   onSelectTemplate: (templateId: string) => void;
   onSetGeneralNotesOverride: (lines: string[] | undefined) => void;
   onSetCodeReferencesOverride: (lines: string[] | undefined) => void;
   onSetSheetIdPrefixOverride: (prefix: AHJSheetIdPrefix | undefined) => void;
+  onSetCustomJurisdictionName: (name: string | undefined) => void;
+  onSetCustomAuthorityName: (name: string | undefined) => void;
 }
 
 // ============================================================================
@@ -82,10 +90,14 @@ export const JurisdictionAndAHJPanel: React.FC<JurisdictionAndAHJPanelProps> = (
   generalNotesOverride,
   codeReferencesOverride,
   sheetIdPrefixOverride,
+  customJurisdictionName,
+  customAuthorityName,
   onSelectTemplate,
   onSetGeneralNotesOverride,
   onSetCodeReferencesOverride,
   onSetSheetIdPrefixOverride,
+  onSetCustomJurisdictionName,
+  onSetCustomAuthorityName,
 }) => {
   const { projectId: urlProjectId } = useParams<{ projectId: string }>();
   const effectiveProjectId = projectId || urlProjectId;
@@ -138,7 +150,9 @@ export const JurisdictionAndAHJPanel: React.FC<JurisdictionAndAHJPanelProps> = (
   const hasOverrides =
     !!generalNotesOverride ||
     !!codeReferencesOverride ||
-    !!sheetIdPrefixOverride;
+    !!sheetIdPrefixOverride ||
+    !!customJurisdictionName ||
+    !!customAuthorityName;
 
   // Advanced section: auto-expand when the user has anything non-default
   // configured OR when they need to pick a template (no auto-bound).
@@ -160,12 +174,24 @@ export const JurisdictionAndAHJPanel: React.FC<JurisdictionAndAHJPanelProps> = (
   const [codeRefsText, setCodeRefsText] = useState(
     (codeReferencesOverride ?? []).join('\n'),
   );
+  const [customJurisdictionText, setCustomJurisdictionText] = useState(
+    customJurisdictionName ?? '',
+  );
+  const [customAuthorityText, setCustomAuthorityText] = useState(
+    customAuthorityName ?? '',
+  );
   useEffect(() => {
     setGeneralNotesText((generalNotesOverride ?? []).join('\n'));
   }, [generalNotesOverride?.join('\n')]);
   useEffect(() => {
     setCodeRefsText((codeReferencesOverride ?? []).join('\n'));
   }, [codeReferencesOverride?.join('\n')]);
+  useEffect(() => {
+    setCustomJurisdictionText(customJurisdictionName ?? '');
+  }, [customJurisdictionName]);
+  useEffect(() => {
+    setCustomAuthorityText(customAuthorityName ?? '');
+  }, [customAuthorityName]);
 
   const parseLines = (raw: string): string[] | undefined => {
     const lines = raw
@@ -549,11 +575,69 @@ export const JurisdictionAndAHJPanel: React.FC<JurisdictionAndAHJPanelProps> = (
                       ) : (
                         <ChevronRight className="w-4 h-4" />
                       )}
-                      Override AHJ details (general notes, code refs, sheet prefix)
+                      Override AHJ details (jurisdiction name, general notes, code refs, sheet prefix)
                     </button>
 
                     {showOverrides && (
                       <div className="mt-3 space-y-4">
+                        {/* Sprint 2C M4 fix-up: custom AHJ identity for
+                            unmodeled-AHJ projects. Fills the cover sheet's
+                            JURISDICTION cell when no row is picked. When the
+                            user has saved a jurisdiction (e.g., Tampa), these
+                            fields are still accepted as per-project overrides
+                            of the row's defaults. */}
+                        <div className="bg-gray-50 border border-gray-200 rounded-md p-3 space-y-3">
+                          <p className="text-xs text-gray-600">
+                            <span className="font-semibold">AHJ identity on the cover sheet.</span>{' '}
+                            Use these fields when your AHJ isn't in SparkPlan's search index
+                            (Cape Coral, Sanford, etc.) — or to override the saved
+                            jurisdiction's display name for one specific permit.
+                          </p>
+                          <div>
+                            <label
+                              htmlFor="customJurisdictionName"
+                              className="block text-sm font-medium text-gray-700 mb-1"
+                            >
+                              Jurisdiction name (custom)
+                            </label>
+                            <input
+                              id="customJurisdictionName"
+                              type="text"
+                              value={customJurisdictionText}
+                              onChange={(e) => setCustomJurisdictionText(e.target.value)}
+                              onBlur={() =>
+                                onSetCustomJurisdictionName(customJurisdictionText || undefined)
+                              }
+                              placeholder="e.g., Cape Coral, FL"
+                              className="w-full border border-gray-200 rounded px-3 py-2 text-sm focus:border-[#2d3b2d] focus:ring-2 focus:ring-[#2d3b2d]/20 outline-none"
+                            />
+                          </div>
+                          <div>
+                            <label
+                              htmlFor="customAuthorityName"
+                              className="block text-sm font-medium text-gray-700 mb-1"
+                            >
+                              Authority (custom)
+                            </label>
+                            <input
+                              id="customAuthorityName"
+                              type="text"
+                              value={customAuthorityText}
+                              onChange={(e) => setCustomAuthorityText(e.target.value)}
+                              onBlur={() =>
+                                onSetCustomAuthorityName(customAuthorityText || undefined)
+                              }
+                              placeholder="e.g., Cape Coral Building Department"
+                              className="w-full border border-gray-200 rounded px-3 py-2 text-sm focus:border-[#2d3b2d] focus:ring-2 focus:ring-[#2d3b2d]/20 outline-none"
+                            />
+                          </div>
+                          <p className="text-xs text-gray-500">
+                            Leave blank to use the saved jurisdiction's name
+                            ({selectedJurisdiction?.jurisdiction_name ?? 'none picked'})
+                            or hide the cell when none is saved.
+                          </p>
+                        </div>
+
                         {/* General notes override */}
                         <div>
                           <label
