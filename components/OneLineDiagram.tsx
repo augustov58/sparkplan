@@ -143,6 +143,7 @@ import {
 import { DiagramPanZoom } from './DiagramPanZoom';
 import { exportDiagram, DiagramExportOptions } from '../services/pdfExport/oneLineDiagramExport';
 import { calculateTreeLayout, getDescendantIds } from '../services/diagram/treeLayoutCalculator';
+import { SYSTEM_TYPE_OPTIONS, systemTypeFromVP, vpFromSystemType } from '../lib/electricalDisplay';
 import {
   getPanelDownstream,
   getTransformerDownstream,
@@ -228,6 +229,12 @@ export const OneLineDiagram: React.FC<OneLineDiagramProps> = ({ project, updateP
   const isResidentialProject = project.type === ProjectType.RESIDENTIAL;
 
   // Panel Editor State
+  // Sprint 2C M3 follow-on (2026-05-17): for existing-construction projects,
+  // sub-panels default to is_proposed=true (NEW installation). MDP and panels
+  // on new-construction projects stay false (existing, or "all panels new").
+  const isExistingConstruction = !!project.settings?.service_modification_type
+    && project.settings.service_modification_type !== 'new-service';
+
   const [newPanel, setNewPanel] = useState({
     name: '',
     busRating: 200,
@@ -236,6 +243,8 @@ export const OneLineDiagram: React.FC<OneLineDiagramProps> = ({ project, updateP
     voltage: project.serviceVoltage,
     phase: project.servicePhase,
     isMain: false,
+    isProposed: isExistingConstruction, // sub-panels added to an existing
+                                        // service are presumed new by default
     numSpaces: 42,
     fedFromType: 'panel' as 'panel' | 'transformer' | 'service',
     fedFromId: '', // Can be panel ID or transformer ID depending on fedFromType
@@ -1043,7 +1052,11 @@ export const OneLineDiagram: React.FC<OneLineDiagramProps> = ({ project, updateP
       fed_from_type: fedFromType,
       is_main: newPanel.isMain,
       num_spaces: newPanel.numSpaces,
-      fed_from_circuit_number: fedFromType === 'panel' ? newPanel.fedFromCircuitNumber : null
+      fed_from_circuit_number: fedFromType === 'panel' ? newPanel.fedFromCircuitNumber : null,
+      // MDP is always considered existing (the contractor is modifying an
+      // existing service, not replacing it). For sub-panels, honor the
+      // toggle the form exposed.
+      is_proposed: newPanel.isMain ? false : newPanel.isProposed,
     };
 
     await createPanel(panelData);
@@ -1055,6 +1068,7 @@ export const OneLineDiagram: React.FC<OneLineDiagramProps> = ({ project, updateP
       voltage: project.serviceVoltage,
       phase: project.servicePhase,
       isMain: false,
+      isProposed: isExistingConstruction, // re-arm default for next add
       numSpaces: 42,
       fedFromType: 'panel',
       fedFromId: '',
@@ -1941,6 +1955,12 @@ export const OneLineDiagram: React.FC<OneLineDiagramProps> = ({ project, updateP
       panelColor = '#D97706'; // Dark amber for high voltage
     }
 
+    // Sprint 2C M3 follow-on (2026-05-17): proposed (new) panel treatment —
+    // dashed amber outer box + corner "NEW" badge so the in-app diagram
+    // matches the riser PDF treatment. Only rendered for existing-
+    // construction projects where the EXIST/NEW differentiation is meaningful.
+    const isProposedPanel = panel.is_proposed === true && isExistingConstruction;
+
     const element = (
       <g>
         {/* Panel enclosure (outer box) */}
@@ -1950,10 +1970,33 @@ export const OneLineDiagram: React.FC<OneLineDiagramProps> = ({ project, updateP
           width={width}
           height={height}
           fill="#E5E7EB"
-          stroke="#6B7280"
-          strokeWidth={2}
+          stroke={isProposedPanel ? '#d97706' : '#6B7280'}
+          strokeWidth={isProposedPanel ? 2.5 : 2}
+          strokeDasharray={isProposedPanel ? '6,3' : undefined}
           rx={2}
         />
+        {isProposedPanel && (
+          <g>
+            <rect
+              x={x + width / 2 - 32}
+              y={y - 6}
+              width={30}
+              height={12}
+              fill="#d97706"
+              rx={2}
+            />
+            <text
+              x={x + width / 2 - 17}
+              y={y + 2}
+              textAnchor="middle"
+              fontSize={8}
+              fontWeight="bold"
+              fill="white"
+            >
+              NEW
+            </text>
+          </g>
+        )}
 
         {/* Panel door (inner rectangle with slight inset) */}
         <rect
@@ -2751,32 +2794,30 @@ export const OneLineDiagram: React.FC<OneLineDiagramProps> = ({ project, updateP
                     className="w-full border-gray-200 rounded text-sm py-2 focus:border-[#2d3b2d] focus:ring-[#2d3b2d]/20"
                  />
                </div>
-               <div className="grid grid-cols-2 gap-3">
-                 <div>
-                   <label className="text-xs font-semibold text-gray-500 uppercase">Voltage (V)</label>
-                   <select
-                      value={newPanel.voltage}
-                      onChange={e => setNewPanel({...newPanel, voltage: Number(e.target.value)})}
-                      className="w-full border-gray-200 rounded text-sm py-2"
-                   >
-                     <option value="120">120V</option>
-                     <option value="208">208V</option>
-                     <option value="240">240V</option>
-                     <option value="277">277V</option>
-                     <option value="480">480V</option>
-                   </select>
-                 </div>
-                 <div>
-                   <label className="text-xs font-semibold text-gray-500 uppercase">Phase</label>
-                   <select
-                      value={newPanel.phase}
-                      onChange={e => setNewPanel({...newPanel, phase: Number(e.target.value) as 1 | 3})}
-                      className="w-full border-gray-200 rounded text-sm py-2"
-                   >
-                     <option value="1">Single-Phase</option>
-                     <option value="3">Three-Phase</option>
-                   </select>
-                 </div>
+               {/* Sprint 2C M3 follow-on (2026-05-17): system-type selector
+                   replaces the two-cascade voltage+phase dropdowns. The old
+                   form let users pick electrically-invalid combinations
+                   (e.g., 480V single-phase, 277V three-phase) — this
+                   constrains the choice to the 3 canonical service
+                   configurations. Mirrors ProjectSetup.tsx's selector
+                   pattern. */}
+               <div>
+                 <label className="text-xs font-semibold text-gray-500 uppercase">System Type</label>
+                 <select
+                    value={systemTypeFromVP(newPanel.voltage, newPanel.phase)}
+                    onChange={e => {
+                      const { voltage, phase } = vpFromSystemType(e.target.value);
+                      setNewPanel({...newPanel, voltage, phase});
+                    }}
+                    className="w-full border-gray-200 rounded text-sm py-2 font-mono"
+                 >
+                   {SYSTEM_TYPE_OPTIONS.map(opt => (
+                     <option key={opt.key} value={opt.key}>{opt.label}</option>
+                   ))}
+                 </select>
+                 <p className="text-xs text-gray-400 mt-1">
+                   Most common configurations. Line-to-neutral derives automatically (e.g. 480V 3Ø → 277V L-N).
+                 </p>
                </div>
                <div className="grid grid-cols-2 gap-3">
                  <div>
@@ -2838,6 +2879,10 @@ export const OneLineDiagram: React.FC<OneLineDiagramProps> = ({ project, updateP
                        ...newPanel,
                        isMain,
                        numSpaces: isMain ? 30 : 42,
+                       // MDP on an existing-construction project is always
+                       // considered existing — flip is_proposed off when the
+                       // user marks this panel as the MDP.
+                       isProposed: isMain ? false : isExistingConstruction,
                      });
                    }}
                    className="rounded border-gray-300 text-[#2d3b2d] focus:ring-[#2d3b2d]/20"
@@ -2846,6 +2891,35 @@ export const OneLineDiagram: React.FC<OneLineDiagramProps> = ({ project, updateP
                    This is the Main Distribution Panel (MDP)
                  </label>
                </div>
+
+               {/* Sprint 2C M3 follow-on (2026-05-17): is_proposed toggle.
+                   Only shown on existing-construction projects for non-MDP
+                   panels — the MDP is implicitly existing (the contractor
+                   is modifying an existing service, not replacing it), and
+                   in new-construction projects every panel is implicitly
+                   new (the EXIST/NEW renderer pathway is suppressed). */}
+               {isExistingConstruction && !newPanel.isMain && (
+                 <div className="flex items-start gap-2 p-3 bg-amber-50 border border-amber-200 rounded-md">
+                   <input
+                     type="checkbox"
+                     id="isProposedPanel"
+                     checked={newPanel.isProposed}
+                     onChange={e => setNewPanel({...newPanel, isProposed: e.target.checked})}
+                     className="mt-0.5 rounded border-gray-300 text-amber-700 focus:ring-amber-500/30"
+                   />
+                   <div className="flex-1">
+                     <label htmlFor="isProposedPanel" className="text-sm font-medium text-amber-900 cursor-pointer">
+                       This is a new (proposed) panel
+                     </label>
+                     <p className="text-xs text-amber-700 mt-0.5">
+                       Renders with a dashed outline + "NEW" badge on the riser
+                       and a "PROPOSED — NEW INSTALLATION" tag on the panel
+                       schedule cover. Uncheck if you're documenting an existing
+                       panel already in the field.
+                     </p>
+                   </div>
+                 </div>
+               )}
 
                {!newPanel.isMain && (
                  <>

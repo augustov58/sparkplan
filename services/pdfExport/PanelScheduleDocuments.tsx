@@ -53,6 +53,30 @@ export const styles = StyleSheet.create({
     justifyContent: 'space-between',
     marginTop: 5,
   },
+  // PROPOSED — NEW INSTALLATION banner (Sprint 2C M3 follow-on, 2026-05-17).
+  // Amber palette matches the in-app warning treatment and stands out
+  // against the otherwise-neutral schedule cover so AHJ reviewers can't
+  // miss it. Only renders when panel.is_proposed && showExistingNewMarkers.
+  proposedBanner: {
+    backgroundColor: '#fef3c7',
+    borderWidth: 1,
+    borderColor: '#d97706',
+    borderStyle: 'solid',
+    borderRadius: 3,
+    padding: 6,
+    marginBottom: 8,
+  },
+  proposedBannerText: {
+    fontSize: 10,
+    fontFamily: 'Helvetica-Bold',
+    color: '#78350f',
+    letterSpacing: 0.5,
+  },
+  proposedBannerSub: {
+    fontSize: 8,
+    color: '#92400e',
+    marginTop: 2,
+  },
   infoColumn: {
     width: '48%',
   },
@@ -257,12 +281,17 @@ export const PanelSchedulePages: React.FC<PanelSchedulePDFProps> = ({
 }) => {
   // Helper: append " *" to a description when (a) markers are enabled AND
   // (b) the circuit is flagged as a proposed new addition. Returns the raw
-  // description otherwise.
-  const decorateDescription = (c: Circuit | undefined): string => {
+  // description otherwise. Sprint 2C M3 follow-on (2026-05-17): when the
+  // circuit is proposed, render the whole description in Helvetica-Bold
+  // so new circuits visually pop on a dense schedule with 30-42 rows.
+  const decorateDescription = (c: Circuit | undefined): React.ReactNode => {
     if (!c) return '';
-    return showExistingNewMarkers && c.is_proposed
-      ? `${c.description} *`
-      : c.description;
+    if (!(showExistingNewMarkers && c.is_proposed)) return c.description;
+    return (
+      <Text style={{ fontFamily: 'Helvetica-Bold' }}>
+        {`${c.description} *`}
+      </Text>
+    );
   };
   // Whether to surface the legend below the title block. Only render the
   // legend if markers are enabled AND at least one circuit is actually
@@ -326,6 +355,23 @@ export const PanelSchedulePages: React.FC<PanelSchedulePDFProps> = ({
       </View>
       <View style={styles.header}>
 
+          {/* Sprint 2C M3 follow-on (2026-05-17): NEW INSTALLATION banner.
+              Surfaces at the top of the title block (above the spec grid) so
+              an AHJ reviewer flipping to this panel's schedule cover knows
+              instantly it represents a new (proposed) installation rather
+              than an existing field panel being modified. Suppressed when
+              showExistingNewMarkers is off (new-construction projects). */}
+          {showExistingNewMarkers && panel.is_proposed && (
+            <View style={styles.proposedBanner}>
+              <Text style={styles.proposedBannerText}>
+                PROPOSED &mdash; NEW INSTALLATION
+              </Text>
+              <Text style={styles.proposedBannerSub}>
+                This panel does not yet exist in the field. Install per this schedule.
+              </Text>
+            </View>
+          )}
+
           <View style={styles.infoGrid}>
             <View style={styles.infoColumn}>
               <View style={styles.infoRow}>
@@ -370,7 +416,7 @@ export const PanelSchedulePages: React.FC<PanelSchedulePDFProps> = ({
         {showLegend && (
           <View style={{ marginBottom: 4, marginTop: -4 }}>
             <Text style={{ fontSize: 8, fontStyle: 'italic', color: '#555' }}>
-              * = Proposed new circuit (added under this permit)
+              * = Proposed new circuit
             </Text>
           </View>
         )}
@@ -630,6 +676,19 @@ export const MultiPanelDocument: React.FC<MultiPanelDocumentProps> = ({
           </View>
           <View style={styles.header}>
 
+            {/* PROPOSED — NEW INSTALLATION banner (Sprint 2C M3 follow-on,
+                2026-05-17). Mirrors the banner on PanelSchedulePages above. */}
+            {showExistingNewMarkers && panel.is_proposed && (
+              <View style={styles.proposedBanner}>
+                <Text style={styles.proposedBannerText}>
+                  PROPOSED &mdash; NEW INSTALLATION
+                </Text>
+                <Text style={styles.proposedBannerSub}>
+                  This panel does not yet exist in the field. Install per this schedule.
+                </Text>
+              </View>
+            )}
+
             <View style={styles.infoGrid}>
               <View style={styles.infoColumn}>
                 <View style={styles.infoRow}>
@@ -673,7 +732,7 @@ export const MultiPanelDocument: React.FC<MultiPanelDocumentProps> = ({
           {showExistingNewMarkers && circuits.some(c => c.is_proposed) && (
             <View style={{ marginBottom: 4, marginTop: -4 }}>
               <Text style={{ fontSize: 8, fontStyle: 'italic', color: '#555' }}>
-                * = Proposed new circuit (added under this permit)
+                * = Proposed new circuit
               </Text>
             </View>
           )}
@@ -698,9 +757,14 @@ export const MultiPanelDocument: React.FC<MultiPanelDocumentProps> = ({
               const sortedCircuits = circuits.sort((a, b) => a.circuit_number - b.circuit_number);
               const maxSlots = panel.num_spaces ?? (panel.is_main ? 30 : 42);
               const numRows = maxSlots / 2;
-              const decorate = (c: Circuit | undefined): string => {
+              const decorate = (c: Circuit | undefined): React.ReactNode => {
                 if (!c) return '';
-                return showExistingNewMarkers && c.is_proposed ? `${c.description} *` : c.description;
+                if (!(showExistingNewMarkers && c.is_proposed)) return c.description;
+                return (
+                  <Text style={{ fontFamily: 'Helvetica-Bold' }}>
+                    {`${c.description} *`}
+                  </Text>
+                );
               };
 
               const rows = [];
