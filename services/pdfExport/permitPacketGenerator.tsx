@@ -252,6 +252,17 @@ export interface PermitPacketData {
   codeReferencesOverride?: string[];
   sheetIdPrefixOverride?: AHJSheetIdPrefix;
   /**
+   * Sprint 2C M4 fix-up (2026-05-18): AHJ identity for cover sheet's
+   * JURISDICTION cell. Caller resolves the 3-tier chain:
+   *   1. settings.custom_jurisdiction_name override (for fully unmodeled AHJs)
+   *   2. jurisdiction.jurisdiction_name (when wizard picked a row)
+   *   3. undefined → cell hidden from cover sheet
+   *
+   * `authorityName` is the optional sub-line ("City of Tampa Building Department").
+   */
+  jurisdictionName?: string;
+  authorityName?: string;
+  /**
    * Sprint 2B PR-3: user-uploaded PDF artifacts to splice into the packet.
    *
    * Storage fetch happens at the React layer (Supabase auth context lives
@@ -559,6 +570,8 @@ export const generatePermitPacket = async (data: PermitPacketData): Promise<void
         codeReferences={data.codeReferences}
         sheetId={sheetIds[0]}
         permitMode={data.permitMode}
+        jurisdictionName={data.jurisdictionName}
+        authorityName={data.authorityName}
       />
     ),
   });
@@ -1661,6 +1674,8 @@ export const generateLightweightPermitPacket = async (data: PermitPacketData): P
           necEdition={data.necEdition}
           codeReferences={data.codeReferences}
           permitMode={data.permitMode}
+          jurisdictionName={data.jurisdictionName}
+          authorityName={data.authorityName}
         />
         <EquipmentSchedule
           panels={data.panels}

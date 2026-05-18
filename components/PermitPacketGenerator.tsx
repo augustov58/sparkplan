@@ -776,6 +776,30 @@ export const PermitPacketGenerator: React.FC<PermitPacketGeneratorProps> = ({ pr
       },
     });
   };
+  // Sprint 2C M4 fix-up (2026-05-18): persist the custom AHJ name + authority
+  // for projects whose AHJ isn't in the legacy `jurisdictions` search index
+  // (Cape Coral / Sanford / Winter Park / etc.). Resolves into the cover
+  // sheet's JURISDICTION cell via the 3-tier chain in packetData.
+  const handleSetCustomJurisdictionName = async (name: string | undefined) => {
+    if (!currentProject) return;
+    await updateProject({
+      ...currentProject,
+      settings: {
+        ...currentProject.settings,
+        custom_jurisdiction_name: name && name.trim().length > 0 ? name.trim() : undefined,
+      },
+    });
+  };
+  const handleSetCustomAuthorityName = async (name: string | undefined) => {
+    if (!currentProject) return;
+    await updateProject({
+      ...currentProject,
+      settings: {
+        ...currentProject.settings,
+        custom_authority_name: name && name.trim().length > 0 ? name.trim() : undefined,
+      },
+    });
+  };
 
   // Group toggle configs for the rendered grid.
   const toggleGroups = SECTION_TOGGLE_CONFIG.reduce<Record<string, SectionToggleConfig[]>>(
@@ -954,6 +978,18 @@ export const PermitPacketGenerator: React.FC<PermitPacketGeneratorProps> = ({ pr
         generalNotesOverride: currentProject.settings?.general_notes_override,
         codeReferencesOverride: currentProject.settings?.code_references_override,
         sheetIdPrefixOverride: currentProject.settings?.sheet_id_prefix_override,
+        // Sprint 2C M4 fix-up: cover-sheet AHJ identity resolution.
+        //   Tier 1: per-project override (for unmodeled AHJs not in the search index)
+        //   Tier 2: jurisdiction row from the legacy table (when wizard picked one)
+        //   Tier 3: undefined → cell hidden on cover (Sprint 2A behavior)
+        jurisdictionName:
+          currentProject.settings?.custom_jurisdiction_name?.trim() ||
+          jurisdiction?.jurisdiction_name ||
+          undefined,
+        authorityName:
+          currentProject.settings?.custom_authority_name?.trim() ||
+          jurisdiction?.ahj_name ||
+          undefined,
       };
 
       // Gap 3: when a per-project override is present, suppress the
@@ -1151,10 +1187,14 @@ export const PermitPacketGenerator: React.FC<PermitPacketGeneratorProps> = ({ pr
           currentProject.settings?.code_references_override
         }
         sheetIdPrefixOverride={currentProject.settings?.sheet_id_prefix_override}
+        customJurisdictionName={currentProject.settings?.custom_jurisdiction_name}
+        customAuthorityName={currentProject.settings?.custom_authority_name}
         onSelectTemplate={handleSelectManifestTemplate}
         onSetGeneralNotesOverride={handleSetGeneralNotesOverride}
         onSetCodeReferencesOverride={handleSetCodeReferencesOverride}
         onSetSheetIdPrefixOverride={handleSetSheetIdPrefixOverride}
+        onSetCustomJurisdictionName={handleSetCustomJurisdictionName}
+        onSetCustomAuthorityName={handleSetCustomAuthorityName}
       />
 
       {/* Sprint 2A H1+H2+H3: Section Toggle Panel */}
