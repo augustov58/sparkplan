@@ -126,12 +126,8 @@ export const JurisdictionAndAHJPanel: React.FC<JurisdictionAndAHJPanelProps> = (
   // wizard's pick alone covers it (vs. relying on a template).
   const wizardAutoBoundManifest: AHJManifest | null = useMemo(() => {
     if (!selectedJurisdiction) return null;
-    return (
-      findManifestForJurisdiction(
-        selectedJurisdiction.jurisdiction_name,
-        selectedJurisdiction.ahj_name,
-      ) ?? null
-    );
+    // findManifestForJurisdiction takes a single object, not two string args.
+    return findManifestForJurisdiction(selectedJurisdiction) ?? null;
   }, [
     selectedJurisdiction?.jurisdiction_name,
     selectedJurisdiction?.ahj_name,
@@ -526,10 +522,17 @@ export const JurisdictionAndAHJPanel: React.FC<JurisdictionAndAHJPanelProps> = (
                     <p className="text-xs text-gray-500 mt-1">
                       Only needed when your AHJ isn't fully modeled, or to
                       preview another AHJ's defaults. Does NOT change the AHJ
-                      name on the cover sheet — that stays{' '}
-                      <span className="font-medium">
-                        {selectedJurisdiction.jurisdiction_name}
-                      </span>
+                      name on the cover sheet
+                      {selectedJurisdiction ? (
+                        <>
+                          {' '}— that stays{' '}
+                          <span className="font-medium">
+                            {selectedJurisdiction.jurisdiction_name}
+                          </span>
+                        </>
+                      ) : (
+                        ' (no jurisdiction picked yet)'
+                      )}
                       .
                     </p>
                   </div>
