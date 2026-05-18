@@ -47,7 +47,7 @@ import { useMeterStacks } from '../hooks/useMeterStacks';
 import { useMeters } from '../hooks/useMeters';
 import { useProfile } from '../hooks/useProfile';
 import { JurisdictionSearchWizard } from './JurisdictionSearchWizard';
-import { calculateMultiFamilyEV, type MultiFamilyEVInput } from '../services/calculations/multiFamilyEV';
+import type { MultiFamilyEVResult } from '../services/calculations/multiFamilyEV';
 import { buildMultiFamilyContext, isEVEMSManagedPanel } from '../services/calculations/upstreamLoadAggregation';
 import { screenContractorExemption } from '../services/permitMode/exemptionScreening';
 import {
@@ -245,13 +245,6 @@ export const PermitPacketGenerator: React.FC<PermitPacketGeneratorProps> = ({ pr
   const [meterLocation, setMeterLocation] = useState('');
   const [serviceConductorRouting, setServiceConductorRouting] = useState('');
 
-  // Multi-Family EV Analysis state
-  const [includeMultiFamilyEV, setIncludeMultiFamilyEV] = useState(false);
-  const [mfEvDwellingUnits, setMfEvDwellingUnits] = useState(20);
-  const [mfEvChargersPerUnit, setMfEvChargersPerUnit] = useState(1);
-  const [mfEvChargerLevel, setMfEvChargerLevel] = useState<'level1' | 'level2'>('level2');
-  const [mfEvBuildingName, setMfEvBuildingName] = useState('');
-
   // Sprint 2A H14: NEC 220.87 existing-service narrative inputs.
   // Off by default; the user opts in by checking includeNEC22087 and filling
   // the source citation + observation window. Auto-disable predicate hides
@@ -307,6 +300,56 @@ export const PermitPacketGenerator: React.FC<PermitPacketGeneratorProps> = ({ pr
       | undefined;
     setSectionPrefs(stored ?? {});
   }, [currentProject?.id, currentProject?.settings?.sectionPreferences]);
+
+  // Sprint 2C M3 (2026-05-17): hydrate NEC 220.87 narrative inputs from
+  // project settings on project load so they survive a reload. Skipped if
+  // no persisted block (defaults remain blank). Tracks restoration via a
+  // ref so the debounced persist effect doesn't fire on the initial
+  // hydration pass.
+  const nec22087HydratedRef = React.useRef(false);
+  useEffect(() => {
+    const stored = currentProject?.settings?.nec22087Narrative;
+    if (!stored) {
+      nec22087HydratedRef.current = true;
+      return;
+    }
+    if (stored.include != null) setIncludeNEC22087(stored.include);
+    if (stored.method) setNec22087Method(stored.method);
+    if (stored.dataSourceCitation != null) setNec22087DataSource(stored.dataSourceCitation);
+    if (stored.dateRangeFrom != null) setNec22087DateFrom(stored.dateRangeFrom);
+    if (stored.dateRangeTo != null) setNec22087DateTo(stored.dateRangeTo);
+    if (stored.maxDemandKVA != null) setNec22087MaxDemandKVA(stored.maxDemandKVA);
+    if (stored.proposedNewLoadKVA != null) setNec22087ProposedKVA(stored.proposedNewLoadKVA);
+    nec22087HydratedRef.current = true;
+  }, [currentProject?.id]);
+
+  // Persist NEC 220.87 narrative inputs (debounced 500ms). Skipped until
+  // hydration completes so the first paint doesn't blow over stored values
+  // with the default empty state.
+  useEffect(() => {
+    if (!currentProject || !nec22087HydratedRef.current) return;
+    const next = {
+      include: includeNEC22087,
+      method: nec22087Method,
+      dataSourceCitation: nec22087DataSource,
+      dateRangeFrom: nec22087DateFrom,
+      dateRangeTo: nec22087DateTo,
+      maxDemandKVA: nec22087MaxDemandKVA,
+      proposedNewLoadKVA: nec22087ProposedKVA,
+    };
+    const stored = currentProject.settings?.nec22087Narrative;
+    if (JSON.stringify(next) === JSON.stringify(stored ?? {})) return;
+    const timer = setTimeout(() => {
+      updateProject({
+        ...currentProject,
+        settings: {
+          ...currentProject.settings,
+          nec22087Narrative: next,
+        },
+      });
+    }, 500);
+    return () => clearTimeout(timer);
+  }, [includeNEC22087, nec22087Method, nec22087DataSource, nec22087DateFrom, nec22087DateTo, nec22087MaxDemandKVA, nec22087ProposedKVA]);
 
   // Early return if no projectId
   if (!projectId) {
@@ -495,10 +538,22 @@ export const PermitPacketGenerator: React.FC<PermitPacketGeneratorProps> = ({ pr
         return meterStacks.length === 0
           ? 'No meter stacks defined (multi-family only)'
           : undefined;
-      case 'multiFamilyEV':
-        return !includeMultiFamilyEV
-          ? 'Enable Multi-Family EV inputs above to include this analysis'
-          : undefined;
+      case 'multiFamilyEV': {
+        // Source of truth: MultiFamilyEVCalculator (Tools Hub) persists its
+        // computed result to project.settings.residential.mfEvCalculation.
+        // Auto-disable if (a) project isn't multi-family or (b) the user
+        // hasn't run the calculator yet. CTA points at the Tools Hub.
+        const residential = currentProject?.settings?.residential as
+          | { dwellingType?: string; mfEvCalculation?: unknown }
+          | undefined;
+        if ((residential?.dwellingType ?? 'single_family') !== 'multi_family') {
+          return 'Multi-Family EV Analysis applies only to multi-family projects (set Dwelling Type in Project Setup).';
+        }
+        if (!residential?.mfEvCalculation) {
+          return 'Open the Multi-Family EV Calculator in Tools Hub and run an analysis to include it here.';
+        }
+        return undefined;
+      }
       case 'nec22087Narrative':
         return !includeNEC22087 || !nec22087DataSource.trim() || !nec22087MaxDemandKVA
           ? 'Provide NEC 220.87 narrative inputs below (source citation + max demand) to enable'
@@ -872,23 +927,18 @@ export const PermitPacketGenerator: React.FC<PermitPacketGeneratorProps> = ({ pr
         packetData.nec22087Narrative = narrative;
       }
 
-      // Add Multi-Family EV Analysis if enabled
-      if (includeMultiFamilyEV && mfEvDwellingUnits > 0) {
-        const mfEvInput: MultiFamilyEVInput = {
-          dwellingUnits: mfEvDwellingUnits,
-          evChargersPerUnit: mfEvChargersPerUnit,
-          chargerLevel: mfEvChargerLevel,
-          chargerAmps: mfEvChargerLevel === 'level2' ? 40 : 12,
-          voltage: currentProject.servicePhase === 3 ? 208 : 240,
-          phase: currentProject.servicePhase === 3 ? 3 : 1,
-          squareFeetPerUnit: 1000, // Default assumption
-          includeCommonAreas: true,
-          commonAreaSqFt: Math.round(mfEvDwellingUnits * 50), // Estimate common area
-        };
-        const mfEvResult = calculateMultiFamilyEV(mfEvInput);
+      // Multi-Family EV Analysis (Sprint 2C M3 — 2026-05-17): consume the
+      // pre-computed result persisted by MultiFamilyEVCalculator (Tools Hub)
+      // instead of recomputing from an inline duplicated form. The Tools Hub
+      // is the source of truth — what the user reviews there is what lands
+      // in the packet, byte-for-byte.
+      const mfEvCalc = (currentProject.settings?.residential as
+        | { mfEvCalculation?: { result: MultiFamilyEVResult; buildingName?: string } }
+        | undefined)?.mfEvCalculation;
+      if (mfEvCalc?.result) {
         packetData.multiFamilyEVAnalysis = {
-          result: mfEvResult,
-          buildingName: mfEvBuildingName.trim() || currentProject.name,
+          result: mfEvCalc.result,
+          buildingName: mfEvCalc.buildingName?.trim() || currentProject.name,
         };
       }
 
@@ -1466,128 +1516,44 @@ export const PermitPacketGenerator: React.FC<PermitPacketGeneratorProps> = ({ pr
         </div>
       </div>
 
-      {/* Multi-Family EV Analysis Section */}
-      <div className="bg-white border border-gray-200 rounded-lg p-6 space-y-4">
-        <div className="flex items-center justify-between">
+      {/* Multi-Family EV Analysis — banner card pointing to Tools Hub.
+          Source of truth: MultiFamilyEVCalculator persists its computed result
+          to project.settings.residential.mfEvCalculation. The section toggle
+          in "Configure Sections" below auto-enables when the persisted result
+          is present and the project is multi-family. No duplicated inputs
+          here — what the user reviews in the Tools Hub is what lands in the
+          packet, byte-for-byte. */}
+      {(currentProject?.settings?.residential as { dwellingType?: string } | undefined)
+        ?.dwellingType === 'multi_family' && (
+        <div className="bg-white border border-gray-200 rounded-lg p-6 space-y-3">
           <div className="flex items-center gap-3">
             <Building2 className="w-5 h-5 text-[#2d3b2d]" />
             <div>
               <h3 className="font-bold text-gray-900">Multi-Family EV Analysis</h3>
-              <p className="text-sm text-gray-500">NEC 220.84 + 220.57 + 625.42 compliance</p>
+              <p className="text-sm text-gray-500">NEC 220.84 + 220.57 + 625.42</p>
             </div>
           </div>
-          <label className="relative inline-flex items-center cursor-pointer">
-            <input
-              type="checkbox"
-              checked={includeMultiFamilyEV}
-              onChange={(e) => setIncludeMultiFamilyEV(e.target.checked)}
-              className="sr-only peer"
-            />
-            <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-[#2d3b2d]/20/20 rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[#2d3b2d]"></div>
-            <span className="ml-2 text-sm font-medium text-gray-700">Include</span>
-          </label>
-        </div>
-
-        {includeMultiFamilyEV && (
-          <div className="pt-4 border-t border-gray-200 space-y-4">
-            <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
-              <p className="text-sm text-blue-800">
-                <strong>Note:</strong> For detailed analysis, use the Multi-Family EV Calculator in the Tools Hub.
-                This section provides quick integration for permit packets with basic parameters.
+          {(currentProject?.settings?.residential as { mfEvCalculation?: unknown } | undefined)
+            ?.mfEvCalculation ? (
+            <div className="bg-green-50 border border-green-200 rounded-lg p-3 flex items-start gap-2">
+              <CheckCircle className="w-4 h-4 text-green-700 flex-shrink-0 mt-0.5" />
+              <p className="text-sm text-green-800">
+                Analysis saved from the Multi-Family EV Calculator. Toggle the
+                "Multi-Family EV Analysis" section below to include it in the packet.
               </p>
             </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label htmlFor="mfEvBuildingName" className="block text-sm font-medium text-gray-700 mb-2">
-                  Building Name (Optional)
-                </label>
-                <input
-                  id="mfEvBuildingName"
-                  type="text"
-                  value={mfEvBuildingName}
-                  onChange={(e) => setMfEvBuildingName(e.target.value)}
-                  placeholder="e.g., Parkside Apartments"
-                  className="w-full border border-gray-200 rounded px-3 py-2 text-sm focus:border-[#2d3b2d] focus:ring-2 focus:ring-[#2d3b2d]/20/20 outline-none"
-                />
-              </div>
-              <div>
-                <label htmlFor="mfEvDwellingUnits" className="block text-sm font-medium text-gray-700 mb-2">
-                  Number of Dwelling Units
-                </label>
-                <input
-                  id="mfEvDwellingUnits"
-                  type="number"
-                  min="3"
-                  max="500"
-                  value={mfEvDwellingUnits}
-                  onChange={(e) => setMfEvDwellingUnits(parseInt(e.target.value) || 20)}
-                  className="w-full border border-gray-200 rounded px-3 py-2 text-sm focus:border-[#2d3b2d] focus:ring-2 focus:ring-[#2d3b2d]/20/20 outline-none"
-                />
-                <p className="text-xs text-gray-500 mt-1">Min 3 units for NEC 220.84</p>
-              </div>
+          ) : (
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 flex items-start gap-2">
+              <Info className="w-4 h-4 text-blue-700 flex-shrink-0 mt-0.5" />
+              <p className="text-sm text-blue-800">
+                Open the <strong>Multi-Family EV Calculator</strong> in the Tools Hub
+                to compute and save your analysis. Once saved, this section can
+                be included in the permit packet.
+              </p>
             </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label htmlFor="mfEvChargersPerUnit" className="block text-sm font-medium text-gray-700 mb-2">
-                  EV Chargers per Unit
-                </label>
-                <select
-                  id="mfEvChargersPerUnit"
-                  value={mfEvChargersPerUnit}
-                  onChange={(e) => setMfEvChargersPerUnit(parseInt(e.target.value))}
-                  className="w-full border border-gray-200 rounded px-3 py-2 text-sm focus:border-[#2d3b2d] focus:ring-2 focus:ring-[#2d3b2d]/20/20 outline-none"
-                >
-                  <option value="1">1 charger per unit</option>
-                  <option value="2">2 chargers per unit</option>
-                </select>
-              </div>
-              <div>
-                <label htmlFor="mfEvChargerLevel" className="block text-sm font-medium text-gray-700 mb-2">
-                  Charger Level
-                </label>
-                <select
-                  id="mfEvChargerLevel"
-                  value={mfEvChargerLevel}
-                  onChange={(e) => setMfEvChargerLevel(e.target.value as 'level1' | 'level2')}
-                  className="w-full border border-gray-200 rounded px-3 py-2 text-sm focus:border-[#2d3b2d] focus:ring-2 focus:ring-[#2d3b2d]/20/20 outline-none"
-                >
-                  <option value="level2">Level 2 (40A, 240V) - Recommended</option>
-                  <option value="level1">Level 1 (12A, 120V)</option>
-                </select>
-              </div>
-            </div>
-
-            {/* Preview of calculation impact */}
-            <div className="bg-gray-50 rounded-lg p-3">
-              <p className="text-sm font-medium text-gray-700 mb-2">Estimated Impact Preview:</p>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
-                <div>
-                  <p className="text-gray-500">Total Chargers</p>
-                  <p className="font-semibold">{mfEvDwellingUnits * mfEvChargersPerUnit}</p>
-                </div>
-                <div>
-                  <p className="text-gray-500">Connected Load</p>
-                  <p className="font-semibold">
-                    {((mfEvDwellingUnits * mfEvChargersPerUnit * (mfEvChargerLevel === 'level2' ? 40 : 12) * (mfEvChargerLevel === 'level2' ? 240 : 120)) / 1000).toFixed(1)} kW
-                  </p>
-                </div>
-                <div>
-                  <p className="text-gray-500">Demand Factor</p>
-                  <p className="font-semibold">
-                    {mfEvDwellingUnits <= 10 ? '100%' : mfEvDwellingUnits <= 25 ? '70%' : mfEvDwellingUnits <= 50 ? '50%' : '35%'}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-gray-500">NEC Reference</p>
-                  <p className="font-semibold">220.57</p>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-      </div>
+          )}
+        </div>
+      )}
 
       {/* Sprint 2A H14: NEC 220.87 Existing-Service Narrative inputs */}
       <div className="bg-white border border-gray-200 rounded-lg p-6 space-y-4">

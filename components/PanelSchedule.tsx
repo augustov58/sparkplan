@@ -649,6 +649,14 @@ export const PanelSchedule: React.FC<PanelScheduleProps> = ({ project }) => {
         pole: pole,
         load_type: newCircuit.loadType || 'O',
         conductor_size: newCircuit.conductorSize || '12 AWG',
+        // Sprint 2C M3 (2026-05-17): in existing-construction mode, manually
+        // added circuits represent *new* additions to an existing system, so
+        // they default to is_proposed=true (which renders as "NEW" on the
+        // PanelSchedule + emits the "*" marker on the packet panel-schedule
+        // sheet). For new-construction projects, is_proposed is irrelevant
+        // (the EXIST/NEW badges are hidden entirely) and we omit the field
+        // so the DB default of false flows through.
+        ...(isExistingConstruction ? { is_proposed: true } : {}),
       });
 
       // Reset form only if successful

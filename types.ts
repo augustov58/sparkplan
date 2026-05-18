@@ -328,6 +328,25 @@ export interface ProjectSettings {
   dwelling_calc_mode?: 'per-category' | 'true-optional';
   scope_flags?: ProjectScopeFlags;
   estimated_value_usd?: number;
+
+  /**
+   * Sprint 2C M3 (2026-05-17): NEC 220.87 existing-service narrative inputs
+   * persisted from the Permit Packet Generator. Survives reloads so users
+   * don't re-enter the source citation / max demand fields every time.
+   * Shape mirrors `NEC22087NarrativeData` in PermitPacketDocuments.tsx but
+   * stored as strings (raw form values) to avoid coupling types.ts to the
+   * pdfExport layer. The packet generator parses these into the final
+   * narrative shape at submit time.
+   */
+  nec22087Narrative?: {
+    include?: boolean;
+    method?: 'utility_bill' | 'load_study' | 'calculated' | 'manual';
+    dataSourceCitation?: string;
+    dateRangeFrom?: string;
+    dateRangeTo?: string;
+    maxDemandKVA?: string;
+    proposedNewLoadKVA?: string;
+  };
 }
 
 /**

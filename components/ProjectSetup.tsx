@@ -289,13 +289,26 @@ export const ProjectSetup: React.FC<ProjectSetupProps> = ({ project, updateProje
               >
                 <option value="new-service">New Construction</option>
                 <option value="existing">Existing Construction</option>
+                <option value="service-upgrade">Service Upgrade (NEC 220.87)</option>
               </select>
               <p className="text-xs text-[#888] mt-1">
-                {isResidential
-                  ? (localProject.settings.service_modification_type === 'new-service'
-                      ? 'Dwelling loads calculated per NEC 220.82 (Optional, New Dwelling).'
-                      : 'Dwelling loads calculated per NEC 220.83 (Optional, Existing Dwelling Adding Loads).')
-                  : 'Used by the permit packet to emit new-vs-existing narratives. Check the "Service upgrade" scope element below if this is an upsize.'}
+                {(() => {
+                  const status = localProject.settings.service_modification_type ?? 'existing';
+                  // Sprint 2C M3 (2026-05-17): help text branches on building
+                  // type so commercial / multi-family projects see narratives
+                  // that match their workflow (220.83 only applies to
+                  // single-family dwellings; multi-family uses 220.84;
+                  // commercial uses 220.87 for existing services).
+                  if (isResidential) {
+                    if (status === 'new-service') return 'Dwelling loads calculated per NEC 220.82 (Optional, New Dwelling).';
+                    if (status === 'service-upgrade') return 'Existing service + load addition — NEC 220.87 narrative required for AHJ.';
+                    return 'Dwelling loads calculated per NEC 220.83 (Optional, Existing Dwelling Adding Loads).';
+                  }
+                  // Commercial / industrial copy.
+                  if (status === 'new-service') return 'Commercial new construction — loads computed from occupancy + sq ft (NEC 220.12–220.18). No existing-service narrative needed.';
+                  if (status === 'service-upgrade') return 'Existing commercial service being upsized — NEC 220.87 narrative documents existing demand (Method 1 utility data, or Method 2 calculated from panel schedule).';
+                  return 'Existing commercial facility — circuits tagged "EXIST" remain; new circuits get the "NEW" badge. NEC 220.87 narrative shows existing service has capacity for the addition.';
+                })()}
               </p>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">

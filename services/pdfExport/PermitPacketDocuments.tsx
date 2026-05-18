@@ -2164,6 +2164,17 @@ export const NEC22087NarrativePage: React.FC<NEC22087NarrativePageProps> = ({
   const utilizationPct = capacityKVA > 0 ? (totalFutureDemand / capacityKVA) * 100 : 0;
   const isCompliant = totalFutureDemand <= capacityKVA;
 
+  // Inverse of serviceCapacityKVA — needed for the kVA→amps subscript on the
+  // existing/proposed/total cards. Contractors and AHJ reviewers reason in
+  // both units; showing only kVA on a 480V 3-phase commercial service forced
+  // them to do the √3 conversion in their head. 2026-05-17 user feedback.
+  const kVAToAmps = (kVA: number): number => {
+    const v = data.serviceVoltage || 240;
+    return data.servicePhase === 3
+      ? (kVA * 1000) / (v * Math.sqrt(3))
+      : (kVA * 1000) / v;
+  };
+
   return (
     <Page size="LETTER" style={themeStyles.page}>
       <BrandBar pageLabel="NEC 220.87 NARRATIVE" sheetId={sheetId} />
@@ -2193,7 +2204,7 @@ export const NEC22087NarrativePage: React.FC<NEC22087NarrativePageProps> = ({
             <Text style={themeStyles.summaryUnit}>kVA</Text>
           </Text>
           <Text style={themeStyles.summarySub}>
-            {isMeasured ? 'measured (no 125% mult.)' : 'calculated x 1.25'}
+            {`${Math.round(kVAToAmps(data.maxDemandKVA))} A • ${isMeasured ? 'measured (no 125% mult.)' : 'calculated x 1.25'}`}
           </Text>
         </View>
         <View style={themeStyles.summaryCard}>
@@ -2202,7 +2213,9 @@ export const NEC22087NarrativePage: React.FC<NEC22087NarrativePageProps> = ({
             {data.proposedNewLoadKVA.toFixed(1)}
             <Text style={themeStyles.summaryUnit}>kVA</Text>
           </Text>
-          <Text style={themeStyles.summarySub}>added to existing</Text>
+          <Text style={themeStyles.summarySub}>
+            {`${Math.round(kVAToAmps(data.proposedNewLoadKVA))} A • added to existing`}
+          </Text>
         </View>
         <View style={isCompliant ? themeStyles.summaryCardHighlight : themeStyles.summaryCard}>
           <Text style={themeStyles.summaryLabel}>Total Future Demand</Text>
@@ -2210,7 +2223,9 @@ export const NEC22087NarrativePage: React.FC<NEC22087NarrativePageProps> = ({
             {totalFutureDemand.toFixed(1)}
             <Text style={themeStyles.summaryUnit}>kVA</Text>
           </Text>
-          <Text style={themeStyles.summarySub}>{`${utilizationPct.toFixed(1)}% utilization`}</Text>
+          <Text style={themeStyles.summarySub}>
+            {`${Math.round(kVAToAmps(totalFutureDemand))} A • ${utilizationPct.toFixed(1)}% utilization`}
+          </Text>
         </View>
       </View>
 
@@ -2470,8 +2485,16 @@ export const AvailableFaultCurrentPage: React.FC<AvailableFaultCurrentPageProps>
         <View style={themeStyles.summaryCard}>
           <Text style={themeStyles.summaryLabel}>Min Required AIC</Text>
           <Text style={themeStyles.summaryValue}>
-            {requiredAIC ?? '—'}
-            <Text style={themeStyles.summaryUnit}>kA</Text>
+            {requiredAIC !== null && requiredAIC !== undefined
+              ? requiredAIC >= 1000
+                ? (requiredAIC / 1000).toFixed(2)
+                : Math.round(requiredAIC).toString()
+              : '—'}
+            <Text style={themeStyles.summaryUnit}>
+              {requiredAIC !== null && requiredAIC !== undefined && requiredAIC >= 1000
+                ? 'kA'
+                : 'A'}
+            </Text>
           </Text>
           <Text style={themeStyles.summarySub}>NEC 110.9 / 110.10</Text>
         </View>
@@ -2547,7 +2570,7 @@ export const AvailableFaultCurrentPage: React.FC<AvailableFaultCurrentPageProps>
           <View style={themeStyles.tableRowAlt}>
             <Text style={[themeStyles.td, { width: '50%', fontFamily: 'Helvetica-Bold' }]}>Minimum required AIC rating</Text>
             <Text style={[themeStyles.td, { width: '50%', fontFamily: 'Helvetica-Bold' }]}>
-              {requiredAIC !== null && requiredAIC !== undefined ? `${requiredAIC} kA` : '—'}
+              {fmtAmps(requiredAIC)}
             </Text>
           </View>
         </View>

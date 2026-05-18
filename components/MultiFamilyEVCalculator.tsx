@@ -279,6 +279,53 @@ export const MultiFamilyEVCalculator: React.FC<MultiFamilyEVCalculatorProps> = (
     return () => clearTimeout(timer);
   }, [evChargerCount, evChargerLevel, evAmpsPerCharger, useEVEMS, capacityReserveVA, existingServiceAmps, selectedScenario, voltage, phase]);
 
+  // Sprint 2C M3 (2026-05-17): persist the computed MF-EV result so the
+  // permit packet can include it without duplicating inputs. Source of
+  // truth lives here — what the user reviews on this page is what lands
+  // in the packet. Debounced 750ms (slightly slower than mfEvInputs
+  // persistence since result is larger and may include nested objects).
+  useEffect(() => {
+    if (!project || !updateProject || !result) return;
+    if (!evInputsRestoredRef.current && (project.settings?.residential as any)?.mfEvCalculation) return;
+
+    const stored = (project.settings?.residential as any)?.mfEvCalculation as
+      | { result?: MultiFamilyEVResult; buildingName?: string; computedAt?: string }
+      | undefined;
+    // Cheap structural check — if the result payload matches what's stored,
+    // skip the write. Compare on a small projection (building demand + EV
+    // demand + total system demand) rather than the full result JSON.
+    const projection = (r: MultiFamilyEVResult | undefined | null) => r ? [
+      r.buildingLoad?.buildingDemandVA,
+      r.evLoad?.demandVA,
+      r.serviceAnalysis?.totalDemandVA,
+      r.serviceAnalysis?.existingCapacityAmps,
+    ] : null;
+    if (
+      stored?.buildingName === (buildingName || undefined)
+      && JSON.stringify(projection(stored?.result)) === JSON.stringify(projection(result))
+    ) {
+      return;
+    }
+
+    const timer = setTimeout(() => {
+      updateProject({
+        ...project,
+        settings: {
+          ...project.settings,
+          residential: {
+            ...project.settings?.residential,
+            mfEvCalculation: {
+              result,
+              buildingName: buildingName || undefined,
+              computedAt: new Date().toISOString(),
+            },
+          } as any,
+        },
+      });
+    }, 750);
+    return () => clearTimeout(timer);
+  }, [result, buildingName]);
+
   // Calculate results
   const result = useMemo<MultiFamilyEVResult | null>(() => {
     try {
