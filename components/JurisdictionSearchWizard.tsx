@@ -22,11 +22,12 @@
 
 import React, { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
-import { MapPin, CheckCircle, Calculator, AlertCircle, FileText, X } from 'lucide-react';
+import { MapPin, CheckCircle, Calculator, AlertCircle, FileText, X, Info } from 'lucide-react';
 import { useProjects } from '../hooks/useProjects';
 import { useJurisdictions } from '../hooks/useJurisdictions';
 import type { Jurisdiction } from '../types';
 import { DOCUMENT_LABELS, CALCULATION_LABELS } from '../types';
+import { findManifestForJurisdiction } from '../data/ahj/registry';
 
 interface JurisdictionSearchWizardProps {
   projectId?: string;
@@ -254,7 +255,21 @@ export const JurisdictionSearchWizard: React.FC<JurisdictionSearchWizardProps> =
           {/* RIGHT COLUMN: Requirements Display */}
           <div className="space-y-4">
             {selectedJurisdiction ? (
-              <>
+              (() => {
+                // Sprint 2C M3 (2026-05-18): when a Sprint 2C manifest exists
+                // for this jurisdiction, the manifest engine drives the
+                // lane-aware Configure Sections grid + the E-502 checklist
+                // below. The legacy required_documents / required_calculations
+                // arrays are lane-unaware and would contradict the manifest
+                // for residential trade-permit projects. Suppress the legacy
+                // preview and point users to Configure Sections instead.
+                const manifestForJurisdiction = findManifestForJurisdiction(
+                  selectedJurisdiction.jurisdiction_name,
+                  selectedJurisdiction.ahj_name,
+                );
+                const hasManifest = !!manifestForJurisdiction;
+                return (
+                  <>
                 {/* Jurisdiction Header */}
                 <div className="bg-[#f0f5f0] border border-[#2d3b2d]/30 rounded-lg p-4">
                   <h4 className="font-bold text-[#111711] flex items-center gap-2">
@@ -277,7 +292,24 @@ export const JurisdictionSearchWizard: React.FC<JurisdictionSearchWizardProps> =
                   </div>
                 </div>
 
-                {/* Required Documents Checklist */}
+                {hasManifest && (
+                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                    <div className="flex items-start gap-2">
+                      <Info className="w-4 h-4 text-blue-600 mt-0.5 flex-shrink-0" />
+                      <div className="text-sm text-blue-900">
+                        <span className="font-semibold">Project-specific requirements available.</span>{' '}
+                        SparkPlan has a lane-aware manifest for this AHJ. See{' '}
+                        <span className="font-medium">Configure Sections</span> below
+                        for the exact list of pages and uploads that apply to
+                        <em> this project's</em> building type and permitting lane.
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Required Documents Checklist — suppressed when a manifest
+                    drives the lane-aware Configure Sections grid below. */}
+                {!hasManifest && (
                 <div className="space-y-2">
                   <h5 className="font-semibold text-gray-900 flex items-center gap-2">
                     <FileText className="w-4 h-4 text-green-600" />
@@ -298,8 +330,11 @@ export const JurisdictionSearchWizard: React.FC<JurisdictionSearchWizardProps> =
                     ))}
                   </div>
                 </div>
+                )}
 
-                {/* Required Calculations Checklist */}
+                {/* Required Calculations Checklist — also suppressed when a
+                    manifest is active, for the same reason as Documents above. */}
+                {!hasManifest && (
                 <div className="space-y-2">
                   <h5 className="font-semibold text-gray-900 flex items-center gap-2">
                     <Calculator className="w-4 h-4 text-[#2d3b2d]" />
@@ -320,6 +355,7 @@ export const JurisdictionSearchWizard: React.FC<JurisdictionSearchWizardProps> =
                     ))}
                   </div>
                 </div>
+                )}
 
                 {/* Special Notes */}
                 {selectedJurisdiction.notes && (
@@ -376,7 +412,9 @@ export const JurisdictionSearchWizard: React.FC<JurisdictionSearchWizardProps> =
                     </a>
                   </div>
                 )}
-              </>
+                  </>
+                );
+              })()
             ) : (
               <div className="text-center py-12 text-gray-500">
                 <MapPin className="w-12 h-12 mx-auto mb-2 opacity-20" />
