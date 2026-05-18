@@ -134,13 +134,13 @@ const SECTION_TOGGLE_CONFIG: SectionToggleConfig[] = [
   {
     key: 'nec22087Narrative',
     label: 'NEC 220.87 Existing-Service Narrative',
-    description: 'Required by Orlando existing-service path: 3-condition checklist + cited data source',
+    description: 'Existing-service-capacity proof: 3-condition checklist + cited data source. Required by most AHJs.',
     group: 'Engineering',
   },
   {
     key: 'availableFaultCurrent',
     label: 'Available Fault Current Calculation',
-    description: 'Service-main fault current (IEEE 141) — required by Orlando new-service path',
+    description: 'Service-main fault current (IEEE 141 / NEC 110.9, 110.10). Commonly required on new-service permits.',
     group: 'Engineering',
   },
   {
@@ -300,6 +300,56 @@ export const PermitPacketGenerator: React.FC<PermitPacketGeneratorProps> = ({ pr
       | undefined;
     setSectionPrefs(stored ?? {});
   }, [currentProject?.id, currentProject?.settings?.sectionPreferences]);
+
+  // Sprint 2C M3 follow-on (2026-05-17): hydrate the per-project permit-
+  // packet form defaults (preparedBy, contractor license, scope, etc.) on
+  // mount so the user doesn't re-enter them on every visit. Profile-based
+  // auto-fill at the useEffects above still works for users who haven't
+  // explicitly saved an override — stored values take precedence because
+  // they fire later and set `!preparedBy` to false.
+  const packetDefaultsHydratedRef = React.useRef(false);
+  useEffect(() => {
+    const stored = currentProject?.settings?.permitPacketDefaults;
+    if (!stored) {
+      packetDefaultsHydratedRef.current = true;
+      return;
+    }
+    if (stored.preparedBy != null) setPreparedBy(stored.preparedBy);
+    if (stored.permitNumber != null) setPermitNumber(stored.permitNumber);
+    if (stored.contractorLicense != null) setContractorLicense(stored.contractorLicense);
+    if (stored.scopeOfWork != null) setScopeOfWork(stored.scopeOfWork);
+    if (stored.serviceType) setServiceType(stored.serviceType);
+    if (stored.meterLocation != null) setMeterLocation(stored.meterLocation);
+    if (stored.serviceConductorRouting != null) setServiceConductorRouting(stored.serviceConductorRouting);
+    packetDefaultsHydratedRef.current = true;
+  }, [currentProject?.id]);
+
+  // Debounced persist back. 750ms — enough to coalesce typing bursts but
+  // fast enough that the user sees their last edit survive a quick reload.
+  useEffect(() => {
+    if (!currentProject || !packetDefaultsHydratedRef.current) return;
+    const next = {
+      preparedBy,
+      permitNumber,
+      contractorLicense,
+      scopeOfWork,
+      serviceType,
+      meterLocation,
+      serviceConductorRouting,
+    };
+    const stored = currentProject.settings?.permitPacketDefaults;
+    if (JSON.stringify(next) === JSON.stringify(stored ?? {})) return;
+    const timer = setTimeout(() => {
+      updateProject({
+        ...currentProject,
+        settings: {
+          ...currentProject.settings,
+          permitPacketDefaults: next,
+        },
+      });
+    }, 750);
+    return () => clearTimeout(timer);
+  }, [preparedBy, permitNumber, contractorLicense, scopeOfWork, serviceType, meterLocation, serviceConductorRouting]);
 
   // Sprint 2C M3 (2026-05-17): hydrate NEC 220.87 narrative inputs from
   // project settings on project load so they survive a reload. Skipped if
@@ -491,23 +541,33 @@ export const PermitPacketGenerator: React.FC<PermitPacketGeneratorProps> = ({ pr
     : resolveSections(sectionPrefs);
 
   /**
-   * Sprint 2B PR-4: AttachmentUploadCard slot visibility. When a manifest
-   * is active, hide slots the manifest+overrides resolve to OFF. When no
-   * manifest is active, show ALL slots (Sprint 2A backward compat — the
-   * UI used to show every slot unconditionally).
+   * Sprint 2B PR-4 + 2C M3 follow-on (2026-05-17): AttachmentUploadCard slot
+   * visibility. The artifact section is COLLAPSED by default whether or not
+   * a manifest is active — users opt-in to specific slots via the toggle
+   * grid above. Previously, no-manifest meant "show every slot
+   * unconditionally", which crowded the page (8 cards rendered even on
+   * projects that only needed a site plan).
    *
-   * Note: the slot HTML is still rendered in the DOM for the active set;
-   * inactive slots are conditionally skipped. This avoids the case where
-   * the user can't see a slot they need but the manifest didn't list it,
-   * because the user-override layer can still toggle artifact_type ON via
-   * a future UI (not implemented in PR-4 — for now contractors who need
-   * an off-by-manifest artifact toggle it on by adding `section_overrides.
-   * artifactTypes.{key}: true` directly, or via the Sprint 2C M1
-   * manifest-aware UI when it ships).
+   * Resolution chain:
+   *   - manifest active → manifest defaults + user overrides
+   *   - no manifest    → user overrides only, all-false default
    */
+  const artifactVisibility: Record<ArtifactTypeKey, boolean> = (() => {
+    if (manifestVisibility) return manifestVisibility.artifactTypes;
+    // No manifest — synthesize an all-false base and overlay user overrides.
+    const base = ALL_ARTIFACT_TYPE_KEYS.reduce(
+      (acc, k) => { acc[k] = false; return acc; },
+      {} as Record<ArtifactTypeKey, boolean>,
+    );
+    const overrides = (userOverrides?.artifactTypes ?? {}) as Record<string, boolean>;
+    for (const k of ALL_ARTIFACT_TYPE_KEYS) {
+      if (overrides[k] === true) base[k] = true;
+    }
+    return base;
+  })();
+
   const shouldShowArtifactSlot = (key: ArtifactType): boolean => {
-    if (!manifestVisibility) return true;
-    return manifestVisibility.artifactTypes[key] === true;
+    return artifactVisibility[key] === true;
   };
 
   // Auto-disable predicate: returns a reason string when the toggle should
@@ -1208,18 +1268,17 @@ export const PermitPacketGenerator: React.FC<PermitPacketGeneratorProps> = ({ pr
           </div>
         </div>
 
-        {/* Gap 2 (2026-05-16): per-slot toggle grid. When an AHJ manifest is
-            active, this lets contractors turn off-by-default artifact slots
-            ON (e.g., enabling 'survey' when reusing Orlando's manifest in a
-            jurisdiction that does require a separate survey). When no
-            manifest is active, every slot is shown unconditionally
-            (matching pre-Gap-2 behavior) and the grid is suppressed. */}
-        {manifestVisibility && (
-          <ArtifactSlotToggleGrid
-            visibility={manifestVisibility.artifactTypes}
-            onToggle={handleToggleArtifactSlot}
-          />
-        )}
+        {/* Gap 2 + Sprint 2C M3 follow-on (2026-05-17): per-slot toggle grid
+            always rendered. Without an AHJ manifest, every slot defaults
+            off and the contractor opts in via this grid. With a manifest
+            active, defaults come from the manifest + user overrides on top.
+            Matches the section-toggle grid pattern below. */}
+        <ArtifactSlotToggleGrid
+          visibility={artifactVisibility}
+          onToggle={handleToggleArtifactSlot}
+          hasActiveManifest={!!manifestVisibility}
+        />
+
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {shouldShowArtifactSlot('site_plan') && (
@@ -1227,7 +1286,7 @@ export const PermitPacketGenerator: React.FC<PermitPacketGeneratorProps> = ({ pr
               projectId={projectId}
               artifactType="site_plan"
               title="Site Plan / Survey"
-              description="Property layout, equipment locations, utility connections (required by all 5 FL AHJs)"
+              description="Property layout, equipment locations, utility connections (commonly required)"
             />
           )}
           {shouldShowArtifactSlot('cut_sheet') && (
@@ -1243,7 +1302,7 @@ export const PermitPacketGenerator: React.FC<PermitPacketGeneratorProps> = ({ pr
               projectId={projectId}
               artifactType="fire_stopping"
               title="Fire Stopping Schedule"
-              description="UL-listed firestop assemblies for rated-wall penetrations (Orlando intake)"
+              description="UL-listed firestop assemblies for rated-wall penetrations"
             />
           )}
           {shouldShowArtifactSlot('manufacturer_data') && (
@@ -1563,7 +1622,7 @@ export const PermitPacketGenerator: React.FC<PermitPacketGeneratorProps> = ({ pr
             <div>
               <h3 className="font-bold text-gray-900">NEC 220.87 Existing-Service Narrative</h3>
               <p className="text-sm text-gray-500">
-                Required by Orlando + most FL AHJs when claiming existing-service capacity for an EV upgrade.
+                Required by most AHJs when claiming existing-service capacity for an EV upgrade or load addition.
               </p>
             </div>
           </div>
@@ -1585,7 +1644,7 @@ export const PermitPacketGenerator: React.FC<PermitPacketGeneratorProps> = ({ pr
               <p className="text-sm text-blue-800">
                 <strong>What this generates:</strong> A signed sheet documenting the three NEC 220.87 conditions
                 (12-month max demand source, demand × 125% + new load ≤ ampacity, OCPD per 240.4 / overload per 230.90).
-                Without this, Orlando rejects existing-service EV submittals on intake.
+                Without this, most AHJs reject existing-service load-addition submittals on intake.
               </p>
             </div>
 
@@ -2022,19 +2081,27 @@ const AHJTemplateAndOverridesPanel: React.FC<AHJTemplateAndOverridesPanelProps> 
 interface ArtifactSlotToggleGridProps {
   visibility: Record<ArtifactTypeKey, boolean>;
   onToggle: (key: ArtifactTypeKey, next: boolean) => void;
+  /**
+   * Sprint 2C M3 follow-on (2026-05-17): whether an AHJ manifest is
+   * driving the defaults. Changes the descriptive copy below — with a
+   * manifest the defaults are AHJ-derived; without one the user is
+   * opting in to slots manually.
+   */
+  hasActiveManifest?: boolean;
 }
 
 /**
  * Per-artifact-type toggle grid (Gap 2, 2026-05-16). Mirrors the section
- * toggle grid pattern but for upload slots. Renders only when a manifest is
- * active (otherwise every slot is shown unconditionally — matching the
- * pre-Gap-2 fallback). Toggle writes through to
+ * toggle grid pattern but for upload slots. Always renders since
+ * Sprint 2C M3 — without a manifest the toggles all default to off and
+ * the user opts in. Toggle writes through to
  * `projects.settings.section_overrides.artifactTypes.{key}` which
  * `applyUserOverrides` already consumes.
  */
 const ArtifactSlotToggleGrid: React.FC<ArtifactSlotToggleGridProps> = ({
   visibility,
   onToggle,
+  hasActiveManifest = false,
 }) => {
   return (
     <div className="border border-gray-200 rounded-md p-3 bg-gray-50/50 space-y-2">
@@ -2043,9 +2110,9 @@ const ArtifactSlotToggleGrid: React.FC<ArtifactSlotToggleGridProps> = ({
           Upload slot visibility
         </p>
         <p className="text-xs text-gray-500 mt-1">
-          Toggle which upload slots are shown for this project. Default
-          state comes from the active AHJ manifest; toggles persist as
-          per-project overrides.
+          {hasActiveManifest
+            ? 'Defaults from the active AHJ manifest. Toggle to override.'
+            : 'No AHJ manifest selected — toggle slots on as needed. Selections persist per project.'}
         </p>
       </div>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-x-4 gap-y-1">
