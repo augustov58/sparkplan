@@ -193,6 +193,11 @@ interface CoverPageProps {
   // resolves the 3-tier chain (settings override → jurisdiction row → undefined).
   jurisdictionName?: string;
   authorityName?: string;
+  // Sprint 2C M5 fix-up (2026-05-20): project status surfaced on the cover.
+  // Renders a PROJECT STATUS cell so AHJ reviewers see at-a-glance whether
+  // this packet is for an existing facility (work on existing service) vs a
+  // new installation. Driven from project.settings.service_modification_type.
+  serviceModificationType?: 'existing' | 'service-upgrade' | 'new-service';
 }
 
 // FL pilot AHJs adopt NFPA-70 2020 via FBC 8th ed. NEC 220.84 demand-factor
@@ -223,6 +228,7 @@ export const CoverPage: React.FC<CoverPageProps> = ({
   permitMode,
   jurisdictionName,
   authorityName,
+  serviceModificationType,
 }) => (
   <Page size="LETTER" style={themeStyles.page}>
     <BrandBar pageLabel="PERMIT APPLICATION" sheetId={sheetId} />
@@ -271,6 +277,21 @@ export const CoverPage: React.FC<CoverPageProps> = ({
         <View style={themeStyles.projectCell}>
           <Text style={themeStyles.projectLabel}>Permit Number</Text>
           <Text style={themeStyles.projectValue}>{permitNumber}</Text>
+        </View>
+      )}
+      {/* Sprint 2C M5 fix-up: project status (existing / service-upgrade /
+          new) surfaced on the cover so AHJ reviewers see at-a-glance whether
+          this packet covers an existing facility or new construction. */}
+      {serviceModificationType && (
+        <View style={themeStyles.projectCell}>
+          <Text style={themeStyles.projectLabel}>Project Status</Text>
+          <Text style={themeStyles.projectValue}>
+            {serviceModificationType === 'existing'
+              ? 'Existing — Work on Existing Service'
+              : serviceModificationType === 'service-upgrade'
+              ? 'Existing — Service Upgrade'
+              : 'New Construction'}
+          </Text>
         </View>
       )}
       {/* Sprint 2C M4 fix-up: AHJ identity on the cover for at-a-glance
@@ -915,12 +936,25 @@ const buildPanelSubtree = (
     children: [],
   };
 
+  // Sprint 2C M5 fix-up (2026-05-20): the riser tree is built primarily
+  // from `feeders` records, but contractors often model panel hierarchy
+  // via the `fed_from_*` fields on panels/transformers WITHOUT creating
+  // explicit feeder rows. The in-app OneLineDiagram walks fed_from_*
+  // directly so it shows the full tree; this PDF builder was feeder-only
+  // and would silently drop branches with no feeder record. Now we walk
+  // feeders FIRST (so feeder labels — conductor sizes, VD %, kVA — keep
+  // appearing on the edges), then fill in any panel/transformer linked
+  // via fed_from_* that didn't already get rendered via a feeder.
+  const visitedPanelIds = new Set<string>();
+  const visitedTransformerIds = new Set<string>();
+
   const outgoing = feeders.filter(f => f.source_panel_id === panel.id);
   for (const feeder of outgoing) {
     const label = buildFeederLabel(feeder);
     if (feeder.destination_panel_id) {
       const dest = panels.find(p => p.id === feeder.destination_panel_id);
       if (dest) {
+        visitedPanelIds.add(dest.id);
         node.children.push(
           buildPanelSubtree(dest, panels, transformers, feeders, label, cumulativeVd)
         );
@@ -928,6 +962,7 @@ const buildPanelSubtree = (
     } else if (feeder.destination_transformer_id) {
       const xfmr = transformers.find(t => t.id === feeder.destination_transformer_id);
       if (xfmr) {
+        visitedTransformerIds.add(xfmr.id);
         const xfmrNode: RiserNode = {
           id: xfmr.id,
           kind: 'transformer',
@@ -941,11 +976,51 @@ const buildPanelSubtree = (
           p => p.fed_from_type === 'transformer' && p.fed_from_transformer_id === xfmr.id
         );
         for (const p of xfmrPanels) {
+          visitedPanelIds.add(p.id);
           xfmrNode.children.push(buildPanelSubtree(p, panels, transformers, feeders, undefined, cumulativeVd));
         }
         node.children.push(xfmrNode);
       }
     }
+  }
+
+  // Fallback pass: pick up panels/transformers linked via fed_from_* but
+  // missing a feeder record. The feederLabel is omitted (no feeder data to
+  // populate it) — the AHJ still sees the tree structure, just without the
+  // conductor / VD annotation on that edge.
+  const directPanelChildren = panels.filter(
+    p =>
+      p.fed_from_type === 'panel' &&
+      p.fed_from === panel.id &&
+      !visitedPanelIds.has(p.id)
+  );
+  for (const dest of directPanelChildren) {
+    node.children.push(
+      buildPanelSubtree(dest, panels, transformers, feeders, undefined, cumulativeVd)
+    );
+  }
+
+  const childTransformers = transformers.filter(
+    t => t.fed_from_panel_id === panel.id && !visitedTransformerIds.has(t.id)
+  );
+  for (const xfmr of childTransformers) {
+    const xfmrNode: RiserNode = {
+      id: xfmr.id,
+      kind: 'transformer',
+      line1: xfmr.name,
+      line2: `${xfmr.kva_rating} kVA`,
+      line3: `${xfmr.primary_voltage}V -> ${xfmr.secondary_voltage}V`,
+      children: [],
+    };
+    const xfmrPanels = panels.filter(
+      p => p.fed_from_type === 'transformer' && p.fed_from_transformer_id === xfmr.id
+    );
+    for (const p of xfmrPanels) {
+      xfmrNode.children.push(
+        buildPanelSubtree(p, panels, transformers, feeders, undefined, cumulativeVd)
+      );
+    }
+    node.children.push(xfmrNode);
   }
 
   return node;
