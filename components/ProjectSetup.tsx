@@ -538,7 +538,7 @@ export const ProjectSetup: React.FC<ProjectSetupProps> = ({ project, updateProje
 
           <div className="mt-6 pt-6 border-t border-[#f0eeeb]">
             <h4 className="text-sm font-medium text-[#1a1a1a] mb-3">Scope Elements</h4>
-            <p className="text-xs text-[#888] mb-4">Check any element that applies. Used by the AHJ override engine in Sprint 2C to flag jurisdictions that require PE seal regardless of value/ampacity.</p>
+            <p className="text-xs text-[#888] mb-4">Check any element that applies. Used by the AHJ override engine to flag jurisdictions that require PE seal regardless of value/ampacity.</p>
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
               {([
                 { key: 'service_upgrade', label: 'Service upgrade' },

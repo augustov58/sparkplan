@@ -1496,7 +1496,7 @@ const RiserPageBody: React.FC<RiserPageBodyProps> = ({
         {`MLO = Main Lug Only (no main breaker) \u2022 AIC = Available Interrupting Current`}
       </Text>
       <Text style={{ fontSize: 8 }}>
-        Feeder labels show conductor size + design load in kVA. Per-node AIC ratings per Orlando one-line item #4 (NEC 110.9 / 110.10).
+        Feeder labels show conductor size + design load in kVA. Per-node AIC ratings shown for compliance with NEC 110.9 / 110.10.
       </Text>
 
       <BrandFooter

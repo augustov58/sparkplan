@@ -460,10 +460,11 @@ export const JurisdictionAndAHJPanel: React.FC<JurisdictionAndAHJPanelProps> = (
                       No SparkPlan manifest for this AHJ yet.
                     </span>{' '}
                     Pick a similar AHJ's defaults below, or proceed with the
-                    generic Sprint 2A baseline (sheet ID{' '}
+                    generic SparkPlan defaults (sheet ID{' '}
                     <code className="bg-amber-100 px-1 rounded text-xs">E-</code>,
-                    generic codes, all sections default ON — toggle off what
-                    you don't need in Configure Sections below).
+                    standard NEC + FBC code references, all sections default
+                    ON — toggle off what you don't need in Configure Sections
+                    below).
                   </div>
                 </div>
               )}
@@ -537,7 +538,7 @@ export const JurisdictionAndAHJPanel: React.FC<JurisdictionAndAHJPanelProps> = (
                       <option value="">
                         {hasAutoBoundManifest
                           ? `Auto-detected from jurisdiction (${wizardAutoBoundManifest!.name})`
-                          : 'None — use Sprint 2A generic defaults'}
+                          : 'None — use SparkPlan generic defaults'}
                       </option>
                       {ALL_MANIFESTS.map((m) => (
                         <option key={m.id} value={m.id}>
@@ -757,7 +758,7 @@ export const JurisdictionAndAHJPanel: React.FC<JurisdictionAndAHJPanelProps> = (
       {!loading && !selectedJurisdiction && !hasTemplateManifest && !hasOverrides && (
         <div className="text-center py-4 text-gray-500 text-xs flex items-center justify-center gap-2 border-t border-gray-100">
           <CheckCircle className="w-3 h-3 opacity-30" />
-          No jurisdiction selected — packet will use Sprint 2A generic defaults
+          No jurisdiction selected — packet will use SparkPlan generic defaults
         </div>
       )}
     </div>
