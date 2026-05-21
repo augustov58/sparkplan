@@ -749,6 +749,11 @@ interface MultiPanelDocumentProps {
   contractorLicense?: string;
   /** Mirrors PanelSchedulePDFProps.showExistingNewMarkers. */
   showExistingNewMarkers?: boolean;
+  /** Mirrors PanelSchedulePDFProps.buildingType — gates single-family-MDP
+   *  dwelling-demand detection so commercial / multi-family aggregate MDPs
+   *  with dwelling-shape circuit names (Kitchen Hood, Common Laundry) don't
+   *  false-positive into the NEC 220.82/.83 display branch. */
+  buildingType?: 'single_family_residential' | 'multi_family' | 'commercial';
 }
 
 export const MultiPanelDocument: React.FC<MultiPanelDocumentProps> = ({
@@ -759,6 +764,7 @@ export const MultiPanelDocument: React.FC<MultiPanelDocumentProps> = ({
   contractorName,
   contractorLicense,
   showExistingNewMarkers = false,
+  buildingType,
 }) => (
   <Document>
     {panels.map((panel) => {
