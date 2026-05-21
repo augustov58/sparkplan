@@ -266,6 +266,16 @@ interface PanelSchedulePDFProps {
    * packets stay visually unchanged.
    */
   showExistingNewMarkers?: boolean;
+  /**
+   * Sprint 2C M6 fix-up #4 (2026-05-21): building type gates the single-family-MDP
+   * dwelling-demand display so commercial restaurants with "Kitchen Hood" /
+   * "Range" circuits don't false-positive as dwellings, and multi-family MDPs
+   * with "Common Laundry" feeders don't apply per-unit NEC 220.82/.83 instead
+   * of building-level NEC 220.84. Only 'single_family_residential' projects
+   * enter the single-family-MDP detection path. Multi-family UNIT panels
+   * still activate via isDwellingUnitPanel (which doesn't require this gate).
+   */
+  buildingType?: 'single_family_residential' | 'multi_family' | 'commercial';
 }
 
 // Main PDF Component for single panel — page-level fragment for embedding.
@@ -279,6 +289,7 @@ export const PanelSchedulePages: React.FC<PanelSchedulePDFProps> = ({
   contractorLicense,
   sheetId,
   showExistingNewMarkers = false,
+  buildingType,
 }) => {
   // Helper: append " *" to a description when (a) markers are enabled AND
   // (b) the circuit is flagged as a proposed new addition. Returns the raw
@@ -342,7 +353,21 @@ export const PanelSchedulePages: React.FC<PanelSchedulePDFProps> = ({
     );
   });
   const isUnitPanel = isDwellingUnitPanel(panel.name, dwellingCircuitsForCalc);
-  const isSingleFamilyMDP = panel.is_main === true && hasDwellingShape;
+  // Gate single-family MDP detection on buildingType === 'single_family_residential'.
+  // - Multi-family aggregate MDPs (buildingType === 'multi_family') stay
+  //   on the non-dwelling display because they use NEC 220.84 (table demand
+  //   factors by unit count), not per-unit 220.82/.83.
+  // - Commercial buildings (buildingType === 'commercial') don't use the
+  //   dwelling method at all, even if they have "Kitchen Hood" circuits.
+  // - Multi-family UNIT panels still activate via isUnitPanel (which
+  //   doesn't depend on buildingType — it matches by panel name pattern).
+  // - Legacy callers (buildingType=undefined) default to single-family
+  //   behavior to preserve the dwelling display for projects that haven't
+  //   set buildingType yet; net effect for them matches Sprint 2C M5 behavior.
+  const isSingleFamilyContext =
+    buildingType === 'single_family_residential' || buildingType === undefined;
+  const isSingleFamilyMDP =
+    panel.is_main === true && hasDwellingShape && isSingleFamilyContext;
   const dwellingUnitDemand = (isUnitPanel || isSingleFamilyMDP)
     ? calculateDwellingUnitDemandVA(dwellingCircuitsForCalc)
     : null;
@@ -639,29 +664,17 @@ export const PanelSchedulePages: React.FC<PanelSchedulePDFProps> = ({
           )}
         </View>
 
-        {/* NEC 220.82 Dwelling Unit demand callout — shows the actual sized-for
-            demand on a per-unit panel so AHJ reviewers don't read raw connected
-            load (e.g. 36 kVA / 150 A) and assume the panel is over-capacity. */}
+        {/* Dwelling Demand Breakdown — companion to the Load Summary (NEC
+            Dwelling Demand) section above. Total Demand + Demand Amps are
+            shown in the Load Summary; this card shows ONLY the per-category
+            breakdown (general-loads bucket tiered per 220.42, HVAC at 100%
+            non-coincident per 220.60). Sprint 2C M6 fix-up #3 (2026-05-21):
+            removed the duplicate Total Demand + Demand Amps rows that
+            appeared identically in the Load Summary above. */}
         {dwellingUnitDemand && (
           <View style={styles.summarySection} wrap={false}>
-            <Text style={styles.summaryTitle}>Dwelling Unit Demand (NEC 220.82 Optional Method)</Text>
+            <Text style={styles.summaryTitle}>Dwelling Demand Breakdown (NEC 220.82/.83)</Text>
             <View style={styles.summaryGrid}>
-              <View style={styles.summaryItem}>
-                <Text style={styles.summaryLabel}>Total Demand</Text>
-                <Text style={styles.summaryValue}>
-                  {(dwellingUnitDemand.totalDemandVA / 1000).toFixed(1)} kVA
-                </Text>
-              </View>
-              <View style={styles.summaryItem}>
-                <Text style={styles.summaryLabel}>Demand Amps</Text>
-                <Text style={styles.summaryValue}>
-                  {(
-                    dwellingUnitDemand.totalDemandVA /
-                    (panel.voltage * (panel.phase === 3 ? Math.sqrt(3) : 1))
-                  ).toFixed(1)}
-                  A
-                </Text>
-              </View>
               <View style={styles.summaryItem}>
                 <Text style={styles.summaryLabel}>General @ Tiered</Text>
                 <Text style={styles.summaryValue}>
@@ -669,12 +682,15 @@ export const PanelSchedulePages: React.FC<PanelSchedulePDFProps> = ({
                 </Text>
               </View>
               <View style={styles.summaryItem}>
-                <Text style={styles.summaryLabel}>Climate @ 100%</Text>
+                <Text style={styles.summaryLabel}>Climate @ 100% (non-coincident)</Text>
                 <Text style={styles.summaryValue}>
                   {(dwellingUnitDemand.climateDemandVA / 1000).toFixed(1)} kVA
                 </Text>
               </View>
             </View>
+            <Text style={[styles.summaryLabel, { marginTop: 4, fontSize: 7, fontStyle: 'italic' }]}>
+              General-loads bucket tiered per NEC 220.42. Climate is the larger of heating/cooling per NEC 220.60 (non-coincident loads).
+            </Text>
           </View>
         )}
 
@@ -936,7 +952,10 @@ export const MultiPanelDocument: React.FC<MultiPanelDocumentProps> = ({
               );
             });
             const isUnitPanel2 = isDwellingUnitPanel(panel.name, dwellingCircuitsForCalc);
-            const isSingleFamilyMDP2 = panel.is_main === true && hasDwellingShape2;
+            const isSingleFamilyContext2 =
+              buildingType === 'single_family_residential' || buildingType === undefined;
+            const isSingleFamilyMDP2 =
+              panel.is_main === true && hasDwellingShape2 && isSingleFamilyContext2;
             const dwellingDemand = (isUnitPanel2 || isSingleFamilyMDP2)
               ? calculateDwellingUnitDemandVA(dwellingCircuitsForCalc)
               : null;
