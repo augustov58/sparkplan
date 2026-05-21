@@ -572,6 +572,7 @@ export const generatePermitPacket = async (data: PermitPacketData): Promise<void
         permitMode={data.permitMode}
         jurisdictionName={data.jurisdictionName}
         authorityName={data.authorityName}
+        serviceModificationType={data.serviceModificationType}
       />
     ),
   });
@@ -1676,6 +1677,7 @@ export const generateLightweightPermitPacket = async (data: PermitPacketData): P
           permitMode={data.permitMode}
           jurisdictionName={data.jurisdictionName}
           authorityName={data.authorityName}
+          serviceModificationType={data.serviceModificationType}
         />
         <EquipmentSchedule
           panels={data.panels}
