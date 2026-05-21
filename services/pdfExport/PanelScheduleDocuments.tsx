@@ -509,63 +509,109 @@ export const PanelSchedulePages: React.FC<PanelSchedulePDFProps> = ({
 
         {/* Phase Balancing Summary — wrap={false} keeps the entire card on
             one page; with the contractor block + sheet ID footer reducing
-            the content area, react-pdf otherwise splits this card mid-content. */}
+            the content area, react-pdf otherwise splits this card mid-content.
+
+            Sprint 2C M6 fix-up (2026-05-21): for DWELLING panels, NEC 220.82/
+            220.83 is the authoritative sizing method — the dwelling demand is
+            NOT the raw circuit sum (220.83 uses a 3 VA/sq ft baseline that
+            displaces lighting/SABC/laundry). Showing connected-line-amps for
+            a 240V split-phase dwelling panel would also be misleading because
+            NEC demand factors substantially reduce actual service current.
+
+            So we branch: dwelling panels show DEMAND values matching the
+            in-app Panel Summary + Dwelling Load Calculator. Non-dwelling
+            panels (commercial / industrial) keep the connected sum + per-leg
+            amperage display since those are the relevant questions for those
+            panel types. */}
         <View style={styles.summarySection} wrap={false}>
-          <Text style={styles.summaryTitle}>Load Summary & Phase Balance</Text>
-
-          <View style={styles.summaryGrid}>
-            <View style={styles.summaryItem}>
-              <Text style={styles.summaryLabel}>Total Circuits</Text>
-              <Text style={styles.summaryValue}>{sortedCircuits.length}</Text>
-            </View>
-
-            <View style={styles.summaryItem}>
-              <Text style={styles.summaryLabel}>Connected Load (sum)</Text>
-              <Text style={styles.summaryValue}>
-                {(totalVA / 1000).toFixed(1)} kVA
-              </Text>
-            </View>
-
-            {panel.phase === 3 ? (
-              <>
-                <View style={styles.summaryItem}>
-                  <Text style={styles.summaryLabel}>Phase A (connected)</Text>
-                  <Text style={styles.summaryValue}>
-                    {phaseA_Amps.toFixed(1)}A
-                  </Text>
-                </View>
-
-                <View style={styles.summaryItem}>
-                  <Text style={styles.summaryLabel}>Phase B (connected)</Text>
-                  <Text style={styles.summaryValue}>
-                    {phaseB_Amps.toFixed(1)}A
-                  </Text>
-                </View>
-
-                <View style={styles.summaryItem}>
-                  <Text style={styles.summaryLabel}>Phase C (connected)</Text>
-                  <Text style={styles.summaryValue}>
-                    {phaseC_Amps.toFixed(1)}A
-                  </Text>
-                </View>
-              </>
-            ) : (
-              <View style={styles.summaryItem}>
-                <Text style={styles.summaryLabel}>Connected Line Amps (per leg)</Text>
-                <Text style={styles.summaryValue}>
-                  {phaseA_Amps.toFixed(1)}A
-                </Text>
-              </View>
-            )}
-          </View>
-          {/* Sprint 2C M6 fix-up: distinguish connected sum (this section)
-              from demand-method values (Load Calculation Summary EL-101).
-              Connected line current exceeding the panel's main breaker
-              rating is normal for dwellings — NEC demand factors reduce
-              the actual demand the service must support. */}
-          <Text style={[styles.summaryLabel, { marginTop: 4, fontSize: 7, fontStyle: 'italic' }]}>
-            Connected load sums all circuits at nameplate; per-leg amps use line-to-neutral voltage. Service sizing uses NEC 220 demand-method values — see Load Calculation Summary.
+          <Text style={styles.summaryTitle}>
+            {dwellingUnitDemand
+              ? 'Load Summary (NEC Dwelling Demand)'
+              : 'Load Summary & Phase Balance'}
           </Text>
+
+          {dwellingUnitDemand ? (
+            <>
+              <View style={styles.summaryGrid}>
+                <View style={styles.summaryItem}>
+                  <Text style={styles.summaryLabel}>Total Circuits</Text>
+                  <Text style={styles.summaryValue}>{sortedCircuits.length}</Text>
+                </View>
+
+                <View style={styles.summaryItem}>
+                  <Text style={styles.summaryLabel}>Demand Load</Text>
+                  <Text style={styles.summaryValue}>
+                    {(dwellingUnitDemand.totalDemandVA / 1000).toFixed(1)} kVA
+                  </Text>
+                </View>
+
+                <View style={styles.summaryItem}>
+                  <Text style={styles.summaryLabel}>Demand Amps</Text>
+                  <Text style={styles.summaryValue}>
+                    {(
+                      dwellingUnitDemand.totalDemandVA /
+                      (panel.voltage * (panel.phase === 3 ? Math.sqrt(3) : 1))
+                    ).toFixed(1)}
+                    A
+                  </Text>
+                </View>
+              </View>
+              <Text style={[styles.summaryLabel, { marginTop: 4, fontSize: 7, fontStyle: 'italic' }]}>
+                NEC 220.82/.83 dwelling demand — matches the Dwelling Load Calculator and the Load Calculation Summary. Per-phase connected breakdown shown in the schedule above for balance verification only; NEC dwelling demand is NOT the sum of circuit nameplate loads.
+              </Text>
+            </>
+          ) : (
+            <>
+              <View style={styles.summaryGrid}>
+                <View style={styles.summaryItem}>
+                  <Text style={styles.summaryLabel}>Total Circuits</Text>
+                  <Text style={styles.summaryValue}>{sortedCircuits.length}</Text>
+                </View>
+
+                <View style={styles.summaryItem}>
+                  <Text style={styles.summaryLabel}>Connected Load (sum)</Text>
+                  <Text style={styles.summaryValue}>
+                    {(totalVA / 1000).toFixed(1)} kVA
+                  </Text>
+                </View>
+
+                {panel.phase === 3 ? (
+                  <>
+                    <View style={styles.summaryItem}>
+                      <Text style={styles.summaryLabel}>Phase A (connected)</Text>
+                      <Text style={styles.summaryValue}>
+                        {phaseA_Amps.toFixed(1)}A
+                      </Text>
+                    </View>
+
+                    <View style={styles.summaryItem}>
+                      <Text style={styles.summaryLabel}>Phase B (connected)</Text>
+                      <Text style={styles.summaryValue}>
+                        {phaseB_Amps.toFixed(1)}A
+                      </Text>
+                    </View>
+
+                    <View style={styles.summaryItem}>
+                      <Text style={styles.summaryLabel}>Phase C (connected)</Text>
+                      <Text style={styles.summaryValue}>
+                        {phaseC_Amps.toFixed(1)}A
+                      </Text>
+                    </View>
+                  </>
+                ) : (
+                  <View style={styles.summaryItem}>
+                    <Text style={styles.summaryLabel}>Connected Line Amps (per leg)</Text>
+                    <Text style={styles.summaryValue}>
+                      {phaseA_Amps.toFixed(1)}A
+                    </Text>
+                  </View>
+                )}
+              </View>
+              <Text style={[styles.summaryLabel, { marginTop: 4, fontSize: 7, fontStyle: 'italic' }]}>
+                Connected load sums all circuits at nameplate; per-leg amps use line-to-neutral voltage. Service sizing uses NEC 220 demand-method values — see Load Calculation Summary.
+              </Text>
+            </>
+          )}
         </View>
 
         {/* NEC 220.82 Dwelling Unit demand callout — shows the actual sized-for
@@ -830,69 +876,110 @@ export const MultiPanelDocument: React.FC<MultiPanelDocumentProps> = ({
             )}
           </View>
 
-          {/* Phase Balancing Summary */}
+          {/* Phase Balancing Summary — see sibling implementation in the
+              standalone-page block above for the dwelling-vs-non-dwelling
+              branch rationale. */}
           {(() => {
             const phaseBalancing = calculatePhaseBalancing(circuits, panel.phase);
             const totalVA =
               phaseBalancing.phaseA_VA +
               phaseBalancing.phaseB_VA +
               phaseBalancing.phaseC_VA;
-            // Sprint 2C M6 fix-up (2026-05-21): per-leg current uses L-N
-            // voltage. See sibling fix in the standalone-page block above.
             const vLN = lineToNeutralVoltage(panel.voltage, panel.phase);
             const phaseA_Amps = phaseBalancing.phaseA_VA / vLN;
             const phaseB_Amps = phaseBalancing.phaseB_VA / vLN;
             const phaseC_Amps = phaseBalancing.phaseC_VA / vLN;
 
+            // Dwelling-panel demand re-uses the same calc helpers used by
+            // the standalone-page block above so both render paths show
+            // identical numbers for the same panel.
+            const dwellingCircuitsForCalc = circuits.map(c => ({
+              description: c.description,
+              loadWatts: c.load_watts || 0,
+            }));
+            const isDwelling = isDwellingUnitPanel(panel.name, dwellingCircuitsForCalc);
+            const dwellingDemand = isDwelling
+              ? calculateDwellingUnitDemandVA(dwellingCircuitsForCalc)
+              : null;
+
             return (
               <View style={styles.summarySection}>
-                <Text style={styles.summaryTitle}>Load Summary & Phase Balance</Text>
+                <Text style={styles.summaryTitle}>
+                  {dwellingDemand
+                    ? 'Load Summary (NEC Dwelling Demand)'
+                    : 'Load Summary & Phase Balance'}
+                </Text>
 
-                <View style={styles.summaryGrid}>
-                  <View style={styles.summaryItem}>
-                    <Text style={styles.summaryLabel}>Total Circuits</Text>
-                    <Text style={styles.summaryValue}>{circuits.length}</Text>
+                {dwellingDemand ? (
+                  <View style={styles.summaryGrid}>
+                    <View style={styles.summaryItem}>
+                      <Text style={styles.summaryLabel}>Total Circuits</Text>
+                      <Text style={styles.summaryValue}>{circuits.length}</Text>
+                    </View>
+                    <View style={styles.summaryItem}>
+                      <Text style={styles.summaryLabel}>Demand Load</Text>
+                      <Text style={styles.summaryValue}>
+                        {(dwellingDemand.totalDemandVA / 1000).toFixed(1)} kVA
+                      </Text>
+                    </View>
+                    <View style={styles.summaryItem}>
+                      <Text style={styles.summaryLabel}>Demand Amps</Text>
+                      <Text style={styles.summaryValue}>
+                        {(
+                          dwellingDemand.totalDemandVA /
+                          (panel.voltage * (panel.phase === 3 ? Math.sqrt(3) : 1))
+                        ).toFixed(1)}
+                        A
+                      </Text>
+                    </View>
                   </View>
+                ) : (
+                  <View style={styles.summaryGrid}>
+                    <View style={styles.summaryItem}>
+                      <Text style={styles.summaryLabel}>Total Circuits</Text>
+                      <Text style={styles.summaryValue}>{circuits.length}</Text>
+                    </View>
 
-                  <View style={styles.summaryItem}>
-                    <Text style={styles.summaryLabel}>Connected Load (sum)</Text>
-                    <Text style={styles.summaryValue}>
-                      {(totalVA / 1000).toFixed(1)} kVA
-                    </Text>
-                  </View>
+                    <View style={styles.summaryItem}>
+                      <Text style={styles.summaryLabel}>Connected Load (sum)</Text>
+                      <Text style={styles.summaryValue}>
+                        {(totalVA / 1000).toFixed(1)} kVA
+                      </Text>
+                    </View>
 
-                  {panel.phase === 3 ? (
-                    <>
+                    {panel.phase === 3 ? (
+                      <>
+                        <View style={styles.summaryItem}>
+                          <Text style={styles.summaryLabel}>Phase A (connected)</Text>
+                          <Text style={styles.summaryValue}>
+                            {phaseA_Amps.toFixed(1)}A
+                          </Text>
+                        </View>
+
+                        <View style={styles.summaryItem}>
+                          <Text style={styles.summaryLabel}>Phase B (connected)</Text>
+                          <Text style={styles.summaryValue}>
+                            {phaseB_Amps.toFixed(1)}A
+                          </Text>
+                        </View>
+
+                        <View style={styles.summaryItem}>
+                          <Text style={styles.summaryLabel}>Phase C (connected)</Text>
+                          <Text style={styles.summaryValue}>
+                            {phaseC_Amps.toFixed(1)}A
+                          </Text>
+                        </View>
+                      </>
+                    ) : (
                       <View style={styles.summaryItem}>
-                        <Text style={styles.summaryLabel}>Phase A (connected)</Text>
+                        <Text style={styles.summaryLabel}>Connected Line Amps (per leg)</Text>
                         <Text style={styles.summaryValue}>
                           {phaseA_Amps.toFixed(1)}A
                         </Text>
                       </View>
-
-                      <View style={styles.summaryItem}>
-                        <Text style={styles.summaryLabel}>Phase B (connected)</Text>
-                        <Text style={styles.summaryValue}>
-                          {phaseB_Amps.toFixed(1)}A
-                        </Text>
-                      </View>
-
-                      <View style={styles.summaryItem}>
-                        <Text style={styles.summaryLabel}>Phase C (connected)</Text>
-                        <Text style={styles.summaryValue}>
-                          {phaseC_Amps.toFixed(1)}A
-                        </Text>
-                      </View>
-                    </>
-                  ) : (
-                    <View style={styles.summaryItem}>
-                      <Text style={styles.summaryLabel}>Connected Line Amps (per leg)</Text>
-                      <Text style={styles.summaryValue}>
-                        {phaseA_Amps.toFixed(1)}A
-                      </Text>
-                    </View>
-                  )}
-                </View>
+                    )}
+                  </View>
+                )}
               </View>
             );
           })()}
