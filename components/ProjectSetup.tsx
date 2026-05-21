@@ -506,18 +506,26 @@ export const ProjectSetup: React.FC<ProjectSetupProps> = ({ project, updateProje
           </p>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {/* Sprint 2C M6 fix-up (2026-05-21): this used to be a duplicate
+                dropdown writing to service_modification_type — same field as
+                the "Project Status" dropdown in General Information above.
+                Replaced with a read-only display so there's only one source
+                of truth for this setting, eliminating the "same field, two
+                labels — am I configuring twice?" confusion. */}
             <div>
               <label className="block text-xs font-semibold text-[#888] uppercase mb-1">Service Modification Type</label>
-              <select
-                value={localProject.settings.service_modification_type ?? 'existing'}
-                onChange={e => handleSettingChange('service_modification_type', e.target.value)}
-                className="w-full border-[#e8e6e3] rounded-md text-sm"
-              >
-                <option value="existing">Existing service (no change)</option>
-                <option value="service-upgrade">Service upgrade (NEC 220.87)</option>
-                <option value="new-service">New service installation</option>
-              </select>
-              <p className="text-xs text-[#888] mt-1">Determines which calc narratives the packet generator emits.</p>
+              <div className="w-full border border-[#e8e6e3] bg-[#f8f6f3] rounded-md text-sm px-3 py-2 text-[#1a1a1a]">
+                {(() => {
+                  const val = localProject.settings.service_modification_type ?? 'existing';
+                  if (val === 'new-service') return 'New service installation';
+                  if (val === 'service-upgrade') return 'Service upgrade (NEC 220.87)';
+                  return 'Existing service (no change)';
+                })()}
+              </div>
+              <p className="text-xs text-[#888] mt-1">
+                Set via <span className="font-medium">Project Status</span> in General Information above.
+                Determines which calc narratives the packet generator emits.
+              </p>
             </div>
 
             <div>
