@@ -1217,6 +1217,7 @@ export const generatePermitPacket = async (data: PermitPacketData): Promise<void
             showExistingNewMarkers={
               !!data.serviceModificationType && data.serviceModificationType !== 'new-service'
             }
+            buildingType={data.buildingType}
           />
         ),
       });
