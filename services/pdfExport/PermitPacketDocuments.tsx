@@ -1781,7 +1781,13 @@ export const LoadCalculationSummary: React.FC<LoadSummaryProps> = ({
 
       <View style={themeStyles.summaryRow}>
         <View style={themeStyles.summaryCard}>
-          <Text style={themeStyles.summaryLabel}>Connected Load</Text>
+          {/* Sprint 2C M6 fix-up (2026-05-21): labeled "Connected (NEC method)"
+              so contractors don't confuse this with the Panel Schedule's raw
+              "Connected Load (sum)" — they're different quantities. The NEC
+              method (e.g., 220.83) may apply a 3 VA/sq ft baseline that
+              displaces the per-circuit lighting/SABC/laundry sums, so this
+              total may differ from the panel-schedule circuit-sum. */}
+          <Text style={themeStyles.summaryLabel}>Connected (NEC method)</Text>
           <Text style={themeStyles.summaryValue}>
             {(totalConnectedVA / 1000).toFixed(2)}
             <Text style={themeStyles.summaryUnit}> kVA</Text>

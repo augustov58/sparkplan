@@ -20,6 +20,7 @@ import {
   isEVEMSMarkerCircuit,
   findEVEMSSetpointMarker,
 } from '../calculations/upstreamLoadAggregation';
+import { lineToNeutralVoltage } from '../../lib/electricalDisplay';
 
 // Helvetica + Helvetica-Bold are built-in PDF standard fonts in react-pdf —
 // calling Font.register() on them corrupts the font cache and causes
@@ -324,18 +325,27 @@ export const PanelSchedulePages: React.FC<PanelSchedulePDFProps> = ({
   const phaseBalancing = calculatePhaseBalancing(sortedCircuits, panel.phase);
   const voltage = panel.voltage;
 
-  // Calculate amps per phase
+  // Sprint 2C M6 fix-up (2026-05-21): per-leg line current uses the
+  // line-to-neutral voltage, NOT line-to-line. The phaseA_VA tally
+  // already represents the leg's load referenced to neutral (half of
+  // 240V 2P loads + all 120V 1P loads on that leg), so dividing by
+  // L-L (240V) would give half the actual line current. Previous
+  // value of ~113 A for a 51.8 kVA single-phase panel was numerically
+  // off by 2× — the correct value is ~226 A per leg connected.
+  const vLN = lineToNeutralVoltage(voltage, panel.phase);
+
+  // Calculate amps per phase using the corrected divisor.
   let phaseA_Amps = 0;
   let phaseB_Amps = 0;
   let phaseC_Amps = 0;
 
   if (panel.phase === 1) {
-    phaseA_Amps = phaseBalancing.phaseA_VA / voltage;
+    phaseA_Amps = phaseBalancing.phaseA_VA / vLN;
   } else {
-    // Three-phase: I = VA / (√3 × V) for line current
-    phaseA_Amps = phaseBalancing.phaseA_VA / voltage;
-    phaseB_Amps = phaseBalancing.phaseB_VA / voltage;
-    phaseC_Amps = phaseBalancing.phaseC_VA / voltage;
+    // Three-phase wye: I_line = phase_VA / V_LN.
+    phaseA_Amps = phaseBalancing.phaseA_VA / vLN;
+    phaseB_Amps = phaseBalancing.phaseB_VA / vLN;
+    phaseC_Amps = phaseBalancing.phaseC_VA / vLN;
   }
 
   const totalVA =
@@ -510,7 +520,7 @@ export const PanelSchedulePages: React.FC<PanelSchedulePDFProps> = ({
             </View>
 
             <View style={styles.summaryItem}>
-              <Text style={styles.summaryLabel}>Total Load</Text>
+              <Text style={styles.summaryLabel}>Connected Load (sum)</Text>
               <Text style={styles.summaryValue}>
                 {(totalVA / 1000).toFixed(1)} kVA
               </Text>
@@ -519,21 +529,21 @@ export const PanelSchedulePages: React.FC<PanelSchedulePDFProps> = ({
             {panel.phase === 3 ? (
               <>
                 <View style={styles.summaryItem}>
-                  <Text style={styles.summaryLabel}>Phase A</Text>
+                  <Text style={styles.summaryLabel}>Phase A (connected)</Text>
                   <Text style={styles.summaryValue}>
                     {phaseA_Amps.toFixed(1)}A
                   </Text>
                 </View>
 
                 <View style={styles.summaryItem}>
-                  <Text style={styles.summaryLabel}>Phase B</Text>
+                  <Text style={styles.summaryLabel}>Phase B (connected)</Text>
                   <Text style={styles.summaryValue}>
                     {phaseB_Amps.toFixed(1)}A
                   </Text>
                 </View>
 
                 <View style={styles.summaryItem}>
-                  <Text style={styles.summaryLabel}>Phase C</Text>
+                  <Text style={styles.summaryLabel}>Phase C (connected)</Text>
                   <Text style={styles.summaryValue}>
                     {phaseC_Amps.toFixed(1)}A
                   </Text>
@@ -541,13 +551,21 @@ export const PanelSchedulePages: React.FC<PanelSchedulePDFProps> = ({
               </>
             ) : (
               <View style={styles.summaryItem}>
-                <Text style={styles.summaryLabel}>Current Draw</Text>
+                <Text style={styles.summaryLabel}>Connected Line Amps (per leg)</Text>
                 <Text style={styles.summaryValue}>
                   {phaseA_Amps.toFixed(1)}A
                 </Text>
               </View>
             )}
           </View>
+          {/* Sprint 2C M6 fix-up: distinguish connected sum (this section)
+              from demand-method values (Load Calculation Summary EL-101).
+              Connected line current exceeding the panel's main breaker
+              rating is normal for dwellings — NEC demand factors reduce
+              the actual demand the service must support. */}
+          <Text style={[styles.summaryLabel, { marginTop: 4, fontSize: 7, fontStyle: 'italic' }]}>
+            Connected load sums all circuits at nameplate; per-leg amps use line-to-neutral voltage. Service sizing uses NEC 220 demand-method values — see Load Calculation Summary.
+          </Text>
         </View>
 
         {/* NEC 220.82 Dwelling Unit demand callout — shows the actual sized-for
@@ -819,9 +837,12 @@ export const MultiPanelDocument: React.FC<MultiPanelDocumentProps> = ({
               phaseBalancing.phaseA_VA +
               phaseBalancing.phaseB_VA +
               phaseBalancing.phaseC_VA;
-            const phaseA_Amps = phaseBalancing.phaseA_VA / panel.voltage;
-            const phaseB_Amps = phaseBalancing.phaseB_VA / panel.voltage;
-            const phaseC_Amps = phaseBalancing.phaseC_VA / panel.voltage;
+            // Sprint 2C M6 fix-up (2026-05-21): per-leg current uses L-N
+            // voltage. See sibling fix in the standalone-page block above.
+            const vLN = lineToNeutralVoltage(panel.voltage, panel.phase);
+            const phaseA_Amps = phaseBalancing.phaseA_VA / vLN;
+            const phaseB_Amps = phaseBalancing.phaseB_VA / vLN;
+            const phaseC_Amps = phaseBalancing.phaseC_VA / vLN;
 
             return (
               <View style={styles.summarySection}>
@@ -834,7 +855,7 @@ export const MultiPanelDocument: React.FC<MultiPanelDocumentProps> = ({
                   </View>
 
                   <View style={styles.summaryItem}>
-                    <Text style={styles.summaryLabel}>Total Load</Text>
+                    <Text style={styles.summaryLabel}>Connected Load (sum)</Text>
                     <Text style={styles.summaryValue}>
                       {(totalVA / 1000).toFixed(1)} kVA
                     </Text>
@@ -843,21 +864,21 @@ export const MultiPanelDocument: React.FC<MultiPanelDocumentProps> = ({
                   {panel.phase === 3 ? (
                     <>
                       <View style={styles.summaryItem}>
-                        <Text style={styles.summaryLabel}>Phase A</Text>
+                        <Text style={styles.summaryLabel}>Phase A (connected)</Text>
                         <Text style={styles.summaryValue}>
                           {phaseA_Amps.toFixed(1)}A
                         </Text>
                       </View>
 
                       <View style={styles.summaryItem}>
-                        <Text style={styles.summaryLabel}>Phase B</Text>
+                        <Text style={styles.summaryLabel}>Phase B (connected)</Text>
                         <Text style={styles.summaryValue}>
                           {phaseB_Amps.toFixed(1)}A
                         </Text>
                       </View>
 
                       <View style={styles.summaryItem}>
-                        <Text style={styles.summaryLabel}>Phase C</Text>
+                        <Text style={styles.summaryLabel}>Phase C (connected)</Text>
                         <Text style={styles.summaryValue}>
                           {phaseC_Amps.toFixed(1)}A
                         </Text>
@@ -865,7 +886,7 @@ export const MultiPanelDocument: React.FC<MultiPanelDocumentProps> = ({
                     </>
                   ) : (
                     <View style={styles.summaryItem}>
-                      <Text style={styles.summaryLabel}>Current Draw</Text>
+                      <Text style={styles.summaryLabel}>Connected Line Amps (per leg)</Text>
                       <Text style={styles.summaryValue}>
                         {phaseA_Amps.toFixed(1)}A
                       </Text>
