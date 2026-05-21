@@ -310,15 +310,40 @@ export const PanelSchedulePages: React.FC<PanelSchedulePDFProps> = ({
     (a, b) => a.circuit_number - b.circuit_number
   );
 
-  // NEC 220.82 Optional Method demand for dwelling unit panels — surfaced
-  // as a separate callout below the Load Summary so AHJ reviewers see the
-  // sized-for demand alongside raw connected. Same pattern as the EVEMS
-  // setpoint callout below.
+  // NEC 220.82/.83 Optional Method demand for dwelling panels.
+  //
+  // Sprint 2C M6 fix-up #2 (2026-05-21): the upstream isDwellingUnitPanel
+  // helper is intentionally narrow — it matches ONLY multi-family unit
+  // panels ("Unit 101", "Apt 3B") and explicitly rejects single-family
+  // MDPs ("Main Panel", "House Panel", "Multifamily Test MDP"). That's
+  // correct for multi-family aggregate MDPs (which use NEC 220.84, not
+  // 220.82/.83) but excludes single-family service panels, which DO use
+  // 220.82/.83. So we layer a second check here: a panel marked is_main
+  // with dwelling-shape circuits (kitchen / range / laundry / dryer /
+  // water heater / dishwasher) is a single-family MDP and gets the
+  // dwelling demand. Multi-family aggregate MDPs DON'T have these
+  // circuits (their loads are feeders to unit panels), so this check
+  // doesn't false-positive on them. Sub-panels (is_main=false) keep the
+  // connected-sum + per-leg amps display since 220.82/.83 applies at the
+  // service level, not per sub-panel.
   const dwellingCircuitsForCalc = realCircuits.map(c => ({
     description: c.description,
     loadWatts: c.load_watts || 0,
   }));
-  const dwellingUnitDemand = isDwellingUnitPanel(panel.name, dwellingCircuitsForCalc)
+  const hasDwellingShape = dwellingCircuitsForCalc.some(c => {
+    const d = (c.description ?? '').toLowerCase();
+    return (
+      d.includes('kitchen') ||
+      d.includes('range') ||
+      d.includes('laundry') ||
+      d.includes('dryer') ||
+      d.includes('water heater') ||
+      d.includes('dishwasher')
+    );
+  });
+  const isUnitPanel = isDwellingUnitPanel(panel.name, dwellingCircuitsForCalc);
+  const isSingleFamilyMDP = panel.is_main === true && hasDwellingShape;
+  const dwellingUnitDemand = (isUnitPanel || isSingleFamilyMDP)
     ? calculateDwellingUnitDemandVA(dwellingCircuitsForCalc)
     : null;
 
@@ -890,15 +915,29 @@ export const MultiPanelDocument: React.FC<MultiPanelDocumentProps> = ({
             const phaseB_Amps = phaseBalancing.phaseB_VA / vLN;
             const phaseC_Amps = phaseBalancing.phaseC_VA / vLN;
 
-            // Dwelling-panel demand re-uses the same calc helpers used by
-            // the standalone-page block above so both render paths show
-            // identical numbers for the same panel.
+            // Dwelling-panel demand re-uses the same detection layered in
+            // the standalone-page block above: multi-family unit panels
+            // (via isDwellingUnitPanel) OR single-family MDPs (is_main +
+            // dwelling-shape circuits). Both paths must compute identical
+            // numbers for the same panel so PDF + in-app + Load Calc agree.
             const dwellingCircuitsForCalc = circuits.map(c => ({
               description: c.description,
               loadWatts: c.load_watts || 0,
             }));
-            const isDwelling = isDwellingUnitPanel(panel.name, dwellingCircuitsForCalc);
-            const dwellingDemand = isDwelling
+            const hasDwellingShape2 = dwellingCircuitsForCalc.some(c => {
+              const d = (c.description ?? '').toLowerCase();
+              return (
+                d.includes('kitchen') ||
+                d.includes('range') ||
+                d.includes('laundry') ||
+                d.includes('dryer') ||
+                d.includes('water heater') ||
+                d.includes('dishwasher')
+              );
+            });
+            const isUnitPanel2 = isDwellingUnitPanel(panel.name, dwellingCircuitsForCalc);
+            const isSingleFamilyMDP2 = panel.is_main === true && hasDwellingShape2;
+            const dwellingDemand = (isUnitPanel2 || isSingleFamilyMDP2)
               ? calculateDwellingUnitDemandVA(dwellingCircuitsForCalc)
               : null;
 
