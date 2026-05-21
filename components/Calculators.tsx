@@ -310,11 +310,20 @@ export const Calculators: React.FC<CalculatorsProps> = ({ projectId }) => {
               <CircuitSharingCalculator />
             </FeatureGate>
           )}
-          <div style={{ display: activeTab === 'multi-family-ev' ? 'block' : 'none' }}>
+          {/* Sprint 2C M6 fix-up (2026-05-21): conditional render to match
+              every other Tools sub-tab. Previously this was always-mounted
+              via display:none, which meant any render-time crash in
+              MultiFamilyEVCalculator would propagate to sibling tabs (the
+              user was working on a single-family project but the MF-EV's
+              TDZ error still surfaced because MF-EV was silently rendering
+              in the background). Persisted inputs flow through
+              projects.settings.residential.mfEvCalculation so the user
+              doesn't lose work when navigating away. */}
+          {activeTab === 'multi-family-ev' && (
             <FeatureGate feature="multi-family-ev">
               <MultiFamilyEVCalculator projectId={projectId} project={project} updateProject={updateProject} />
             </FeatureGate>
-          </div>
+          )}
           {activeTab === 'ev-panel-builder' && (
             <FeatureGate feature="ev-panel-templates">
               {project ? (
