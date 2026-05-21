@@ -639,29 +639,17 @@ export const PanelSchedulePages: React.FC<PanelSchedulePDFProps> = ({
           )}
         </View>
 
-        {/* NEC 220.82 Dwelling Unit demand callout — shows the actual sized-for
-            demand on a per-unit panel so AHJ reviewers don't read raw connected
-            load (e.g. 36 kVA / 150 A) and assume the panel is over-capacity. */}
+        {/* Dwelling Demand Breakdown — companion to the Load Summary (NEC
+            Dwelling Demand) section above. Total Demand + Demand Amps are
+            shown in the Load Summary; this card shows ONLY the per-category
+            breakdown (general-loads bucket tiered per 220.42, HVAC at 100%
+            non-coincident per 220.60). Sprint 2C M6 fix-up #3 (2026-05-21):
+            removed the duplicate Total Demand + Demand Amps rows that
+            appeared identically in the Load Summary above. */}
         {dwellingUnitDemand && (
           <View style={styles.summarySection} wrap={false}>
-            <Text style={styles.summaryTitle}>Dwelling Unit Demand (NEC 220.82 Optional Method)</Text>
+            <Text style={styles.summaryTitle}>Dwelling Demand Breakdown (NEC 220.82/.83)</Text>
             <View style={styles.summaryGrid}>
-              <View style={styles.summaryItem}>
-                <Text style={styles.summaryLabel}>Total Demand</Text>
-                <Text style={styles.summaryValue}>
-                  {(dwellingUnitDemand.totalDemandVA / 1000).toFixed(1)} kVA
-                </Text>
-              </View>
-              <View style={styles.summaryItem}>
-                <Text style={styles.summaryLabel}>Demand Amps</Text>
-                <Text style={styles.summaryValue}>
-                  {(
-                    dwellingUnitDemand.totalDemandVA /
-                    (panel.voltage * (panel.phase === 3 ? Math.sqrt(3) : 1))
-                  ).toFixed(1)}
-                  A
-                </Text>
-              </View>
               <View style={styles.summaryItem}>
                 <Text style={styles.summaryLabel}>General @ Tiered</Text>
                 <Text style={styles.summaryValue}>
@@ -669,12 +657,15 @@ export const PanelSchedulePages: React.FC<PanelSchedulePDFProps> = ({
                 </Text>
               </View>
               <View style={styles.summaryItem}>
-                <Text style={styles.summaryLabel}>Climate @ 100%</Text>
+                <Text style={styles.summaryLabel}>Climate @ 100% (non-coincident)</Text>
                 <Text style={styles.summaryValue}>
                   {(dwellingUnitDemand.climateDemandVA / 1000).toFixed(1)} kVA
                 </Text>
               </View>
             </View>
+            <Text style={[styles.summaryLabel, { marginTop: 4, fontSize: 7, fontStyle: 'italic' }]}>
+              General-loads bucket tiered per NEC 220.42. Climate is the larger of heating/cooling per NEC 220.60 (non-coincident loads).
+            </Text>
           </View>
         )}
 
