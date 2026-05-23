@@ -543,6 +543,13 @@ export const PanelSchedule: React.FC<PanelScheduleProps> = ({ project }) => {
         totalConnectedVA: number;
         downstreamPanelCount: number;
         necReference?: string;
+        demandBreakdown?: Array<{
+          loadType: string;
+          connectedVA: number;
+          demandVA: number;
+          demandFactor: number;
+          necReference: string;
+        }>;
       }>();
       panels.forEach(panel => {
         const ctx = panel.is_main ? multiFamilyCtx : undefined;
@@ -558,6 +565,7 @@ export const PanelSchedule: React.FC<PanelScheduleProps> = ({ project }) => {
           totalConnectedVA: r.totalConnectedVA,
           downstreamPanelCount: r.downstreamPanelCount,
           necReference: dominantNec,
+          demandBreakdown: r.demandBreakdown,
         });
       });
 

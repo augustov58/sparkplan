@@ -1243,6 +1243,12 @@ export const generatePermitPacket = async (data: PermitPacketData): Promise<void
         totalConnectedVA: aggResult.totalConnectedVA,
         downstreamPanelCount: aggResult.downstreamPanelCount,
         necReference: dominantNec,
+        // demandBreakdown shows the per-load-type NEC 220 cascade application
+        // (Receptacles @ 220.44, Motors @ 220.50, HVAC @ 220.60, etc.).
+        // Surfaces as a compact audit table below the Load Summary card so
+        // inspectors can verify how the aggregate demand was derived without
+        // flipping to the separate Load Calculation Summary page.
+        demandBreakdown: aggResult.demandBreakdown,
       };
       builders.push({
         name: `PanelSchedule[${panel.name}]`,

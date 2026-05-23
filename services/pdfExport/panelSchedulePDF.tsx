@@ -80,6 +80,13 @@ export const exportAllPanelsPDF = async (
     totalConnectedVA: number;
     downstreamPanelCount: number;
     necReference?: string;
+    demandBreakdown?: Array<{
+      loadType: string;
+      connectedVA: number;
+      demandVA: number;
+      demandFactor: number;
+      necReference: string;
+    }>;
   }>,
 ) => {
   try {
