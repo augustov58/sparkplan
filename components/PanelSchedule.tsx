@@ -533,6 +533,34 @@ export const PanelSchedule: React.FC<PanelScheduleProps> = ({ project }) => {
         circuitsByPanel.set(panel.id, [...direct, ...synthesized]);
       });
 
+      // Build per-panel aggregated demand map so the Load Summary in the PDF
+      // surfaces NEC 220.84 / 625.42 numbers (matching the in-app Panel
+      // Summary). Pass multiFamilyCtx only for the MDP — it applies the
+      // blanket dwelling demand factor at the aggregate; sub-panel demand
+      // uses the standard NEC 220 cascade with auto-EVEMS clamping.
+      const aggregatedLoadByPanel = new Map<string, {
+        totalDemandVA: number;
+        totalConnectedVA: number;
+        downstreamPanelCount: number;
+        necReference?: string;
+      }>();
+      panels.forEach(panel => {
+        const ctx = panel.is_main ? multiFamilyCtx : undefined;
+        const r = calculateAggregatedLoad(
+          panel.id, panels, circuits, transformers, occupancyForCalc, ctx,
+        );
+        const dominantNec = r.necReferences.find(ref => ref.includes('625.42'))
+          ?? r.necReferences.find(ref => ref.includes('220.84'))
+          ?? r.necReferences.find(ref => ref.includes('220.'))
+          ?? undefined;
+        aggregatedLoadByPanel.set(panel.id, {
+          totalDemandVA: r.totalDemandVA,
+          totalConnectedVA: r.totalConnectedVA,
+          downstreamPanelCount: r.downstreamPanelCount,
+          necReference: dominantNec,
+        });
+      });
+
       // Mirrors PermitPacketGenerator.tsx buildingType derivation so the
       // multi-panel export's dwelling-demand gate matches the permit-packet
       // gate for the same project. Without this, the MultiPanelDocument's
@@ -559,6 +587,7 @@ export const PanelSchedule: React.FC<PanelScheduleProps> = ({ project }) => {
         project.address,
         !!isExistingConstruction,
         buildingType,
+        aggregatedLoadByPanel,
       );
     } catch (error) {
       alert(`Failed to export PDF: ${error instanceof Error ? error.message : 'Unknown error'}`);
