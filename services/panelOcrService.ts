@@ -49,7 +49,7 @@ function parseJsonResponse(responseText: string): any {
   // Remove markdown code blocks if present
   const codeBlockMatch = responseText.match(/```(?:json)?\s*(\{[\s\S]*\})\s*```/);
   if (codeBlockMatch) {
-    jsonText = codeBlockMatch[1];
+    jsonText = codeBlockMatch[1] || responseText;
   } else {
     // Try to find raw JSON object
     const jsonMatch = responseText.match(/\{[\s\S]*\}/);

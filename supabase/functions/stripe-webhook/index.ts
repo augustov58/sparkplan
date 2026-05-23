@@ -6,8 +6,11 @@
 // @ts-ignore: Deno global available in Supabase Edge Functions
 declare const Deno: any;
 
+// @ts-ignore: Deno URL import resolved at runtime
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
+// @ts-ignore: Deno URL import resolved at runtime
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2"
+// @ts-ignore: Deno URL import resolved at runtime
 import Stripe from "https://esm.sh/stripe@14?target=denonext"
 
 const stripe = new Stripe(Deno.env.get('STRIPE_SECRET_KEY') as string, {
@@ -32,7 +35,7 @@ const PRICE_TO_PLAN: Record<string, 'starter' | 'pro' | 'business'> = {
   [getRequiredEnv('STRIPE_PRICE_BUSINESS')]: 'business',
 }
 
-serve(async (req) => {
+serve(async (req: Request) => {
   const signature = req.headers.get('Stripe-Signature')
 
   if (!signature) {

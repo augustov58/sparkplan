@@ -158,7 +158,7 @@ export const ButtonGroup: React.FC<ButtonGroupProps> = ({ children, className = 
 
         return React.cloneElement(child as React.ReactElement<any>, {
           className: `
-            ${child.props.className || ''}
+            ${(child.props as { className?: string }).className || ''}
             ${!isFirst ? '-ml-px' : ''}
             ${!isFirst && !isLast ? 'rounded-none' : ''}
             ${isFirst && !isLast ? 'rounded-r-none' : ''}

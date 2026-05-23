@@ -86,7 +86,7 @@ export function getNextLargerSize(currentSize: string): string | null {
   if (index === -1 || index === STANDARD_CONDUCTOR_SIZES.length - 1) {
     return null;
   }
-  return STANDARD_CONDUCTOR_SIZES[index + 1];
+  return STANDARD_CONDUCTOR_SIZES[index + 1] ?? null;
 }
 
 /**

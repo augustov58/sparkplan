@@ -216,10 +216,10 @@ describe('generatePermitPacket — Sprint 2B PR-3 attachment wiring', () => {
     const sitePages = [doc.getPage(total - 4).getSize(), doc.getPage(total - 3).getSize()];
     const cutPages = [doc.getPage(total - 2).getSize(), doc.getPage(total - 1).getSize()];
 
-    expect(Math.round(sitePages[0].width)).toBe(1728); // ARCH D title
-    expect(Math.round(sitePages[1].width)).toBe(1728); // ARCH D upload
-    expect(Math.round(cutPages[0].width)).toBe(612); // Letter title
-    expect(Math.round(cutPages[1].width)).toBe(612); // Letter upload
+    expect(Math.round(sitePages[0]!.width)).toBe(1728); // ARCH D title
+    expect(Math.round(sitePages[1]!.width)).toBe(1728); // ARCH D upload
+    expect(Math.round(cutPages[0]!.width)).toBe(612); // Letter title
+    expect(Math.round(cutPages[1]!.width)).toBe(612); // Letter upload
   });
 
   // ---------------------------------------------------------------------

@@ -1472,3 +1472,14 @@ export interface ConversationContextSettings {
   /** How often to include full project context */
   projectContextFrequency: 'first' | 'always' | 'summarized';
 }
+
+// Re-export DB entity aliases from lib/database.types so '@/types' importers
+// don't need to know whether a type comes from the hand-curated types.ts or
+// the auto-gen Supabase types file. types.ts owns Feeder (a richer interface
+// extending the DB row), so Feeder is intentionally NOT re-exported here.
+export type {
+  Circuit,
+  Panel,
+  ShortCircuitCalculation,
+  Transformer,
+} from './lib/database.types';

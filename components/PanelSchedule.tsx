@@ -224,19 +224,24 @@ export const PanelSchedule: React.FC<PanelScheduleProps> = ({ project }) => {
     // If no direct circuits but has feeder circuits, return minimal result
     if (panelCircuits.length === 0 && feederCircuits.length === 0) return null;
 
+    // Narrow DB-row wide types (Panel.phase: number) to the calc-side
+    // unions. Panels in this codebase are always 1Φ or 3Φ; bus poles are
+    // 1 / 2 / 3. Defaulting to 1 keeps misconfigured rows from blowing up
+    // demand calc — they'd just under-balance until the user corrects them.
+    const panelPhase: 1 | 3 = selectedPanel.phase === 3 ? 3 : 1;
     const circuitLoads: CircuitLoad[] = panelCircuits.map(c => ({
       id: c.id,
       description: c.description,
       loadWatts: c.load_watts || 0,
       loadType: (c.load_type as LoadTypeCode) || 'O',
-      pole: c.pole,
+      pole: (c.pole === 1 || c.pole === 2 || c.pole === 3) ? c.pole : 1,
       circuitNumber: c.circuit_number,
-      phase: getCircuitPhase(c.circuit_number, selectedPanel.phase),
+      phase: getCircuitPhase(c.circuit_number, panelPhase),
     }));
 
     // Calculate direct circuit demand
-    const directDemand = panelCircuits.length > 0 
-      ? calculatePanelDemand(circuitLoads, selectedPanel.voltage, selectedPanel.phase)
+    const directDemand = panelCircuits.length > 0
+      ? calculatePanelDemand(circuitLoads, selectedPanel.voltage, panelPhase)
       : null;
 
     // Calculate total including feeders
@@ -320,14 +325,26 @@ export const PanelSchedule: React.FC<PanelScheduleProps> = ({ project }) => {
       };
     }
 
-    // Branch 2: sub-panel dwelling-unit detection (multi-family)
+    // Branch 2: sub-panel dwelling-unit detection (multi-family). Returns
+    // the calc shape merged with necArticle so the union with Branch 1
+    // stays single-shape — every reader can read .necArticle and
+    // .totalConnectedVA without narrowing.
     if (selectedPanel.is_main) return null;
     const dwellingCircuits = panelCircuits.map(c => ({
       description: c.description,
       loadWatts: c.load_watts || 0,
     }));
     if (!isDwellingUnitPanel(selectedPanel.name, dwellingCircuits)) return null;
-    return calculateDwellingUnitDemandVA(dwellingCircuits);
+    const result = calculateDwellingUnitDemandVA(dwellingCircuits);
+    return {
+      totalConnectedVA: result.generalConnectedVA,
+      totalDemandVA: result.totalDemandVA,
+      necArticle: 'NEC 220.82' as const,
+      // Preserve the granular fields for callers that read them.
+      generalConnectedVA: result.generalConnectedVA,
+      generalDemandVA: result.generalDemandVA,
+      climateDemandVA: result.climateDemandVA,
+    };
   }, [selectedPanel, panelCircuits, project.settings]);
 
   // Calculate aggregated load including downstream panels
@@ -424,19 +441,111 @@ export const PanelSchedule: React.FC<PanelScheduleProps> = ({ project }) => {
   const handleExportAllPanels = async () => {
     if (panels.length === 0) return;
     try {
+      const occ = project.settings?.occupancyType;
+      const occupancyForCalc = occ || 'commercial';
+
+      // Synthesize "virtual feeder circuits" for any panel that has
+      // downstream panels or transformers fed from it. Mirrors the in-app
+      // feederCircuits useMemo above (~L131) — without this the standalone
+      // "All Panels" PDF renders multi-family aggregate MDPs as 0 circuits
+      // because the MDP has no direct circuit rows in the DB (its outgoing
+      // connections live in the feeders / fed_from_* relationships).
+      // Slot assignment follows the UI's left/right alternation so the PDF
+      // layout matches what the user sees on-screen.
+      const synthesizeFeedersForPanel = (panel: typeof panels[0]): typeof panelCircuits => {
+        const children = panels.filter(
+          p => p.fed_from_type === 'panel' && p.fed_from === panel.id
+        );
+        const childXfmrs = transformers.filter(t => t.fed_from_panel_id === panel.id);
+        const synthesized: typeof panelCircuits = [];
+
+        const assignSlot = (i: number): number => {
+          // i=0→1, i=1→2, i=2→5, i=3→6, i=4→9, i=5→10... — pair-aligned
+          // alternation with 4-slot stride between rows. Matches the in-app
+          // visual where left-column feeders sit at 1,5,9,... and right at
+          // 2,6,10,...
+          const pairIdx = Math.floor(i / 2);
+          const isLeft = i % 2 === 0;
+          return pairIdx * 4 + (isLeft ? 1 : 2);
+        };
+
+        children.forEach((child, idx) => {
+          const childLoad = calculateAggregatedLoad(
+            child.id, panels, circuits, transformers, occupancyForCalc
+          );
+          synthesized.push({
+            id: `synth-feeder-panel-${child.id}`,
+            panel_id: panel.id,
+            project_id: project.id,
+            circuit_number: assignSlot(idx),
+            description: `→ PANEL ${child.name}`,
+            pole: child.phase === 3 ? 3 : 2,
+            breaker_amps: child.feeder_breaker_amps || child.main_breaker_amps || 100,
+            load_watts: childLoad.totalDemandVA,
+            conductor_size: '',
+            egc_size: null,
+            load_type: 'O',
+            is_proposed: false,
+            created_at: null,
+          } as unknown as typeof panelCircuits[number]);
+        });
+
+        const offset = children.length;
+        childXfmrs.forEach((xfmr, idx) => {
+          const xfmrPanels = panels.filter(p => p.fed_from_transformer_id === xfmr.id);
+          let totalLoad = 0;
+          xfmrPanels.forEach(p => {
+            totalLoad += calculateAggregatedLoad(
+              p.id, panels, circuits, transformers, occupancyForCalc
+            ).totalDemandVA;
+          });
+          if (xfmrPanels.length === 0 && xfmr.kva_rating) {
+            totalLoad = xfmr.kva_rating * 1000;
+          }
+          const denom = (panel.voltage || 480) * (panel.phase === 3 ? Math.sqrt(3) : 1);
+          synthesized.push({
+            id: `synth-feeder-xfmr-${xfmr.id}`,
+            panel_id: panel.id,
+            project_id: project.id,
+            circuit_number: assignSlot(offset + idx),
+            description: `→ XFMR ${xfmr.name || (xfmr.kva_rating + 'kVA')}`,
+            pole: panel.phase === 3 ? 3 : 2,
+            breaker_amps: Math.ceil(totalLoad / denom) || 100,
+            load_watts: totalLoad,
+            conductor_size: '',
+            egc_size: null,
+            load_type: 'M',
+            is_proposed: false,
+            created_at: null,
+          } as unknown as typeof panelCircuits[number]);
+        });
+
+        return synthesized;
+      };
+
       const circuitsByPanel = new Map<string, typeof panelCircuits>();
       panels.forEach(panel => {
-        circuitsByPanel.set(panel.id, circuits.filter(c => c.panel_id === panel.id));
+        const direct = circuits.filter(c => c.panel_id === panel.id);
+        // Synthesize feeders only when the panel has zero direct circuits —
+        // otherwise the panel's real branch circuits already represent its
+        // load, and synthesizing on top would double-count visually.
+        const synthesized = direct.length === 0 ? synthesizeFeedersForPanel(panel) : [];
+        circuitsByPanel.set(panel.id, [...direct, ...synthesized]);
       });
+
       // Mirrors PermitPacketGenerator.tsx buildingType derivation so the
       // multi-panel export's dwelling-demand gate matches the permit-packet
       // gate for the same project. Without this, the MultiPanelDocument's
       // buildingType prop would be undefined and the gate would default to
       // single-family — false-positiving on commercial restaurants with
       // "Kitchen Hood" / multi-family MDPs with "Common Laundry" feeders.
-      const occ = project.settings?.occupancyType;
+      // ResidentialSettings.totalUnits is the canonical field for unit count;
+      // PR #93 originally used multi_family_units which doesn't exist on the
+      // interface — buildingType derivation always fell through to
+      // 'single_family' for multi-family projects. Fixed during the tsc
+      // baseline cleanup that exposed the field name drift.
       const isMultiFamily =
-        ((project.settings?.residential as { multi_family_units?: number } | undefined)?.multi_family_units ?? 0) >= 3;
+        (project.settings?.residential?.totalUnits ?? 0) >= 3;
       const buildingType: 'single_family_residential' | 'multi_family' | 'commercial' =
         isMultiFamily
           ? 'multi_family'
@@ -784,7 +893,10 @@ export const PanelSchedule: React.FC<PanelScheduleProps> = ({ project }) => {
   // Calculate load per phase for a circuit
   const getLoadPerPhase = (ckt: any, phase: 'A' | 'B' | 'C') => {
     if (!ckt || !ckt.load_watts) return null;
-    const cktPhase = getCircuitPhase(ckt.circuit_number, selectedPanel?.phase || 3);
+    // Narrow DB-row Panel.phase (number) to the 1 | 3 union getCircuitPhase
+    // expects. Same fallback policy as the demandResult useMemo above.
+    const panelPhaseNarrow: 1 | 3 = selectedPanel?.phase === 3 ? 3 : 1;
+    const cktPhase = getCircuitPhase(ckt.circuit_number, panelPhaseNarrow);
     
     if (ckt.pole === 1) {
       return cktPhase === phase ? (ckt.load_watts / 1000).toFixed(2) : null;

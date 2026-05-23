@@ -60,7 +60,7 @@ test.describe('Multi-Family EV — Tools Hub calc persists → packet renders', 
     await page.waitForLoadState('networkidle');
     const projectStatus = page.locator('select').filter({ has: page.getByText(/Existing Construction|New Construction|Service Upgrade/) }).first();
     await expect(projectStatus).toBeVisible({ timeout: 5_000 });
-    await projectStatus.selectOption({ label: /Existing Construction/i }).catch(() => {});
+    await projectStatus.selectOption({ label: 'Existing Construction' }).catch(() => {});
     await shot(page, '03-project-status-existing');
 
     // Step 2: navigate to Tools Hub → Multi-Family EV Calculator.

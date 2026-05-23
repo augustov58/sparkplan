@@ -444,6 +444,14 @@ export const generatePermitPacket = async (data: PermitPacketData): Promise<void
 
   const circuitsByPanel = new Map<string, Circuit[]>();
   data.circuits.forEach(circuit => {
+    // Skip orphan circuits (panel_id null) — they shouldn't be rendered
+    // on any panel schedule because they have no parent panel; the
+    // panel_id column is nullable in the DB but every UI flow should
+    // backfill it. Log them so future debugging is easier.
+    if (!circuit.panel_id) {
+      console.warn('Permit packet: skipping circuit with no panel_id', circuit.id);
+      return;
+    }
     const panelCircuits = circuitsByPanel.get(circuit.panel_id) || [];
     panelCircuits.push(circuit);
     circuitsByPanel.set(circuit.panel_id, panelCircuits);
@@ -845,11 +853,15 @@ export const generatePermitPacket = async (data: PermitPacketData): Promise<void
       pageCount: 1,
       tocTitles: ['Equipment Specifications'],
       render: (sheetIds) => (
+        // EquipmentSpecsPages declares its own narrower Panel/Transformer
+        // interfaces (with phase: 1 | 3 + optional spec fields) — wider DB
+        // rows satisfy the runtime contract since every consumed field is
+        // present, so the cast is safe.
         <EquipmentSpecsPages
           projectName={data.projectName}
           projectAddress={data.projectAddress}
-          panels={data.panels}
-          transformers={data.transformers}
+          panels={data.panels as never[]}
+          transformers={data.transformers as never[]}
           circuits={data.circuits}
           includeNECReferences={true}
           {...contractor}
@@ -1262,7 +1274,9 @@ export const generatePermitPacket = async (data: PermitPacketData): Promise<void
   const tocEntries: TocEntry[] = [];
   builders.forEach((b, i) => {
     if (b.kind === 'cover' || b.kind === 'tableOfContents') return;
-    allocatedIds[i].forEach((sheetId, j) => {
+    // allocatedIds is built from builders.map so indices align 1:1; the ??
+    // [] is just for noUncheckedIndexedAccess.
+    (allocatedIds[i] ?? []).forEach((sheetId, j) => {
       tocEntries.push({
         sheetId,
         title: b.tocTitles[j] ?? b.name,
@@ -1292,11 +1306,11 @@ export const generatePermitPacket = async (data: PermitPacketData): Promise<void
 
   const pages: Array<{ name: string; element: React.ReactElement }> = builders.map((b, i) => ({
     name: b.name,
-    element: b.render(allocatedIds[i], tocEntries),
+    element: b.render(allocatedIds[i] ?? [], tocEntries),
   }));
 
   console.log('[permit-packet] pages assembled:', pages.length, pages.map(p => p.name));
-  console.log('[permit-packet] sheet IDs:', builders.map((b, i) => `${b.name} → ${allocatedIds[i].join(', ') || '(none)'}`));
+  console.log('[permit-packet] sheet IDs:', builders.map((b, i) => `${b.name} → ${(allocatedIds[i] ?? []).join(', ') || '(none)'}`));
 
   const fileName = `Permit_Packet_${data.projectName.replace(/[^a-z0-9]/gi, '_')}_${new Date().toISOString().split('T')[0]}.pdf`;
 

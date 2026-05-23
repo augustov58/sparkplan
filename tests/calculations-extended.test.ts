@@ -91,6 +91,7 @@ import type {
   ServiceUpgradeInput,
   ResidentialAppliances,
 } from '../types';
+import { ExistingLoadDeterminationMethod } from '../types';
 
 // ============================================================================
 // 1. SHORT CIRCUIT — NEC 110.9, IEEE 141
@@ -284,7 +285,7 @@ describe('Service Upgrade (NEC 220.87)', () => {
         currentServiceAmps: 200,
         currentUsageAmps: 120,
         proposedLoadAmps: 40,
-        existingLoadMethod: 'manual',
+        existingLoadMethod: ExistingLoadDeterminationMethod.MANUAL,
       };
       const result = quickServiceCheck(input);
       // adjustedExisting = 120 × 1.25 = 150A
@@ -301,7 +302,7 @@ describe('Service Upgrade (NEC 220.87)', () => {
         currentServiceAmps: 200,
         currentUsageAmps: 120,
         proposedLoadAmps: 40,
-        existingLoadMethod: 'utility_bill',
+        existingLoadMethod: ExistingLoadDeterminationMethod.UTILITY_BILL,
       };
       const result = quickServiceCheck(input);
       // adjustedExisting = 120A (no multiplier)
@@ -317,7 +318,7 @@ describe('Service Upgrade (NEC 220.87)', () => {
         currentServiceAmps: 200,
         currentUsageAmps: 120,
         proposedLoadAmps: 40,
-        existingLoadMethod: 'load_study',
+        existingLoadMethod: ExistingLoadDeterminationMethod.LOAD_STUDY,
       };
       const result = quickServiceCheck(input);
       expect(result.totalAmps).toBe(160);
@@ -328,7 +329,7 @@ describe('Service Upgrade (NEC 220.87)', () => {
         currentServiceAmps: 100,
         currentUsageAmps: 80,
         proposedLoadAmps: 40,
-        existingLoadMethod: 'manual',
+        existingLoadMethod: ExistingLoadDeterminationMethod.MANUAL,
       };
       const result = quickServiceCheck(input);
       // adjustedExisting = 80 × 1.25 = 100A
@@ -345,7 +346,7 @@ describe('Service Upgrade (NEC 220.87)', () => {
         serviceVoltage: 240,
         servicePhase: 1,
         existingDemandLoad_kVA: 30,
-        existingLoadMethod: 'calculated',
+        existingLoadMethod: ExistingLoadDeterminationMethod.CALCULATED,
         proposedLoads: [
           { description: 'EV Charger', kw: 9.6, continuous: true, category: 'EV' },
         ],
@@ -369,7 +370,7 @@ describe('Service Upgrade (NEC 220.87)', () => {
         serviceVoltage: 240,
         servicePhase: 1,
         existingDemandLoad_kVA: 30,
-        existingLoadMethod: 'utility_bill',
+        existingLoadMethod: ExistingLoadDeterminationMethod.UTILITY_BILL,
         proposedLoads: [],
       };
       const result = analyzeServiceUpgrade(input);
@@ -1663,7 +1664,7 @@ describe('Project metadata validation (C3)', () => {
       const result = flContractorLicenseSchema.safeParse('test');
       expect(result.success).toBe(false);
       if (!result.success) {
-        expect(result.error.issues[0].message).toMatch(/Format: EC#######/);
+        expect(result.error.issues[0]!.message).toMatch(/Format: EC#######/);
       }
     });
 
@@ -1701,7 +1702,7 @@ describe('Project metadata validation (C3)', () => {
       const result = permitNumberSchema.safeParse('AB');
       expect(result.success).toBe(false);
       if (!result.success) {
-        expect(result.error.issues[0].message).toMatch(/at least 4 characters/);
+        expect(result.error.issues[0]!.message).toMatch(/at least 4 characters/);
       }
     });
 
@@ -1709,7 +1710,7 @@ describe('Project metadata validation (C3)', () => {
       const result = permitNumberSchema.safeParse('test');
       expect(result.success).toBe(false);
       if (!result.success) {
-        expect(result.error.issues[0].message).toMatch(/placeholder/);
+        expect(result.error.issues[0]!.message).toMatch(/placeholder/);
       }
     });
   });
@@ -1735,7 +1736,7 @@ describe('Project metadata validation (C3)', () => {
       const result = projectAddressSchema.safeParse('Main Street, Orlando, Florida');
       expect(result.success).toBe(false);
       if (!result.success) {
-        expect(result.error.issues[0].message).toMatch(/street number or ZIP/);
+        expect(result.error.issues[0]!.message).toMatch(/street number or ZIP/);
       }
     });
 

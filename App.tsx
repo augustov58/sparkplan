@@ -385,7 +385,10 @@ const NecAssistant = () => {
             currentProject.servicePhase,
             panels,
             circuits,
-            feeders,
+            // useFeeders returns the camelCase `Feeder` shape from types.ts; the
+            // builder is typed against the DB Row shape. Runtime data is the same
+            // — cast to satisfy the strict structural mismatch.
+            feeders as unknown as Parameters<typeof buildProjectContext>[7],
             transformers,
             currentProject.settings?.residential,
             undefined, // estimates - not yet wired into Copilot
@@ -585,7 +588,7 @@ const NecAssistant = () => {
     const handleRetry = () => {
         const lastUser = [...history].reverse().find(m => m.role === 'user');
         if (!lastUser) return;
-        setHistory(prev => prev.filter((_, i) => !(i === prev.length - 1 && prev[i].role === 'user')));
+        setHistory(prev => prev.filter((_, i) => !(i === prev.length - 1 && prev[i]?.role === 'user')));
         setErrorMessage(null);
         handleAsk(lastUser.text);
     };
@@ -972,7 +975,7 @@ function AppContent() {
         servicePhase: template ? template.servicePhase : defaultServicePhase,
         conductorMaterial: 'Cu',
         temperatureRating: 75,
-        occupancyType: selectedType === ProjectType.RESIDENTIAL ? 'dwelling' : 'office' // Default based on project type
+        occupancyType: selectedType === ProjectType.RESIDENTIAL ? 'dwelling' : 'commercial' // Default based on project type
       }
     };
 

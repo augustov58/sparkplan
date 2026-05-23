@@ -135,7 +135,7 @@ async function run() {
   console.log('\nWaiting for Google to redirect back to the callback server...');
   console.log('(Press Ctrl+C to cancel.)\n');
 
-  let code: string;
+  let code: string = '';
   try {
     code = await codePromise;
   } catch (err: any) {

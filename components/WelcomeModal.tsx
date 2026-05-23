@@ -217,6 +217,11 @@ export const WelcomeModal: React.FC<WelcomeModalProps> = ({ onClose, onCreatePro
 
   const currentStepData = steps[currentStep];
 
+  // Guard for noUncheckedIndexedAccess — if currentStep walks past the
+  // steps array (shouldn't happen given the Next button bounds), close
+  // the modal rather than crash.
+  if (!currentStepData) return null;
+
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
       <div className="bg-white rounded-xl shadow-sm border border-gray-200 max-w-2xl w-full max-h-[90vh] overflow-y-auto">

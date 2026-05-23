@@ -49,7 +49,7 @@ export function useAllOpenItems(): UseAllOpenItemsReturn {
         `)
         .eq('user_id', user.id)
         .in('status', ['Pending', 'Answered'])
-        .order('due_date', { ascending: true, nullsLast: true });
+        .order('due_date', { ascending: true, nullsFirst: false });
 
       if (rfisError) throw rfisError;
 

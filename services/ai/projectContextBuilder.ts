@@ -213,9 +213,9 @@ export function buildProjectContext(
     return {
       id: panel.id,
       name: panel.name,
-      isMain: panel.is_main,
+      isMain: panel.is_main ?? false,
       voltage: panel.voltage,
-      phase: panel.phase,
+      phase: (panel.phase === 3 ? 3 : 1) as 1 | 3,
       busRating: panel.bus_rating,
       numSpaces: panel.num_spaces ?? (panel.is_main ? 30 : 42),
       mainBreaker: panel.main_breaker_amps || undefined,
@@ -223,7 +223,7 @@ export function buildProjectContext(
       totalLoadVA,
       location: panel.location || undefined,
       fedFrom,
-      fedFromType: panel.fed_from_type || undefined,
+      fedFromType: (panel.fed_from_type as 'service' | 'panel' | 'transformer' | 'meter_stack' | null) || undefined,
       downstreamPanels: downstreamPanels.length > 0 ? downstreamPanels : undefined,
       downstreamTransformers: downstreamTransformers.length > 0 ? downstreamTransformers : undefined,
     };
@@ -240,7 +240,7 @@ export function buildProjectContext(
         circuitNumber: circuit.circuit_number,
         description: circuit.description,
         breakerAmps: circuit.breaker_amps,
-        pole: circuit.pole,
+        pole: (circuit.pole === 2 ? 2 : circuit.pole === 3 ? 3 : 1) as 1 | 2 | 3,
         loadWatts: circuit.load_watts || 0,
         loadType: circuit.load_type || undefined,
         conductorSize: circuit.conductor_size,
@@ -464,15 +464,17 @@ ${transformers.length > 0 ? `Transformers: ${transformers.length}` : ''}${permit
       (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
     );
     const top = sortedByDate[0];
-    estimatingSummary = {
-      count: estimates.length,
-      mostRecent: {
-        name: top.name,
-        status: top.status,
-        revision: top.revision,
-        total: top.total,
-      },
-    };
+    estimatingSummary = top
+      ? {
+          count: estimates.length,
+          mostRecent: {
+            name: top.name,
+            status: top.status,
+            revision: top.revision,
+            total: top.total,
+          },
+        }
+      : { count: estimates.length };
   } else if (estimates) {
     estimatingSummary = { count: 0 };
   }

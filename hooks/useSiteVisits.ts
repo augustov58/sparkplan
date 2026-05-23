@@ -36,7 +36,7 @@ export function useSiteVisits(projectId: string | undefined): UseSiteVisitsRetur
 
       if (fetchError) throw fetchError;
 
-      setVisits(data || []);
+      setVisits((data || []) as unknown as SiteVisit[]);
     } catch (err: any) {
       setError(err.message || 'Failed to fetch site visits');
       console.error('Error fetching site visits:', err);
@@ -99,8 +99,9 @@ export function useSiteVisits(projectId: string | undefined): UseSiteVisitsRetur
       if (error) throw error;
 
       // Optimistic update
-      setVisits((prev) => [data, ...prev]);
-      return data;
+      const newVisit = data as unknown as SiteVisit;
+      setVisits((prev) => [newVisit, ...prev]);
+      return newVisit;
     } catch (err: any) {
       setError(err.message || 'Failed to create site visit');
       console.error('Error creating site visit:', err);

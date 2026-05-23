@@ -287,9 +287,9 @@ export const InspectorMode: React.FC<InspectorModeProps> = ({
           warnings: latestReport.warnings,
           critical: latestReport.critical,
         },
-        issues: latestReport.issues as InspectionIssue[],
+        issues: latestReport.issues as unknown as InspectionIssue[],
         passedChecks: latestReport.passed_checks as any[],
-        necArticlesReferenced: latestReport.nec_articles_referenced,
+        necArticlesReferenced: latestReport.nec_articles_referenced ?? [],
         timestamp: new Date(latestReport.inspected_at),
       };
       setResult(savedResult);
@@ -320,7 +320,10 @@ export const InspectorMode: React.FC<InspectorModeProps> = ({
       } : undefined,
     };
 
-    const inspectionResult = runInspection(inspectionData);
+    // useFeeders returns the camelCase `Feeder` from types.ts; runInspection
+    // is typed against the DB Row shape. Runtime data is the same — cast to
+    // satisfy the structural mismatch.
+    const inspectionResult = runInspection(inspectionData as Parameters<typeof runInspection>[0]);
     setResult(inspectionResult);
 
     // Save report to database for persistence

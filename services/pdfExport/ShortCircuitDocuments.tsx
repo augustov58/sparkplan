@@ -251,7 +251,7 @@ export const ShortCircuitCalculationPages: React.FC<CalcProps> = ({
                 <View style={styles.tableRow}>
                   <Text style={styles.tableCellLabel}>Service Rating:</Text>
                   <Text style={styles.tableCellValue}>
-                    {calculation.service_amps}A, {calculation.service_voltage}V, {phaseLabel(calculation.service_phase)}
+                    {calculation.service_amps}A, {calculation.service_voltage}V, {phaseLabel(calculation.service_phase ?? '—')}
                   </Text>
                 </View>
                 {calculation.transformer_kva && (
@@ -306,7 +306,7 @@ export const ShortCircuitCalculationPages: React.FC<CalcProps> = ({
                 <View style={styles.tableRow}>
                   <Text style={styles.tableCellLabel}>Feeder Voltage/Phase:</Text>
                   <Text style={styles.tableCellValue}>
-                    {calculation.feeder_voltage}V, {phaseLabel(calculation.feeder_phase)}
+                    {calculation.feeder_voltage}V, {phaseLabel(calculation.feeder_phase ?? '—')}
                   </Text>
                 </View>
                 <View style={styles.tableRow}>
@@ -481,9 +481,11 @@ function buildRow(calc: ShortCircuitCalculation): TableRowData {
   const results = calc.results as unknown as ShortCircuitResult;
   const isService = calc.calculation_type === 'service';
 
-  // Panel/location label — use location_name first (set on insert), then panel_name,
-  // then a calc-type fallback so the row is never blank.
-  const panelLabel = calc.location_name || calc.panel_name || (isService ? 'Service Main' : 'Panel');
+  // Panel/location label — use location_name first (set on insert), then panel_name
+  // (legacy field, may not exist on current schema), then a calc-type fallback so the
+  // row is never blank.
+  const legacyPanelName = (calc as { panel_name?: string | null }).panel_name;
+  const panelLabel = calc.location_name || legacyPanelName || (isService ? 'Service Main' : 'Panel');
 
   const feederLabel = isService
     ? (calc.service_conductor_size
@@ -774,7 +776,7 @@ export const ShortCircuitSystemReport: React.FC<SystemReportProps> = ({
                     <View style={styles.tableRow}>
                       <Text style={styles.tableCellLabel}>Service:</Text>
                       <Text style={styles.tableCellValue}>
-                        {calc.service_amps}A, {calc.service_voltage}V, {phaseLabel(calc.service_phase)}
+                        {calc.service_amps}A, {calc.service_voltage}V, {phaseLabel(calc.service_phase ?? '—')}
                       </Text>
                     </View>
                     {calc.transformer_kva && (

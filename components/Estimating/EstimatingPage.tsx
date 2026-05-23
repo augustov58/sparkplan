@@ -73,7 +73,7 @@ export const EstimatingPage: React.FC<EstimatingPageProps> = ({ project }) => {
     if (!created) return;
 
     if (runAutoTakeoff && user) {
-      const result = autoTakeoffFromProject({ panels, circuits, feeders, transformers });
+      const result = autoTakeoffFromProject({ panels, circuits, feeders: feeders as never[], transformers });
       if (result.lineItems.length > 0) {
         const rows = result.lineItems.map((li) => ({
           estimate_id: created.id,

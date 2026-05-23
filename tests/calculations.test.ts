@@ -1211,7 +1211,7 @@ function makePanel(overrides: Partial<Panel> & Pick<Panel, 'id' | 'name'>): Pane
     ul_listing: null,
     voltage: 240,
     ...overrides,
-  };
+  } as Panel;
 }
 
 function makeFeeder(overrides: Partial<Feeder> & Pick<Feeder, 'id' | 'name'>): Feeder {

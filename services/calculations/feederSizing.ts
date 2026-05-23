@@ -119,10 +119,15 @@ export function calculateFeederSizing(
   // to run in separate raceways (typical practice), so we do NOT multiply by parallelSets.
   // If a contractor stuffs all parallel sets into one raceway, they must manually set
   // num_current_carrying to the total (e.g. parallelSets × CCCs-per-set).
-  const settingsForSizing = {
+  // Narrow `source_phase: number` to the `1 | 3` literal union required by
+  // ProjectSettings / calculateVoltageDropAC. Defaults to 3-phase if the input
+  // is anything other than 1 (calc services never throw on bad input).
+  const normalizedPhase: 1 | 3 = input.source_phase === 1 ? 1 : 3;
+
+  const settingsForSizing: import('../../types').ProjectSettings = {
     serviceVoltage: input.source_voltage,
-    servicePhase: input.source_phase,
-    occupancyType: 'commercial' as const,
+    servicePhase: normalizedPhase,
+    occupancyType: 'commercial',
     conductorMaterial: input.conductor_material,
     temperatureRating: (input.temperature_rating || 75) as 60 | 75 | 90,
   };
@@ -199,7 +204,7 @@ export function calculateFeederSizing(
     input.distance_ft,
     perConductorAmps,
     input.source_voltage,
-    input.source_phase
+    normalizedPhase
   );
 
   const max_vd = input.max_voltage_drop_percent || 3.0;
@@ -330,5 +335,5 @@ function upsizeConduit(currentSize: string, steps: number): string {
   if (currentIndex === -1) return currentSize;
 
   const newIndex = Math.min(currentIndex + steps, sizes.length - 1);
-  return sizes[newIndex];
+  return sizes[newIndex] ?? currentSize;
 }

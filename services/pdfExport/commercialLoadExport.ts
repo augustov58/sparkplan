@@ -45,7 +45,9 @@ function slugify(name: string): string {
 }
 
 function dateStamp(): string {
-  return new Date().toISOString().split('T')[0];
+  // ISO string always has T separator → split[0] is always defined; fallback
+  // is for noUncheckedIndexedAccess only.
+  return new Date().toISOString().split('T')[0] ?? '';
 }
 
 // ==================== PDF EXPORT ====================
@@ -53,7 +55,9 @@ function dateStamp(): string {
 export async function exportCommercialLoadPDF(
   input: CommercialLoadExportInput
 ): Promise<void> {
-  const blob = await pdf(React.createElement(CommercialLoadDocument, input)).toBlob();
+  // react-pdf's pdf() expects ReactElement<DocumentProps>; the component
+  // is structurally compatible at runtime, cast to bridge the strict type.
+  const blob = await pdf(React.createElement(CommercialLoadDocument, input) as never).toBlob();
   const filename = `CommercialLoadCalc_${slugify(input.project.name)}_${dateStamp()}.pdf`;
   downloadBlob(blob, filename);
 }

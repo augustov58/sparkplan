@@ -94,8 +94,10 @@ export const EVPanelTemplates: React.FC<EVPanelTemplatesProps> = ({ project }) =
         config
       });
 
-      // Create panel in database
-      const newPanel = await createPanel(panel);
+      // Create panel in database. The template generator returns a Partial<Panel>
+      // (Supabase fills the remaining nullable columns at insert time); cast to
+      // satisfy createPanel's stricter Omit<PanelInsert, 'id'> shape.
+      const newPanel = await createPanel(panel as Parameters<typeof createPanel>[0]);
 
       if (!newPanel || !newPanel.id) {
         throw new Error('Failed to create panel');
@@ -107,12 +109,15 @@ export const EVPanelTemplates: React.FC<EVPanelTemplatesProps> = ({ project }) =
       // when the project is existing-construction. (The flag is harmless on
       // new-construction projects because the marker is gated upstream.)
       for (const circuit of circuits) {
+        // TemplateCircuit uses a camelCase intermediate shape; this call site
+        // preserves the legacy spread behavior. Cast satisfies the stricter
+        // snake_case CircuitInsert signature.
         await createCircuit({
           ...circuit,
           panel_id: newPanel.id,
           project_id: project.id,
           is_proposed: true,
-        });
+        } as unknown as Parameters<typeof createCircuit>[0]);
       }
 
       setApplyStatus('success');
@@ -401,7 +406,7 @@ export const EVPanelTemplates: React.FC<EVPanelTemplatesProps> = ({ project }) =
           </div>
 
           {/* Service Upgrade Warning */}
-          {panelSpecs.totalLoad > (project.serviceSizeAmps || 200) && (
+          {panelSpecs.totalLoad > (project.serviceAmps || 200) && (
             <div className="bg-orange-50 border border-orange-200 rounded-lg p-4">
               <div className="flex items-start gap-2">
                 <AlertCircle className="w-5 h-5 text-orange-600 flex-shrink-0 mt-0.5" />
@@ -409,7 +414,7 @@ export const EVPanelTemplates: React.FC<EVPanelTemplatesProps> = ({ project }) =
                   <h4 className="font-medium text-orange-900 mb-1">Service Upgrade May Be Required</h4>
                   <p className="text-sm text-orange-800">
                     This configuration requires <strong>{panelSpecs.totalLoad}A</strong> of capacity,
-                    but your current service is only <strong>{project.serviceSizeAmps || 200}A</strong>.
+                    but your current service is only <strong>{project.serviceAmps || 200}A</strong>.
                     Use the <strong>Service Upgrade Wizard</strong> to determine if an upgrade is needed per NEC 220.87.
                   </p>
                 </div>

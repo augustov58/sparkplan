@@ -28,6 +28,7 @@
 // @ts-ignore: Deno global
 declare const Deno: any;
 
+// @ts-ignore: Deno URL import resolved at runtime
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import {
   getAccessToken,
@@ -229,7 +230,7 @@ async function processMessage(
   return result;
 }
 
-serve(async (req) => {
+serve(async (req: Request) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
   }

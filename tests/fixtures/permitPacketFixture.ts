@@ -221,7 +221,8 @@ const arcFlashResult = calculateArcFlash({
   voltage: 480,
   phase: 3,
   equipmentType: 'panelboard',
-  clearingTime: 0.083,
+  protectiveDevice: 'circuit_breaker',
+  deviceRating: 200,
 });
 
 const grounding: any = {

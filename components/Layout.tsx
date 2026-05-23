@@ -150,11 +150,14 @@ export const Layout: React.FC<LayoutProps> = ({ children, title, showBack, onSig
   const getUserInitials = () => {
     if (profile?.full_name) {
       const parts = profile.full_name.trim().split(/\s+/);
-      if (parts.length >= 2) return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
-      return parts[0].slice(0, 2).toUpperCase();
+      const first = parts[0];
+      const last = parts[parts.length - 1];
+      if (parts.length >= 2 && first && last) return (first[0]! + last[0]!).toUpperCase();
+      if (first) return first.slice(0, 2).toUpperCase();
     }
     if (!user?.email) return '??';
-    return user.email.split('@')[0].slice(0, 2).toUpperCase();
+    const local = user.email.split('@')[0];
+    return local ? local.slice(0, 2).toUpperCase() : '??';
   };
 
   const getUserDisplayName = () => {
@@ -298,14 +301,18 @@ export const Layout: React.FC<LayoutProps> = ({ children, title, showBack, onSig
                   <SidebarSection title={section.title} />
                   {section.items
                     .filter(item => item.show !== false)
-                    .map((item) => (
+                    .map((item) => {
+                      // Mixed union: only the 'Circuit Design' item has `nested`.
+                      // Narrow via a cast so we can read it without TS complaining.
+                      const nested = (item as { nested?: Array<{ label: string; icon: any; path: string }> }).nested;
+                      return (
                       <React.Fragment key={item.label}>
                         <SidebarItem
                           icon={item.icon}
                           label={item.label}
                           path={item.path}
                           active={location.pathname === item.path}
-                          hasChildren={!!item.nested}
+                          hasChildren={!!nested}
                           isExpanded={expandedSections[item.label]}
                           beta={(item as any).beta}
                           onToggle={() => setExpandedSections(prev => ({
@@ -314,7 +321,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, title, showBack, onSig
                           }))}
                           onNavigate={() => setIsMobileMenuOpen(false)}
                         />
-                        {item.nested && expandedSections[item.label] && item.nested.map((nestedItem: any) => (
+                        {nested && expandedSections[item.label] && nested.map((nestedItem: any) => (
                           <SidebarItem
                             key={nestedItem.label}
                             icon={nestedItem.icon}
@@ -326,7 +333,8 @@ export const Layout: React.FC<LayoutProps> = ({ children, title, showBack, onSig
                           />
                         ))}
                       </React.Fragment>
-                    ))}
+                      );
+                    })}
                 </React.Fragment>
               ))}
             </>

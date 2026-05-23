@@ -80,7 +80,7 @@ export const RFIPDFExtractor: React.FC<RFIPDFExtractorProps> = ({ onDataExtracte
           const base64 = reader.result as string;
           // Remove data:application/pdf;base64, prefix
           const base64Data = base64.split(',')[1];
-          resolve(base64Data);
+          resolve(base64Data || '');
         };
         reader.onerror = reject;
       });

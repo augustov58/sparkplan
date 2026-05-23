@@ -11,8 +11,25 @@
  * - NEC 220.87: Determining existing loads (for service upgrades)
  */
 
-import type { Panel, Circuit } from '../types';
+import type { Panel } from '../types';
 import { nanoid } from 'nanoid';
+
+// Template-time circuit shape — camelCase, distinct from the snake_case
+// DB Circuit row type. These templates are display fixtures; the
+// applyEVPanelTemplate / generateCustomEVPanel paths convert to DB shape
+// before insert.
+interface TemplateCircuit {
+  circuitNumber: number;
+  breakerAmps: number;
+  poles: number;
+  voltage: number;
+  description: string;
+  conductorSize: string;
+  conductorType: string;
+  loadVA: number;
+  isEvCharger: boolean;
+  evChargerAmps?: number;
+}
 
 export interface EVPanelTemplate {
   id: string;
@@ -40,8 +57,8 @@ export interface EVPanelTemplate {
   totalLoadAmps: number;          // Total calculated load
   necArticles: string[];          // Relevant NEC articles
 
-  // Pre-configured Circuits
-  circuits: Omit<Circuit, 'id' | 'project_id' | 'panel_id' | 'created_at'>[];
+  // Pre-configured Circuits (template-time camelCase shape, not DB row)
+  circuits: TemplateCircuit[];
 
   // Use Cases
   idealFor: string[];             // Recommended applications
@@ -382,22 +399,26 @@ export interface ApplyTemplateInput {
 }
 
 export interface ApplyTemplateOutput {
-  panel: Omit<Panel, 'id' | 'created_at'>;
-  circuits: Omit<Circuit, 'id' | 'created_at' | 'project_id' | 'panel_id'>[];
+  // Partial because the template path only fills a subset of Panel columns;
+  // Supabase fills defaults for the remaining nullable columns at insert time.
+  panel: Partial<Omit<Panel, 'id' | 'created_at'>>;
+  // Template-time circuit shape (camelCase) — callers convert to DB row
+  // shape (snake_case Circuit) before inserting via Supabase. project_id
+  // is added by callers, not the template generator itself.
+  circuits: TemplateCircuit[];
 }
 
 export function applyEVPanelTemplate(input: ApplyTemplateInput): ApplyTemplateOutput {
   const { projectId, template, panelName } = input;
 
   // Create panel from template
-  const panel: Omit<Panel, 'id' | 'created_at'> = {
+  const panel: Partial<Omit<Panel, 'id' | 'created_at'>> = {
     project_id: projectId,
     name: panelName || template.name,
     main_breaker_amps: template.panelRating,
     voltage: template.voltage,
     phase: template.phase,
     bus_rating: template.panelRating,
-    panel_type: 'Sub-panel',
     fed_from_type: 'service',  // User must configure parent panel
     location: 'EV Charging Area'
   };
@@ -544,20 +565,19 @@ export function generateCustomEVPanel(input: CustomEVPanelInput): ApplyTemplateO
   const defaultName = `${numberOfChargers}× ${chargerType}${useEVEMS ? ' with EVEMS' : ''} Panel`;
 
   // Create panel
-  const panel: Omit<Panel, 'id' | 'created_at'> = {
+  const panel: Partial<Omit<Panel, 'id' | 'created_at'>> = {
     project_id: projectId,
     name: panelName || defaultName,
     main_breaker_amps: panelRating,
     voltage: voltage,
     phase: phase,
     bus_rating: panelRating,
-    panel_type: 'Sub-panel',
     fed_from_type: 'service',
     location: 'EV Charging Area'
   };
 
-  // Generate circuits
-  const circuits: Omit<Circuit, 'id' | 'created_at' | 'project_id' | 'panel_id'>[] = [];
+  // Generate circuits (TemplateCircuit shape — caller converts to DB row)
+  const circuits: TemplateCircuit[] = [];
   let circuitNumber = 1;
 
   // NEC 220.57(A): Per-EVSE branch-circuit load = max(7,200 VA, nameplate).

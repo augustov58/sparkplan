@@ -8,13 +8,13 @@
  */
 
 import type { ProjectContext } from './projectContextBuilder';
-import type { ToolResult, ToolResultDisplay, Feeder } from '@/types';
+import type { ToolResult, ToolResultDisplay, Feeder, FeederCalculationInput } from '@/types';
 import type { Database } from '@/lib/database.types';
 import { analyzeChangeImpact, draftRFI, predictInspection } from '../api/pythonBackend';
 import { supabase } from '@/lib/supabase';
 import { notifyDataRefresh } from '@/lib/dataRefreshEvents';
 import { computeFeederLoadVA } from '@/services/feeder/feederLoadSync';
-import { calculateFeederSizing, type FeederCalculationInput } from '@/services/calculations/feederSizing';
+import { calculateFeederSizing } from '@/services/calculations/feederSizing';
 import {
   calculateAllCumulativeVoltageDrops,
   calculateCumulativeForFeeder,
@@ -500,7 +500,9 @@ function buildTestLoadPool(
 function shuffleInPlace<T>(arr: T[]): T[] {
   for (let i = arr.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1));
-    [arr[i], arr[j]] = [arr[j], arr[i]];
+    const tmp = arr[i] as T;
+    arr[i] = arr[j] as T;
+    arr[j] = tmp;
   }
   return arr;
 }

@@ -71,7 +71,7 @@ export const InspectionsListTab: React.FC<InspectionsListTabProps> = ({
   const selected = inspections.find((i) => i.id === selectedId) || null;
   const selectedPermitLabel =
     selected && permitsById[selected.permit_id]
-      ? formatPermitLabel(permitsById[selected.permit_id])
+      ? formatPermitLabel(permitsById[selected.permit_id]!)
       : undefined;
 
   return (

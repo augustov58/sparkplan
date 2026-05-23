@@ -48,7 +48,7 @@ export function useCalendarEvents(projectId: string | undefined): UseCalendarEve
 
       if (fetchError) throw fetchError;
 
-      setEvents(data || []);
+      setEvents((data || []) as unknown as CalendarEvent[]);
     } catch (err: any) {
       setError(err.message || 'Failed to fetch calendar events');
       console.error('Error fetching calendar events:', err);
@@ -104,11 +104,12 @@ export function useCalendarEvents(projectId: string | undefined): UseCalendarEve
       if (createError) throw createError;
 
       // Optimistic update
-      setEvents(prev => [...prev, data].sort((a, b) =>
+      const newEvent = data as unknown as CalendarEvent;
+      setEvents(prev => [...prev, newEvent].sort((a, b) =>
         new Date(a.event_date).getTime() - new Date(b.event_date).getTime()
       ));
 
-      return data;
+      return newEvent;
     } catch (err: any) {
       setError(err.message || 'Failed to create calendar event');
       console.error('Error creating calendar event:', err);

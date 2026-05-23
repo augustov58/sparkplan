@@ -265,6 +265,7 @@ const makeCalcErrorResult = (message: string): FeederCalculationResult => ({
   voltage_drop_percent: 0,
   voltage_drop_volts: 0,
   meets_voltage_drop: false,
+  sets_in_parallel: 1,
   warnings: [`Calculation failed: ${message}`],
   necReferences: [],
 });
@@ -329,8 +330,12 @@ function buildBaseFeederRow(
       // C2: live-derive feeder load from destination panel demand. Falls back to
       // cached feeder.total_load_va when circuits aren't supplied (legacy callers,
       // test fixtures) or the feeder targets a transformer instead of a panel.
+      // computeFeederLoadVA expects the curated types.ts Feeder shape
+      // (non-null fields) but feeder here is the wider DB Row; cast at
+      // the boundary — the runtime only reads stable fields that both
+      // shapes share.
       const liveLoadVA = circuits
-        ? computeFeederLoadVA(feeder, panels, circuits, transformers)
+        ? computeFeederLoadVA(feeder as never, panels, circuits, transformers)
         : (feeder.total_load_va || 0);
 
       const input: FeederCalculationInput = {

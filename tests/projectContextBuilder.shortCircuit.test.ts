@@ -154,8 +154,8 @@ describe('buildProjectContext: short-circuit calculations', () => {
       [makeServiceCalc({ results: null })] as any,
     );
     expect(ctx.shortCircuits).toHaveLength(1);
-    expect(ctx.shortCircuits![0].faultCurrentA).toBe(0);
-    expect(ctx.shortCircuits![0].requiredAicKa).toBeUndefined();
+    expect(ctx.shortCircuits![0]!.faultCurrentA).toBe(0);
+    expect(ctx.shortCircuits![0]!.requiredAicKa).toBeUndefined();
   });
 });
 

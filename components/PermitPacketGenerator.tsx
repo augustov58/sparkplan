@@ -504,7 +504,7 @@ export const PermitPacketGenerator: React.FC<PermitPacketGeneratorProps> = ({ pr
     // count when present.
     const occ = currentProject?.settings?.occupancyType;
     const isMultiFamily =
-      (currentProject?.settings?.residential?.multi_family_units ?? 0) >= 3;
+      (currentProject?.settings?.residential?.totalUnits ?? 0) >= 3;
     let buildingType: BuildingType;
     if (isMultiFamily) {
       buildingType = 'multi_family';
@@ -910,7 +910,7 @@ export const PermitPacketGenerator: React.FC<PermitPacketGeneratorProps> = ({ pr
         servicePhase: currentProject.servicePhase,
         panels,
         circuits,
-        feeders,
+        feeders: feeders as any,
         transformers,
         preparedBy: preparedBy.trim() || undefined,
         permitNumber: permitNumber.trim() || undefined,
@@ -931,7 +931,7 @@ export const PermitPacketGenerator: React.FC<PermitPacketGeneratorProps> = ({ pr
         meterStacks: meterStacks.length > 0 ? meterStacks : undefined,
         meters: meters.length > 0 ? meters : undefined,
         // Tier 3: Jurisdiction requirements
-        jurisdictionId: currentProject.jurisdiction_id,
+        jurisdictionId: currentProject.jurisdiction_id ?? undefined,
         jurisdiction: jurisdiction,
         // NEC 220.84 multifamily Optional Method context (undefined for non-MF projects)
         multiFamilyContext,
@@ -1023,8 +1023,8 @@ export const PermitPacketGenerator: React.FC<PermitPacketGeneratorProps> = ({ pr
         const narrative: NEC22087NarrativeData = {
           method: nec22087Method,
           dataSourceCitation: nec22087DataSource.trim(),
-          dateRangeFrom: nec22087DateFrom || new Date(Date.now() - 365 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-          dateRangeTo: nec22087DateTo || new Date().toISOString().split('T')[0],
+          dateRangeFrom: nec22087DateFrom || new Date(Date.now() - 365 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]!,
+          dateRangeTo: nec22087DateTo || new Date().toISOString().split('T')[0]!,
           maxDemandKVA: maxDemandParsed,
           proposedNewLoadKVA: Number.isFinite(proposedParsed) ? proposedParsed : 0,
           serviceCapacityAmps,

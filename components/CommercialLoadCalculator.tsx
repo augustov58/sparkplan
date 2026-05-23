@@ -1007,38 +1007,42 @@ export const CommercialLoadCalculator: React.FC<CommercialLoadCalculatorProps> =
                   </div>
 
                   {/* Show feeder calculation results inline */}
-                  {feederResults[`feeder-${index}`] && (
+                  {(() => {
+                    const fr = feederResults[`feeder-${index}`];
+                    if (!fr) return null;
+                    return (
                     <div className="mt-2 p-2 bg-gray-50 rounded border border-gray-200">
                       <div className="grid grid-cols-4 gap-2 text-xs">
                         <div>
                           <div className="text-gray-600">Conductors</div>
                           <div className="font-semibold text-gray-900">
-                            {feederResults[`feeder-${index}`].phase_conductor_size} {feeder.conductor_material}
+                            {fr.phase_conductor_size} {feeder.conductor_material}
                           </div>
                         </div>
                         <div>
                           <div className="text-gray-600">EGC</div>
                           <div className="font-semibold text-gray-900">
-                            {feederResults[`feeder-${index}`].egc_size}
+                            {fr.egc_size}
                           </div>
                         </div>
                         <div>
                           <div className="text-gray-600">Conduit</div>
                           <div className="font-semibold text-gray-900">
-                            {feederResults[`feeder-${index}`].recommended_conduit_size}
+                            {fr.recommended_conduit_size}
                           </div>
                         </div>
                         <div>
                           <div className="text-gray-600">V.D.</div>
                           <div className={`font-semibold ${
-                            feederResults[`feeder-${index}`].meets_voltage_drop ? 'text-green-600' : 'text-red-600'
+                            fr.meets_voltage_drop ? 'text-green-600' : 'text-red-600'
                           }`}>
-                            {feederResults[`feeder-${index}`].voltage_drop_percent.toFixed(2)}%
+                            {fr.voltage_drop_percent.toFixed(2)}%
                           </div>
                         </div>
                       </div>
                     </div>
-                  )}
+                    );
+                  })()}
                 </div>
               ))}
 

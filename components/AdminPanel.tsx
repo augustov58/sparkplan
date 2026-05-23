@@ -58,10 +58,12 @@ export const AdminPanel: React.FC = () => {
       return;
     }
 
-    if (data?.success) {
-      setUsers(data.users || []);
+    // RPC contract: backend returns { success: boolean; users?: UserResult[]; error?: string }
+    const result = data as { success?: boolean; users?: UserResult[]; error?: string } | null;
+    if (result?.success) {
+      setUsers(result.users || []);
     } else {
-      setMessage({ type: 'error', text: data?.error || 'Unknown error' });
+      setMessage({ type: 'error', text: result?.error || 'Unknown error' });
     }
   }, []);
 
@@ -89,13 +91,15 @@ export const AdminPanel: React.FC = () => {
       return;
     }
 
-    if (data?.success) {
+    // RPC contract: backend returns { success: boolean; error?: string }
+    const result = data as { success?: boolean; error?: string } | null;
+    if (result?.success) {
       setMessage({ type: 'success', text: `Set ${email} to ${plan} plan.` });
       setUsers(prev =>
         prev.map(u => (u.email === email ? { ...u, plan, status: 'active', trial_end: null } : u))
       );
     } else {
-      setMessage({ type: 'error', text: data?.error || 'Unknown error' });
+      setMessage({ type: 'error', text: result?.error || 'Unknown error' });
     }
   };
 
@@ -117,7 +121,9 @@ export const AdminPanel: React.FC = () => {
       return;
     }
 
-    if (data?.success) {
+    // RPC contract: backend returns { success: boolean; error?: string }
+    const result = data as { success?: boolean; error?: string } | null;
+    if (result?.success) {
       setMessage({ type: 'success', text: `Created user ${newEmail} with ${newPlan} plan.` });
       setNewEmail('');
       setNewPassword('');
@@ -125,7 +131,7 @@ export const AdminPanel: React.FC = () => {
       setShowAddForm(false);
       loadUsers(searchEmail.trim());
     } else {
-      setMessage({ type: 'error', text: data?.error || 'Unknown error' });
+      setMessage({ type: 'error', text: result?.error || 'Unknown error' });
     }
   };
 
@@ -146,11 +152,13 @@ export const AdminPanel: React.FC = () => {
       return;
     }
 
-    if (data?.success) {
+    // RPC contract: backend returns { success: boolean; error?: string }
+    const result = data as { success?: boolean; error?: string } | null;
+    if (result?.success) {
       setMessage({ type: 'success', text: `Deleted ${email}.` });
       setUsers(prev => prev.filter(u => u.email !== email));
     } else {
-      setMessage({ type: 'error', text: data?.error || 'Unknown error' });
+      setMessage({ type: 'error', text: result?.error || 'Unknown error' });
     }
   };
 
@@ -169,13 +177,15 @@ export const AdminPanel: React.FC = () => {
       return;
     }
 
-    if (data?.success) {
+    // RPC contract: backend returns { success: boolean; error?: string }
+    const result = data as { success?: boolean; error?: string } | null;
+    if (result?.success) {
       setMessage({ type: 'success', text: `Confirmed ${email}.` });
       setUsers(prev =>
         prev.map(u => (u.email === email ? { ...u, email_confirmed_at: new Date().toISOString() } : u))
       );
     } else {
-      setMessage({ type: 'error', text: data?.error || 'Unknown error' });
+      setMessage({ type: 'error', text: result?.error || 'Unknown error' });
     }
   };
 

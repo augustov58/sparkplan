@@ -533,7 +533,7 @@ function checkFeederEgc(feeder: Feeder, panels: Panel[]): InspectionIssue | null
   if (!destPanel) return null;
   
   const ocpdAmps = destPanel.main_breaker_amps || destPanel.feeder_breaker_amps || destPanel.bus_rating;
-  const requiredEgc = getRequiredEgcSize(ocpdAmps, feeder.conductor_material);
+  const requiredEgc = getRequiredEgcSize(ocpdAmps, feeder.conductor_material as 'Cu' | 'Al');
   
   if (!feeder.egc_size) {
     return {

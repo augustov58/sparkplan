@@ -176,7 +176,7 @@ export const EstimateBidDocument: React.FC<EstimateBidDocumentProps> = ({
   }
   // Sort each group by position.
   for (const k of Object.keys(byCategory)) {
-    byCategory[k].sort((a, b) => a.position - b.position);
+    byCategory[k]!.sort((a, b) => a.position - b.position);
   }
 
   const projectName = project?.name ?? 'Project';

@@ -60,7 +60,7 @@ export const PreInspection: React.FC<InspectionProps> = ({ project }) => {
         project.servicePhase,
         panels,
         circuits,
-        feeders,
+        feeders as never[],
         transformers,
         undefined, // residentialSettings
         undefined, // estimates

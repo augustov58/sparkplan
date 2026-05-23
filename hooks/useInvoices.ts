@@ -150,7 +150,13 @@ export function useInvoices(projectId: string | undefined): UseInvoicesReturn {
     try {
       const { draft, invoiceNumber, invoiceDate, dueDate, periodStart, periodEnd } = args;
 
-      const { data, error: err } = await supabase.rpc('generate_invoice_atomic', {
+      // The Supabase-generated RPC types mark optional fields as non-null
+      // `string`, but the underlying SQL function (see migration
+      // `20260513_tm_billing_phase1b.sql`) accepts NULL for due_date,
+      // description, notes, and the customer snapshot columns. Cast the
+      // args object so we can preserve the null-passing runtime contract
+      // without breaking the build under stricter Supabase typegen.
+      const rpcArgs = {
         p_project_id: projectIdLocal,
         p_period_start: periodStart,
         p_period_end: periodEnd,
@@ -171,7 +177,9 @@ export function useInvoices(projectId: string | undefined): UseInvoicesReturn {
         p_time_entry_ids: draft.timeEntries.map((t) => t.id),
         p_material_entry_ids: draft.materialEntries.map((m) => m.id),
         p_mark_sent: args.markSent,
-      });
+      } as Database['public']['Functions']['generate_invoice_atomic']['Args'];
+
+      const { data, error: err } = await supabase.rpc('generate_invoice_atomic', rpcArgs);
       if (err) throw err;
 
       showToast.success(toastMessages.invoice.created);

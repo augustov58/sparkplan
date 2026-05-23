@@ -355,7 +355,7 @@ export function calculateMaxPanelsPerString(
   inverterMaxVdc: number,
   lowestAmbientTemp: number = -10
 ): number {
-  const tempCorrection = TEMPERATURE_CORRECTION_VOC[lowestAmbientTemp.toString()] || 1.05;
+  const tempCorrection = TEMPERATURE_CORRECTION_VOC[lowestAmbientTemp as number] || 1.05;
   const correctedVoc = panelVoc * tempCorrection;
   return Math.floor(inverterMaxVdc / correctedVoc);
 }

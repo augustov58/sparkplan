@@ -66,7 +66,7 @@ test.describe('NEC 220.83 — existing dwelling + proposed load → permit packe
     if (await addCustomBtn.isVisible().catch(() => false)) {
       const templateSelect = page.locator('select').filter({ hasText: /Select Load|EV|HVAC/i }).first();
       if (await templateSelect.isVisible().catch(() => false)) {
-        await templateSelect.selectOption({ label: /Level 2 EV Charger \(48A\)/ }).catch(async () => {
+        await templateSelect.selectOption({ label: 'Level 2 EV Charger (48A)' }).catch(async () => {
           await templateSelect.selectOption({ index: 1 });
         });
       } else {

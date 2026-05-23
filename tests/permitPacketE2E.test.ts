@@ -312,7 +312,8 @@ const arcFlashResult = calculateArcFlash({
   voltage: 480,
   phase: 3,
   equipmentType: 'panelboard',
-  clearingTime: 0.083, // 5 cycles
+  protectiveDevice: 'circuit_breaker',
+  deviceRating: 200,
 });
 
 const grounding: any = {
@@ -571,7 +572,7 @@ describe('Permit packet: full generator E2E (mirrors button click)', () => {
     await generatePermitPacket(uiLikePacket);
 
     expect(downloads).toHaveLength(1);
-    const dl = downloads[0];
+    const dl = downloads[0]!;
     expect(dl.fileName).toMatch(/^Permit_Packet_E2E_Harness_Project_\d{4}-\d{2}-\d{2}\.pdf$/);
     expect(dl.bytes).toBeGreaterThan(10_000); // a 15+ page PDF is comfortably >10KB
     // Sanity: header bytes for "%PDF-"
@@ -597,7 +598,7 @@ describe('Permit packet: full generator E2E (mirrors button click)', () => {
     downloads.length = 0;
     await generatePermitPacket(fullPacket);
     expect(downloads).toHaveLength(1);
-    expect(downloads[0].bytes).toBeGreaterThan(10_000);
+    expect(downloads[0]!.bytes).toBeGreaterThan(10_000);
   }, 60_000);
 
   it('generates lightweight packet without errors', async () => {
@@ -605,7 +606,7 @@ describe('Permit packet: full generator E2E (mirrors button click)', () => {
     await generateLightweightPermitPacket(fullPacket);
 
     expect(downloads).toHaveLength(1);
-    const dl = downloads[0];
+    const dl = downloads[0]!;
     expect(dl.fileName).toMatch(/^Permit_Packet_Lightweight_/);
     expect(dl.bytes).toBeGreaterThan(5_000);
   }, 30_000);
@@ -622,7 +623,7 @@ describe('Permit packet: full generator E2E (mirrors button click)', () => {
     expect(downloads).toHaveLength(1);
     // Should still produce the same number of bytes ballpark (grounding page
     // is included via its calculated default).
-    expect(downloads[0].bytes).toBeGreaterThan(10_000);
+    expect(downloads[0]!.bytes).toBeGreaterThan(10_000);
   }, 60_000);
 
   it('generates minimal packet (no optional sections)', async () => {
@@ -645,7 +646,7 @@ describe('Permit packet: full generator E2E (mirrors button click)', () => {
     await generatePermitPacket(minimal);
 
     expect(downloads).toHaveLength(1);
-    expect(downloads[0].bytes).toBeGreaterThan(5_000);
+    expect(downloads[0]!.bytes).toBeGreaterThan(5_000);
   }, 30_000);
 });
 
@@ -787,7 +788,7 @@ describe('Permit packet: NEC 220.83 existing dwelling — proposed loads on PDF'
     const streamRe = /stream[\r\n]+([\s\S]*?)[\r\n]+endstream/g;
     let m: RegExpExecArray | null;
     while ((m = streamRe.exec(buf.toString('binary'))) !== null) {
-      const streamBytes = Buffer.from(m[1], 'binary');
+      const streamBytes = Buffer.from(m[1]!, 'binary');
       let inflated: Buffer;
       try {
         inflated = zlib.inflateSync(streamBytes);
@@ -803,7 +804,7 @@ describe('Permit packet: NEC 220.83 existing dwelling — proposed loads on PDF'
       const hexRe = /<([0-9a-fA-F\s]+)>/g;
       let h: RegExpExecArray | null;
       while ((h = hexRe.exec(streamText)) !== null) {
-        const hex = h[1].replace(/\s+/g, '');
+        const hex = h[1]!.replace(/\s+/g, '');
         if (hex.length === 0 || hex.length % 2 !== 0) continue;
         try {
           const decoded = Buffer.from(hex, 'hex').toString('binary');
@@ -912,7 +913,7 @@ describe('Permit packet: NEC 220.83 existing dwelling — proposed loads on PDF'
     await generatePermitPacket(packet);
 
     expect(downloads).toHaveLength(1);
-    const dl = downloads[0];
+    const dl = downloads[0]!;
     expect(dl.bytes).toBeGreaterThan(10_000);
 
     // Opt-in disk dump so the user can visually inspect the rendered PDF.
@@ -961,7 +962,7 @@ describe('Permit packet: NEC 220.83 existing dwelling — proposed loads on PDF'
     await generatePermitPacket(packet);
 
     expect(downloads).toHaveLength(1);
-    const text = await extractTextFromPdf(downloads[0].blob);
+    const text = await extractTextFromPdf(downloads[0]!.blob);
 
     expect(text).not.toContain('Proposed new circuit');
   }, 60_000);
@@ -1131,7 +1132,7 @@ describe('Permit packet: Commercial Existing 220.87 scenarios (visual proof)', (
 
     await generatePermitPacket(packet);
     expect(downloads).toHaveLength(1);
-    const dl = downloads[0];
+    const dl = downloads[0]!;
     expect(dl.bytes).toBeGreaterThan(10_000);
 
     if (process.env.E2E_DUMP_PDFS === '1') {
@@ -1170,7 +1171,7 @@ describe('Permit packet: Commercial Existing 220.87 scenarios (visual proof)', (
 
     await generatePermitPacket(packet);
     expect(downloads).toHaveLength(1);
-    const dl = downloads[0];
+    const dl = downloads[0]!;
     expect(dl.bytes).toBeGreaterThan(10_000);
 
     if (process.env.E2E_DUMP_PDFS === '1') {
