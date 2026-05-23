@@ -3,8 +3,15 @@
  * Pre-configured projects to help new users get started quickly
  */
 
-import { ProjectStatus, ProjectType } from '../types';
-import type { Project, LoadItem, PanelCircuit, GroundingDetail } from '../types';
+import { DwellingType, ProjectStatus, ProjectType } from '../types';
+import type {
+  Project,
+  LoadItem,
+  PanelCircuit,
+  GroundingDetail,
+  ProjectSettings,
+  ResidentialSettings,
+} from '../types';
 import type { Database } from '../lib/database.types';
 
 type PanelInsert = Database['public']['Tables']['panels']['Insert'];
@@ -16,26 +23,10 @@ interface ProjectTemplate {
   description: string;
   type: ProjectType;
   necEdition: '2020' | '2023';
-  settings: {
-    serviceVoltage: number;
-    servicePhase: 1 | 3;
-    occupancyType: 'dwelling' | 'commercial' | 'industrial';
-    conductorMaterial: 'Cu' | 'Al';
-    temperatureRating: 60 | 75 | 90;
-    residential?: {
-      squareFootage: number;
-      buildingType: 'single_family' | 'multi_family';
-      stories: number;
-      bedrooms: number;
-      hasAirConditioning: boolean;
-      hasElectricHeat: boolean;
-      hasElectricCooking: boolean;
-      hasElectricDryer: boolean;
-    };
-  };
+  settings: ProjectSettings;
   loads: Omit<LoadItem, 'id' | 'project_id'>[];
   panels: Omit<PanelInsert, 'id' | 'project_id'>[];
-  grounding: Omit<GroundingDetail, 'id' | 'project_id'>;
+  grounding: GroundingDetail;
 }
 
 const TEMPLATES: Record<TemplateType, ProjectTemplate> = {
@@ -51,7 +42,7 @@ const TEMPLATES: Record<TemplateType, ProjectTemplate> = {
       conductorMaterial: 'Cu',
       temperatureRating: 75,
       residential: {
-        dwellingType: 'single_family',
+        dwellingType: DwellingType.SINGLE_FAMILY,
         squareFootage: 2400,
         numBedrooms: 4,
         numBathrooms: 2,
@@ -136,16 +127,10 @@ const TEMPLATES: Record<TemplateType, ProjectTemplate> = {
       },
     ],
     grounding: {
-      systemType: 'service',
-      electrodeType: 'rod',
-      electrodeCount: 2,
-      conductorSize: 6,
-      conductorMaterial: 'Cu',
-      connectionMethod: 'exothermic',
-      soilResistivity: 100,
-      testDate: new Date().toISOString().split('T')[0],
-      notes: 'Two 8-foot ground rods spaced 6 feet apart',
-      bondingJumpers: [],
+      electrodes: ['Rod'],
+      gecSize: '6 AWG Cu',
+      bonding: ['Interior Water Piping', 'Gas Piping'],
+      notes: 'Two 8-foot ground rods spaced 6 feet apart, exothermic connections (NEC 250.52(A)(5))',
     },
   },
 
@@ -227,16 +212,10 @@ const TEMPLATES: Record<TemplateType, ProjectTemplate> = {
       },
     ],
     grounding: {
-      systemType: 'service',
-      electrodeType: 'ufer',
-      electrodeCount: 1,
-      conductorSize: 4,
-      conductorMaterial: 'Cu',
-      connectionMethod: 'exothermic',
-      soilResistivity: 80,
-      testDate: new Date().toISOString().split('T')[0],
-      notes: 'Concrete-encased electrode (Ufer ground) in building foundation',
-      bondingJumpers: [],
+      electrodes: ['Concrete-Encased'],
+      gecSize: '4 AWG Cu',
+      bonding: ['Interior Water Piping', 'Structural Steel'],
+      notes: 'Concrete-encased electrode (Ufer ground) in building foundation, exothermic connections (NEC 250.52(A)(3))',
     },
   },
 
@@ -325,16 +304,10 @@ const TEMPLATES: Record<TemplateType, ProjectTemplate> = {
       },
     ],
     grounding: {
-      systemType: 'service',
-      electrodeType: 'ground-ring',
-      electrodeCount: 1,
-      conductorSize: 2,
-      conductorMaterial: 'Cu',
-      connectionMethod: 'exothermic',
-      soilResistivity: 100,
-      testDate: new Date().toISOString().split('T')[0],
-      notes: '#2 Cu ground ring around building perimeter, buried 30 inches',
-      bondingJumpers: [],
+      electrodes: ['Ground Ring'],
+      gecSize: '2 AWG Cu',
+      bonding: ['Interior Water Piping', 'Structural Steel', 'Gas Piping'],
+      notes: '#2 Cu ground ring around building perimeter, buried 30 inches, exothermic connections (NEC 250.52(A)(4))',
     },
   },
 
@@ -350,7 +323,7 @@ const TEMPLATES: Record<TemplateType, ProjectTemplate> = {
       conductorMaterial: 'Cu',
       temperatureRating: 75,
       residential: {
-        dwellingType: 'single_family',
+        dwellingType: DwellingType.SINGLE_FAMILY,
         squareFootage: 2000,
         numBedrooms: 3,
         numBathrooms: 2,
@@ -428,16 +401,10 @@ const TEMPLATES: Record<TemplateType, ProjectTemplate> = {
       },
     ],
     grounding: {
-      systemType: 'service',
-      electrodeType: 'rod',
-      electrodeCount: 2,
-      conductorSize: 6,
-      conductorMaterial: 'Cu',
-      connectionMethod: 'exothermic',
-      soilResistivity: 100,
-      testDate: new Date().toISOString().split('T')[0],
-      notes: 'Two 8-foot ground rods, EV equipment grounding per NEC 625.43',
-      bondingJumpers: [],
+      electrodes: ['Rod'],
+      gecSize: '6 AWG Cu',
+      bonding: ['Interior Water Piping', 'Gas Piping'],
+      notes: 'Two 8-foot ground rods spaced 6 feet apart, EV equipment grounding per NEC 625.43, exothermic connections',
     },
   },
 };
@@ -496,11 +463,9 @@ export function createProjectFromTemplate(
       // Empty inspection list
       inspectionList: [],
 
-      // Grounding with IDs
+      // Grounding (GroundingDetail is embedded on the project, no id/project_id)
       grounding: {
         ...template.grounding,
-        id: crypto.randomUUID(),
-        project_id: projectId,
       },
     },
     // Panels with project_id

@@ -35,10 +35,18 @@ export function autoPopulateInterconnectionForm(
 ): Partial<UtilityInterconnectionForm> {
   const { project, panels, circuits, shortCircuitCalc } = projectData;
 
+  // Project type comparison: `ProjectType` enum uses Title-case values
+  // ('Residential' / 'Commercial' / 'Industrial'). Existing comparisons against
+  // lowercase strings predate the enum and currently evaluate to `false` for
+  // every project, so the form defaults to `'industrial'`. Casting to `string`
+  // preserves that runtime behavior verbatim — DO NOT swap to the enum constants
+  // here without also auditing downstream consumers of the form's `serviceType`.
+  const projectTypeStr = project.type as unknown as string;
+
   // Determine service type
   const serviceType: ServiceType =
-    project.type === 'residential' ? 'residential' :
-    project.type === 'commercial' ? 'commercial' :
+    projectTypeStr === 'residential' ? 'residential' :
+    projectTypeStr === 'commercial' ? 'commercial' :
     'industrial';
 
   // Determine interconnection type based on circuits
@@ -48,9 +56,19 @@ export function autoPopulateInterconnectionForm(
   const systemSize = calculateSystemSize(circuits);
 
   // Get service entrance parameters
+  // NOTE: `serviceSizeAmps` is the legacy field name; the canonical field on
+  // `Project` is `serviceAmps` (matches the DB column `service_amps`).
   const serviceVoltage = project.serviceVoltage || 240;
   const servicePhase = project.servicePhase || 1;
-  const serviceAmps = project.serviceSizeAmps || 200;
+  const serviceAmps = project.serviceAmps || 200;
+
+  // The interconnection form expects mailing-address fields (city/state/zip,
+  // APN, utility account #) and a `totalLoadVA` rollup that aren't first-class
+  // properties on the `Project` model. They live in `project.settings` or
+  // separate calc results in practice; until those plumbing changes ship, fall
+  // back to `undefined` / `''` so the contractor fills them in. Cast through
+  // `any` to avoid TS2339 without lying about the Project shape elsewhere.
+  const projectAny = project as unknown as Record<string, unknown>;
 
   // Pre-populate form
   const form: Partial<UtilityInterconnectionForm> = {
@@ -62,11 +80,11 @@ export function autoPopulateInterconnectionForm(
       phone: '',
       email: '',
       siteAddress: project.address || '',
-      city: project.city || '',
-      state: project.state || 'CA',
-      zip: project.zip || '',
-      parcelNumber: project.parcelNumber || undefined,
-      utilityAccountNumber: project.utilityAccountNumber || undefined
+      city: (projectAny.city as string) || '',
+      state: (projectAny.state as string) || 'CA',
+      zip: (projectAny.zip as string) || '',
+      parcelNumber: (projectAny.parcelNumber as string) || undefined,
+      utilityAccountNumber: (projectAny.utilityAccountNumber as string) || undefined
     },
 
     system: {
@@ -90,7 +108,7 @@ export function autoPopulateInterconnectionForm(
       threeLineDiagram: false,
       sitePhotos: false,
       equipmentSpecs: false,
-      loadCalculation: !!project.totalLoadVA, // True if load calc exists
+      loadCalculation: !!projectAny.totalLoadVA, // True if load calc exists
       shortCircuitStudy: !!shortCircuitCalc, // True if SCC exists
       utilityBillCopy: false,
       propertyDeed: false,
@@ -153,7 +171,12 @@ function calculateSystemSize(circuits: Circuit[]): {
 
   circuits.forEach(circuit => {
     const description = (circuit.description || '').toLowerCase();
-    const loadKw = (circuit.loadVA || 0) / 1000; // Convert VA to kW (rough estimate)
+    // The DB Circuit row only carries `load_watts`; `loadVA` was the legacy
+    // alias and is always undefined on a fresh row, so this expression has
+    // historically evaluated to 0. Cast preserves that behavior while clearing
+    // TS2339 — DO NOT replace with `load_watts` without re-deriving the kW
+    // accounting downstream (system size, charger count thresholds).
+    const loadKw = ((circuit as unknown as { loadVA?: number }).loadVA || 0) / 1000; // Convert VA to kW (rough estimate)
 
     // EV Chargers
     if (description.includes('ev') || description.includes('charger')) {

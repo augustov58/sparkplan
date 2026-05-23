@@ -224,19 +224,24 @@ export const PanelSchedule: React.FC<PanelScheduleProps> = ({ project }) => {
     // If no direct circuits but has feeder circuits, return minimal result
     if (panelCircuits.length === 0 && feederCircuits.length === 0) return null;
 
+    // Narrow DB-row wide types (Panel.phase: number) to the calc-side
+    // unions. Panels in this codebase are always 1Φ or 3Φ; bus poles are
+    // 1 / 2 / 3. Defaulting to 1 keeps misconfigured rows from blowing up
+    // demand calc — they'd just under-balance until the user corrects them.
+    const panelPhase: 1 | 3 = selectedPanel.phase === 3 ? 3 : 1;
     const circuitLoads: CircuitLoad[] = panelCircuits.map(c => ({
       id: c.id,
       description: c.description,
       loadWatts: c.load_watts || 0,
       loadType: (c.load_type as LoadTypeCode) || 'O',
-      pole: c.pole,
+      pole: (c.pole === 1 || c.pole === 2 || c.pole === 3) ? c.pole : 1,
       circuitNumber: c.circuit_number,
-      phase: getCircuitPhase(c.circuit_number, selectedPanel.phase),
+      phase: getCircuitPhase(c.circuit_number, panelPhase),
     }));
 
     // Calculate direct circuit demand
-    const directDemand = panelCircuits.length > 0 
-      ? calculatePanelDemand(circuitLoads, selectedPanel.voltage, selectedPanel.phase)
+    const directDemand = panelCircuits.length > 0
+      ? calculatePanelDemand(circuitLoads, selectedPanel.voltage, panelPhase)
       : null;
 
     // Calculate total including feeders
@@ -320,14 +325,26 @@ export const PanelSchedule: React.FC<PanelScheduleProps> = ({ project }) => {
       };
     }
 
-    // Branch 2: sub-panel dwelling-unit detection (multi-family)
+    // Branch 2: sub-panel dwelling-unit detection (multi-family). Returns
+    // the calc shape merged with necArticle so the union with Branch 1
+    // stays single-shape — every reader can read .necArticle and
+    // .totalConnectedVA without narrowing.
     if (selectedPanel.is_main) return null;
     const dwellingCircuits = panelCircuits.map(c => ({
       description: c.description,
       loadWatts: c.load_watts || 0,
     }));
     if (!isDwellingUnitPanel(selectedPanel.name, dwellingCircuits)) return null;
-    return calculateDwellingUnitDemandVA(dwellingCircuits);
+    const result = calculateDwellingUnitDemandVA(dwellingCircuits);
+    return {
+      totalConnectedVA: result.generalConnectedVA,
+      totalDemandVA: result.totalDemandVA,
+      necArticle: 'NEC 220.82' as const,
+      // Preserve the granular fields for callers that read them.
+      generalConnectedVA: result.generalConnectedVA,
+      generalDemandVA: result.generalDemandVA,
+      climateDemandVA: result.climateDemandVA,
+    };
   }, [selectedPanel, panelCircuits, project.settings]);
 
   // Calculate aggregated load including downstream panels
@@ -784,7 +801,10 @@ export const PanelSchedule: React.FC<PanelScheduleProps> = ({ project }) => {
   // Calculate load per phase for a circuit
   const getLoadPerPhase = (ckt: any, phase: 'A' | 'B' | 'C') => {
     if (!ckt || !ckt.load_watts) return null;
-    const cktPhase = getCircuitPhase(ckt.circuit_number, selectedPanel?.phase || 3);
+    // Narrow DB-row Panel.phase (number) to the 1 | 3 union getCircuitPhase
+    // expects. Same fallback policy as the demandResult useMemo above.
+    const panelPhaseNarrow: 1 | 3 = selectedPanel?.phase === 3 ? 3 : 1;
+    const cktPhase = getCircuitPhase(ckt.circuit_number, panelPhaseNarrow);
     
     if (ckt.pole === 1) {
       return cktPhase === phase ? (ckt.load_watts / 1000).toFixed(2) : null;

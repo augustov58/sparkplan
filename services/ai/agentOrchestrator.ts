@@ -31,6 +31,12 @@ export async function queueAgentAction(
   const expiresAt = new Date();
   expiresAt.setHours(expiresAt.getHours() + (options?.expiresInHours || 72));
 
+  // Supabase Insert typing wants the action_data/impact_analysis fields shaped
+  // as `Json` (which excludes object index types like `Record<string, any>` and
+  // the strongly-typed `ImpactAnalysis`). Cast at the boundary — the values are
+  // already JSON-serialisable. AgentAction's union-typed fields (action_type /
+  // agent_name / status) widen to `string` on the DB row, so cast `data` back
+  // to the contract shape for callers.
   const { data, error } = await supabase
     .from('agent_actions')
     .insert({
@@ -40,13 +46,13 @@ export async function queueAgentAction(
       agent_name: agentName,
       title,
       description,
-      action_data: actionData,
+      action_data: actionData as unknown as Record<string, never>,
       priority: options?.priority || 50,
       reasoning: options?.reasoning,
       confidence_score: options?.confidence,
-      impact_analysis: options?.impactAnalysis,
+      impact_analysis: options?.impactAnalysis as unknown as Record<string, never>,
       expires_at: expiresAt.toISOString(),
-    })
+    } as never)
     .select()
     .single();
 
@@ -62,7 +68,7 @@ export async function queueAgentAction(
     title,
   });
 
-  return data;
+  return data as unknown as AgentAction;
 }
 
 /**
@@ -95,7 +101,9 @@ export async function getPendingActions(
     return [];
   }
 
-  return data || [];
+  // DB row widens AgentActionType/AgentName/AgentActionStatus to `string`.
+  // Trust the schema's CHECK constraints and re-tag at the API boundary.
+  return (data || []) as unknown as AgentAction[];
 }
 
 /**
@@ -130,7 +138,8 @@ export async function getAllActions(
     return [];
   }
 
-  return data || [];
+  // Re-tag union-typed columns at the boundary — see queueAgentAction comment.
+  return (data || []) as unknown as AgentAction[];
 }
 
 /**
@@ -167,11 +176,13 @@ export async function approveAction(
     return false;
   }
 
-  // Execute the action (delegate to specific handler)
-  await executeAction(action);
+  // Execute the action (delegate to specific handler).
+  // Re-tag the DB row's bare-`string` union columns to AgentAction.
+  const typedAction = action as unknown as AgentAction;
+  await executeAction(typedAction);
 
   // Log activity
-  await logActivity(action.project_id, user.id, action.agent_name, 'action_approved', {
+  await logActivity(action.project_id, user.id, typedAction.agent_name, 'action_approved', {
     action_id: actionId,
     action_type: action.action_type,
   });
@@ -211,7 +222,8 @@ export async function rejectAction(
 
   // Log activity
   if (action) {
-    await logActivity(action.project_id, user.id, action.agent_name, 'action_rejected', {
+    // DB widens agent_name to `string`; re-tag to AgentName at the boundary.
+    await logActivity(action.project_id, user.id, action.agent_name as AgentName, 'action_rejected', {
       action_id: actionId,
       action_type: action.action_type,
       reason,
@@ -300,7 +312,12 @@ async function createRFIFromDraft(action: AgentAction): Promise<void> {
 
   let rfiNumber = 'RFI-001';
   if (existingRFIs && existingRFIs.length > 0) {
-    const lastNumber = parseInt(existingRFIs[0].rfi_number.split('-')[1]);
+    // `existingRFIs[0]` exists because length>0; `.split('-')[1]` may be
+    // undefined for malformed legacy values — fall back to 0 so the next
+    // number becomes RFI-001 instead of NaN.
+    const lastRfi = existingRFIs[0];
+    const lastNumberStr = lastRfi?.rfi_number?.split('-')[1] ?? '0';
+    const lastNumber = parseInt(lastNumberStr) || 0;
     rfiNumber = `RFI-${String(lastNumber + 1).padStart(3, '0')}`;
   }
 

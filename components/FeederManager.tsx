@@ -151,12 +151,14 @@ export const FeederManager: React.FC<FeederManagerProps> = ({
       return;
     }
 
-    // Use enhanced validation that handles all four combinations
+    // Use enhanced validation that handles all four combinations.
+    // Coalesce undefined → null because the validator only accepts string | null;
+    // Partial<Feeder> widens these to string | null | undefined when no value is set.
     const validation = validateFeederConnectivityEnhanced(
-      formData.source_panel_id,
-      formData.source_transformer_id,
-      formData.destination_panel_id,
-      formData.destination_transformer_id,
+      formData.source_panel_id ?? null,
+      formData.source_transformer_id ?? null,
+      formData.destination_panel_id ?? null,
+      formData.destination_transformer_id ?? null,
       panels,
       transformers
     );
@@ -196,16 +198,28 @@ export const FeederManager: React.FC<FeederManagerProps> = ({
       }
     });
 
-    // Add downstream loads as non-continuous (already factored)
-    noncontinuousVA += aggregated.downstreamPanelsDemandVA + aggregated.transformerLoadVA;
+    // Add downstream loads as non-continuous (already factored).
+    // NOTE: `downstreamPanelsDemandVA` / `transformerLoadVA` were removed when
+    // upstreamLoadAggregation was refactored to apply demand factors system-wide
+    // (commit 88b0f8a). The aggregated `totalDemandVA` now bakes in downstream
+    // and transformer contributions, so we derive the downstream portion as
+    // (system demand) − (direct circuit VA) and treat it as non-continuous.
+    // Clamp to 0 to guard against negative deltas when demand factors reduce
+    // the system below direct connected.
+    const directConnectedVA = continuousVA + noncontinuousVA;
+    const downstreamDemandContributionVA = Math.max(
+      0,
+      aggregated.totalDemandVA - directConnectedVA,
+    );
+    noncontinuousVA += downstreamDemandContributionVA;
 
-    return { 
-      totalVA: aggregated.totalConnectedVA, 
-      continuousVA, 
+    return {
+      totalVA: aggregated.totalConnectedVA,
+      continuousVA,
       noncontinuousVA,
       demandVA: aggregated.totalDemandVA,
       hasDownstreamLoads: aggregated.downstreamPanelCount > 0 || aggregated.transformerCount > 0,
-      breakdown: aggregated.breakdown
+      breakdown: aggregated.demandBreakdown
     };
   };
 
@@ -283,11 +297,14 @@ export const FeederManager: React.FC<FeederManagerProps> = ({
         ambient_temperature_c: feeder.ambient_temperature_c || 30,
         num_current_carrying: feeder.num_current_carrying || 4,
         max_voltage_drop_percent: 3,
-        // Add transformer parameters if feeding a transformer
+        // Add transformer parameters if feeding a transformer.
+        // DB stores primary_phase as `number`; FeederCalculationInput narrows
+        // it to `1 | 3`. Cast at the boundary — only 1 and 3 are valid runtime
+        // values per project schema.
         ...(destTransformer && {
           transformer_kva: destTransformer.kva_rating,
           transformer_primary_voltage: destTransformer.primary_voltage,
-          transformer_primary_phase: destTransformer.primary_phase
+          transformer_primary_phase: destTransformer.primary_phase as 1 | 3
         })
       });
 
@@ -570,14 +587,17 @@ export const FeederManager: React.FC<FeederManagerProps> = ({
         max_voltage_drop_percent: 3,
         temperature_rating: temperatureRating, // Use user-specified temperature rating
         sets_in_parallel: feeder.sets_in_parallel ?? 1,
-        // Add transformer parameters if feeding a transformer
+        // Add transformer parameters if feeding a transformer.
+        // DB stores primary_phase as `number`; FeederCalculationInput narrows
+        // it to `1 | 3`. Cast at the boundary — only 1 and 3 are valid runtime
+        // values per project schema.
         ...(destTransformer && {
           transformer_kva: destTransformer.kva_rating,
           transformer_primary_voltage: destTransformer.primary_voltage,
-          transformer_primary_phase: destTransformer.primary_phase
+          transformer_primary_phase: destTransformer.primary_phase as 1 | 3
         })
       });
-      
+
       // ISSUE FIX: EGC should be based on the OCPD protecting the downstream panel or transformer
       // per NEC 250.122 - use panel's main breaker or feeder breaker amps, or transformer primary breaker
       let egcSize = result.egc_size;
@@ -685,9 +705,13 @@ export const FeederManager: React.FC<FeederManagerProps> = ({
       const projectName = panels.length > 0 ? `Project ${projectId.substring(0, 8)}` : 'Electrical Project';
       const projectAddress = ''; // Could be passed as prop if available
 
+      // voltageDropPDF helpers type their `feeders` arg as the Supabase Row
+      // (nullable cols, broader `conductor_material: string`), while our hook
+      // returns the curated types.ts `Feeder`. Same data, different declared
+      // shape — cast at the boundary. See CLAUDE.md "Database Types" note.
       await exportVoltageDropReport(
         projectName,
-        feeders,
+        feeders as unknown as Parameters<typeof exportVoltageDropReport>[1],
         panels,
         transformers,
         projectAddress,
@@ -707,6 +731,11 @@ export const FeederManager: React.FC<FeederManagerProps> = ({
   if (error) {
     return <div className="text-red-600">Error: {error}</div>;
   }
+
+  // voltageDropPDF helpers declare their feeders arg as the DB Row type;
+  // useFeeders gives us the curated types.ts shape (same fields, slightly
+  // narrower). Reuse a single cast for all UI gates / labels below.
+  const feedersForVdHelpers = feeders as unknown as Parameters<typeof hasVoltageDropData>[0];
 
   return (
     <div className="space-y-6">
@@ -769,7 +798,7 @@ export const FeederManager: React.FC<FeederManagerProps> = ({
           {/* Debug info for voltage drop export. C2: live-derive feeder loads
               so newly-populated EVSE/sub-panels gate correctly without requiring
               a manual recalc click. */}
-          {feeders.length > 0 && !hasVoltageDropData(feeders, panels, circuits, transformers) && (
+          {feeders.length > 0 && !hasVoltageDropData(feedersForVdHelpers, panels, circuits, transformers) && (
             <p className="text-xs text-[#3d6b3d] mt-2 flex items-center gap-1">
               <Info className="w-3 h-3" />
               Voltage drop export requires at least one feeder with length and calculated load.
@@ -784,14 +813,14 @@ export const FeederManager: React.FC<FeederManagerProps> = ({
             {feeders.length > 0 && (
               <button
                 onClick={handleExportVoltageDropReport}
-                disabled={!hasVoltageDropData(feeders, panels, circuits, transformers)}
+                disabled={!hasVoltageDropData(feedersForVdHelpers, panels, circuits, transformers)}
                 className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-colors text-sm font-medium ${
-                  hasVoltageDropData(feeders, panels, circuits, transformers)
+                  hasVoltageDropData(feedersForVdHelpers, panels, circuits, transformers)
                     ? 'bg-gray-700 text-white hover:bg-gray-800'
                     : 'bg-gray-300 text-gray-500 cursor-not-allowed'
                 }`}
                 title={
-                  hasVoltageDropData(feeders, panels, circuits, transformers)
+                  hasVoltageDropData(feedersForVdHelpers, panels, circuits, transformers)
                     ? 'Export voltage drop analysis report (PDF)'
                     : 'Add length and load data to feeders to enable export'
                 }

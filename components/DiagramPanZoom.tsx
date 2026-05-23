@@ -106,8 +106,10 @@ export const DiagramPanZoom: React.FC<DiagramPanZoomProps> = ({
     const ts = touchStateRef.current;
 
     if (e.touches.length === 2) {
-      // Pinch start
-      ts.initialPinchDistance = getTouchDistance(e.touches[0], e.touches[1]);
+      // Pinch start — length === 2 guarantees both touches exist
+      const t0 = e.touches[0]!;
+      const t1 = e.touches[1]!;
+      ts.initialPinchDistance = getTouchDistance(t0, t1);
       ts.initialScale = transform.scale;
     } else if (e.touches.length === 1) {
       // Check for double-tap
@@ -119,13 +121,14 @@ export const DiagramPanZoom: React.FC<DiagramPanZoomProps> = ({
         return;
       }
 
-      // Single-finger pan start
+      // Single-finger pan start — length === 1 guarantees touch[0] exists
+      const t0 = e.touches[0]!;
       ts.isTouching = true;
-      ts.touchStartPos = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+      ts.touchStartPos = { x: t0.clientX, y: t0.clientY };
       setIsPanning(true);
       setPanStart({
-        x: e.touches[0].clientX - transform.translateX,
-        y: e.touches[0].clientY - transform.translateY
+        x: t0.clientX - transform.translateX,
+        y: t0.clientY - transform.translateY
       });
     }
   }, [transform]);
@@ -134,17 +137,19 @@ export const DiagramPanZoom: React.FC<DiagramPanZoomProps> = ({
     const ts = touchStateRef.current;
 
     if (e.touches.length === 2) {
-      // Pinch zoom
+      // Pinch zoom — length === 2 guarantees both touches exist
       e.preventDefault();
-      const currentDistance = getTouchDistance(e.touches[0], e.touches[1]);
+      const t0 = e.touches[0]!;
+      const t1 = e.touches[1]!;
+      const currentDistance = getTouchDistance(t0, t1);
       const scaleRatio = currentDistance / ts.initialPinchDistance;
       const newScale = Math.min(maxZoom, Math.max(minZoom, ts.initialScale * scaleRatio));
 
       // Zoom towards pinch center
       if (containerRef.current) {
         const rect = containerRef.current.getBoundingClientRect();
-        const centerX = (e.touches[0].clientX + e.touches[1].clientX) / 2 - rect.left;
-        const centerY = (e.touches[0].clientY + e.touches[1].clientY) / 2 - rect.top;
+        const centerX = (t0.clientX + t1.clientX) / 2 - rect.left;
+        const centerY = (t0.clientY + t1.clientY) / 2 - rect.top;
         const scaleDiff = newScale - transform.scale;
 
         setTransform(prev => ({
@@ -156,11 +161,12 @@ export const DiagramPanZoom: React.FC<DiagramPanZoomProps> = ({
         setTransform(prev => ({ ...prev, scale: newScale }));
       }
     } else if (e.touches.length === 1 && ts.isTouching) {
-      // Single-finger pan
+      // Single-finger pan — length === 1 guarantees touch[0] exists
+      const t0 = e.touches[0]!;
       setTransform(prev => ({
         ...prev,
-        translateX: e.touches[0].clientX - panStart.x,
-        translateY: e.touches[0].clientY - panStart.y
+        translateX: t0.clientX - panStart.x,
+        translateY: t0.clientY - panStart.y
       }));
     }
   }, [transform, panStart, minZoom, maxZoom]);
