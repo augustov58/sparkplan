@@ -45,6 +45,7 @@ function panelRow(overrides: Partial<Panel> = {}): Panel {
     supplied_by_feeder_id: null,
     ul_listing: null,
     created_at: null,
+    is_proposed: false,
     ...overrides,
   };
 }
@@ -94,6 +95,7 @@ function circuitRow(overrides: Partial<Circuit> = {}): Circuit {
     load_type: 'lighting',
     load_watts: 1500,
     created_at: null,
+    is_proposed: false,
     ...overrides,
   };
 }
@@ -152,15 +154,15 @@ describe('autoTakeoffFromProject — single MDP', () => {
     // material + labor
     expect(r.lineItems).toHaveLength(2);
     const [mat, lab] = r.lineItems;
-    expect(mat.category).toBe('material');
-    expect(mat.source_kind).toBe('panel');
-    expect(mat.source_id).toBe('mdp');
-    expect(mat.description).toContain('MDP');
-    expect(mat.unit_price).toBeGreaterThan(0);
-    expect(mat.line_total).toBeGreaterThan(0);
-    expect(lab.category).toBe('labor');
-    expect(lab.unit).toBe('hr');
-    expect(lab.taxable).toBe(false);
+    expect(mat!.category).toBe('material');
+    expect(mat!.source_kind).toBe('panel');
+    expect(mat!.source_id).toBe('mdp');
+    expect(mat!.description).toContain('MDP');
+    expect(mat!.unit_price).toBeGreaterThan(0);
+    expect(mat!.line_total).toBeGreaterThan(0);
+    expect(lab!.category).toBe('labor');
+    expect(lab!.unit).toBe('hr');
+    expect(lab!.taxable).toBe(false);
   });
 
   it('places MDP first when multiple panels exist', () => {
@@ -174,7 +176,7 @@ describe('autoTakeoffFromProject — single MDP', () => {
       feeders: [],
       transformers: [],
     });
-    expect(r.lineItems[0].source_id).toBe('mdp');
+    expect(r.lineItems[0]!.source_id).toBe('mdp');
   });
 });
 

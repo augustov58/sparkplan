@@ -268,7 +268,7 @@ describe('evaluatePacket — locator wiring', () => {
       manifest,
       ctxExistingSFR,
     );
-    expect(result.items[0].location).toBe('C-201');
+    expect(result.items[0]!.location).toBe('C-201');
   });
 
   it('returns null when no locator is supplied', () => {
@@ -282,7 +282,7 @@ describe('evaluatePacket — locator wiring', () => {
       },
     ]);
     const result = evaluatePacket({}, [], manifest, ctxExistingSFR);
-    expect(result.items[0].location).toBeNull();
+    expect(result.items[0]!.location).toBeNull();
   });
 
   it('returns null when locator returns empty/whitespace string', () => {
@@ -297,7 +297,7 @@ describe('evaluatePacket — locator wiring', () => {
       },
     ]);
     const result = evaluatePacket({}, [], manifest, ctxExistingSFR);
-    expect(result.items[0].location).toBeNull();
+    expect(result.items[0]!.location).toBeNull();
   });
 
   it('returns null when locator returns null', () => {
@@ -312,7 +312,7 @@ describe('evaluatePacket — locator wiring', () => {
       },
     ]);
     const result = evaluatePacket({}, [], manifest, ctxExistingSFR);
-    expect(result.items[0].location).toBeNull();
+    expect(result.items[0]!.location).toBeNull();
   });
 });
 
@@ -357,7 +357,7 @@ describe('evaluatePacket — never throws on malformed predicates', () => {
     ]);
     const result = evaluatePacket({}, [], manifest, ctxExistingSFR);
     // required=true, present=false (default on throw) → severity:'fail'
-    expect(result.items[0].severity).toBe('fail');
+    expect(result.items[0]!.severity).toBe('fail');
     expect(result.warnings.some((w) => /broken-detect/.test(w))).toBe(true);
     expect(result.warnings.some((w) => /detect/.test(w))).toBe(true);
   });
@@ -377,8 +377,8 @@ describe('evaluatePacket — never throws on malformed predicates', () => {
     ]);
     const result = evaluatePacket({}, [], manifest, ctxExistingSFR);
     // pass severity unchanged; locator failure surfaces as warning only
-    expect(result.items[0].severity).toBe('pass');
-    expect(result.items[0].location).toBeNull();
+    expect(result.items[0]!.severity).toBe('pass');
+    expect(result.items[0]!.location).toBeNull();
     expect(result.warnings.some((w) => /broken-locator/.test(w))).toBe(true);
   });
 });
@@ -399,10 +399,10 @@ describe('evaluatePacket — context routing', () => {
       },
     ]);
     const existing = evaluatePacket({}, [], manifest, ctxExistingSFR);
-    expect(existing.items[0].severity).toBe('fail'); // required, not present
+    expect(existing.items[0]!.severity).toBe('fail'); // required, not present
 
     const newSvc = evaluatePacket({}, [], manifest, ctxNewServiceCommercial);
-    expect(newSvc.items[0].severity).toBe('na'); // not required, not present
+    expect(newSvc.items[0]!.severity).toBe('na'); // not required, not present
   });
 
   it('forks on ctx.buildingType (Pompano Fire Review excludes SFR)', () => {
@@ -416,12 +416,12 @@ describe('evaluatePacket — context routing', () => {
       },
     ]);
     const sfr = evaluatePacket({}, [], manifest, ctxExistingSFR);
-    expect(sfr.items[0].required).toBe(false);
-    expect(sfr.items[0].severity).toBe('na');
+    expect(sfr.items[0]!.required).toBe(false);
+    expect(sfr.items[0]!.severity).toBe('na');
 
     const commercial = evaluatePacket({}, [], manifest, ctxNewServiceCommercial);
-    expect(commercial.items[0].required).toBe(true);
-    expect(commercial.items[0].severity).toBe('fail');
+    expect(commercial.items[0]!.required).toBe(true);
+    expect(commercial.items[0]!.severity).toBe('fail');
   });
 });
 
@@ -443,7 +443,7 @@ describe('evaluatePacket — defensive degradation', () => {
     // @ts-expect-error — runtime defensive check
     const result = evaluatePacket(null, [], manifest, ctxExistingSFR);
     expect(result.items.length).toBe(1);
-    expect(result.items[0].severity).toBe('fail');
+    expect(result.items[0]!.severity).toBe('fail');
   });
 
   it('tolerates non-array attachments', () => {
@@ -458,7 +458,7 @@ describe('evaluatePacket — defensive degradation', () => {
     ]);
     // @ts-expect-error — runtime defensive check
     const result = evaluatePacket({}, undefined, manifest, ctxExistingSFR);
-    expect(result.items[0].severity).toBe('fail');
+    expect(result.items[0]!.severity).toBe('fail');
   });
 
   it('tolerates manifest with missing/non-array requirements', () => {

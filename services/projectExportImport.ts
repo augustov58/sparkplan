@@ -4,7 +4,7 @@
  */
 
 import { supabase } from '../lib/supabase';
-import type { Project } from '../types';
+import { ProjectType, ProjectStatus, type Project } from '../types';
 import type { Database } from '../lib/database.types';
 
 type Panel = Database['public']['Tables']['panels']['Row'];
@@ -15,17 +15,22 @@ type RFI = Database['public']['Tables']['rfis']['Row'];
 type SiteVisit = Database['public']['Tables']['site_visits']['Row'];
 type CalendarEvent = Database['public']['Tables']['calendar_events']['Row'];
 
+// Each export-array entry is a Partial<> of the corresponding DB row so the
+// export function can pick a stable subset of columns without listing every
+// nullable/auto-managed column. Supabase fills defaults for absent fields at
+// import-insert time. version='1.0' frames the snapshot; bump on incompatible
+// changes to the picked subset.
 export interface ProjectExportData {
   version: string; // Format version for future compatibility
   exportDate: string;
-  project: Omit<Project, 'id' | 'user_id' | 'created_at' | 'updated_at'>;
-  panels: Omit<Panel, 'id' | 'project_id' | 'created_at'>[];
-  circuits: Omit<Circuit, 'id' | 'project_id' | 'panel_id' | 'created_at'>[];
-  transformers: Omit<Transformer, 'id' | 'project_id' | 'created_at'>[];
-  feeders: Omit<Feeder, 'id' | 'project_id' | 'created_at' | 'updated_at'>[];
-  rfis?: Omit<RFI, 'id' | 'project_id' | 'created_at' | 'updated_at'>[];
-  siteVisits?: Omit<SiteVisit, 'id' | 'project_id' | 'created_at' | 'updated_at'>[];
-  calendarEvents?: Omit<CalendarEvent, 'id' | 'project_id' | 'created_at' | 'updated_at'>[];
+  project: Partial<Omit<Project, 'id' | 'created_at' | 'updated_at'>>;
+  panels: Partial<Omit<Panel, 'id' | 'project_id' | 'created_at'>>[];
+  circuits: Partial<Omit<Circuit, 'id' | 'project_id' | 'panel_id' | 'created_at'>>[];
+  transformers: Partial<Omit<Transformer, 'id' | 'project_id' | 'created_at'>>[];
+  feeders: Partial<Omit<Feeder, 'id' | 'project_id' | 'created_at' | 'updated_at'>>[];
+  rfis?: Partial<Omit<RFI, 'id' | 'project_id' | 'created_at' | 'updated_at'>>[];
+  siteVisits?: Partial<Omit<SiteVisit, 'id' | 'project_id' | 'created_at' | 'updated_at'>>[];
+  calendarEvents?: Partial<Omit<CalendarEvent, 'id' | 'project_id' | 'created_at' | 'updated_at'>>[];
 }
 
 /**
@@ -52,21 +57,23 @@ export async function exportProjectToJSON(projectId: string, projectName: string
       supabase.from('calendar_events').select('*').eq('project_id', projectId)
     ]);
 
-    // Get project metadata from first panel or use defaults
+    // Get project metadata from first panel or use defaults. Fields use the
+    // Project interface shape (camelCase), not the DB columns — backup/restore
+    // works at the frontend type level so callers don't have to re-run the
+    // DB → frontend adapter on import.
+    const firstPanelPhase = panels?.[0]?.phase;
     const project: ProjectExportData['project'] = {
       name: projectName,
       address: '',
-      type: 'COMMERCIAL',
+      type: ProjectType.COMMERCIAL,
       necEdition: '2023',
-      status: 'IN_PROGRESS',
+      status: ProjectStatus.IN_PROGRESS,
       progress: 0,
       loads: [],
       issues: [],
-      service_voltage: panels?.[0]?.voltage || 480,
-      service_phase: panels?.[0]?.phase || 3,
-      service_amps: panels?.[0]?.bus_rating_amps || 400,
-      occupancy_type: 'Office',
-      building_area_sqft: 0,
+      serviceVoltage: panels?.[0]?.voltage || 480,
+      servicePhase: (firstPanelPhase === 1 || firstPanelPhase === 3) ? firstPanelPhase : 3,
+      serviceAmps: panels?.[0]?.bus_rating || 400,
       jurisdiction_id: undefined
     };
 
@@ -78,39 +85,45 @@ export async function exportProjectToJSON(projectId: string, projectName: string
         name: p.name,
         voltage: p.voltage,
         phase: p.phase,
-        bus_rating_amps: p.bus_rating_amps,
+        bus_rating: p.bus_rating,
         main_breaker_amps: p.main_breaker_amps,
         is_main: p.is_main,
+        is_proposed: p.is_proposed,
         location: p.location,
         fed_from_type: p.fed_from_type,
         fed_from: p.fed_from,
         fed_from_transformer_id: p.fed_from_transformer_id,
         feeder_breaker_amps: p.feeder_breaker_amps,
-        manual_position_x: p.manual_position_x,
-        manual_position_y: p.manual_position_y
       })),
       circuits: (circuits || []).map(c => ({
         circuit_number: c.circuit_number,
         description: c.description,
         load_type: c.load_type,
-        poles: c.poles,
-        breaker_rating_amps: c.breaker_rating_amps,
+        pole: c.pole,
+        breaker_amps: c.breaker_amps,
         load_watts: c.load_watts,
-        load_va: c.load_va,
-        voltage: c.voltage,
-        notes: c.notes
+        conductor_size: c.conductor_size,
+        egc_size: c.egc_size,
+        is_proposed: c.is_proposed,
       })),
       transformers: (transformers || []).map(t => ({
         name: t.name,
         kva_rating: t.kva_rating,
         primary_voltage: t.primary_voltage,
         secondary_voltage: t.secondary_voltage,
-        phase: t.phase,
+        primary_phase: t.primary_phase,
+        secondary_phase: t.secondary_phase,
         impedance_percent: t.impedance_percent,
-        fed_from_type: t.fed_from_type,
         fed_from_panel_id: t.fed_from_panel_id,
-        manual_position_x: t.manual_position_x,
-        manual_position_y: t.manual_position_y
+        fed_from_circuit_number: t.fed_from_circuit_number,
+        primary_breaker_amps: t.primary_breaker_amps,
+        secondary_breaker_amps: t.secondary_breaker_amps,
+        primary_conductor_size: t.primary_conductor_size,
+        secondary_conductor_size: t.secondary_conductor_size,
+        connection_type: t.connection_type,
+        cooling_type: t.cooling_type,
+        winding_type: t.winding_type,
+        impedance_percent_tested: null,
       })),
       feeders: (feeders || []).map(f => ({
         name: f.name,
@@ -118,13 +131,22 @@ export async function exportProjectToJSON(projectId: string, projectName: string
         source_transformer_id: f.source_transformer_id,
         destination_panel_id: f.destination_panel_id,
         destination_transformer_id: f.destination_transformer_id,
-        design_current_amps: f.design_current_amps,
-        conductor_size_awg: f.conductor_size_awg,
+        design_load_va: f.design_load_va,
+        phase_conductor_size: f.phase_conductor_size,
+        neutral_conductor_size: f.neutral_conductor_size,
+        egc_size: f.egc_size,
         conductor_material: f.conductor_material,
-        conduit_size_inches: f.conduit_size_inches,
-        length_feet: f.length_feet,
+        conduit_size: f.conduit_size,
+        conduit_type: f.conduit_type,
+        distance_ft: f.distance_ft,
         voltage_drop_percent: f.voltage_drop_percent,
-        sizing_basis: f.sizing_basis
+        ambient_temperature_c: f.ambient_temperature_c,
+        sets_in_parallel: f.sets_in_parallel,
+        is_service_entrance: f.is_service_entrance,
+        continuous_load_va: f.continuous_load_va,
+        noncontinuous_load_va: f.noncontinuous_load_va,
+        total_load_va: f.total_load_va,
+        num_current_carrying: f.num_current_carrying,
       })),
       rfis: (rfis || []).map(r => ({
         rfi_number: r.rfi_number,
@@ -137,19 +159,18 @@ export async function exportProjectToJSON(projectId: string, projectName: string
         requested_by: r.requested_by,
         responded_by: r.responded_by,
         due_date: r.due_date,
-        answered_date: r.answered_date,
-        closed_date: r.closed_date
+        closed_date: r.closed_date,
+        notes: r.notes,
       })),
       siteVisits: (siteVisits || []).map(v => ({
         visit_date: v.visit_date,
         visit_type: v.visit_type,
         attendees: v.attendees,
         weather_conditions: v.weather_conditions,
-        observations: v.observations,
+        description: v.description,
         issues_found: v.issues_found,
         action_items: v.action_items,
-        photo_urls: v.photo_urls,
-        status: v.status
+        status: v.status,
       })),
       calendarEvents: (calendarEvents || []).map(e => ({
         title: e.title,
@@ -157,9 +178,9 @@ export async function exportProjectToJSON(projectId: string, projectName: string
         event_type: e.event_type,
         event_date: e.event_date,
         location: e.location,
-        is_completed: e.is_completed,
+        completed: e.completed,
         related_rfi_id: e.related_rfi_id,
-        related_site_visit_id: e.related_site_visit_id
+        related_site_visit_id: e.related_site_visit_id,
       }))
     };
 
@@ -199,22 +220,27 @@ export async function importProjectFromJSON(
           throw new Error('Unsupported export format version');
         }
 
-        // Create project (using dbProjectToFrontend adapters would be needed here)
+        // Create project. Map the Project (camelCase) shape from the JSON
+        // back to the DB columns (snake_case) — symmetric to the export
+        // which captured the frontend Project shape. Defensive `?? null`
+        // ensures missing optional fields don't blow up the insert. Insert
+        // payload is typed loosely via `as never` because the projects table
+        // has many non-nullable columns this minimal restore path doesn't
+        // populate; the DB fills defaults.
+        const projectInsert = {
+          user_id: userId,
+          name: `${data.project.name ?? 'Imported Project'} (Imported)`,
+          address: data.project.address ?? '',
+          type: data.project.type ?? null,
+          nec_edition: data.project.necEdition ?? '2023',
+          status: data.project.status ?? null,
+          service_voltage: data.project.serviceVoltage ?? null,
+          service_phase: data.project.servicePhase ?? null,
+          service_amps: data.project.serviceAmps ?? null,
+        };
         const { data: newProject, error: projectError } = await supabase
           .from('projects')
-          .insert([{
-            user_id: userId,
-            name: `${data.project.name} (Imported)`,
-            address: data.project.address,
-            type: data.project.type,
-            nec_edition: data.project.necEdition,
-            status: data.project.status,
-            service_voltage: data.project.service_voltage,
-            service_phase: data.project.service_phase,
-            service_amps: data.project.service_amps,
-            occupancy_type: data.project.occupancy_type,
-            building_area_sqft: data.project.building_area_sqft
-          }])
+          .insert([projectInsert as never])
           .select()
           .single();
 
@@ -228,7 +254,10 @@ export async function importProjectFromJSON(
         const panelIdMap = new Map<number, string>();
         const transformerIdMap = new Map<number, string>();
 
-        // Import panels
+        // Import panels. Partial fields the export wrote are forwarded
+        // verbatim; the DB fills defaults for the rest. Insert payload is
+        // typed `as never[]` to satisfy the strict Insert overload while
+        // tolerating partial shapes.
         if (data.panels.length > 0) {
           const { data: newPanels, error: panelsError } = await supabase
             .from('panels')
@@ -236,7 +265,7 @@ export async function importProjectFromJSON(
               data.panels.map(p => ({
                 ...p,
                 project_id: projectId
-              }))
+              })) as never[]
             )
             .select();
 
@@ -248,7 +277,7 @@ export async function importProjectFromJSON(
           });
         }
 
-        // Import transformers
+        // Import transformers (same Partial-as-never pattern as panels).
         if (data.transformers.length > 0) {
           const { data: newTransformers, error: transformersError } = await supabase
             .from('transformers')
@@ -256,7 +285,7 @@ export async function importProjectFromJSON(
               data.transformers.map(t => ({
                 ...t,
                 project_id: projectId
-              }))
+              })) as never[]
             )
             .select();
 
@@ -267,7 +296,8 @@ export async function importProjectFromJSON(
           });
         }
 
-        // Import circuits (map panel IDs)
+        // Import circuits (map panel IDs). All four supabase.insert calls
+        // use `as never[]` casts for the same reason as panels above.
         if (data.circuits.length > 0) {
           const { error: circuitsError } = await supabase
             .from('circuits')
@@ -276,7 +306,7 @@ export async function importProjectFromJSON(
                 ...c,
                 project_id: projectId,
                 panel_id: panelIdMap.get(0) // Assign to first panel (simplified)
-              }))
+              })) as never[]
             );
 
           if (circuitsError) throw new Error('Failed to import circuits');
@@ -290,7 +320,7 @@ export async function importProjectFromJSON(
               data.feeders.map(f => ({
                 ...f,
                 project_id: projectId
-              }))
+              })) as never[]
             );
 
           if (feedersError) console.warn('Some feeders failed to import');
@@ -299,21 +329,21 @@ export async function importProjectFromJSON(
         // Import RFIs (optional)
         if (data.rfis && data.rfis.length > 0) {
           await supabase.from('rfis').insert(
-            data.rfis.map(r => ({ ...r, project_id: projectId }))
+            data.rfis.map(r => ({ ...r, project_id: projectId })) as never[]
           );
         }
 
         // Import site visits (optional)
         if (data.siteVisits && data.siteVisits.length > 0) {
           await supabase.from('site_visits').insert(
-            data.siteVisits.map(v => ({ ...v, project_id: projectId }))
+            data.siteVisits.map(v => ({ ...v, project_id: projectId })) as never[]
           );
         }
 
         // Import calendar events (optional)
         if (data.calendarEvents && data.calendarEvents.length > 0) {
           await supabase.from('calendar_events').insert(
-            data.calendarEvents.map(e => ({ ...e, project_id: projectId }))
+            data.calendarEvents.map(e => ({ ...e, project_id: projectId })) as never[]
           );
         }
 
