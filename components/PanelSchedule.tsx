@@ -428,12 +428,28 @@ export const PanelSchedule: React.FC<PanelScheduleProps> = ({ project }) => {
       panels.forEach(panel => {
         circuitsByPanel.set(panel.id, circuits.filter(c => c.panel_id === panel.id));
       });
+      // Mirrors PermitPacketGenerator.tsx buildingType derivation so the
+      // multi-panel export's dwelling-demand gate matches the permit-packet
+      // gate for the same project. Without this, the MultiPanelDocument's
+      // buildingType prop would be undefined and the gate would default to
+      // single-family — false-positiving on commercial restaurants with
+      // "Kitchen Hood" / multi-family MDPs with "Common Laundry" feeders.
+      const occ = project.settings?.occupancyType;
+      const isMultiFamily =
+        ((project.settings?.residential as { multi_family_units?: number } | undefined)?.multi_family_units ?? 0) >= 3;
+      const buildingType: 'single_family_residential' | 'multi_family' | 'commercial' =
+        isMultiFamily
+          ? 'multi_family'
+          : (occ === 'commercial' || occ === 'industrial')
+            ? 'commercial'
+            : 'single_family_residential';
       await exportAllPanelsPDF(
         panels,
         circuitsByPanel,
         project.name,
         project.address,
         !!isExistingConstruction,
+        buildingType,
       );
     } catch (error) {
       alert(`Failed to export PDF: ${error instanceof Error ? error.message : 'Unknown error'}`);

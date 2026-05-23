@@ -73,7 +73,8 @@ export const exportAllPanelsPDF = async (
   circuitsByPanel: Map<string, Circuit[]>,
   projectName: string,
   projectAddress?: string,
-  showExistingNewMarkers: boolean = false
+  showExistingNewMarkers: boolean = false,
+  buildingType?: 'single_family_residential' | 'multi_family' | 'commercial',
 ) => {
   try {
     // Validate panels data
@@ -90,6 +91,7 @@ export const exportAllPanelsPDF = async (
         projectName={projectName}
         projectAddress={projectAddress}
         showExistingNewMarkers={showExistingNewMarkers}
+        buildingType={buildingType}
       />
     ).toBlob();
 
