@@ -18,11 +18,11 @@ export function dbProjectToFrontend(dbProject: DbProject): Project {
     name: dbProject.name,
     address: dbProject.address,
     type: dbProject.type as any,
-    necEdition: dbProject.nec_edition,
+    necEdition: dbProject.nec_edition as '2020' | '2023',
     status: dbProject.status as any,
-    progress: dbProject.progress,
+    progress: dbProject.progress ?? 0,
     serviceVoltage: dbProject.service_voltage,
-    servicePhase: dbProject.service_phase,
+    servicePhase: dbProject.service_phase as 1 | 3,
     serviceAmps: dbProject.service_amps,
     utilityAvailableFaultCurrentA: dbProject.utility_available_fault_current_a,
     utilityTransformerKva: dbProject.utility_transformer_kva,
@@ -60,7 +60,7 @@ export function frontendProjectToDbInsert(project: Partial<Project>): Omit<DbPro
     progress: project.progress || 0,
     service_voltage: project.serviceVoltage || 120,
     service_phase: (project.servicePhase || 1) as 1 | 3,
-    settings: project.settings || {
+    settings: (project.settings as any) || {
       serviceVoltage: project.serviceVoltage || 120,
       servicePhase: project.servicePhase || 1,
       conductorMaterial: 'Cu',
@@ -86,7 +86,7 @@ export function frontendProjectToDbUpdate(project: Project): Database['public'][
     utility_available_fault_current_a: project.utilityAvailableFaultCurrentA,
     utility_transformer_kva: project.utilityTransformerKva,
     utility_transformer_impedance_pct: project.utilityTransformerImpedancePct,
-    settings: project.settings,
+    settings: project.settings as any,
     jurisdiction_id: project.jurisdiction_id  // BUGFIX: Include jurisdiction_id
   };
 }

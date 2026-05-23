@@ -68,7 +68,7 @@ export function panelPrice(busRatingAmps: number, isMain: boolean): PriceQuote {
     .map((k) => Number(k))
     .sort((a, b) => a - b);
   const tier = tiers.find((t) => busRatingAmps <= t) ?? tiers[tiers.length - 1];
-  const entry = PANEL_PRICES_BY_BUS_RATING[tier];
+  const entry = tier !== undefined ? PANEL_PRICES_BY_BUS_RATING[tier] : undefined;
 
   if (!entry) {
     // Fallback for absurd inputs (≥1000A or non-finite).
@@ -181,7 +181,7 @@ export function branchCircuitBundlePrice(breakerAmps: number, pole: number): Pri
     .map((k) => Number(k))
     .sort((a, b) => a - b);
   const tier = tiers.find((t) => breakerAmps <= t) ?? tiers[tiers.length - 1];
-  const entry = CIRCUIT_BUNDLE_BY_AMPS[tier];
+  const entry = tier !== undefined ? CIRCUIT_BUNDLE_BY_AMPS[tier] : undefined;
 
   if (!entry) {
     return quote(
@@ -217,7 +217,7 @@ export function transformerPrice(kvaRating: number): PriceQuote {
     .map((k) => Number(k))
     .sort((a, b) => a - b);
   const tier = tiers.find((t) => kvaRating <= t) ?? tiers[tiers.length - 1];
-  const entry = TRANSFORMER_PRICES_BY_KVA[tier];
+  const entry = tier !== undefined ? TRANSFORMER_PRICES_BY_KVA[tier] : undefined;
   if (!entry) {
     return quote(kvaRating * 60, `${kvaRating} kVA transformer (estimated)`, 'ea', 'fallback');
   }

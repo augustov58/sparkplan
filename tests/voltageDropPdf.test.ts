@@ -41,7 +41,7 @@ describe('VoltageDropDocument renders in Node', () => {
         panels,
         transformers: [],
         includeNECReferences: true,
-      })
+      }) as Parameters<typeof pdf>[0]
     ).toBlob();
     expect(blob.size).toBeGreaterThan(0);
   });
@@ -73,7 +73,7 @@ describe('VoltageDropDocument renders in Node', () => {
         panels: [],
         transformers: [],
         includeNECReferences: true,
-      })
+      }) as Parameters<typeof pdf>[0]
     ).toBlob();
     expect(blob.size).toBeGreaterThan(0);
   });
@@ -88,7 +88,7 @@ describe('VoltageDropDocument renders in Node', () => {
         panels,
         transformers: [],
         includeNECReferences: true,
-      })
+      }) as Parameters<typeof pdf>[0]
     ).toBlob();
     expect(blob.size).toBeGreaterThan(0);
   });

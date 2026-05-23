@@ -75,7 +75,9 @@ export const LoadCalculator: React.FC<LoadCalculatorProps> = ({ project, updateP
   const runAiValidation = async () => {
     setIsValidating(true);
     setValidationResult(null);
-    const result = await validateLoadCalculation(loads, project.serviceVoltage, project.servicePhase);
+    // loads comes from a DB Row shape with nullable booleans; validateLoadCalculation
+    // operates on the curated LoadItem shape. Runtime fields used are stable across both.
+    const result = await validateLoadCalculation(loads as never, project.serviceVoltage, project.servicePhase);
     setValidationResult(result || "No response received.");
     setIsValidating(false);
   };
@@ -379,7 +381,7 @@ export const LoadCalculator: React.FC<LoadCalculatorProps> = ({ project, updateP
         <div className="mt-8">
           {(() => {
             try {
-              const result = calculateLoad(loads, project.settings);
+              const result = calculateLoad(loads as never, project.settings);
 
               return (
                 <CalculationBreakdown

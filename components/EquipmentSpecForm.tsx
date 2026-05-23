@@ -64,9 +64,15 @@ export function EquipmentSpecForm({
   onChange,
   faultCurrentKA
 }: EquipmentSpecFormProps) {
-  // Form state
-  const [manufacturer, setManufacturer] = useState(currentData.manufacturer || '');
-  const [modelNumber, setModelNumber] = useState(currentData.model_number || '');
+  // Form state. `manufacturer` and `model_number` only exist on the Panel
+  // variant of the union; narrow via cast to read them safely when the union
+  // resolves to the Transformer side (they'll be undefined and fall back to '').
+  const [manufacturer, setManufacturer] = useState(
+    (currentData as Partial<PanelEquipmentSpecs>).manufacturer || ''
+  );
+  const [modelNumber, setModelNumber] = useState(
+    (currentData as Partial<PanelEquipmentSpecs>).model_number || ''
+  );
   const [availableModels, setAvailableModels] = useState<PanelModel[]>([]);
   const [selectedTemplate, setSelectedTemplate] = useState<PanelModel | null>(null);
 
@@ -127,8 +133,9 @@ export function EquipmentSpecForm({
         setSelectedTemplate(template);
 
         // Auto-populate fields from template
-        if (!nemaType && template.nema_types.length > 0) {
-          setNemaType(template.nema_types[0]);
+        const firstNema = template.nema_types[0];
+        if (!nemaType && firstNema) {
+          setNemaType(firstNema);
         }
         if (!aicRating) {
           setAicRating(template.aic);

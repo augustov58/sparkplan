@@ -298,10 +298,13 @@ export function buildStampMaps(args: {
       // Cover-ON (separate): first entry is the title page (no stamp,
       // BrandBar already painted), remaining entries are upload pages
       // (stamp each).
-      sheetIdMap.push(att.sheetIdRange[0]);
+      // ?? '' keeps the array index types happy under noUncheckedIndexedAccess;
+      // in practice the cover-ON branch only fires when sheetIdRange has
+      // at least one entry, so the fallback never lands.
+      sheetIdMap.push(att.sheetIdRange[0] ?? '');
       shouldStamp.push(false);
       for (let j = 1; j < att.sheetIdRange.length; j++) {
-        sheetIdMap.push(att.sheetIdRange[j]);
+        sheetIdMap.push(att.sheetIdRange[j] ?? '');
         shouldStamp.push(true);
       }
     }

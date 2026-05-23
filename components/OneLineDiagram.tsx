@@ -473,6 +473,7 @@ export const OneLineDiagram: React.FC<OneLineDiagramProps> = ({ project, updateP
       if (draggingNodeId && diagramRef.current && e.touches.length === 1) {
         e.preventDefault(); // Prevent scrolling while dragging
         const touch = e.touches[0];
+        if (!touch) return;
         const svg = diagramRef.current;
         const svgRect = svg.getBoundingClientRect();
         const viewBox = svg.viewBox.baseVal;
@@ -553,6 +554,7 @@ export const OneLineDiagram: React.FC<OneLineDiagramProps> = ({ project, updateP
           e.stopPropagation();
           if (e.touches.length === 1) {
             const touch = e.touches[0];
+            if (!touch) return;
             const currentOffset = manualOffsets.get(nodeId) || 0;
             setDraggingNodeId(nodeId);
             setDragStartX(touch.clientX);
@@ -1137,7 +1139,7 @@ export const OneLineDiagram: React.FC<OneLineDiagramProps> = ({ project, updateP
       mainBreakerAmps: panel.main_breaker_amps || panel.bus_rating,
       location: panel.location || '',
       voltage: panel.voltage,
-      phase: panel.phase,
+      phase: (panel.phase === 3 ? 3 : 1) as 1 | 3,
       numSpaces: panel.num_spaces ?? (panel.is_main ? 30 : 42)
     });
 
@@ -1766,7 +1768,7 @@ export const OneLineDiagram: React.FC<OneLineDiagramProps> = ({ project, updateP
       transformerData.fed_from_circuit_number = newTransformer.fedFromCircuitNumber;
     }
 
-    const result = await createTransformer(transformerData);
+    const result = await createTransformer(transformerData as any);
     if (result) {
       setNewTransformer({
         name: '',
@@ -3386,7 +3388,7 @@ export const OneLineDiagram: React.FC<OneLineDiagramProps> = ({ project, updateP
                                value={editingPanel.voltage}
                                onChange={e => setEditingPanel({ ...editingPanel, voltage: Number(e.target.value) })}
                                className="w-full border-gray-200 rounded text-xs py-1"
-                               disabled={panel.is_main && isResidentialProject}
+                               disabled={!!panel.is_main && isResidentialProject}
                              >
                                <option value="120">120V</option>
                                <option value="208">208V</option>
@@ -3401,7 +3403,7 @@ export const OneLineDiagram: React.FC<OneLineDiagramProps> = ({ project, updateP
                                value={editingPanel.phase}
                                onChange={e => setEditingPanel({ ...editingPanel, phase: Number(e.target.value) as 1 | 3 })}
                                className="w-full border-gray-200 rounded text-xs py-1"
-                               disabled={panel.is_main && isResidentialProject}
+                               disabled={!!panel.is_main && isResidentialProject}
                              >
                                <option value="1">1Φ</option>
                                <option value="3">3Φ</option>
@@ -3788,7 +3790,7 @@ export const OneLineDiagram: React.FC<OneLineDiagramProps> = ({ project, updateP
                 : 1
             }
             onCreateCircuits={handleBulkCreateCircuits}
-            panelPhase={bulkPanel?.phase || 3}
+            panelPhase={(bulkPanel?.phase === 1 ? 1 : 3) as 1 | 3}
             panelName={bulkPanel?.name || 'Panel'}
           />
         );

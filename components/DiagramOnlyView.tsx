@@ -21,8 +21,8 @@ export const DiagramOnlyView: React.FC<DiagramOnlyViewProps> = ({ project }) => 
   const { circuits } = useCircuits(project.id);
   const { transformers } = useTransformers(project.id);
 
-  // Find MDP (Main Distribution Panel)
-  const mdp = panels.find(p => p.panel_type === 'MDP');
+  // Find MDP (Main Distribution Panel) — DB uses `is_main`, not a panel_type discriminator
+  const mdp = panels.find(p => p.is_main);
 
   // Helper function to get downstream elements (panels/transformers) from a panel
   const getDownstreamElements = (panelId: string) => {
@@ -70,6 +70,7 @@ export const DiagramOnlyView: React.FC<DiagramOnlyViewProps> = ({ project }) => 
     if (downstreamElements.length === 1) {
       // Single element - direct vertical line
       const elem = downstreamElements[0];
+      if (!elem) return null;
       return (
         <line
           x1={parentX}

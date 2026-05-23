@@ -51,11 +51,11 @@ export function getTemperatureCorrectionFactor(
   if (TABLE_310_15_B1.length === 0) return 1.0;
 
   // For temps at or below the lowest row (10°C), use that row (gives a bonus factor)
-  if (ambientTempC <= TABLE_310_15_B1[0].ambientTempC) {
-    const entry = TABLE_310_15_B1[0];
-    if (insulationTemp === 60) return entry.temp60C;
-    if (insulationTemp === 75) return entry.temp75C;
-    return entry.temp90C;
+  const lowestEntry = TABLE_310_15_B1[0];
+  if (lowestEntry && ambientTempC <= lowestEntry.ambientTempC) {
+    if (insulationTemp === 60) return lowestEntry.temp60C;
+    if (insulationTemp === 75) return lowestEntry.temp75C;
+    return lowestEntry.temp90C;
   }
 
   // Find the first row where table temp >= ambient temp (round up)

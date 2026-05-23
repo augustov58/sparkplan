@@ -75,8 +75,10 @@ export const PanelPhotoImporter: React.FC<PanelPhotoImporterProps> = ({
       const dataUrl = e.target?.result as string;
       setImagePreview(dataUrl);
 
-      // Extract base64 data (remove data URL prefix)
-      const base64 = dataUrl.split(',')[1];
+      // Extract base64 data (remove data URL prefix). FileReader.readAsDataURL
+      // always emits "data:<mime>;base64,<payload>" → split[1] is always present;
+      // ?? '' is just for noUncheckedIndexedAccess.
+      const base64 = dataUrl.split(',')[1] ?? '';
       setImageBase64(base64);
 
       // Start analysis

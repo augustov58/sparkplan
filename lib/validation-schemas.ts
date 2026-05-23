@@ -11,7 +11,7 @@ import { z } from 'zod';
 
 export const supportTicketSchema = z.object({
   category: z.enum(['bug', 'question', 'feedback', 'feature_request'], {
-    errorMap: () => ({ message: 'Please select a category' }),
+    message: 'Please select a category',
   }),
 
   subject: z.string()
@@ -93,7 +93,7 @@ export const projectSchema = z.object({
     .max(100, 'Project name must be less than 100 characters'),
 
   type: z.enum(['Residential', 'Commercial', 'Industrial'], {
-    errorMap: () => ({ message: 'Please select a valid project type' })
+    message: 'Please select a valid project type',
   }),
 
   // Permissive — placeholders ("TBD", drafts) are allowed at form level.
@@ -408,11 +408,11 @@ export const feederSchema = z.object({
     .max(10000, 'Distance must be less than 10,000 feet'),
 
   conductor_material: z.enum(['Cu', 'Al'], {
-    errorMap: () => ({ message: 'Conductor material must be Cu (Copper) or Al (Aluminum)' })
+    message: 'Conductor material must be Cu (Copper) or Al (Aluminum)',
   }),
 
   conduit_type: z.enum(['EMT', 'PVC', 'IMC', 'RMC'], {
-    errorMap: () => ({ message: 'Invalid conduit type' })
+    message: 'Invalid conduit type',
   }).optional().default('PVC'),
 
   ambient_temperature_c: z.number()

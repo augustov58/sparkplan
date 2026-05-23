@@ -12,6 +12,7 @@
 // @ts-ignore: Deno global
 declare const Deno: any;
 
+// @ts-ignore: Deno URL import resolved at runtime
 import { createClient, type SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 export type SupportEventType =
@@ -86,14 +87,14 @@ export function extractTicketIdFromText(text: string): string | null {
   if (!text) return null;
   for (const pat of TICKET_ADDRESS_PATTERNS) {
     const m = text.match(pat);
-    if (m) return m[1];
+    if (m && m[1]) return m[1];
   }
   return null;
 }
 
 export function extractBareAddress(input: string): string {
   const angled = input.match(/<([^>]+)>/);
-  const raw = (angled ? angled[1] : input).trim().toLowerCase();
+  const raw = (angled?.[1] ?? input).trim().toLowerCase();
   return raw;
 }
 
@@ -126,7 +127,7 @@ export function stripQuotedReply(body: string): string {
   const lines = cleaned.split('\n');
   while (lines.length) {
     const last = lines[lines.length - 1];
-    if (last.trim() === '' || last.trim().startsWith('>')) {
+    if (last !== undefined && (last.trim() === '' || last.trim().startsWith('>'))) {
       lines.pop();
     } else {
       break;

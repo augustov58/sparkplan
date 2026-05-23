@@ -452,8 +452,13 @@ export const PanelSchedule: React.FC<PanelScheduleProps> = ({ project }) => {
       // single-family — false-positiving on commercial restaurants with
       // "Kitchen Hood" / multi-family MDPs with "Common Laundry" feeders.
       const occ = project.settings?.occupancyType;
+      // ResidentialSettings.totalUnits is the canonical field for unit count;
+      // PR #93 originally used multi_family_units which doesn't exist on the
+      // interface — buildingType derivation always fell through to
+      // 'single_family' for multi-family projects. Fixed during the tsc
+      // baseline cleanup that exposed the field name drift.
       const isMultiFamily =
-        ((project.settings?.residential as { multi_family_units?: number } | undefined)?.multi_family_units ?? 0) >= 3;
+        (project.settings?.residential?.totalUnits ?? 0) >= 3;
       const buildingType: 'single_family_residential' | 'multi_family' | 'commercial' =
         isMultiFamily
           ? 'multi_family'

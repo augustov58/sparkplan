@@ -82,7 +82,7 @@ export const ServiceUpgradeWizard: React.FC<ServiceUpgradeWizardProps> = ({ proj
           squareFootage: residentialSettings.squareFootage || 2000,
           smallApplianceCircuits: residentialSettings.smallApplianceCircuits || 2,
           laundryCircuit: residentialSettings.laundryCircuit ?? true,
-          appliances: residentialSettings.appliances,
+          appliances: residentialSettings.appliances ?? {},
           existingDwelling: isExistingDwelling,
           useTrueOptionalMethod: useTrueOptional,
         });
@@ -841,7 +841,7 @@ export const ServiceUpgradeWizard: React.FC<ServiceUpgradeWizardProps> = ({ proj
                   result.utilizationPercent,
                   proposedLoadAmps
                 );
-                if (circuitSharingCheck.recommended && proposedLoadAmps >= 24) {
+                if (circuitSharingCheck.recommend && proposedLoadAmps >= 24) {
                   return (
                     <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
                       <div className="flex items-start gap-3">

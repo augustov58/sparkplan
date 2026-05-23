@@ -579,7 +579,7 @@ interface RevisionLogPageProps {
   sheetId?: string;
 }
 
-const todayIso = (): string => new Date().toISOString().split('T')[0];
+const todayIso = (): string => new Date().toISOString().split('T')[0] ?? '';
 
 export const RevisionLogPage: React.FC<RevisionLogPageProps> = ({
   projectName,
@@ -1104,7 +1104,8 @@ const computeSubtreeWidth = (node: RiserNode): number => {
   let sum = 0;
   for (let i = 0; i < node.children.length; i++) {
     if (i > 0) sum += H_GAP;
-    sum += computeSubtreeWidth(node.children[i]);
+    const child = node.children[i];
+    if (child) sum += computeSubtreeWidth(child);
   }
   node.subtreeWidth = Math.max(NODE_W, sum);
   return node.subtreeWidth;
@@ -1630,7 +1631,7 @@ export const RiserDiagram: React.FC<RiserDiagramProps> = ({
   }
 
   const plans = planRiserPages(tree);
-  if (plans.length === 1) {
+  if (plans.length === 1 && plans[0]) {
     return (
       <RiserPageBody
         tree={plans[0].tree}

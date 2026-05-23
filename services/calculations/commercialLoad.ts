@@ -702,22 +702,25 @@ function applyKitchenDemandFactor(
 
   // First 3 units @ 100%
   for (let i = 0; i < Math.min(3, count); i++) {
-    if (sorted[i]) {
-      demandLoad += sorted[i].nameplateRating_kW * 1000 * 1.00;
+    const unit = sorted[i];
+    if (unit) {
+      demandLoad += unit.nameplateRating_kW * 1000 * 1.00;
     }
   }
 
   // Next 3 units @ 65%
   for (let i = 3; i < Math.min(6, count); i++) {
-    if (sorted[i]) {
-      demandLoad += sorted[i].nameplateRating_kW * 1000 * 0.65;
+    const unit = sorted[i];
+    if (unit) {
+      demandLoad += unit.nameplateRating_kW * 1000 * 0.65;
     }
   }
 
   // Remaining units @ 25%
   for (let i = 6; i < count; i++) {
-    if (sorted[i]) {
-      demandLoad += sorted[i].nameplateRating_kW * 1000 * 0.25;
+    const unit = sorted[i];
+    if (unit) {
+      demandLoad += unit.nameplateRating_kW * 1000 * 0.25;
     }
   }
 

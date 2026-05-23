@@ -26,7 +26,7 @@ export function validateForm<T extends z.ZodTypeAny>(
   }
 
   const errors: Record<string, string> = {};
-  result.error.errors.forEach((err) => {
+  result.error.issues.forEach((err: z.ZodIssue) => {
     const path = err.path.join('.');
     errors[path] = err.message;
   });
@@ -193,7 +193,7 @@ export function getStandardBreakerSize(amps: number): number {
     if (size >= amps) return size;
   }
 
-  return standardSizes[standardSizes.length - 1];
+  return standardSizes[standardSizes.length - 1] ?? 5000;
 }
 
 /**

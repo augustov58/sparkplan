@@ -41,11 +41,14 @@ export const ShortCircuitResults: React.FC = () => {
 
   // Stale-detection: any saved panel calc whose stored source_fault_current
   // disagrees with the currently-resolvable upstream value (because the
-  // upstream calc was changed since this one was saved).
+  // upstream calc was changed since this one was saved). detectStaleCalculations
+  // accepts a Pick of the DB row but only reads service_voltage / service_phase
+  // / utility_available_fault_current_a — the frontend Project is compatible
+  // via camelCase aliases; cast at the boundary.
   const staleMap = useMemo(() => {
     if (!project) return new Map();
     return detectStaleCalculations({
-      project,
+      project: project as never,
       panels,
       transformers,
       calculations,
@@ -113,10 +116,11 @@ export const ShortCircuitResults: React.FC = () => {
         </div>
       )}
 
-      {/* Project-aware calculator (inline) */}
+      {/* Project-aware calculator (inline). Same DB-row-vs-frontend-Project
+          mismatch as the stale-map call above; cast at the prop boundary. */}
       {project && (
         <ShortCircuitProjectCalculator
-          project={project}
+          project={project as never}
           panels={panels}
           transformers={transformers}
           existingCalculations={calculations}

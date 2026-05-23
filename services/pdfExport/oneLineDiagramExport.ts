@@ -65,8 +65,8 @@ export const exportDiagramAsPNG = async (
     try {
       // Get SVG dimensions
       const viewBox = svgElement.getAttribute('viewBox')?.split(' ') || ['0', '0', '800', '750'];
-      const width = parseInt(viewBox[2]) * scale;
-      const height = parseInt(viewBox[3]) * scale;
+      const width = parseInt(viewBox[2] ?? '800') * scale;
+      const height = parseInt(viewBox[3] ?? '750') * scale;
 
       // Clone and prepare SVG
       const clonedSvg = svgElement.cloneNode(true) as SVGSVGElement;
@@ -165,8 +165,8 @@ export const exportDiagramAsPDF = async (
     try {
       // Get SVG dimensions
       const viewBox = svgElement.getAttribute('viewBox')?.split(' ') || ['0', '0', '800', '750'];
-      const svgWidth = parseInt(viewBox[2]);
-      const svgHeight = parseInt(viewBox[3]);
+      const svgWidth = parseInt(viewBox[2] ?? '800');
+      const svgHeight = parseInt(viewBox[3] ?? '750');
 
       // Clone and prepare SVG
       const clonedSvg = svgElement.cloneNode(true) as SVGSVGElement;

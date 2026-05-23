@@ -38,7 +38,7 @@ export function useRFIs(projectId: string | undefined): UseRFIsReturn {
 
       if (fetchError) throw fetchError;
 
-      setRfis(data || []);
+      setRfis((data || []) as unknown as RFI[]);
     } catch (err: any) {
       setError(err.message || 'Failed to fetch RFIs');
       console.error('Error fetching RFIs:', err);
@@ -122,8 +122,9 @@ export function useRFIs(projectId: string | undefined): UseRFIsReturn {
       if (error) throw error;
 
       // Optimistic update
-      setRfis((prev) => [data, ...prev]);
-      return data;
+      const newRfi = data as unknown as RFI;
+      setRfis((prev) => [newRfi, ...prev]);
+      return newRfi;
     } catch (err: any) {
       setError(err.message || 'Failed to create RFI');
       console.error('Error creating RFI:', err);

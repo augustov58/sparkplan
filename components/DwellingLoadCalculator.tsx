@@ -254,8 +254,15 @@ export const DwellingLoadCalculator: React.FC<DwellingLoadCalculatorProps> = ({
     const hasElectricHeat = appliances.hvac?.enabled === true &&
       (appliances.hvac.type === 'heat_pump' || appliances.hvac.type === 'electric_heat');
 
-    // Compare key values to skip update if nothing changed
-    const stored = project.settings?.residential?.multiFamilyLoadResult;
+    // Compare key values to skip update if nothing changed. multiFamilyLoadResult
+    // lives on settings.residential as an ad-hoc cache and isn't part of the
+    // canonical ResidentialSettings shape — read via index access.
+    const stored = (project.settings?.residential as { multiFamilyLoadResult?: {
+      totalDemandVA: number;
+      serviceAmps: number;
+      dwellingUnits: number;
+      commonAreaLoadVA: number;
+    } } | undefined)?.multiFamilyLoadResult;
     if (stored &&
         stored.totalDemandVA === loadResult.totalDemandVA &&
         stored.serviceAmps === loadResult.serviceAmps &&
@@ -550,7 +557,7 @@ export const DwellingLoadCalculator: React.FC<DwellingLoadCalculatorProps> = ({
         const circuit = generatedCircuits[i];
         if (!circuit) continue;
         const slot = assignedSlots[i];
-        if (slot === -1) continue; // Skipped — panel out of space; warn after loop
+        if (slot === undefined || slot === -1) continue; // Skipped — panel out of space; warn after loop
 
         await createCircuit({
           project_id: project.id,

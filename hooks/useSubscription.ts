@@ -298,12 +298,15 @@ export function useSubscription(): UseSubscriptionReturn {
             .single();
 
           if (createError) throw createError;
-          setSubscription(newSub);
+          // DB rows widen several non-null Subscription fields to T | null
+          // (auto-gen drift). The actual DB columns are non-null with
+          // defaults; cast to the curated Subscription shape at the boundary.
+          setSubscription(newSub as Subscription);
         } else {
           throw fetchError;
         }
       } else {
-        setSubscription(data);
+        setSubscription(data as Subscription);
       }
     } catch (err: any) {
       console.error('Error fetching subscription:', err);
@@ -492,12 +495,15 @@ export function useSubscription(): UseSubscriptionReturn {
         return { success: false, error: rpcError.message };
       }
 
-      // Refresh subscription data after redemption
-      if (data?.success) {
+      // Refresh subscription data after redemption. The RPC `data` is
+      // typed as the Supabase Json union; cast to the PromoCodeResult
+      // contract enforced by the backing SQL function.
+      const result = data as unknown as PromoCodeResult | null;
+      if (result?.success) {
         await fetchSubscription();
       }
 
-      return data as PromoCodeResult;
+      return result ?? { success: false, error: 'Unknown error' };
     } catch (err: any) {
       console.error('Error redeeming promo code:', err);
       return { success: false, error: err.message };

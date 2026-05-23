@@ -507,6 +507,10 @@ export const SiteVisitManager: React.FC<SiteVisitManagerProps> = ({ project }) =
                                 continue;
                               }
                               const storagePath = urlParts[1];
+                              if (!storagePath) {
+                                console.warn('Skipping photo with malformed URL parts:', urlParts);
+                                continue;
+                              }
 
                               // Download photo from Supabase Storage
                               const { data: blob, error } = await supabase.storage

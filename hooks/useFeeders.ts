@@ -35,7 +35,7 @@ export function useFeeders(projectId: string | undefined) {
         .order('created_at', { ascending: true });
 
       if (error) throw error;
-      setFeeders(data || []);
+      setFeeders((data || []) as unknown as Feeder[]);
       setError(null);
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to fetch feeders';
@@ -103,7 +103,8 @@ export function useFeeders(projectId: string | undefined) {
       if (error) throw error;
 
       // Optimistic update
-      setFeeders(prev => [...prev, data]);
+      const newFeeder = data as unknown as Feeder;
+      setFeeders(prev => [...prev, newFeeder]);
       setError(null);
       showToast.success(toastMessages.feeder.created);
 
@@ -135,7 +136,8 @@ export function useFeeders(projectId: string | undefined) {
       if (error) throw error;
 
       // Optimistic update
-      setFeeders(prev => prev.map(f => f.id === id ? { ...f, ...data } : f));
+      const updatedFeeder = data as unknown as Feeder;
+      setFeeders(prev => prev.map(f => f.id === id ? { ...f, ...updatedFeeder } : f));
       setError(null);
       showToast.success(toastMessages.feeder.updated);
 

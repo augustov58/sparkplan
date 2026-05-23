@@ -6,8 +6,11 @@
 // @ts-ignore: Deno global available in Supabase Edge Functions
 declare const Deno: any;
 
+// @ts-ignore: Deno URL import resolved at runtime
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
+// @ts-ignore: Deno URL import resolved at runtime
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2"
+// @ts-ignore: Deno URL import resolved at runtime
 import Stripe from "https://esm.sh/stripe@14?target=denonext"
 
 const corsHeaders = {
@@ -41,7 +44,7 @@ interface CheckoutRequest {
   cancelUrl?: string
 }
 
-serve(async (req) => {
+serve(async (req: Request) => {
   // Handle CORS preflight
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })

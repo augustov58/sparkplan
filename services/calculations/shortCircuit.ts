@@ -110,7 +110,7 @@ export function calculateDownstreamFaultCurrent(
   if (!conductorData) {
     return {
       faultCurrent: 0,
-      requiredAIC: STANDARD_AIC_RATINGS[STANDARD_AIC_RATINGS.length - 1],
+      requiredAIC: STANDARD_AIC_RATINGS[STANDARD_AIC_RATINGS.length - 1] ?? 200,
       details: {
         sourceFaultCurrent,
         conductorImpedance: 0,
@@ -392,7 +392,7 @@ export function calculateDownstreamTransformerFaultCurrent(
   if (primaryFaultCurrent <= 0 || kva <= 0 || impedance <= 0) {
     return {
       faultCurrent: 0,
-      requiredAIC: STANDARD_AIC_RATINGS[STANDARD_AIC_RATINGS.length - 1],
+      requiredAIC: STANDARD_AIC_RATINGS[STANDARD_AIC_RATINGS.length - 1] ?? 200,
       details: {
         sourceFaultCurrent: primaryFaultCurrent,
         conductorImpedance: 0,
