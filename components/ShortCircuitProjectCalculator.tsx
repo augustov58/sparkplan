@@ -162,7 +162,7 @@ export const ShortCircuitProjectCalculator: React.FC<Props> = ({
     setSelectedPanelId(panelId);
     const panel = panels.find((p) => p.id === panelId);
     if (!panel) return;
-    const next = derivePanelFormState(panel, project, getSupplyingFeeder(panelId));
+    const next = derivePanelFormState(panel, project, getSupplyingFeeder(panelId) as never);
     setFeederLength(next.feederLength);
     setFeederSize(next.feederSize);
     setFeederMaterial(next.feederMaterial);

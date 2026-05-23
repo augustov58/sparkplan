@@ -104,7 +104,7 @@ export const PermitsOverviewTab: React.FC<PermitsOverviewTabProps> = ({
     const map: Record<string, typeof inspections> = {};
     for (const i of inspections) {
       if (!map[i.permit_id]) map[i.permit_id] = [];
-      map[i.permit_id].push(i);
+      map[i.permit_id]!.push(i);
     }
     return map;
   }, [inspections]);

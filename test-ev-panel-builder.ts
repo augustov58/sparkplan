@@ -133,7 +133,7 @@ testCases.forEach((testCase, index) => {
 
     // Calculate total load
     const totalLoad = circuits.reduce((sum, c) => sum + c.breakerAmps, 0);
-    const utilization = (totalLoad / panel.main_breaker_amps * 100).toFixed(1);
+    const utilization = (totalLoad / (panel.main_breaker_amps ?? 1) * 100).toFixed(1);
     console.log(`  Total Load: ${totalLoad}A (${utilization}% utilization)`);
 
     if (panelRatingMatch && circuitCountMatch) {

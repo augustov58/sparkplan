@@ -31,7 +31,7 @@ function resolveFeederLoadVA(
   transformers?: Transformer[],
 ): number {
   if (panels && circuits && transformers) {
-    return computeFeederLoadVA(feeder, panels, circuits, transformers);
+    return computeFeederLoadVA(feeder as never, panels, circuits, transformers);
   }
   return feeder.total_load_va || 0;
 }

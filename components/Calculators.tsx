@@ -2239,7 +2239,7 @@ const ChangeImpactAnalyzer: React.FC<ChangeImpactAnalyzerProps> = ({ projectId }
 
   const updateLoad = (index: number, field: 'type' | 'amps' | 'quantity', value: string | number) => {
     const updated = [...proposedLoads];
-    updated[index] = { ...updated[index], [field]: value };
+    updated[index] = { ...updated[index]!, [field]: value };
     setProposedLoads(updated);
   };
 

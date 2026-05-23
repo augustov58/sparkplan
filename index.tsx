@@ -1,4 +1,5 @@
 import React from 'react';
+// @ts-ignore - react-dom/client types not installed
 import { createRoot } from 'react-dom/client';
 import App from './App';
 import { AuthProvider } from './components/Auth/AuthProvider';

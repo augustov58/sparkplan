@@ -64,7 +64,7 @@ export function useAgentActivityLog(
 
       if (fetchError) throw fetchError;
 
-      setLogs(data || []);
+      setLogs((data || []) as never);
     } catch (err: any) {
       setError(err.message || 'Failed to fetch activity logs');
       console.error('Error fetching activity logs:', err);

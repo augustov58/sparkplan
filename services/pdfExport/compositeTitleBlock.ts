@@ -218,7 +218,7 @@ export async function compositeTitleBlock(
       composited: false,
     };
   }
-  const titleBlockPage = embeddedTitleBlock[0];
+  const titleBlockPage = embeddedTitleBlock[0]!;
 
   // Per-page draw. We scale the title block to each page's dimensions —
   // if the upload is mixed-size (rare but possible — multi-page PDFs from

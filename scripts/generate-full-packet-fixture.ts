@@ -83,7 +83,7 @@ async function generateAndSave(
       `Expected 1 download, got ${downloads.length} (${downloads.map((d) => d.fileName).join(', ')})`,
     );
   }
-  const dl = downloads[0];
+  const dl = downloads[0]!;
   const buf = Buffer.from(await dl.blob.arrayBuffer());
   const outDir = path.resolve(process.cwd(), 'example_reports');
   await fs.mkdir(outDir, { recursive: true });

@@ -196,7 +196,7 @@ export const EstimateDetailView: React.FC<EstimateDetailViewProps> = ({
     const result = autoTakeoffFromProject({
       panels,
       circuits,
-      feeders,
+      feeders: feeders as never[],
       transformers,
     });
     if (result.lineItems.length === 0) {

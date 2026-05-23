@@ -53,7 +53,7 @@ export function useJurisdictions(): UseJurisdictionsReturn {
 
         if (fetchError) throw fetchError;
 
-        setJurisdictions(data || []);
+        setJurisdictions((data || []) as never);
       } catch (err) {
         console.error('Error fetching jurisdictions:', err);
         setError(err instanceof Error ? err : new Error('Unknown error fetching jurisdictions'));

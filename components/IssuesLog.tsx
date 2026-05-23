@@ -170,7 +170,7 @@ export const IssuesLog: React.FC<IssuesLogProps> = ({ project }) => {
                           </span>
                           <span className="text-xs font-mono text-gray-500">NEC {issue.article}</span>
                           <span className="text-xs text-gray-300 mx-1">•</span>
-                          <span className="text-xs text-gray-400">{new Date(issue.created_at).toLocaleDateString()}</span>
+                          <span className="text-xs text-gray-400">{issue.created_at ? new Date(issue.created_at).toLocaleDateString() : ''}</span>
                       </div>
                       <p className={`text-sm ${issue.status === 'Resolved' ? 'text-gray-400 line-through' : 'text-gray-900'}`}>
                           {issue.description}
