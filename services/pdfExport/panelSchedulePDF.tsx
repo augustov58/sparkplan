@@ -75,6 +75,12 @@ export const exportAllPanelsPDF = async (
   projectAddress?: string,
   showExistingNewMarkers: boolean = false,
   buildingType?: 'single_family_residential' | 'multi_family' | 'commercial',
+  aggregatedLoadByPanel?: Map<string, {
+    totalDemandVA: number;
+    totalConnectedVA: number;
+    downstreamPanelCount: number;
+    necReference?: string;
+  }>,
 ) => {
   try {
     // Validate panels data
@@ -92,6 +98,7 @@ export const exportAllPanelsPDF = async (
         projectAddress={projectAddress}
         showExistingNewMarkers={showExistingNewMarkers}
         buildingType={buildingType}
+        aggregatedLoadByPanel={aggregatedLoadByPanel}
       />
     ).toBlob();
 

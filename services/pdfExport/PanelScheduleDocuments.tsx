@@ -276,6 +276,27 @@ interface PanelSchedulePDFProps {
    * still activate via isDwellingUnitPanel (which doesn't require this gate).
    */
   buildingType?: 'single_family_residential' | 'multi_family' | 'commercial';
+  /**
+   * Aggregated load for this panel — the same `calculateAggregatedLoad` result
+   * the in-app Panel Summary uses. When provided AND meaningful (downstream
+   * panels > 0 OR demand < connected, i.e. EVEMS feeder clamp engaged), the
+   * Load Summary card surfaces Demand kVA + Demand Amps alongside the
+   * connected sum so AHJ reviewers see the NEC-sized number (e.g. a 1000A
+   * MDP bus is verified against 999A demand, not the 1380A nameplate sum).
+   *
+   * Pass `undefined` (or a result where demand equals connected) to fall
+   * back to the legacy connected-sum / per-leg-amps display.
+   *
+   * `necReference` is the dominant article applied (e.g. "NEC 220.84" for
+   * multi-family aggregate, "NEC 625.42" for EVEMS-clamped EV panels) and
+   * renders as an inline annotation on the Demand label.
+   */
+  aggregatedLoad?: {
+    totalDemandVA: number;
+    totalConnectedVA: number;
+    downstreamPanelCount: number;
+    necReference?: string;
+  };
 }
 
 // Main PDF Component for single panel — page-level fragment for embedding.
@@ -290,6 +311,7 @@ export const PanelSchedulePages: React.FC<PanelSchedulePDFProps> = ({
   sheetId,
   showExistingNewMarkers = false,
   buildingType,
+  aggregatedLoad,
 }) => {
   // Helper: append " *" to a description when (a) markers are enabled AND
   // (b) the circuit is flagged as a proposed new addition. Returns the raw
@@ -402,6 +424,33 @@ export const PanelSchedulePages: React.FC<PanelSchedulePDFProps> = ({
     phaseBalancing.phaseA_VA +
     phaseBalancing.phaseB_VA +
     phaseBalancing.phaseC_VA;
+
+  // Detect "meaningful aggregated demand" — when the NEC demand factor or
+  // EVEMS feeder clamp materially reduces the panel's draw vs the raw
+  // connected sum. Two triggers:
+  //   1. Panel feeds downstream sub-panels (MDP aggregator under NEC 220.84)
+  //   2. Demand is at least 1 VA below connected (EVEMS feeder clamp engaged
+  //      per NEC 625.42 — e.g. 140 kVA nameplate clamped to a 47.9 kVA setpoint).
+  // Dwelling unit panels (Branch 1 above) don't go through aggregatedLoad —
+  // they show NEC 220.82/.83 demand from `dwellingUnitDemand` instead.
+  const hasMeaningfulAggregated =
+    !dwellingUnitDemand &&
+    !!aggregatedLoad &&
+    aggregatedLoad.totalDemandVA > 0 &&
+    (aggregatedLoad.downstreamPanelCount > 0 ||
+      aggregatedLoad.totalDemandVA < aggregatedLoad.totalConnectedVA - 1);
+  const voltageDivisor = panel.voltage * (panel.phase === 3 ? Math.sqrt(3) : 1);
+  const aggregatedDemandAmps = hasMeaningfulAggregated
+    ? aggregatedLoad!.totalDemandVA / voltageDivisor
+    : 0;
+  // EVEMS callout is now redundant when the Load Summary already shows the
+  // setpoint as Demand kVA / Demand Amps. Keep the separate card only when
+  // the setpoint marker exists but the aggregatedLoad path didn't surface it
+  // (e.g. caller passed no aggregatedLoad). Otherwise the AHJ reviewer sees
+  // the same numbers twice on a page that's already tight on vertical space.
+  const hasEvemsInLoadSummary =
+    hasMeaningfulAggregated &&
+    (aggregatedLoad?.necReference ?? '').includes('625.42');
 
   return (
     <Page size="LETTER" style={themeStyles.page}>
@@ -573,11 +622,25 @@ export const PanelSchedulePages: React.FC<PanelSchedulePDFProps> = ({
             panels (commercial / industrial) keep the connected sum + per-leg
             amperage display since those are the relevant questions for those
             panel types. */}
+        {/* Load Summary — single consolidated card. Three modes:
+            1. Dwelling unit panel (NEC 220.82/.83): Total Circuits | Demand kVA |
+               Demand Amps | General@Tiered | Climate@100% — five columns merge the
+               former "Dwelling Demand Breakdown" card into the Load Summary so
+               42-circuit panels don't overflow to a second page.
+            2. Aggregator / EVEMS-clamped (NEC 220.84 or 625.42): Total Circuits |
+               Connected kVA | Demand kVA | Demand Amps — surfaces the AHJ-relevant
+               sized-current alongside the connected nameplate sum. MDPs on a 1000A
+               bus that summed to 1380A nameplate now show the 999A demand explicitly.
+            3. Default (panel-local, no factor reduction): Total Circuits |
+               Connected kVA | per-leg / per-phase connected amps. Unchanged from
+               the prior layout for panels where demand == connected. */}
         <View style={styles.summarySection} wrap={false}>
           <Text style={styles.summaryTitle}>
             {dwellingUnitDemand
               ? 'Load Summary (NEC Dwelling Demand)'
-              : 'Load Summary & Phase Balance'}
+              : hasMeaningfulAggregated
+                ? `Load Summary (NEC Demand${aggregatedLoad?.necReference ? ` — ${aggregatedLoad.necReference}` : ''})`
+                : 'Load Summary & Phase Balance'}
           </Text>
 
           {dwellingUnitDemand ? (
@@ -598,16 +661,61 @@ export const PanelSchedulePages: React.FC<PanelSchedulePDFProps> = ({
                 <View style={styles.summaryItem}>
                   <Text style={styles.summaryLabel}>Demand Amps</Text>
                   <Text style={styles.summaryValue}>
-                    {(
-                      dwellingUnitDemand.totalDemandVA /
-                      (panel.voltage * (panel.phase === 3 ? Math.sqrt(3) : 1))
-                    ).toFixed(1)}
-                    A
+                    {(dwellingUnitDemand.totalDemandVA / voltageDivisor).toFixed(1)}A
+                  </Text>
+                </View>
+
+                <View style={styles.summaryItem}>
+                  <Text style={styles.summaryLabel}>General @ Tiered</Text>
+                  <Text style={styles.summaryValue}>
+                    {(dwellingUnitDemand.generalDemandVA / 1000).toFixed(1)} kVA
+                  </Text>
+                </View>
+
+                <View style={styles.summaryItem}>
+                  <Text style={styles.summaryLabel}>Climate @ 100%</Text>
+                  <Text style={styles.summaryValue}>
+                    {(dwellingUnitDemand.climateDemandVA / 1000).toFixed(1)} kVA
                   </Text>
                 </View>
               </View>
               <Text style={[styles.summaryLabel, { marginTop: 4, fontSize: 7, fontStyle: 'italic' }]}>
-                NEC 220.82/.83 dwelling demand — matches the Dwelling Load Calculator and the Load Calculation Summary. Per-phase connected breakdown shown in the schedule above for balance verification only; NEC dwelling demand is NOT the sum of circuit nameplate loads.
+                NEC 220.82/.83 dwelling demand — matches the Dwelling Load Calculator and the Load Calculation Summary. General-loads bucket tiered per 220.42; Climate is the larger of heating/cooling per 220.60 (non-coincident).
+              </Text>
+            </>
+          ) : hasMeaningfulAggregated ? (
+            <>
+              <View style={styles.summaryGrid}>
+                <View style={styles.summaryItem}>
+                  <Text style={styles.summaryLabel}>Total Circuits</Text>
+                  <Text style={styles.summaryValue}>{sortedCircuits.length}</Text>
+                </View>
+
+                <View style={styles.summaryItem}>
+                  <Text style={styles.summaryLabel}>Connected Load (sum)</Text>
+                  <Text style={styles.summaryValue}>
+                    {(aggregatedLoad!.totalConnectedVA / 1000).toFixed(1)} kVA
+                  </Text>
+                </View>
+
+                <View style={styles.summaryItem}>
+                  <Text style={styles.summaryLabel}>Demand Load</Text>
+                  <Text style={styles.summaryValue}>
+                    {(aggregatedLoad!.totalDemandVA / 1000).toFixed(1)} kVA
+                  </Text>
+                </View>
+
+                <View style={styles.summaryItem}>
+                  <Text style={styles.summaryLabel}>Demand Amps</Text>
+                  <Text style={styles.summaryValue}>
+                    {aggregatedDemandAmps.toFixed(1)}A
+                  </Text>
+                </View>
+              </View>
+              <Text style={[styles.summaryLabel, { marginTop: 4, fontSize: 7, fontStyle: 'italic' }]}>
+                {aggregatedLoad?.downstreamPanelCount && aggregatedLoad.downstreamPanelCount > 0
+                  ? `Aggregated demand across ${aggregatedLoad.downstreamPanelCount} downstream panel${aggregatedLoad.downstreamPanelCount === 1 ? '' : 's'} per ${aggregatedLoad.necReference || 'NEC 220'} — verify bus rating against Demand Amps, not the nameplate sum.`
+                  : `Demand reflects ${aggregatedLoad?.necReference || 'NEC 220'} — feeder/service sizing uses Demand Amps; branch conductors stay at full nameplate per NEC 220.57(A).`}
               </Text>
             </>
           ) : (
@@ -664,39 +772,12 @@ export const PanelSchedulePages: React.FC<PanelSchedulePDFProps> = ({
           )}
         </View>
 
-        {/* Dwelling Demand Breakdown — companion to the Load Summary (NEC
-            Dwelling Demand) section above. Total Demand + Demand Amps are
-            shown in the Load Summary; this card shows ONLY the per-category
-            breakdown (general-loads bucket tiered per 220.42, HVAC at 100%
-            non-coincident per 220.60). Sprint 2C M6 fix-up #3 (2026-05-21):
-            removed the duplicate Total Demand + Demand Amps rows that
-            appeared identically in the Load Summary above. */}
-        {dwellingUnitDemand && (
+        {/* NEC 625.42 EVEMS Setpoint callout — only rendered when the Load
+            Summary above didn't already integrate the setpoint as Demand kVA /
+            Demand Amps. Avoids duplicating identical numbers on a page that's
+            tight on vertical space. */}
+        {evemsSetpointMarker && evemsSetpointMarker.load_watts && evemsSetpointMarker.load_watts > 0 && !hasEvemsInLoadSummary && (
           <View style={styles.summarySection} wrap={false}>
-            <Text style={styles.summaryTitle}>Dwelling Demand Breakdown (NEC 220.82/.83)</Text>
-            <View style={styles.summaryGrid}>
-              <View style={styles.summaryItem}>
-                <Text style={styles.summaryLabel}>General @ Tiered</Text>
-                <Text style={styles.summaryValue}>
-                  {(dwellingUnitDemand.generalDemandVA / 1000).toFixed(1)} kVA
-                </Text>
-              </View>
-              <View style={styles.summaryItem}>
-                <Text style={styles.summaryLabel}>Climate @ 100% (non-coincident)</Text>
-                <Text style={styles.summaryValue}>
-                  {(dwellingUnitDemand.climateDemandVA / 1000).toFixed(1)} kVA
-                </Text>
-              </View>
-            </View>
-            <Text style={[styles.summaryLabel, { marginTop: 4, fontSize: 7, fontStyle: 'italic' }]}>
-              General-loads bucket tiered per NEC 220.42. Climate is the larger of heating/cooling per NEC 220.60 (non-coincident loads).
-            </Text>
-          </View>
-        )}
-
-        {/* NEC 625.42 EVEMS Setpoint callout — visible to AHJ reviewers */}
-        {evemsSetpointMarker && evemsSetpointMarker.load_watts && evemsSetpointMarker.load_watts > 0 && (
-          <View style={styles.summarySection}>
             <Text style={styles.summaryTitle}>EVEMS Aggregate Setpoint (NEC 625.42)</Text>
             <View style={styles.summaryGrid}>
               <View style={styles.summaryItem}>
@@ -708,11 +789,7 @@ export const PanelSchedulePages: React.FC<PanelSchedulePDFProps> = ({
               <View style={styles.summaryItem}>
                 <Text style={styles.summaryLabel}>Setpoint Amps</Text>
                 <Text style={styles.summaryValue}>
-                  {(
-                    evemsSetpointMarker.load_watts /
-                    (panel.voltage * (panel.phase === 3 ? Math.sqrt(3) : 1))
-                  ).toFixed(1)}
-                  A
+                  {(evemsSetpointMarker.load_watts / voltageDivisor).toFixed(1)}A
                 </Text>
               </View>
             </View>
@@ -754,6 +831,17 @@ interface MultiPanelDocumentProps {
    *  with dwelling-shape circuit names (Kitchen Hood, Common Laundry) don't
    *  false-positive into the NEC 220.82/.83 display branch. */
   buildingType?: 'single_family_residential' | 'multi_family' | 'commercial';
+  /** Per-panel aggregated demand (NEC 220.84 multi-family aggregate, EVEMS
+   *  feeder clamp per 625.42, or standard NEC 220 cascade with downstream
+   *  feeders). Keyed by panel.id. Mirrors PanelSchedulePDFProps.aggregatedLoad
+   *  — see that interface for the trigger semantics. Optional; panels not in
+   *  the map fall back to the legacy connected-sum display. */
+  aggregatedLoadByPanel?: Map<string, {
+    totalDemandVA: number;
+    totalConnectedVA: number;
+    downstreamPanelCount: number;
+    necReference?: string;
+  }>;
 }
 
 export const MultiPanelDocument: React.FC<MultiPanelDocumentProps> = ({
@@ -765,6 +853,7 @@ export const MultiPanelDocument: React.FC<MultiPanelDocumentProps> = ({
   contractorLicense,
   showExistingNewMarkers = false,
   buildingType,
+  aggregatedLoadByPanel,
 }) => (
   <Document>
     {panels.map((panel) => {
@@ -923,9 +1012,11 @@ export const MultiPanelDocument: React.FC<MultiPanelDocumentProps> = ({
             )}
           </View>
 
-          {/* Phase Balancing Summary — see sibling implementation in the
-              standalone-page block above for the dwelling-vs-non-dwelling
-              branch rationale. */}
+          {/* Phase Balancing Summary — see sibling implementation in
+              PanelSchedulePages above for full branch rationale (dwelling vs
+              aggregator/EVEMS vs default). Mirror logic kept here to keep
+              MultiPanelDocument self-contained for the standalone "export
+              all panels" download path. */}
           {(() => {
             const phaseBalancing = calculatePhaseBalancing(circuits, panel.phase);
             const totalVA =
@@ -936,12 +1027,8 @@ export const MultiPanelDocument: React.FC<MultiPanelDocumentProps> = ({
             const phaseA_Amps = phaseBalancing.phaseA_VA / vLN;
             const phaseB_Amps = phaseBalancing.phaseB_VA / vLN;
             const phaseC_Amps = phaseBalancing.phaseC_VA / vLN;
+            const voltageDivisor = panel.voltage * (panel.phase === 3 ? Math.sqrt(3) : 1);
 
-            // Dwelling-panel demand re-uses the same detection layered in
-            // the standalone-page block above: multi-family unit panels
-            // (via isDwellingUnitPanel) OR single-family MDPs (is_main +
-            // dwelling-shape circuits). Both paths must compute identical
-            // numbers for the same panel so PDF + in-app + Load Calc agree.
             const dwellingCircuitsForCalc = circuits.map(c => ({
               description: c.description,
               loadWatts: c.load_watts || 0,
@@ -966,37 +1053,95 @@ export const MultiPanelDocument: React.FC<MultiPanelDocumentProps> = ({
               ? calculateDwellingUnitDemandVA(dwellingCircuitsForCalc)
               : null;
 
+            const aggLoad = aggregatedLoadByPanel?.get(panel.id);
+            const hasMeaningfulAggregated =
+              !dwellingDemand &&
+              !!aggLoad &&
+              aggLoad.totalDemandVA > 0 &&
+              (aggLoad.downstreamPanelCount > 0 ||
+                aggLoad.totalDemandVA < aggLoad.totalConnectedVA - 1);
+            const aggDemandAmps = hasMeaningfulAggregated
+              ? aggLoad!.totalDemandVA / voltageDivisor
+              : 0;
+
             return (
-              <View style={styles.summarySection}>
+              <View style={styles.summarySection} wrap={false}>
                 <Text style={styles.summaryTitle}>
                   {dwellingDemand
                     ? 'Load Summary (NEC Dwelling Demand)'
-                    : 'Load Summary & Phase Balance'}
+                    : hasMeaningfulAggregated
+                      ? `Load Summary (NEC Demand${aggLoad?.necReference ? ` — ${aggLoad.necReference}` : ''})`
+                      : 'Load Summary & Phase Balance'}
                 </Text>
 
                 {dwellingDemand ? (
-                  <View style={styles.summaryGrid}>
-                    <View style={styles.summaryItem}>
-                      <Text style={styles.summaryLabel}>Total Circuits</Text>
-                      <Text style={styles.summaryValue}>{circuits.length}</Text>
+                  <>
+                    <View style={styles.summaryGrid}>
+                      <View style={styles.summaryItem}>
+                        <Text style={styles.summaryLabel}>Total Circuits</Text>
+                        <Text style={styles.summaryValue}>{circuits.length}</Text>
+                      </View>
+                      <View style={styles.summaryItem}>
+                        <Text style={styles.summaryLabel}>Demand Load</Text>
+                        <Text style={styles.summaryValue}>
+                          {(dwellingDemand.totalDemandVA / 1000).toFixed(1)} kVA
+                        </Text>
+                      </View>
+                      <View style={styles.summaryItem}>
+                        <Text style={styles.summaryLabel}>Demand Amps</Text>
+                        <Text style={styles.summaryValue}>
+                          {(dwellingDemand.totalDemandVA / voltageDivisor).toFixed(1)}A
+                        </Text>
+                      </View>
+                      <View style={styles.summaryItem}>
+                        <Text style={styles.summaryLabel}>General @ Tiered</Text>
+                        <Text style={styles.summaryValue}>
+                          {(dwellingDemand.generalDemandVA / 1000).toFixed(1)} kVA
+                        </Text>
+                      </View>
+                      <View style={styles.summaryItem}>
+                        <Text style={styles.summaryLabel}>Climate @ 100%</Text>
+                        <Text style={styles.summaryValue}>
+                          {(dwellingDemand.climateDemandVA / 1000).toFixed(1)} kVA
+                        </Text>
+                      </View>
                     </View>
-                    <View style={styles.summaryItem}>
-                      <Text style={styles.summaryLabel}>Demand Load</Text>
-                      <Text style={styles.summaryValue}>
-                        {(dwellingDemand.totalDemandVA / 1000).toFixed(1)} kVA
-                      </Text>
+                    <Text style={[styles.summaryLabel, { marginTop: 4, fontSize: 7, fontStyle: 'italic' }]}>
+                      NEC 220.82/.83 dwelling demand — matches the Dwelling Load Calculator. General-loads bucket tiered per 220.42; Climate is the larger of heating/cooling per 220.60 (non-coincident).
+                    </Text>
+                  </>
+                ) : hasMeaningfulAggregated ? (
+                  <>
+                    <View style={styles.summaryGrid}>
+                      <View style={styles.summaryItem}>
+                        <Text style={styles.summaryLabel}>Total Circuits</Text>
+                        <Text style={styles.summaryValue}>{circuits.length}</Text>
+                      </View>
+                      <View style={styles.summaryItem}>
+                        <Text style={styles.summaryLabel}>Connected Load (sum)</Text>
+                        <Text style={styles.summaryValue}>
+                          {(aggLoad!.totalConnectedVA / 1000).toFixed(1)} kVA
+                        </Text>
+                      </View>
+                      <View style={styles.summaryItem}>
+                        <Text style={styles.summaryLabel}>Demand Load</Text>
+                        <Text style={styles.summaryValue}>
+                          {(aggLoad!.totalDemandVA / 1000).toFixed(1)} kVA
+                        </Text>
+                      </View>
+                      <View style={styles.summaryItem}>
+                        <Text style={styles.summaryLabel}>Demand Amps</Text>
+                        <Text style={styles.summaryValue}>
+                          {aggDemandAmps.toFixed(1)}A
+                        </Text>
+                      </View>
                     </View>
-                    <View style={styles.summaryItem}>
-                      <Text style={styles.summaryLabel}>Demand Amps</Text>
-                      <Text style={styles.summaryValue}>
-                        {(
-                          dwellingDemand.totalDemandVA /
-                          (panel.voltage * (panel.phase === 3 ? Math.sqrt(3) : 1))
-                        ).toFixed(1)}
-                        A
-                      </Text>
-                    </View>
-                  </View>
+                    <Text style={[styles.summaryLabel, { marginTop: 4, fontSize: 7, fontStyle: 'italic' }]}>
+                      {aggLoad?.downstreamPanelCount && aggLoad.downstreamPanelCount > 0
+                        ? `Aggregated demand across ${aggLoad.downstreamPanelCount} downstream panel${aggLoad.downstreamPanelCount === 1 ? '' : 's'} per ${aggLoad.necReference || 'NEC 220'} — verify bus rating against Demand Amps, not the nameplate sum.`
+                        : `Demand reflects ${aggLoad?.necReference || 'NEC 220'} — feeder/service sizing uses Demand Amps; branch conductors stay at full nameplate per NEC 220.57(A).`}
+                    </Text>
+                  </>
                 ) : (
                   <View style={styles.summaryGrid}>
                     <View style={styles.summaryItem}>
@@ -1048,32 +1193,41 @@ export const MultiPanelDocument: React.FC<MultiPanelDocumentProps> = ({
             );
           })()}
 
-          {/* NEC 625.42 EVEMS Setpoint callout — replaces the misleading
-              "EVEMS Aggregate Setpoint" row in the circuit table with a
-              clearly-labeled info block AHJ reviewers can read at a glance. */}
-          {evemsSetpoint && evemsSetpoint.load_watts && evemsSetpoint.load_watts > 0 && (
-            <View style={styles.summarySection}>
-              <Text style={styles.summaryTitle}>EVEMS Aggregate Setpoint (NEC 625.42)</Text>
-              <View style={styles.summaryGrid}>
-                <View style={styles.summaryItem}>
-                  <Text style={styles.summaryLabel}>Setpoint</Text>
-                  <Text style={styles.summaryValue}>
-                    {(evemsSetpoint.load_watts / 1000).toFixed(1)} kVA
-                  </Text>
-                </View>
-                <View style={styles.summaryItem}>
-                  <Text style={styles.summaryLabel}>Setpoint Amps</Text>
-                  <Text style={styles.summaryValue}>
-                    {(
-                      evemsSetpoint.load_watts /
-                      (panel.voltage * (panel.phase === 3 ? Math.sqrt(3) : 1))
-                    ).toFixed(1)}
-                    A
-                  </Text>
+          {/* NEC 625.42 EVEMS Setpoint callout — only when not already
+              integrated into the Load Summary as Demand kVA / Demand Amps
+              (which happens when aggregatedLoadByPanel surfaced the EVEMS
+              clamp). Prevents the same numbers from rendering twice on a
+              page that's already tight on vertical space. */}
+          {(() => {
+            const aggLoad = aggregatedLoadByPanel?.get(panel.id);
+            const hasEvemsInLoadSummary =
+              !!aggLoad &&
+              aggLoad.totalDemandVA > 0 &&
+              aggLoad.totalDemandVA < aggLoad.totalConnectedVA - 1 &&
+              (aggLoad.necReference ?? '').includes('625.42');
+            if (!evemsSetpoint || !evemsSetpoint.load_watts || evemsSetpoint.load_watts <= 0) return null;
+            if (hasEvemsInLoadSummary) return null;
+            const voltageDivisor = panel.voltage * (panel.phase === 3 ? Math.sqrt(3) : 1);
+            return (
+              <View style={styles.summarySection} wrap={false}>
+                <Text style={styles.summaryTitle}>EVEMS Aggregate Setpoint (NEC 625.42)</Text>
+                <View style={styles.summaryGrid}>
+                  <View style={styles.summaryItem}>
+                    <Text style={styles.summaryLabel}>Setpoint</Text>
+                    <Text style={styles.summaryValue}>
+                      {(evemsSetpoint.load_watts / 1000).toFixed(1)} kVA
+                    </Text>
+                  </View>
+                  <View style={styles.summaryItem}>
+                    <Text style={styles.summaryLabel}>Setpoint Amps</Text>
+                    <Text style={styles.summaryValue}>
+                      {(evemsSetpoint.load_watts / voltageDivisor).toFixed(1)}A
+                    </Text>
+                  </View>
                 </View>
               </View>
-            </View>
-          )}
+            );
+          })()}
 
           <BrandFooter
             projectName={projectName}

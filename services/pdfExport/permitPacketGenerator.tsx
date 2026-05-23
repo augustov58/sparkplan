@@ -1212,6 +1212,38 @@ export const generatePermitPacket = async (data: PermitPacketData): Promise<void
       const panelCircuits = circuitsByPanel.get(panel.id) || [];
       const feederRows = synthesizeFeederCircuits(panel, panelCircuits);
       const allCircuits = [...panelCircuits, ...feederRows];
+      // Compute the panel's aggregated demand for the Load Summary card.
+      // Two cases produce a "meaningful" demand for AHJ display:
+      //   1. Multi-family MDP — apply data.multiFamilyContext so NEC 220.84's
+      //      blanket demand factor surfaces. The MDP's connected sum is the
+      //      sum of feeder nameplate loads (e.g. 12 units × 36 kVA each =
+      //      432 kVA) which is meaningless for bus rating; the 220.84 demand
+      //      is what's verifiable against a 1000A bus.
+      //   2. EVEMS-managed EV panel — calculateAggregatedLoad auto-detects
+      //      via isEVEMSManagedPanel + clamps to setpoint per NEC 625.42.
+      //      The 200A EV sub-panel with 583A connected nameplate clamps to
+      //      199.8A demand — only the demand fits the bus.
+      // For panels in neither case, demand == connected and the renderer
+      // falls back to the legacy connected-sum display (no behavior change).
+      const isMDP = panel.is_main === true;
+      const aggResult = calculateAggregatedLoad(
+        panel.id,
+        data.panels,
+        data.circuits,
+        data.transformers,
+        occupancyType,
+        isMDP ? data.multiFamilyContext : undefined,
+      );
+      const dominantNec = aggResult.necReferences.find(r => r.includes('625.42'))
+        ?? aggResult.necReferences.find(r => r.includes('220.84'))
+        ?? aggResult.necReferences.find(r => r.includes('220.'))
+        ?? undefined;
+      const aggregatedLoad = {
+        totalDemandVA: aggResult.totalDemandVA,
+        totalConnectedVA: aggResult.totalConnectedVA,
+        downstreamPanelCount: aggResult.downstreamPanelCount,
+        necReference: dominantNec,
+      };
       builders.push({
         name: `PanelSchedule[${panel.name}]`,
         kind: 'panelSchedule',
@@ -1230,6 +1262,7 @@ export const generatePermitPacket = async (data: PermitPacketData): Promise<void
               !!data.serviceModificationType && data.serviceModificationType !== 'new-service'
             }
             buildingType={data.buildingType}
+            aggregatedLoad={aggregatedLoad}
           />
         ),
       });
