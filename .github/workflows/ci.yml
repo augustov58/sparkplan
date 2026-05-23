@@ -26,6 +26,25 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
 
+    # Placeholder Supabase env vars for the build + test steps.
+    #
+    # The VITE_SUPABASE_URL + VITE_SUPABASE_ANON_KEY are PUBLIC by design —
+    # Vite bundles them into the frontend, and security comes from RLS, not
+    # from hiding the anon key. But lib/supabase.ts:12 throws at module
+    # load when they're missing, which crashed 4 test files in CI run #1
+    # (the throw fires before any test code or mock can intercept).
+    #
+    # Tests don't hit a real Supabase instance — they use mocks and
+    # fixtures — so placeholders that satisfy the existence check are
+    # sufficient. No repo secrets needed, no real credentials exposed.
+    #
+    # If integration tests against a real Supabase project are added later,
+    # switch these to secrets.VITE_SUPABASE_URL / secrets.VITE_SUPABASE_ANON_KEY
+    # and configure them in repo Settings → Secrets and variables → Actions.
+    env:
+      VITE_SUPABASE_URL: https://placeholder.supabase.co
+      VITE_SUPABASE_ANON_KEY: placeholder-anon-key-ci-tests-do-not-connect
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
