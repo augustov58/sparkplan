@@ -43,5 +43,11 @@
     "noImplicitReturns": true,
     "noFallthroughCasesInSwitch": true
     */
-  }
+  },
+  "exclude": [
+    "node_modules",
+    "dist",
+    ".claude/worktrees",
+    "tests/examples"
+  ]
 }
