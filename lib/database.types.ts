@@ -2710,207 +2710,6 @@ export type Database = {
           },
         ]
       }
-      project_billing_settings: {
-        Row: {
-          project_id: string
-          user_id: string
-          default_billable_rate: number | null
-          default_cost_rate: number | null
-          default_material_markup_pct: number
-          tax_pct: number
-          payment_terms_days: number
-          invoice_prefix: string | null
-          next_invoice_number: number
-          customer_name: string | null
-          customer_email: string | null
-          customer_address: string | null
-          customer_po_number: string | null
-          created_at: string
-          updated_at: string
-        }
-        Insert: {
-          project_id: string
-          user_id: string
-          default_billable_rate?: number | null
-          default_cost_rate?: number | null
-          default_material_markup_pct?: number
-          tax_pct?: number
-          payment_terms_days?: number
-          invoice_prefix?: string | null
-          next_invoice_number?: number
-          customer_name?: string | null
-          customer_email?: string | null
-          customer_address?: string | null
-          customer_po_number?: string | null
-          created_at?: string
-          updated_at?: string
-        }
-        Update: {
-          project_id?: string
-          user_id?: string
-          default_billable_rate?: number | null
-          default_cost_rate?: number | null
-          default_material_markup_pct?: number
-          tax_pct?: number
-          payment_terms_days?: number
-          invoice_prefix?: string | null
-          next_invoice_number?: number
-          customer_name?: string | null
-          customer_email?: string | null
-          customer_address?: string | null
-          customer_po_number?: string | null
-          created_at?: string
-          updated_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "project_billing_settings_project_id_fkey"
-            columns: ["project_id"]
-            isOneToOne: true
-            referencedRelation: "projects"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      time_entries: {
-        Row: {
-          id: string
-          project_id: string
-          user_id: string
-          worker_name: string
-          work_date: string
-          hours: number
-          description: string | null
-          cost_code: string | null
-          billable_rate: number
-          cost_rate: number | null
-          billable_amount: number
-          cost_amount: number | null
-          invoice_id: string | null
-          created_at: string
-          updated_at: string
-        }
-        Insert: {
-          id?: string
-          project_id: string
-          user_id: string
-          worker_name: string
-          work_date: string
-          hours: number
-          description?: string | null
-          cost_code?: string | null
-          billable_rate: number
-          cost_rate?: number | null
-          billable_amount?: number
-          cost_amount?: number | null
-          invoice_id?: string | null
-          created_at?: string
-          updated_at?: string
-        }
-        Update: {
-          id?: string
-          project_id?: string
-          user_id?: string
-          worker_name?: string
-          work_date?: string
-          hours?: number
-          description?: string | null
-          cost_code?: string | null
-          billable_rate?: number
-          cost_rate?: number | null
-          billable_amount?: number
-          cost_amount?: number | null
-          invoice_id?: string | null
-          created_at?: string
-          updated_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "time_entries_project_id_fkey"
-            columns: ["project_id"]
-            isOneToOne: false
-            referencedRelation: "projects"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      material_entries: {
-        Row: {
-          id: string
-          project_id: string
-          user_id: string
-          installed_date: string
-          description: string
-          cost_code: string | null
-          quantity: number
-          unit: string | null
-          invoice_unit_cost: number
-          markup_pct: number
-          billing_unit_price: number
-          taxable: boolean
-          billing_amount: number
-          cost_amount: number
-          receipt_url: string | null
-          supplier_name: string | null
-          supplier_invoice_number: string | null
-          invoice_id: string | null
-          created_at: string
-          updated_at: string
-        }
-        Insert: {
-          id?: string
-          project_id: string
-          user_id: string
-          installed_date: string
-          description: string
-          cost_code?: string | null
-          quantity?: number
-          unit?: string | null
-          invoice_unit_cost: number
-          markup_pct?: number
-          billing_unit_price: number
-          taxable?: boolean
-          billing_amount?: number
-          cost_amount?: number
-          receipt_url?: string | null
-          supplier_name?: string | null
-          supplier_invoice_number?: string | null
-          invoice_id?: string | null
-          created_at?: string
-          updated_at?: string
-        }
-        Update: {
-          id?: string
-          project_id?: string
-          user_id?: string
-          installed_date?: string
-          description?: string
-          cost_code?: string | null
-          quantity?: number
-          unit?: string | null
-          invoice_unit_cost?: number
-          markup_pct?: number
-          billing_unit_price?: number
-          taxable?: boolean
-          billing_amount?: number
-          cost_amount?: number
-          receipt_url?: string | null
-          supplier_name?: string | null
-          supplier_invoice_number?: string | null
-          invoice_id?: string | null
-          created_at?: string
-          updated_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "material_entries_project_id_fkey"
-            columns: ["project_id"]
-            isOneToOne: false
-            referencedRelation: "projects"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
     }
     Views: {
       [_ in never]: never
@@ -3091,3 +2890,39 @@ export const Constants = {
     Enums: {},
   },
 } as const
+
+// Named type aliases — bridge between the auto-gen Tables<'name'> pattern
+// and code that imports Panel / Circuit / etc. directly. Add new aliases
+// here when downstream code wants a friendlier name than Tables<'foo'>.
+// Keep these alphabetical to make collisions obvious.
+export type Circuit = Database['public']['Tables']['circuits']['Row']
+export type CircuitInsert = Database['public']['Tables']['circuits']['Insert']
+export type CircuitUpdate = Database['public']['Tables']['circuits']['Update']
+
+export type Feeder = Database['public']['Tables']['feeders']['Row']
+export type FeederInsert = Database['public']['Tables']['feeders']['Insert']
+export type FeederUpdate = Database['public']['Tables']['feeders']['Update']
+
+export type InspectionItem = Database['public']['Tables']['inspection_items']['Row']
+export type InspectionItemInsert = Database['public']['Tables']['inspection_items']['Insert']
+export type InspectionItemUpdate = Database['public']['Tables']['inspection_items']['Update']
+
+export type InspectorReport = Database['public']['Tables']['inspector_reports']['Row']
+export type InspectorReportInsert = Database['public']['Tables']['inspector_reports']['Insert']
+export type InspectorReportUpdate = Database['public']['Tables']['inspector_reports']['Update']
+
+export type Issue = Database['public']['Tables']['issues']['Row']
+export type IssueInsert = Database['public']['Tables']['issues']['Insert']
+export type IssueUpdate = Database['public']['Tables']['issues']['Update']
+
+export type Panel = Database['public']['Tables']['panels']['Row']
+export type PanelInsert = Database['public']['Tables']['panels']['Insert']
+export type PanelUpdate = Database['public']['Tables']['panels']['Update']
+
+export type ShortCircuitCalculation = Database['public']['Tables']['short_circuit_calculations']['Row']
+export type ShortCircuitCalculationInsert = Database['public']['Tables']['short_circuit_calculations']['Insert']
+export type ShortCircuitCalculationUpdate = Database['public']['Tables']['short_circuit_calculations']['Update']
+
+export type Transformer = Database['public']['Tables']['transformers']['Row']
+export type TransformerInsert = Database['public']['Tables']['transformers']['Insert']
+export type TransformerUpdate = Database['public']['Tables']['transformers']['Update']
