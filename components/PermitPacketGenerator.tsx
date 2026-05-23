@@ -7,7 +7,7 @@ import React, { useState, useEffect } from 'react';
 import { FileText, Download, Loader2, AlertCircle, CheckCircle, Info, Building2, AlertTriangle, ListChecks, Paperclip } from 'lucide-react';
 import { generatePermitPacket, generateLightweightPermitPacket, type PermitPacketData, type PermitPacketAttachment } from '../services/pdfExport/permitPacketGenerator';
 import { AttachmentUploadCard } from './AttachmentUploadCard';
-import { useProjectAttachments, downloadAttachmentBytes, type ArtifactType } from '../hooks/useProjectAttachments';
+import { useProjectAttachments, downloadAttachmentBytes, type ArtifactType, type CoverMode } from '../hooks/useProjectAttachments';
 import type { NEC22087NarrativeData, NEC22087Method } from '../services/pdfExport/PermitPacketDocuments';
 import {
   DEFAULT_SECTIONS,
@@ -1069,7 +1069,9 @@ export const PermitPacketGenerator: React.FC<PermitPacketGeneratorProps> = ({ pr
             filename: a.filename,
             uploadedAt: a.uploaded_at,
             uploadBytes: bytes,
-            coverMode: a.cover_mode ?? 'separate',
+            // DB cover_mode is typed as string; the CHECK constraint
+            // restricts it to the CoverMode union ('separate' / 'overlay' / 'none').
+            coverMode: (a.cover_mode as CoverMode) ?? 'separate',
             customSheetId: a.custom_sheet_id ?? null,
             // v5 commit 17: per-upload discipline letter override. When
             // null, the orchestrator auto-determines from artifact_type.
