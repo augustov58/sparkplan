@@ -1,0 +1,71 @@
+name: CI
+
+# Verification gate for the SparkPlan webapp. Mirrors the CLAUDE.md
+# "Verification Protocol" section: typecheck → build → tests, fail closed
+# on any error. The typecheck step is the one this workflow was created
+# for — without it, Vite's esbuild strips type annotations without
+# validating them and tsc errors accumulate silently (we shipped 447 of
+# them before PR #94 cleaned the slate). Keeping the baseline at zero
+# requires the gate.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+# Cancel in-flight runs for the same branch when a new commit lands —
+# saves CI minutes on rapid push cycles.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    name: Verify (typecheck + build + tests)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    # Placeholder Supabase env vars for the build + test steps.
+    #
+    # The VITE_SUPABASE_URL + VITE_SUPABASE_ANON_KEY are PUBLIC by design —
+    # Vite bundles them into the frontend, and security comes from RLS, not
+    # from hiding the anon key. But lib/supabase.ts:12 throws at module
+    # load when they're missing, which crashed 4 test files in CI run #1
+    # (the throw fires before any test code or mock can intercept).
+    #
+    # Tests don't hit a real Supabase instance — they use mocks and
+    # fixtures — so placeholders that satisfy the existence check are
+    # sufficient. No repo secrets needed, no real credentials exposed.
+    #
+    # If integration tests against a real Supabase project are added later,
+    # switch these to secrets.VITE_SUPABASE_URL / secrets.VITE_SUPABASE_ANON_KEY
+    # and configure them in repo Settings → Secrets and variables → Actions.
+    env:
+      VITE_SUPABASE_URL: https://placeholder.supabase.co
+      VITE_SUPABASE_ANON_KEY: placeholder-anon-key-ci-tests-do-not-connect
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      # The gate. Must pass for merge. As of PR #94 the baseline is 0;
+      # any new error means a type guarantee was silently broken. Do not
+      # raise this threshold without explicit discussion.
+      - name: Type check (tsc --noEmit)
+        run: npx tsc --noEmit
+
+      - name: Build (Vite)
+        run: npm run build
+
+      - name: Tests (vitest)
+        run: npm test
