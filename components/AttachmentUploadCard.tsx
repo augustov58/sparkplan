@@ -502,7 +502,9 @@ export const AttachmentUploadCard: React.FC<AttachmentUploadCardProps> = ({
         <ul className="space-y-1.5">
           {ownAttachments.map((a) => {
             const isDeleting = deletingId === a.id;
-            const mode: CoverMode = a.cover_mode ?? 'separate';
+            // DB column is widened to `string`; the table's CHECK constraint
+            // restricts it to one of the three CoverMode values at runtime.
+            const mode: CoverMode = (a.cover_mode as CoverMode) ?? 'separate';
             return (
               <li
                 key={a.id}
