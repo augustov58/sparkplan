@@ -34,11 +34,15 @@ export const styles = StyleSheet.create({
     fontFamily: 'Helvetica',
   },
   header: {
-    marginBottom: 20,
+    // Spacing tightened (2026-05-24) to give 42-circuit panels enough
+    // vertical room for the Load Summary + NEC 220 breakdown table on
+    // the same page. Previous values (mb:20, pb:10) wasted ~30pt
+    // between the info grid and the circuit table for no functional gain.
+    marginBottom: 8,
     borderBottomWidth: 2,
     borderBottomColor: '#000',
     borderBottomStyle: 'solid',
-    paddingBottom: 10,
+    paddingBottom: 4,
   },
   title: {
     fontSize: 16,
@@ -83,7 +87,7 @@ export const styles = StyleSheet.create({
   },
   infoRow: {
     flexDirection: 'row',
-    marginBottom: 3,
+    marginBottom: 1,
   },
   infoLabel: {
     fontFamily: 'Helvetica-Bold',
@@ -93,8 +97,10 @@ export const styles = StyleSheet.create({
     width: '60%',
   },
   tableContainer: {
-    marginTop: 15,
-    marginBottom: 15,
+    // Tightened 2026-05-24: was mt:15/mb:15. Saves ~18pt for 42-row
+    // panels to fit Load Summary + NEC breakdown on one page.
+    marginTop: 4,
+    marginBottom: 6,
   },
   tableHeader: {
     flexDirection: 'row',
@@ -102,7 +108,7 @@ export const styles = StyleSheet.create({
     borderBottomWidth: 2,
     borderBottomColor: '#000',
     borderBottomStyle: 'solid',
-    paddingVertical: 5,
+    paddingVertical: 3,
     paddingHorizontal: 3,
     fontFamily: 'Helvetica-Bold',
   },
@@ -111,7 +117,10 @@ export const styles = StyleSheet.create({
     borderBottomWidth: 0.5,
     borderBottomColor: '#ccc',
     borderBottomStyle: 'solid',
-    paddingVertical: 4,
+    // Row padding tightened 2026-05-24: was 4. 21 rows × 1.5pt = 31.5pt
+    // saved on a 42-circuit panel — the difference between fitting the
+    // breakdown table on the same page vs. spilling to a second page.
+    paddingVertical: 2.5,
     paddingHorizontal: 3,
   },
   tableRowAlt: {
@@ -119,7 +128,7 @@ export const styles = StyleSheet.create({
     borderBottomWidth: 0.5,
     borderBottomColor: '#ccc',
     borderBottomStyle: 'solid',
-    paddingVertical: 4,
+    paddingVertical: 2.5,
     paddingHorizontal: 3,
     backgroundColor: '#fafafa',
   },
@@ -167,6 +176,36 @@ export const styles = StyleSheet.create({
     fontSize: 10.5,
     fontFamily: 'Helvetica-Bold',
   },
+  // NEC 220 demand-by-load-type breakdown table — sits under the Load
+  // Summary card so AHJ inspectors see the per-load-type factor application
+  // (NEC 220.44 receptacles, 220.50 motors, 220.60 HVAC, etc.) without
+  // flipping to the separate Load Calculation Summary page. Compact 4-col
+  // row format (LoadType | Connected | Demand | NEC) at fontSize 7 so it
+  // fits below a 42-row schedule on the same page.
+  breakdownTable: {
+    marginTop: 4,
+    paddingTop: 3,
+    borderTopWidth: 0.5,
+    borderTopColor: '#999',
+    borderTopStyle: 'solid',
+  },
+  breakdownHeader: {
+    flexDirection: 'row',
+    fontSize: 6.5,
+    fontFamily: 'Helvetica-Bold',
+    color: '#444',
+    marginBottom: 1,
+  },
+  breakdownRow: {
+    flexDirection: 'row',
+    fontSize: 7,
+    marginBottom: 0.5,
+  },
+  breakdownColType: { width: '32%' },
+  breakdownColConnected: { width: '17%', textAlign: 'right' },
+  breakdownColDemand: { width: '17%', textAlign: 'right' },
+  breakdownColFactor: { width: '10%', textAlign: 'right' },
+  breakdownColNec: { width: '24%', textAlign: 'right', color: '#666', fontFamily: 'Helvetica-Oblique' },
   footer: {
     position: 'absolute',
     bottom: 30,
@@ -296,6 +335,21 @@ interface PanelSchedulePDFProps {
     totalConnectedVA: number;
     downstreamPanelCount: number;
     necReference?: string;
+    /**
+     * Per-load-type breakdown showing the NEC 220 cascade application
+     * (e.g. "Receptacles: 9.0 → 9.0 kVA @ 100% per NEC 220.44",
+     * "Motors: 5.0 → 6.3 kVA @ 125% per NEC 220.50"). Renders as a compact
+     * audit-trail table below the Load Summary card so AHJ inspectors can
+     * verify how the aggregate demand was derived without consulting the
+     * external Load Calculation Summary page.
+     */
+    demandBreakdown?: Array<{
+      loadType: string;
+      connectedVA: number;
+      demandVA: number;
+      demandFactor: number;
+      necReference: string;
+    }>;
   };
 }
 
@@ -425,22 +479,22 @@ export const PanelSchedulePages: React.FC<PanelSchedulePDFProps> = ({
     phaseBalancing.phaseB_VA +
     phaseBalancing.phaseC_VA;
 
-  // Detect "meaningful aggregated demand" — when the NEC demand factor or
-  // EVEMS feeder clamp materially reduces the panel's draw vs the raw
-  // connected sum. Two triggers:
-  //   1. Panel feeds downstream sub-panels (MDP aggregator under NEC 220.84)
-  //   2. Demand is at least 1 VA below connected (EVEMS feeder clamp engaged
-  //      per NEC 625.42 — e.g. 140 kVA nameplate clamped to a 47.9 kVA setpoint).
-  // Dwelling unit panels (Branch 1 above) don't go through aggregatedLoad —
-  // they show NEC 220.82/.83 demand from `dwellingUnitDemand` instead.
-  const hasMeaningfulAggregated =
+  // Show the NEC-applied demand on any non-dwelling panel where the
+  // aggregator produced a positive result. This fires for:
+  //   1. Aggregator MDPs (downstream panels — NEC 220.84 multi-family, or
+  //      standard NEC 220 cascade for commercial)
+  //   2. EVEMS-clamped EV panels (demand < connected due to NEC 625.42)
+  //   3. Commercial / industrial sub-panels (demand may equal connected
+  //      when all loads are at 100% factor, but the inspector still wants
+  //      to see Demand kVA + Demand Amps with the NEC 220 audit trail).
+  // Dwelling unit panels (Unit 101, single-family MDPs) bypass this in
+  // favor of `dwellingUnitDemand` from NEC 220.82/.83.
+  const hasAggregatedDemand =
     !dwellingUnitDemand &&
     !!aggregatedLoad &&
-    aggregatedLoad.totalDemandVA > 0 &&
-    (aggregatedLoad.downstreamPanelCount > 0 ||
-      aggregatedLoad.totalDemandVA < aggregatedLoad.totalConnectedVA - 1);
+    aggregatedLoad.totalDemandVA > 0;
   const voltageDivisor = panel.voltage * (panel.phase === 3 ? Math.sqrt(3) : 1);
-  const aggregatedDemandAmps = hasMeaningfulAggregated
+  const aggregatedDemandAmps = hasAggregatedDemand
     ? aggregatedLoad!.totalDemandVA / voltageDivisor
     : 0;
   // EVEMS callout is now redundant when the Load Summary already shows the
@@ -449,8 +503,15 @@ export const PanelSchedulePages: React.FC<PanelSchedulePDFProps> = ({
   // (e.g. caller passed no aggregatedLoad). Otherwise the AHJ reviewer sees
   // the same numbers twice on a page that's already tight on vertical space.
   const hasEvemsInLoadSummary =
-    hasMeaningfulAggregated &&
+    hasAggregatedDemand &&
     (aggregatedLoad?.necReference ?? '').includes('625.42');
+  // Render the NEC 220 breakdown rows only when the aggregator actually
+  // computed per-load-type splits AND there's a meaningful reduction OR
+  // multiple categories. Skip for single-category panels where the
+  // breakdown would just restate the Load Summary numbers.
+  const breakdownRows = (aggregatedLoad?.demandBreakdown ?? [])
+    .filter(b => b.connectedVA > 0 || b.demandVA > 0);
+  const showBreakdown = hasAggregatedDemand && breakdownRows.length >= 1;
 
   return (
     <Page size="LETTER" style={themeStyles.page}>
@@ -638,7 +699,7 @@ export const PanelSchedulePages: React.FC<PanelSchedulePDFProps> = ({
           <Text style={styles.summaryTitle}>
             {dwellingUnitDemand
               ? 'Load Summary (NEC Dwelling Demand)'
-              : hasMeaningfulAggregated
+              : hasAggregatedDemand
                 ? `Load Summary (NEC Demand${aggregatedLoad?.necReference ? ` — ${aggregatedLoad.necReference}` : ''})`
                 : 'Load Summary & Phase Balance'}
           </Text>
@@ -679,11 +740,26 @@ export const PanelSchedulePages: React.FC<PanelSchedulePDFProps> = ({
                   </Text>
                 </View>
               </View>
-              <Text style={[styles.summaryLabel, { marginTop: 4, fontSize: 7, fontStyle: 'italic' }]}>
-                NEC 220.82/.83 dwelling demand — matches the Dwelling Load Calculator and the Load Calculation Summary. General-loads bucket tiered per 220.42; Climate is the larger of heating/cooling per 220.60 (non-coincident).
-              </Text>
+              {(() => {
+                // Surface the NEC 220.83 tier derivation as an inspector-readable
+                // formula. Reverses the math from calculateDwellingUnitDemandVA:
+                // first 10 kVA @ 100% + remainder @ 40%, so we reconstruct the
+                // "general bucket connected" from the demand result. When
+                // general demand <= 10 kVA, no tier applied — all of it was
+                // under the threshold.
+                const genDemandKVA = dwellingUnitDemand.generalDemandVA / 1000;
+                const genConnectedKVA = dwellingUnitDemand.generalConnectedVA / 1000;
+                const tierFormula = genDemandKVA <= 10
+                  ? `General: ${genConnectedKVA.toFixed(1)} kVA @ 100% (under NEC 220.83 tier threshold)`
+                  : `General: 10.0 kVA × 100% + ${(genConnectedKVA - 10).toFixed(1)} kVA × 40% = ${genDemandKVA.toFixed(1)} kVA per NEC 220.83`;
+                return (
+                  <Text style={[styles.summaryLabel, { marginTop: 4, fontSize: 7, fontStyle: 'italic' }]}>
+                    {tierFormula}. Climate: larger of heating/cooling @ 100% per NEC 220.60 (non-coincident).
+                  </Text>
+                );
+              })()}
             </>
-          ) : hasMeaningfulAggregated ? (
+          ) : hasAggregatedDemand ? (
             <>
               <View style={styles.summaryGrid}>
                 <View style={styles.summaryItem}>
@@ -717,6 +793,34 @@ export const PanelSchedulePages: React.FC<PanelSchedulePDFProps> = ({
                   ? `Aggregated demand across ${aggregatedLoad.downstreamPanelCount} downstream panel${aggregatedLoad.downstreamPanelCount === 1 ? '' : 's'} per ${aggregatedLoad.necReference || 'NEC 220'} — verify bus rating against Demand Amps, not the nameplate sum.`
                   : `Demand reflects ${aggregatedLoad?.necReference || 'NEC 220'} — feeder/service sizing uses Demand Amps; branch conductors stay at full nameplate per NEC 220.57(A).`}
               </Text>
+              {showBreakdown && (
+                <View style={styles.breakdownTable}>
+                  <View style={styles.breakdownHeader}>
+                    <Text style={styles.breakdownColType}>Load Type</Text>
+                    <Text style={styles.breakdownColConnected}>Connected</Text>
+                    <Text style={styles.breakdownColDemand}>Demand</Text>
+                    <Text style={styles.breakdownColFactor}>Factor</Text>
+                    <Text style={styles.breakdownColNec}>NEC</Text>
+                  </View>
+                  {breakdownRows.map((b, i) => (
+                    <View key={i} style={styles.breakdownRow}>
+                      <Text style={styles.breakdownColType}>{b.loadType}</Text>
+                      <Text style={styles.breakdownColConnected}>
+                        {(b.connectedVA / 1000).toFixed(1)} kVA
+                      </Text>
+                      <Text style={styles.breakdownColDemand}>
+                        {(b.demandVA / 1000).toFixed(1)} kVA
+                      </Text>
+                      <Text style={styles.breakdownColFactor}>
+                        {(b.demandFactor * 100).toFixed(0)}%
+                      </Text>
+                      <Text style={styles.breakdownColNec}>
+                        {b.necReference.replace(/^NEC\s+/, '').replace(/\s*\(.*$/, '')}
+                      </Text>
+                    </View>
+                  ))}
+                </View>
+              )}
             </>
           ) : (
             <>
@@ -841,6 +945,13 @@ interface MultiPanelDocumentProps {
     totalConnectedVA: number;
     downstreamPanelCount: number;
     necReference?: string;
+    demandBreakdown?: Array<{
+      loadType: string;
+      connectedVA: number;
+      demandVA: number;
+      demandFactor: number;
+      necReference: string;
+    }>;
   }>;
 }
 
@@ -1054,22 +1165,23 @@ export const MultiPanelDocument: React.FC<MultiPanelDocumentProps> = ({
               : null;
 
             const aggLoad = aggregatedLoadByPanel?.get(panel.id);
-            const hasMeaningfulAggregated =
+            const hasAggregatedDemand =
               !dwellingDemand &&
               !!aggLoad &&
-              aggLoad.totalDemandVA > 0 &&
-              (aggLoad.downstreamPanelCount > 0 ||
-                aggLoad.totalDemandVA < aggLoad.totalConnectedVA - 1);
-            const aggDemandAmps = hasMeaningfulAggregated
+              aggLoad.totalDemandVA > 0;
+            const aggDemandAmps = hasAggregatedDemand
               ? aggLoad!.totalDemandVA / voltageDivisor
               : 0;
+            const breakdownRows2 = (aggLoad?.demandBreakdown ?? [])
+              .filter(b => b.connectedVA > 0 || b.demandVA > 0);
+            const showBreakdown2 = hasAggregatedDemand && breakdownRows2.length >= 1;
 
             return (
               <View style={styles.summarySection} wrap={false}>
                 <Text style={styles.summaryTitle}>
                   {dwellingDemand
                     ? 'Load Summary (NEC Dwelling Demand)'
-                    : hasMeaningfulAggregated
+                    : hasAggregatedDemand
                       ? `Load Summary (NEC Demand${aggLoad?.necReference ? ` — ${aggLoad.necReference}` : ''})`
                       : 'Load Summary & Phase Balance'}
                 </Text>
@@ -1106,11 +1218,20 @@ export const MultiPanelDocument: React.FC<MultiPanelDocumentProps> = ({
                         </Text>
                       </View>
                     </View>
-                    <Text style={[styles.summaryLabel, { marginTop: 4, fontSize: 7, fontStyle: 'italic' }]}>
-                      NEC 220.82/.83 dwelling demand — matches the Dwelling Load Calculator. General-loads bucket tiered per 220.42; Climate is the larger of heating/cooling per 220.60 (non-coincident).
-                    </Text>
+                    {(() => {
+                      const genDemandKVA = dwellingDemand.generalDemandVA / 1000;
+                      const genConnectedKVA = dwellingDemand.generalConnectedVA / 1000;
+                      const tierFormula = genDemandKVA <= 10
+                        ? `General: ${genConnectedKVA.toFixed(1)} kVA @ 100% (under NEC 220.83 tier threshold)`
+                        : `General: 10.0 kVA × 100% + ${(genConnectedKVA - 10).toFixed(1)} kVA × 40% = ${genDemandKVA.toFixed(1)} kVA per NEC 220.83`;
+                      return (
+                        <Text style={[styles.summaryLabel, { marginTop: 4, fontSize: 7, fontStyle: 'italic' }]}>
+                          {tierFormula}. Climate: larger of heating/cooling @ 100% per NEC 220.60 (non-coincident).
+                        </Text>
+                      );
+                    })()}
                   </>
-                ) : hasMeaningfulAggregated ? (
+                ) : hasAggregatedDemand ? (
                   <>
                     <View style={styles.summaryGrid}>
                       <View style={styles.summaryItem}>
@@ -1141,6 +1262,34 @@ export const MultiPanelDocument: React.FC<MultiPanelDocumentProps> = ({
                         ? `Aggregated demand across ${aggLoad.downstreamPanelCount} downstream panel${aggLoad.downstreamPanelCount === 1 ? '' : 's'} per ${aggLoad.necReference || 'NEC 220'} — verify bus rating against Demand Amps, not the nameplate sum.`
                         : `Demand reflects ${aggLoad?.necReference || 'NEC 220'} — feeder/service sizing uses Demand Amps; branch conductors stay at full nameplate per NEC 220.57(A).`}
                     </Text>
+                    {showBreakdown2 && (
+                      <View style={styles.breakdownTable}>
+                        <View style={styles.breakdownHeader}>
+                          <Text style={styles.breakdownColType}>Load Type</Text>
+                          <Text style={styles.breakdownColConnected}>Connected</Text>
+                          <Text style={styles.breakdownColDemand}>Demand</Text>
+                          <Text style={styles.breakdownColFactor}>Factor</Text>
+                          <Text style={styles.breakdownColNec}>NEC</Text>
+                        </View>
+                        {breakdownRows2.map((b, i) => (
+                          <View key={i} style={styles.breakdownRow}>
+                            <Text style={styles.breakdownColType}>{b.loadType}</Text>
+                            <Text style={styles.breakdownColConnected}>
+                              {(b.connectedVA / 1000).toFixed(1)} kVA
+                            </Text>
+                            <Text style={styles.breakdownColDemand}>
+                              {(b.demandVA / 1000).toFixed(1)} kVA
+                            </Text>
+                            <Text style={styles.breakdownColFactor}>
+                              {(b.demandFactor * 100).toFixed(0)}%
+                            </Text>
+                            <Text style={styles.breakdownColNec}>
+                              {b.necReference.replace(/^NEC\s+/, '').replace(/\s*\(.*$/, '')}
+                            </Text>
+                          </View>
+                        ))}
+                      </View>
+                    )}
                   </>
                 ) : (
                   <View style={styles.summaryGrid}>
