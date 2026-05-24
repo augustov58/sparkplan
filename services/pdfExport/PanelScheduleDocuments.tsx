@@ -698,7 +698,7 @@ export const PanelSchedulePages: React.FC<PanelSchedulePDFProps> = ({
         <View style={styles.summarySection} wrap={false}>
           <Text style={styles.summaryTitle}>
             {dwellingUnitDemand
-              ? 'Load Summary (NEC Dwelling Demand)'
+              ? `Load Summary (NEC ${showExistingNewMarkers ? '220.83 — Existing Dwelling' : '220.82 — Optional Method'})`
               : hasAggregatedDemand
                 ? `Load Summary (NEC Demand${aggregatedLoad?.necReference ? ` — ${aggregatedLoad.necReference}` : ''})`
                 : 'Load Summary & Phase Balance'}
@@ -710,6 +710,13 @@ export const PanelSchedulePages: React.FC<PanelSchedulePDFProps> = ({
                 <View style={styles.summaryItem}>
                   <Text style={styles.summaryLabel}>Total Circuits</Text>
                   <Text style={styles.summaryValue}>{sortedCircuits.length}</Text>
+                </View>
+
+                <View style={styles.summaryItem}>
+                  <Text style={styles.summaryLabel}>Connected (general+climate)</Text>
+                  <Text style={styles.summaryValue}>
+                    {((dwellingUnitDemand.generalConnectedVA + dwellingUnitDemand.climateDemandVA) / 1000).toFixed(1)} kVA
+                  </Text>
                 </View>
 
                 <View style={styles.summaryItem}>
@@ -725,37 +732,87 @@ export const PanelSchedulePages: React.FC<PanelSchedulePDFProps> = ({
                     {(dwellingUnitDemand.totalDemandVA / voltageDivisor).toFixed(1)}A
                   </Text>
                 </View>
-
-                <View style={styles.summaryItem}>
-                  <Text style={styles.summaryLabel}>General @ Tiered</Text>
-                  <Text style={styles.summaryValue}>
-                    {(dwellingUnitDemand.generalDemandVA / 1000).toFixed(1)} kVA
-                  </Text>
-                </View>
-
-                <View style={styles.summaryItem}>
-                  <Text style={styles.summaryLabel}>Climate @ 100%</Text>
-                  <Text style={styles.summaryValue}>
-                    {(dwellingUnitDemand.climateDemandVA / 1000).toFixed(1)} kVA
-                  </Text>
-                </View>
               </View>
+              <Text style={[styles.summaryLabel, { marginTop: 4, fontSize: 7, fontStyle: 'italic' }]}>
+                {showExistingNewMarkers
+                  ? 'NEC 220.83 (Existing Dwelling Unit) — general loads tiered + largest of heating/cooling per 220.60. See breakdown below for per-category factor application.'
+                  : 'NEC 220.82 (Optional Method — New Dwelling Unit) — general loads tiered + largest of heating/cooling per 220.60. See breakdown below for per-category factor application.'}
+              </Text>
+              {/* NEC 220.82/.83 per-category breakdown — the dwelling
+                  equivalent of the commercial NEC 220 cascade table.
+                  Shows the tier split explicitly (first 10 kVA @ 100% +
+                  remainder @ 40%) so the inspector can verify the math
+                  without re-running the calc. Climate row appears only
+                  when at least one of heating/cooling is present. */}
               {(() => {
-                // Surface the NEC 220.83 tier derivation as an inspector-readable
-                // formula. Reverses the math from calculateDwellingUnitDemandVA:
-                // first 10 kVA @ 100% + remainder @ 40%, so we reconstruct the
-                // "general bucket connected" from the demand result. When
-                // general demand <= 10 kVA, no tier applied — all of it was
-                // under the threshold.
-                const genDemandKVA = dwellingUnitDemand.generalDemandVA / 1000;
-                const genConnectedKVA = dwellingUnitDemand.generalConnectedVA / 1000;
-                const tierFormula = genDemandKVA <= 10
-                  ? `General: ${genConnectedKVA.toFixed(1)} kVA @ 100% (under NEC 220.83 tier threshold)`
-                  : `General: 10.0 kVA × 100% + ${(genConnectedKVA - 10).toFixed(1)} kVA × 40% = ${genDemandKVA.toFixed(1)} kVA per NEC 220.83`;
+                const necRef = showExistingNewMarkers ? '220.83' : '220.82';
+                const genConnVA = dwellingUnitDemand.generalConnectedVA;
+                const genDemVA = dwellingUnitDemand.generalDemandVA;
+                const rows: Array<{
+                  loadType: string;
+                  connectedVA: number;
+                  demandVA: number;
+                  demandFactor: number;
+                  necReference: string;
+                }> = [];
+                if (genConnVA <= 10_000) {
+                  rows.push({
+                    loadType: 'General loads (under tier threshold)',
+                    connectedVA: genConnVA,
+                    demandVA: genDemVA,
+                    demandFactor: 1.0,
+                    necReference: necRef,
+                  });
+                } else {
+                  rows.push({
+                    loadType: 'General loads (first 10 kVA @ 100%)',
+                    connectedVA: 10_000,
+                    demandVA: 10_000,
+                    demandFactor: 1.0,
+                    necReference: necRef,
+                  });
+                  rows.push({
+                    loadType: 'General loads (remainder @ 40%)',
+                    connectedVA: genConnVA - 10_000,
+                    demandVA: genDemVA - 10_000,
+                    demandFactor: 0.4,
+                    necReference: necRef,
+                  });
+                }
+                if (dwellingUnitDemand.climateDemandVA > 0) {
+                  rows.push({
+                    loadType: 'Climate (largest of HVAC, non-coincident)',
+                    connectedVA: dwellingUnitDemand.climateDemandVA,
+                    demandVA: dwellingUnitDemand.climateDemandVA,
+                    demandFactor: 1.0,
+                    necReference: '220.60',
+                  });
+                }
                 return (
-                  <Text style={[styles.summaryLabel, { marginTop: 4, fontSize: 7, fontStyle: 'italic' }]}>
-                    {tierFormula}. Climate: larger of heating/cooling @ 100% per NEC 220.60 (non-coincident).
-                  </Text>
+                  <View style={styles.breakdownTable}>
+                    <View style={styles.breakdownHeader}>
+                      <Text style={styles.breakdownColType}>Load Type</Text>
+                      <Text style={styles.breakdownColConnected}>Connected</Text>
+                      <Text style={styles.breakdownColDemand}>Demand</Text>
+                      <Text style={styles.breakdownColFactor}>Factor</Text>
+                      <Text style={styles.breakdownColNec}>NEC</Text>
+                    </View>
+                    {rows.map((r, i) => (
+                      <View key={i} style={styles.breakdownRow}>
+                        <Text style={styles.breakdownColType}>{r.loadType}</Text>
+                        <Text style={styles.breakdownColConnected}>
+                          {(r.connectedVA / 1000).toFixed(1)} kVA
+                        </Text>
+                        <Text style={styles.breakdownColDemand}>
+                          {(r.demandVA / 1000).toFixed(1)} kVA
+                        </Text>
+                        <Text style={styles.breakdownColFactor}>
+                          {(r.demandFactor * 100).toFixed(0)}%
+                        </Text>
+                        <Text style={styles.breakdownColNec}>{r.necReference}</Text>
+                      </View>
+                    ))}
+                  </View>
                 );
               })()}
             </>
@@ -1180,7 +1237,7 @@ export const MultiPanelDocument: React.FC<MultiPanelDocumentProps> = ({
               <View style={styles.summarySection} wrap={false}>
                 <Text style={styles.summaryTitle}>
                   {dwellingDemand
-                    ? 'Load Summary (NEC Dwelling Demand)'
+                    ? `Load Summary (NEC ${showExistingNewMarkers ? '220.83 — Existing Dwelling' : '220.82 — Optional Method'})`
                     : hasAggregatedDemand
                       ? `Load Summary (NEC Demand${aggLoad?.necReference ? ` — ${aggLoad.necReference}` : ''})`
                       : 'Load Summary & Phase Balance'}
@@ -1194,6 +1251,12 @@ export const MultiPanelDocument: React.FC<MultiPanelDocumentProps> = ({
                         <Text style={styles.summaryValue}>{circuits.length}</Text>
                       </View>
                       <View style={styles.summaryItem}>
+                        <Text style={styles.summaryLabel}>Connected (general+climate)</Text>
+                        <Text style={styles.summaryValue}>
+                          {((dwellingDemand.generalConnectedVA + dwellingDemand.climateDemandVA) / 1000).toFixed(1)} kVA
+                        </Text>
+                      </View>
+                      <View style={styles.summaryItem}>
                         <Text style={styles.summaryLabel}>Demand Load</Text>
                         <Text style={styles.summaryValue}>
                           {(dwellingDemand.totalDemandVA / 1000).toFixed(1)} kVA
@@ -1205,29 +1268,81 @@ export const MultiPanelDocument: React.FC<MultiPanelDocumentProps> = ({
                           {(dwellingDemand.totalDemandVA / voltageDivisor).toFixed(1)}A
                         </Text>
                       </View>
-                      <View style={styles.summaryItem}>
-                        <Text style={styles.summaryLabel}>General @ Tiered</Text>
-                        <Text style={styles.summaryValue}>
-                          {(dwellingDemand.generalDemandVA / 1000).toFixed(1)} kVA
-                        </Text>
-                      </View>
-                      <View style={styles.summaryItem}>
-                        <Text style={styles.summaryLabel}>Climate @ 100%</Text>
-                        <Text style={styles.summaryValue}>
-                          {(dwellingDemand.climateDemandVA / 1000).toFixed(1)} kVA
-                        </Text>
-                      </View>
                     </View>
+                    <Text style={[styles.summaryLabel, { marginTop: 4, fontSize: 7, fontStyle: 'italic' }]}>
+                      {showExistingNewMarkers
+                        ? 'NEC 220.83 (Existing Dwelling Unit) — general loads tiered + largest of heating/cooling per 220.60. See breakdown below.'
+                        : 'NEC 220.82 (Optional Method — New Dwelling Unit) — general loads tiered + largest of heating/cooling per 220.60. See breakdown below.'}
+                    </Text>
                     {(() => {
-                      const genDemandKVA = dwellingDemand.generalDemandVA / 1000;
-                      const genConnectedKVA = dwellingDemand.generalConnectedVA / 1000;
-                      const tierFormula = genDemandKVA <= 10
-                        ? `General: ${genConnectedKVA.toFixed(1)} kVA @ 100% (under NEC 220.83 tier threshold)`
-                        : `General: 10.0 kVA × 100% + ${(genConnectedKVA - 10).toFixed(1)} kVA × 40% = ${genDemandKVA.toFixed(1)} kVA per NEC 220.83`;
+                      const necRef = showExistingNewMarkers ? '220.83' : '220.82';
+                      const genConnVA = dwellingDemand.generalConnectedVA;
+                      const genDemVA = dwellingDemand.generalDemandVA;
+                      const rows: Array<{
+                        loadType: string;
+                        connectedVA: number;
+                        demandVA: number;
+                        demandFactor: number;
+                        necReference: string;
+                      }> = [];
+                      if (genConnVA <= 10_000) {
+                        rows.push({
+                          loadType: 'General loads (under tier threshold)',
+                          connectedVA: genConnVA,
+                          demandVA: genDemVA,
+                          demandFactor: 1.0,
+                          necReference: necRef,
+                        });
+                      } else {
+                        rows.push({
+                          loadType: 'General loads (first 10 kVA @ 100%)',
+                          connectedVA: 10_000,
+                          demandVA: 10_000,
+                          demandFactor: 1.0,
+                          necReference: necRef,
+                        });
+                        rows.push({
+                          loadType: 'General loads (remainder @ 40%)',
+                          connectedVA: genConnVA - 10_000,
+                          demandVA: genDemVA - 10_000,
+                          demandFactor: 0.4,
+                          necReference: necRef,
+                        });
+                      }
+                      if (dwellingDemand.climateDemandVA > 0) {
+                        rows.push({
+                          loadType: 'Climate (largest of HVAC, non-coincident)',
+                          connectedVA: dwellingDemand.climateDemandVA,
+                          demandVA: dwellingDemand.climateDemandVA,
+                          demandFactor: 1.0,
+                          necReference: '220.60',
+                        });
+                      }
                       return (
-                        <Text style={[styles.summaryLabel, { marginTop: 4, fontSize: 7, fontStyle: 'italic' }]}>
-                          {tierFormula}. Climate: larger of heating/cooling @ 100% per NEC 220.60 (non-coincident).
-                        </Text>
+                        <View style={styles.breakdownTable}>
+                          <View style={styles.breakdownHeader}>
+                            <Text style={styles.breakdownColType}>Load Type</Text>
+                            <Text style={styles.breakdownColConnected}>Connected</Text>
+                            <Text style={styles.breakdownColDemand}>Demand</Text>
+                            <Text style={styles.breakdownColFactor}>Factor</Text>
+                            <Text style={styles.breakdownColNec}>NEC</Text>
+                          </View>
+                          {rows.map((r, i) => (
+                            <View key={i} style={styles.breakdownRow}>
+                              <Text style={styles.breakdownColType}>{r.loadType}</Text>
+                              <Text style={styles.breakdownColConnected}>
+                                {(r.connectedVA / 1000).toFixed(1)} kVA
+                              </Text>
+                              <Text style={styles.breakdownColDemand}>
+                                {(r.demandVA / 1000).toFixed(1)} kVA
+                              </Text>
+                              <Text style={styles.breakdownColFactor}>
+                                {(r.demandFactor * 100).toFixed(0)}%
+                              </Text>
+                              <Text style={styles.breakdownColNec}>{r.necReference}</Text>
+                            </View>
+                          ))}
+                        </View>
                       );
                     })()}
                   </>
