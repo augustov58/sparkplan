@@ -794,3 +794,106 @@ export const permitInspectionSchema = z.object({
 });
 
 export type PermitInspectionFormData = z.infer<typeof permitInspectionSchema>;
+
+// ============================================
+// Founding Contractors application (public form)
+// ============================================
+// Public application form at /founders. Stranger fills, edge function writes
+// to `founding_applications`, Augusto reviews within 48h and either issues a
+// coupon + Slack invite (approve) or a polite decline pointing at the standard
+// 14-day trial.
+//
+// EC license # is OPTIONAL — Augusto verifies licenses live against FL DBPR
+// before approval. The form question is a convenience for applicants who know
+// their number, not a hard gate.
+
+export const TYPICAL_WORK_OPTIONS = [
+  'single_family',
+  'multi_family',
+  'commercial',
+  'ev',
+  'service_upgrade',
+  'solar',
+] as const;
+
+export const PERMIT_VOLUME_BUCKETS = ['0', '1-5', '6-20', '21-50', '50+'] as const;
+
+export const REFERRAL_SOURCES = [
+  'youtube',
+  'mike_holt',
+  'reddit',
+  'linkedin',
+  'dm',
+  'other',
+] as const;
+
+export const PREFERRED_CONTACT_OPTIONS = ['slack', 'phone_call', 'sms_imessage'] as const;
+
+export const foundingApplicationSchema = z.object({
+  full_name: z.string()
+    .trim()
+    .min(2, 'Please enter your full name')
+    .max(200, 'Name must be less than 200 characters'),
+
+  email: z.string()
+    .trim()
+    .email('Please enter a valid email address')
+    .max(320, 'Email too long'),
+
+  phone: z.string()
+    .trim()
+    .max(40, 'Phone number too long')
+    .optional()
+    .or(z.literal('')),
+
+  company_name: z.string()
+    .trim()
+    .max(200, 'Company name too long')
+    .optional()
+    .or(z.literal('')),
+
+  // OPTIONAL — same FL DBPR format as flContractorLicenseSchema, but blank/missing is fine.
+  ec_license_number: z.string()
+    .trim()
+    .max(60, 'License too long')
+    .refine(
+      (val) => !val || /^E[CR]\d{7}$/i.test(val),
+      'If provided, format is EC####### or ER####### (FL DBPR)'
+    )
+    .optional()
+    .or(z.literal('')),
+
+  state: z.string()
+    .trim()
+    .min(2, 'State is required')
+    .max(4, 'Use a 2-letter state code'),
+
+  primary_counties: z.string()
+    .trim()
+    .min(1, 'Tell us which FL counties or cities you pull permits in')
+    .max(500, 'Keep it under 500 characters'),
+
+  permits_last_12mo: z.enum(PERMIT_VOLUME_BUCKETS, {
+    message: 'Please select a permit volume bucket',
+  }),
+
+  typical_work: z.array(z.enum(TYPICAL_WORK_OPTIONS))
+    .min(1, 'Please select at least one type of work'),
+
+  active_job_detail: z.string()
+    .trim()
+    .max(2000, 'Keep it under 2000 characters')
+    .optional()
+    .or(z.literal('')),
+
+  referral_source: z.enum(REFERRAL_SOURCES).optional(),
+
+  preferred_contact: z.enum(PREFERRED_CONTACT_OPTIONS, {
+    message: 'Please pick a preferred way to stay in touch',
+  }),
+
+  // Honeypot — humans never see/fill this; bots fill all fields. Reject if non-empty.
+  website: z.string().max(0, 'Bot detected').optional().or(z.literal('')),
+});
+
+export type FoundingApplicationFormData = z.infer<typeof foundingApplicationSchema>;
