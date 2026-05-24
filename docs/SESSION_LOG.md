@@ -3,7 +3,54 @@
 **Purpose**: Tracks recent work for seamless handoff between Claude instances.
 **Maintenance Rule**: Keep only the last 2 sessions. At the start of a new session, delete older entries — git history preserves everything.
 
-**Last Updated**: 2026-05-17
+**Last Updated**: 2026-05-24
+
+---
+
+### Session: 2026-05-23 / 2026-05-24 — Post-Sprint-2C panel-PDF demand surfacing + type baseline + CI gate (PRs #94, #95, #96, #97, #98, #99 all merged)
+
+**Focus**: Two-day arc closing three threads deferred during Sprint 2C. Day 1 (2026-05-23): cleaned the TypeScript baseline (447 → 0 errors), added the first CI workflow in the repo with a `tsc --noEmit` gate, regenerated `database.types.ts` from the Supabase MCP. Day 2 (2026-05-24): three layered panel-schedule PDF improvements driven by user visual review of multifamily + commercial generated packets — surface NEC demand kVA/amps inline on the Load Summary, add a per-load-type NEC 220 audit breakdown table, and route the dwelling card's NEC article (220.82 vs 220.83) by construction context.
+
+**Status**: 6 PRs merged sequentially. Build green. 995/995 tests passing throughout (zero net test count change — all production code, no test additions other than the two opt-in PDF disk-dump blocks in `permitPacketE2E.test.ts`).
+
+**Architecture decisions worth carrying forward**:
+
+- **Trust-the-aggregator pattern beats reimplementing NEC math at every render site.** The panel-schedule PDF doesn't redo any NEC 220 cascade math — it asks `calculateAggregatedLoad` (the single source of truth for the in-app Panel Summary) and trusts the result. The `necReferences` array on the result drives the inline article annotation in the card title; the `demandBreakdown` array drives the audit table. If a future NEC update changes how the aggregator computes demand, the PDF automatically picks up the new behavior without renderer changes. Replicable pattern for any rendered NEC artifact: the calc service is the source of truth, the renderer is dumb-but-structured.
+- **The per-row tightening is the load-bearing fix when fighting tabular overflow.** PR #98's third sub-change recovered ~80pt total by tightening panel-schedule spacing. One-time fixes (header marginBottom 20→8, paddingBottom 10→4, infoRow marginBottom 3→1, tableContainer margins, etc.) saved ~48pt. But the load-bearing change was `tableRow.paddingVertical 4→2.5` × 21 rows = 31.5pt — the multiplied-cost source. **Lesson for future overflow fights: identify the multiplied-cost line first; fixed-cost savings rarely accumulate enough alone.**
+- **Reuse existing semantic props rather than introducing new ones with overlapping meaning.** PR #99 needed a signal for "is this existing construction or new" to route between NEC 220.82 and 220.83. `showExistingNewMarkers` was already plumbed for the "* = Proposed new circuit" decorator from Sprint 2C. Same boolean semantically, two distinct uses. No new prop. **General rule**: when an upstream signal already encodes the answer to a downstream question, route off it directly even if the original use was visual-only.
+- **Postgres enums > CHECK constraints when narrow-typed columns matter.** PR #96's regen surfaced that `cover_mode` widened from a 3-literal union to `string` because Supabase's gen-types doesn't introspect CHECK constraints — the runtime safety is there, but the type system can't see it. Fixed inline with `as CoverMode` casts at two call sites, but the deeper lesson is for the next narrow-typed text column: use `CREATE TYPE x AS ENUM (...)` so gen-types can narrow it. Already at least one such column on the schema worth migrating; documented as a low-stakes high-leverage cleanup for a future session.
+- **The audit-breakdown pattern is a data → UI evolution worth replicating.** Inspector ergonomics shifted measurably: an AHJ reviewer now sees the NEC 220 cascade application on the same page as the panel schedule, eliminating the cross-reference flip to the separate Load Calculation Summary. The breakdown table's compact 5-col layout (`Load Type | Connected | Demand | Factor | NEC`) fits below a 42-row schedule with ~30% page room to spare. **Same pattern applies anywhere we have a "summary number that was derived from a multi-rule cascade"** — short circuit AIC, voltage drop %, conductor sizing, etc. Each renders today as a single result number with no per-rule visibility. The breakdown pattern is the next polish layer.
+
+**Process gotchas worth remembering**:
+
+- **Vite skipping type validation is a real production hazard.** PR #94 surfaced one real bug among 447 type errors: `MultiFamilyEVInput.evChargersPerUnit` was a stale field that Vite's transpile-only build had silently shipped past the broken type checker. Without PR #95's CI gate, the 0-error baseline would have drifted right back up. **For any new repo / monorepo additions: include `npx tsc --noEmit` in CI from day one.**
+- **The Supabase MCP `generate_typescript_types` works identically to the CLI but without local auth state.** PR #96 used `mcp__plugin_supabase_supabase__generate_typescript_types({project_id: "..."})` — output is byte-identical to `supabase gen types typescript --project-id` from the CLI. For future regens, either path works; the MCP path is one tool invocation if already authenticated, the CLI path is one shell line. No need to lean on one over the other.
+- **Visual review (PDFs converted to PNG + sent via SendUserFile) is a real bug-finding tool.** User caught the dwelling false-positive on commercial MDPs (kitchen-shape circuits triggering single-family-MDP detection) on a Commercial Building generated packet — would have shipped uncaught without the visual review cycle. Same cycle caught the 42-circuit overflow in PR #98 and led to the spacing-tightening third sub-change. **Pattern: send each generated PDF as a SendUserFile artifact (status: normal) so the user opens it natively; user names a specific visual issue → renderer site located via grep → minimal targeted edit → regenerate + re-send → user confirms or names the next thing.** Scales far better than trying to anticipate every visual detail upfront.
+- **Fold related fixes into the open PR, not as land-and-followup.** Mid-PR-#98 review surfaced the layout overflow on 42-circuit panels (NOT a regression — PR #97 was clean, but #98's added breakdown row pushed it over). Folded the tightening into the same PR per the user's saved preference (`feedback_scope_during_review.md`) rather than opening a separate PR. Three commits in one PR vs three separate PRs is the right call when the fixes are in the same architectural area.
+
+**Deliverables**:
+
+| PR | Branch | Files | Result |
+|---|---|---|---|
+| **#94** | `fix/types-baseline` | many files, 447→0 tsc errors | ✅ Merged 2026-05-23 |
+| **#95** | `ci/add-tsc-gate` | `.github/workflows/ci.yml` (new) | ✅ Merged 2026-05-23 |
+| **#96** | `chore/regen-database-types` | `lib/database.types.ts` + 2 cover_mode call sites | ✅ Merged 2026-05-23 |
+| **#97** | `fix/panel-pdf-demand-display` | 4 files, +321 / -98 LOC | ✅ Merged 2026-05-23 |
+| **#98** | `fix/panel-pdf-commercial-demand` | 4 files, +190 / -29 LOC across 2 commits | ✅ Merged 2026-05-24 |
+| **#99** | `fix/panel-pdf-dwelling-breakdown` | 2 files, +188 / -49 LOC | ✅ Merged 2026-05-24 |
+
+**No DB migrations.** All six PRs are pure-code: type cleanup, CI infrastructure, types regen, and PDF rendering changes. Backward compat preserved everywhere.
+
+**Visual proofs in `example_reports/`** (regeneratable via `E2E_DUMP_PDFS=1 npm test`):
+- `Permit_Packet_MF_EV_Existing_2026-05-17.pdf` — multifamily packet with MDP + H1 sub-panel pages showing the new aggregator card + breakdown table
+- `PanelSchedule_Dwelling_Existing_22083.pdf` — single-page dwelling MDP showing the NEC 220.83 card + tier-split breakdown
+- `PanelSchedule_Dwelling_New_22082.pdf` — same fixture rendered as new-construction, NEC 220.82 routing
+
+**Follow-ups not on this session's queue**:
+1. **STRATEGIC_ANALYSIS.md + DISTRIBUTION_PLAYBOOK.md feature-inventory sweep** — still owed from the prior session; now also needs the audit-breakdown story added as a competitive differentiator (no competing SaaS surfaces the NEC 220 cascade on the panel page itself).
+2. **Commercial demand-factor coverage extension** — `calculateAggregatedLoad`'s per-load-type helpers cover Receptacles / Motors / HVAC / Range / Dryer. Specialty commercial loads (welders @ NEC 220.55, restaurant kitchen equipment @ 220.56) currently bucket into "Other @ 100%" — not wrong but conservative. Extend coverage if a real packet surfaces it.
+3. **Migrate CHECK-constrained text columns to Postgres enums** — surfaced by PR #96. `cover_mode` is the known one; grep the schema for other narrow-typed text columns with CHECK constraints and migrate them so the next gen-types regen produces narrow unions automatically.
+4. **Apply audit-breakdown pattern to other multi-rule results** — short circuit AIC, voltage drop, conductor sizing all currently render as single numbers without per-rule visibility. Same pattern would surface those derivations on their respective PDF pages.
 
 ---
 
@@ -49,43 +96,4 @@ Merge order is #79 → #80 → #81. Each subsequent PR auto-rebases to main when
 
 ---
 
-### Session: 2026-05-16 — Sprint 2C M2 (AHJ coverage expansion + manifest reuse flexibility, PRs #70–#75 in-flight)
-
-**Focus**: One-shot expansion from the post-2C-M1 audit. User asked whether the packet was flexible enough for contractors in unmodeled FL cities (Winter Park, Sanford, Cape Coral, Lake Mary, etc.) to reuse an existing AHJ's defaults without misrepresenting their actual AHJ on the cover sheet. Answered yes-but-with-3-gaps; user said "do both (a) Tier 1 manifest expansion and (b) close those gaps. Use parallel agents." Six PRs landed in-flight against main: PR #70 Orlando-populate (sequential, foreground), then 5 PRs from 5 parallel agents in worktree isolation — 4 Tier 1 manifests (City of Miami, Orange County unincorporated, City of St. Petersburg, Jacksonville/Duval) + 1 flexibility-gaps PR.
-
-**Status**: 6 PRs open (#70 Orlando-populate, #71 Gaps, #72 Miami, #73 Orange, #74 St. Pete, #75 Jacksonville). None merged yet. Full test suite at 960/960 passing in local pre-merge verification (vs ~797 baseline). Build green. AHJ count when all 6 merge: 5 → 9 registered; FL metro population served: ~2.3M → ~3.5M directly.
-
-**Architecture decisions worth carrying forward**:
-
-- **Two-layer visibility model paid off.** Sprint 2B PR #51 designed the AHJ-aware visibility module with Layer 1 (manifest defaults) + Layer 2 (user overrides), and put `section_overrides.artifactTypes` on the schema even though there was no UI for it at the time. PR #71 Gap 2 only needed to add the UI — `applyUserOverrides` already consumed the artifact-types branch. Lesson: when you build a layered model, plumb the bottom layer even before the UI exists. Adding the UI later is one PR; adding the persistence shape later would have required a migration + a backward-compat retrofit.
-- **Manifest-template reuse is a higher-leverage move than adding more manifests.** Adding 4 Tier 1 AHJs (#72–#75) directly covers ~1.2M additional FL population. PR #71's Gap 1 (`manifest_template_id` separation from `jurisdiction_id`) unblocks every OTHER unmodeled FL city in one dropdown click. Per the audit, that's the entire long tail — Winter Park / Sanford / Cape Coral / Lake Mary / Naples etc. — all served via "pick the nearest covered AHJ's defaults" rather than waiting for individual manifest research. The architecture made Gap 1 a ~½-day fix; the marginal cost of more manifests is ~1–2 days each. Always prefer the leverage move.
-- **Pure-function manifests with named research artifacts scale to many AHJs.** Each agent followed the Pompano template (best exemplar at 22 reqs / 5 categories) and produced 4 deliverables: `data/ahj/<id>.ts` + `tests/<id>Manifest.test.ts` + `docs/ahj-source-checklists/<id>.md` + registry.ts addition. 4 agents in 4 parallel worktrees took ~11 minutes wall-clock and produced 9 files / ~3000 LOC / 172 new tests. The architecture's data-only contract (no engine changes per AHJ) is what made parallelization clean.
-
-**Process gotchas worth remembering**:
-
-- **Sequential merges of agent branches can leak orphan conflict markers past Git.** Resolving the 4 `registry.ts` conflicts during local sequential merges, one Edit's `old_string` captured the `=======/>>>>>>>` markers but not the corresponding `<<<<<<< HEAD` higher up. Git accepts commits containing literal `<<<<<<<` text once the file is `git add`-ed — it only blocks unmerged paths, not conflict-marker patterns. The orphan only surfaced at `npm run build` via esbuild's `Transform failed: Expected identifier but found "<<"`. Fixed forward with a 1-line cleanup commit. A pre-commit hook (`grep -E '^(<<<<<<<|=======|>>>>>>>)' --include='*.{ts,tsx,js,jsx}'`) would catch it next time — added to follow-ups.
-- **Worktree CWD doesn't always survive Bash calls across an agent's session.** The gaps-closure agent's report mentioned it had to revert "accidental edits" to `/home/augusto/projects/sparkplan` (the main repo) after `cd` jumped it out of its worktree. Resulted in `tests/visibility.test.ts` being modified in the main repo working tree (NOT committed in the agent's branch), plus St. Pete files leaking from the St. Pete agent's worktree into the main repo as untracked files. All correctly preserved on the respective agent branches; the floating state in main was safely discarded with `git restore` + `rm`. **Lesson for future parallel-agent prompts: include "always use absolute paths or `git -C $WORKTREE_PATH` for git commands" explicitly.**
-- **Agent confidence ratings are honest signal.** All 4 manifest agents reported MEDIUM confidence on EV-specific scope because none of the new AHJs publish dedicated EV checklists (verified by direct fetches). Each agent documented the specific phone-call follow-up that would close the gap. Trusting MEDIUM is better than asking for HIGH-or-nothing — the manifests work today; the phone-call closure is a Sprint 2C+ task.
-- **Local merges can be "verification only" rather than "ship".** I merged all 5 agent branches into local main, ran full tests, then `git reset --hard origin/main` and opened 5 PRs targeting main. This preserves the PR-per-feature review workflow while letting me verify integration locally. Trade-off: each PR will re-hit the same `registry.ts` conflicts on merge (user resolves in GitHub UI). Worth it for the granular review surface; not worth it if the user wanted single-PR bulk merge.
-
-**Deliverables**:
-
-| PR | Branch | Files | Result |
-|---|---|---|---|
-| **#70** | `feat/orlando-manifest-requirements` | 4 files, +592 / -11 LOC, 28 new tests | ⏳ Open against main |
-| **#71** | `feat/manifest-flexibility-gaps` | 4 files, +815 / -9 LOC, 19 new tests | ⏳ Open against main |
-| **#72** | `feat/ahj-city-of-miami` | 4 files, +1092 / 0 LOC, 44 new tests | ⏳ Open against main |
-| **#73** | `feat/ahj-orange-county` | 4 files, +1051 / 0 LOC, 33 new tests | ⏳ Open against main |
-| **#74** | `feat/ahj-st-petersburg` | 4 files, ~+1200 LOC, 51 new tests | ⏳ Open against main |
-| **#75** | `feat/ahj-jacksonville-duval` | 4 files, ~+1100 LOC, 44 new tests | ⏳ Open against main |
-
-**Worktrees in play at session end**: 5 agent worktrees in `.claude/worktrees/agent-*` are still on disk (locked branches). Safe to `git worktree remove` after PRs merge.
-
-**Follow-ups not on this session's queue**:
-1. **Pre-commit hook for orphan conflict markers** — `grep -E '^(<<<<<<<|=======|>>>>>>>)' --include='*.{ts,tsx,js,jsx}'`. Caught in this session by `npm run build`; should fail-fast at commit time.
-2. **STRATEGIC_ANALYSIS.md + DISTRIBUTION_PLAYBOOK.md feature-inventory sweep** — neither doc mentions the AHJ manifest layer (PRs #51/#54/#56/#70-#75), permit-merge engine (PR #49), NEC 220.83 retrofit (PR #61), H17 contractor-exemption screening (PR #41), PE-as-service positioning, or T&M Phase 1 (PRs #33-#36).
-3. **Commercial fixture in Playwright suite** — would have caught PR #64 earlier. Smoke test fixture is single-family residential happy path with zero fail-severity rows.
-
----
-
-<!-- Earlier sessions (2026-05-15 docs cleanup + JurisdictionRequirements font hotfix + dwelling-load follow-up PRs #63/#64/#65, 2026-05-13 Sprint 2B PR-4 Orlando manifest scaffold + AHJ-aware visibility, 2026-05-12 Sprint 2B PR-3 merge engine, 2026-05-10 Sprint 2A final 2 PRs, 2026-05-09 contractor-pivot + T&M Phase 1) rotated out per "keep last 2 sessions" rule. Git history preserves them. -->
+<!-- Earlier sessions (2026-05-16 Sprint 2C M2 AHJ expansion PRs #70–#75, 2026-05-15 docs cleanup + JurisdictionRequirements font hotfix + dwelling-load follow-up PRs #63/#64/#65, 2026-05-13 Sprint 2B PR-4 Orlando manifest scaffold + AHJ-aware visibility, 2026-05-12 Sprint 2B PR-3 merge engine, 2026-05-10 Sprint 2A final 2 PRs, 2026-05-09 contractor-pivot + T&M Phase 1) rotated out per "keep last 2 sessions" rule. Git history preserves them. -->

@@ -1,32 +1,63 @@
 # SparkPlan - Roadmap
 
-**Last Updated:** 2026-05-16
+**Last Updated:** 2026-05-24
 
-## Current Phase: 3.12 (AHJ Coverage Expansion + Manifest Reuse Flexibility — Sprint 2C M2) - ⏳ IN-FLIGHT (May 2026)
+## Current Phase: 3.13 (Post-Sprint-2C panel-PDF demand surfacing + type baseline + CI gate) - ✅ COMPLETE 2026-05-24
 
-## Latest Completed Phase: 3.11 (NEC 220.83 routing for existing dwellings) - ✅ COMPLETE (May 2026)
-## Also Recently Shipped: 3.10 (Sprint 2C M1) + 3.9 (Sprint 2B) + 3.8 (T&M Billing) + 3.7 (Estimating) + 3.6 (Permits) - all complete or Phase 1 implemented (May 2026)
+## Latest Completed Phase: 3.13 (PRs #94, #95, #96, #97, #98, #99 all merged 2026-05-23/24)
+## Also Recently Shipped: 3.12 (Sprint 2C M2) + 3.11 (220.83 routing) + 3.10 (Sprint 2C M1) + 3.9 (Sprint 2B) + 3.8 (T&M Billing) + 3.7 (Estimating) + 3.6 (Permits) — all complete or Phase 1 implemented (May 2026)
 ## Sprint 2A: ✅ COMPLETE (19/19 findings; 5 themed PRs merged)
 ## Sprint 2B: ✅ COMPLETE (4 PRs merged — PR #45 + PR #47 + PR #49 + PR #51 Orlando manifest scaffold)
 ## Sprint 2C M1: ✅ COMPLETE 2026-05-14 (PR #54 engine + PR #56 4 manifests — Pompano / Miami-Dade / Davie / Hillsborough-Tampa)
-## Sprint 2C M2: ⏳ IN-FLIGHT 2026-05-16 (6 PRs open #70–#75 — Orlando-populate + 4 Tier 1 AHJs + flexibility gaps)
+## Sprint 2C M2: ✅ COMPLETE 2026-05-16 (6 PRs merged #70–#75 — Orlando-populate + 4 Tier 1 AHJs + flexibility gaps)
+## Sprint 2C M3: ✅ COMPLETE 2026-05-17 (3 stacked PRs #79/#80/#81 — Existing/New construction end-to-end across SF / MF / Commercial)
 
 ---
 
-## Phase 3.12: AHJ Coverage Expansion + Manifest Reuse Flexibility (Sprint 2C M2) - ⏳ IN-FLIGHT (May 2026)
+## Phase 3.13: Post-Sprint-2C panel-PDF demand surfacing + type baseline + CI gate - ✅ COMPLETE 2026-05-24
+
+Six PRs over two days (2026-05-23 + 2026-05-24) close out three independent threads deferred during Sprint 2C: a tsc baseline at 447 errors with no CI gate to enforce it, panel-schedule PDF pages that showed only raw connected-load sums with no NEC-demand reference for AHJ reviewers, and the in-app per-load-type NEC 220 breakdown that lived nowhere in the printed packet. After this phase, the panel-schedule PDF is in a fundamentally different posture — every panel surfaces the NEC-applied demand inline with a per-load-type audit table, and the type system is locked at 0 errors with CI enforcement.
+
+| PR | Status | What it shipped |
+|---|---|---|
+| **PR #94** (Type baseline cleanup) | ✅ Merged 2026-05-23 | Eliminates all 447 tsc baseline errors. Mostly mechanical (missing annotations, optional-chain narrowing). Surfaced one real bug (`MultiFamilyEVInput.evChargersPerUnit` stale field that Vite's transpile-only build had silently shipped past). |
+| **PR #95** (CI tsc gate) | ✅ Merged 2026-05-23 | First GitHub Actions workflow in the repo. Runs `tsc --noEmit` + `npm run build` + `npm test` on every push / PR to main. Tsc gate is the load-bearing addition — Vite skips type validation, so without this the 0-error baseline drifts. |
+| **PR #96** (Regen database.types.ts) | ✅ Merged 2026-05-23 | Replaces PR #94's hand-patched dedup with a fresh Supabase MCP regen. 31-line diff vs hand-patched proves the dedup was correct. Surfaced a Postgres-enums > CHECK-constraints lesson for future schema. |
+| **PR #97** (Panel PDF demand display) | ✅ Merged 2026-05-23 | Threads `calculateAggregatedLoad` into the renderer. Three Load Summary modes by panel type: dwelling unit (5-col card with General@Tiered + Climate@100%), aggregator/EVEMS-clamped (4-col with NEC article inline), default. Consolidates former separate Dwelling Demand Breakdown card to eliminate page-overflow. |
+| **PR #98** (Demand on every panel + NEC 220 audit table) | ✅ Merged 2026-05-24 | Loosens trigger so commercial sub-panels also surface Demand kVA/Amps. Adds compact per-load-type breakdown table sourced from `aggregatedLoad.demandBreakdown` (5 cols: Type / Connected / Demand / Factor / NEC). Layout tightening recovered ~80pt — `tableRow.paddingVertical 4→2.5` × 21 rows = 31.5pt is the load-bearing change. |
+| **PR #99** (NEC 220.82/.83 dwelling breakdown) | ✅ Merged 2026-05-24 | Same audit-table treatment on dwelling panels. Title routes 220.82 (new construction) vs 220.83 (existing) by `showExistingNewMarkers`. Breakdown table renders tier-split explicitly (`first 10 kVA @ 100%` + `remainder @ 40%`) with Climate row at `220.60` for non-coincident HVAC. |
+
+**Inspector ergonomics shift**: AHJ reviewer no longer flips between panel page and Load Calculation Summary to verify bus rating compliance. The NEC 220 cascade application now appears on the same page as the panel schedule. Time-to-permit-approval savings accumulate across the AHJ's review queue.
+
+**No DB migrations.** All six PRs are pure-code: type cleanup, CI infrastructure, types regen, and PDF rendering changes. Backward compat preserved everywhere.
+
+**Visual proofs in `example_reports/`** (regeneratable via `E2E_DUMP_PDFS=1 npm test`):
+- `Permit_Packet_MF_EV_Existing_2026-05-17.pdf` — multifamily packet with MDP + H1 sub-panel pages showing aggregator card + breakdown table
+- `PanelSchedule_Dwelling_Existing_22083.pdf` — single-page dwelling MDP with NEC 220.83 card + tier-split breakdown
+- `PanelSchedule_Dwelling_New_22082.pdf` — same fixture rendered as new-construction (NEC 220.82 routing)
+
+**Open follow-ups** (documented in `docs/SESSION_LOG.md`):
+1. STRATEGIC_ANALYSIS.md + DISTRIBUTION_PLAYBOOK.md feature-inventory sweep (still owed from prior session — needs the audit-breakdown story added as a competitive differentiator since no competing SaaS surfaces the NEC 220 cascade on the panel page itself).
+2. Commercial demand-factor coverage extension — specialty loads (welders @ NEC 220.55, restaurant kitchen equipment @ 220.56) currently bucket into "Other @ 100%". Not wrong but conservative.
+3. Migrate CHECK-constrained text columns to Postgres enums — surfaced by PR #96 (`cover_mode` is the known one).
+4. Apply audit-breakdown pattern to other multi-rule results — short circuit AIC, voltage drop, conductor sizing all render as single numbers without per-rule visibility.
+
+---
+
+## Phase 3.12: AHJ Coverage Expansion + Manifest Reuse Flexibility (Sprint 2C M2) - ✅ COMPLETE 2026-05-16
 
 Closes two gaps that surfaced once Sprint 2C M1 landed: (1) the FL pilot AHJs only covered ~30% of the metro populations they're in (Orlando-metro alone has 30+ AHJs; we'd modeled 1), and (2) contractors in unmodeled cities could fall back to all-on defaults but couldn't reuse an existing manifest as a starting template without misrepresenting their AHJ on the cover sheet. M2 ships 4 new AHJ manifests (Tier 1 from the audit) **plus** 3 UX flexibility gaps so every unmodeled FL city is one dropdown click away from a workable packet. After M2, ~9 AHJs cover ~3.5M FL population directly; the unmodeled tail is unblocked by template reuse.
 
 | PR | Status | Closes |
 |---|---|---|
-| **PR #70** (Orlando manifest populate) | ⏳ Open | Backports Sprint 2C M1's requirements[] schema onto Orlando's manifest (PR #56 missed it). 17 reqs + 28 tests. |
-| **PR #71** (Manifest flexibility gaps) | ⏳ Open | Gap 1: `manifest_template_id` separation from `jurisdiction_id`. Gap 2: artifact-slot toggle UI. Gap 3: per-project string overrides for `general_notes` / `code_references` / `sheet_id_prefix`. 19 tests. |
-| **PR #72** (City of Miami manifest) | ⏳ Open | Biggest single-AHJ gap in FL (~440k pop). Independent of Miami-Dade County RER. HVHZ ON. 17 reqs + 44 tests. |
-| **PR #73** (Orange County unincorporated manifest) | ⏳ Open | Closes Orlando-metro gap. NOC threshold = $2,500 (lower than statewide $5k). NOT in HVHZ. 15 reqs + 33 tests. |
-| **PR #74** (City of St. Petersburg manifest) | ⏳ Open | Closes Tampa Bay gap. NOT in HVHZ, IS in Wind-Borne Debris Region 140 mph. 24 reqs + 51 tests. |
-| **PR #75** (Jacksonville/Duval consolidated manifest) | ⏳ Open | Largest untouched FL market (~920k pop). First North-FL AHJ. NOT in HVHZ. 25 reqs + 44 tests. |
+| **PR #70** (Orlando manifest populate) | ✅ Merged | Backports Sprint 2C M1's requirements[] schema onto Orlando's manifest (PR #56 missed it). 17 reqs + 28 tests. |
+| **PR #71** (Manifest flexibility gaps) | ✅ Merged | Gap 1: `manifest_template_id` separation from `jurisdiction_id`. Gap 2: artifact-slot toggle UI. Gap 3: per-project string overrides for `general_notes` / `code_references` / `sheet_id_prefix`. 19 tests. |
+| **PR #72** (City of Miami manifest) | ✅ Merged | Biggest single-AHJ gap in FL (~440k pop). Independent of Miami-Dade County RER. HVHZ ON. 17 reqs + 44 tests. |
+| **PR #73** (Orange County unincorporated manifest) | ✅ Merged | Closes Orlando-metro gap. NOC threshold = $2,500 (lower than statewide $5k). NOT in HVHZ. 15 reqs + 33 tests. |
+| **PR #74** (City of St. Petersburg manifest) | ✅ Merged | Closes Tampa Bay gap. NOT in HVHZ, IS in Wind-Borne Debris Region 140 mph. 24 reqs + 51 tests. |
+| **PR #75** (Jacksonville/Duval consolidated manifest) | ✅ Merged | Largest untouched FL market (~920k pop). First North-FL AHJ. NOT in HVHZ. 25 reqs + 44 tests. |
 
-**Coverage delta when merged**: 5 → 9 AHJs registered; ~2.3M → ~3.5M FL population served directly; every other FL city unblocked via Gap 1's manifest-template dropdown. Net new tests across all 6 PRs: **191** (28 + 44 + 33 + 51 + 44 + 19 - the 11 stale-assertion edits in #70 = ~208 add, ~17 remove).
+**Coverage delta**: 5 → 9 AHJs registered; ~2.3M → ~3.5M FL population served directly; every other FL city unblocked via Gap 1's manifest-template dropdown.
 
 **No DB migrations.** Sprint 2C M2 is pure data + UI extensions on existing jsonb. Backward compat preserved — projects without manifest_template_id or string-overrides behave IDENTICALLY to today.
 
