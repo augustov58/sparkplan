@@ -34,11 +34,15 @@ export const styles = StyleSheet.create({
     fontFamily: 'Helvetica',
   },
   header: {
-    marginBottom: 20,
+    // Spacing tightened (2026-05-24) to give 42-circuit panels enough
+    // vertical room for the Load Summary + NEC 220 breakdown table on
+    // the same page. Previous values (mb:20, pb:10) wasted ~30pt
+    // between the info grid and the circuit table for no functional gain.
+    marginBottom: 8,
     borderBottomWidth: 2,
     borderBottomColor: '#000',
     borderBottomStyle: 'solid',
-    paddingBottom: 10,
+    paddingBottom: 4,
   },
   title: {
     fontSize: 16,
@@ -83,7 +87,7 @@ export const styles = StyleSheet.create({
   },
   infoRow: {
     flexDirection: 'row',
-    marginBottom: 3,
+    marginBottom: 1,
   },
   infoLabel: {
     fontFamily: 'Helvetica-Bold',
@@ -93,8 +97,10 @@ export const styles = StyleSheet.create({
     width: '60%',
   },
   tableContainer: {
-    marginTop: 15,
-    marginBottom: 15,
+    // Tightened 2026-05-24: was mt:15/mb:15. Saves ~18pt for 42-row
+    // panels to fit Load Summary + NEC breakdown on one page.
+    marginTop: 4,
+    marginBottom: 6,
   },
   tableHeader: {
     flexDirection: 'row',
@@ -102,7 +108,7 @@ export const styles = StyleSheet.create({
     borderBottomWidth: 2,
     borderBottomColor: '#000',
     borderBottomStyle: 'solid',
-    paddingVertical: 5,
+    paddingVertical: 3,
     paddingHorizontal: 3,
     fontFamily: 'Helvetica-Bold',
   },
@@ -111,7 +117,10 @@ export const styles = StyleSheet.create({
     borderBottomWidth: 0.5,
     borderBottomColor: '#ccc',
     borderBottomStyle: 'solid',
-    paddingVertical: 4,
+    // Row padding tightened 2026-05-24: was 4. 21 rows × 1.5pt = 31.5pt
+    // saved on a 42-circuit panel — the difference between fitting the
+    // breakdown table on the same page vs. spilling to a second page.
+    paddingVertical: 2.5,
     paddingHorizontal: 3,
   },
   tableRowAlt: {
@@ -119,7 +128,7 @@ export const styles = StyleSheet.create({
     borderBottomWidth: 0.5,
     borderBottomColor: '#ccc',
     borderBottomStyle: 'solid',
-    paddingVertical: 4,
+    paddingVertical: 2.5,
     paddingHorizontal: 3,
     backgroundColor: '#fafafa',
   },
