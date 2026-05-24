@@ -41,6 +41,36 @@ const STANDARD_BREAKER_SIZES = [15, 20, 25, 30, 35, 40, 45, 50, 60, 70, 80, 90, 
 const VALID_LOAD_TYPES = ['L', 'M', 'R', 'O', 'H', 'C', 'W', 'D', 'K'];
 
 /**
+ * OpenAPI-style schema passed to Gemini's structured-output mode so the model
+ * emits a JSON object with this exact shape (no markdown, no preamble).
+ * Mirrors ExtractionResult + ExtractedCircuit.
+ */
+const EXTRACTION_SCHEMA = {
+  type: 'object',
+  properties: {
+    circuits: {
+      type: 'array',
+      items: {
+        type: 'object',
+        properties: {
+          circuit_number: { type: 'integer' },
+          description: { type: 'string', nullable: true },
+          breaker_amps: { type: 'integer', nullable: true },
+          load_watts: { type: 'number', nullable: true },
+          load_type: { type: 'string', nullable: true },
+          pole: { type: 'integer' },
+          conductor_size: { type: 'string', nullable: true },
+        },
+        required: ['circuit_number', 'pole'],
+      },
+    },
+    confidence: { type: 'string', enum: ['high', 'medium', 'low'] },
+    warnings: { type: 'array', items: { type: 'string' } },
+  },
+  required: ['circuits', 'confidence', 'warnings'],
+} as const;
+
+/**
  * Parse JSON from LLM response, handling markdown code blocks
  */
 function parseJsonResponse(responseText: string): any {
@@ -191,13 +221,31 @@ export async function extractCircuitsFromPhoto(
     // Build prompt
     const prompt = buildExtractionPrompt(panelName, maxCircuits);
 
-    // Call Gemini Vision via Edge Function
+    // Call Gemini Vision via Edge Function.
+    //
+    // For image-based structured extraction we override the proxy's free-text
+    // defaults so the model is constrained to emit valid JSON:
+    //   - responseMimeType=application/json + responseSchema → no markdown fences,
+    //     no narrative preamble, schema-validated structure.
+    //   - temperature 0.1 → near-deterministic extraction (proxy default 0.7 is
+    //     calibrated for chat, not OCR).
+    //   - maxOutputTokens 16384 → 42-circuit panels with full descriptions can
+    //     exceed the proxy's 8192 default once formatting is included.
+    //   - thinkingBudget 0 → gemini-2.5-flash is a thinking model; disabling
+    //     thinking for OCR (a perception task, not reasoning) frees the entire
+    //     token budget for the actual JSON answer and prevents mid-object
+    //     truncation.
     const response = await supabase.functions.invoke('gemini-proxy', {
       body: {
         prompt,
         imageData: imageBase64,
         imageMimeType,
         model: 'gemini-2.5-flash',
+        responseMimeType: 'application/json',
+        responseSchema: EXTRACTION_SCHEMA,
+        temperature: 0.1,
+        maxOutputTokens: 16384,
+        thinkingBudget: 0,
       },
     });
 
@@ -230,17 +278,27 @@ export async function extractCircuitsFromPhoto(
       };
     }
 
-    // Parse JSON response
+    // Parse JSON response.
+    //
+    // With responseMimeType=application/json the response should already be
+    // pure JSON, but parseJsonResponse() retains markdown/regex fallback as a
+    // safety net for older proxy deployments and for graceful degradation if
+    // the model emits a partial response (e.g. token cap hit).
     let parsed: any;
     try {
       parsed = parseJsonResponse(responseText);
     } catch (parseError) {
-      console.error('Failed to parse JSON:', responseText);
+      console.error('Failed to parse JSON. Raw response:', responseText);
+      // Surface a preview of the raw response so the user can tell whether the
+      // model returned prose, a truncated object, or an outright refusal.
+      const preview = responseText.length > 200
+        ? `${responseText.slice(0, 200)}…`
+        : responseText;
       return {
         circuits: [],
         confidence: 'low',
-        warnings: ['Could not parse AI response'],
-        error: 'Failed to parse extraction results',
+        warnings: [`AI response was not valid JSON. Preview: ${preview}`],
+        error: 'Failed to parse extraction results. The AI did not return valid JSON — see warnings for the raw response.',
       };
     }
 
