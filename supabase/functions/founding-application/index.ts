@@ -34,7 +34,10 @@ const corsHeaders = {
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
 };
 
-const ADMIN_EMAIL = 'augustovalbuena@gmail.com';
+// Send to the brand inbox (Google Workspace), which already forwards to Augusto.
+// Keeps the program-facing flow consistent with support@sparkplan.app and
+// makes future delegation (hiring, alerts) trivial.
+const NOTIFY_TO = 'support@sparkplan.app';
 const NOTIFY_FROM = 'SparkPlan Apps <support@sparkplan.app>';
 
 const TYPICAL_WORK_VALUES = new Set([
@@ -57,6 +60,14 @@ const REFERRAL_SOURCES = new Set([
   'other',
 ]);
 
+const PREFERRED_CONTACT_VALUES = new Set(['slack', 'phone_call', 'sms_imessage']);
+
+const CONTACT_LABEL: Record<string, string> = {
+  slack: 'Slack (default)',
+  phone_call: 'Phone call',
+  sms_imessage: 'SMS / iMessage',
+};
+
 interface ApplicationPayload {
   full_name: string;
   email: string;
@@ -69,6 +80,7 @@ interface ApplicationPayload {
   typical_work: string[];
   active_job_detail?: string;
   referral_source?: string;
+  preferred_contact?: string;
   website?: string; // honeypot — must be empty
 }
 
@@ -133,6 +145,10 @@ function validate(payload: ApplicationPayload): string | null {
     return 'Invalid referral source.';
   }
 
+  if (payload.preferred_contact && !PREFERRED_CONTACT_VALUES.has(payload.preferred_contact)) {
+    return 'Invalid preferred contact method.';
+  }
+
   const activeJob = trimOrEmpty(payload.active_job_detail);
   if (activeJob.length > 2000) {
     return 'Active job detail is too long.';
@@ -148,6 +164,7 @@ function buildAdminEmail(row: any): string {
   const activeJob = row.active_job_detail || '(none)';
   const referral = row.referral_source || '(unknown)';
   const workTags = (row.typical_work as string[]).join(', ') || '(none)';
+  const contactPref = CONTACT_LABEL[row.preferred_contact] || 'Slack (default)';
 
   return `
     <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; max-width: 640px; margin: 0 auto; padding: 24px; background: #faf9f7;">
@@ -160,6 +177,7 @@ function buildAdminEmail(row: any): string {
         <table style="width: 100%; font-size: 13px; color: #4b5563; margin-bottom: 16px;">
           <tr><td style="padding: 4px 0; width: 160px;"><strong>Email:</strong></td><td><a href="mailto:${escapeHtml(row.email)}">${escapeHtml(row.email)}</a></td></tr>
           <tr><td style="padding: 4px 0;"><strong>Phone:</strong></td><td>${escapeHtml(phone)}</td></tr>
+          <tr><td style="padding: 4px 0;"><strong>Preferred contact:</strong></td><td><strong style="color: #2d3b2d;">${escapeHtml(contactPref)}</strong></td></tr>
           <tr><td style="padding: 4px 0;"><strong>Company:</strong></td><td>${escapeHtml(company)}</td></tr>
           <tr><td style="padding: 4px 0;"><strong>State:</strong></td><td>${escapeHtml(row.state)}</td></tr>
           <tr><td style="padding: 4px 0;"><strong>EC License #:</strong></td><td>${escapeHtml(license)}</td></tr>
@@ -258,6 +276,7 @@ serve(async (req: Request) => {
       typical_work: payload.typical_work,
       active_job_detail: payload.active_job_detail?.trim() || null,
       referral_source: payload.referral_source || null,
+      preferred_contact: payload.preferred_contact || 'slack',
     };
 
     const { data: row, error: insertError } = await supabase
@@ -288,7 +307,7 @@ serve(async (req: Request) => {
       try {
         await sendEmail({
           apiKey: resendApiKey,
-          to: ADMIN_EMAIL,
+          to: NOTIFY_TO,
           subject: `[Founding Contractors] ${row.full_name} (${row.state}) — ${row.permits_last_12mo} permits/yr`,
           html: buildAdminEmail(row),
           replyTo: row.email,

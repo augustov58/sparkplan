@@ -827,6 +827,8 @@ export const REFERRAL_SOURCES = [
   'other',
 ] as const;
 
+export const PREFERRED_CONTACT_OPTIONS = ['slack', 'phone_call', 'sms_imessage'] as const;
+
 export const foundingApplicationSchema = z.object({
   full_name: z.string()
     .trim()
@@ -885,6 +887,10 @@ export const foundingApplicationSchema = z.object({
     .or(z.literal('')),
 
   referral_source: z.enum(REFERRAL_SOURCES).optional(),
+
+  preferred_contact: z.enum(PREFERRED_CONTACT_OPTIONS, {
+    message: 'Please pick a preferred way to stay in touch',
+  }),
 
   // Honeypot — humans never see/fill this; bots fill all fields. Reject if non-empty.
   website: z.string().max(0, 'Bot detected').optional().or(z.literal('')),

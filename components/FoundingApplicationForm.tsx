@@ -16,6 +16,7 @@ import { Loader2, CheckCircle2 } from 'lucide-react';
 import {
   foundingApplicationSchema,
   PERMIT_VOLUME_BUCKETS,
+  PREFERRED_CONTACT_OPTIONS,
   REFERRAL_SOURCES,
   TYPICAL_WORK_OPTIONS,
   type FoundingApplicationFormData,
@@ -49,6 +50,12 @@ const REFERRAL_LABELS: Record<typeof REFERRAL_SOURCES[number], string> = {
   other: 'Other',
 };
 
+const CONTACT_LABELS: Record<typeof PREFERRED_CONTACT_OPTIONS[number], { title: string; hint: string }> = {
+  slack: { title: 'Slack', hint: 'Private cohort channel — the main experience' },
+  phone_call: { title: 'Phone call', hint: 'Direct call — best for on-site contractors' },
+  sms_imessage: { title: 'SMS / iMessage', hint: 'Text-based, async, works from a truck' },
+};
+
 interface Props {
   onSuccess?: () => void;
 }
@@ -73,6 +80,7 @@ export const FoundingApplicationForm: React.FC<Props> = ({ onSuccess }) => {
       primary_counties: '',
       typical_work: [],
       active_job_detail: '',
+      preferred_contact: 'slack',
       website: '',
     },
   });
@@ -280,6 +288,35 @@ export const FoundingApplicationForm: React.FC<Props> = ({ onSuccess }) => {
         <p className="mt-1 text-xs text-[#888]">
           Founding Contractors get hands-on help with their first real project — tell us what you're working on.
         </p>
+      </div>
+
+      <div>
+        <label className={labelClass}>
+          How would you prefer we stay in touch during the cohort? <span className="text-red-600">*</span>
+          <span className="block text-xs font-normal text-[#888] mt-0.5">
+            Slack is the main channel, but we know many electricians prefer phone or text. Pick what works for you.
+          </span>
+        </label>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
+          {PREFERRED_CONTACT_OPTIONS.map((option) => (
+            <label
+              key={option}
+              className="flex items-start gap-2 px-3 py-2.5 border border-[#e8e6e3] rounded-md text-sm cursor-pointer hover:border-[#2d3b2d] transition-colors"
+            >
+              <input
+                type="radio"
+                value={option}
+                className="mt-0.5 text-[#2d3b2d] focus:ring-[#2d3b2d]"
+                {...register('preferred_contact')}
+              />
+              <span>
+                <span className="block font-medium text-[#1a1a1a]">{CONTACT_LABELS[option].title}</span>
+                <span className="block text-xs text-[#888]">{CONTACT_LABELS[option].hint}</span>
+              </span>
+            </label>
+          ))}
+        </div>
+        {errors.preferred_contact && <p className={errorClass}>{errors.preferred_contact.message as string}</p>}
       </div>
 
       <div>
