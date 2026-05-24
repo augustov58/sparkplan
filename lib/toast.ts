@@ -280,6 +280,13 @@ export const toastMessages = {
     disciplineOverrideInvalid: 'Discipline should be a single letter A-Z. Saved anyway.',
   },
 
+  // Founding Contractors application
+  foundingApplication: {
+    submitted: "Application received — we'll review within 48 hours.",
+    duplicate: "We already have your application on file. We'll be in touch shortly.",
+    error: 'Could not submit application. Please try again or email support@sparkplan.app.',
+  },
+
   // Generic
   saved: 'Changes saved',
   copied: 'Copied to clipboard',

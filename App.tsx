@@ -33,6 +33,7 @@ const UtilityInterconnectionForm = lazy(() => import('./components/UtilityInterc
 const PricingPage = lazy(() => import('./components/PricingPage').then(m => ({ default: m.PricingPage })));
 const AdminPanel = lazy(() => import('./components/AdminPanel').then(m => ({ default: m.AdminPanel })));
 const UserProfile = lazy(() => import('./components/UserProfile').then(m => ({ default: m.UserProfile })));
+const FoundingApplicationPage = lazy(() => import('./components/FoundingApplicationPage').then(m => ({ default: m.FoundingApplicationPage })));
 // EVPanelTemplates moved to Calculators component
 import { Project, ProjectStatus, ProjectType } from './types';
 import { askNecAssistantWithTools, applyConfirmedAction } from './services/geminiService';
@@ -1157,6 +1158,13 @@ function AppContent() {
         } />
         <Route path="/signup" element={
           user ? <Navigate to="/" replace /> : <Signup onSuccess={() => {}} />
+        } />
+
+        {/* Public Founding Contractors application — anyone can apply, no auth */}
+        <Route path="/founders" element={
+          <Suspense fallback={<LoadingSpinner />}>
+            <FoundingApplicationPage />
+          </Suspense>
         } />
 
         {/* Protected project routes */}

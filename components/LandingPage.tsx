@@ -9,7 +9,8 @@ import {
   FolderKanban,
   ChevronDown,
   Menu,
-  X
+  X,
+  Sparkles
 } from 'lucide-react';
 
 export const LandingPage: React.FC = () => {
@@ -97,6 +98,32 @@ export const LandingPage: React.FC = () => {
           </button>
         </div>
         <p className="text-sm text-[#888]">No credit card required · Full Business features for 14 days</p>
+      </section>
+
+      {/* Florida Founding Contractors banner */}
+      <section className="px-6 lg:px-12 max-w-5xl mx-auto -mt-4 mb-16">
+        <div className="bg-gradient-to-r from-[#2d3b2d] to-[#3d4f3d] text-white rounded-2xl p-6 md:p-8 shadow-sm border border-[#2d3b2d]">
+          <div className="flex flex-col md:flex-row md:items-center gap-6">
+            <div className="flex-shrink-0 w-12 h-12 bg-[#c9a227]/20 rounded-full flex items-center justify-center">
+              <Sparkles className="w-6 h-6 text-[#c9a227]" />
+            </div>
+            <div className="flex-1">
+              <div className="inline-flex items-center gap-2 bg-[#c9a227]/20 text-[#c9a227] px-2.5 py-0.5 rounded-full text-xs font-semibold uppercase tracking-wider mb-2">
+                Florida pilot · 20 spots
+              </div>
+              <h3 className="font-serif text-2xl font-medium mb-1">Florida contractor? Apply for Founding Contractors.</h3>
+              <p className="text-white/70 text-sm leading-relaxed">
+                60 days free, a private Slack with the team, and hands-on help with your first FL permit — in exchange for honest feedback and one case study.
+              </p>
+            </div>
+            <button
+              onClick={() => navigate('/founders')}
+              className="flex-shrink-0 bg-[#c9a227] hover:bg-[#d4ad32] text-[#1a1a1a] px-5 py-3 text-sm font-semibold rounded-md transition-colors flex items-center gap-2 whitespace-nowrap"
+            >
+              Apply now <ArrowRight className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
       </section>
 
       {/* 3. Social Proof */}
