@@ -856,6 +856,18 @@ describe('Permit packet: NEC 220.83 existing dwelling — proposed loads on PDF'
     // in the visible portion of the page (no clipping concerns).
     expect(text).toMatch(/Electric Range(?!\s?\*)/);
     expect(text).toMatch(/Electric Dryer(?!\s?\*)/);
+
+    // Opt-in disk dump for visual verification of the NEC 220.83 dwelling
+    // card + breakdown table. Set E2E_DUMP_PDFS=1 to enable.
+    if (process.env.E2E_DUMP_PDFS === '1') {
+      const fs = await import('fs');
+      const path = await import('path');
+      const outDir = path.resolve(__dirname, '..', 'example_reports');
+      fs.mkdirSync(outDir, { recursive: true });
+      const outPath = path.join(outDir, 'PanelSchedule_Dwelling_Existing_22083.pdf');
+      fs.writeFileSync(outPath, Buffer.from(await buf.arrayBuffer()));
+      console.log(`[e2e dump] wrote ${outPath}`);
+    }
   }, 30_000);
 
   it('omits asterisk and legend when markers OFF (gate works)', async () => {
@@ -883,6 +895,18 @@ describe('Permit packet: NEC 220.83 existing dwelling — proposed loads on PDF'
     expect(text).not.toMatch(/Level 2 EV Charger \(48A\)\s?\*/);
     // But the description itself still renders (sanity).
     expect(text).toContain('Level 2 EV Charger');
+
+    // Opt-in disk dump for visual verification of the NEC 220.82 dwelling
+    // card + breakdown table (new construction). Set E2E_DUMP_PDFS=1.
+    if (process.env.E2E_DUMP_PDFS === '1') {
+      const fs = await import('fs');
+      const path = await import('path');
+      const outDir = path.resolve(__dirname, '..', 'example_reports');
+      fs.mkdirSync(outDir, { recursive: true });
+      const outPath = path.join(outDir, 'PanelSchedule_Dwelling_New_22082.pdf');
+      fs.writeFileSync(outPath, Buffer.from(await buf.arrayBuffer()));
+      console.log(`[e2e dump] wrote ${outPath}`);
+    }
   }, 30_000);
 
   it('full-generator E2E: existing-construction packet emits the legend', async () => {
