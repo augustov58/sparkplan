@@ -172,14 +172,26 @@ Best,
 
 ## Decline reason variants
 
-### Out-of-state
+### Out-of-state (redirect, not really a decline)
+
+This isn't really a decline — the SparkPlan product works anywhere, the *cohort program* is just FL-only while we pilot. Use this variant to reframe so the contractor leaves understanding (a) why they're not in the cohort and (b) that the product still applies to them.
+
+The base template's "That said: SparkPlan is fully open to you on the standard plan…" sentence flows naturally after this variant — no need to repeat the trial pitch inside the variant block itself.
 
 ```
-For this round, the Founding Contractors program is Florida-only —
-the cohort leans heavily on FL-specific AHJ work (Pompano,
-Miami-Dade, Davie, Tampa, Orlando) and the per-jurisdiction packet
-engine that's most mature there. I'll be opening cohorts in other
-states later in 2026.
+Quick context: the Founding Contractors cohort is Florida-only
+right now because we're pilot-testing the AHJ-specific workflow
+in five FL jurisdictions (Pompano, Miami-Dade, Davie, Tampa,
+Orlando) before opening it up more broadly. Other states will get
+their own cohorts later in 2026.
+
+The good news: SparkPlan itself works anywhere. The generic permit
+packet covers NEC requirements universally, and the load
+calculators, conductor sizing, voltage drop, short-circuit, and
+panel schedule tools are all state-agnostic. You'd get the full
+product on the standard plan — just without the FL-cohort
+goodies (private Slack, hands-on packet review, AHJ-tuned
+templates).
 ```
 
 ### Inactive or no FL license
@@ -215,7 +227,7 @@ outside that lane for now.
 
 | Decline reason | Bridge sentence |
 |---|---|
-| Out-of-state | "Also — if you have a FL job coming up and want a permit packet engineered, drop me a note. I can help on a one-off basis through the PE-as-service path." |
+| Out-of-state | "If you'd like a heads-up when your state's cohort opens, just reply with your state and I'll keep you posted." |
 | Inactive license | "No rush — apply again when you're set on the renewal." |
 | Too few permits | "If the volume picks up, the application is always open." |
 | Wedge mismatch | "If you start picking up MF / EV / commercial work, ping me — happy to re-look." |
