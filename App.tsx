@@ -34,6 +34,7 @@ const PricingPage = lazy(() => import('./components/PricingPage').then(m => ({ d
 const AdminPanel = lazy(() => import('./components/AdminPanel').then(m => ({ default: m.AdminPanel })));
 const UserProfile = lazy(() => import('./components/UserProfile').then(m => ({ default: m.UserProfile })));
 const FoundingApplicationPage = lazy(() => import('./components/FoundingApplicationPage').then(m => ({ default: m.FoundingApplicationPage })));
+const FounderSignupPage = lazy(() => import('./components/FounderSignupPage').then(m => ({ default: m.FounderSignupPage })));
 // EVPanelTemplates moved to Calculators component
 import { Project, ProjectStatus, ProjectType } from './types';
 import { askNecAssistantWithTools, applyConfirmedAction } from './services/geminiService';
@@ -1165,6 +1166,15 @@ function AppContent() {
           <Suspense fallback={<LoadingSpinner />}>
             <FoundingApplicationPage />
           </Suspense>
+        } />
+
+        {/* Founders-gated signup — coupon required, no email confirmation, no app trial */}
+        <Route path="/founder-signup" element={
+          user ? <Navigate to="/" replace /> : (
+            <Suspense fallback={<LoadingSpinner />}>
+              <FounderSignupPage />
+            </Suspense>
+          )
         } />
 
         {/* Protected project routes */}
