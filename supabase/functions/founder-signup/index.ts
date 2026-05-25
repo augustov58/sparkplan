@@ -113,12 +113,14 @@ serve(async (req: Request) => {
     const email = payload.email.trim().toLowerCase();
     const fullName = payload.full_name.trim();
 
-    // Look up the coupon. Case-insensitive match against the index we created
-    // on lower(coupon_code).
-    const { data: application, error: lookupError } = await admin
-      .from('founding_applications')
-      .select('id, email, review_status, coupon_redeemed_at, redeemed_user_id, full_name')
-      .ilike('coupon_code', couponCode)
+    // Look up the coupon in the pool. Case-insensitive match via the
+    // lower(code) unique index. Coupon ↔ applicant linkage is intentionally
+    // loose — we don't require the signup email to match any application
+    // email (the contractor may use work/personal interchangeably).
+    const { data: coupon, error: lookupError } = await admin
+      .from('founder_coupons')
+      .select('id, code, redeemed_at, assigned_application_id')
+      .ilike('code', couponCode)
       .maybeSingle();
 
     if (lookupError) {
@@ -126,7 +128,7 @@ serve(async (req: Request) => {
       throw lookupError;
     }
 
-    if (!application) {
+    if (!coupon) {
       return new Response(
         JSON.stringify({ error: "We couldn't find that coupon code. Double-check the spelling — codes are case-insensitive." }),
         {
@@ -136,17 +138,7 @@ serve(async (req: Request) => {
       );
     }
 
-    if (application.review_status !== 'approved') {
-      return new Response(
-        JSON.stringify({ error: "This coupon isn't active yet. If you just got approved, give us a few minutes and try again." }),
-        {
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          status: 403,
-        }
-      );
-    }
-
-    if (application.coupon_redeemed_at) {
+    if (coupon.redeemed_at) {
       return new Response(
         JSON.stringify({
           error: "This coupon has already been redeemed. If you're locked out of your account, reply to your welcome email and we'll get you back in.",
@@ -156,15 +148,6 @@ serve(async (req: Request) => {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
           status: 409,
         }
-      );
-    }
-
-    // Soft consistency check: email used at signup should match the application
-    // email. Not a hard fail (the contractor might use a different work email),
-    // but we log + warn.
-    if (application.email.toLowerCase() !== email) {
-      console.warn(
-        `founder-signup: signup email ${email} differs from application email ${application.email} for coupon ${couponCode}`
       );
     }
 
@@ -201,21 +184,25 @@ serve(async (req: Request) => {
       throw createError ?? new Error('User creation failed');
     }
 
-    // Mark redemption atomically. If this UPDATE fails for any reason, we have
-    // a created user with no redemption record — surface the error but don't
-    // try to delete the user (recovery is easier than retry-create).
-    const { error: updateError } = await admin
-      .from('founding_applications')
+    // Mark redemption atomically in founder_coupons. The `.is('redeemed_at',
+    // null)` guard prevents a TOCTOU race between two simultaneous redemption
+    // attempts for the same code.
+    const { data: redeemedCoupon, error: updateError } = await admin
+      .from('founder_coupons')
       .update({
-        coupon_redeemed_at: new Date().toISOString(),
+        redeemed_at: new Date().toISOString(),
         redeemed_user_id: created.user.id,
+        redeemed_email: email,
       })
-      .eq('id', application.id)
-      .is('coupon_redeemed_at', null); // belt-and-suspenders against race
+      .eq('id', coupon.id)
+      .is('redeemed_at', null)
+      .select('id, assigned_application_id')
+      .maybeSingle();
 
     if (updateError) {
       console.error('founder-signup: redemption mark failed', updateError);
-      // User exists; redemption tracking failed. Don't block them.
+      // User exists; redemption tracking failed. Don't block them — they can
+      // still complete the flow. The audit row will need manual cleanup.
     }
 
     return new Response(
@@ -223,7 +210,10 @@ serve(async (req: Request) => {
         success: true,
         user_id: created.user.id,
         email: created.user.email,
-        application_id: application.id,
+        coupon_id: coupon.id,
+        // Optional pre-assignment lets the email template / caller know which
+        // founding_applications row this coupon was earmarked for (if any).
+        assigned_application_id: redeemedCoupon?.assigned_application_id ?? coupon.assigned_application_id ?? null,
       }),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },

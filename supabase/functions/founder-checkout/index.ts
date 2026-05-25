@@ -94,17 +94,18 @@ serve(async (req: Request) => {
       { auth: { autoRefreshToken: false, persistSession: false } }
     );
 
-    // The Founder's application — must already be redeemed by this user
-    // (founder-signup sets redeemed_user_id atomically).
-    const { data: application, error: appError } = await admin
-      .from('founding_applications')
-      .select('id, coupon_code, review_status, redeemed_user_id, full_name')
+    // The Founder's redeemed coupon — set atomically by founder-signup
+    // when the user was created. Lookup is by redeemed_user_id, not email
+    // (founder may have signed up with any email; coupon owns the link).
+    const { data: coupon, error: couponError } = await admin
+      .from('founder_coupons')
+      .select('id, code, redeemed_user_id')
       .eq('redeemed_user_id', user.id)
       .maybeSingle();
 
-    if (appError) throw appError;
+    if (couponError) throw couponError;
 
-    if (!application || !application.coupon_code) {
+    if (!coupon || !coupon.code) {
       return new Response(
         JSON.stringify({ error: 'No active Founders coupon found for this account. Reply to your welcome email if this is wrong.' }),
         {
@@ -118,7 +119,7 @@ serve(async (req: Request) => {
     // We pre-apply it via the `discounts` parameter so the Founder doesn't
     // have to paste it at the Stripe-hosted Checkout page.
     const promoCodes = await stripe.promotionCodes.list({
-      code: application.coupon_code,
+      code: coupon.code,
       active: true,
       limit: 1,
     });
@@ -126,7 +127,7 @@ serve(async (req: Request) => {
     const promotionCode = promoCodes.data[0];
     if (!promotionCode) {
       console.error(
-        `founder-checkout: no active Stripe promotion code found for "${application.coupon_code}"`
+        `founder-checkout: no active Stripe promotion code found for "${coupon.code}"`
       );
       return new Response(
         JSON.stringify({ error: "Your coupon couldn't be applied. Please reply to your welcome email so we can re-issue it." }),
@@ -154,7 +155,7 @@ serve(async (req: Request) => {
         metadata: {
           supabase_user_id: user.id,
           is_founder: 'true',
-          coupon_code: application.coupon_code,
+          coupon_code: coupon.code,
         },
       });
       customerId = customer.id;
@@ -196,7 +197,7 @@ serve(async (req: Request) => {
           supabase_user_id: user.id,
           is_founder: 'true',
           plan: 'business',
-          coupon_code: application.coupon_code,
+          coupon_code: coupon.code,
         },
       },
       // tax_id_collection and billing_address_collection: omitted so the

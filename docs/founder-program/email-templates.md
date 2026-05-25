@@ -7,22 +7,38 @@ These will eventually become Resend templates triggered by a `review_status` tra
 **Workflow context**:
 - Applications arrive at `support@sparkplan.app` from the `/founders` form
 - Augusto reviews + verifies FL DBPR license + makes approve/decline call
-- For approvals: create a Stripe Promotion Code (e.g., `FOUNDER-DAVIS`), paste it into the `coupon_code` column of the `founding_applications` row
-- Send the approval email below
-- Founder uses `/#/founder-signup` to redeem (one-step activation, no card)
+- For approvals: flip `review_status = 'approved'` in Studio, pick any unused code from the pre-created `founder_coupons` pool, paste it into the welcome email
+- Founder uses `/#/founder-signup` to redeem (one-step activation, no card). They may sign up with any email — the coupon code is the gate, not email match.
 
-## Stripe coupon setup (one-time per Founder)
+## One-time setup (done once, then never again)
 
-In the Stripe Dashboard before sending the approval email:
-1. **Products → Coupons → Create new**
-   - Type: 100% off
-   - Duration: Repeating, 2 months
-   - Name: "Founders 2026 — {{Last Name}}"
-2. **Promotion codes → Create promotion code** (for the coupon you just made)
-   - Code: a memorable string, e.g. `FOUNDER-DAVIS` (uppercase letters + numbers + dashes)
-   - Max redemptions: 1
+In the Stripe Dashboard:
+
+1. **Products → Coupons → Create coupon**
+   - Type: Percentage discount, **100% off**
+   - Duration: **Repeating, 2 months**
+   - Name (internal only): "Founders 2026"
+   - → click Create
+
+2. **Promotion codes → Create promotion code** — repeat 20 times, once for each of:
+   - `FOUNDER-01`, `FOUNDER-02`, … through `FOUNDER-20`
+   - All pointing at the single Coupon created in step 1
+   - Max redemptions: **1** each
    - Customer-facing: yes
-3. Copy the code string and paste into `founding_applications.coupon_code` in Supabase Studio. Set `review_status = 'approved'`.
+
+In Supabase: the `founder_coupons` table is pre-seeded with the same 20 codes by migration `20260524_founder_coupons_pool.sql`. No manual seeding needed.
+
+After this is done once, **per-approval Stripe work is zero** — the pool already exists in both Stripe and Supabase.
+
+## Per-approval workflow (~30 seconds, no Stripe Dashboard visit)
+
+1. In Supabase Studio, open `founding_applications`, find the pending row
+2. Set `review_status = 'approved'`, optionally add `reviewer_notes` (e.g., "Verified EC1234567, MF EV focus")
+3. Open `founder_coupons` table, find any row where `redeemed_at IS NULL` — pick whichever code (`FOUNDER-01` if it's free, otherwise the next available)
+4. (Optional, audit-only): set that coupon's `assigned_application_id = <the row's id>` so you remember who you sent it to
+5. Send the approval email below with that code in `{{COUPON_CODE}}`
+
+That's it. When the Founder redeems, the coupon's `redeemed_at`, `redeemed_user_id`, and `redeemed_email` fields auto-populate via the `founder-signup` edge function — even if the Founder used a different email than their application.
 
 ---
 
