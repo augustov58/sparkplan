@@ -29,6 +29,13 @@ interface GeminiRequest {
     toolName: string
     result: any
   }
+  // Optional generationConfig overrides. When omitted, proxy defaults apply
+  // (temperature 0.7, maxOutputTokens 8192, free-text response).
+  responseMimeType?: string // e.g. "application/json" to force structured output
+  responseSchema?: Record<string, any> // OpenAPI-style schema; used with responseMimeType=application/json
+  temperature?: number
+  maxOutputTokens?: number
+  thinkingBudget?: number // gemini-2.5-flash only: 0 disables thinking, frees output budget
 }
 
 interface ToolDefinition {
@@ -82,7 +89,21 @@ serve(async (req: Request) => {
     }
 
     // Parse request body
-    const { prompt, systemInstruction, model = 'gemini-2.5-flash', pdfData, imageData, imageMimeType, tools, toolResult }: GeminiRequest = await req.json()
+    const {
+      prompt,
+      systemInstruction,
+      model = 'gemini-2.5-flash',
+      pdfData,
+      imageData,
+      imageMimeType,
+      tools,
+      toolResult,
+      responseMimeType,
+      responseSchema,
+      temperature,
+      maxOutputTokens,
+      thinkingBudget,
+    }: GeminiRequest = await req.json()
 
     if (!prompt) {
       throw new Error('Prompt is required')
@@ -143,6 +164,23 @@ serve(async (req: Request) => {
       contents = [{ parts: inputParts }]
     }
 
+    const generationConfig: Record<string, any> = {
+      temperature: typeof temperature === 'number' ? temperature : 0.7,
+      topK: 40,
+      topP: 0.95,
+      maxOutputTokens: typeof maxOutputTokens === 'number' ? maxOutputTokens : 8192,
+    }
+    if (responseMimeType) {
+      generationConfig.responseMimeType = responseMimeType
+      if (responseSchema) {
+        generationConfig.responseSchema = responseSchema
+      }
+    }
+    // gemini-2.5-flash supports thinkingConfig; older models ignore it.
+    if (typeof thinkingBudget === 'number') {
+      generationConfig.thinkingConfig = { thinkingBudget }
+    }
+
     const geminiPayload: any = {
       contents,
       ...(systemInstruction && {
@@ -150,12 +188,7 @@ serve(async (req: Request) => {
           parts: [{ text: systemInstruction }]
         }
       }),
-      generationConfig: {
-        temperature: 0.7,
-        topK: 40,
-        topP: 0.95,
-        maxOutputTokens: 8192,
-      }
+      generationConfig,
     }
 
     // Add function calling tools if provided
