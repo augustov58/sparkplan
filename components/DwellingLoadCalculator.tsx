@@ -428,19 +428,24 @@ export const DwellingLoadCalculator: React.FC<DwellingLoadCalculatorProps> = ({
       return;
     }
 
-    // Check for main panel
+    // Multi-family: the orchestrator builds the MDP + meter stack + unit
+    // panels + house panel from scratch (handleGenerateMFProject), so we
+    // intentionally do NOT require a pre-existing MDP here. Requiring one
+    // led the user to manually create an MDP only to have it overwritten
+    // by the generator. Redirect to the MF generation card first.
+    if (!isSingleFamily) {
+      setShowMFRedirect(true);
+      return;
+    }
+
+    // Single-family path generates circuits INTO an existing MDP — so it
+    // still needs one. Bail with a helpful prompt if missing.
     if (!mainPanel) {
       alert(
         '❌ No Main Panel Found\n\n' +
         'You need to create a Main Distribution Panel (MDP) first.\n\n' +
         'Go to "Circuit Design" tab and create an MDP before generating a panel schedule.'
       );
-      return;
-    }
-
-    // Multi-family: redirect to MF EV Calculator
-    if (!isSingleFamily) {
-      setShowMFRedirect(true);
       return;
     }
     

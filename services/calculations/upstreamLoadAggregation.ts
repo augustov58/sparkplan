@@ -743,17 +743,45 @@ export function calculateAggregatedLoad(
     const housePanelLoadVA = multiFamilyContext.housePanelLoadVA || 0;
     const nonDwellingConnectedVA = evLoadVA + housePanelLoadVA;
     const dwellingConnectedVA = totalConnectedVA - nonDwellingConnectedVA;
-    const dwellingDemandVA = Math.round(dwellingConnectedVA * demandFactor);
+
+    // NEC 220.84(C)(4): electric space heating at 65% of connected.
+    // NEC 220.60: heating and cooling are non-coincident — count the larger.
+    // Combined effect: the dwelling demand base counts max(heating × 0.65,
+    // cooling) instead of summing both at nameplate. Without this, the MDP
+    // overstates demand vs. the DLC's calculateMultiFamilyLoad result.
+    // Loads here are summed across ALL downstream panels (including any HVAC
+    // accidentally tagged on the house panel); for the basic MF generator
+    // that's just unit panels, which is exactly the dwelling base we want.
+    const heatingAt65 = loads.heating * 0.65;
+    const climateNameplateVA = loads.heating + loads.cooling;
+    const climateDemandVA = Math.max(heatingAt65, loads.cooling);
+    const climateReductionVA = Math.max(0, climateNameplateVA - climateDemandVA);
+    const dwellingDemandBaseVA = Math.max(0, dwellingConnectedVA - climateReductionVA);
+    const dwellingDemandVA = Math.round(dwellingDemandBaseVA * demandFactor);
     const totalDemandVA = dwellingDemandVA + housePanelLoadVA + evDemandVA;
 
     const demandBreakdown: DemandCalculation[] = [{
       loadType: `Multi-Family Dwelling (${multiFamilyContext.dwellingUnits} units)`,
-      connectedVA: dwellingConnectedVA,
+      connectedVA: dwellingDemandBaseVA,
       demandVA: dwellingDemandVA,
       demandFactor,
       necReference: `NEC 220.84 Table (${multiFamilyContext.dwellingUnits} units @ ${(demandFactor * 100).toFixed(0)}%)`,
     }];
     const necRefs = ['NEC 220.84 (Optional Calculation — Multifamily Dwelling)'];
+
+    // Surface the HVAC reduction as its own breakdown row so the user can
+    // see WHY the dwelling base shrank below the raw connected nameplate.
+    if (climateReductionVA > 0) {
+      demandBreakdown.push({
+        loadType: 'HVAC non-coincident reduction',
+        connectedVA: climateNameplateVA,
+        demandVA: climateDemandVA,
+        demandFactor: climateNameplateVA > 0 ? climateDemandVA / climateNameplateVA : 1.0,
+        necReference: 'NEC 220.60 (non-coincident) + 220.84(C)(4) (electric heat @ 65%)',
+      });
+      necRefs.push('NEC 220.60 (Non-Coincident Loads)');
+      necRefs.push('NEC 220.84(C)(4) (Electric Space Heating @ 65%)');
+    }
 
     if (housePanelLoadVA > 0) {
       demandBreakdown.push({

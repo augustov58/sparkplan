@@ -85,8 +85,10 @@ export interface GeneratedProject {
   mdp: Omit<PanelInsert, 'id'>;
   meterStack: Omit<MeterStackInsert, 'id'>;
   housePanel: Omit<PanelInsert, 'id'>;
-  evPanel: Omit<PanelInsert, 'id'>;
-  evCircuits: Omit<CircuitInsert, 'id' | 'panel_id' | 'project_id'>[];
+  // Optional: basic MF generator omits EV infrastructure entirely. Only the
+  // MF EV scenario generator (generateMultiFamilyProject) populates these.
+  evPanel?: Omit<PanelInsert, 'id'>;
+  evCircuits?: Omit<CircuitInsert, 'id' | 'panel_id' | 'project_id'>[];
   unitPanels: Omit<PanelInsert, 'id'>[];
   unitCircuits: Map<number, Omit<CircuitInsert, 'id' | 'panel_id' | 'project_id'>[]>; // key = unit index
   houseCircuits: Omit<CircuitInsert, 'id' | 'panel_id' | 'project_id'>[];
@@ -254,17 +256,10 @@ export function generateBasicMultiFamilyProject(
     projectId, voltage, phase, commonAreaLoadVA
   );
 
-  // ---- Empty EV Panel placeholder (required by GeneratedProject type) ----
-  const evPanel: Omit<PanelInsert, 'id'> = {
-    project_id: projectId,
-    name: 'EV Panel (Not Required)',
-    voltage: 240,
-    phase: 1,
-    bus_rating: 100,
-    is_main: false,
-    fed_from_type: 'panel',
-    location: 'N/A',
-  };
+  // No EV panel in the basic flow — evPanel/evCircuits are now optional on
+  // GeneratedProject. Users add EV infrastructure separately via the MF EV
+  // Calculator (generateEVInfrastructure + addEVInfrastructure orchestrator),
+  // which also handles meter/feeder wiring.
 
   // ---- Unit Panels ----
   const { panels: unitPanels, circuits: unitCircuits } = generateUnitPanels(
@@ -299,8 +294,7 @@ export function generateBasicMultiFamilyProject(
     mdp,
     meterStack,
     housePanel,
-    evPanel,
-    evCircuits: [],
+    // evPanel + evCircuits intentionally omitted — orchestrator skips both.
     unitPanels,
     unitCircuits,
     houseCircuits,
@@ -753,6 +747,15 @@ function generateSingleUnitPanel(
     return slot;
   }
 
+  // load_type codes (mirrors VALID_LOAD_TYPES in panelOcrService.ts and the
+  // switch in upstreamLoadAggregation.collectCircuitLoads):
+  //   L lighting, R receptacles, M motors, H heating, C cooling,
+  //   W water heater, D dryer, K kitchen (range/oven/DW/disposal), O other.
+  // These are what lets the MDP aggregator apply NEC 220.84(C)(4) heating @
+  // 65% and NEC 220.60 non-coincident HVAC at the system level — without
+  // them, every circuit falls into the "Other" bucket at 100% nameplate
+  // and the MDP demand inflates above the DLC's service calc.
+
   // NEC 210.11(C)(1) - Small Appliance Branch Circuits (min 2 required)
   circuits.push({
     circuit_number: nextSlot(1),
@@ -760,6 +763,7 @@ function generateSingleUnitPanel(
     breaker_amps: 20,
     pole: 1,
     load_watts: 1500,
+    load_type: 'K',
     conductor_size: '12 AWG Cu',
   });
 
@@ -769,6 +773,7 @@ function generateSingleUnitPanel(
     breaker_amps: 20,
     pole: 1,
     load_watts: 1500,
+    load_type: 'K',
     conductor_size: '12 AWG Cu',
   });
 
@@ -779,6 +784,7 @@ function generateSingleUnitPanel(
     breaker_amps: 20,
     pole: 1,
     load_watts: 1500,
+    load_type: 'R',
     conductor_size: '12 AWG Cu',
   });
 
@@ -789,6 +795,7 @@ function generateSingleUnitPanel(
     breaker_amps: 20,
     pole: 1,
     load_watts: 1500,
+    load_type: 'R',
     conductor_size: '12 AWG Cu',
   });
 
@@ -802,6 +809,7 @@ function generateSingleUnitPanel(
       breaker_amps: 15,
       pole: 1,
       load_watts: Math.round(lightingVA / lightingCircuits),
+      load_type: 'L',
       conductor_size: '14 AWG Cu',
     });
   }
@@ -818,6 +826,7 @@ function generateSingleUnitPanel(
       breaker_amps: rangeBreaker,
       pole: 2,
       load_watts: rangeWatts,
+      load_type: 'K',
       conductor_size: conductorForBreaker(rangeBreaker),
     });
   }
@@ -834,6 +843,7 @@ function generateSingleUnitPanel(
       breaker_amps: dryerBreaker,
       pole: 2,
       load_watts: dryerWatts,
+      load_type: 'D',
       conductor_size: conductorForBreaker(dryerBreaker),
     });
   }
@@ -850,6 +860,7 @@ function generateSingleUnitPanel(
       breaker_amps: heatBreaker,
       pole: 2,
       load_watts: heatWatts,
+      load_type: 'H',
       conductor_size: conductorForBreaker(heatBreaker),
     });
   }
@@ -865,6 +876,7 @@ function generateSingleUnitPanel(
     breaker_amps: acBreaker,
     pole: 2,
     load_watts: acWatts,
+    load_type: 'C',
     conductor_size: conductorForBreaker(acBreaker),
   });
 
@@ -879,6 +891,7 @@ function generateSingleUnitPanel(
     breaker_amps: whBreaker,
     pole: 2,
     load_watts: whWatts,
+    load_type: 'W',
     conductor_size: conductorForBreaker(whBreaker),
   });
 
@@ -890,6 +903,7 @@ function generateSingleUnitPanel(
       breaker_amps: 20,
       pole: 1,
       load_watts: applianceConfig.dishwasherKW * 1000,
+      load_type: 'K',
       conductor_size: '12 AWG Cu',
     });
   }
@@ -902,6 +916,7 @@ function generateSingleUnitPanel(
       breaker_amps: 20,
       pole: 1,
       load_watts: applianceConfig.disposalKW * 1000,
+      load_type: 'M',
       conductor_size: '12 AWG Cu',
     });
   }
