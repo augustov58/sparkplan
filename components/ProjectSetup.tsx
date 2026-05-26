@@ -593,7 +593,7 @@ export const ProjectSetup: React.FC<ProjectSetupProps> = ({ project, updateProje
                   onChange={e => handleResidentialChange('dwellingType', e.target.value)}
                   className="w-full border-[#3d6b3d]/30 rounded-md text-sm bg-white focus:border-[#3d6b3d] focus:ring-[#3d6b3d]/20"
                 >
-                  <option value={DwellingType.SINGLE_FAMILY}>Single-Family (NEC 220.82)</option>
+                  <option value={DwellingType.SINGLE_FAMILY}>Single-Family (NEC 220.82 / 220.83)</option>
                   <option value={DwellingType.MULTI_FAMILY}>Multi-Family (NEC 220.84)</option>
                 </select>
                 <p className="text-xs text-[#888] mt-1">
@@ -637,24 +637,39 @@ export const ProjectSetup: React.FC<ProjectSetupProps> = ({ project, updateProje
                 </div>
               )}
 
-              {/* Service Size Selector */}
-              <div>
-                <label className="block text-xs font-semibold text-[#888] uppercase mb-1">Service Size</label>
-                <select
-                  value={localProject.settings.residential?.selectedServiceAmps || ''}
-                  onChange={e => handleResidentialChange('selectedServiceAmps', e.target.value ? Number(e.target.value) : undefined)}
-                  className="w-full border-[#3d6b3d]/30 rounded-md text-sm bg-white focus:border-[#3d6b3d] focus:ring-[#3d6b3d]/20"
-                >
-                  <option value="">Auto-Calculate</option>
-                  <option value="100">100A</option>
-                  <option value="150">150A</option>
-                  <option value="200">200A</option>
-                  <option value="400">400A (Multi-Family)</option>
-                </select>
-                <p className="text-xs text-[#888] mt-1">
-                  Override calculated service
-                </p>
-              </div>
+              {/* Service Size Selector.
+                  Locked on Existing Construction: on a 220.83 retrofit the
+                  service is whatever's already installed, not a "what should
+                  we install" override. The existing service amps lives on the
+                  Dwelling Calculator → Existing Service Size field, which is
+                  what the headroom/comparison logic reads. */}
+              {(() => {
+                const isExistingConstruction =
+                  (localProject.settings.service_modification_type ?? 'existing') === 'existing';
+                return (
+                  <div>
+                    <label className="block text-xs font-semibold text-[#888] uppercase mb-1">Service Size</label>
+                    <select
+                      value={localProject.settings.residential?.selectedServiceAmps || ''}
+                      onChange={e => handleResidentialChange('selectedServiceAmps', e.target.value ? Number(e.target.value) : undefined)}
+                      disabled={isExistingConstruction}
+                      title={isExistingConstruction ? 'On Existing Construction, set the existing service amps in the Dwelling Calculator' : undefined}
+                      className="w-full border-[#3d6b3d]/30 rounded-md text-sm bg-white focus:border-[#3d6b3d] focus:ring-[#3d6b3d]/20 disabled:bg-[#f0f0f0] disabled:text-[#888] disabled:cursor-not-allowed"
+                    >
+                      <option value="">Auto-Calculate</option>
+                      <option value="100">100A</option>
+                      <option value="150">150A</option>
+                      <option value="200">200A</option>
+                      <option value="400">400A (Multi-Family)</option>
+                    </select>
+                    <p className="text-xs text-[#888] mt-1">
+                      {isExistingConstruction
+                        ? 'Locked on Existing Construction — set existing service amps in the Dwelling Calculator'
+                        : 'Override calculated service'}
+                    </p>
+                  </div>
+                );
+              })()}
             </div>
 
             {/* Required Circuits Section */}
