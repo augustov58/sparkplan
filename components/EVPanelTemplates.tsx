@@ -97,7 +97,14 @@ export const EVPanelTemplates: React.FC<EVPanelTemplatesProps> = ({ project }) =
       // Create panel in database. The template generator returns a Partial<Panel>
       // (Supabase fills the remaining nullable columns at insert time); cast to
       // satisfy createPanel's stricter Omit<PanelInsert, 'id'> shape.
-      const newPanel = await createPanel(panel as Parameters<typeof createPanel>[0]);
+      // EV sub-panels from this template are post-existing-service additions
+      // by construction — flag with is_proposed:true so the riser PDF + One-Line
+      // diagram render the dashed outline + "NEW" badge on existing projects.
+      // Matches the per-circuit flag below at the createCircuit call.
+      const newPanel = await createPanel({
+        ...panel,
+        is_proposed: true,
+      } as Parameters<typeof createPanel>[0]);
 
       if (!newPanel || !newPanel.id) {
         throw new Error('Failed to create panel');
