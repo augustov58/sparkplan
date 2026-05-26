@@ -124,16 +124,22 @@ export async function populateProject(
       throw new Error(`Failed to create house panel: ${hpError?.message || 'Unknown error'}`);
     }
 
-    // EV Panel
-    const evPanelData = { ...generated.evPanel, fed_from: mdp.id };
-    const { data: evPanel, error: epError } = await supabase
-      .from('panels')
-      .insert(evPanelData)
-      .select()
-      .single();
+    // EV Panel — only when the generator produced one. The basic
+    // multi-family flow (no EV) intentionally omits evPanel/evCircuits;
+    // users add EV infrastructure later via the MF EV Calculator.
+    let evPanel: { id: string } | null = null;
+    if (generated.evPanel) {
+      const evPanelData = { ...generated.evPanel, fed_from: mdp.id };
+      const { data, error: epError } = await supabase
+        .from('panels')
+        .insert(evPanelData)
+        .select()
+        .single();
 
-    if (epError || !evPanel) {
-      throw new Error(`Failed to create EV panel: ${epError?.message || 'Unknown error'}`);
+      if (epError || !data) {
+        throw new Error(`Failed to create EV panel: ${epError?.message || 'Unknown error'}`);
+      }
+      evPanel = data;
     }
 
     // Unit Panels (batch insert)
@@ -167,7 +173,7 @@ export async function populateProject(
     const meterInserts = generated.meters.map(m => {
       let panelId: string | null = null;
       if (m.panelRef === 'house') panelId = housePanel.id;
-      else if (m.panelRef === 'ev') panelId = evPanel.id;
+      else if (m.panelRef === 'ev') panelId = evPanel?.id ?? null;
       else if (typeof m.panelRef === 'object' && 'unitIndex' in m.panelRef) {
         panelId = unitPanelIds[m.panelRef.unitIndex] || null;
       }
@@ -216,8 +222,8 @@ export async function populateProject(
       else circuitCount += houseCircuitInserts.length;
     }
 
-    // EV panel circuits
-    if (generated.evCircuits.length > 0) {
+    // EV panel circuits — only if both the EV panel and circuits exist.
+    if (evPanel && generated.evCircuits && generated.evCircuits.length > 0) {
       const evCircuitInserts = generated.evCircuits.map(c => ({
         ...c,
         project_id: generated.mdp.project_id,
@@ -252,7 +258,7 @@ export async function populateProject(
     const feederInserts = generated.feeders.map(f => {
       let destPanelId: string | null = null;
       if (f.destRef === 'house') destPanelId = housePanel.id;
-      else if (f.destRef === 'ev') destPanelId = evPanel.id;
+      else if (f.destRef === 'ev') destPanelId = evPanel?.id ?? null;
       else if (typeof f.destRef === 'object' && 'unitIndex' in f.destRef) {
         destPanelId = unitPanelIds[f.destRef.unitIndex] || null;
       }
@@ -282,7 +288,7 @@ export async function populateProject(
         mdpId: mdp.id,
         meterStackId: meterStack.id,
         housePanelId: housePanel.id,
-        evPanelId: evPanel.id,
+        evPanelId: evPanel?.id ?? '',
         unitPanelIds,
         meterIds,
         circuitCount,

@@ -1414,6 +1414,98 @@ describe('Upstream Load Aggregation — NEC 220.84 Optional Method (C1)', () => 
       const result = calculateAggregatedLoad(mdp.id, panels, circuits, transformers, 'commercial', ctx);
       expect(result.totalDemandVA).toBe(result.totalConnectedVA);
     });
+
+    // -----------------------------------------------------------------
+    // NEC 220.60 + 220.84(C)(4) climate non-coincident reduction
+    // -----------------------------------------------------------------
+    // Regression for the multi-family MDP demand mismatch reported on the
+    // basic MF generator: unit-panel circuits without load_type tags fell
+    // into the "Other" bucket and the aggregator multiplied raw nameplate
+    // HVAC by 45%, inflating MDP demand above what the DLC's
+    // calculateMultiFamilyLoad service calc reported.
+    //
+    // After the fix: when H/C circuits are present on dwelling panels, the
+    // aggregator counts max(heating × 0.65, cooling) toward the dwelling
+    // demand base instead of summing both at nameplate.
+    it('applies NEC 220.60 + 220.84(C)(4): max(heat × 0.65, cool) toward dwelling base', () => {
+      // 4-unit MF, 240V/1Φ. Each unit has tagged HVAC:
+      //   10 kVA general 'O' + 5 kVA heat 'H' + 3.5 kVA cool 'C' = 18.5 kVA/unit
+      //   Per-unit climate (NEC 220.60 + 220.84(C)(4)): max(5×0.65, 3.5) = 3.5
+      //   Per-unit reduction = (5 + 3.5) - 3.5 = 5 kVA
+      //   Total connected dwelling = 4 × 18.5 = 74 kVA
+      //   Total reduction = 4 × 5 = 20 kVA
+      //   Dwelling demand base = 74 - 20 = 54 kVA
+      //   Demand factor (4 units, Table 220.84) = 45%
+      //   Dwelling demand = 54 × 0.45 = 24.3 kVA
+      const mdp = makePanel({ id: 'mdp', name: 'MF MDP', is_main: true, bus_rating: 400 });
+      const unitPanels: Panel[] = Array.from({ length: 4 }, (_, i) =>
+        makePanel({
+          id: `p-unit-${101 + i}`,
+          name: `Unit ${101 + i} Panel`,
+          fed_from_type: 'panel',
+          fed_from: 'mdp',
+        }),
+      );
+      const panels = [mdp, ...unitPanels];
+
+      const circuits: Circuit[] = unitPanels.flatMap(p => [
+        makeCircuit(p.id, 10_000, 'O', 'general'),
+        makeCircuit(p.id, 5_000, 'H', 'heat'),
+        makeCircuit(p.id, 3_500, 'C', 'cool'),
+      ]);
+
+      const ctx = buildMultiFamilyContext(mdp, panels, circuits, [], {
+        occupancyType: 'dwelling',
+        residential: { dwellingType: 'multi_family', totalUnits: 4 },
+      });
+      expect(ctx).toBeDefined();
+
+      const result = calculateAggregatedLoad(mdp.id, panels, circuits, [], 'dwelling', ctx);
+
+      // Raw connected nameplate is unchanged — display still shows reality.
+      expect(result.totalConnectedVA).toBe(74_000);
+
+      // Dwelling demand reflects the climate reduction: 54 kVA × 45% = 24.3 kVA.
+      expect(result.totalDemandVA).toBeGreaterThanOrEqual(24_200);
+      expect(result.totalDemandVA).toBeLessThanOrEqual(24_400);
+
+      // Breakdown surfaces both the dwelling row (with the reduced base) and
+      // an explicit climate-reduction row so the AHJ can see the math.
+      const dwellingRow = result.demandBreakdown.find(d =>
+        d.loadType.includes('Multi-Family Dwelling'),
+      );
+      expect(dwellingRow?.connectedVA).toBe(54_000);
+      expect(dwellingRow?.demandFactor).toBeCloseTo(0.45, 2);
+
+      const climateRow = result.demandBreakdown.find(d =>
+        d.loadType.includes('HVAC non-coincident'),
+      );
+      expect(climateRow).toBeDefined();
+      // Aggregated across 4 units: 4 × (5k heat + 3.5k cool) = 34 kVA nameplate.
+      // Demand: max(4 × 5k × 0.65, 4 × 3.5k) = max(13 kVA, 14 kVA) = 14 kVA.
+      expect(climateRow?.connectedVA).toBe(34_000);
+      expect(climateRow?.demandVA).toBe(14_000);
+    });
+
+    it('all-O circuits (no HVAC tags) → climate reduction is zero, legacy math preserved', () => {
+      // Pre-fix behavior: unit panels imported from PDFs (no load_type tags)
+      // get bucketed as 'Other'. With heating=0 and cooling=0 the climate
+      // reduction is 0 and demand = connectedDwelling × DF, exactly as
+      // before the fix. This guards against accidental behavior change for
+      // projects that don't tag HVAC circuits.
+      const { panels, circuits, transformers, mdp } = buildFixture();
+      const ctx = buildMultiFamilyContext(mdp, panels, circuits, transformers, {
+        occupancyType: 'dwelling',
+        residential: { dwellingType: 'multi_family', totalUnits: 12 },
+      });
+
+      const result = calculateAggregatedLoad(mdp.id, panels, circuits, transformers, 'dwelling', ctx);
+      // No HVAC reduction row added when both H and C are zero.
+      const climateRow = result.demandBreakdown.find(d =>
+        d.loadType.includes('HVAC non-coincident'),
+      );
+      expect(climateRow).toBeUndefined();
+    });
   });
 });
 
