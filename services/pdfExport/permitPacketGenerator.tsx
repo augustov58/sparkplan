@@ -435,11 +435,22 @@ export const generatePermitPacket = async (data: PermitPacketData): Promise<void
   // Build a shadow `data` reference that uses the manifest-resolved values
   // when the explicit top-level fields are missing. Keep the original
   // `data` untouched so we don't surprise downstream callers.
+  //
+  // PR-2 Step 1 (2026-05-26): coerce null/undefined serviceModificationType
+  // to 'existing' to match the UI default at ProjectSetup.tsx:286
+  // (`value={... ?? 'existing'}`). Without this, projects whose DB column
+  // is NULL (e.g. created before the picker existed, or where the user
+  // never touched the dropdown) suppress both the panel-schedule "* =
+  // Proposed new circuit" legend (gate at line ~1268) and the cover
+  // page's "Project Status" cell (CoverPage in PermitPacketDocuments.tsx
+  // line ~285). Coercing once at the shadow-rewrite makes 'existing' the
+  // canonical default for all downstream PDF consumers in one place.
   data = {
     ...data,
     necEdition: resolvedNecEdition,
     generalNotes: resolvedGeneralNotes,
     codeReferences: resolvedCodeReferences,
+    serviceModificationType: data.serviceModificationType ?? 'existing',
   };
 
   const circuitsByPanel = new Map<string, Circuit[]>();
@@ -1264,9 +1275,13 @@ export const generatePermitPacket = async (data: PermitPacketData): Promise<void
             projectAddress={data.projectAddress}
             {...contractor}
             sheetId={sheetIds[0]}
-            showExistingNewMarkers={
-              !!data.serviceModificationType && data.serviceModificationType !== 'new-service'
-            }
+            // PR-2 Step 1 (2026-05-26): with the shadow rewrite above
+            // guaranteeing serviceModificationType is non-null, the gate
+            // collapses to "show markers unless this is explicitly
+            // new-construction". The `!!` guard the pre-PR-2 gate used to
+            // suppress markers on null is no longer needed and would
+            // misclassify null-defaulted projects as new-construction.
+            showExistingNewMarkers={data.serviceModificationType !== 'new-service'}
             buildingType={data.buildingType}
             aggregatedLoad={aggregatedLoad}
           />
@@ -1698,6 +1713,8 @@ export const generateLightweightPermitPacket = async (data: PermitPacketData): P
         : undefined);
     // Gap 3 (2026-05-16): per-project overrides win over manifest defaults
     // on the lightweight path too (kept aligned with the full generator).
+    // PR-2 Step 1 (2026-05-26): mirror full-generator's serviceModificationType
+    // null-coerce so the lightweight cover page also defaults to 'existing'.
     data = {
       ...data,
       necEdition: lwResolvedNecEdition,
@@ -1709,6 +1726,7 @@ export const generateLightweightPermitPacket = async (data: PermitPacketData): P
         data.codeReferences
         ?? data.codeReferencesOverride
         ?? data.manifest?.codeReferences,
+      serviceModificationType: data.serviceModificationType ?? 'existing',
     };
 
     const contractor = {

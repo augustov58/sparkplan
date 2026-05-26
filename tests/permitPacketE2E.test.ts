@@ -990,6 +990,53 @@ describe('Permit packet: NEC 220.83 existing dwelling — proposed loads on PDF'
 
     expect(text).not.toContain('Proposed new circuit');
   }, 60_000);
+
+  /**
+   * PR-2 Step 1 (2026-05-26) — null serviceModificationType must default to
+   * 'existing' (matches the UI's `?? 'existing'` coercion at
+   * ProjectSetup.tsx:286).
+   *
+   * Pre-PR-2, the gate at permitPacketGenerator.tsx:1268 was
+   * `!!data.serviceModificationType && data.serviceModificationType !==
+   * 'new-service'` — `null` evaluated to `false` and suppressed the
+   * legend, so older projects whose DB column had never been written
+   * silently looked like new-construction. The shadow-rewrite now
+   * coerces null → 'existing' before any consumer reads it, so the
+   * legend appears for any non-new-service project.
+   *
+   * If the shadow-rewrite gets removed or the field's default flips,
+   * this test fails loudly before users see the regression.
+   */
+  it('full-generator E2E: null serviceModificationType defaults to existing (legend appears)', async () => {
+    downloads.length = 0;
+
+    const packet: PermitPacketData = {
+      projectId,
+      projectName: 'Legacy Project (no DB value)',
+      projectAddress: '600 Untouched Drive, Orlando FL',
+      projectType: 'Residential',
+      serviceVoltage: 240,
+      servicePhase: 1,
+      panels: [existingMdp],
+      circuits: allCircuits,
+      feeders: [],
+      transformers: [],
+      preparedBy: 'E2E Harness',
+      contractorLicense: 'C-10 #LEGACY',
+      scopeOfWork: 'Legacy project — DB column null because picker never touched.',
+      // INTENTIONALLY OMITTED: serviceModificationType is undefined here,
+      // simulating a project where the user never opened ProjectSetup or
+      // an older record from before the picker existed.
+    };
+
+    await generatePermitPacket(packet);
+
+    expect(downloads).toHaveLength(1);
+    const text = await extractTextFromPdf(downloads[0]!.blob);
+
+    // The legend must appear because null defaults to 'existing'.
+    expect(text).toContain('Proposed new circuit');
+  }, 60_000);
 });
 
 // ============================================================================
