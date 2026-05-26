@@ -788,13 +788,20 @@ function generateSingleUnitPanel(
     conductor_size: '12 AWG Cu',
   });
 
-  // NEC 210.11(C)(3) - Bathroom Circuit
+  // NEC 210.11(C)(3) - Bathroom Circuit.
+  // The 20A circuit is required (a compliance line on the panel schedule),
+  // but its SERVICE-CALC load is 0 — NEC 220.52 attributes explicit 1500
+  // VA loads only to small-appliance (A) and laundry (B) circuits, NOT
+  // bathroom. Receptacle usage in the dwelling is already counted by the
+  // general lighting 3 VA/sq ft (NEC 220.12 + 220.14(I)). Stamping 1500
+  // here double-counts and inflates MDP demand above the DLC's 220.84
+  // service calc by 1500 × dwellingUnits.
   circuits.push({
     circuit_number: nextSlot(1),
     description: 'Bathroom(s)',
     breaker_amps: 20,
     pole: 1,
-    load_watts: 1500,
+    load_watts: 0,
     load_type: 'R',
     conductor_size: '12 AWG Cu',
   });
