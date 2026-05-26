@@ -611,6 +611,7 @@ function generateEVPanel(
         is_main: false,
         fed_from_type: 'panel',
         location: 'Parking Garage',
+        is_proposed: true,
       },
       circuits: [],
     };
@@ -657,7 +658,11 @@ function generateEVPanel(
 
   const result = generateCustomEVPanel({ projectId, config });
 
-  // Convert from EV template format to our insert format
+  // Convert from EV template format to our insert format.
+  // EV infrastructure is a post-existing-service addition by construction
+  // — flag as proposed so the riser PDF renders a dashed outline + "NEW"
+  // badge and the panel schedule shows the "*" marker. Harmless on new-
+  // construction projects because the renderers gate visibility upstream.
   const circuits = result.circuits.map((c, idx) => ({
     circuit_number: c.circuitNumber ?? (idx * 2 + 1),
     description: c.description ?? `EV Circuit ${idx + 1}`,
@@ -665,6 +670,7 @@ function generateEVPanel(
     pole: c.poles ?? 2,
     load_watts: c.loadVA ?? 0,
     conductor_size: c.conductorSize ?? '6 AWG Cu',
+    is_proposed: true,
   }));
 
   const panel: Omit<PanelInsert, 'id'> = {
@@ -677,6 +683,7 @@ function generateEVPanel(
     is_main: false,
     fed_from_type: 'panel', // Fed from MDP
     location: 'Parking Garage / EV Charging Area',
+    is_proposed: true,
   };
 
   return { panel, circuits };
