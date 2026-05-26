@@ -1207,29 +1207,46 @@ export function calculateMultiFamilyEV(input: MultiFamilyEVInput): MultiFamilyEV
   const perEVSELoad = calculatePerEVSELoad(evChargers.ampsPerCharger, evVoltage);
   const totalEVConnectedVA = perEVSELoad * evChargers.count;
 
-  // IMPORTANT: NEC 220.57 does NOT provide demand factors for multiple EVSE!
+  // Service capacity numbers — computed BEFORE evDemandVA so the EVEMS
+  // setpoint (which derives from available capacity) can clamp the EV demand
+  // when useEVEMS=true.
+  const existingCapacityVA = calculateServiceCapacityVA(existingServiceAmps, voltage, phase);
+  const existingCapacityAmps = existingServiceAmps;
+  const capacityReserveVA = input.capacityReserveVA || 0;
+  const availableCapacityVA = Math.max(0, existingCapacityVA - buildingDemandVA - capacityReserveVA);
+  const availableCapacityAmps = calculateAmps(availableCapacityVA, voltage, phase);
+
+  // EVEMS setpoint per NEC 625.42 — service-side demand clamp. Computed
+  // once here so both (a) the top-level service-analysis numbers and (b)
+  // the per-scenario withEVEMS block below pull from the same value.
+  // 90% efficiency factor leaves headroom for ALMS overhead + safety margin.
+  const EVEMS_EFFICIENCY = 0.90;
+  const evemsSetpointAmps = availableCapacityAmps * EVEMS_EFFICIENCY;
+  const evemsSetpointVA = calculateServiceCapacityVA(evemsSetpointAmps, voltage, phase);
+
+  // NEC 220.57 does NOT provide demand factors for multiple EVSE.
   // - Without EVEMS: Use FULL connected EV load in service calculation
-  // - With EVEMS (NEC 625.42): Size to EVEMS setpoint, treated as continuous
-  //
-  // The "evDemandVA" below represents the load for service/feeder sizing.
-  // For the base calculation (no EVEMS), we use 100% of connected load.
+  // - With EVEMS (NEC 625.42): Size feeder/service to the EVEMS setpoint
+  //   ("the maximum load permitted by the ALMS"), clamped down from full
+  //   nameplate. Without this clamp, the service-analysis block treats
+  //   EVEMS projects as worst-case and produces a false "upgrade required"
+  //   warning — verified on 'new 4-plex' permit packet 2026-05-26, E-402:
+  //   115.2% utilization despite EVEMS being configured. The Load Calc
+  //   Summary page (E-101) correctly shows the EVEMS-clamped 387A because
+  //   it uses calculateAggregatedLoad, which IS EVEMS-aware via the
+  //   setpoint marker. This fix brings the MF-EV page in line.
   const evDemandFactor = 1.0; // No NEC-based demand factor for EV loads
-  const evDemandVA = totalEVConnectedVA; // Full connected load per NEC 220.57
+  const evDemandVA = useEVEMS
+    ? Math.min(totalEVConnectedVA, evemsSetpointVA)
+    : totalEVConnectedVA;
   const evLoadAmps = calculateAmps(evDemandVA, voltage, phase);
 
   // =========================================================================
-  // STEP 3: Service Analysis
+  // STEP 3: Service Analysis (uses EVEMS-aware evDemandVA from above)
   // =========================================================================
-
-  const existingCapacityVA = calculateServiceCapacityVA(existingServiceAmps, voltage, phase);
-  const existingCapacityAmps = existingServiceAmps;
 
   const totalDemandVA = buildingDemandVA + evDemandVA;
   const totalDemandAmps = calculateAmps(totalDemandVA, voltage, phase);
-
-  const capacityReserveVA = input.capacityReserveVA || 0;
-  const availableCapacityVA = existingCapacityVA - buildingDemandVA - capacityReserveVA;
-  const availableCapacityAmps = calculateAmps(availableCapacityVA, voltage, phase);
 
   const utilizationPercent = (totalDemandVA / existingCapacityVA) * 100;
 
@@ -1308,8 +1325,10 @@ export function calculateMultiFamilyEV(input: MultiFamilyEVInput): MultiFamilyEV
   // IMPORTANT: EVEMS only provides value when direct connection can't support
   // the requested chargers. If direct already works, EVEMS adds cost without benefit.
 
-  const evemsEfficiencyFactor = 0.90; // 90% of theoretical capacity (system overhead, safety margin)
-  const evemsSetpointAmps = Math.max(0, availableCapacityAmps) * evemsEfficiencyFactor;
+  // evemsSetpointAmps + EVEMS_EFFICIENCY are computed earlier (pre-evDemandVA);
+  // reuse them here so the withEVEMSScenario block stays consistent with the
+  // top-level service-analysis numbers.
+  const evemsEfficiencyFactor = EVEMS_EFFICIENCY; // kept for downstream readability
 
   // Minimum viable charging: ~2.5 kW (12A @ 208V) provides ~8-10 miles/hour
   const minViableAmpsPerCharger = 12;
