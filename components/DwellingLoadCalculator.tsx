@@ -1758,20 +1758,46 @@ export const DwellingLoadCalculator: React.FC<DwellingLoadCalculatorProps> = ({
             </div>
           )}
 
-          {/* Warnings */}
-          {loadResult?.warnings && loadResult.warnings.length > 0 && (
-            <div className="bg-[#fff8e6] border border-[#c9a227]/40 rounded-lg p-4">
-              <h4 className="font-medium text-[#7a6200] flex items-center gap-2 mb-2">
-                <AlertTriangle className="w-4 h-4" />
-                Warnings
-              </h4>
-              <ul className="text-sm text-[#9a7b00] space-y-1">
-                {loadResult.warnings.map((w, i) => (
-                  <li key={i}>• {w}</li>
-                ))}
-              </ul>
-            </div>
-          )}
+          {/* Warnings & Notes — split by severity so informational notes
+              (NEC sub-rules, calc-context reminders) don't share the same
+              visual treatment as real warnings or critical issues. The
+              calc-service contract uses ℹ️/WARNING:/CRITICAL: markers in the
+              `warnings[]` array; this UI sorts them into two buckets. */}
+          {loadResult?.warnings && loadResult.warnings.length > 0 && (() => {
+            const isInfo = (w: string) => w.trim().startsWith('ℹ️') || /^\s*INFO[:\s]/i.test(w);
+            const infoNotes = loadResult.warnings.filter(isInfo);
+            const realWarnings = loadResult.warnings.filter((w) => !isInfo(w));
+            return (
+              <>
+                {realWarnings.length > 0 && (
+                  <div className="bg-[#fff8e6] border border-[#c9a227]/40 rounded-lg p-4">
+                    <h4 className="font-medium text-[#7a6200] flex items-center gap-2 mb-2">
+                      <AlertTriangle className="w-4 h-4" />
+                      Warnings
+                    </h4>
+                    <ul className="text-sm text-[#9a7b00] space-y-1">
+                      {realWarnings.map((w, i) => (
+                        <li key={i}>• {w}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+                {infoNotes.length > 0 && (
+                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                    <h4 className="font-medium text-blue-900 flex items-center gap-2 mb-2">
+                      <Info className="w-4 h-4" />
+                      Notes
+                    </h4>
+                    <ul className="text-sm text-blue-800 space-y-1">
+                      {infoNotes.map((w, i) => (
+                        <li key={i}>• {w}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+              </>
+            );
+          })()}
 
           {/* Load Breakdown */}
           {loadResult && (

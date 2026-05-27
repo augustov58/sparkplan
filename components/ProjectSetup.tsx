@@ -250,7 +250,11 @@ export const ProjectSetup: React.FC<ProjectSetupProps> = ({ project, updateProje
               <label className="block text-xs font-semibold text-[#888] uppercase mb-1">Address</label>
               <input
                 type="text"
-                value={localProject.address}
+                // Treat the 'TBD' DB sentinel as empty for editing — the placeholder
+                // ('Street, City, State ZIP') is more honest than a stored 'TBD' string.
+                // The typeAdapter still defaults to 'TBD' on save for downstream PDF consumers.
+                value={localProject.address === 'TBD' ? '' : localProject.address}
+                placeholder="Street, City, State ZIP"
                 onChange={e => handleMetaChange('address', e.target.value)}
                 className="w-full border-[#e8e6e3] rounded-md text-sm focus:border-[#2d3b2d] focus:ring-[#2d3b2d]/20"
               />
@@ -548,31 +552,47 @@ export const ProjectSetup: React.FC<ProjectSetupProps> = ({ project, updateProje
             <h4 className="text-sm font-medium text-[#1a1a1a] mb-3">Scope Elements</h4>
             <p className="text-xs text-[#888] mb-4">Check any element that applies. Used by the AHJ override engine to flag jurisdictions that require PE seal regardless of value/ampacity.</p>
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
-              {([
-                { key: 'service_upgrade', label: 'Service upgrade' },
-                { key: 'ct_cabinet', label: 'CT cabinet' },
-                { key: 'meter_stack', label: 'Meter stack' },
-                { key: 'switchgear', label: 'Switchgear' },
-                { key: 'multi_tenant_feeder', label: 'Multi-tenant feeder' },
-                { key: 'evems_used', label: 'EVEMS in use (NEC 625.42)' },
-              ] as const).map(({ key, label }) => {
-                const flags = localProject.settings.scope_flags;
-                const checked = flags ? !!flags[key] : false;
-                return (
-                  <div key={key} className="flex items-center gap-2">
-                    <input
-                      type="checkbox"
-                      id={`scope-${key}`}
-                      checked={checked}
-                      onChange={e => handleScopeFlagChange(key, e.target.checked)}
-                      className="rounded border-[#e8e6e3] text-[#2d3b2d] focus:ring-[#2d3b2d]/20"
-                    />
-                    <label htmlFor={`scope-${key}`} className="text-sm text-[#444]">
-                      {label}
-                    </label>
-                  </div>
-                );
-              })}
+              {(() => {
+                // Filter scope-element rows to those that can apply to this building type.
+                // SF residential never has CT cabinets / meter stacks / switchgear / multi-tenant feeders.
+                // MF residential commonly has meter stacks + multi-tenant feeders but still no switchgear / CT cabinet.
+                // Commercial / industrial keep all rows.
+                const dwellingType = localProject.settings.residential?.dwellingType;
+                const isMultiFamily = dwellingType === DwellingType.MULTI_FAMILY;
+                const allRows = [
+                  { key: 'service_upgrade', label: 'Service upgrade', appliesTo: 'all' },
+                  { key: 'ct_cabinet', label: 'CT cabinet', appliesTo: 'commercial' },
+                  { key: 'meter_stack', label: 'Meter stack', appliesTo: 'multifamily-or-commercial' },
+                  { key: 'switchgear', label: 'Switchgear', appliesTo: 'commercial' },
+                  { key: 'multi_tenant_feeder', label: 'Multi-tenant feeder', appliesTo: 'multifamily-or-commercial' },
+                  { key: 'evems_used', label: 'EVEMS in use (NEC 625.42)', appliesTo: 'all' },
+                ] as const;
+                const visibleRows = allRows.filter(r => {
+                  if (r.appliesTo === 'all') return true;
+                  if (!isResidential) return true;
+                  if (r.appliesTo === 'commercial') return false;
+                  if (r.appliesTo === 'multifamily-or-commercial') return isMultiFamily;
+                  return true;
+                });
+                return visibleRows.map(({ key, label }) => {
+                  const flags = localProject.settings.scope_flags;
+                  const checked = flags ? !!flags[key] : false;
+                  return (
+                    <div key={key} className="flex items-center gap-2">
+                      <input
+                        type="checkbox"
+                        id={`scope-${key}`}
+                        checked={checked}
+                        onChange={e => handleScopeFlagChange(key, e.target.checked)}
+                        className="rounded border-[#e8e6e3] text-[#2d3b2d] focus:ring-[#2d3b2d]/20"
+                      />
+                      <label htmlFor={`scope-${key}`} className="text-sm text-[#444]">
+                        {label}
+                      </label>
+                    </div>
+                  );
+                });
+              })()}
             </div>
           </div>
         </div>

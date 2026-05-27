@@ -108,14 +108,13 @@ export function useGrounding(projectId: string): UseGroundingReturn {
         .from('grounding_details')
         .select('*')
         .eq('project_id', projectId)
-        .single();
+        .maybeSingle();
 
-      if (fetchError && fetchError.code !== 'PGRST116') {
-        // PGRST116 = no rows returned (which is fine for new projects)
+      if (fetchError) {
         throw fetchError;
       }
 
-      setGrounding(data || null);
+      setGrounding(data ?? null);
       setError(null);
     } catch (err) {
       console.error('Error fetching grounding:', err);

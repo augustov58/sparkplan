@@ -126,8 +126,15 @@ export const TemplateSelector: React.FC<TemplateSelectorProps> = ({
                     <button
                       key={template.type}
                       onClick={() => {
-                        setSelectedSampleTemplate(template.type);
-                        setSelectedTemplateId(null);
+                        // Quick Start templates apply immediately — no second confirm click.
+                        // Advanced Panel Templates below still use select-then-confirm.
+                        if (onSelectSampleTemplate) {
+                          onSelectSampleTemplate(template.type);
+                          onClose();
+                        } else {
+                          setSelectedSampleTemplate(template.type);
+                          setSelectedTemplateId(null);
+                        }
                       }}
                       className={`p-6 border-2 rounded-lg text-left transition-all hover:shadow-lg ${
                         selectedSampleTemplate === template.type

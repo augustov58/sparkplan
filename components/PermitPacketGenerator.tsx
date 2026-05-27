@@ -1195,31 +1195,31 @@ export const PermitPacketGenerator: React.FC<PermitPacketGeneratorProps> = ({ pr
         </p>
       </div>
 
-      {/* Info Card */}
-      <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-        <div className="flex gap-3">
-          <Info className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" />
-          <div className="text-sm text-blue-900">
-            <p className="font-medium mb-1">What's Included:</p>
-            <ul className="list-disc list-inside space-y-1 text-blue-800">
-              <li>Cover page with contractor license & scope of work</li>
-              <li>Service entrance details</li>
-              <li>Equipment schedule (panels, transformers, feeders)</li>
-              <li>Riser diagram (system hierarchy)</li>
-              <li>Load calculation summary</li>
-              <li>NEC compliance summary</li>
-              <li>Equipment specifications (Tier 2)</li>
-              <li>Voltage drop report (if feeders exist)</li>
-              <li>Short circuit analysis (if calculations exist)</li>
-              <li>Arc flash analysis (if data available)</li>
-              <li>Grounding plan (NEC Article 250)</li>
-              <li>Multi-Family EV analysis (NEC 220.84 + 220.57 + 625.42) if enabled</li>
-              <li>Jurisdiction requirements checklist (if jurisdiction selected)</li>
-              {packetType === 'full' && <li>Complete panel schedules for all panels</li>}
-            </ul>
-          </div>
-        </div>
-      </div>
+      {/* Info Card — collapsed by default. The section checkboxes below already
+          enumerate what's in the packet; this preamble is for first-time users
+          who want a flat list before scrolling. */}
+      <details className="bg-blue-50 border border-blue-200 rounded-lg">
+        <summary className="px-4 py-3 cursor-pointer text-sm text-blue-900 flex items-center gap-3 select-none">
+          <Info className="w-5 h-5 text-blue-600 flex-shrink-0" />
+          <span className="font-medium">What's Included in a permit packet</span>
+        </summary>
+        <ul className="list-disc list-inside space-y-1 text-blue-800 text-sm px-4 pb-3 pl-12">
+          <li>Cover page with contractor license & scope of work</li>
+          <li>Service entrance details</li>
+          <li>Equipment schedule (panels, transformers, feeders)</li>
+          <li>Riser diagram (system hierarchy)</li>
+          <li>Load calculation summary</li>
+          <li>NEC compliance summary</li>
+          <li>Equipment specifications (Tier 2)</li>
+          <li>Voltage drop report (if feeders exist)</li>
+          <li>Short circuit analysis (if calculations exist)</li>
+          <li>Arc flash analysis (if data available)</li>
+          <li>Grounding plan (NEC Article 250)</li>
+          <li>Multi-Family EV analysis (NEC 220.84 + 220.57 + 625.42) if enabled</li>
+          <li>Jurisdiction requirements checklist (if jurisdiction selected)</li>
+          {packetType === 'full' && <li>Complete panel schedules for all panels</li>}
+        </ul>
+      </details>
 
       {/* Project Summary */}
       <div className="bg-white border border-gray-200 rounded-lg p-6">
@@ -1323,50 +1323,80 @@ export const PermitPacketGenerator: React.FC<PermitPacketGeneratorProps> = ({ pr
           </div>
         )}
 
-        {/* Grouped checkbox grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {Object.entries(toggleGroups).map(([groupName, items]) => (
-            <div key={groupName} className="border border-gray-200 rounded-md p-3 space-y-2">
-              <p className="text-xs uppercase tracking-wider font-medium text-gray-500 mb-2">
-                {groupName}
-              </p>
-              {items.map((cfg) => {
-                const disabledReason = sectionDisabledReason(cfg.key);
-                const isChecked = effectiveSections[cfg.key];
-                const hasOffWarning = !!cfg.offWarning && isChecked === false;
-                return (
-                  <label
-                    key={cfg.key}
-                    className={`flex items-start gap-2 ${
-                      disabledReason ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'
-                    }`}
-                    title={disabledReason}
-                  >
-                    <input
-                      type="checkbox"
-                      checked={isChecked}
-                      disabled={!!disabledReason}
-                      onChange={(e) => handleToggleSection(cfg.key, e.target.checked)}
-                      className="mt-1 text-[#2d3b2d] focus:ring-[#2d3b2d]/20 rounded"
-                    />
-                    <div className="text-sm flex-1">
-                      <span
-                        className={`font-medium ${
-                          hasOffWarning ? 'text-amber-900' : 'text-gray-900'
-                        }`}
-                      >
-                        {cfg.label}
-                      </span>
-                      <p className="text-xs text-gray-500">
-                        {disabledReason ?? cfg.description}
-                      </p>
-                    </div>
-                  </label>
-                );
-              })}
-            </div>
-          ))}
-        </div>
+        {/* Grouped checkbox grid — disabled sections are hidden by default to
+            keep the surface focused on what the contractor can actually toggle.
+            They're listed below in a collapsible "Locked sections" disclosure
+            so they're still discoverable. */}
+        {(() => {
+          const groupsWithVisibility = Object.entries(toggleGroups).map(([groupName, items]) => {
+            const visibleItems = items.filter((cfg) => !sectionDisabledReason(cfg.key));
+            const hiddenItems = items.filter((cfg) => !!sectionDisabledReason(cfg.key));
+            return { groupName, visibleItems, hiddenItems };
+          });
+          const visibleGroups = groupsWithVisibility.filter((g) => g.visibleItems.length > 0);
+          const lockedSections = groupsWithVisibility
+            .flatMap((g) => g.hiddenItems.map((cfg) => ({ ...cfg, group: g.groupName })));
+          return (
+            <>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {visibleGroups.map(({ groupName, visibleItems }) => (
+                  <div key={groupName} className="border border-gray-200 rounded-md p-3 space-y-2">
+                    <p className="text-xs uppercase tracking-wider font-medium text-gray-500 mb-2">
+                      {groupName}
+                    </p>
+                    {visibleItems.map((cfg) => {
+                      const isChecked = effectiveSections[cfg.key];
+                      const hasOffWarning = !!cfg.offWarning && isChecked === false;
+                      return (
+                        <label
+                          key={cfg.key}
+                          className="flex items-start gap-2 cursor-pointer"
+                        >
+                          <input
+                            type="checkbox"
+                            checked={isChecked}
+                            onChange={(e) => handleToggleSection(cfg.key, e.target.checked)}
+                            className="mt-1 text-[#2d3b2d] focus:ring-[#2d3b2d]/20 rounded"
+                          />
+                          <div className="text-sm flex-1">
+                            <span
+                              className={`font-medium ${
+                                hasOffWarning ? 'text-amber-900' : 'text-gray-900'
+                              }`}
+                            >
+                              {cfg.label}
+                            </span>
+                            <p className="text-xs text-gray-500">
+                              {cfg.description}
+                            </p>
+                          </div>
+                        </label>
+                      );
+                    })}
+                  </div>
+                ))}
+              </div>
+              {lockedSections.length > 0 && (
+                <details className="border border-gray-200 rounded-md bg-gray-50">
+                  <summary className="px-4 py-2 text-xs text-gray-600 cursor-pointer hover:text-gray-900 select-none">
+                    {lockedSections.length} more {lockedSections.length === 1 ? 'section' : 'sections'} will unlock when data is added
+                  </summary>
+                  <ul className="px-4 pb-3 space-y-1 text-xs text-gray-600">
+                    {lockedSections.map((cfg) => (
+                      <li key={cfg.key} className="flex items-start gap-2">
+                        <span className="text-gray-400 flex-shrink-0">·</span>
+                        <span>
+                          <span className="font-medium text-gray-700">{cfg.label}</span>
+                          <span className="text-gray-500"> — {sectionDisabledReason(cfg.key)}</span>
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                </details>
+              )}
+            </>
+          );
+        })()}
       </div>
 
       {/* Sprint 2B PR-2: User-supplied PDF artifacts (site plans, cut sheets,

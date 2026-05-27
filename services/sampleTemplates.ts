@@ -434,7 +434,7 @@ export function createProjectFromTemplate(
     project: {
       id: projectId,
       name: customName || template.name,
-      address: customAddress || 'Sample Address - Update as needed',
+      address: customAddress || '',
       type: template.type,
       necEdition: template.necEdition,
       status: ProjectStatus.PLANNING,
