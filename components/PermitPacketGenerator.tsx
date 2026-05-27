@@ -1008,13 +1008,37 @@ export const PermitPacketGenerator: React.FC<PermitPacketGeneratorProps> = ({ pr
       // has opted in AND filled the minimum-required citation + max-demand
       // fields. Without those, the page would render with placeholder text
       // and risk being mistaken for the real evidence the AHJ needs.
-      const maxDemandParsed = parseFloat(nec22087MaxDemandKVA);
-      const proposedParsed = parseFloat(nec22087ProposedKVA);
+      //
+      // PR-2 Step 4 (2026-05-26): when method='calculated', the kVA values
+      // are auto-derived from project circuit data (sum by is_proposed
+      // flag) instead of from the now-read-only text inputs. Pre-PR-2
+      // the inputs always won regardless of method, so picking
+      // 'calculated' was purely cosmetic — fixed here so the dropdown
+      // actually drives the data source.
+      const calculatedExistingKVA =
+        circuits
+          .filter(c => !c.is_proposed)
+          .reduce((sum, c) => sum + (c.load_watts || 0), 0) / 1000;
+      const calculatedProposedKVA =
+        circuits
+          .filter(c => c.is_proposed)
+          .reduce((sum, c) => sum + (c.load_watts || 0), 0) / 1000;
+
+      const useCalculatedSource = nec22087Method === 'calculated';
+      const maxDemandTyped = parseFloat(nec22087MaxDemandKVA);
+      const proposedTyped = parseFloat(nec22087ProposedKVA);
+      const maxDemandFinal = useCalculatedSource
+        ? calculatedExistingKVA
+        : maxDemandTyped;
+      const proposedFinal = useCalculatedSource
+        ? calculatedProposedKVA
+        : (Number.isFinite(proposedTyped) ? proposedTyped : 0);
+
       if (
         includeNEC22087
         && nec22087DataSource.trim().length > 0
-        && Number.isFinite(maxDemandParsed)
-        && maxDemandParsed > 0
+        && Number.isFinite(maxDemandFinal)
+        && maxDemandFinal > 0
       ) {
         const mainPanel = panels.find(p => p.is_main);
         const serviceCapacityAmps = mainPanel?.bus_rating
@@ -1025,8 +1049,8 @@ export const PermitPacketGenerator: React.FC<PermitPacketGeneratorProps> = ({ pr
           dataSourceCitation: nec22087DataSource.trim(),
           dateRangeFrom: nec22087DateFrom || new Date(Date.now() - 365 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]!,
           dateRangeTo: nec22087DateTo || new Date().toISOString().split('T')[0]!,
-          maxDemandKVA: maxDemandParsed,
-          proposedNewLoadKVA: Number.isFinite(proposedParsed) ? proposedParsed : 0,
+          maxDemandKVA: maxDemandFinal,
+          proposedNewLoadKVA: proposedFinal,
           serviceCapacityAmps,
           serviceVoltage: currentProject.serviceVoltage,
           servicePhase: currentProject.servicePhase as 1 | 3,
@@ -1752,36 +1776,84 @@ export const PermitPacketGenerator: React.FC<PermitPacketGeneratorProps> = ({ pr
                   className="w-full border border-gray-200 rounded px-3 py-2 text-sm focus:border-[#2d3b2d] focus:ring-2 focus:ring-[#2d3b2d]/20/20 outline-none"
                 />
               </div>
-              <div>
-                <label htmlFor="nec22087MaxDemandKVA" className="block text-sm font-medium text-gray-700 mb-2">
-                  Max Demand (kVA)
-                </label>
-                <input
-                  id="nec22087MaxDemandKVA"
-                  type="number"
-                  min="0"
-                  step="0.1"
-                  value={nec22087MaxDemandKVA}
-                  onChange={(e) => setNec22087MaxDemandKVA(e.target.value)}
-                  placeholder="e.g., 145.5"
-                  className="w-full border border-gray-200 rounded px-3 py-2 text-sm focus:border-[#2d3b2d] focus:ring-2 focus:ring-[#2d3b2d]/20/20 outline-none"
-                />
-              </div>
-              <div>
-                <label htmlFor="nec22087ProposedKVA" className="block text-sm font-medium text-gray-700 mb-2">
-                  Proposed New Load (kVA)
-                </label>
-                <input
-                  id="nec22087ProposedKVA"
-                  type="number"
-                  min="0"
-                  step="0.1"
-                  value={nec22087ProposedKVA}
-                  onChange={(e) => setNec22087ProposedKVA(e.target.value)}
-                  placeholder="e.g., 48.0"
-                  className="w-full border border-gray-200 rounded px-3 py-2 text-sm focus:border-[#2d3b2d] focus:ring-2 focus:ring-[#2d3b2d]/20/20 outline-none"
-                />
-              </div>
+              {/* PR-2 Step 4 (2026-05-26): when method='calculated', kVA
+                  inputs become read-only and auto-source from project
+                  circuit data (existing = sum of !is_proposed, proposed =
+                  sum of is_proposed). Pre-PR-2 these fields always won
+                  regardless of method, so picking 'calculated' was purely
+                  cosmetic; now the dropdown actually drives the data
+                  source. */}
+              {(() => {
+                const isCalculatedMode = nec22087Method === 'calculated';
+                const derivedExistingKVA =
+                  circuits
+                    .filter(c => !c.is_proposed)
+                    .reduce((sum, c) => sum + (c.load_watts || 0), 0) / 1000;
+                const derivedProposedKVA =
+                  circuits
+                    .filter(c => c.is_proposed)
+                    .reduce((sum, c) => sum + (c.load_watts || 0), 0) / 1000;
+
+                const calcInputClass =
+                  'w-full border border-gray-200 rounded px-3 py-2 text-sm bg-gray-50 text-gray-700 cursor-not-allowed';
+                const userInputClass =
+                  'w-full border border-gray-200 rounded px-3 py-2 text-sm focus:border-[#2d3b2d] focus:ring-2 focus:ring-[#2d3b2d]/20/20 outline-none';
+
+                return (
+                  <>
+                    <div>
+                      <label htmlFor="nec22087MaxDemandKVA" className="block text-sm font-medium text-gray-700 mb-2">
+                        Max Demand (kVA)
+                      </label>
+                      <input
+                        id="nec22087MaxDemandKVA"
+                        type="number"
+                        min="0"
+                        step="0.1"
+                        readOnly={isCalculatedMode}
+                        value={
+                          isCalculatedMode
+                            ? derivedExistingKVA.toFixed(2)
+                            : nec22087MaxDemandKVA
+                        }
+                        onChange={(e) => setNec22087MaxDemandKVA(e.target.value)}
+                        placeholder="e.g., 145.5"
+                        className={isCalculatedMode ? calcInputClass : userInputClass}
+                      />
+                      {isCalculatedMode && (
+                        <p className="text-xs text-gray-500 mt-1">
+                          Auto-sourced from sum of existing circuits (where is_proposed = false).
+                        </p>
+                      )}
+                    </div>
+                    <div>
+                      <label htmlFor="nec22087ProposedKVA" className="block text-sm font-medium text-gray-700 mb-2">
+                        Proposed New Load (kVA)
+                      </label>
+                      <input
+                        id="nec22087ProposedKVA"
+                        type="number"
+                        min="0"
+                        step="0.1"
+                        readOnly={isCalculatedMode}
+                        value={
+                          isCalculatedMode
+                            ? derivedProposedKVA.toFixed(2)
+                            : nec22087ProposedKVA
+                        }
+                        onChange={(e) => setNec22087ProposedKVA(e.target.value)}
+                        placeholder="e.g., 48.0"
+                        className={isCalculatedMode ? calcInputClass : userInputClass}
+                      />
+                      {isCalculatedMode && (
+                        <p className="text-xs text-gray-500 mt-1">
+                          Auto-sourced from sum of proposed circuits (where is_proposed = true).
+                        </p>
+                      )}
+                    </div>
+                  </>
+                );
+              })()}
             </div>
           </div>
         )}
