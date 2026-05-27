@@ -161,9 +161,16 @@ export function generateMultiFamilyProject(
   );
 
   // ---- EV Panel (reuse proven generateCustomEVPanel) ----
+  // PR-2 Step 2 (2026-05-26): pass projectIsExistingConstruction=false because
+  // the wholesale orchestrator generates a brand-new project end-to-end
+  // (MDP + house + units + EV all at once). Flagging the EV panel as
+  // is_proposed while MDP/house/units default to false would render the
+  // EV gear with a "NEW" badge in the middle of a greenfield design —
+  // inconsistent and confusing. Symmetry with sibling panels wins here.
   const { panel: evPanel, circuits: evCircuits } = generateEVPanel(
     projectId, evChargers, options.evAmpsPerCharger, options.evChargerLevel,
-    scenario !== 'noEVEMS', selectedScenario
+    scenario !== 'noEVEMS', selectedScenario,
+    false
   );
 
   // ---- Unit Panels ----
@@ -336,6 +343,21 @@ export interface EVInfrastructureOptions {
   projectId: string;
   evAmpsPerCharger: number;
   evChargerLevel: 'Level1' | 'Level2';
+  /**
+   * PR-2 Step 2 (2026-05-26): when true (default), the generated EV
+   * sub-panel + circuits carry is_proposed=true so they render with the
+   * "* = Proposed new circuit" marker on panel schedules + the dashed
+   * orange outline on the riser. Pass false when the project's
+   * service_modification_type is 'new-service' — in greenfield design
+   * there's no existing/proposed distinction and flagging the EV gear
+   * alone would be inconsistent with the rest of the new project.
+   *
+   * Default is `true` because this entry point is only reachable when
+   * an MDP already exists (see MultiFamilyEVCalculator's projectHasPanels
+   * gate at line ~403), and the most common case for "Add EV
+   * Infrastructure" is retrofitting onto an existing project.
+   */
+  projectIsExistingConstruction?: boolean;
 }
 
 /**
@@ -346,7 +368,10 @@ export function generateEVInfrastructure(
   result: MultiFamilyEVResult,
   options: EVInfrastructureOptions
 ): EVInfrastructureProject {
-  const { scenario, projectId, evAmpsPerCharger, evChargerLevel } = options;
+  const {
+    scenario, projectId, evAmpsPerCharger, evChargerLevel,
+    projectIsExistingConstruction = true,
+  } = options;
 
   const selectedScenario = result.scenarios[scenario];
   const evChargers = Math.min(selectedScenario.maxChargers, result.input.evChargersRequested);
@@ -354,7 +379,8 @@ export function generateEVInfrastructure(
   // Generate EV panel and circuits using the existing proven function
   const { panel: evPanel, circuits: evCircuits } = generateEVPanel(
     projectId, evChargers, evAmpsPerCharger, evChargerLevel,
-    scenario !== 'noEVEMS', selectedScenario
+    scenario !== 'noEVEMS', selectedScenario,
+    projectIsExistingConstruction
   );
 
   return {
@@ -597,7 +623,13 @@ function generateEVPanel(
   ampsPerCharger: number,
   level: 'Level1' | 'Level2',
   useEVEMS: boolean,
-  scenario: EVCapacityScenario
+  scenario: EVCapacityScenario,
+  // PR-2 Step 2 (2026-05-26): controls whether the generated EV panel +
+  // circuits carry is_proposed=true. See EVInfrastructureOptions JSDoc
+  // for the full rationale. Required param to force both call sites
+  // (wholesale orchestrator + add-to-existing path) to make an explicit
+  // choice — defaults are easy to misread.
+  projectIsExistingConstruction: boolean
 ): { panel: Omit<PanelInsert, 'id'>; circuits: Omit<CircuitInsert, 'id' | 'panel_id' | 'project_id'>[] } {
   if (chargerCount <= 0) {
     // No EV panel needed
@@ -611,7 +643,7 @@ function generateEVPanel(
         is_main: false,
         fed_from_type: 'panel',
         location: 'Parking Garage',
-        is_proposed: true,
+        is_proposed: projectIsExistingConstruction,
       },
       circuits: [],
     };
@@ -659,10 +691,11 @@ function generateEVPanel(
   const result = generateCustomEVPanel({ projectId, config });
 
   // Convert from EV template format to our insert format.
-  // EV infrastructure is a post-existing-service addition by construction
-  // — flag as proposed so the riser PDF renders a dashed outline + "NEW"
-  // badge and the panel schedule shows the "*" marker. Harmless on new-
-  // construction projects because the renderers gate visibility upstream.
+  // PR-2 Step 2 (2026-05-26): is_proposed now branches on the caller-supplied
+  // projectIsExistingConstruction flag. Pre-PR-2 it was always true, which
+  // worked for the "Add EV Infrastructure" retrofit path but was wrong for
+  // the wholesale-orchestrator greenfield path (rendered a "NEW" badge on
+  // the EV panel next to MDP/house/units that defaulted to false).
   const circuits = result.circuits.map((c, idx) => ({
     circuit_number: c.circuitNumber ?? (idx * 2 + 1),
     description: c.description ?? `EV Circuit ${idx + 1}`,
@@ -670,7 +703,7 @@ function generateEVPanel(
     pole: c.poles ?? 2,
     load_watts: c.loadVA ?? 0,
     conductor_size: c.conductorSize ?? '6 AWG Cu',
-    is_proposed: true,
+    is_proposed: projectIsExistingConstruction,
   }));
 
   const panel: Omit<PanelInsert, 'id'> = {
@@ -683,7 +716,7 @@ function generateEVPanel(
     is_main: false,
     fed_from_type: 'panel', // Fed from MDP
     location: 'Parking Garage / EV Charging Area',
-    is_proposed: true,
+    is_proposed: projectIsExistingConstruction,
   };
 
   return { panel, circuits };

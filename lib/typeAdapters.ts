@@ -51,6 +51,25 @@ export function dbProjectToFrontend(dbProject: DbProject): Project {
  * Convert frontend project to database insert
  */
 export function frontendProjectToDbInsert(project: Partial<Project>): Omit<DbProjectInsert, 'id' | 'user_id'> {
+  // PR-2 Polish B (2026-05-26): defense-in-depth default for
+  // service_modification_type. PR-2 Step 1 coerces null/undefined to
+  // 'existing' at the packet generator, but writing the explicit default
+  // at INSERT time means future projects never have a NULL in the column
+  // — UI display, AHJ-visibility predicates, and downstream consumers all
+  // see a deterministic value from creation. Matches the UI default at
+  // ProjectSetup.tsx:286 (`value={... ?? 'existing'}`).
+  const baseSettings = (project.settings as any) || {
+    serviceVoltage: project.serviceVoltage || 120,
+    servicePhase: project.servicePhase || 1,
+    conductorMaterial: 'Cu',
+    temperatureRating: 75,
+  };
+  const settingsWithDefault = {
+    ...baseSettings,
+    service_modification_type:
+      baseSettings.service_modification_type ?? 'existing',
+  };
+
   return {
     name: project.name || 'Untitled Project',
     address: project.address || 'TBD',
@@ -60,12 +79,7 @@ export function frontendProjectToDbInsert(project: Partial<Project>): Omit<DbPro
     progress: project.progress || 0,
     service_voltage: project.serviceVoltage || 120,
     service_phase: (project.servicePhase || 1) as 1 | 3,
-    settings: (project.settings as any) || {
-      serviceVoltage: project.serviceVoltage || 120,
-      servicePhase: project.servicePhase || 1,
-      conductorMaterial: 'Cu',
-      temperatureRating: 75
-    }
+    settings: settingsWithDefault,
   };
 }
 

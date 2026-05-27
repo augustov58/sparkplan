@@ -6,6 +6,7 @@
 
 import React, { useState, useMemo, useCallback } from 'react';
 import { Project } from '../types';
+import { isExistingConstructionProject } from '../lib/projectSettings';
 import { LayoutGrid, Download, Edit2, Save, X, Trash2, Settings, Calculator, Info, ArrowDown, Plus, Camera } from 'lucide-react';
 import { PanelPhotoImporter } from './PanelPhotoImporter';
 import type { ExtractedCircuit } from '@/services/panelOcrService';
@@ -302,9 +303,10 @@ export const PanelSchedule: React.FC<PanelScheduleProps> = ({ project }) => {
 
     // Branch 1: single-family MDP → compute from circuits, not from toggles.
     if (selectedPanel.is_main && isSingleFamily) {
-      const existingDwelling = project.settings?.service_modification_type
-        ? project.settings.service_modification_type !== 'new-service'
-        : true;
+      // PR-2 Step 7 (2026-05-27): single shared coercion for null/undefined
+      // service_modification_type. Matches the UI default at
+      // ProjectSetup.tsx:286 + the packet PDF gate from PR-2 Step 1.
+      const existingDwelling = isExistingConstructionProject(project);
       const result = calculateDwellingPanelDemand({
         circuits: panelCircuits.map(c => ({
           description: c.description,
@@ -416,8 +418,13 @@ export const PanelSchedule: React.FC<PanelScheduleProps> = ({ project }) => {
   // Existing-construction gates the per-circuit Existing/New badge. On a
   // new-construction project every circuit is implicitly new, so the toggle
   // would just be noise.
-  const isExistingConstruction = project.settings?.service_modification_type
-    && project.settings.service_modification_type !== 'new-service';
+  //
+  // PR-2 Step 7 (2026-05-27): use the shared coercion helper. Pre-PR-2
+  // this read site short-circuited `null && ...` to false, suppressing
+  // the EXIST/NEW badges entirely for legacy projects whose DB column
+  // had never been written — exactly the bug the user observed when
+  // generating the 'new 4-plex' packet 2026-05-27.
+  const isExistingConstruction = isExistingConstructionProject(project);
 
   const toggleProposed = useCallback(async (circuit: { id: string; is_proposed?: boolean }) => {
     await updateCircuit(circuit.id, { is_proposed: !circuit.is_proposed });

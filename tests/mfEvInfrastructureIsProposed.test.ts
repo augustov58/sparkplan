@@ -112,8 +112,12 @@ describe('MF-EV service analysis → EVEMS clamping (NEC 625.42)', () => {
 });
 
 describe('MF-EV autogeneration → is_proposed contract', () => {
-  it('stamps is_proposed:true on every generated EV circuit', () => {
+  it('stamps is_proposed:true on every generated EV circuit (default path)', () => {
     const result = calculateMultiFamilyEV(FOURPLEX_INPUT);
+    // No projectIsExistingConstruction passed — defaults to true, which
+    // matches the pre-PR-2-Step-2 "Add EV Infrastructure" retrofit
+    // behavior. Existing callers that haven't been updated yet still get
+    // the original behavior.
     const evInfra = generateEVInfrastructure(result, {
       scenario: 'withEVEMS',
       projectId: 'test-project-id',
@@ -127,7 +131,7 @@ describe('MF-EV autogeneration → is_proposed contract', () => {
     }
   });
 
-  it('stamps is_proposed:true on the generated EV sub-panel', () => {
+  it('stamps is_proposed:true on the generated EV sub-panel (default path)', () => {
     const result = calculateMultiFamilyEV(FOURPLEX_INPUT);
     const evInfra = generateEVInfrastructure(result, {
       scenario: 'withEVEMS',
@@ -149,11 +153,48 @@ describe('MF-EV autogeneration → is_proposed contract', () => {
         projectId: 'test-project-id',
         evAmpsPerCharger: 48,
         evChargerLevel: 'Level2',
+        projectIsExistingConstruction: true,
       });
       expect(evInfra.evPanel.is_proposed, `panel for scenario ${scenario}`).toBe(true);
       for (const c of evInfra.evCircuits) {
         expect(c.is_proposed, `circuit ${c.description} for scenario ${scenario}`).toBe(true);
       }
+    }
+  });
+
+  /**
+   * PR-2 Step 2 (2026-05-26) — new-construction path must produce
+   * is_proposed=false on the generated EV gear.
+   *
+   * Pre-PR-2-Step-2, `generateEVInfrastructure` (and its inner
+   * `generateEVPanel`) unconditionally set is_proposed=true. That was the
+   * Bug 1 fix from PR-1 (PR #107), but it was over-broad — for projects
+   * whose service_modification_type is 'new-service', everything in the
+   * design is new and the existing/proposed distinction is meaningless.
+   * The EV gear ended up rendering with a "NEW" badge next to MDP/house/
+   * unit panels that defaulted to false — visually inconsistent.
+   *
+   * After Step 2, callers pass an explicit `projectIsExistingConstruction`
+   * boolean derived from the project's service_modification_type setting.
+   * When false, the EV gear matches the rest of the greenfield design.
+   *
+   * If this regresses, fresh MF projects with EV will visually misclassify
+   * the EV panel — caught here before it ships.
+   */
+  it('produces is_proposed=false when projectIsExistingConstruction=false (greenfield)', () => {
+    const result = calculateMultiFamilyEV(FOURPLEX_INPUT);
+    const evInfra = generateEVInfrastructure(result, {
+      scenario: 'withEVEMS',
+      projectId: 'test-project-id',
+      evAmpsPerCharger: 48,
+      evChargerLevel: 'Level2',
+      projectIsExistingConstruction: false,
+    });
+
+    expect(evInfra.evCircuits.length).toBeGreaterThan(0);
+    expect(evInfra.evPanel.is_proposed).toBe(false);
+    for (const c of evInfra.evCircuits) {
+      expect(c.is_proposed, `circuit ${c.description}`).toBe(false);
     }
   });
 });

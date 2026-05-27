@@ -1507,6 +1507,75 @@ describe('Upstream Load Aggregation — NEC 220.84 Optional Method (C1)', () => 
       expect(climateRow).toBeUndefined();
     });
   });
+
+  /**
+   * PR-2 Step 3 (2026-05-26) — existing/proposed split must split
+   * connected VA exactly by the `is_proposed` flag and split demand VA
+   * such that the two split values sum to `totalDemandVA`.
+   *
+   * The split is what powers the new "EXISTING vs PROPOSED LOAD SPLIT"
+   * tri-column on the LoadCalculationSummary page; without it, AHJ
+   * reviewers can't tell from the packet how much load the project is
+   * adding versus inheriting.
+   *
+   * Three guards:
+   *   1. When no circuit is_proposed, the existing values equal the
+   *      totals and the proposed values are 0 (preserves the empty
+   *      case + every pre-PR-1 test fixture).
+   *   2. When some circuits are flagged, the connected split sums to
+   *      totalConnectedVA.
+   *   3. The demand split sums to totalDemandVA via the proportional
+   *      allocation rule (preserves the precise NEC demand total).
+   */
+  describe('existing vs proposed split (PR-2 Step 3)', () => {
+    it('produces zero proposed totals + existing == total when no circuit is_proposed', () => {
+      const { panels, circuits, transformers, mdp } = buildFixture();
+      const result = calculateAggregatedLoad(mdp.id, panels, circuits, transformers, 'commercial');
+
+      expect(result.proposedConnectedVA).toBe(0);
+      expect(result.proposedDemandVA).toBe(0);
+      expect(result.existingConnectedVA).toBe(result.totalConnectedVA);
+      expect(result.existingDemandVA).toBe(Math.round(result.totalDemandVA));
+    });
+
+    it('splits connected VA by is_proposed flag and proposed/existing sum to total', () => {
+      const { panels, circuits, transformers, mdp } = buildFixture();
+
+      // Flag the EV sub-panel's circuit as proposed (50.3 kVA addition).
+      // House panel + 12 unit panels stay existing.
+      const splitCircuits = circuits.map(c =>
+        c.id === 'c-p-ev-50300-ev' ? { ...c, is_proposed: true } : c,
+      );
+
+      const result = calculateAggregatedLoad(
+        mdp.id, panels, splitCircuits, transformers, 'commercial',
+      );
+
+      // Connected split is exact: proposed = the one flagged circuit,
+      // existing = everything else.
+      expect(result.proposedConnectedVA).toBe(50_300);
+      expect(result.existingConnectedVA).toBe(result.totalConnectedVA - 50_300);
+      expect(result.existingConnectedVA + result.proposedConnectedVA).toBe(result.totalConnectedVA);
+    });
+
+    it('demand split sums to totalDemandVA (proportional allocation invariant)', () => {
+      const { panels, circuits, transformers, mdp } = buildFixture();
+      const splitCircuits = circuits.map(c =>
+        c.id === 'c-p-ev-50300-ev' ? { ...c, is_proposed: true } : c,
+      );
+
+      const result = calculateAggregatedLoad(
+        mdp.id, panels, splitCircuits, transformers, 'commercial',
+      );
+
+      // Invariant: rounded-existing + proposed-by-subtraction = rounded-total.
+      // Done this way so the tri-column never shows a numeric drift
+      // between the sum of split rows and the "Total" column.
+      expect(result.existingDemandVA + result.proposedDemandVA).toBe(Math.round(result.totalDemandVA));
+      expect(result.proposedDemandVA).toBeGreaterThan(0);
+      expect(result.existingDemandVA).toBeGreaterThan(0);
+    });
+  });
 });
 
 // ============================================================================

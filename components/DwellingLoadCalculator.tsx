@@ -48,6 +48,7 @@ import {
 } from '../services/calculations/residentialLoad';
 import { LOAD_TEMPLATES } from '../services/calculations/serviceUpgrade';
 import type { LoadTemplate } from '../types';
+import { isExistingConstructionProject } from '../lib/projectSettings';
 import { usePanels } from '../hooks/usePanels';
 import { useCircuits } from '../hooks/useCircuits';
 import {
@@ -216,9 +217,8 @@ export const DwellingLoadCalculator: React.FC<DwellingLoadCalculatorProps> = ({
         // Project Status (General Information) drives 220.82 vs 220.83.
         // 'new-service' → 220.82 (new construction); anything else
         // ('existing' or 'service-upgrade') → 220.83 (existing dwelling).
-        const existingDwelling = project.settings?.service_modification_type
-          ? project.settings.service_modification_type !== 'new-service'
-          : true; // default to existing — safer assumption for retrofit work
+        // PR-2 Step 7 (2026-05-27): use the shared coercion helper.
+        const existingDwelling = isExistingConstructionProject(project);
         // Calculation Method (this page) only applies to 220.82 (new). 220.83
         // is always a bucket method by NEC definition.
         const useTrueOptionalMethod = project.settings?.dwelling_calc_mode === 'true-optional';
@@ -597,8 +597,10 @@ export const DwellingLoadCalculator: React.FC<DwellingLoadCalculatorProps> = ({
       // overwrite the user's stated 125A existing service, destroying
       // their input on every Regenerate.
       if (loadResult) {
-        const isExisting = project.settings?.service_modification_type
-          && project.settings.service_modification_type !== 'new-service';
+        // PR-2 Step 7 (2026-05-27): use the shared coercion helper so legacy
+        // projects with NULL service_modification_type are treated as
+        // existing (matches UI default).
+        const isExisting = isExistingConstructionProject(project);
         const existingAmps = project.settings?.residential?.existingServiceAmps
           ?? mainPanel?.main_breaker_amps;
         const existingHolds = isExisting
@@ -796,7 +798,7 @@ export const DwellingLoadCalculator: React.FC<DwellingLoadCalculatorProps> = ({
           </h2>
           <p className="text-gray-500 mt-1 text-sm sm:text-base">
             {isSingleFamily
-              ? (project.settings?.service_modification_type && project.settings.service_modification_type !== 'new-service'
+              ? (isExistingConstructionProject(project)
                   ? 'NEC 220.83 - Optional Method for Existing Single-Family Dwellings'
                   : project.settings?.dwelling_calc_mode === 'true-optional'
                     ? 'NEC 220.82 - Optional Method for Single-Family Dwellings (10 kVA / 40% bucket)'
@@ -810,8 +812,7 @@ export const DwellingLoadCalculator: React.FC<DwellingLoadCalculatorProps> = ({
               is stored, so the headroom card has a sensible value from
               first paint. */}
           {isSingleFamily
-            && project.settings?.service_modification_type
-            && project.settings.service_modification_type !== 'new-service'
+            && isExistingConstructionProject(project)
             && (
               <div className="mt-3 flex flex-wrap items-center gap-2">
                 <label className="text-xs font-semibold text-[#888] uppercase">Existing Service Size</label>
@@ -847,8 +848,8 @@ export const DwellingLoadCalculator: React.FC<DwellingLoadCalculatorProps> = ({
               220.83 is always bucket method by NEC definition, so we disable
               the control with a note when an existing dwelling is active. */}
           {isSingleFamily && (() => {
-            const isExisting = project.settings?.service_modification_type
-              && project.settings.service_modification_type !== 'new-service';
+            // PR-2 Step 7 (2026-05-27): shared coercion helper.
+            const isExisting = isExistingConstructionProject(project);
             return (
               <div className="mt-3 flex flex-wrap items-center gap-2">
                 <label className="text-xs font-semibold text-[#888] uppercase">Calculation Method</label>
@@ -1486,8 +1487,7 @@ export const DwellingLoadCalculator: React.FC<DwellingLoadCalculatorProps> = ({
                     demand calc (×1.25 when continuous) and become circuits
                     with is_proposed=true on Generate Schedule. */}
                 {isSingleFamily
-                  && project.settings?.service_modification_type
-                  && project.settings.service_modification_type !== 'new-service'
+                  && isExistingConstructionProject(project)
                   && (
                   <div className="mt-4 pt-4 border-t border-gray-200">
                     <div className="flex justify-between items-center mb-2">
@@ -1628,8 +1628,8 @@ export const DwellingLoadCalculator: React.FC<DwellingLoadCalculatorProps> = ({
                     // service that holds, the "recommendation" IS the
                     // existing service — surface that, not the abstract
                     // NEC new-install number that would override it.
-                    const isExisting = project.settings?.service_modification_type
-                      && project.settings.service_modification_type !== 'new-service';
+                    // PR-2 Step 7 (2026-05-27): shared coercion helper.
+                    const isExisting = isExistingConstructionProject(project);
                     const existing = project.settings?.residential?.existingServiceAmps
                       ?? mainPanel?.main_breaker_amps;
                     const existingHolds = isExisting
@@ -1656,8 +1656,7 @@ export const DwellingLoadCalculator: React.FC<DwellingLoadCalculatorProps> = ({
                     existing service rating so the EE can answer "can my
                     125 A panel hold a new EV?" without leaving this page. */}
                 {isSingleFamily
-                  && project.settings?.service_modification_type
-                  && project.settings.service_modification_type !== 'new-service'
+                  && isExistingConstructionProject(project)
                   && (() => {
                     const existing = project.settings?.residential?.existingServiceAmps
                       ?? mainPanel?.main_breaker_amps;

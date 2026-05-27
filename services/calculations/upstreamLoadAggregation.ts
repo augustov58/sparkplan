@@ -144,19 +144,19 @@ export interface AggregatedLoad {
   panelId: string;
   panelName: string;
   occupancyType: OccupancyType;
-  
+
   // Connected loads (before demand factors)
   totalConnectedVA: number;
-  
+
   // Demand load (after applying NEC demand factors)
   totalDemandVA: number;
-  
+
   // Overall demand factor achieved
   overallDemandFactor: number;
-  
+
   // Breakdown by load type with demand calculations
   demandBreakdown: DemandCalculation[];
-  
+
   // Source breakdown (direct vs downstream)
   sourceBreakdown: Array<{
     sourceId: string;
@@ -164,13 +164,31 @@ export interface AggregatedLoad {
     sourceType: 'direct' | 'panel' | 'transformer';
     connectedVA: number;
   }>;
-  
+
   // Downstream counts
   downstreamPanelCount: number;
   transformerCount: number;
-  
+
   // NEC references applied
   necReferences: string[];
+
+  /**
+   * PR-2 Step 3 (2026-05-26): existing vs proposed split, derived from the
+   * `is_proposed` flag on contributing circuits. Both connected and demand
+   * splits sum to the totals above. Demand split is a proportional
+   * allocation of `totalDemandVA` by the connected-VA ratio — conservative
+   * and decoupled from the demand-factor pipeline so the precise NEC math
+   * stays unchanged.
+   *
+   * When no proposed circuits exist (i.e. the existing pre-PR-1 codebase
+   * state), `proposedConnectedVA` + `proposedDemandVA` are 0 and the
+   * existing values equal the totals. Tri-column rendering should gate
+   * on `proposedConnectedVA > 0`.
+   */
+  existingConnectedVA: number;
+  proposedConnectedVA: number;
+  existingDemandVA: number;
+  proposedDemandVA: number;
 }
 
 /**
@@ -807,6 +825,11 @@ export function calculateAggregatedLoad(
       necRefs.push('NEC 625.42 (EVEMS Load)');
     }
 
+    // PR-2 Step 3 (2026-05-26): existing/proposed split — MF dwelling path.
+    const mfSplit = computeProposedSplit(
+      panelId, panels, circuits, transformers, totalConnectedVA, totalDemandVA,
+    );
+
     return {
       panelId,
       panelName: panel.name,
@@ -819,6 +842,7 @@ export function calculateAggregatedLoad(
       downstreamPanelCount: panelCount,
       transformerCount,
       necReferences: necRefs,
+      ...mfSplit,
     };
   }
 
@@ -847,6 +871,11 @@ export function calculateAggregatedLoad(
     }
   }
 
+  // PR-2 Step 3 (2026-05-26): existing/proposed split — standard NEC 220 path.
+  const stdSplit = computeProposedSplit(
+    panelId, panels, circuits, transformers, totalConnectedVA, totalDemandVA,
+  );
+
   return {
     panelId,
     panelName: panel.name,
@@ -859,6 +888,7 @@ export function calculateAggregatedLoad(
     downstreamPanelCount: panelCount,
     transformerCount,
     necReferences,
+    ...stdSplit,
   };
 }
 
@@ -878,6 +908,103 @@ function createEmptyAggregatedLoad(panelId: string, panelName: string, occupancy
     downstreamPanelCount: 0,
     transformerCount: 0,
     necReferences: [],
+    // PR-2 Step 3 (2026-05-26): empty result has no contributing circuits,
+    // so the existing/proposed split is trivially zero on both sides.
+    existingConnectedVA: 0,
+    proposedConnectedVA: 0,
+    existingDemandVA: 0,
+    proposedDemandVA: 0,
+  };
+}
+
+/**
+ * PR-2 Step 3 (2026-05-26): collect the set of panel IDs in `rootPanelId`'s
+ * downstream subtree (direct + transformer-fed). Used to scope the
+ * existing/proposed circuit-VA split to the same hierarchy that
+ * `collectAllDownstreamLoads` traverses for totals.
+ *
+ * Pure / no side effects. The visited set is local to a single call.
+ */
+function collectDownstreamPanelIds(
+  rootPanelId: string,
+  panels: Panel[],
+  transformers: Transformer[],
+  visited: Set<string> = new Set(),
+): Set<string> {
+  if (visited.has(rootPanelId)) return visited;
+  visited.add(rootPanelId);
+
+  const directChildren = panels.filter(
+    p => p.fed_from_type === 'panel' && p.fed_from === rootPanelId,
+  );
+  for (const child of directChildren) {
+    collectDownstreamPanelIds(child.id, panels, transformers, visited);
+  }
+
+  const fedTransformers = transformers.filter(t => t.fed_from_panel_id === rootPanelId);
+  for (const xfmr of fedTransformers) {
+    const xfmrChildren = panels.filter(p => p.fed_from_transformer_id === xfmr.id);
+    for (const child of xfmrChildren) {
+      collectDownstreamPanelIds(child.id, panels, transformers, visited);
+    }
+  }
+
+  return visited;
+}
+
+/**
+ * PR-2 Step 3 (2026-05-26): compute the existing/proposed VA split for a
+ * panel + its downstream subtree by filtering circuits on `is_proposed`
+ * and summing `load_watts`. Demand split is allocated proportionally
+ * against the already-computed `totalDemandVA` — conservative because it
+ * matches the overall demand factor without re-running NEC tier math
+ * separately on each subset.
+ *
+ * EVEMS marker circuits are excluded (matches the connected-VA semantics
+ * used everywhere else in this module).
+ */
+function computeProposedSplit(
+  panelId: string,
+  panels: Panel[],
+  circuits: Circuit[],
+  transformers: Transformer[],
+  totalConnectedVA: number,
+  totalDemandVA: number,
+): {
+  existingConnectedVA: number;
+  proposedConnectedVA: number;
+  existingDemandVA: number;
+  proposedDemandVA: number;
+} {
+  const downstreamPanelIds = collectDownstreamPanelIds(panelId, panels, transformers);
+
+  let existingConnectedVA = 0;
+  let proposedConnectedVA = 0;
+
+  for (const c of circuits) {
+    if (!c.panel_id || !downstreamPanelIds.has(c.panel_id)) continue;
+    if (isEVEMSMarkerCircuit(c)) continue;
+
+    const va = c.load_watts || 0;
+    if (c.is_proposed) {
+      proposedConnectedVA += va;
+    } else {
+      existingConnectedVA += va;
+    }
+  }
+
+  const demandRatio = totalConnectedVA > 0 ? totalDemandVA / totalConnectedVA : 0;
+  const existingDemandVA = Math.round(existingConnectedVA * demandRatio);
+  // Final value uses subtraction (not separate proportional calc) so the
+  // two split demand values sum exactly to totalDemandVA — preserves
+  // arithmetic invariant for the LoadCalculationSummary tri-column.
+  const proposedDemandVA = Math.round(totalDemandVA) - existingDemandVA;
+
+  return {
+    existingConnectedVA,
+    proposedConnectedVA,
+    existingDemandVA,
+    proposedDemandVA,
   };
 }
 

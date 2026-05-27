@@ -409,12 +409,25 @@ export const MultiFamilyEVCalculator: React.FC<MultiFamilyEVCalculatorProps> = (
         return;
       }
 
-      // Generate EV-only entities
+      // Generate EV-only entities.
+      // PR-2 Step 2 (2026-05-26): derive projectIsExistingConstruction from
+      // the project's service_modification_type setting. Matches the UI's
+      // `?? 'existing'` default at ProjectSetup.tsx:286 and the gate
+      // coercion landed in PR-2 Step 1. Greenfield projects ('new-service')
+      // get is_proposed=false so the EV gear doesn't carry a stray "NEW"
+      // badge next to other panels in the design that don't.
+      const serviceModType =
+        (project?.settings?.service_modification_type as
+          | 'existing' | 'service-upgrade' | 'new-service' | undefined)
+        ?? 'existing';
+      const projectIsExistingConstruction = serviceModType !== 'new-service';
+
       const evInfra = generateEVInfrastructure(result, {
         scenario: selectedScenario,
         projectId,
         evAmpsPerCharger,
         evChargerLevel,
+        projectIsExistingConstruction,
       });
 
       // Add to existing project
@@ -433,7 +446,7 @@ export const MultiFamilyEVCalculator: React.FC<MultiFamilyEVCalculatorProps> = (
       setIsApplying(false);
       setApplyProgress(null);
     }
-  }, [projectId, result, selectedScenario, evAmpsPerCharger, evChargerLevel]);
+  }, [projectId, result, selectedScenario, evAmpsPerCharger, evChargerLevel, project]);
 
   // Quick check for header summary
   const quickCheck = useMemo(() => {

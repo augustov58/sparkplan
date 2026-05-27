@@ -1894,6 +1894,57 @@ export const LoadCalculationSummary: React.FC<LoadSummaryProps> = ({
         </View>
       </View>
 
+      {/* PR-2 Step 3 (2026-05-26): Existing vs Proposed split.
+          Renders only when downstream circuits include at least one
+          is_proposed=true entity. Surfaces the before/after picture so
+          AHJ reviewers can see how much load the project is ADDING vs
+          inheriting from the existing service. The split is a
+          proportional allocation of the precise NEC demand total,
+          decoupled from the demand-factor pipeline. */}
+      {aggregate && aggregate.proposedConnectedVA > 0 && (
+        <>
+          <Text style={themeStyles.sectionTitle}>EXISTING vs PROPOSED LOAD SPLIT</Text>
+          <View style={themeStyles.table}>
+            <View style={themeStyles.tableHeaderRow}>
+              <Text style={[themeStyles.th, { width: '28%' }]}>Category</Text>
+              <Text style={[themeStyles.th, { width: '24%', textAlign: 'right' }]}>
+                Existing (kVA)
+              </Text>
+              <Text style={[themeStyles.th, { width: '24%', textAlign: 'right' }]}>
+                Proposed (kVA)
+              </Text>
+              <Text style={[themeStyles.th, { width: '24%', textAlign: 'right' }]}>
+                Total (kVA)
+              </Text>
+            </View>
+            <View style={themeStyles.tableRow}>
+              <Text style={[themeStyles.td, { width: '28%' }]}>Connected Load</Text>
+              <Text style={[themeStyles.tdNum, { width: '24%' }]}>
+                {(aggregate.existingConnectedVA / 1000).toFixed(2)}
+              </Text>
+              <Text style={[themeStyles.tdNum, { width: '24%' }]}>
+                {(aggregate.proposedConnectedVA / 1000).toFixed(2)}
+              </Text>
+              <Text style={[themeStyles.tdNum, { width: '24%' }]}>
+                {(aggregate.totalConnectedVA / 1000).toFixed(2)}
+              </Text>
+            </View>
+            <View style={themeStyles.tableRowAlt}>
+              <Text style={[themeStyles.td, { width: '28%' }]}>Calculated Demand</Text>
+              <Text style={[themeStyles.tdNum, { width: '24%' }]}>
+                {(aggregate.existingDemandVA / 1000).toFixed(2)}
+              </Text>
+              <Text style={[themeStyles.tdNum, { width: '24%' }]}>
+                {(aggregate.proposedDemandVA / 1000).toFixed(2)}
+              </Text>
+              <Text style={[themeStyles.tdNum, { width: '24%' }]}>
+                {(aggregate.totalDemandVA / 1000).toFixed(2)}
+              </Text>
+            </View>
+          </View>
+        </>
+      )}
+
       {((dwellingBreakdown && dwellingBreakdown.length > 0)
         || (aggregate && aggregate.demandBreakdown.length > 0)) && (
         <>
