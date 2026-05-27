@@ -41,6 +41,22 @@ export interface MultiFamilyContext {
    * If undefined, falls back to `evLoadVA` (preserves pre-C4 behavior).
    */
   evDemandVA?: number;
+  /**
+   * Sprint 3 (2026-05-27): top-level EV panel IDs under the MDP. The
+   * existing/proposed demand split walks each EV panel's downstream
+   * subtree to partition is_proposed share within the EV row's demand
+   * (rather than spreading the global blended demand factor uniformly,
+   * which produced the 4-plex 23.27 vs 28.32 kVA mismatch on E-101).
+   * Optional — legacy callers that hand-build the context without
+   * these fields fall back to the proportional split.
+   */
+  evPanelIds?: string[];
+  /**
+   * Sprint 3 (2026-05-27): top-level house/common-area panel IDs under
+   * the MDP. Same partitioning role as `evPanelIds` for the
+   * house-panel row.
+   */
+  housePanelIds?: string[];
 }
 
 /**
@@ -826,9 +842,24 @@ export function calculateAggregatedLoad(
     }
 
     // PR-2 Step 3 (2026-05-26): existing/proposed split — MF dwelling path.
-    const mfSplit = computeProposedSplit(
-      panelId, panels, circuits, transformers, totalConnectedVA, totalDemandVA,
-    );
+    // Sprint 3 (2026-05-27): when the MF context carries the per-subset
+    // panel IDs (the new path), use per-subset allocation so the EV row's
+    // demand (post NEC 625.42 clamp) isn't blended with NEC 220.84 dwelling
+    // demand at the same proportional factor. Legacy contexts without
+    // `evPanelIds`/`housePanelIds` fall back to the original proportional
+    // split — preserves the Sprint 2 4-unit regression test (no EV / no
+    // house → single subset → same numeric result as proportional).
+    const hasSubsetProvenance =
+      (multiFamilyContext.evPanelIds && multiFamilyContext.evPanelIds.length > 0)
+      || (multiFamilyContext.housePanelIds && multiFamilyContext.housePanelIds.length > 0);
+    const mfSplit = hasSubsetProvenance
+      ? computeMFProposedSplit(
+          panelId, panels, circuits, transformers,
+          multiFamilyContext, dwellingDemandVA, housePanelLoadVA, evDemandVA,
+        )
+      : computeProposedSplit(
+          panelId, panels, circuits, transformers, totalConnectedVA, totalDemandVA,
+        );
 
     return {
       panelId,
@@ -1009,6 +1040,141 @@ function computeProposedSplit(
 }
 
 /**
+ * Sprint 3 (2026-05-27) — per-subset existing/proposed split for the
+ * NEC 220.84 multi-family path.
+ *
+ * The proportional `computeProposedSplit` (above) spreads the BLENDED
+ * demand factor uniformly over connected VA. When the MF path has
+ * subsets with different demand factors (NEC 220.84 dwelling @ 45% +
+ * NEC 625.42 EVEMS-clamped EV @ 59%), uniform spreading produces a
+ * "proposed" column that disagrees with the per-row demand breakdown
+ * on the same packet. On the 4-plex this surfaced as: E-101's tri-
+ * column proposed = 23.27 kVA (47.88 × 0.486 blended), while the EV
+ * breakdown row demand = 28.32 kVA (47.88 × 0.59 EVEMS-clamped) —
+ * ~5 kVA apart for the same EV load.
+ *
+ * The fix: partition circuits into the same three subsets the MF
+ * branch uses (EV / house / dwelling-remainder) and apply each
+ * subset's is_proposed_share to that subset's demand VA. Sum across
+ * subsets gives the true proposed demand. Sum invariant preserved by
+ * subtraction.
+ *
+ * For the 4-plex with 100%-proposed EV bank:
+ *   EV subset:    47.88 connected (all proposed) × 28.32 demand → 28.32 proposed
+ *   Dwelling:     143.40 connected (all existing) × 64.53 demand → 0 proposed
+ *   House:        0 → 0
+ *   proposedDemandVA = 28.32 kVA — matches the EV breakdown row exactly.
+ *
+ * Degrades gracefully:
+ *   - No EV / house subset → all circuits in dwelling-remainder, behaves
+ *     identically to the proportional split for a single subset
+ *     (preserves the Sprint 2 4-unit regression test that expected 13.5/4.5).
+ *   - Legacy `MultiFamilyContext` without `evPanelIds`/`housePanelIds`
+ *     → caller falls back to `computeProposedSplit` (proportional).
+ */
+function computeMFProposedSplit(
+  mdpId: string,
+  panels: Panel[],
+  circuits: Circuit[],
+  transformers: Transformer[],
+  ctx: MultiFamilyContext,
+  dwellingDemandVA: number,
+  housePanelDemandVA: number,
+  evDemandVA: number,
+): {
+  existingConnectedVA: number;
+  proposedConnectedVA: number;
+  existingDemandVA: number;
+  proposedDemandVA: number;
+} {
+  const downstreamPanelIds = collectDownstreamPanelIds(mdpId, panels, transformers);
+
+  // Expand each top-level EV / house panel into its full downstream subtree
+  // (EV sub-panels and grandchildren contribute too — the buildMultiFamilyContext
+  // recursion already counts them via calculateAggregatedLoad).
+  const evPanelSet = new Set<string>();
+  for (const evPid of ctx.evPanelIds ?? []) {
+    for (const pid of collectDownstreamPanelIds(evPid, panels, transformers)) {
+      evPanelSet.add(pid);
+    }
+  }
+  const housePanelSet = new Set<string>();
+  for (const hPid of ctx.housePanelIds ?? []) {
+    for (const pid of collectDownstreamPanelIds(hPid, panels, transformers)) {
+      housePanelSet.add(pid);
+    }
+  }
+
+  // Partition every contributing circuit into one of three subsets.
+  // Note: EV and house subsets are disjoint by construction (panel name
+  // can include only one of "ev" / "house" — there's no overlap).
+  let evExistingConnected = 0;
+  let evProposedConnected = 0;
+  let houseExistingConnected = 0;
+  let houseProposedConnected = 0;
+  let dwellingExistingConnected = 0;
+  let dwellingProposedConnected = 0;
+
+  for (const c of circuits) {
+    if (!c.panel_id || !downstreamPanelIds.has(c.panel_id)) continue;
+    if (isEVEMSMarkerCircuit(c)) continue;
+    const va = c.load_watts || 0;
+    if (evPanelSet.has(c.panel_id)) {
+      if (c.is_proposed) evProposedConnected += va;
+      else evExistingConnected += va;
+    } else if (housePanelSet.has(c.panel_id)) {
+      if (c.is_proposed) houseProposedConnected += va;
+      else houseExistingConnected += va;
+    } else {
+      if (c.is_proposed) dwellingProposedConnected += va;
+      else dwellingExistingConnected += va;
+    }
+  }
+
+  // For each subset: proposed_demand = subset_demand × (proposed_connected /
+  // total_connected). Guards div-by-zero by short-circuiting empty subsets.
+  const partitionProposedDemand = (
+    existingConn: number,
+    proposedConn: number,
+    subsetDemandVA: number,
+  ): number => {
+    const total = existingConn + proposedConn;
+    if (total <= 0 || subsetDemandVA <= 0) return 0;
+    return subsetDemandVA * (proposedConn / total);
+  };
+
+  const evProposedDemand = partitionProposedDemand(
+    evExistingConnected, evProposedConnected, evDemandVA,
+  );
+  const houseProposedDemand = partitionProposedDemand(
+    houseExistingConnected, houseProposedConnected, housePanelDemandVA,
+  );
+  const dwellingProposedDemand = partitionProposedDemand(
+    dwellingExistingConnected, dwellingProposedConnected, dwellingDemandVA,
+  );
+
+  const totalConnectedVA = evExistingConnected + evProposedConnected
+    + houseExistingConnected + houseProposedConnected
+    + dwellingExistingConnected + dwellingProposedConnected;
+  const proposedConnectedVA = evProposedConnected + houseProposedConnected + dwellingProposedConnected;
+  const existingConnectedVA = totalConnectedVA - proposedConnectedVA;
+
+  const totalDemandVA = dwellingDemandVA + housePanelDemandVA + evDemandVA;
+  const proposedDemandVA = Math.round(
+    evProposedDemand + houseProposedDemand + dwellingProposedDemand,
+  );
+  // Subtraction preserves the sum invariant (matches `computeProposedSplit`).
+  const existingDemandVA = Math.round(totalDemandVA) - proposedDemandVA;
+
+  return {
+    existingConnectedVA,
+    proposedConnectedVA,
+    existingDemandVA,
+    proposedDemandVA,
+  };
+}
+
+/**
  * Gets aggregated loads for all panels in a project
  */
 export function getAllPanelAggregatedLoads(
@@ -1084,20 +1250,24 @@ export function buildMultiFamilyContext(
     evDemandVA += result.totalDemandVA;
   }
 
-  const housePanelLoadVA = downstreamFromMDP
-    .filter(p => p.name.toLowerCase().includes('house'))
-    .reduce(
-      (sum, p) =>
-        sum +
-        calculateAggregatedLoad(p.id, panels, circuits, transformers, 'dwelling').totalConnectedVA,
-      0,
-    );
+  const housePanels = downstreamFromMDP.filter(p => p.name.toLowerCase().includes('house'));
+  const housePanelLoadVA = housePanels.reduce(
+    (sum, p) =>
+      sum +
+      calculateAggregatedLoad(p.id, panels, circuits, transformers, 'dwelling').totalConnectedVA,
+    0,
+  );
 
   return {
     dwellingUnits: totalUnits,
     evLoadVA: evLoadVA > 0 ? evLoadVA : undefined,
     evDemandVA: evLoadVA > 0 && evDemandVA !== evLoadVA ? evDemandVA : undefined,
     housePanelLoadVA: housePanelLoadVA > 0 ? housePanelLoadVA : undefined,
+    // Sprint 3 (2026-05-27): expose the panel IDs so the existing/proposed
+    // demand split can partition the EV / house / dwelling subsets without
+    // re-doing the "name includes ev" / "name includes house" classification.
+    evPanelIds: evPanels.length > 0 ? evPanels.map(p => p.id) : undefined,
+    housePanelIds: housePanels.length > 0 ? housePanels.map(p => p.id) : undefined,
   };
 }
 

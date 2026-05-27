@@ -9,6 +9,7 @@ import { generatePermitPacket, generateLightweightPermitPacket, type PermitPacke
 import { AttachmentUploadCard } from './AttachmentUploadCard';
 import { useProjectAttachments, downloadAttachmentBytes, type ArtifactType, type CoverMode } from '../hooks/useProjectAttachments';
 import type { NEC22087NarrativeData, NEC22087Method } from '../services/pdfExport/PermitPacketDocuments';
+import { deriveNarrativeOccupancy } from '../lib/projectSettings';
 import {
   DEFAULT_SECTIONS,
   resolveSections,
@@ -1086,8 +1087,13 @@ export const PermitPacketGenerator: React.FC<PermitPacketGeneratorProps> = ({ pr
         const serviceCapacityAmps = mainPanel?.bus_rating
           ?? mainPanel?.main_breaker_amps
           ?? 200; // sensible fallback for residential
+        // Sprint 3 (2026-05-27): occupancy axis for the calculated-method
+        // narrative. Drives which NEC 220 Part III subsections are cited.
+        // No-op for measured / manual methods — the helper ignores
+        // `occupancy` when `method !== 'calculated'`.
         const narrative: NEC22087NarrativeData = {
           method: nec22087Method,
+          occupancy: deriveNarrativeOccupancy(currentProject),
           dataSourceCitation: nec22087DataSource.trim(),
           dateRangeFrom: nec22087DateFrom || new Date(Date.now() - 365 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]!,
           dateRangeTo: nec22087DateTo || new Date().toISOString().split('T')[0]!,

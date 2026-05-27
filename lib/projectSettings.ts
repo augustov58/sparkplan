@@ -20,6 +20,10 @@
  */
 
 import type { Project } from '../types';
+// Type-only import — `NarrativeOccupancy` is a string union, fully erased at
+// build time. No runtime dependency on PermitPacketDocuments.tsx (which would
+// otherwise pull in @react-pdf/renderer).
+import type { NarrativeOccupancy } from '../services/pdfExport/PermitPacketDocuments';
 
 /** Just the slice of Project this module needs — keeps imports loose. */
 type ProjectLike = {
@@ -40,4 +44,37 @@ type ProjectLike = {
 export function isExistingConstructionProject(project: ProjectLike | Project): boolean {
   const value = project.settings?.service_modification_type;
   return (value ?? 'existing') !== 'new-service';
+}
+
+/**
+ * Sprint 3 (2026-05-27): derive the narrative occupancy kind from a Project.
+ *
+ * Drives the NEC 220 Part III subsections cited on the calculated-method
+ * existing-service narrative page. Decision tree:
+ *
+ *   Commercial project type             → 'commercial'        (220.42 / 220.44 / 220.56)
+ *   Industrial project type             → 'industrial'        (220.42 / 220.56)
+ *   Residential + multi_family dwelling → 'dwelling_multi_family'        (220.42 / 220.84)
+ *   Residential + single_family + existing → 'dwelling_single_family_existing' (220.42 / 220.83)
+ *   Residential + single_family + new   → 'dwelling_single_family_new'   (220.42 / 220.82)
+ *
+ * Defaults:
+ *   - Missing `settings.residential.dwellingType` → 'single_family'
+ *     (matches the codebase's existing default at PermitPacketGenerator.tsx:657 / :907)
+ *   - Missing `settings.service_modification_type` → 'existing'
+ *     (via [[isExistingConstructionProject]] above)
+ *
+ * Pure function. No DB, no hooks, no side effects.
+ */
+export function deriveNarrativeOccupancy(project: Project): NarrativeOccupancy {
+  if (project.type === 'Commercial') return 'commercial';
+  if (project.type === 'Industrial') return 'industrial';
+  const residential = project.settings?.residential as
+    | { dwellingType?: string }
+    | undefined;
+  const isMultiFamily = (residential?.dwellingType ?? 'single_family') === 'multi_family';
+  if (isMultiFamily) return 'dwelling_multi_family';
+  return isExistingConstructionProject(project)
+    ? 'dwelling_single_family_existing'
+    : 'dwelling_single_family_new';
 }

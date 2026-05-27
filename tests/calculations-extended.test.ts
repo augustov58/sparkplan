@@ -1725,6 +1725,250 @@ describe('Upstream Load Aggregation — NEC 220.84 Optional Method (C1)', () => 
       expect(result.existingDemandVA + result.proposedDemandVA).toBe(Math.round(result.totalDemandVA));
     });
   });
+
+  /**
+   * Sprint 3 (2026-05-27) — per-subset existing/proposed demand allocation
+   * for the NEC 220.84 multi-family path.
+   *
+   * The proportional `computeProposedSplit` spreads the BLENDED demand
+   * factor uniformly over connected VA. That mis-allocates when subsets
+   * have different demand factors. The 4-plex E-101 / E-102 quirk:
+   * dwelling demand @ NEC 220.84 45% + EV demand @ NEC 625.42 EVEMS clamp
+   * 59% → blended factor 48.6%. The EV row (all is_proposed) showed
+   * 47.88 × 0.486 = 23.27 kVA on the tri-column but 47.88 × 0.59 =
+   * 28.32 kVA on its own breakdown row — same EV load, two numbers,
+   * ~5 kVA apart on the same packet.
+   *
+   * The fix: partition circuits into EV / house / dwelling-remainder
+   * subsets and apply each subset's is_proposed_share to that subset's
+   * demand VA. Sum across subsets → proposed demand. Sum invariant
+   * preserved by subtraction (existingDemandVA + proposedDemandVA =
+   * round(totalDemandVA)).
+   *
+   * This test pins the 4-plex EV scenario. A regression silently
+   * re-introduces the cross-row numeric drift on packets with separate
+   * demand-factor subsets.
+   */
+  describe('Sprint 3: MF per-subset proposed-demand allocation', () => {
+    it('EV subset all-proposed → proposed demand equals EV row demand (not blended proportional)', () => {
+      // 4-unit MF + dedicated EV panel (the 4-plex shape).
+      // Dwelling: 4 units × 10 kVA general = 40 kVA connected, NEC 220.84 @ 45% → 18 kVA demand.
+      // EV: 12 kVA × 4 chargers = 48 kVA connected, simple 100% demand → 48 kVA (no clamp).
+      // All EV circuits is_proposed=true. All dwelling circuits is_proposed=false.
+      //
+      // Per-subset allocation (Sprint 3):
+      //   EV: 48 connected all proposed → proposed_share=1.0 → 48 kVA to proposed.
+      //   Dwelling: 40 connected all existing → 0 to proposed.
+      //   → proposedDemandVA = 48 kVA, existingDemandVA = 18 kVA.
+      //
+      // Old proportional allocation (what we're fixing):
+      //   demandRatio = (18+48)/(40+48) = 66/88 = 0.75
+      //   existing_demand = 40 × 0.75 = 30 kVA (wrong — dwelling demand is only 18 kVA)
+      //   proposed_demand = 66 - 30 = 36 kVA (wrong — should be the full EV demand, 48 kVA)
+      const mdp = makePanel({ id: 'mdp', name: 'MF MDP', is_main: true, bus_rating: 400 });
+      const unitPanels: Panel[] = Array.from({ length: 4 }, (_, i) =>
+        makePanel({
+          id: `p-unit-${301 + i}`,
+          name: `Unit ${301 + i} Panel`,
+          fed_from_type: 'panel',
+          fed_from: 'mdp',
+        }),
+      );
+      const evPanel = makePanel({
+        id: 'p-ev',
+        name: 'EV Sub-Panel',
+        fed_from_type: 'panel',
+        fed_from: 'mdp',
+        bus_rating: 200,
+      });
+      const allPanels = [mdp, ...unitPanels, evPanel];
+
+      const dwellingCircuits: Circuit[] = unitPanels.map((p, i) =>
+        ({
+          id: `c-${p.id}-10000`,
+          panel_id: p.id,
+          load_watts: 10_000,
+          load_type: 'O',
+          project_id: 'proj-sprint3',
+          circuit_number: 1,
+          pole: 1,
+          breaker_amps: 50,
+          description: `Unit ${301 + i} general`,
+          is_proposed: false,
+        } as unknown as Circuit),
+      );
+      const evCircuits: Circuit[] = Array.from({ length: 4 }, (_, i) =>
+        ({
+          id: `c-ev-${i}`,
+          panel_id: 'p-ev',
+          load_watts: 12_000,
+          load_type: 'O',
+          project_id: 'proj-sprint3',
+          circuit_number: i + 1,
+          pole: 2,
+          breaker_amps: 50,
+          description: `EVSE ${i + 1} (Level 2)`,
+          is_proposed: true,
+        } as unknown as Circuit),
+      );
+      const circuits = [...dwellingCircuits, ...evCircuits];
+
+      const ctx = buildMultiFamilyContext(mdp, allPanels, circuits, [], {
+        occupancyType: 'dwelling',
+        residential: { dwellingType: 'multi_family', totalUnits: 4 },
+      });
+      expect(ctx).toBeDefined();
+      // Sprint 3: context must surface the EV panel ID so the split function
+      // can partition the EV subset out from dwelling-remainder.
+      expect(ctx?.evPanelIds).toEqual(['p-ev']);
+
+      const result = calculateAggregatedLoad(
+        mdp.id, allPanels, circuits, [], 'dwelling', ctx,
+      );
+
+      // Sanity: total connected nameplate.
+      expect(result.totalConnectedVA).toBe(88_000); // 40 + 48
+      // Connected split partitions correctly via is_proposed flag (unchanged
+      // from Sprint 2 — the connected side was always exact).
+      expect(result.existingConnectedVA).toBe(40_000);
+      expect(result.proposedConnectedVA).toBe(48_000);
+
+      // Total demand: 40 × 0.45 (NEC 220.84, 4 units) + 48 × 1.0 = 18 + 48 = 66 kVA.
+      expect(result.totalDemandVA).toBe(66_000);
+
+      // Sprint 3 regression: proposed demand = full EV row demand (48 kVA),
+      // not the blended 36 kVA the old proportional split would produce.
+      // The EV row's demandVA on the breakdown should match this exactly.
+      const evRow = result.demandBreakdown.find(d => d.loadType.includes('EV'));
+      expect(evRow?.demandVA).toBe(48_000);
+      expect(result.proposedDemandVA).toBe(48_000);
+      expect(result.existingDemandVA).toBe(18_000);
+
+      // Sum invariant — preserved by subtraction (matches Sprint 2 invariant).
+      expect(result.existingDemandVA + result.proposedDemandVA).toBe(Math.round(result.totalDemandVA));
+    });
+
+    it('mixed-proposed EV subset → demand split is proportional within the EV subset only', () => {
+      // Same MF + EV shape but only HALF the EV circuits are proposed.
+      // EV subset: 2 of 4 chargers @ 12 kVA each are is_proposed → 24/48 connected proposed.
+      // Per-subset (Sprint 3): EV proposed_share = 24/48 = 0.5 → 48 × 0.5 = 24 kVA to proposed.
+      // Dwelling subset still all existing.
+      // → proposedDemandVA = 24 kVA, existingDemandVA = 66 - 24 = 42 kVA.
+      const mdp = makePanel({ id: 'mdp', name: 'MF MDP', is_main: true, bus_rating: 400 });
+      const unitPanels: Panel[] = Array.from({ length: 4 }, (_, i) =>
+        makePanel({
+          id: `p-unit-${401 + i}`,
+          name: `Unit ${401 + i} Panel`,
+          fed_from_type: 'panel',
+          fed_from: 'mdp',
+        }),
+      );
+      const evPanel = makePanel({
+        id: 'p-ev',
+        name: 'EV Sub-Panel',
+        fed_from_type: 'panel',
+        fed_from: 'mdp',
+        bus_rating: 200,
+      });
+      const allPanels = [mdp, ...unitPanels, evPanel];
+
+      const dwellingCircuits: Circuit[] = unitPanels.map((p, i) =>
+        ({
+          id: `c-${p.id}-10000`,
+          panel_id: p.id,
+          load_watts: 10_000,
+          load_type: 'O',
+          project_id: 'proj-sprint3-mixed',
+          circuit_number: 1,
+          pole: 1,
+          breaker_amps: 50,
+          description: `Unit ${401 + i} general`,
+          is_proposed: false,
+        } as unknown as Circuit),
+      );
+      const evCircuits: Circuit[] = Array.from({ length: 4 }, (_, i) =>
+        ({
+          id: `c-ev-mixed-${i}`,
+          panel_id: 'p-ev',
+          load_watts: 12_000,
+          load_type: 'O',
+          project_id: 'proj-sprint3-mixed',
+          circuit_number: i + 1,
+          pole: 2,
+          breaker_amps: 50,
+          description: `EVSE ${i + 1} (Level 2)`,
+          is_proposed: i >= 2, // first 2 existing, last 2 proposed
+        } as unknown as Circuit),
+      );
+      const circuits = [...dwellingCircuits, ...evCircuits];
+
+      const ctx = buildMultiFamilyContext(mdp, allPanels, circuits, [], {
+        occupancyType: 'dwelling',
+        residential: { dwellingType: 'multi_family', totalUnits: 4 },
+      });
+
+      const result = calculateAggregatedLoad(
+        mdp.id, allPanels, circuits, [], 'dwelling', ctx,
+      );
+
+      // Half the EV circuits are proposed → 24 of 48 kVA EV connected proposed.
+      expect(result.proposedConnectedVA).toBe(24_000);
+      // Per-subset proposed demand: dwelling 0 + EV (48 × 0.5) = 24 kVA.
+      expect(result.proposedDemandVA).toBe(24_000);
+      // Existing = total demand - proposed (subtraction preserves sum invariant).
+      expect(result.existingDemandVA).toBe(result.totalDemandVA - 24_000);
+      expect(result.existingDemandVA + result.proposedDemandVA).toBe(Math.round(result.totalDemandVA));
+    });
+
+    it('no EV / no house panels (single-subset MF) → degrades to proportional (Sprint 2 4-unit regression unchanged)', () => {
+      // Same fixture as the Sprint 2 NEC 220.87 auto-source test above but
+      // pinned here to make the back-compat explicit: when MultiFamilyContext
+      // has no evPanelIds and no housePanelIds (or empty arrays), the
+      // single-subset (dwelling-only) result is numerically identical to the
+      // old proportional allocation. This guards against a Sprint 3
+      // regression that would silently change the 13_500 / 4_500 numbers.
+      const mdp = makePanel({ id: 'mdp', name: 'MF MDP', is_main: true, bus_rating: 200 });
+      const unitPanels: Panel[] = Array.from({ length: 4 }, (_, i) =>
+        makePanel({
+          id: `p-unit-${501 + i}`,
+          name: `Unit ${501 + i} Panel`,
+          fed_from_type: 'panel',
+          fed_from: 'mdp',
+        }),
+      );
+      const circuits: Circuit[] = unitPanels.map((p, i) =>
+        ({
+          id: `c-${p.id}-10000`,
+          panel_id: p.id,
+          load_watts: 10_000,
+          load_type: 'O',
+          project_id: 'proj-sprint3-noev',
+          circuit_number: 1,
+          pole: 1,
+          breaker_amps: 50,
+          description: `Unit ${501 + i} general`,
+          is_proposed: i === 3,
+        } as unknown as Circuit),
+      );
+
+      const ctx = buildMultiFamilyContext(mdp, [mdp, ...unitPanels], circuits, [], {
+        occupancyType: 'dwelling',
+        residential: { dwellingType: 'multi_family', totalUnits: 4 },
+      });
+      // No EV / house panels → context omits the panel-ID arrays entirely.
+      expect(ctx?.evPanelIds).toBeUndefined();
+      expect(ctx?.housePanelIds).toBeUndefined();
+
+      const result = calculateAggregatedLoad(
+        mdp.id, [mdp, ...unitPanels], circuits, [], 'dwelling', ctx,
+      );
+
+      // Single-subset (dwelling-only) result must equal the proportional
+      // result: 30/40 × 18k = 13.5k existing, 4.5k proposed.
+      expect(result.existingDemandVA).toBe(13_500);
+      expect(result.proposedDemandVA).toBe(4_500);
+    });
+  });
 });
 
 // ============================================================================
