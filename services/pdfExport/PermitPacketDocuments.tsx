@@ -2329,12 +2329,85 @@ const METHOD_LABEL: Record<NEC22087Method, string> = {
   manual: 'Manual entry (informational only \u2014 AHJ may require source documentation)',
 };
 
+// Sprint 2 (2026-05-27, follow-up): NEC 220.87 is the section name for
+// the MEASURED-demand path. Calculated loads use NEC 220 Part III directly
+// \u2014 there is no "Method 2 = calculated" inside 220.87 (the codebase
+// previously labeled it that way as a convenience, but the citation was
+// misleading to AHJ reviewers).
 const METHOD_NEC_REF: Record<NEC22087Method, string> = {
-  utility_bill: 'NEC 220.87 Method 1 \u2014 actual maximum demand',
-  load_study: 'NEC 220.87 Method 1 \u2014 actual maximum demand (load study)',
-  calculated: 'NEC 220.87 Method 2 \u2014 calculated using NEC 220.82/220.84',
-  manual: 'NEC 220.87 \u2014 method unspecified',
+  utility_bill: 'NEC 220.87 \u2014 actual maximum demand from utility billing',
+  load_study: 'NEC 220.87 \u2014 actual maximum demand from recording load study',
+  calculated: 'NEC 220 Part III calculation \u2014 demand factors from NEC 220.42 / 220.82 / 220.84 (not NEC 220.87, which is for measured demand)',
+  manual: 'NEC 220.87 (defensive default) \u2014 method unspecified, 125% multiplier applied',
 };
+
+/**
+ * Method-aware copy bundle for the existing-service narrative page.
+ *
+ * NEC 220.87 narrative wording applies only to MEASURED demand methods
+ * (`utility_bill` / `load_study`). When existing demand is `calculated`
+ * from the project's panel schedule via NEC 220 Part III, we're not
+ * invoking 220.87 \u2014 the narrative needs to cite NEC 220 Part III and
+ * drop the 125% / 220.87(2) language. `manual` falls back to the 220.87
+ * narrative because of the defensive 1.25\u00d7 default (provenance unknown).
+ *
+ * Centralizing the per-method copy here means the page component, the
+ * orchestrator's TOC title, and any future caller pull from the same
+ * source of truth \u2014 no copy drift across surfaces.
+ */
+export interface NEC22087NarrativeCopy {
+  sheetHeader: string;        // BrandBar pageLabel
+  pageSubtitleSuffix: string; // After "ProjectName \u2022 "
+  conditionsHeader: string;   // Section title before the 3-condition checklist
+  condition1Header: string;
+  condition2Header: string;
+  condition3Header: string;
+  verdictAdequateBanner: string;
+  verdictAdequateBody: string;
+  verdictInadequateBody: string;
+  tocTitle: string;           // Table of Contents entry
+}
+
+export function getNEC22087NarrativeCopy(method: NEC22087Method): NEC22087NarrativeCopy {
+  if (method === 'calculated') {
+    return {
+      sheetHeader: 'EXISTING LOAD CALCULATION',
+      pageSubtitleSuffix: 'NEC 220 Part III \u2014 Calculated Existing Load + Proposed Addition',
+      conditionsHeader: 'CONDITIONS FOR EXISTING SERVICE CAPACITY VERIFICATION',
+      condition1Header: 'Existing load calculated from the project\u2019s panel schedule using NEC 220 Part III demand factors',
+      condition2Header: 'Calculated existing demand plus the proposed new load does not exceed the service ampacity',
+      condition3Header: 'Feeder OCPD per NEC 240.4 and service overload per NEC 230.90',
+      verdictAdequateBanner: 'EXISTING SERVICE ADEQUATE (PER NEC 220 PART III CALCULATION)',
+      verdictAdequateBody:
+        'The existing service has sufficient capacity for the proposed new load. NEC 220.87 is not invoked here \u2014 ' +
+        'existing demand is calculated using NEC 220 Part III demand factors (220.42 / 220.82 / 220.84 / etc.), and ' +
+        'those factors already provide the NEC-required diversity allowance.',
+      verdictInadequateBody:
+        'The proposed new load combined with the calculated existing demand exceeds the service ampacity. ' +
+        'A service upgrade or load management (NEC 750 / NEC 625.42) is required.',
+      tocTitle: 'NEC 220 Calculated Existing Load \u2014 Service Capacity Verification',
+    };
+  }
+  // measured (`utility_bill` / `load_study`) + `manual` fall back to the
+  // NEC 220.87 narrative because both paths apply the 125% multiplier
+  // (measured: per 220.87(B) on historical data; manual: defensive default).
+  return {
+    sheetHeader: 'NEC 220.87 NARRATIVE',
+    pageSubtitleSuffix: 'NEC 220.87 \u2014 Determining Existing Loads',
+    conditionsHeader: 'CONDITIONS PER NEC 220.87',
+    condition1Header: 'Maximum demand data is available for a 1-year period (NEC 220.87(1))',
+    condition2Header: 'Maximum demand at 125% plus the new load does not exceed the ampacity (NEC 220.87(2))',
+    condition3Header: 'Feeder OCPD per NEC 240.4 and service overload per NEC 230.90 (NEC 220.87(3))',
+    verdictAdequateBanner: 'EXISTING SERVICE ADEQUATE PER NEC 220.87',
+    verdictAdequateBody:
+      'Per NEC 220.87, the existing service has sufficient capacity for the proposed new load. ' +
+      'Contractor\u2019s signature on this sheet attests that the three conditions above are verified.',
+    verdictInadequateBody:
+      'The proposed new load combined with the existing maximum demand exceeds the service ampacity. ' +
+      'NEC 220.87 cannot be claimed; a service upgrade or load management (NEC 750 / NEC 625.42) is required.',
+    tocTitle: 'NEC 220.87 \u2014 Existing Service Capacity Verification',
+  };
+}
 
 const serviceCapacityKVA = (amps: number, volts: number, phase: 1 | 3): number => {
   if (phase === 3) return (amps * volts * 1.732) / 1000;
@@ -2353,11 +2426,31 @@ export const NEC22087NarrativePage: React.FC<NEC22087NarrativePageProps> = ({
     data.serviceVoltage,
     data.servicePhase,
   );
-  // NEC 220.87: measured methods (utility bill / load study) use the value
-  // directly; calculated/manual methods apply the 125% safety multiplier.
-  const isMeasured = data.method === 'utility_bill' || data.method === 'load_study';
-  const adjustedExisting = isMeasured ? data.maxDemandKVA : data.maxDemandKVA * 1.25;
+  // Sprint 2 (2026-05-27, follow-up to demand unification): the 125%
+  // multiplier in NEC 220.87 is a safety margin on MEASURED historical
+  // demand — it accounts for the possibility that future peak exceeds
+  // recorded peak. For calculated demand the diversity allowance is
+  // already built into NEC 220 Part III demand factors (220.42/220.84/
+  // etc.), so applying 1.25× on top would double-count. Strict NEC
+  // reading: 220.87 is measured-only; calculated loads use NEC 220
+  // Part III without an additional safety factor. Only 'manual' entries
+  // — where the value's provenance (connected vs. demand) is unknown —
+  // get the 1.25× as a defensive default.
+  //
+  // Mirror change at services/calculations/serviceUpgrade.ts:164 — both
+  // implementations of the rule must stay in sync.
+  const valueIsAlreadyDemandAdjusted =
+    data.method === 'utility_bill'
+    || data.method === 'load_study'
+    || data.method === 'calculated';
+  const adjustedExisting = valueIsAlreadyDemandAdjusted
+    ? data.maxDemandKVA
+    : data.maxDemandKVA * 1.25;
   const totalFutureDemand = adjustedExisting + data.proposedNewLoadKVA;
+  // Sprint 2 (2026-05-27 follow-up): method-aware copy. NEC 220.87 only
+  // applies to measured demand; `calculated` invokes NEC 220 Part III
+  // and gets different headers/labels throughout the page.
+  const copy = getNEC22087NarrativeCopy(data.method);
   const utilizationPct = capacityKVA > 0 ? (totalFutureDemand / capacityKVA) * 100 : 0;
   const isCompliant = totalFutureDemand <= capacityKVA;
 
@@ -2374,12 +2467,12 @@ export const NEC22087NarrativePage: React.FC<NEC22087NarrativePageProps> = ({
 
   return (
     <Page size="LETTER" style={themeStyles.page}>
-      <BrandBar pageLabel="NEC 220.87 NARRATIVE" sheetId={sheetId} />
+      <BrandBar pageLabel={copy.sheetHeader} sheetId={sheetId} />
 
       <View style={themeStyles.titleBlock}>
         <Text style={themeStyles.docTitle}>Existing Service Capacity Verification</Text>
         <Text style={themeStyles.docSubtitle}>
-          {`${projectName} \u2022 NEC 220.87 \u2014 Determining Existing Loads`}
+          {`${projectName} \u2022 ${copy.pageSubtitleSuffix}`}
         </Text>
       </View>
 
@@ -2401,7 +2494,13 @@ export const NEC22087NarrativePage: React.FC<NEC22087NarrativePageProps> = ({
             <Text style={themeStyles.summaryUnit}>kVA</Text>
           </Text>
           <Text style={themeStyles.summarySub}>
-            {`${Math.round(kVAToAmps(data.maxDemandKVA))} A • ${isMeasured ? 'measured (no 125% mult.)' : 'calculated x 1.25'}`}
+            {`${Math.round(kVAToAmps(data.maxDemandKVA))} A • ${
+              data.method === 'utility_bill' || data.method === 'load_study'
+                ? 'measured peak (no add. factor)'
+                : data.method === 'calculated'
+                  ? 'NEC demand-factored (no add. factor)'
+                  : 'manual entry x 1.25'
+            }`}
           </Text>
         </View>
         <View style={themeStyles.summaryCard}>
@@ -2427,7 +2526,7 @@ export const NEC22087NarrativePage: React.FC<NEC22087NarrativePageProps> = ({
       </View>
 
       <View wrap={false}>
-        <Text style={themeStyles.sectionTitle}>CONDITIONS PER NEC 220.87</Text>
+        <Text style={themeStyles.sectionTitle}>{copy.conditionsHeader}</Text>
 
         <View style={{ flexDirection: 'row', marginTop: 4, marginBottom: 6 }}>
           <Text style={{ fontSize: 9, fontFamily: 'Helvetica-Bold', width: 18, color: '#1f2937' }}>1.</Text>
@@ -2440,7 +2539,7 @@ export const NEC22087NarrativePage: React.FC<NEC22087NarrativePageProps> = ({
                 marginBottom: 1,
               }}
             >
-              Maximum demand data is available for a 1-year period (NEC 220.87(1))
+              {copy.condition1Header}
             </Text>
             <Text style={{ fontSize: 8.5, color: '#374151', lineHeight: 1.4 }}>
               {`Method: ${METHOD_LABEL[data.method]}. ${METHOD_NEC_REF[data.method]}.`}
@@ -2475,12 +2574,14 @@ export const NEC22087NarrativePage: React.FC<NEC22087NarrativePageProps> = ({
                 marginBottom: 1,
               }}
             >
-              Maximum demand at 125% plus the new load does not exceed the ampacity (NEC 220.87(2))
+              {copy.condition2Header}
             </Text>
             <Text style={{ fontSize: 8.5, color: '#374151', lineHeight: 1.4 }}>
-              {isMeasured
-                ? `${data.maxDemandKVA.toFixed(2)} kVA (measured \u2014 no 125% multiplier per NEC 220.87) + ${data.proposedNewLoadKVA.toFixed(2)} kVA (new) = ${totalFutureDemand.toFixed(2)} kVA`
-                : `${data.maxDemandKVA.toFixed(2)} kVA x 1.25 = ${adjustedExisting.toFixed(2)} kVA (adjusted) + ${data.proposedNewLoadKVA.toFixed(2)} kVA (new) = ${totalFutureDemand.toFixed(2)} kVA`}
+              {data.method === 'utility_bill' || data.method === 'load_study'
+                ? `${data.maxDemandKVA.toFixed(2)} kVA (measured peak \u2014 no 125% multiplier per NEC 220.87) + ${data.proposedNewLoadKVA.toFixed(2)} kVA (new) = ${totalFutureDemand.toFixed(2)} kVA`
+                : data.method === 'calculated'
+                  ? `${data.maxDemandKVA.toFixed(2)} kVA (existing demand \u2014 NEC 220 Part III demand factors already applied; no additional 125% multiplier) + ${data.proposedNewLoadKVA.toFixed(2)} kVA (new) = ${totalFutureDemand.toFixed(2)} kVA`
+                  : `${data.maxDemandKVA.toFixed(2)} kVA x 1.25 = ${adjustedExisting.toFixed(2)} kVA (adjusted, manual-entry default) + ${data.proposedNewLoadKVA.toFixed(2)} kVA (new) = ${totalFutureDemand.toFixed(2)} kVA`}
             </Text>
             <Text style={{ fontSize: 8.5, color: '#374151', lineHeight: 1.4, marginTop: 1 }}>
               {`Service ampacity: ${data.serviceCapacityAmps}A x ${data.serviceVoltage}V${data.servicePhase === 3 ? ' x sqrt(3)' : ''} = ${capacityKVA.toFixed(2)} kVA`}
@@ -2512,7 +2613,7 @@ export const NEC22087NarrativePage: React.FC<NEC22087NarrativePageProps> = ({
                 marginBottom: 1,
               }}
             >
-              Feeder OCPD per NEC 240.4 and service overload per NEC 230.90 (NEC 220.87(3))
+              {copy.condition3Header}
             </Text>
             <Text style={{ fontSize: 8.5, color: '#374151', lineHeight: 1.4 }}>
               {`OCPD (NEC 240.4): ${data.ocpdNotes || 'Existing service main breaker confirmed; sized per NEC 240.4(B) for the conductors it protects.'}`}
@@ -2537,13 +2638,11 @@ export const NEC22087NarrativePage: React.FC<NEC22087NarrativePageProps> = ({
           }}
         >
           {isCompliant
-            ? 'EXISTING SERVICE ADEQUATE PER NEC 220.87'
+            ? copy.verdictAdequateBanner
             : 'EXISTING SERVICE INADEQUATE \u2014 UPGRADE REQUIRED'}
         </Text>
         <Text style={isCompliant ? themeStyles.noteText : themeStyles.warningText}>
-          {isCompliant
-            ? `Per NEC 220.87, the existing ${data.serviceCapacityAmps}A service has sufficient capacity for the proposed new load. Contractor's signature on this sheet attests that the three conditions above are verified.`
-            : `The proposed new load combined with the existing maximum demand exceeds the ${data.serviceCapacityAmps}A service ampacity. NEC 220.87 cannot be claimed; a service upgrade or load management (NEC 750 / NEC 625.42) is required.`}
+          {isCompliant ? copy.verdictAdequateBody : copy.verdictInadequateBody}
         </Text>
       </View>
 

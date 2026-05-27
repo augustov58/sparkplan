@@ -25,6 +25,7 @@ import {
   TableOfContentsPage,
   RevisionLogPage,
   NEC22087NarrativePage,
+  getNEC22087NarrativeCopy,
   AvailableFaultCurrentPage,
   EVEMSNarrativePage,
   EVSELabelingPage,
@@ -683,12 +684,17 @@ export const generatePermitPacket = async (data: PermitPacketData): Promise<void
   // sheet for the majority of packets.
   if (sections.nec22087Narrative && data.nec22087Narrative) {
     const narrative = data.nec22087Narrative;
+    // Sprint 2 (2026-05-27 follow-up): TOC title is method-aware so a
+    // packet rendered with `method='calculated'` shows up in the
+    // contents as "NEC 220 Calculated Existing Load — Service Capacity
+    // Verification" rather than misleadingly invoking NEC 220.87.
+    const narrativeCopy = getNEC22087NarrativeCopy(narrative.method);
     builders.push({
       name: 'NEC22087Narrative',
       kind: 'nec22087Narrative',
       band: BAND_CALCULATIONS,
       pageCount: 1,
-      tocTitles: ['NEC 220.87 — Existing Service Capacity Verification'],
+      tocTitles: [narrativeCopy.tocTitle],
       render: (sheetIds) => (
         <NEC22087NarrativePage
           projectName={data.projectName}

@@ -280,7 +280,7 @@ describe('Short Circuit (NEC 110.9)', () => {
 
 describe('Service Upgrade (NEC 220.87)', () => {
   describe('quickServiceCheck', () => {
-    it('should apply 125% to manual/calculated loads per NEC 220.87', () => {
+    it('should apply 125% only to manual loads (Sprint 2: calculated values are already NEC demand-factored)', () => {
       const input: QuickCheckInput = {
         currentServiceAmps: 200,
         currentUsageAmps: 120,
@@ -340,7 +340,23 @@ describe('Service Upgrade (NEC 220.87)', () => {
   });
 
   describe('analyzeServiceUpgrade', () => {
-    it('should perform detailed analysis with NEC references', () => {
+    /**
+     * Sprint 2 (2026-05-27, follow-up to demand unification): the
+     * NEC 220.87 125% multiplier is a safety margin for MEASURED
+     * historical demand. For calculated demand (NEC 220 Part III) the
+     * diversity allowance is already in the demand factors (220.42 /
+     * 220.84 / etc.); applying 1.25× on top would double-count.
+     *
+     * Pre-Sprint 2 this test asserted `30 × 1.25 = 37.5` for the
+     * `calculated` method — codifying the over-conservative
+     * interpretation that 220.87(2)'s "125% on max demand" applies to
+     * calculated values too. The fix flips the expectation: calculated
+     * values flow through at face value.
+     *
+     * Only `manual` still gets the 1.25× — provenance unknown, so
+     * defensive default.
+     */
+    it('should NOT apply 125% multiplier for calculated method (NEC 220 Part III demand factors already applied)', () => {
       const input: ServiceUpgradeInput = {
         currentServiceAmps: 200,
         serviceVoltage: 240,
@@ -353,18 +369,29 @@ describe('Service Upgrade (NEC 220.87)', () => {
       };
       const result = analyzeServiceUpgrade(input);
 
-      // Existing load adjusted: 30 × 1.25 = 37.5 kVA
-      expect(result.existingDemand_kVA).toBe(37.5);
+      // Calculated demand flows through at face value (no additional
+      // 125% on top of NEC 220.84/220.42 demand-factored values).
+      expect(result.existingDemand_kVA).toBe(30);
 
-      // Proposed: 9.6 × 1.25 (continuous) = 12 kVA
+      // Proposed continuous load still gets NEC 210.19's 1.25×:
+      // 9.6 × 1.25 = 12 kVA. NEC 210.19 (continuous branch-circuit)
+      // is a different code section than NEC 220.87 — both can apply
+      // simultaneously on different loads.
       expect(result.proposedAdditionalLoad_kVA).toBe(12);
 
-      // NEC references should include 220.87
+      // NEC references still include 220.87 (the section names the
+      // existing-load determination procedure; we just don't apply
+      // the multiplier to a calculated value).
       expect(result.necReferences).toContain('NEC 220.87 - Determining Existing Loads (125% multiplier)');
-      expect(result.warnings.length).toBeGreaterThanOrEqual(0);
+
+      // Breakdown row for existing load must NOT describe a 1.25× op.
+      const existingRow = result.breakdown.find(b => b.category === 'Existing Load');
+      expect(existingRow?.description).toContain('NEC 220 Part III');
+      expect(existingRow?.description).not.toContain('× 1.25');
+      expect(existingRow?.load_kVA).toBe(30);
     });
 
-    it('should skip 125% multiplier for utility_bill method', () => {
+    it('should skip 125% multiplier for utility_bill method (measured peak)', () => {
       const input: ServiceUpgradeInput = {
         currentServiceAmps: 200,
         serviceVoltage: 240,
@@ -376,6 +403,35 @@ describe('Service Upgrade (NEC 220.87)', () => {
       const result = analyzeServiceUpgrade(input);
       // No multiplier → existing demand = 30 kVA
       expect(result.existingDemand_kVA).toBe(30);
+    });
+
+    it('should APPLY 125% multiplier only for manual method (provenance unknown)', () => {
+      // Sprint 2 regression: 'manual' is the only existingLoadMethod
+      // where we can't trust the value's basis (could be connected, could
+      // be demand, could be back-of-envelope). The 1.25× stays as a
+      // defensive default — and the result includes a recommendation to
+      // use a measured or calculated source instead.
+      const input: ServiceUpgradeInput = {
+        currentServiceAmps: 200,
+        serviceVoltage: 240,
+        servicePhase: 1,
+        existingDemandLoad_kVA: 30,
+        existingLoadMethod: ExistingLoadDeterminationMethod.MANUAL,
+        proposedLoads: [],
+      };
+      const result = analyzeServiceUpgrade(input);
+      // 30 × 1.25 = 37.5 kVA — manual is the conservative branch.
+      expect(result.existingDemand_kVA).toBe(37.5);
+
+      const existingRow = result.breakdown.find(b => b.category === 'Existing Load');
+      expect(existingRow?.description).toContain('Manual entry');
+      expect(existingRow?.description).toContain('1.25');
+      expect(existingRow?.load_kVA).toBe(37.5);
+
+      // The result should also flag a recommendation to use a better source.
+      expect(
+        result.warnings.some(w => w.includes('NEC 220.87 RECOMMENDATION')),
+      ).toBe(true);
     });
   });
 
@@ -1574,6 +1630,99 @@ describe('Upstream Load Aggregation — NEC 220.84 Optional Method (C1)', () => 
       expect(result.existingDemandVA + result.proposedDemandVA).toBe(Math.round(result.totalDemandVA));
       expect(result.proposedDemandVA).toBeGreaterThan(0);
       expect(result.existingDemandVA).toBeGreaterThan(0);
+    });
+  });
+
+  /**
+   * Sprint 2 (2026-05-27) — NEC 220.87 narrative auto-source must read
+   * NEC-demanded existing/proposed loads (existingDemandVA /
+   * proposedDemandVA), not raw `circuit.load_watts` sums by is_proposed.
+   *
+   * The 2026-05-27 'new 4-plex' walkthrough surfaced two pages of the
+   * same packet disagreeing: E-101 LoadCalculationSummary reported the
+   * NEC 220.84 multi-family demand (~96 kVA), while E-102 NEC 220.87
+   * narrative reported raw connected sum × 1.25 (~360 kVA) and falsely
+   * claimed an upgrade was required. Sprint 2 routes the narrative's
+   * auto-source through `calculateAggregatedLoad` so both pages share
+   * the same demand-factor-adjusted base.
+   *
+   * This regression guards the architectural assumption underneath the
+   * PermitPacketGenerator.tsx::aggregatedDemandSplit memo. If the
+   * aggregator ever stopped reflecting NEC 220.84 in `existingDemandVA`
+   * for a multi-family project, the auto-source would silently revert
+   * to the pre-Sprint 2 over-conservative behavior.
+   */
+  describe('NEC 220.87 auto-source uses NEC-demanded existing load (Sprint 2)', () => {
+    it('multi-family 4-unit: existingDemandVA is the NEC-demanded value, not the raw nameplate sum', () => {
+      // 4 units × 10 kVA general 'O' load each = 40 kVA total connected.
+      // No HVAC tagged → no climate reduction; pure NEC 220.84 demand factor.
+      // Expected: total demand = 40 × 0.45 = 18 kVA.
+      const mdp = makePanel({ id: 'mdp', name: 'MF MDP', is_main: true, bus_rating: 200 });
+      const unitPanels: Panel[] = Array.from({ length: 4 }, (_, i) =>
+        makePanel({
+          id: `p-unit-${201 + i}`,
+          name: `Unit ${201 + i} Panel`,
+          fed_from_type: 'panel',
+          fed_from: 'mdp',
+        }),
+      );
+      const allPanels = [mdp, ...unitPanels];
+
+      // One 10 kVA circuit per unit; flag unit #4's circuit as proposed
+      // so the split has both existing (3 units = 30 kVA) and proposed
+      // (1 unit = 10 kVA) components. This mirrors the 'new 4-plex'
+      // scenario where one unit's load addition triggered the audit.
+      const circuits: Circuit[] = unitPanels.map((p, i) =>
+        ({
+          id: `c-${p.id}-10000`,
+          panel_id: p.id,
+          load_watts: 10_000,
+          load_type: 'O',
+          project_id: 'proj-sprint2',
+          circuit_number: 1,
+          pole: 1,
+          breaker_amps: 50,
+          description: `Unit ${201 + i} general`,
+          is_proposed: i === 3,
+        } as unknown as Circuit),
+      );
+
+      const ctx = buildMultiFamilyContext(mdp, allPanels, circuits, [], {
+        occupancyType: 'dwelling',
+        residential: { dwellingType: 'multi_family', totalUnits: 4 },
+      });
+      expect(ctx).toBeDefined();
+
+      const result = calculateAggregatedLoad(
+        mdp.id, allPanels, circuits, [], 'dwelling', ctx,
+      );
+
+      // Sanity: raw connected nameplate is unchanged.
+      expect(result.totalConnectedVA).toBe(40_000);
+      // Connected split exactly by is_proposed flag.
+      expect(result.existingConnectedVA).toBe(30_000);
+      expect(result.proposedConnectedVA).toBe(10_000);
+
+      // NEC 220.84 demand factor (45% for 4 units) compresses the total.
+      // 40 kVA × 0.45 = 18 kVA total demand.
+      expect(result.totalDemandVA).toBe(18_000);
+
+      // Sprint 2 regression: existingDemandVA must reflect NEC 220.84,
+      // NOT the raw existingConnectedVA. Pre-Sprint 2 the NEC 220.87
+      // narrative auto-source shipped 30 kVA (the raw sum); Sprint 2
+      // ships the demand-adjusted value ≈ 13.5 kVA (30/40 × 18).
+      // The strict bound `< existingConnectedVA * 0.6` would fail if
+      // the demand factor ever silently drifted toward 1.0.
+      expect(result.existingDemandVA).toBeLessThan(result.existingConnectedVA * 0.6);
+      expect(result.existingDemandVA).toBeGreaterThan(0);
+      expect(result.existingDemandVA).toBe(13_500);
+
+      // Proposed slice is the remainder by construction (proportional
+      // allocation by subtraction so the split sums exactly).
+      expect(result.proposedDemandVA).toBe(4_500);
+
+      // Sum invariant — guards the tri-column "Total" alignment.
+      expect(result.existingDemandVA + result.proposedDemandVA).toBe(Math.round(result.totalDemandVA));
     });
   });
 });

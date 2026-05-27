@@ -1047,8 +1047,9 @@ describe('Permit packet: NEC 220.83 existing dwelling — proposed loads on PDF'
 // that the renderer + data layer differentiate between the scenarios.
 //   - Scenario 1: Existing MF + EV (covered by the "UI-reachable flow" test
 //     above, which already dumps to Permit_Packet_MF_EV_Existing_*.pdf)
-//   - Scenario 2: Existing Commercial + new loads, NEC 220.87 Method 2
-//     (calculated demand × 1.25)
+//   - Scenario 2: Existing Commercial + new loads, calculated existing
+//     demand from NEC 220 Part III (no additional 1.25× — demand factors
+//     already provide diversity allowance; Sprint 2 fix 2026-05-27)
 //   - Scenario 3: Existing Commercial + new loads, NEC 220.87 Method 1
 //     (utility-bill-measured demand, no 1.25 multiplier)
 //
@@ -1182,7 +1183,7 @@ describe('Permit packet: Commercial Existing 220.87 scenarios (visual proof)', (
     meters: [],
   };
 
-  it('Scenario 2: Commercial Existing + Method 2 (calculated × 1.25)', async () => {
+  it('Scenario 2: Commercial Existing + calculated existing demand (no additional 1.25×)', async () => {
     downloads.length = 0;
     const packet: PermitPacketData = {
       ...baseCommercialPacket,
