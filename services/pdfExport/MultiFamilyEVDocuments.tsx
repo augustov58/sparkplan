@@ -377,7 +377,17 @@ export const MultiFamilyEVPages: React.FC<MultiFamilyEVDocumentProps> = ({
               <Text style={styles.label}>EV LOAD (NEC 220.57)</Text>
               <Text style={styles.value}>{result.evLoad.loadAmps}A</Text>
               <Text style={styles.subValue}>
-                {(result.evLoad.demandVA / 1000).toFixed(1)} kVA ({result.input.evChargersRequested} EVSE @ full load)
+                {/* PR-2 Polish A (2026-05-26): label tracks the math — the
+                    value was already correct (PR-1 Bug 2 clamped demandVA
+                    to EVEMS setpoint when useEVEMS=true), but the label
+                    still read "full load" regardless. Mismatch made
+                    EVEMS-enabled projects look mis-calculated. EVEMS
+                    engagement is inferred from clamping evidence
+                    (demandVA < totalConnectedVA) because the result.input
+                    narrowing doesn't carry useEVEMS through. NEC 220.57
+                    provides no multi-EVSE demand factor, so any clamping
+                    below nameplate must be EVEMS per NEC 625.42. */}
+                {(result.evLoad.demandVA / 1000).toFixed(1)} kVA ({result.input.evChargersRequested} EVSE @ {result.evLoad.demandVA < result.evLoad.totalConnectedVA ? 'EVEMS setpoint' : 'full load'})
               </Text>
             </View>
           </View>
@@ -674,9 +684,18 @@ export const MultiFamilyEVPages: React.FC<MultiFamilyEVDocumentProps> = ({
               <Text style={styles.tableCellValue}>{(result.evLoad.totalConnectedVA / 1000).toFixed(1)} kVA</Text>
             </View>
             <View style={[styles.tableRow, { backgroundColor: '#f3f4f6' }]}>
-              <Text style={[styles.tableCellLabel, { fontFamily: 'Helvetica-Bold' }]}>Service Demand (No EVEMS)</Text>
+              {/* PR-2 Polish A (2026-05-26): label scenario-aware. When
+                  EVEMS clamps the demand (demandVA < totalConnectedVA per
+                  NEC 625.42), the value shown is the EVEMS setpoint, not
+                  the unmanaged full load — so labelling it "(No EVEMS)" +
+                  "- Full load" was actively misleading. See the gridItem
+                  comment above for why EVEMS engagement is inferred from
+                  clamping evidence instead of from result.input. */}
+              <Text style={[styles.tableCellLabel, { fontFamily: 'Helvetica-Bold' }]}>
+                {result.evLoad.demandVA < result.evLoad.totalConnectedVA ? 'Service Demand (EVEMS managed)' : 'Service Demand (No EVEMS)'}
+              </Text>
               <Text style={[styles.tableCellValue, { fontFamily: 'Helvetica-Bold' }]}>
-                {(result.evLoad.demandVA / 1000).toFixed(1)} kVA ({result.evLoad.loadAmps}A) - Full load
+                {(result.evLoad.demandVA / 1000).toFixed(1)} kVA ({result.evLoad.loadAmps}A) - {result.evLoad.demandVA < result.evLoad.totalConnectedVA ? 'EVEMS setpoint' : 'Full load'}
               </Text>
             </View>
           </View>
