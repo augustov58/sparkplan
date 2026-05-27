@@ -44,16 +44,19 @@ import type {
  * @returns Quick check result with status and recommendation
  */
 export function quickServiceCheck(input: QuickCheckInput): QuickCheckResult {
-  // NEC 220.87: Apply 125% to existing load based on determination method
+  // Sprint 2 (2026-05-27): the NEC 220.87 125% multiplier is a safety
+  // margin for MEASURED historical demand (utility bill / load study).
+  // For calculated loads (NEC 220 Part III), the diversity allowance is
+  // already in the demand factors — applying 1.25× on top would double-
+  // count. Only `manual` (provenance unknown) gets the multiplier as a
+  // defensive default. Mirror change in `analyzeServiceUpgrade` below.
   let adjustedExistingLoad = input.currentUsageAmps;
 
   const method = input.existingLoadMethod || 'manual';
-  const isActualMeasurement =
-    method === 'utility_bill' || method === 'load_study';
+  const valueIsAlreadyDemandAdjusted =
+    method === 'utility_bill' || method === 'load_study' || method === 'calculated';
 
-  // Apply 125% multiplier per NEC 220.87 for calculated/manual loads
-  // (Actual measured demand already represents peak, no multiplier needed)
-  if (!isActualMeasurement) {
+  if (!valueIsAlreadyDemandAdjusted) {
     adjustedExistingLoad = input.currentUsageAmps * 1.25;
   }
 
@@ -161,30 +164,46 @@ export function analyzeServiceUpgrade(input: ServiceUpgradeInput): ServiceUpgrad
     input.servicePhase
   );
 
-  // Step 2: NEC 220.87 - Apply 125% to existing load based on determination method
-  const isActualMeasurement =
+  // Sprint 2 (2026-05-27, follow-up to demand unification): the 125%
+  // multiplier in NEC 220.87 is a safety margin on MEASURED historical
+  // demand. For calculated demand (NEC 220 Part III), the diversity
+  // allowance is already in the demand factors (220.42 / 220.84 / etc.);
+  // applying 1.25× on top would double-count. Strict NEC reading:
+  // 220.87(B) is measured-only. Only `manual` (provenance unknown)
+  // gets the 1.25× as a defensive default.
+  //
+  // Mirror change at services/pdfExport/PermitPacketDocuments.tsx (the
+  // NEC22087NarrativePage React-PDF re-implementation) — both sites
+  // apply the same rule and must stay in sync.
+  const valueIsAlreadyDemandAdjusted =
     input.existingLoadMethod === 'utility_bill' ||
-    input.existingLoadMethod === 'load_study';
+    input.existingLoadMethod === 'load_study' ||
+    input.existingLoadMethod === 'calculated';
 
-  // Apply 125% multiplier per NEC 220.87 for calculated/manual loads
-  const adjustedExistingLoad_kVA = isActualMeasurement
+  const adjustedExistingLoad_kVA = valueIsAlreadyDemandAdjusted
     ? input.existingDemandLoad_kVA
     : input.existingDemandLoad_kVA * 1.25;
 
   // Add note about determination method
-  if (isActualMeasurement) {
+  if (input.existingLoadMethod === 'utility_bill' || input.existingLoadMethod === 'load_study') {
     notes.push(
-      `Existing load from ${input.existingLoadMethod === 'utility_bill' ? '12-month utility billing' : '30-day load study'} ` +
-      `(actual measured demand - no 125% multiplier per NEC 220.87)`
+      `Existing load from ${input.existingLoadMethod === 'utility_bill' ? '12-month utility billing' : '30-day recording load study'} ` +
+      `(actual measured peak demand — no 125% multiplier per NEC 220.87)`
+    );
+  } else if (input.existingLoadMethod === 'calculated') {
+    notes.push(
+      `Existing load from panel schedule calculation using NEC 220 Part III demand factors ` +
+      `(no additional 125% multiplier — demand factors already provide diversity allowance)`
     );
   } else {
     notes.push(
-      `Existing load from ${input.existingLoadMethod === 'calculated' ? 'panel schedule calculation' : 'manual entry'} ` +
-      `(125% multiplier applied per NEC 220.87)`
+      `Existing load from manual entry ` +
+      `(125% multiplier applied as defensive default — provenance of value unknown)`
     );
     warnings.push(
       `⚠️ NEC 220.87 RECOMMENDATION: For most accurate results, use actual maximum demand from ` +
-      `12-month utility billing or 30-day load study instead of calculated loads.`
+      `12-month utility billing or 30-day load study, or use a calculated value from your project's ` +
+      `panel schedule (NEC 220 Part III) instead of manual entry.`
     );
   }
 
@@ -232,9 +251,12 @@ export function analyzeServiceUpgrade(input: ServiceUpgradeInput): ServiceUpgrad
   // Add existing load to breakdown
   breakdown.unshift({
     category: 'Existing Load',
-    description: isActualMeasurement
-      ? `Actual measured demand (${input.existingLoadMethod === 'utility_bill' ? 'utility billing' : 'load study'})`
-      : `Calculated demand × 1.25 (NEC 220.87)`,
+    description:
+      input.existingLoadMethod === 'utility_bill' || input.existingLoadMethod === 'load_study'
+        ? `Actual measured peak demand (${input.existingLoadMethod === 'utility_bill' ? 'utility billing' : 'load study'})`
+        : input.existingLoadMethod === 'calculated'
+          ? `Calculated demand (NEC 220 Part III demand factors applied; no additional multiplier)`
+          : `Manual entry × 1.25 (defensive default — value provenance unknown)`,
     load_kVA: adjustedExistingLoad_kVA,
     continuous: false
   });

@@ -2353,10 +2353,26 @@ export const NEC22087NarrativePage: React.FC<NEC22087NarrativePageProps> = ({
     data.serviceVoltage,
     data.servicePhase,
   );
-  // NEC 220.87: measured methods (utility bill / load study) use the value
-  // directly; calculated/manual methods apply the 125% safety multiplier.
-  const isMeasured = data.method === 'utility_bill' || data.method === 'load_study';
-  const adjustedExisting = isMeasured ? data.maxDemandKVA : data.maxDemandKVA * 1.25;
+  // Sprint 2 (2026-05-27, follow-up to demand unification): the 125%
+  // multiplier in NEC 220.87 is a safety margin on MEASURED historical
+  // demand — it accounts for the possibility that future peak exceeds
+  // recorded peak. For calculated demand the diversity allowance is
+  // already built into NEC 220 Part III demand factors (220.42/220.84/
+  // etc.), so applying 1.25× on top would double-count. Strict NEC
+  // reading: 220.87 is measured-only; calculated loads use NEC 220
+  // Part III without an additional safety factor. Only 'manual' entries
+  // — where the value's provenance (connected vs. demand) is unknown —
+  // get the 1.25× as a defensive default.
+  //
+  // Mirror change at services/calculations/serviceUpgrade.ts:164 — both
+  // implementations of the rule must stay in sync.
+  const valueIsAlreadyDemandAdjusted =
+    data.method === 'utility_bill'
+    || data.method === 'load_study'
+    || data.method === 'calculated';
+  const adjustedExisting = valueIsAlreadyDemandAdjusted
+    ? data.maxDemandKVA
+    : data.maxDemandKVA * 1.25;
   const totalFutureDemand = adjustedExisting + data.proposedNewLoadKVA;
   const utilizationPct = capacityKVA > 0 ? (totalFutureDemand / capacityKVA) * 100 : 0;
   const isCompliant = totalFutureDemand <= capacityKVA;
@@ -2401,7 +2417,13 @@ export const NEC22087NarrativePage: React.FC<NEC22087NarrativePageProps> = ({
             <Text style={themeStyles.summaryUnit}>kVA</Text>
           </Text>
           <Text style={themeStyles.summarySub}>
-            {`${Math.round(kVAToAmps(data.maxDemandKVA))} A • ${isMeasured ? 'measured (no 125% mult.)' : 'calculated x 1.25'}`}
+            {`${Math.round(kVAToAmps(data.maxDemandKVA))} A • ${
+              data.method === 'utility_bill' || data.method === 'load_study'
+                ? 'measured peak (no add. factor)'
+                : data.method === 'calculated'
+                  ? 'NEC demand-factored (no add. factor)'
+                  : 'manual entry x 1.25'
+            }`}
           </Text>
         </View>
         <View style={themeStyles.summaryCard}>
@@ -2478,9 +2500,11 @@ export const NEC22087NarrativePage: React.FC<NEC22087NarrativePageProps> = ({
               Maximum demand at 125% plus the new load does not exceed the ampacity (NEC 220.87(2))
             </Text>
             <Text style={{ fontSize: 8.5, color: '#374151', lineHeight: 1.4 }}>
-              {isMeasured
-                ? `${data.maxDemandKVA.toFixed(2)} kVA (measured \u2014 no 125% multiplier per NEC 220.87) + ${data.proposedNewLoadKVA.toFixed(2)} kVA (new) = ${totalFutureDemand.toFixed(2)} kVA`
-                : `${data.maxDemandKVA.toFixed(2)} kVA x 1.25 = ${adjustedExisting.toFixed(2)} kVA (adjusted) + ${data.proposedNewLoadKVA.toFixed(2)} kVA (new) = ${totalFutureDemand.toFixed(2)} kVA`}
+              {data.method === 'utility_bill' || data.method === 'load_study'
+                ? `${data.maxDemandKVA.toFixed(2)} kVA (measured peak \u2014 no 125% multiplier per NEC 220.87) + ${data.proposedNewLoadKVA.toFixed(2)} kVA (new) = ${totalFutureDemand.toFixed(2)} kVA`
+                : data.method === 'calculated'
+                  ? `${data.maxDemandKVA.toFixed(2)} kVA (existing demand \u2014 NEC 220 Part III demand factors already applied; no additional 125% multiplier) + ${data.proposedNewLoadKVA.toFixed(2)} kVA (new) = ${totalFutureDemand.toFixed(2)} kVA`
+                  : `${data.maxDemandKVA.toFixed(2)} kVA x 1.25 = ${adjustedExisting.toFixed(2)} kVA (adjusted, manual-entry default) + ${data.proposedNewLoadKVA.toFixed(2)} kVA (new) = ${totalFutureDemand.toFixed(2)} kVA`}
             </Text>
             <Text style={{ fontSize: 8.5, color: '#374151', lineHeight: 1.4, marginTop: 1 }}>
               {`Service ampacity: ${data.serviceCapacityAmps}A x ${data.serviceVoltage}V${data.servicePhase === 3 ? ' x sqrt(3)' : ''} = ${capacityKVA.toFixed(2)} kVA`}

@@ -48,7 +48,11 @@ import { useMeters } from '../hooks/useMeters';
 import { useProfile } from '../hooks/useProfile';
 import { JurisdictionAndAHJPanel } from './JurisdictionAndAHJPanel';
 import type { MultiFamilyEVResult } from '../services/calculations/multiFamilyEV';
-import { buildMultiFamilyContext, isEVEMSManagedPanel } from '../services/calculations/upstreamLoadAggregation';
+import {
+  buildMultiFamilyContext,
+  calculateAggregatedLoad,
+  isEVEMSManagedPanel,
+} from '../services/calculations/upstreamLoadAggregation';
 import { screenContractorExemption } from '../services/permitMode/exemptionScreening';
 import {
   projectAddressSchema,
@@ -277,6 +281,50 @@ export const PermitPacketGenerator: React.FC<PermitPacketGeneratorProps> = ({ pr
   const { profile } = useProfile();
   // Sprint 2B PR-3: user-uploaded artifacts to splice into the packet.
   const { attachments: projectAttachments } = useProjectAttachments(projectId || '');
+
+  // Sprint 2 (2026-05-27): canonical demand split for the NEC 220.87
+  // narrative's auto-source path. Both the read-only form display AND the
+  // packet assembly path consume this — same source of truth → E-101
+  // LoadCalculationSummary and E-102 NEC 220.87 narrative agree by
+  // construction. Pre-Sprint 2 the auto-source summed circuit.load_watts
+  // (raw nameplate, no NEC demand factors), which on a 4-unit MF project
+  // overstated existing demand by ~4x and falsely triggered "upgrade
+  // required" on the narrative even when LoadCalculationSummary said the
+  // service was adequate. NEC 220.87 "max demand" for the calculated
+  // method means NEC-demanded existing load, not raw connected sum.
+  const aggregatedDemandSplit = React.useMemo<{ existingKVA: number; proposedKVA: number }>(() => {
+    if (!currentProject) return { existingKVA: 0, proposedKVA: 0 };
+    const mdp = panels.find(p => p.is_main);
+    if (!mdp) return { existingKVA: 0, proposedKVA: 0 };
+    const mfCtx = buildMultiFamilyContext(
+      mdp,
+      panels,
+      circuits,
+      transformers,
+      currentProject.settings,
+    );
+    // Match the orchestrator's occupancyType derivation
+    // (services/pdfExport/permitPacketGenerator.tsx:1116) so the demand
+    // factor cascade picks the same branch.
+    const occupancyType: 'dwelling' | 'commercial' | 'industrial' =
+      currentProject.type === 'Residential'
+        ? 'dwelling'
+        : currentProject.type === 'Industrial'
+          ? 'industrial'
+          : 'commercial';
+    const agg = calculateAggregatedLoad(
+      mdp.id,
+      panels,
+      circuits,
+      transformers,
+      occupancyType,
+      mfCtx,
+    );
+    return {
+      existingKVA: agg.existingDemandVA / 1000,
+      proposedKVA: agg.proposedDemandVA / 1000,
+    };
+  }, [currentProject, panels, circuits, transformers]);
 
   // Auto-fill from profile (only on first load, before user edits)
   useEffect(() => {
@@ -1009,29 +1057,23 @@ export const PermitPacketGenerator: React.FC<PermitPacketGeneratorProps> = ({ pr
       // fields. Without those, the page would render with placeholder text
       // and risk being mistaken for the real evidence the AHJ needs.
       //
-      // PR-2 Step 4 (2026-05-26): when method='calculated', the kVA values
-      // are auto-derived from project circuit data (sum by is_proposed
-      // flag) instead of from the now-read-only text inputs. Pre-PR-2
-      // the inputs always won regardless of method, so picking
-      // 'calculated' was purely cosmetic — fixed here so the dropdown
-      // actually drives the data source.
-      const calculatedExistingKVA =
-        circuits
-          .filter(c => !c.is_proposed)
-          .reduce((sum, c) => sum + (c.load_watts || 0), 0) / 1000;
-      const calculatedProposedKVA =
-        circuits
-          .filter(c => c.is_proposed)
-          .reduce((sum, c) => sum + (c.load_watts || 0), 0) / 1000;
-
+      // Sprint 2 (2026-05-27): when method='calculated', the auto-source
+      // reads NEC-demanded existing/proposed kVA from `calculateAggregatedLoad`
+      // (via the `aggregatedDemandSplit` memo above), not raw `load_watts`
+      // sums. NEC 220.87 "max demand" for the calculated method = the
+      // demand-factor-adjusted figure the building is engineered to draw,
+      // matching what E-101 LoadCalculationSummary reports. Pre-Sprint 2
+      // this path summed nameplate VA and overstated multi-family demand
+      // by ~4x because the NEC 220.84 multi-family demand factor wasn't
+      // applied. Two pages of the same packet disagreed by design.
       const useCalculatedSource = nec22087Method === 'calculated';
       const maxDemandTyped = parseFloat(nec22087MaxDemandKVA);
       const proposedTyped = parseFloat(nec22087ProposedKVA);
       const maxDemandFinal = useCalculatedSource
-        ? calculatedExistingKVA
+        ? aggregatedDemandSplit.existingKVA
         : maxDemandTyped;
       const proposedFinal = useCalculatedSource
-        ? calculatedProposedKVA
+        ? aggregatedDemandSplit.proposedKVA
         : (Number.isFinite(proposedTyped) ? proposedTyped : 0);
 
       if (
@@ -1776,24 +1818,16 @@ export const PermitPacketGenerator: React.FC<PermitPacketGeneratorProps> = ({ pr
                   className="w-full border border-gray-200 rounded px-3 py-2 text-sm focus:border-[#2d3b2d] focus:ring-2 focus:ring-[#2d3b2d]/20/20 outline-none"
                 />
               </div>
-              {/* PR-2 Step 4 (2026-05-26): when method='calculated', kVA
-                  inputs become read-only and auto-source from project
-                  circuit data (existing = sum of !is_proposed, proposed =
-                  sum of is_proposed). Pre-PR-2 these fields always won
-                  regardless of method, so picking 'calculated' was purely
-                  cosmetic; now the dropdown actually drives the data
-                  source. */}
+              {/* Sprint 2 (2026-05-27): when method='calculated', kVA
+                  inputs become read-only and auto-source from
+                  `aggregatedDemandSplit` (NEC-demanded existing/proposed
+                  kVA via calculateAggregatedLoad). Pre-Sprint 2 the
+                  auto-source summed raw circuit.load_watts and missed
+                  NEC 220.84 demand factors, so the narrative disagreed
+                  with E-101 LoadCalculationSummary. Both surfaces now
+                  pull from the same memoized result. */}
               {(() => {
                 const isCalculatedMode = nec22087Method === 'calculated';
-                const derivedExistingKVA =
-                  circuits
-                    .filter(c => !c.is_proposed)
-                    .reduce((sum, c) => sum + (c.load_watts || 0), 0) / 1000;
-                const derivedProposedKVA =
-                  circuits
-                    .filter(c => c.is_proposed)
-                    .reduce((sum, c) => sum + (c.load_watts || 0), 0) / 1000;
-
                 const calcInputClass =
                   'w-full border border-gray-200 rounded px-3 py-2 text-sm bg-gray-50 text-gray-700 cursor-not-allowed';
                 const userInputClass =
@@ -1813,7 +1847,7 @@ export const PermitPacketGenerator: React.FC<PermitPacketGeneratorProps> = ({ pr
                         readOnly={isCalculatedMode}
                         value={
                           isCalculatedMode
-                            ? derivedExistingKVA.toFixed(2)
+                            ? aggregatedDemandSplit.existingKVA.toFixed(2)
                             : nec22087MaxDemandKVA
                         }
                         onChange={(e) => setNec22087MaxDemandKVA(e.target.value)}
@@ -1822,7 +1856,7 @@ export const PermitPacketGenerator: React.FC<PermitPacketGeneratorProps> = ({ pr
                       />
                       {isCalculatedMode && (
                         <p className="text-xs text-gray-500 mt-1">
-                          Auto-sourced from sum of existing circuits (where is_proposed = false).
+                          NEC-demanded existing load (via calculateAggregatedLoad → NEC 220.84/220.42 demand factors). Matches E-101.
                         </p>
                       )}
                     </div>
@@ -1838,7 +1872,7 @@ export const PermitPacketGenerator: React.FC<PermitPacketGeneratorProps> = ({ pr
                         readOnly={isCalculatedMode}
                         value={
                           isCalculatedMode
-                            ? derivedProposedKVA.toFixed(2)
+                            ? aggregatedDemandSplit.proposedKVA.toFixed(2)
                             : nec22087ProposedKVA
                         }
                         onChange={(e) => setNec22087ProposedKVA(e.target.value)}
@@ -1847,7 +1881,7 @@ export const PermitPacketGenerator: React.FC<PermitPacketGeneratorProps> = ({ pr
                       />
                       {isCalculatedMode && (
                         <p className="text-xs text-gray-500 mt-1">
-                          Auto-sourced from sum of proposed circuits (where is_proposed = true).
+                          NEC-demanded proposed load (EVEMS-clamped where applicable per NEC 625.42).
                         </p>
                       )}
                     </div>
