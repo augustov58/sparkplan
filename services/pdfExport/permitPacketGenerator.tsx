@@ -32,6 +32,7 @@ import {
   type TocEntry,
   type RevisionEntry,
   type NEC22087NarrativeData,
+  type NarrativeOccupancy,
   type AvailableFaultCurrentInput,
   type EVEMSNarrativePanelEntry,
   type EVSELabelingPanelEntry,
@@ -688,11 +689,33 @@ export const generatePermitPacket = async (data: PermitPacketData): Promise<void
     // packet rendered with `method='calculated'` shows up in the
     // contents as "NEC 220 Calculated Existing Load — Service Capacity
     // Verification" rather than misleadingly invoking NEC 220.87.
-    // Sprint 3 (2026-05-27): pass `narrative.occupancy` so the TOC
-    // title (and downstream page copy) cite the right NEC 220 Part III
-    // subsections per occupancy. Optional — helper defaults to
-    // `dwelling_multi_family` for legacy callers.
-    const narrativeCopy = getNEC22087NarrativeCopy(narrative.method, narrative.occupancy);
+    // Sprint 3 (2026-05-27): orchestrator-level occupancy inference.
+    // The React UI (components/PermitPacketGenerator.tsx) sets
+    // `narrative.occupancy` via `deriveNarrativeOccupancy(currentProject)`
+    // which has access to the full Project (commercial / industrial /
+    // dwelling SF-existing / SF-new / multi-family). Direct API callers
+    // (E2E test fixtures, scripted packet generators) often omit
+    // `occupancy` — without this fallback they'd render with the
+    // `dwelling_multi_family` default citation (NEC 220.42 / 220.84)
+    // even on commercial / industrial packets. The orchestrator has
+    // `data.projectType`, which is enough to infer the right occupancy
+    // for non-residential cases; residential dwellings without explicit
+    // SF/MF detail still default to multi-family (the React path is
+    // expected to set `occupancy` explicitly when SF detail is known).
+    const inferredOccupancy: NarrativeOccupancy =
+      data.projectType === 'Commercial'
+        ? 'commercial'
+        : data.projectType === 'Industrial'
+          ? 'industrial'
+          : 'dwelling_multi_family';
+    const effectiveNarrative: NEC22087NarrativeData = {
+      ...narrative,
+      occupancy: narrative.occupancy ?? inferredOccupancy,
+    };
+    const narrativeCopy = getNEC22087NarrativeCopy(
+      effectiveNarrative.method,
+      effectiveNarrative.occupancy,
+    );
     builders.push({
       name: 'NEC22087Narrative',
       kind: 'nec22087Narrative',
@@ -702,7 +725,7 @@ export const generatePermitPacket = async (data: PermitPacketData): Promise<void
       render: (sheetIds) => (
         <NEC22087NarrativePage
           projectName={data.projectName}
-          data={narrative}
+          data={effectiveNarrative}
           {...contractor}
           sheetId={sheetIds[0]}
         />
