@@ -1,0 +1,240 @@
+- generic [ref=e2]:
+  - generic [ref=e3220]:
+    - complementary [ref=e3221]:
+      - generic [ref=e3225] [cursor=pointer]: ⚡ SparkPlan
+      - generic [ref=e3226]:
+        - button "Back to Dashboard" [ref=e3228]:
+          - img [ref=e3229]
+          - text: Back to Dashboard
+        - heading "PROJECT DESIGN" [level=3] [ref=e3232]
+        - link "Project Setup" [ref=e3233] [cursor=pointer]:
+          - /url: "#/project/f103e345-757d-4245-890f-24829da692a5"
+          - img [ref=e3234]
+          - generic [ref=e3237]: Project Setup
+        - link "Load Calculator" [ref=e3238] [cursor=pointer]:
+          - /url: "#/project/f103e345-757d-4245-890f-24829da692a5/load-calc"
+          - img [ref=e3239]
+          - generic [ref=e3241]: Load Calculator
+        - link "Circuit Design" [ref=e3242] [cursor=pointer]:
+          - /url: "#/project/f103e345-757d-4245-890f-24829da692a5/circuits"
+          - img [ref=e3243]
+          - generic [ref=e3249]: Circuit Design
+          - img [ref=e3250]
+        - link "One-Line Diagram" [ref=e3252] [cursor=pointer]:
+          - /url: "#/project/f103e345-757d-4245-890f-24829da692a5/diagram"
+          - img [ref=e3253]
+          - generic [ref=e3258]: One-Line Diagram
+        - link "Panel Schedules" [ref=e3259] [cursor=pointer]:
+          - /url: "#/project/f103e345-757d-4245-890f-24829da692a5/panel"
+          - img [ref=e3260]
+          - generic [ref=e3262]: Panel Schedules
+        - link "Feeder Sizing" [ref=e3263] [cursor=pointer]:
+          - /url: "#/project/f103e345-757d-4245-890f-24829da692a5/feeders"
+          - img [ref=e3264]
+          - generic [ref=e3268]: Feeder Sizing
+        - link "Short Circuit Analysis" [ref=e3269] [cursor=pointer]:
+          - /url: "#/project/f103e345-757d-4245-890f-24829da692a5/short-circuit"
+          - img [ref=e3270]
+          - generic [ref=e3272]: Short Circuit Analysis
+        - link "Grounding & Bonding" [ref=e3273] [cursor=pointer]:
+          - /url: "#/project/f103e345-757d-4245-890f-24829da692a5/grounding"
+          - img [ref=e3274]
+          - generic [ref=e3276]: Grounding & Bonding
+        - link "Tools & Calculators" [ref=e3277] [cursor=pointer]:
+          - /url: "#/project/f103e345-757d-4245-890f-24829da692a5/tools"
+          - img [ref=e3278]
+          - generic [ref=e3280]: Tools & Calculators
+        - heading "PROJECT MANAGEMENT" [level=3] [ref=e3282]
+        - link "Estimating beta" [ref=e3283] [cursor=pointer]:
+          - /url: "#/project/f103e345-757d-4245-890f-24829da692a5/estimating"
+          - img [ref=e3284]
+          - generic [ref=e3286]: Estimating
+          - generic [ref=e3287]: beta
+        - link "Permits beta" [ref=e3288] [cursor=pointer]:
+          - /url: "#/project/f103e345-757d-4245-890f-24829da692a5/permits"
+          - img [ref=e3289]
+          - generic [ref=e3291]: Permits
+          - generic [ref=e3292]: beta
+        - link "T&M Billing beta" [ref=e3293] [cursor=pointer]:
+          - /url: "#/project/f103e345-757d-4245-890f-24829da692a5/billing"
+          - img [ref=e3294]
+          - generic [ref=e3296]: T&M Billing
+          - generic [ref=e3297]: beta
+        - link "Calendar" [ref=e3298] [cursor=pointer]:
+          - /url: "#/project/f103e345-757d-4245-890f-24829da692a5/calendar"
+          - img [ref=e3299]
+          - generic [ref=e3301]: Calendar
+        - link "AI Inspector & Activity" [ref=e3302] [cursor=pointer]:
+          - /url: "#/project/f103e345-757d-4245-890f-24829da692a5/inspector"
+          - img [ref=e3303]
+          - generic [ref=e3305]: AI Inspector & Activity
+        - link "Pre-Inspection Check" [ref=e3306] [cursor=pointer]:
+          - /url: "#/project/f103e345-757d-4245-890f-24829da692a5/check"
+          - img [ref=e3307]
+          - generic [ref=e3310]: Pre-Inspection Check
+        - link "Permit Packet" [ref=e3311] [cursor=pointer]:
+          - /url: "#/project/f103e345-757d-4245-890f-24829da692a5/permit-packet"
+          - img [ref=e3312]
+          - generic [ref=e3315]: Permit Packet
+      - generic [ref=e3316]:
+        - generic [ref=e3317]:
+          - generic [ref=e3318]: AV
+          - generic [ref=e3319]:
+            - paragraph [ref=e3320]: Augusto E Valbuena
+            - paragraph [ref=e3321]: augustovalbuena@gmail.com
+        - button "Billing & Plans" [ref=e3322]:
+          - img [ref=e3323]
+          - text: Billing & Plans
+        - button "Account Settings" [ref=e3325]:
+          - img [ref=e3326]
+          - text: Account Settings
+        - button "Sign Out" [ref=e3329]:
+          - img [ref=e3330]
+          - text: Sign Out
+    - main [ref=e3333]:
+      - heading "Commercial Building (Test)" [level=1] [ref=e3336]
+      - generic [ref=e3793]:
+        - generic [ref=e3794]:
+          - generic [ref=e3795]:
+            - heading "Project Configuration" [level=2] [ref=e3796]
+            - paragraph [ref=e3797]: Define site parameters and electrical characteristics. Changes save automatically.
+          - button "Delete Project" [ref=e3798]:
+            - img [ref=e3799]
+            - text: Delete Project
+        - generic [ref=e3802]:
+          - generic [ref=e3803]:
+            - heading "General Information" [level=3] [ref=e3804]:
+              - img [ref=e3805]
+              - text: General Information
+            - generic [ref=e3808]:
+              - generic [ref=e3809]:
+                - generic [ref=e3810]: Project Name
+                - textbox [ref=e3811]: Commercial Building (Test)
+              - generic [ref=e3812]:
+                - generic [ref=e3813]: Address
+                - textbox [ref=e3814]: TBD
+              - generic [ref=e3815]:
+                - generic [ref=e3816]:
+                  - generic [ref=e3817]: Building Type
+                  - combobox [ref=e3818]:
+                    - option "Residential"
+                    - option "Commercial" [selected]
+                    - option "Industrial"
+                - generic [ref=e3819]:
+                  - generic [ref=e3820]: NEC Edition
+                  - combobox [ref=e3821]:
+                    - option "2023 Edition" [selected]
+                    - option "2020 Edition"
+              - generic [ref=e3822]:
+                - generic [ref=e3823]: Project Status
+                - combobox [ref=e3824]:
+                  - option "New Construction"
+                  - option "Existing Construction" [selected]
+                  - option "Service Upgrade (NEC 220.87)"
+                - paragraph [ref=e3825]: Existing commercial facility — circuits tagged "EXIST" remain; new circuits get the "NEW" badge. NEC 220.87 narrative shows existing service has capacity for the addition.
+              - generic [ref=e3826]:
+                - generic [ref=e3827]:
+                  - generic [ref=e3828]: Permit Number
+                  - textbox "Optional" [ref=e3829]
+                - generic [ref=e3830]:
+                  - generic [ref=e3831]: Utility Provider
+                  - textbox "e.g. PG&E" [ref=e3832]
+          - generic [ref=e3833]:
+            - heading "System Characteristics" [level=3] [ref=e3834]:
+              - img [ref=e3835]
+              - text: System Characteristics
+            - generic [ref=e3837]:
+              - img [ref=e3838]
+              - paragraph [ref=e3840]: Changing system voltage or phase will affect all load calculations and panel schedules. Ensure downstream equipment is rated for the selected voltage.
+            - generic [ref=e3841]:
+              - generic [ref=e3842]:
+                - generic [ref=e3843]: Electrical System Type
+                - combobox [ref=e3844]:
+                  - option "120/240V Single-Phase (Residential)"
+                  - option "120/208V Three-Phase (Commercial)"
+                  - option "277/480V Three-Phase (Industrial)" [selected]
+                - paragraph [ref=e3845]: Common electrical system configurations per NEC standards
+              - generic [ref=e3846]:
+                - heading "Conductor Defaults" [level=4] [ref=e3847]
+                - generic [ref=e3848]:
+                  - generic [ref=e3849]:
+                    - generic [ref=e3850]: Material
+                    - combobox [ref=e3851]:
+                      - option "Copper (Cu)" [selected]
+                      - option "Aluminum (Al)"
+                  - generic [ref=e3852]:
+                    - generic [ref=e3853]: Temp Rating
+                    - combobox [ref=e3854]:
+                      - option "60°C"
+                      - option "75°C (Standard)" [selected]
+                      - option "90°C"
+          - generic [ref=e3855]:
+            - heading "Service Entrance (Utility Source)" [level=3] [ref=e3856]:
+              - img [ref=e3857]
+              - text: Service Entrance (Utility Source)
+            - paragraph [ref=e3859]: Used to label the UTIL→MDP segment on the riser diagram and compute available fault current at the service. All fields optional — fault-current calc falls back to a typical utility transformer estimate when blank.
+            - generic [ref=e3860]:
+              - generic [ref=e3861]:
+                - generic [ref=e3862]: Service Ampacity
+                - spinbutton [ref=e3863]: "400"
+                - paragraph [ref=e3864]: Falls back to MDP main breaker when blank
+              - generic [ref=e3865]:
+                - generic [ref=e3866]: Available Fault Current (A)
+                - spinbutton [ref=e3867]
+                - paragraph [ref=e3868]: Utility-supplied (RMS symmetrical). Leave blank for infinite-bus (transformer-limited fault current — IEEE 141 §4.4).
+              - generic [ref=e3869]:
+                - generic [ref=e3870]: Utility Transformer (kVA)
+                - spinbutton [ref=e3871]
+                - paragraph [ref=e3872]: Estimated from service amps when blank
+              - generic [ref=e3873]:
+                - generic [ref=e3874]: Transformer %Z
+                - spinbutton [ref=e3875]: "5"
+                - paragraph [ref=e3876]: "Typical: 1.5–5.75% by size. Defaults applied when blank."
+            - paragraph [ref=e3878]:
+              - strong [ref=e3879]: No utility data?
+              - text: Leave Available Fault Current blank — the calculator will assume an infinite primary bus and limit fault current by the utility transformer alone. This is the standard early-design approach (IEEE 141 §4.4, IEEE 242) and is accepted by most AHJs. Replace with the utility's actual AFC letter once you have it, especially when claiming series-rated combinations.
+            - paragraph [ref=e3880]:
+              - strong [ref=e3881]: Service conductors
+              - text: (size, length, material, conduit, sets in parallel) are configured in the Feeder Manager — create a feeder marked "Service Entrance" with the MDP as its destination.
+          - generic [ref=e3882]:
+            - heading "Permit Scope (FL Contractor Exemption)" [level=3] [ref=e3883]:
+              - img [ref=e3884]
+              - text: Permit Scope (FL Contractor Exemption)
+            - paragraph [ref=e3888]: Drives the cover-sheet exemption stamp on the permit packet. Per FS 471.003(2)(h), residential services ≤ 600 A @ 240 V, commercial ≤ 800 A @ 240 V, and project value ≤ $125,000 may be designed and signed by a licensed contractor without a PE seal. Anything above triggers the PE-required lane.
+            - generic [ref=e3889]:
+              - generic [ref=e3890]:
+                - generic [ref=e3891]: Service Modification Type
+                - generic [ref=e3892]: Existing service (no change)
+                - paragraph [ref=e3893]: Set via Project Status in General Information above. Determines which calc narratives the packet generator emits.
+              - generic [ref=e3894]:
+                - generic [ref=e3895]:
+                  - img [ref=e3896]
+                  - text: Estimated Project Value (USD)
+                - spinbutton [ref=e3898]
+                - paragraph [ref=e3899]: "FS 471.003(2)(h) cap: $125,000."
+            - generic [ref=e3900]:
+              - heading "Scope Elements" [level=4] [ref=e3901]
+              - paragraph [ref=e3902]: Check any element that applies. Used by the AHJ override engine to flag jurisdictions that require PE seal regardless of value/ampacity.
+              - generic [ref=e3903]:
+                - generic [ref=e3904]:
+                  - checkbox "Service upgrade" [ref=e3905]
+                  - generic [ref=e3906]: Service upgrade
+                - generic [ref=e3907]:
+                  - checkbox "CT cabinet" [ref=e3908]
+                  - generic [ref=e3909]: CT cabinet
+                - generic [ref=e3910]:
+                  - checkbox "Meter stack" [ref=e3911]
+                  - generic [ref=e3912]: Meter stack
+                - generic [ref=e3913]:
+                  - checkbox "Switchgear" [ref=e3914]
+                  - generic [ref=e3915]: Switchgear
+                - generic [ref=e3916]:
+                  - checkbox "Multi-tenant feeder" [ref=e3917]
+                  - generic [ref=e3918]: Multi-tenant feeder
+                - generic [ref=e3919]:
+                  - checkbox "EVEMS in use (NEC 625.42)" [ref=e3920]
+                  - generic [ref=e3921]: EVEMS in use (NEC 625.42)
+  - button "Open Spark Copilot" [ref=e332]:
+    - img [ref=e333]
+  - button "Open support" [ref=e336]:
+    - img [ref=e337]

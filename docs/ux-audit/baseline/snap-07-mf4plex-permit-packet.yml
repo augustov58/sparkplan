@@ -1,0 +1,480 @@
+- generic [ref=e2]:
+  - generic [ref=e2259]:
+    - complementary [ref=e2260]:
+      - generic [ref=e2264] [cursor=pointer]: ⚡ SparkPlan
+      - generic [ref=e2265]:
+        - button "Back to Dashboard" [ref=e2267]:
+          - img [ref=e2268]
+          - text: Back to Dashboard
+        - heading "PROJECT DESIGN" [level=3] [ref=e2271]
+        - link "Project Setup" [ref=e2272] [cursor=pointer]:
+          - /url: "#/project/f12964f9-5669-40f5-a7bb-67ec6ac59318"
+          - img [ref=e2273]
+          - generic [ref=e2276]: Project Setup
+        - link "Dwelling Calculator" [ref=e2277] [cursor=pointer]:
+          - /url: "#/project/f12964f9-5669-40f5-a7bb-67ec6ac59318/load-calc"
+          - img [ref=e2278]
+          - generic [ref=e2281]: Dwelling Calculator
+        - link "Circuit Design" [ref=e2282] [cursor=pointer]:
+          - /url: "#/project/f12964f9-5669-40f5-a7bb-67ec6ac59318/circuits"
+          - img [ref=e2283]
+          - generic [ref=e2289]: Circuit Design
+          - img [ref=e2290]
+        - link "One-Line Diagram" [ref=e2292] [cursor=pointer]:
+          - /url: "#/project/f12964f9-5669-40f5-a7bb-67ec6ac59318/diagram"
+          - img [ref=e2293]
+          - generic [ref=e2298]: One-Line Diagram
+        - link "Panel Schedules" [ref=e2299] [cursor=pointer]:
+          - /url: "#/project/f12964f9-5669-40f5-a7bb-67ec6ac59318/panel"
+          - img [ref=e2300]
+          - generic [ref=e2302]: Panel Schedules
+        - link "Feeder Sizing" [ref=e2303] [cursor=pointer]:
+          - /url: "#/project/f12964f9-5669-40f5-a7bb-67ec6ac59318/feeders"
+          - img [ref=e2304]
+          - generic [ref=e2308]: Feeder Sizing
+        - link "Short Circuit Analysis" [ref=e2309] [cursor=pointer]:
+          - /url: "#/project/f12964f9-5669-40f5-a7bb-67ec6ac59318/short-circuit"
+          - img [ref=e2310]
+          - generic [ref=e2312]: Short Circuit Analysis
+        - link "Grounding & Bonding" [ref=e2313] [cursor=pointer]:
+          - /url: "#/project/f12964f9-5669-40f5-a7bb-67ec6ac59318/grounding"
+          - img [ref=e2314]
+          - generic [ref=e2316]: Grounding & Bonding
+        - link "Tools & Calculators" [ref=e2317] [cursor=pointer]:
+          - /url: "#/project/f12964f9-5669-40f5-a7bb-67ec6ac59318/tools"
+          - img [ref=e2318]
+          - generic [ref=e2320]: Tools & Calculators
+        - heading "PROJECT MANAGEMENT" [level=3] [ref=e2322]
+        - link "Estimating beta" [ref=e2323] [cursor=pointer]:
+          - /url: "#/project/f12964f9-5669-40f5-a7bb-67ec6ac59318/estimating"
+          - img [ref=e2324]
+          - generic [ref=e2326]: Estimating
+          - generic [ref=e2327]: beta
+        - link "Permits beta" [ref=e2328] [cursor=pointer]:
+          - /url: "#/project/f12964f9-5669-40f5-a7bb-67ec6ac59318/permits"
+          - img [ref=e2329]
+          - generic [ref=e2331]: Permits
+          - generic [ref=e2332]: beta
+        - link "T&M Billing beta" [ref=e2333] [cursor=pointer]:
+          - /url: "#/project/f12964f9-5669-40f5-a7bb-67ec6ac59318/billing"
+          - img [ref=e2334]
+          - generic [ref=e2336]: T&M Billing
+          - generic [ref=e2337]: beta
+        - link "Calendar" [ref=e2338] [cursor=pointer]:
+          - /url: "#/project/f12964f9-5669-40f5-a7bb-67ec6ac59318/calendar"
+          - img [ref=e2339]
+          - generic [ref=e2341]: Calendar
+        - link "AI Inspector & Activity" [ref=e2342] [cursor=pointer]:
+          - /url: "#/project/f12964f9-5669-40f5-a7bb-67ec6ac59318/inspector"
+          - img [ref=e2343]
+          - generic [ref=e2345]: AI Inspector & Activity
+        - link "Pre-Inspection Check" [ref=e2346] [cursor=pointer]:
+          - /url: "#/project/f12964f9-5669-40f5-a7bb-67ec6ac59318/check"
+          - img [ref=e2347]
+          - generic [ref=e2350]: Pre-Inspection Check
+        - link "Permit Packet" [ref=e2351] [cursor=pointer]:
+          - /url: "#/project/f12964f9-5669-40f5-a7bb-67ec6ac59318/permit-packet"
+          - img [ref=e2352]
+          - generic [ref=e2355]: Permit Packet
+      - generic [ref=e2356]:
+        - generic [ref=e2357]:
+          - generic [ref=e2358]: AV
+          - generic [ref=e2359]:
+            - paragraph [ref=e2360]: Augusto E Valbuena
+            - paragraph [ref=e2361]: augustovalbuena@gmail.com
+        - button "Billing & Plans" [ref=e2362]:
+          - img [ref=e2363]
+          - text: Billing & Plans
+        - button "Account Settings" [ref=e2365]:
+          - img [ref=e2366]
+          - text: Account Settings
+        - button "Sign Out" [ref=e2369]:
+          - img [ref=e2370]
+          - text: Sign Out
+    - main [ref=e2373]:
+      - heading "Existing 4-plex EV charger install" [level=1] [ref=e2376]
+      - generic [ref=e2571]:
+        - generic [ref=e2572]:
+          - heading "Permit Packet Generator" [level=2] [ref=e2573]:
+            - img [ref=e2574]
+            - text: Permit Packet Generator
+          - paragraph [ref=e2577]: Generate comprehensive permit application package with all required documents
+        - generic [ref=e2579]:
+          - img [ref=e2580]
+          - generic [ref=e2582]:
+            - paragraph [ref=e2583]: "What's Included:"
+            - list [ref=e2584]:
+              - listitem [ref=e2585]: Cover page with contractor license & scope of work
+              - listitem [ref=e2586]: Service entrance details
+              - listitem [ref=e2587]: Equipment schedule (panels, transformers, feeders)
+              - listitem [ref=e2588]: Riser diagram (system hierarchy)
+              - listitem [ref=e2589]: Load calculation summary
+              - listitem [ref=e2590]: NEC compliance summary
+              - listitem [ref=e2591]: Equipment specifications (Tier 2)
+              - listitem [ref=e2592]: Voltage drop report (if feeders exist)
+              - listitem [ref=e2593]: Short circuit analysis (if calculations exist)
+              - listitem [ref=e2594]: Arc flash analysis (if data available)
+              - listitem [ref=e2595]: Grounding plan (NEC Article 250)
+              - listitem [ref=e2596]: Multi-Family EV analysis (NEC 220.84 + 220.57 + 625.42) if enabled
+              - listitem [ref=e2597]: Jurisdiction requirements checklist (if jurisdiction selected)
+              - listitem [ref=e2598]: Complete panel schedules for all panels
+        - generic [ref=e2599]:
+          - heading "Project Summary" [level=3] [ref=e2600]
+          - generic [ref=e2601]:
+            - generic [ref=e2602]:
+              - paragraph [ref=e2603]: Project
+              - paragraph [ref=e2604]: Existing 4-plex EV charger install
+            - generic [ref=e2605]:
+              - paragraph [ref=e2606]: Service
+              - paragraph [ref=e2607]: 240V 1φ
+            - generic [ref=e2608]:
+              - paragraph [ref=e2609]: Panels
+              - paragraph [ref=e2610]: "7"
+            - generic [ref=e2611]:
+              - paragraph [ref=e2612]: Circuits
+              - paragraph [ref=e2613]: "56"
+        - generic [ref=e2614]:
+          - generic [ref=e2615]:
+            - heading "Jurisdiction & AHJ" [level=3] [ref=e2616]:
+              - img [ref=e2617]
+              - text: Jurisdiction & AHJ
+            - paragraph [ref=e2620]: Pick the AHJ this permit is being submitted to. SparkPlan auto-applies the AHJ's lane-aware defaults (sheet ID prefix, code references, required sections) when a manifest is registered for the picked jurisdiction.
+          - generic [ref=e2621]:
+            - generic [ref=e2622]: Where is this permit being submitted?
+            - generic [ref=e2623]:
+              - textbox "Search city, county, or state…" [ref=e2624]
+              - img [ref=e2625]
+            - paragraph [ref=e2628]: "Examples: \"Miami\", \"Dallas\", \"Austin, TX\""
+          - 'button "Advanced: customize AHJ defaults (pick a template manually if your AHJ isn''t listed)" [ref=e2630]':
+            - img [ref=e2631]
+            - text: "Advanced: customize AHJ defaults"
+            - generic [ref=e2633]: (pick a template manually if your AHJ isn't listed)
+          - generic [ref=e2634]:
+            - img [ref=e2635]
+            - text: No jurisdiction selected — packet will use SparkPlan generic defaults
+        - generic [ref=e2638]:
+          - generic [ref=e2639]:
+            - generic [ref=e2640]:
+              - heading "Configure Sections" [level=3] [ref=e2641]:
+                - img [ref=e2642]
+                - text: Configure Sections
+              - paragraph [ref=e2645]: Choose which sections to include in this packet. Cover sheet is always included. Sheet IDs renumber automatically when you toggle a section off.
+            - button "Reset to defaults" [ref=e2646]
+          - generic [ref=e2647]:
+            - img [ref=e2648]
+            - generic [ref=e2651]: Cover SheetAlways included (sheet 001) — required for AHJ identification
+          - generic [ref=e2652]:
+            - generic [ref=e2653]:
+              - paragraph [ref=e2654]: Document Meta
+              - generic [ref=e2655] [cursor=pointer]:
+                - checkbox "Table of Contents Sheet 002 — index of all sheets in the packet" [checked] [ref=e2656]
+                - generic [ref=e2657]:
+                  - text: Table of Contents
+                  - paragraph [ref=e2658]: Sheet 002 — index of all sheets in the packet
+              - generic [ref=e2659] [cursor=pointer]:
+                - checkbox "Revision Log Audit trail of plan revisions; auto-populates Rev 0 on first submittal" [checked] [ref=e2660]
+                - generic [ref=e2661]:
+                  - text: Revision Log
+                  - paragraph [ref=e2662]: Audit trail of plan revisions; auto-populates Rev 0 on first submittal
+              - generic [ref=e2663] [cursor=pointer]:
+                - checkbox "General Notes Numbered notes covering NEC compliance, voltage drop convention, grounding" [checked] [ref=e2664]
+                - generic [ref=e2665]:
+                  - text: General Notes
+                  - paragraph [ref=e2666]: Numbered notes covering NEC compliance, voltage drop convention, grounding
+            - generic [ref=e2667]:
+              - paragraph [ref=e2668]: Engineering
+              - generic [ref=e2669] [cursor=pointer]:
+                - checkbox "Load Calculation Summary NEC 220 demand factor breakdown for the MDP" [checked] [ref=e2670]
+                - generic [ref=e2671]:
+                  - text: Load Calculation Summary
+                  - paragraph [ref=e2672]: NEC 220 demand factor breakdown for the MDP
+              - generic [ref=e2673] [cursor=pointer]:
+                - 'checkbox "Existing-Service Capacity Narrative Existing-service-capacity proof: 3-condition checklist + cited data source. NEC 220.87 narrative when method is measured (utility bill / load study); NEC 220 Part III calculated narrative when method is calculated from project panel schedules. Required by most AHJs." [checked] [ref=e2674]'
+                - generic [ref=e2675]:
+                  - text: Existing-Service Capacity Narrative
+                  - paragraph [ref=e2676]: "Existing-service-capacity proof: 3-condition checklist + cited data source. NEC 220.87 narrative when method is measured (utility bill / load study); NEC 220 Part III calculated narrative when method is calculated from project panel schedules. Required by most AHJs."
+              - generic "No service-main short-circuit calculation recorded — run a service-level calc to enable" [ref=e2677]:
+                - checkbox "Available Fault Current Calculation No service-main short-circuit calculation recorded — run a service-level calc to enable" [checked] [disabled] [ref=e2678]
+                - generic [ref=e2679]:
+                  - text: Available Fault Current Calculation
+                  - paragraph [ref=e2680]: No service-main short-circuit calculation recorded — run a service-level calc to enable
+              - generic [ref=e2681] [cursor=pointer]:
+                - checkbox "Voltage Drop Analysis Per-feeder voltage drop per NEC Chapter 9 Table 9" [checked] [ref=e2682]
+                - generic [ref=e2683]:
+                  - text: Voltage Drop Analysis
+                  - paragraph [ref=e2684]: Per-feeder voltage drop per NEC Chapter 9 Table 9
+              - generic "No short circuit calculations recorded" [ref=e2685]:
+                - checkbox "Short Circuit Analysis No short circuit calculations recorded" [checked] [disabled] [ref=e2686]
+                - generic [ref=e2687]:
+                  - text: Short Circuit Analysis
+                  - paragraph [ref=e2688]: No short circuit calculations recorded
+              - generic "Arc flash analysis is not yet integrated into the packet flow" [ref=e2689]:
+                - checkbox "Arc Flash Analysis Arc flash analysis is not yet integrated into the packet flow" [checked] [disabled] [ref=e2690]
+                - generic [ref=e2691]:
+                  - text: Arc Flash Analysis
+                  - paragraph [ref=e2692]: Arc flash analysis is not yet integrated into the packet flow
+            - generic [ref=e2693]:
+              - paragraph [ref=e2694]: Diagrams & Equipment
+              - generic [ref=e2695] [cursor=pointer]:
+                - checkbox "Riser Diagram One-line/system hierarchy diagram" [checked] [ref=e2696]
+                - generic [ref=e2697]:
+                  - text: Riser Diagram
+                  - paragraph [ref=e2698]: One-line/system hierarchy diagram
+              - generic [ref=e2699] [cursor=pointer]:
+                - checkbox "Equipment Schedule Tabular list of all panels, transformers, feeders" [checked] [ref=e2700]
+                - generic [ref=e2701]:
+                  - text: Equipment Schedule
+                  - paragraph [ref=e2702]: Tabular list of all panels, transformers, feeders
+              - generic [ref=e2703] [cursor=pointer]:
+                - checkbox "Equipment Specifications Detailed spec sheets per panel + transformer" [checked] [ref=e2704]
+                - generic [ref=e2705]:
+                  - text: Equipment Specifications
+                  - paragraph [ref=e2706]: Detailed spec sheets per panel + transformer
+              - generic "No grounding system recorded" [ref=e2707]:
+                - checkbox "Grounding Plan No grounding system recorded" [checked] [disabled] [ref=e2708]
+                - generic [ref=e2709]:
+                  - text: Grounding Plan
+                  - paragraph [ref=e2710]: No grounding system recorded
+            - generic [ref=e2711]:
+              - paragraph [ref=e2712]: Multi-Family
+              - generic [ref=e2713] [cursor=pointer]:
+                - checkbox "Meter Stack Schedule CT cabinet + meter positions (multi-family)" [checked] [ref=e2714]
+                - generic [ref=e2715]:
+                  - text: Meter Stack Schedule
+                  - paragraph [ref=e2716]: CT cabinet + meter positions (multi-family)
+              - generic [ref=e2717] [cursor=pointer]:
+                - checkbox "Multi-Family EV Analysis 3-page NEC 220.84 + 220.57 + 625.42 readiness analysis" [checked] [ref=e2718]
+                - generic [ref=e2719]:
+                  - text: Multi-Family EV Analysis
+                  - paragraph [ref=e2720]: 3-page NEC 220.84 + 220.57 + 625.42 readiness analysis
+            - generic [ref=e2721]:
+              - paragraph [ref=e2722]: Panels
+              - generic [ref=e2723] [cursor=pointer]:
+                - checkbox "Panel Schedules One sheet per panel (NEC 408 requires these for permit submittal)" [checked] [ref=e2724]
+                - generic [ref=e2725]:
+                  - text: Panel Schedules
+                  - paragraph [ref=e2726]: One sheet per panel (NEC 408 requires these for permit submittal)
+            - generic [ref=e2727]:
+              - paragraph [ref=e2728]: Compliance & AHJ
+              - generic [ref=e2729] [cursor=pointer]:
+                - checkbox "NEC Compliance Summary Engineering attestation that the design meets NEC requirements" [checked] [ref=e2730]
+                - generic [ref=e2731]:
+                  - text: NEC Compliance Summary
+                  - paragraph [ref=e2732]: Engineering attestation that the design meets NEC requirements
+              - generic "No jurisdiction or AHJ template selected for this project" [ref=e2733]:
+                - checkbox "Jurisdiction Requirements No jurisdiction or AHJ template selected for this project" [checked] [disabled] [ref=e2734]
+                - generic [ref=e2735]:
+                  - text: Jurisdiction Requirements
+                  - paragraph [ref=e2736]: No jurisdiction or AHJ template selected for this project
+              - generic [ref=e2737] [cursor=pointer]:
+                - checkbox "EVEMS Operational Narrative NEC 625.42 — device, setpoint, monitoring, failure mode, NEC 750 tamper protection" [checked] [ref=e2738]
+                - generic [ref=e2739]:
+                  - text: EVEMS Operational Narrative
+                  - paragraph [ref=e2740]: NEC 625.42 — device, setpoint, monitoring, failure mode, NEC 750 tamper protection
+              - generic [ref=e2741] [cursor=pointer]:
+                - checkbox "EVSE Labeling Reference NEC 625.43 — disconnect labels, breaker locking, emergency shutoff (commercial)" [checked] [ref=e2742]
+                - generic [ref=e2743]:
+                  - text: EVSE Labeling Reference
+                  - paragraph [ref=e2744]: NEC 625.43 — disconnect labels, breaker locking, emergency shutoff (commercial)
+        - generic [ref=e2745]:
+          - generic [ref=e2746]:
+            - img [ref=e2747]
+            - generic [ref=e2749]:
+              - heading "User-supplied Artifacts" [level=3] [ref=e2750]
+              - paragraph [ref=e2751]: Upload PDFs that SparkPlan cannot generate (site plan, equipment cut sheets, fire stopping schedule, NOC, HOA letter, survey, manufacturer data, HVHZ anchoring details). These are required by most AHJs for intake; they are spliced into the generated packet behind SparkPlan title sheets at download time.
+          - generic [ref=e2752]:
+            - generic [ref=e2753]:
+              - paragraph [ref=e2754]: Upload slot visibility
+              - paragraph [ref=e2755]: No AHJ manifest selected — toggle slots on as needed. Selections persist per project.
+            - generic [ref=e2756]:
+              - generic [ref=e2757] [cursor=pointer]:
+                - checkbox "Site Plan / Survey Property layout, equipment locations" [ref=e2758]
+                - generic [ref=e2759]:
+                  - text: Site Plan / Survey
+                  - paragraph [ref=e2760]: Property layout, equipment locations
+              - generic [ref=e2761] [cursor=pointer]:
+                - checkbox "Equipment Cut Sheets Manufacturer spec sheets" [ref=e2762]
+                - generic [ref=e2763]:
+                  - text: Equipment Cut Sheets
+                  - paragraph [ref=e2764]: Manufacturer spec sheets
+              - generic [ref=e2765] [cursor=pointer]:
+                - checkbox "Fire Stopping Schedule UL-listed firestop assemblies" [ref=e2766]
+                - generic [ref=e2767]:
+                  - text: Fire Stopping Schedule
+                  - paragraph [ref=e2768]: UL-listed firestop assemblies
+              - generic [ref=e2769] [cursor=pointer]:
+                - checkbox "Notice of Commencement FL Statute 713 — jobs > $5,000" [ref=e2770]
+                - generic [ref=e2771]:
+                  - text: Notice of Commencement
+                  - paragraph [ref=e2772]: FL Statute 713 — jobs > $5,000
+              - generic [ref=e2773] [cursor=pointer]:
+                - checkbox "HOA / Condo Approval Letter Multi-family / association-governed" [ref=e2774]
+                - generic [ref=e2775]:
+                  - text: HOA / Condo Approval Letter
+                  - paragraph [ref=e2776]: Multi-family / association-governed
+              - generic [ref=e2777] [cursor=pointer]:
+                - checkbox "Property Survey Stamped survey when separate from site plan" [ref=e2778]
+                - generic [ref=e2779]:
+                  - text: Property Survey
+                  - paragraph [ref=e2780]: Stamped survey when separate from site plan
+              - generic [ref=e2781] [cursor=pointer]:
+                - checkbox "Manufacturer Installation Data Vendor installation manuals" [ref=e2782]
+                - generic [ref=e2783]:
+                  - text: Manufacturer Installation Data
+                  - paragraph [ref=e2784]: Vendor installation manuals
+              - generic [ref=e2785] [cursor=pointer]:
+                - checkbox "HVHZ / Outdoor Anchoring Detail Florida Product Approval / NOA tie-down" [ref=e2786]
+                - generic [ref=e2787]:
+                  - text: HVHZ / Outdoor Anchoring Detail
+                  - paragraph [ref=e2788]: Florida Product Approval / NOA tie-down
+              - generic [ref=e2789] [cursor=pointer]:
+                - checkbox "Zoning Compliance Permit Pompano Beach EV charging" [ref=e2790]
+                - generic [ref=e2791]:
+                  - text: Zoning Compliance Permit
+                  - paragraph [ref=e2792]: Pompano Beach EV charging
+              - generic [ref=e2793] [cursor=pointer]:
+                - checkbox "Fire Review Application Pompano + Davie non-SFR EVSE" [ref=e2794]
+                - generic [ref=e2795]:
+                  - text: Fire Review Application
+                  - paragraph [ref=e2796]: Pompano + Davie non-SFR EVSE
+              - generic [ref=e2797] [cursor=pointer]:
+                - checkbox "Notarized Addendum Form Davie contractor + owner notarized" [ref=e2798]
+                - generic [ref=e2799]:
+                  - text: Notarized Addendum Form
+                  - paragraph [ref=e2800]: Davie contractor + owner notarized
+              - generic [ref=e2801] [cursor=pointer]:
+                - checkbox "Property Ownership Search Davie BCPA.NET printout" [ref=e2802]
+                - generic [ref=e2803]:
+                  - text: Property Ownership Search
+                  - paragraph [ref=e2804]: Davie BCPA.NET printout
+              - generic [ref=e2805] [cursor=pointer]:
+                - checkbox "Design Flood Elevation Hillsborough flood-zone" [ref=e2806]
+                - generic [ref=e2807]:
+                  - text: Design Flood Elevation
+                  - paragraph [ref=e2808]: Hillsborough flood-zone
+              - generic [ref=e2809] [cursor=pointer]:
+                - checkbox "Private Provider Documentation FS 553.791 alternative review" [ref=e2810]
+                - generic [ref=e2811]:
+                  - text: Private Provider Documentation
+                  - paragraph [ref=e2812]: FS 553.791 alternative review
+        - generic [ref=e2813]:
+          - heading "Packet Configuration" [level=3] [ref=e2814]
+          - generic [ref=e2815]:
+            - generic [ref=e2816]: Packet Type
+            - generic [ref=e2817]:
+              - generic [ref=e2818] [cursor=pointer]:
+                - radio "Full Packet Includes all panel schedules" [checked] [ref=e2819]
+                - generic [ref=e2820]:
+                  - text: Full Packet
+                  - paragraph [ref=e2821]: Includes all panel schedules
+              - generic [ref=e2822] [cursor=pointer]:
+                - radio "Lightweight Summary only (no panel schedules)" [ref=e2823]
+                - generic [ref=e2824]:
+                  - text: Lightweight
+                  - paragraph [ref=e2825]: Summary only (no panel schedules)
+          - generic [ref=e2826]:
+            - generic [ref=e2827]:
+              - generic [ref=e2828]: Prepared By (Optional)
+              - textbox "Prepared By (Optional)" [ref=e2829]:
+                - /placeholder: Contractor/Engineer name
+                - text: Augusto E Valbuena
+            - generic [ref=e2830]:
+              - generic [ref=e2831]: Contractor License *
+              - textbox "Contractor License *" [ref=e2832]:
+                - /placeholder: e.g., EC1234567
+                - text: EC1234567
+              - paragraph [ref=e2833]: "FL DBPR format: EC####### or ER####### (heads-up only — packet still generates)"
+          - generic [ref=e2835]:
+            - generic [ref=e2836]: Permit Number (Optional)
+            - textbox "Permit Number (Optional)" [ref=e2837]:
+              - /placeholder: e.g., PER-2024-001234
+              - text: test
+          - generic [ref=e2838]:
+            - generic [ref=e2839]: Scope of Work *
+            - textbox "Scope of Work *" [ref=e2840]:
+              - /placeholder: e.g., Replace existing 100A overhead service with 200A underground service, relocate meter to exterior wall, install new 200A main panel
+              - text: Adding 4 Chargers with EVMS
+            - paragraph [ref=e2841]: Brief description of work to be performed
+          - generic [ref=e2842]:
+            - heading "Service Entrance Details" [level=4] [ref=e2843]
+            - generic [ref=e2844]:
+              - generic [ref=e2845]:
+                - generic [ref=e2846]: Service Type
+                - combobox "Service Type" [ref=e2847]:
+                  - option "Overhead"
+                  - option "Underground" [selected]
+              - generic [ref=e2848]:
+                - generic [ref=e2849]: Meter Location
+                - textbox "Meter Location" [ref=e2850]:
+                  - /placeholder: e.g., Exterior wall, north side
+              - generic [ref=e2851]:
+                - generic [ref=e2852]: Conductor Routing
+                - textbox "Conductor Routing" [ref=e2853]:
+                  - /placeholder: e.g., PVC conduit, buried 24in
+        - generic [ref=e2854]:
+          - generic [ref=e2855]:
+            - img [ref=e2856]
+            - generic [ref=e2860]:
+              - heading "Multi-Family EV Analysis" [level=3] [ref=e2861]
+              - paragraph [ref=e2862]: NEC 220.84 + 220.57 + 625.42
+          - generic [ref=e2863]:
+            - img [ref=e2864]
+            - paragraph [ref=e2867]: Analysis saved from the Multi-Family EV Calculator. Toggle the "Multi-Family EV Analysis" section below to include it in the packet.
+        - generic [ref=e2868]:
+          - generic [ref=e2869]:
+            - generic [ref=e2870]:
+              - img [ref=e2871]
+              - generic [ref=e2874]:
+                - heading "Existing-Service Capacity Narrative" [level=3] [ref=e2875]
+                - paragraph [ref=e2876]: Required by most AHJs when claiming existing-service capacity for an EV upgrade or load addition. Cites NEC 220.87 when method is measured (utility bill / load study); cites NEC 220 Part III when method is calculated from project panel schedules.
+            - generic [ref=e2877] [cursor=pointer]:
+              - checkbox "Include" [checked] [ref=e2878]
+              - generic [ref=e2880]: Include
+          - generic [ref=e2881]:
+            - paragraph [ref=e2883]:
+              - strong [ref=e2884]: "What this generates:"
+              - text: A signed sheet documenting the three NEC 220.87 conditions (12-month max demand source, demand × 125% + new load ≤ ampacity, OCPD per 240.4 / overload per 230.90). Without this, most AHJs reject existing-service load-addition submittals on intake.
+            - generic [ref=e2885]:
+              - generic [ref=e2886]:
+                - generic [ref=e2887]: Existing-Load Method
+                - combobox "Existing-Load Method" [ref=e2888]:
+                  - option "Utility billing — 12-month peak (preferred)"
+                  - option "Recording load study — 30-day at 15-min intervals"
+                  - option "Calculated from existing panel schedule (NEC 220.82/220.84)" [selected]
+                  - option "Manual entry (informational only)"
+                - paragraph [ref=e2889]: Measured methods (bill / study) skip the 125% multiplier. Calculated/manual apply 125%.
+              - generic [ref=e2890]:
+                - generic [ref=e2891]: Source Citation
+                - textbox "Source Citation" [ref=e2892]:
+                  - /placeholder: "e.g., FPL utility billing, account #12345-67"
+                  - text: Project Information
+            - generic [ref=e2893]:
+              - generic [ref=e2894]:
+                - generic [ref=e2895]: Window From
+                - textbox "Window From" [ref=e2896]: 2026-04-01
+              - generic [ref=e2897]:
+                - generic [ref=e2898]: Window To
+                - textbox "Window To" [ref=e2899]: 2026-04-30
+              - generic [ref=e2900]:
+                - generic [ref=e2901]: Max Demand (kVA)
+                - spinbutton "Max Demand (kVA)" [ref=e2902]: "64.71"
+                - paragraph [ref=e2903]: NEC-demanded existing load (via calculateAggregatedLoad → NEC 220.84/220.42 demand factors). Matches E-101.
+              - generic [ref=e2904]:
+                - generic [ref=e2905]: Proposed New Load (kVA)
+                - spinbutton "Proposed New Load (kVA)" [ref=e2906]: "28.32"
+                - paragraph [ref=e2907]: NEC-demanded proposed load (EVEMS-clamped where applicable per NEC 625.42).
+        - button "Generate Permit Packet" [ref=e2909]:
+          - img [ref=e2910]
+          - text: Generate Permit Packet
+        - generic [ref=e2914]:
+          - img [ref=e2915]
+          - generic [ref=e2917]:
+            - paragraph [ref=e2918]: Heads up — these may cause AHJ intake friction
+            - list [ref=e2919]:
+              - listitem [ref=e2920]: "Project address: Address must include street, city, state, and ZIP (edit in Project Setup)"
+              - listitem [ref=e2921]: "Permit Number: Permit number cannot be a placeholder (e.g., \"test\")"
+            - paragraph [ref=e2922]: Packet will still generate — these are informational only. Florida AHJs typically reject submittals with placeholder values like "TBD" or "test" on intake.
+  - button "Open Spark Copilot" [ref=e332]:
+    - img [ref=e333]
+  - button "Open support" [ref=e336]:
+    - img [ref=e337]

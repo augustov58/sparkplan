@@ -1,0 +1,453 @@
+- generic [ref=e2]:
+  - generic [ref=e448]:
+    - complementary [ref=e449]:
+      - generic [ref=e453] [cursor=pointer]: ⚡ SparkPlan
+      - generic [ref=e454]:
+        - button "Back to Dashboard" [ref=e456]:
+          - img [ref=e457]
+          - text: Back to Dashboard
+        - heading "PROJECT DESIGN" [level=3] [ref=e460]
+        - link "Project Setup" [ref=e461] [cursor=pointer]:
+          - /url: "#/project/48c393e4-68b9-4bde-9e4c-ea67c1397b44"
+          - img [ref=e462]
+          - generic [ref=e465]: Project Setup
+        - link "Dwelling Calculator" [active] [ref=e466] [cursor=pointer]:
+          - /url: "#/project/48c393e4-68b9-4bde-9e4c-ea67c1397b44/load-calc"
+          - img [ref=e467]
+          - generic [ref=e470]: Dwelling Calculator
+        - link "Circuit Design" [ref=e471] [cursor=pointer]:
+          - /url: "#/project/48c393e4-68b9-4bde-9e4c-ea67c1397b44/circuits"
+          - img [ref=e472]
+          - generic [ref=e478]: Circuit Design
+          - img [ref=e479]
+        - link "One-Line Diagram" [ref=e481] [cursor=pointer]:
+          - /url: "#/project/48c393e4-68b9-4bde-9e4c-ea67c1397b44/diagram"
+          - img [ref=e482]
+          - generic [ref=e487]: One-Line Diagram
+        - link "Panel Schedules" [ref=e488] [cursor=pointer]:
+          - /url: "#/project/48c393e4-68b9-4bde-9e4c-ea67c1397b44/panel"
+          - img [ref=e489]
+          - generic [ref=e491]: Panel Schedules
+        - link "Feeder Sizing" [ref=e492] [cursor=pointer]:
+          - /url: "#/project/48c393e4-68b9-4bde-9e4c-ea67c1397b44/feeders"
+          - img [ref=e493]
+          - generic [ref=e497]: Feeder Sizing
+        - link "Short Circuit Analysis" [ref=e498] [cursor=pointer]:
+          - /url: "#/project/48c393e4-68b9-4bde-9e4c-ea67c1397b44/short-circuit"
+          - img [ref=e499]
+          - generic [ref=e501]: Short Circuit Analysis
+        - link "Grounding & Bonding" [ref=e502] [cursor=pointer]:
+          - /url: "#/project/48c393e4-68b9-4bde-9e4c-ea67c1397b44/grounding"
+          - img [ref=e503]
+          - generic [ref=e505]: Grounding & Bonding
+        - link "Tools & Calculators" [ref=e506] [cursor=pointer]:
+          - /url: "#/project/48c393e4-68b9-4bde-9e4c-ea67c1397b44/tools"
+          - img [ref=e507]
+          - generic [ref=e509]: Tools & Calculators
+        - heading "PROJECT MANAGEMENT" [level=3] [ref=e511]
+        - link "Estimating beta" [ref=e512] [cursor=pointer]:
+          - /url: "#/project/48c393e4-68b9-4bde-9e4c-ea67c1397b44/estimating"
+          - img [ref=e513]
+          - generic [ref=e515]: Estimating
+          - generic [ref=e516]: beta
+        - link "Permits beta" [ref=e517] [cursor=pointer]:
+          - /url: "#/project/48c393e4-68b9-4bde-9e4c-ea67c1397b44/permits"
+          - img [ref=e518]
+          - generic [ref=e520]: Permits
+          - generic [ref=e521]: beta
+        - link "T&M Billing beta" [ref=e522] [cursor=pointer]:
+          - /url: "#/project/48c393e4-68b9-4bde-9e4c-ea67c1397b44/billing"
+          - img [ref=e523]
+          - generic [ref=e525]: T&M Billing
+          - generic [ref=e526]: beta
+        - link "Calendar" [ref=e527] [cursor=pointer]:
+          - /url: "#/project/48c393e4-68b9-4bde-9e4c-ea67c1397b44/calendar"
+          - img [ref=e528]
+          - generic [ref=e530]: Calendar
+        - link "AI Inspector & Activity" [ref=e531] [cursor=pointer]:
+          - /url: "#/project/48c393e4-68b9-4bde-9e4c-ea67c1397b44/inspector"
+          - img [ref=e532]
+          - generic [ref=e534]: AI Inspector & Activity
+        - link "Pre-Inspection Check" [ref=e535] [cursor=pointer]:
+          - /url: "#/project/48c393e4-68b9-4bde-9e4c-ea67c1397b44/check"
+          - img [ref=e536]
+          - generic [ref=e539]: Pre-Inspection Check
+        - link "Permit Packet" [ref=e540] [cursor=pointer]:
+          - /url: "#/project/48c393e4-68b9-4bde-9e4c-ea67c1397b44/permit-packet"
+          - img [ref=e541]
+          - generic [ref=e544]: Permit Packet
+      - generic [ref=e545]:
+        - generic [ref=e546]:
+          - generic [ref=e547]: AV
+          - generic [ref=e548]:
+            - paragraph [ref=e549]: Augusto E Valbuena
+            - paragraph [ref=e550]: augustovalbuena@gmail.com
+        - button "Billing & Plans" [ref=e551]:
+          - img [ref=e552]
+          - text: Billing & Plans
+        - button "Account Settings" [ref=e554]:
+          - img [ref=e555]
+          - text: Account Settings
+        - button "Sign Out" [ref=e558]:
+          - img [ref=e559]
+          - text: Sign Out
+    - main [ref=e562]:
+      - heading "EV Charging - Residential Installation" [level=1] [ref=e565]
+      - generic [ref=e746]:
+        - generic [ref=e747]:
+          - generic [ref=e748]:
+            - heading "Dwelling Load Calculator" [level=2] [ref=e749]:
+              - img [ref=e750]
+              - generic [ref=e753]: Dwelling Load Calculator
+            - paragraph [ref=e754]: NEC 220.83 - Optional Method for Existing Single-Family Dwellings
+            - generic [ref=e755]:
+              - generic [ref=e756]: Existing Service Size
+              - spinbutton [ref=e757]: "200"
+              - generic [ref=e758]: A
+              - generic [ref=e759]: (auto from main panel breaker; override to model upsize scenarios)
+            - generic [ref=e760]:
+              - generic [ref=e761]: Calculation Method
+              - combobox "NEC 220.83 always uses the 8 kVA / 40% bucket method" [disabled] [ref=e762]:
+                - option "220.83 Optional (8 kVA / 40%)" [selected]
+              - generic [ref=e763]: "Locked: NEC 220.83 always uses 8 kVA / 40% bucket"
+          - generic [ref=e764]:
+            - generic [ref=e765]:
+              - paragraph [ref=e766]: "Panel: Main Panel"
+              - paragraph [ref=e767]: No circuits created yet
+            - button "Generate Panel Schedule" [ref=e768]:
+              - img [ref=e769]
+              - generic [ref=e771]: Generate Panel Schedule
+        - generic [ref=e772]:
+          - generic [ref=e773]:
+            - generic [ref=e775]:
+              - generic [ref=e776]:
+                - paragraph [ref=e777]: "General Lighting Load: 6,000 VA"
+                - paragraph [ref=e778]: 2,000 sq ft × 3 VA/sq ft (NEC Table 220.12)
+              - paragraph [ref=e779]: Edit square footage in Project Setup
+            - generic [ref=e780]:
+              - button "Appliances & Equipment" [ref=e781]:
+                - heading "Appliances & Equipment" [level=3] [ref=e782]:
+                  - img [ref=e783]
+                  - text: Appliances & Equipment
+                - img [ref=e785]
+              - generic [ref=e787]:
+                - generic [ref=e788]:
+                  - generic [ref=e789]:
+                    - generic [ref=e790]:
+                      - generic [ref=e791]:
+                        - img [ref=e792]
+                        - generic [ref=e794]: Electric Range
+                      - button [ref=e795]
+                    - generic [ref=e797]:
+                      - combobox [ref=e798]:
+                        - option "Electric" [selected]
+                        - option "Gas (no load)"
+                      - generic [ref=e799]:
+                        - generic [ref=e800]: "kW:"
+                        - spinbutton [ref=e801]: "10"
+                  - generic [ref=e802]:
+                    - generic [ref=e803]:
+                      - generic [ref=e804]:
+                        - img [ref=e805]
+                        - generic [ref=e809]: Clothes Dryer
+                      - button [ref=e810]
+                    - generic [ref=e812]:
+                      - combobox [ref=e813]:
+                        - option "Electric" [selected]
+                        - option "Gas (no load)"
+                      - generic [ref=e814]:
+                        - generic [ref=e815]: "kW:"
+                        - spinbutton [ref=e816]: "5"
+                        - generic [ref=e817]: min 5 kW
+                  - generic [ref=e819]:
+                    - generic [ref=e820]:
+                      - img [ref=e821]
+                      - generic [ref=e824]: Water Heater
+                    - button [ref=e825]
+                  - generic [ref=e827]:
+                    - generic [ref=e828]:
+                      - generic [ref=e829]:
+                        - img [ref=e830]
+                        - generic [ref=e834]: HVAC System
+                      - button [ref=e835]
+                    - generic [ref=e837]:
+                      - combobox [ref=e838]:
+                        - option "A/C Only" [selected]
+                        - option "Heat Pump"
+                        - option "Electric Furnace"
+                        - option "Gas Heat + A/C"
+                      - generic [ref=e840]:
+                        - generic [ref=e841]: "A/C kW:"
+                        - spinbutton [ref=e842]: "3.6"
+                      - paragraph [ref=e843]: "NEC 220.60: Use larger of heat or A/C (non-coincident)"
+                  - generic [ref=e844]:
+                    - generic [ref=e845]:
+                      - generic [ref=e846]:
+                        - img [ref=e847]
+                        - generic [ref=e850]: Dishwasher
+                      - button [ref=e851]
+                    - generic [ref=e854]:
+                      - generic [ref=e855]: "kW:"
+                      - spinbutton [ref=e856]: "1.2"
+                  - generic [ref=e857]:
+                    - generic [ref=e858]:
+                      - generic [ref=e859]:
+                        - img [ref=e860]
+                        - generic [ref=e865]: Garbage Disposal
+                      - button [ref=e866]
+                    - generic [ref=e869]:
+                      - generic [ref=e870]: "kW:"
+                      - spinbutton [ref=e871]: "0.5"
+                  - generic [ref=e872]:
+                    - generic [ref=e873]:
+                      - generic [ref=e874]:
+                        - img [ref=e875]
+                        - generic [ref=e879]: EV Charger
+                      - button [ref=e880]
+                    - generic [ref=e882]:
+                      - combobox [ref=e883]:
+                        - option "Level 1 (120V)"
+                        - option "Level 2 (240V)" [selected]
+                      - generic [ref=e884]:
+                        - generic [ref=e885]: "kW:"
+                        - spinbutton [ref=e886]: "9.6"
+                  - generic [ref=e888]:
+                    - generic [ref=e889]:
+                      - img [ref=e890]
+                      - generic [ref=e894]: Pool Pump
+                    - button [ref=e895]
+                  - generic [ref=e898]:
+                    - generic [ref=e899]:
+                      - img [ref=e900]
+                      - generic [ref=e902]: Pool Heater
+                    - button [ref=e903]
+                  - generic [ref=e906]:
+                    - generic [ref=e907]:
+                      - img [ref=e908]
+                      - generic [ref=e912]: Hot Tub / Spa
+                    - button [ref=e913]
+                  - generic [ref=e916]:
+                    - generic [ref=e917]:
+                      - img [ref=e918]
+                      - generic [ref=e921]: Well Pump
+                    - button [ref=e922]
+                - generic [ref=e925]:
+                  - heading "Other Fixed Appliances" [level=4] [ref=e926]
+                  - button "Add Appliance" [ref=e927]:
+                    - img [ref=e928]
+                    - text: Add Appliance
+                - generic [ref=e929]:
+                  - generic [ref=e930]:
+                    - heading "Proposed New Loads(additions under this permit — marked * on the schedule)" [level=4] [ref=e931]
+                    - button "Add Custom" [ref=e932]:
+                      - img [ref=e933]
+                      - text: Add Custom
+                  - generic [ref=e934]:
+                    - generic [ref=e935]: Select from Common Loads
+                    - combobox [ref=e936]:
+                      - option "-- Select Load --" [selected]
+                      - option "Level 2 EV Charger (32A)"
+                      - option "Level 2 EV Charger (40A)"
+                      - option "Level 2 EV Charger (48A)"
+                      - option "Level 2 EV Charger (80A)"
+                      - option "Central A/C (2.5 Ton)"
+                      - option "Central A/C (3 Ton)"
+                      - option "Central A/C (5 Ton)"
+                      - option "Heat Pump (3 Ton)"
+                      - option "Electric Furnace (10kW)"
+                      - option "Mini-Split Heat Pump"
+                      - option "Electric Range (8kW)"
+                      - option "Electric Dryer (5kW)"
+                      - option "Electric Water Heater (4.5kW)"
+                      - option "Tankless Water Heater (18kW)"
+                      - option "Pool Pump (1.5 HP)"
+                      - option "Pool Heater (11kW)"
+                      - option "Hot Tub/Spa (6kW)"
+                      - option "Well Pump (1 HP)"
+                  - paragraph [ref=e937]: No proposed loads yet. Pick a template above or click "Add Custom".
+          - generic [ref=e938]:
+            - generic [ref=e939]:
+              - generic [ref=e940]:
+                - img [ref=e941]
+                - generic [ref=e943]: Service Calculation
+              - generic [ref=e944]:
+                - generic [ref=e945]:
+                  - generic [ref=e946]: Connected Load
+                  - generic [ref=e947]: 40.4 kVA
+                - generic [ref=e948]:
+                  - generic [ref=e949]: Demand Load
+                  - generic [ref=e950]: 24.1 kVA
+                - generic [ref=e951]:
+                  - generic [ref=e952]: Demand Factor
+                  - generic [ref=e953]: 59.6%
+                - generic [ref=e954]:
+                  - generic [ref=e955]:
+                    - generic [ref=e956]: Service Current
+                    - generic [ref=e957]: 100A
+                  - generic [ref=e958]:
+                    - generic [ref=e959]: Recommended Service
+                    - generic [ref=e960]:
+                      - generic [ref=e961]: 200A
+                      - generic [ref=e962]: existing holds
+                - generic [ref=e963]:
+                  - generic [ref=e964]:
+                    - generic [ref=e965]: Service Headroom (NEC 220.83 vs Existing)
+                    - generic [ref=e966]: Service Holds
+                  - generic [ref=e967]:
+                    - generic [ref=e968]: 100A demand · 200A existing
+                    - generic [ref=e969]: +100A
+            - generic [ref=e970]:
+              - generic [ref=e971]:
+                - img [ref=e972]
+                - generic [ref=e976]: Recommended Conductor Sizes
+              - generic [ref=e977]:
+                - generic [ref=e978]:
+                  - generic [ref=e979]:
+                    - generic [ref=e980]: Service Conductors
+                    - generic [ref=e981]: 1/0 AWG
+                    - generic [ref=e982]: Cu
+                    - generic [ref=e983]: Ungrounded (hot)
+                    - generic [ref=e984]: Per NEC Table 310.12
+                  - generic [ref=e985]:
+                    - generic [ref=e986]: Neutral Conductor
+                    - generic [ref=e987]: 1/0 AWG
+                    - generic [ref=e988]: Cu
+                    - generic [ref=e989]: 100.3A demand
+                    - generic [ref=e990]: No reduction
+                  - generic [ref=e991]:
+                    - generic [ref=e992]: Grounding Electrode
+                    - generic [ref=e993]: 6 AWG
+                    - generic [ref=e994]: AWG Cu
+                    - generic [ref=e995]: GEC to electrode
+                    - generic [ref=e996]: Per NEC 250.66
+                - paragraph [ref=e998]:
+                  - img [ref=e999]
+                  - generic [ref=e1001]: Conductor sizes assume copper (Cu), 75°C terminations, and standard installation conditions. For aluminum, underground, or special conditions, use the Conductor Sizing Tool for detailed calculations.
+            - generic [ref=e1002]:
+              - heading "Warnings" [level=4] [ref=e1003]:
+                - img [ref=e1004]
+                - text: Warnings
+              - list [ref=e1006]:
+                - listitem [ref=e1007]: • ℹ️ NEC 220.83(B) allows 65% for central electric heating or fewer than four separately-controlled space-heating units, and 40% for four or more separately-controlled units. This calc applies 100% — adjust manually if the heating scenario qualifies.
+                - listitem [ref=e1008]: • ℹ️ Calculated per NEC 220.83 (Existing Dwelling, Optional Method). Switch Project Status to "New Construction" on the Project Setup page to use NEC 220.82 instead.
+            - generic [ref=e1009]:
+              - button "Load Breakdown" [ref=e1010]:
+                - heading "Load Breakdown" [level=3] [ref=e1011]:
+                  - img [ref=e1012]
+                  - text: Load Breakdown
+                - img [ref=e1015]
+              - table [ref=e1018]:
+                - rowgroup [ref=e1019]:
+                  - row "Category Connected Demand Factor" [ref=e1020]:
+                    - columnheader "Category" [ref=e1021]
+                    - columnheader "Connected" [ref=e1022]
+                    - columnheader "Demand" [ref=e1023]
+                    - columnheader "Factor" [ref=e1024]
+                - rowgroup [ref=e1025]:
+                  - row "General Lighting 2000 sq ft @ 3 VA/sq ft 6.00 kVA - -" [ref=e1026]:
+                    - cell "General Lighting 2000 sq ft @ 3 VA/sq ft" [ref=e1027]:
+                      - generic [ref=e1028]: General Lighting
+                      - generic [ref=e1029]: 2000 sq ft @ 3 VA/sq ft
+                    - cell "6.00 kVA" [ref=e1030]
+                    - cell "-" [ref=e1031]
+                    - cell "-" [ref=e1032]
+                  - row "Small Appliance Circuits 2 circuits @ 1,500 VA each 3.00 kVA - -" [ref=e1033]:
+                    - cell "Small Appliance Circuits 2 circuits @ 1,500 VA each" [ref=e1034]:
+                      - generic [ref=e1035]: Small Appliance Circuits
+                      - generic [ref=e1036]: 2 circuits @ 1,500 VA each
+                    - cell "3.00 kVA" [ref=e1037]
+                    - cell "-" [ref=e1038]
+                    - cell "-" [ref=e1039]
+                  - row "Laundry Circuit 1 circuit @ 1,500 VA 1.50 kVA - -" [ref=e1040]:
+                    - cell "Laundry Circuit 1 circuit @ 1,500 VA" [ref=e1041]:
+                      - generic [ref=e1042]: Laundry Circuit
+                      - generic [ref=e1043]: 1 circuit @ 1,500 VA
+                    - cell "1.50 kVA" [ref=e1044]
+                    - cell "-" [ref=e1045]
+                    - cell "-" [ref=e1046]
+                  - row "General Loads Subtotal Lighting + Small Appliance + Laundry + Appliances (first 8 kVA @ 100%, remainder @ 40%) 36.80 kVA 20.48 kVA 52%" [ref=e1047]:
+                    - cell "General Loads Subtotal Lighting + Small Appliance + Laundry + Appliances (first 8 kVA @ 100%, remainder @ 40%)" [ref=e1048]:
+                      - generic [ref=e1049]: General Loads Subtotal
+                      - generic [ref=e1050]: Lighting + Small Appliance + Laundry + Appliances (first 8 kVA @ 100%, remainder @ 40%)
+                    - cell "36.80 kVA" [ref=e1051]
+                    - cell "20.48 kVA" [ref=e1052]
+                    - cell "52%" [ref=e1053]
+                  - row "Electric Range 10 kW 10.00 kVA - -" [ref=e1054]:
+                    - cell "Electric Range 10 kW" [ref=e1055]:
+                      - generic [ref=e1056]: Electric Range
+                      - generic [ref=e1057]: 10 kW
+                    - cell "10.00 kVA" [ref=e1058]
+                    - cell "-" [ref=e1059]
+                    - cell "-" [ref=e1060]
+                  - row "Electric Dryer 5 kW (min 5 kW) 5.00 kVA - -" [ref=e1061]:
+                    - cell "Electric Dryer 5 kW (min 5 kW)" [ref=e1062]:
+                      - generic [ref=e1063]: Electric Dryer
+                      - generic [ref=e1064]: 5 kW (min 5 kW)
+                    - cell "5.00 kVA" [ref=e1065]
+                    - cell "-" [ref=e1066]
+                    - cell "-" [ref=e1067]
+                  - row "HVAC A/C 3.6 kW (larger of heat/cool) 3.60 kVA 3.60 kVA 100%" [ref=e1068]:
+                    - cell "HVAC A/C 3.6 kW (larger of heat/cool)" [ref=e1069]:
+                      - generic [ref=e1070]: HVAC
+                      - generic [ref=e1071]: A/C 3.6 kW (larger of heat/cool)
+                    - cell "3.60 kVA" [ref=e1072]
+                    - cell "3.60 kVA" [ref=e1073]
+                    - cell "100%" [ref=e1074]
+                  - row "Dishwasher 1.2 kW 1.20 kVA - -" [ref=e1075]:
+                    - cell "Dishwasher 1.2 kW" [ref=e1076]:
+                      - generic [ref=e1077]: Dishwasher
+                      - generic [ref=e1078]: 1.2 kW
+                    - cell "1.20 kVA" [ref=e1079]
+                    - cell "-" [ref=e1080]
+                    - cell "-" [ref=e1081]
+                  - row "Garbage Disposal 0.5 kW 0.50 kVA - -" [ref=e1082]:
+                    - cell "Garbage Disposal 0.5 kW" [ref=e1083]:
+                      - generic [ref=e1084]: Garbage Disposal
+                      - generic [ref=e1085]: 0.5 kW
+                    - cell "0.50 kVA" [ref=e1086]
+                    - cell "-" [ref=e1087]
+                    - cell "-" [ref=e1088]
+                  - row "EV Charger Level 2 - 9.6 kW (continuous ×1.25) 9.60 kVA - -" [ref=e1089]:
+                    - cell "EV Charger Level 2 - 9.6 kW (continuous ×1.25)" [ref=e1090]:
+                      - generic [ref=e1091]: EV Charger
+                      - generic [ref=e1092]: Level 2 - 9.6 kW (continuous ×1.25)
+                    - cell "9.60 kVA" [ref=e1093]
+                    - cell "-" [ref=e1094]
+                    - cell "-" [ref=e1095]
+                - rowgroup [ref=e1096]:
+                  - row "TOTAL 40.40 kVA 24.08 kVA 59.6%" [ref=e1097]:
+                    - cell "TOTAL" [ref=e1098]
+                    - cell "40.40 kVA" [ref=e1099]
+                    - cell "24.08 kVA" [ref=e1100]
+                    - cell "59.6%" [ref=e1101]
+            - generic [ref=e1102]:
+              - heading "NEC References" [level=4] [ref=e1103]
+              - list [ref=e1104]:
+                - listitem [ref=e1105]:
+                  - img [ref=e1106]
+                  - text: NEC 220.83 - Optional Method for Existing Dwelling Units
+                - listitem [ref=e1109]:
+                  - img [ref=e1110]
+                  - text: NEC Table 220.55
+                - listitem [ref=e1113]:
+                  - img [ref=e1114]
+                  - text: NEC 220.60 - Non-coincident Loads
+                - listitem [ref=e1117]:
+                  - img [ref=e1118]
+                  - text: NEC 625.41 - EVSE Continuous Load
+                - listitem [ref=e1121]:
+                  - img [ref=e1122]
+                  - text: NEC 220.83 - General Loads (first 8 kVA @ 100%, remainder @ 40%)
+                - listitem [ref=e1125]:
+                  - img [ref=e1126]
+                  - text: NEC 220.83(B) - HVAC at 100% (larger of heat/cool)
+                - listitem [ref=e1129]:
+                  - img [ref=e1130]
+                  - text: NEC Table 310.12 - Service Conductor Sizing
+                - listitem [ref=e1133]:
+                  - img [ref=e1134]
+                  - text: NEC 250.66 - Grounding Electrode Conductor
+  - button "Open Spark Copilot" [ref=e332]:
+    - img [ref=e333]
+  - button "Open support" [ref=e336]:
+    - img [ref=e337]
