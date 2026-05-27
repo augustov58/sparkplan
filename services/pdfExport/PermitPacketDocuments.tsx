@@ -2289,9 +2289,45 @@ export const ComplianceSummary: React.FC<ComplianceSummaryProps> = ({
  */
 export type NEC22087Method = 'utility_bill' | 'load_study' | 'calculated' | 'manual';
 
+/**
+ * Sprint 3 (2026-05-27): occupancy axis for the calculated-method narrative.
+ *
+ * When `method === 'calculated'` the page cites the specific NEC 220 Part III
+ * subsections that produced the existing-demand figure. Those subsections
+ * differ by occupancy:
+ *
+ *   dwelling_single_family_existing → NEC 220.42 / 220.83 (Optional Method, existing)
+ *   dwelling_single_family_new      → NEC 220.42 / 220.82 (Optional Method, new)
+ *   dwelling_multi_family           → NEC 220.42 / 220.84 (Optional Method, multifamily)
+ *   commercial                      → NEC 220.42 / 220.44 / 220.56
+ *   industrial                      → NEC 220.42 / 220.56
+ *
+ * Pre-Sprint 3 the citation string was hard-coded to dwelling subsections
+ * (`220.42 / 220.82 / 220.84`) for all occupancies, so commercial / industrial
+ * packets cited dwelling tables a careful AHJ reviewer would flag.
+ *
+ * Only relevant to the `calculated` method. Measured methods (`utility_bill`,
+ * `load_study`) and `manual` cite NEC 220.87 directly and don't fan by
+ * occupancy. Optional on the narrative data block (default
+ * `dwelling_multi_family`) for back-compat with pre-Sprint-3 callers.
+ */
+export type NarrativeOccupancy =
+  | 'dwelling_single_family_existing'
+  | 'dwelling_single_family_new'
+  | 'dwelling_multi_family'
+  | 'commercial'
+  | 'industrial';
+
 export interface NEC22087NarrativeData {
   /** How the existing maximum demand was determined (drives Condition 1 wording). */
   method: NEC22087Method;
+  /**
+   * Sprint 3: occupancy axis for `method === 'calculated'`. Drives which NEC
+   * 220 Part III subsections are cited in the narrative. Optional —
+   * defaults to `dwelling_multi_family` (the pre-Sprint-3 hard-coded
+   * default) so legacy callers continue rendering identically.
+   */
+  occupancy?: NarrativeOccupancy;
   /** Free-text citation: "FPL utility billing, account #12345-67, Sept 2024 - Aug 2025". */
   dataSourceCitation: string;
   /** ISO yyyy-mm-dd; start of the 12-month observation window. */
@@ -2322,10 +2358,14 @@ interface NEC22087NarrativePageProps {
   sheetId?: string;
 }
 
-const METHOD_LABEL: Record<NEC22087Method, string> = {
+// Sprint 3 (2026-05-27): the `calculated` method's label & NEC reference
+// are now occupancy-fanned (commercial cites 220.44/220.56, not the
+// dwelling-only 220.82/220.84). Keep the Records narrowed to the methods
+// that DON'T fan by occupancy \u2014 TypeScript then enforces that the
+// helper handles `calculated` separately via getPartIIIRefs().
+const METHOD_LABEL: Record<Exclude<NEC22087Method, 'calculated'>, string> = {
   utility_bill: 'Utility billing data \u2014 12-month peak demand',
   load_study: 'Recording load study \u2014 30-day at 15-minute intervals',
-  calculated: 'Calculated from existing panel schedule \u2014 NEC 220.82/220.84 demand factors',
   manual: 'Manual entry (informational only \u2014 AHJ may require source documentation)',
 };
 
@@ -2333,13 +2373,38 @@ const METHOD_LABEL: Record<NEC22087Method, string> = {
 // the MEASURED-demand path. Calculated loads use NEC 220 Part III directly
 // \u2014 there is no "Method 2 = calculated" inside 220.87 (the codebase
 // previously labeled it that way as a convenience, but the citation was
-// misleading to AHJ reviewers).
-const METHOD_NEC_REF: Record<NEC22087Method, string> = {
+// misleading to AHJ reviewers). Sprint 3: `calculated` removed from the
+// Record \u2014 it's occupancy-fanned in getNEC22087NarrativeCopy().
+const METHOD_NEC_REF: Record<Exclude<NEC22087Method, 'calculated'>, string> = {
   utility_bill: 'NEC 220.87 \u2014 actual maximum demand from utility billing',
   load_study: 'NEC 220.87 \u2014 actual maximum demand from recording load study',
-  calculated: 'NEC 220 Part III calculation \u2014 demand factors from NEC 220.42 / 220.82 / 220.84 (not NEC 220.87, which is for measured demand)',
   manual: 'NEC 220.87 (defensive default) \u2014 method unspecified, 125% multiplier applied',
 };
+
+/**
+ * Sprint 3 (2026-05-27): NEC 220 Part III subsections by occupancy.
+ *
+ * The Optional Calculation methods for dwellings (220.82 / 220.83 / 220.84)
+ * apply ONLY to dwelling units. Commercial occupancies use 220.42 (lighting)
+ * + 220.44 (receptacles) + 220.56 (commercial cooking). Industrial drops the
+ * receptacle subsection but retains 220.42 + 220.56 for fixed equipment.
+ *
+ * Pre-Sprint 3 the codebase hard-coded `220.42 / 220.82 / 220.84` for all
+ * occupancies on the calculated narrative page, which cited the dwelling
+ * multifamily table (220.84) on commercial / industrial packets. Caught
+ * on the Riverside Office Park (Scenario 2) fixture during PR-109 review.
+ */
+const PART_III_REFS_BY_OCCUPANCY: Record<NarrativeOccupancy, string> = {
+  dwelling_single_family_existing: '220.42 / 220.83',
+  dwelling_single_family_new: '220.42 / 220.82',
+  dwelling_multi_family: '220.42 / 220.84',
+  commercial: '220.42 / 220.44 / 220.56',
+  industrial: '220.42 / 220.56',
+};
+
+function getPartIIIRefs(occupancy: NarrativeOccupancy): string {
+  return PART_III_REFS_BY_OCCUPANCY[occupancy];
+}
 
 /**
  * Method-aware copy bundle for the existing-service narrative page.
@@ -2354,6 +2419,11 @@ const METHOD_NEC_REF: Record<NEC22087Method, string> = {
  * Centralizing the per-method copy here means the page component, the
  * orchestrator's TOC title, and any future caller pull from the same
  * source of truth \u2014 no copy drift across surfaces.
+ *
+ * Sprint 3: `methodLabel` and `methodNecRef` were promoted into this bundle
+ * (previously read directly from the module-level Records by the page
+ * consumer). They're now occupancy-fanned for the `calculated` method
+ * via getPartIIIRefs().
  */
 export interface NEC22087NarrativeCopy {
   sheetHeader: string;        // BrandBar pageLabel
@@ -2366,10 +2436,18 @@ export interface NEC22087NarrativeCopy {
   verdictAdequateBody: string;
   verdictInadequateBody: string;
   tocTitle: string;           // Table of Contents entry
+  /** Sprint 3: per-method, occupancy-fanned for `calculated`. */
+  methodLabel: string;
+  /** Sprint 3: per-method, occupancy-fanned for `calculated`. */
+  methodNecRef: string;
 }
 
-export function getNEC22087NarrativeCopy(method: NEC22087Method): NEC22087NarrativeCopy {
+export function getNEC22087NarrativeCopy(
+  method: NEC22087Method,
+  occupancy: NarrativeOccupancy = 'dwelling_multi_family',
+): NEC22087NarrativeCopy {
   if (method === 'calculated') {
+    const refs = getPartIIIRefs(occupancy);
     return {
       sheetHeader: 'EXISTING LOAD CALCULATION',
       pageSubtitleSuffix: 'NEC 220 Part III \u2014 Calculated Existing Load + Proposed Addition',
@@ -2380,12 +2458,14 @@ export function getNEC22087NarrativeCopy(method: NEC22087Method): NEC22087Narrat
       verdictAdequateBanner: 'EXISTING SERVICE ADEQUATE (PER NEC 220 PART III CALCULATION)',
       verdictAdequateBody:
         'The existing service has sufficient capacity for the proposed new load. NEC 220.87 is not invoked here \u2014 ' +
-        'existing demand is calculated using NEC 220 Part III demand factors (220.42 / 220.82 / 220.84 / etc.), and ' +
+        `existing demand is calculated using NEC 220 Part III demand factors (${refs}), and ` +
         'those factors already provide the NEC-required diversity allowance.',
       verdictInadequateBody:
         'The proposed new load combined with the calculated existing demand exceeds the service ampacity. ' +
         'A service upgrade or load management (NEC 750 / NEC 625.42) is required.',
       tocTitle: 'NEC 220 Calculated Existing Load \u2014 Service Capacity Verification',
+      methodLabel: `Calculated from existing panel schedule \u2014 NEC ${refs} demand factors`,
+      methodNecRef: `NEC 220 Part III calculation \u2014 demand factors from NEC ${refs} (not NEC 220.87, which is for measured demand)`,
     };
   }
   // measured (`utility_bill` / `load_study`) + `manual` fall back to the
@@ -2406,6 +2486,8 @@ export function getNEC22087NarrativeCopy(method: NEC22087Method): NEC22087Narrat
       'The proposed new load combined with the existing maximum demand exceeds the service ampacity. ' +
       'NEC 220.87 cannot be claimed; a service upgrade or load management (NEC 750 / NEC 625.42) is required.',
     tocTitle: 'NEC 220.87 \u2014 Existing Service Capacity Verification',
+    methodLabel: METHOD_LABEL[method],
+    methodNecRef: METHOD_NEC_REF[method],
   };
 }
 
@@ -2450,7 +2532,11 @@ export const NEC22087NarrativePage: React.FC<NEC22087NarrativePageProps> = ({
   // Sprint 2 (2026-05-27 follow-up): method-aware copy. NEC 220.87 only
   // applies to measured demand; `calculated` invokes NEC 220 Part III
   // and gets different headers/labels throughout the page.
-  const copy = getNEC22087NarrativeCopy(data.method);
+  // Sprint 3 (2026-05-27): occupancy axis fans the calculated-method
+  // citations so commercial / industrial packets don't cite dwelling
+  // subsections (220.82 / 220.84). `data.occupancy` is optional —
+  // defaults to `dwelling_multi_family` inside the helper for back-compat.
+  const copy = getNEC22087NarrativeCopy(data.method, data.occupancy);
   const utilizationPct = capacityKVA > 0 ? (totalFutureDemand / capacityKVA) * 100 : 0;
   const isCompliant = totalFutureDemand <= capacityKVA;
 
@@ -2542,7 +2628,7 @@ export const NEC22087NarrativePage: React.FC<NEC22087NarrativePageProps> = ({
               {copy.condition1Header}
             </Text>
             <Text style={{ fontSize: 8.5, color: '#374151', lineHeight: 1.4 }}>
-              {`Method: ${METHOD_LABEL[data.method]}. ${METHOD_NEC_REF[data.method]}.`}
+              {`Method: ${copy.methodLabel}. ${copy.methodNecRef}.`}
             </Text>
             <Text
               style={{ fontSize: 8.5, color: '#374151', lineHeight: 1.4, marginTop: 1 }}

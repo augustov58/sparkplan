@@ -688,7 +688,11 @@ export const generatePermitPacket = async (data: PermitPacketData): Promise<void
     // packet rendered with `method='calculated'` shows up in the
     // contents as "NEC 220 Calculated Existing Load — Service Capacity
     // Verification" rather than misleadingly invoking NEC 220.87.
-    const narrativeCopy = getNEC22087NarrativeCopy(narrative.method);
+    // Sprint 3 (2026-05-27): pass `narrative.occupancy` so the TOC
+    // title (and downstream page copy) cite the right NEC 220 Part III
+    // subsections per occupancy. Optional — helper defaults to
+    // `dwelling_multi_family` for legacy callers.
+    const narrativeCopy = getNEC22087NarrativeCopy(narrative.method, narrative.occupancy);
     builders.push({
       name: 'NEC22087Narrative',
       kind: 'nec22087Narrative',
