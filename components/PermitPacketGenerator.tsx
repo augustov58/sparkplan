@@ -137,8 +137,8 @@ const SECTION_TOGGLE_CONFIG: SectionToggleConfig[] = [
   },
   {
     key: 'nec22087Narrative',
-    label: 'NEC 220.87 Existing-Service Narrative',
-    description: 'Existing-service-capacity proof: 3-condition checklist + cited data source. Required by most AHJs.',
+    label: 'Existing-Service Capacity Narrative',
+    description: 'Existing-service-capacity proof: 3-condition checklist + cited data source. NEC 220.87 narrative when method is measured (utility bill / load study); NEC 220 Part III calculated narrative when method is calculated from project panel schedules. Required by most AHJs.',
     group: 'Engineering',
   },
   {
@@ -1730,9 +1730,9 @@ export const PermitPacketGenerator: React.FC<PermitPacketGeneratorProps> = ({ pr
           <div className="flex items-center gap-3">
             <FileText className="w-5 h-5 text-[#2d3b2d]" />
             <div>
-              <h3 className="font-bold text-gray-900">NEC 220.87 Existing-Service Narrative</h3>
+              <h3 className="font-bold text-gray-900">Existing-Service Capacity Narrative</h3>
               <p className="text-sm text-gray-500">
-                Required by most AHJs when claiming existing-service capacity for an EV upgrade or load addition.
+                Required by most AHJs when claiming existing-service capacity for an EV upgrade or load addition. Cites NEC 220.87 when method is measured (utility bill / load study); cites NEC 220 Part III when method is calculated from project panel schedules.
               </p>
             </div>
           </div>
