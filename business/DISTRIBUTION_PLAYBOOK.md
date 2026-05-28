@@ -1,9 +1,10 @@
 # Distribution Playbook
 
-**Last Updated:** 2026-05-16
+**Last Updated:** 2026-05-27
 **Status:** Pre-revenue. Pilot phase.
 **Parent doc:** [STRATEGIC_ANALYSIS.md](STRATEGIC_ANALYSIS.md)
-**Authoritative source:** Obsidian `SparkPlan Analysis/` (Reconciliation Notes May 2 2026, Competitive Landscape Apr 2026).
+**Authoritative source:** Obsidian `Projects/Sparkplan/SparkPlan Analysis/` (Reconciliation Notes May 2 2026, Competitive Landscape Apr 2026).
+**Video production assets:** Obsidian `Projects/Sparkplan/Videos/` — script `.md`, Excalidraw storyboard, and rendered PNG per video. **Treat the Obsidian copies as authoritative**; this playbook cross-references but does not duplicate them.
 
 ---
 
@@ -58,21 +59,46 @@ Lead every demo (forum reply, DM, screen-recording) with this 60-second flow. It
 
 400K+ members. Search for "multi-family," "EV charger," "load calculation," "service upgrade" posts — focus on FL-tagged ones. Crossover subs: r/evcharging, r/solar.
 
-### 3. Record one demo video — 35-unit FL building scenario
+### 3. Record Video 1 — 6-unit MF + 6 L2 chargers on existing 600 A (live build + EVEMS reveal)
 
-Walk through:
-- Calculation path (220.87(B)) shows 80A available → 1–2 chargers → "impossible."
-- Measurement path (220.87(A)) using utility billing shows 450A available → 9–12 chargers → "feasible."
-- **Pick a FL city** (Pompano Beach) → packet auto-tunes general notes, code references, sheet-ID prefix, and applicable upload slots. Then switch to Miami-Dade → watch the prefix flip from `E-` to `EL-`, NEC edition recompute, HVHZ wind-anchoring slot appear.
-- **Drag in a contractor's site plan PDF** → merge engine splices it behind a size-aware SparkPlan title sheet with continuous sheet-ID stamping in the bottom-right of every page. No Bluebeam, no manual stitching.
-- Run the FL-specific permit packet with cover sheet, riser, load calc, jurisdiction requirements checklist, equipment cuts.
-- 5–10 minutes, screen-recording with narration. Don't overthink production.
+**Constraint:** demo must stay inside FS 471.003(2)(h) so the on-camera job is something a Founders-cohort contractor can actually execute under their own EC license. 600 A existing service · not upsized · sits exactly at the FL contractor exemption ceiling — strong rhetorical point.
 
-YouTube titles:
-- "NEC 220.84 Multi-Family EV Load Calculation — Step by Step"
-- "Florida EV Permit Packet: What Pompano / Davie / Miami-Dade Inspectors Want"
-- "The 220.87 Measurement Path Most Florida Electricians Don't Know About"
-- "Pick a Florida City, Get the Right Permit Packet — Live Demo"
+**Arc:**
+- Build the project live from scratch in SparkPlan — new project, multifamily, 600 A existing, AHJ = Pompano Beach.
+- Enter per-unit dwelling loads in the dwelling calculator (NEC 220.83 per-unit, ~30 kVA connected each). Duplicate to 6 units.
+- Aggregate via NEC 220.84 (6 units → **44 %** demand factor) — building demand lands around **330 A** on the existing 600 A service, leaving ~270 A headroom for everything else.
+- Open the MF EV Readiness Calculator. Specify 6 × 40 A @ 240 V L2 chargers (~9.6 kVA per stall).
+- **First pass — EVEMS OFF:** ~300 A EV branch + 330 A dwelling = **630 A > 600 A → SERVICE UPGRADE REQUIRED**. Owner walks. Job dead.
+- **Second pass — EVEMS ON @ ~200 A setpoint:** ~200 A managed EV + 330 A dwelling = **530 A < 600 A → 6 chargers fit, no upgrade**. Per NEC 625.42, the EVEMS setpoint becomes the demand load for service calcs.
+- Generate the permit packet. Cover sheet cites 220.83 + 220.84 + 220.57 + 625.42. Riser shows the EVEMS controller. AHJ-specific notes and sheet-ID prefix (`E-` for Pompano) auto-populate.
+- Close with the FS 471.003(2)(h) exemption callout + CTA to `/founders`.
+
+**Why this arc over the old 220.87 calc-vs-measured story:** EVEMS lives in a UI toggle. Calc-vs-measured lives in code interpretation. The toggle is easier to imitate, faster to demo, and maps directly to a paid product feature (the MF EV Readiness Calculator). The 220.87 story is still a legitimate Tier 3 tutorial video — see § 8 below.
+
+**Companion artifacts (Obsidian `Projects/Sparkplan/Videos/Video 1 — 6-Unit MF EV/`):**
+- `video1-multifamily-ev-script.md` — beat-by-beat shooting script (pre-production checklist, on-screen callouts, Reels cutdown, distribution plan, code references)
+- `video1-multifamily-ev.excalidraw` — single 16:9 storyboard / on-screen reference card (workflow strip → hero question → red/green comparison → code chips → exemption strip)
+- `video1-multifamily-ev.png` — rendered storyboard image (drop into the recording as a static cut during Beat 7)
+
+**Length target:** 7–9 min YouTube long-form, 60-sec Reels cutdown for IG/LinkedIn.
+
+YouTube titles (V1 + the natural tutorial-series follow-ups):
+- "Six EV Chargers on a 600 A Service — Without a Service Upgrade (NEC 625.42 EVEMS, Live in SparkPlan)"
+- "NEC 220.84 Multi-Family EV Load Calculation — Step by Step" *(future video — Tier 3)*
+- "The 220.87 Measurement Path Most Florida Electricians Don't Know About" *(future video — Tier 3)*
+- "Florida EV Permit Packet: What Pompano / Davie / Miami-Dade Inspectors Want" *(future video — Tier 3)*
+- "Pick a Florida City, Get the Right Permit Packet — Live Demo" *(future video — covers the AHJ flip that Video 1 only touches briefly)*
+
+### 3b. Record Founders launch video — 90-sec talking head for `/founders` hero
+
+A **different format** from Video 1 — face-on-camera, no screen-share, lives above the fold on the `/founders` page. Trust-building, not feature-demoing. Visitors landing on `/founders` already know what SparkPlan is (the page below the video explains it); they need to trust the person on the other end of the application form.
+
+**Companion artifact (Obsidian `Projects/Sparkplan/Videos/Founders Launch/`):**
+- `founders-launch-script.md` — ~90-second script + pre-production checklist + 30-sec LinkedIn/IG cutdown + a deliberate "what this video doesn't say" list (no pricing, no AI angle, no competitor names, no premature credibility claims)
+
+**Where it embeds:** `components/FoundingApplicationPage.tsx` — between the gold "Florida pilot · 20 spots" pill and the `<h1>`. Below the embed, add a line cross-linking to Video 1: "Want to see the workflow before applying? Watch the case study →"
+
+**Two-funnel design:** Video 1 (YouTube) attracts cold viewers who want the technical proof; Founders launch (on-page) converts already-warm visitors. The cross-link between them lets each video do the job it's designed for instead of trying to be both.
 
 ---
 
@@ -180,7 +206,8 @@ Secondary OEM channels: ChargePoint certification ($125–$175/cert), Tesla cert
 
 ```
 Week 1:  3–5 helpful answers on Mike Holt + Reddit (FL-tagged)
-         Record + upload demo video (FL 35-unit scenario)
+         Record + upload Video 1 (FL 6-unit + 600 A + EVEMS reveal — script in Obsidian)
+         Record + embed Founders launch video on /founders page
 Week 2:  DM 10 FL contractors (Pompano / Miami / Orlando / Tampa metros)
          Reach out to Suncoast Permits, Alliance Permitting
 Week 3:  Follow up, deliver calculations, log first permit submissions
