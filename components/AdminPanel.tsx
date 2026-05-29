@@ -385,7 +385,16 @@ export const AdminPanel: React.FC = () => {
               </tr>
             </thead>
             <tbody>
-              {users.map(user => (
+              {users.map(user => {
+                // Trial status is written once at signup and never transitioned when the
+                // date lapses (expiry is computed at read-time in useSubscription.ts, not
+                // persisted). Mirror that here so the admin badge doesn't read a stale
+                // "trialing" for users whose 14-day window has already closed.
+                const trialExpired =
+                  user.status === 'trialing' &&
+                  !!user.trial_end &&
+                  new Date(user.trial_end) < new Date();
+                return (
                 <tr key={user.id} className="border-b border-gray-100 hover:bg-gray-50">
                   <td className="p-3 font-mono text-xs">{user.email}</td>
                   <td className="p-3">
@@ -411,18 +420,19 @@ export const AdminPanel: React.FC = () => {
                   <td className="p-3">
                     <span className="capitalize font-medium">{user.plan || 'none'}</span>
                     {user.trial_end && (
-                      <span className="ml-1 text-xs text-[#3d6b3d]">
-                        (trial ends {new Date(user.trial_end).toLocaleDateString()})
+                      <span className={`ml-1 text-xs ${trialExpired ? 'text-amber-600' : 'text-[#3d6b3d]'}`}>
+                        (trial {trialExpired ? 'ended' : 'ends'} {new Date(user.trial_end).toLocaleDateString()})
                       </span>
                     )}
                   </td>
                   <td className="p-3">
                     <span className={`text-xs px-2 py-0.5 rounded-full ${
+                      trialExpired ? 'bg-amber-100 text-amber-700' :
                       user.status === 'active' ? 'bg-green-100 text-green-700' :
                       user.status === 'trialing' ? 'bg-[#e8f5e8] text-[#2d3b2d]' :
                       'bg-gray-100 text-gray-600'
                     }`}>
-                      {user.status || 'none'}
+                      {trialExpired ? 'expired' : (user.status || 'none')}
                     </span>
                     {user.stripe_subscription_id && (
                       <span className="ml-1 text-xs text-gray-400" title="Has Stripe subscription">$</span>
@@ -482,7 +492,8 @@ export const AdminPanel: React.FC = () => {
                     )}
                   </td>
                 </tr>
-              ))}
+                );
+              })}
             </tbody>
           </table>
         </div>
