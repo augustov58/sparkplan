@@ -138,6 +138,26 @@ serve(async (req: Request) => {
       );
     }
 
+    // Fail fast on a misconfigured Business price BEFORE creating a Stripe
+    // customer. Otherwise a bad STRIPE_PRICE_BUSINESS (wrong casing, wrong
+    // mode, deleted price) only surfaces later at checkout.sessions.create —
+    // after a customer has already been created — which orphans customers and
+    // returns an opaque 400 the founder never sees. Validate up front.
+    try {
+      await stripe.prices.retrieve(STRIPE_PRICE_BUSINESS);
+    } catch (priceError: any) {
+      console.error(
+        `founder-checkout: STRIPE_PRICE_BUSINESS is invalid ("${STRIPE_PRICE_BUSINESS}"): ${priceError?.message || priceError}`
+      );
+      return new Response(
+        JSON.stringify({ error: 'Founders checkout is temporarily misconfigured on our end. Please reply to your welcome email and we will get you activated right away.' }),
+        {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 500,
+        }
+      );
+    }
+
     // Get-or-create the Stripe customer for this user (mirrors stripe-checkout
     // pattern). The standard signup trigger has already created a
     // `subscriptions` row for them, but stripe_customer_id may still be null.
