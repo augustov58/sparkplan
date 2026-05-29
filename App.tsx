@@ -1168,13 +1168,17 @@ function AppContent() {
           </Suspense>
         } />
 
-        {/* Founders-gated signup — coupon required, no email confirmation, no app trial */}
+        {/* Founders-gated signup — coupon required, no email confirmation, no app trial.
+            Intentionally NOT guarded on `user`: the flow signs the founder in mid-submit
+            (founder-checkout needs a live session), so the page must stay mounted afterward
+            to redirect to Stripe or surface a checkout error. Guarding on `user` here caused
+            the in-flight page to unmount the instant sign-in completed, silently swallowing
+            founder-checkout failures. Keeping it mounted also lets a signed-in founder return
+            via the Stripe cancel_url (/founder-signup?canceled=1) to retry. */}
         <Route path="/founder-signup" element={
-          user ? <Navigate to="/" replace /> : (
-            <Suspense fallback={<LoadingSpinner />}>
-              <FounderSignupPage />
-            </Suspense>
-          )
+          <Suspense fallback={<LoadingSpinner />}>
+            <FounderSignupPage />
+          </Suspense>
         } />
 
         {/* Protected project routes */}
