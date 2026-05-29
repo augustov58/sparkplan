@@ -4,6 +4,12 @@ import { Check, Bolt, ArrowLeft } from 'lucide-react';
 
 import { FoundingApplicationForm } from './FoundingApplicationForm';
 
+// SparkPlan Founding Contractors launch video — YouTube unlisted.
+// Paste the 11-character video ID from the unlisted share URL
+// (https://youtu.be/<ID> or https://www.youtube.com/watch?v=<ID>).
+// Leave empty to hide the player until the upload is ready.
+const FOUNDERS_VIDEO_ID = 'bEaC5JTaG8E';
+
 export const FoundingApplicationPage: React.FC = () => {
   const navigate = useNavigate();
 
@@ -39,6 +45,21 @@ export const FoundingApplicationPage: React.FC = () => {
             for honest feedback and one case study.
           </p>
         </div>
+
+        {FOUNDERS_VIDEO_ID ? (
+          <div className="max-w-3xl mx-auto mb-12">
+            <div className="aspect-video w-full overflow-hidden rounded-xl border border-[#e8e6e3] bg-black shadow-sm">
+              <iframe
+                className="h-full w-full"
+                src={`https://www.youtube-nocookie.com/embed/${FOUNDERS_VIDEO_ID}?rel=0&modestbranding=1`}
+                title="SparkPlan Founding Contractors — launch video"
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                allowFullScreen
+                loading="lazy"
+              />
+            </div>
+          </div>
+        ) : null}
 
         <div className="grid md:grid-cols-3 gap-5 mb-12 max-w-4xl mx-auto">
           <div className="bg-white border border-[#e8e6e3] rounded-xl p-5">
