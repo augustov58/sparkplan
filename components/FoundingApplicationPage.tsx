@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Check, Bolt, ArrowLeft } from 'lucide-react';
 
@@ -10,8 +10,34 @@ import { FoundingApplicationForm } from './FoundingApplicationForm';
 // Leave empty to hide the player until the upload is ready.
 const FOUNDERS_VIDEO_ID = 'bEaC5JTaG8E';
 
+// Google Ads tag (gtag.js) for the Founders landing campaign. Injected only on
+// this route (see useEffect below) so app/admin traffic isn't tagged into the
+// campaign's audience. Conversion events can be added later with the conversion
+// label from Google Ads.
+const GOOGLE_ADS_ID = 'AW-617991515';
+
 export const FoundingApplicationPage: React.FC = () => {
   const navigate = useNavigate();
+
+  // Load the Google Ads base tag once, scoped to the Founders page. Equivalent
+  // to pasting the gtag.js <script> in <head>, but only while this route is
+  // mounted. Guarded so SPA re-entry doesn't inject it twice.
+  useEffect(() => {
+    if (document.getElementById('gtag-founders')) return;
+
+    const script = document.createElement('script');
+    script.id = 'gtag-founders';
+    script.async = true;
+    script.src = `https://www.googletagmanager.com/gtag/js?id=${GOOGLE_ADS_ID}`;
+    document.head.appendChild(script);
+
+    const w = window as any;
+    w.dataLayer = w.dataLayer || [];
+    function gtag() { w.dataLayer.push(arguments); }
+    w.gtag = w.gtag || gtag;
+    w.gtag('js', new Date());
+    w.gtag('config', GOOGLE_ADS_ID);
+  }, []);
 
   return (
     <div className="min-h-screen bg-[#faf9f7] font-sans text-[#1a1a1a]">
