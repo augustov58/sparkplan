@@ -24,6 +24,12 @@ import {
 import { supabase } from '../lib/supabase';
 import { showToast, toastMessages } from '../lib/toast';
 
+// Google Ads conversion action for the Founders campaign. Fired once on a
+// genuine successful application submit (not on duplicates). The base gtag.js
+// tag is loaded by FoundingApplicationPage. NOTE: verify the action name in
+// Google Ads matches "Founders Application" — swap the label if it doesn't.
+const GOOGLE_ADS_CONVERSION = 'AW-617991515/ROd2CJH2rdgBENua16YC';
+
 const TYPICAL_WORK_LABELS: Record<typeof TYPICAL_WORK_OPTIONS[number], string> = {
   single_family: 'Single-family residential',
   multi_family: 'Multi-family residential',
@@ -108,6 +114,10 @@ export const FoundingApplicationForm: React.FC<Props> = ({ onSuccess }) => {
       }
 
       if (result?.success) {
+        // Report the lead to Google Ads. Queues into dataLayer if gtag.js is
+        // still loading, so a fast submit isn't dropped. Guarded in case the
+        // tag was blocked (ad blocker / no consent).
+        (window as any).gtag?.('event', 'conversion', { send_to: GOOGLE_ADS_CONVERSION });
         showToast.success(toastMessages.foundingApplication.submitted);
         setSubmitted(true);
         onSuccess?.();
