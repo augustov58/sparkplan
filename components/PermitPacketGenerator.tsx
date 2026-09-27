@@ -293,10 +293,10 @@ export const PermitPacketGenerator: React.FC<PermitPacketGeneratorProps> = ({ pr
   // required" on the narrative even when LoadCalculationSummary said the
   // service was adequate. NEC 220.87 "max demand" for the calculated
   // method means NEC-demanded existing load, not raw connected sum.
-  const aggregatedDemandSplit = React.useMemo<{ existingKVA: number; proposedKVA: number }>(() => {
-    if (!currentProject) return { existingKVA: 0, proposedKVA: 0 };
+  const aggregatedDemandSplit = React.useMemo<{ existingKVA: number; proposedKVA: number; necReferences: string[] }>(() => {
+    if (!currentProject) return { existingKVA: 0, proposedKVA: 0, necReferences: [] };
     const mdp = panels.find(p => p.is_main);
-    if (!mdp) return { existingKVA: 0, proposedKVA: 0 };
+    if (!mdp) return { existingKVA: 0, proposedKVA: 0, necReferences: [] };
     const mfCtx = buildMultiFamilyContext(
       mdp,
       panels,
@@ -324,6 +324,9 @@ export const PermitPacketGenerator: React.FC<PermitPacketGeneratorProps> = ({ pr
     return {
       existingKVA: agg.existingDemandVA / 1000,
       proposedKVA: agg.proposedDemandVA / 1000,
+      // Union with the per-row references: the top-level list omits some
+      // applied sections (e.g. 220.14 "Other", 220.51 water heater).
+      necReferences: [...agg.necReferences, ...agg.demandBreakdown.map(r => r.necReference)],
     };
   }, [currentProject, panels, circuits, transformers]);
 
@@ -1094,6 +1097,11 @@ export const PermitPacketGenerator: React.FC<PermitPacketGeneratorProps> = ({ pr
         const narrative: NEC22087NarrativeData = {
           method: nec22087Method,
           occupancy: deriveNarrativeOccupancy(currentProject),
+          // PE ruling 2026-09-27: cite the sections the calculation that
+          // produced maxDemandKVA actually applied (Part IV only when 220.84 ran).
+          calculationNecReferences: useCalculatedSource
+            ? aggregatedDemandSplit.necReferences
+            : undefined,
           dataSourceCitation: nec22087DataSource.trim(),
           dateRangeFrom: nec22087DateFrom || new Date(Date.now() - 365 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]!,
           dateRangeTo: nec22087DateTo || new Date().toISOString().split('T')[0]!,

@@ -715,6 +715,7 @@ export const generatePermitPacket = async (data: PermitPacketData): Promise<void
     const narrativeCopy = getNEC22087NarrativeCopy(
       effectiveNarrative.method,
       effectiveNarrative.occupancy,
+      effectiveNarrative.calculationNecReferences,
     );
     builders.push({
       name: 'NEC22087Narrative',
