@@ -1811,7 +1811,7 @@ export const PermitPacketGenerator: React.FC<PermitPacketGeneratorProps> = ({ pr
                   <option value="manual">Manual entry (informational only)</option>
                 </select>
                 <p className="text-xs text-gray-500 mt-1">
-                  Measured methods (bill / study) skip the 125% multiplier. Calculated/manual apply 125%.
+                  Measured methods (bill / study) apply 125% per NEC 220.87(2). Calculated is used directly (demand factors already applied); manual applies 125%.
                 </p>
               </div>
               <div>
