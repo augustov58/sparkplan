@@ -1807,11 +1807,11 @@ export const PermitPacketGenerator: React.FC<PermitPacketGeneratorProps> = ({ pr
                 >
                   <option value="utility_bill">Utility billing — 12-month peak (preferred)</option>
                   <option value="load_study">Recording load study — 30-day at 15-min intervals</option>
-                  <option value="calculated">Calculated from existing panel schedule (NEC 220.82/220.84)</option>
+                  <option value="calculated">Calculated from existing panel schedule (NEC Article 220 demand factors)</option>
                   <option value="manual">Manual entry (informational only)</option>
                 </select>
                 <p className="text-xs text-gray-500 mt-1">
-                  Measured methods (bill / study) skip the 125% multiplier. Calculated/manual apply 125%.
+                  Measured methods (bill / study) apply 125% per NEC 220.87(2). Calculated is used directly (demand factors already applied); manual applies 125%.
                 </p>
               </div>
               <div>
