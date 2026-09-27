@@ -49,7 +49,7 @@ The three merge services follow the calc-service contract: **pure, no DB, never 
 - **No procurement data on the packet.** Cost/pricing/$ fields belong on the Bid PDF only. AHJs never see money. (PR #43)
 - Sheet IDs use category bands with the `E-` prefix; Miami-Dade reserves `EL-` via `sheetIdPrefix`.
 - Use `wrap={false}` on cards that must not split across pages.
-- Method-aware narrative: calculated loads cite NEC 220 Part III; measured cite NEC 220.87. Never mix the two vocabularies in one narrative.
+- Method-aware narrative: calculated loads cite the NEC 220 Part the calculation actually ran — Part IV (Optional Method, 220.82 / 220.83 / 220.84) only when an Optional Method section is in the calculation's runtime references, otherwise Part III; measured cite NEC 220.87. Never mix the two vocabularies in one narrative. Citations come from the calculation's own `necReferences` (+ breakdown rows) via `summarizeCalculationRefs` — never from a fixed per-occupancy string. (PE ruling 2026-09-27)
 - Occupancy-aware demand (Sprint 3): commercial packets cite 220.44/220.56; multifamily allocates demand per subset. Check `NarrativeOccupancy` fan-out before editing narrative copy.
 - Validation is **advisory, not blocking**: contractors may print drafts with "TBD" values. Emit warnings; never gate generation.
 
