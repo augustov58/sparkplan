@@ -74,7 +74,7 @@ export function frontendProjectToDbInsert(project: Partial<Project>): Omit<DbPro
     name: project.name || 'Untitled Project',
     address: project.address || 'TBD',
     type: project.type || 'Residential',
-    nec_edition: project.necEdition || '2023',
+    nec_edition: project.necEdition || '2020',
     status: project.status || 'Planning',
     progress: project.progress || 0,
     service_voltage: project.serviceVoltage || 120,

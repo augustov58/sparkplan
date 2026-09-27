@@ -19,6 +19,7 @@ import {
   ALL_MANIFESTS,
   findManifestForJurisdiction,
   getManifestById,
+  resolveNecEdition,
 } from '../data/ahj/registry';
 import {
   ALL_ARTIFACT_TYPE_KEYS,
@@ -199,7 +200,7 @@ const SECTION_TOGGLE_CONFIG: SectionToggleConfig[] = [
   {
     key: 'multiFamilyEV',
     label: 'Multi-Family EV Analysis',
-    description: '3-page NEC 220.84 + 220.57 + 625.42 readiness analysis',
+    description: '3-page NEC 220.84 + per-EVSE load + 625.42 readiness analysis',
     group: 'Multi-Family',
   },
   {
@@ -1008,13 +1009,11 @@ export const PermitPacketGenerator: React.FC<PermitPacketGeneratorProps> = ({ pr
         buildingType: ahjContext.buildingType,
         generalNotes: activeManifest?.generalNotes,
         codeReferences: activeManifest?.codeReferences,
-        necEdition: (() => {
-          if (!activeManifest) return currentProject.necEdition;
-          const ed = activeManifest.necEdition[ahjContext.buildingType];
-          if (ed?.includes('2023')) return '2023';
-          if (ed?.includes('2020')) return '2020';
-          return currentProject.necEdition;
-        })(),
+        necEdition: resolveNecEdition(
+          activeManifest,
+          ahjContext.buildingType,
+          currentProject.necEdition,
+        ),
         // Gap 3 (2026-05-16): per-project AHJ-string overrides. Render-time
         // resolution chain inside permitPacketGenerator.tsx:
         //   data.X ?? data.XOverride ?? data.manifest?.X
@@ -1215,7 +1214,7 @@ export const PermitPacketGenerator: React.FC<PermitPacketGeneratorProps> = ({ pr
           <li>Short circuit analysis (if calculations exist)</li>
           <li>Arc flash analysis (if data available)</li>
           <li>Grounding plan (NEC Article 250)</li>
-          <li>Multi-Family EV analysis (NEC 220.84 + 220.57 + 625.42) if enabled</li>
+          <li>Multi-Family EV analysis (NEC 220.84 + per-EVSE load + 625.42) if enabled</li>
           <li>Jurisdiction requirements checklist (if jurisdiction selected)</li>
           {packetType === 'full' && <li>Complete panel schedules for all panels</li>}
         </ul>
@@ -1735,7 +1734,7 @@ export const PermitPacketGenerator: React.FC<PermitPacketGeneratorProps> = ({ pr
             <Building2 className="w-5 h-5 text-[#2d3b2d]" />
             <div>
               <h3 className="font-bold text-gray-900">Multi-Family EV Analysis</h3>
-              <p className="text-sm text-gray-500">NEC 220.84 + 220.57 + 625.42</p>
+              <p className="text-sm text-gray-500">NEC 220.84 + per-EVSE load + 625.42</p>
             </div>
           </div>
           {(currentProject?.settings?.residential as { mfEvCalculation?: unknown } | undefined)

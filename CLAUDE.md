@@ -85,8 +85,17 @@ Incorrect value causes 40-50% underestimation of fault currents.
 ```
 Implementation: `services/calculations/shortCircuit.ts`
 
-### NEC 220.57 (EVSE Load)
-Per-EVSE load = `max(7,200 VA, nameplate)`. This is NOT a demand factor.
+### EVSE Load — edition-specific (NEC 2020 vs 2023)
+```
+Florida enforces NEC 2020 (FBC 8th Ed.) — 220.57 DOES NOT EXIST in NEC 2020.
+- NEC 2020: per-EVSE load = nameplate per 220.14(A). No 7,200 VA floor.
+- NEC 2023: per-EVSE load = max(7,200 VA, nameplate) per 220.57(A).
+Both at 100% in the Article 220 load calc — the 125% of 625.41 is for
+OCPD/conductor sizing only. Neither is a demand factor.
+```
+PE-confirmed 2026-09-27. Single source: `data/nec/evse-load.ts::getEvseLoadVA`.
+Edition resolves manifest → project `nec_edition` → '2020' via
+`data/ahj/registry.ts::resolveNecEdition` (used by the calculator AND the packet).
 
 ### EVEMS Sizing (NEC 625.42)
 Size to setpoint, not full connected load. EVEMS allows service capacity reduction.
@@ -266,6 +275,7 @@ Real mistakes made in this repo, each paired with the rule that prevents recurre
 | Hard validation gates blocked contractors from printing draft packets | Validation is advisory: warn, never block. Drafts may print with "TBD". |
 | Chatbot second-guessed a correct domain request (NEMA slot numbering) | Fix is prompt-edits in BOTH the system prompt and the tool param description — not tool code. (PR #69) |
 | Renames left stale brand/name strings in meta tags and landing pages | Grep all casings/spacings/abbreviations before AND after; require zero hits. Check user-facing strings explicitly. |
+| Cited NEC 220.57 (a 2023-only section) on every Florida EV packet, while Florida enforces NEC 2020; a test asserted the wrong citation | Check every cited section exists in the edition the AHJ adopted. EVSE load goes through `getEvseLoadVA(nameplate, edition)`, never an inline 7,200 VA floor. |
 | Docs updated with stale "Last Updated" dates; completed features left as "NEXT UP" | Every doc touch updates its date to today; every shipped feature flips its ROADMAP status in the same PR. |
 
 ---

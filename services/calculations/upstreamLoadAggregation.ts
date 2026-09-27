@@ -248,7 +248,7 @@ function mergeCollectedLoads(a: CollectedLoads, b: CollectedLoads): CollectedLoa
  * Load Management System") — they exist only to convey EVEMS metadata to
  * `evemsSetpointVA`/`isEVEMSManagedPanel`, and their `load_watts` values are
  * not real loads. Counting them here would double-count: the EV branch
- * circuits carry the actual nameplate load per NEC 220.57(A); the marker
+ * circuits carry the actual nameplate load (NEC 625.40); the marker
  * just describes the NEC 625.42 setpoint that clamps feeder demand
  * downstream.
  */
@@ -768,7 +768,7 @@ export function calculateAggregatedLoad(
 
     // NEC 220.84 covers dwelling unit loads only — EV and house/common area loads
     // are excluded from the demand factor base and added separately at full value.
-    // After C4: branch rows are at full nameplate (NEC 220.57(A)), so the EV
+    // After C4: branch rows are at full nameplate (NEC 625.40), so the EV
     // *connected* contribution to `totalConnectedVA` is the raw nameplate sum.
     // `evDemandVA` carries the post-NEC-625.42 EVEMS-clamped value (added back
     // at 100%); falls back to `evLoadVA` when no separate clamp was needed.
@@ -884,7 +884,7 @@ export function calculateAggregatedLoad(
   const necReferences = [...phase2.necReferences];
 
   // NEC 625.42 — EVEMS-managed EV bank panel: clamp feeder demand to setpoint.
-  // Branch conductors stay at full nameplate (NEC 220.57(A) + 625.40); only
+  // Branch conductors stay at full nameplate (NEC 625.40 + 210.19); only
   // the FEEDER serving the EV panel benefits from the EVEMS reduction.
   if (isEVEMSManagedPanel(panelId, circuits)) {
     const setpointVA = evemsSetpointVA(panel, circuits);

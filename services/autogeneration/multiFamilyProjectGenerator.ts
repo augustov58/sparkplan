@@ -9,7 +9,7 @@
  *
  * NEC References:
  * - NEC 220.84 - Multi-Family Demand Factors
- * - NEC 220.57 - EVSE Load
+ * - EVSE Load - NEC 220.14(A) (2020) / 220.57 (2023); see data/nec/evse-load.ts
  * - NEC 625.42 - EVEMS
  * - NEC 210.11 - Branch Circuits Required (dwelling units)
  * - NEC 408 - Meter Socket Enclosures
@@ -659,7 +659,7 @@ function generateEVPanel(
     chargerType = 'DC Fast Charge (150kW)';
   }
 
-  // NEC 220.57(A) + 625.40: Branch-circuit conductors and per-EVSE branch
+  // NEC 625.40: Branch-circuit conductors and per-EVSE branch
   // loads are nameplate (full continuous) regardless of EVEMS. NEC 625.42
   // EVEMS reduction is applied downstream at the feeder/service level via
   // `calculateAggregatedLoad` clamping demand to the explicit setpoint

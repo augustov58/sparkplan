@@ -19,7 +19,8 @@
  * @module data/ahj/registry
  */
 
-import type { AHJManifest } from './types';
+import type { AHJManifest, BuildingType } from './types';
+import { necEditionFromManifestString, type NecEdition } from '../nec/evse-load';
 import { orlandoManifest } from './orlando';
 import { pompanoManifest } from './pompano';
 import { miamiDadeManifest } from './miami-dade';
@@ -129,3 +130,21 @@ export function findManifestForJurisdiction(
 export const ALL_MANIFESTS: readonly AHJManifest[] = Object.values(
   MANIFEST_REGISTRY,
 );
+
+/**
+ * Resolve the NEC edition a project is designed under: the active manifest's
+ * edition for the building type wins, then the project's own setting, then
+ * '2020' (the edition Florida enforces via FBC 8th Ed.). Shared by the packet
+ * generator and the calculators so the math and the citations agree.
+ */
+export function resolveNecEdition(
+  manifest: AHJManifest | null | undefined,
+  buildingType: BuildingType,
+  projectEdition: NecEdition | null | undefined,
+): NecEdition {
+  return (
+    necEditionFromManifestString(manifest?.necEdition[buildingType])
+    ?? projectEdition
+    ?? '2020'
+  );
+}

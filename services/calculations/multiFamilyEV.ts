@@ -1,18 +1,20 @@
 /**
  * Multi-Family EV Readiness Calculator
- * NEC 220.84 + NEC 220.57 + NEC 625.42
+ * NEC 220.84 + per-EVSE load (edition-aware) + NEC 625.42
  *
  * Automates the $2-10K engineering calculation that contractors are turning away.
  * Forum-validated feature addressing multi-family EV charging complexity.
  *
  * Key NEC Articles:
  * - NEC 220.84: Optional Calculation for Multi-Family Dwellings
- * - NEC 220.57: Electric Vehicle Supply Equipment (demand factors)
+ * - Per-EVSE load: NEC 2023 220.57(A) / NEC 2020 220.14(A) — see data/nec/evse-load.ts
  * - NEC 625.42: EVEMS Load Management
  * - NEC 230.42: Service Conductor Sizing
  *
  * @module services/calculations/multiFamilyEV
  */
+
+import { getEvseLoadVA, evseLoadCitation, type NecEdition } from '../../data/nec/evse-load';
 
 // ============================================================================
 // NEC CONSTANTS AND TABLES
@@ -57,21 +59,14 @@ const MULTI_FAMILY_DEMAND_TABLE: { units: number; factor: number }[] = [
 ];
 
 /**
- * NEC 220.57 - Electric Vehicle Branch-Circuit Load (2023 NEC)
- *
- * IMPORTANT: NEC 220.57 is NOT a demand factor table!
- * It specifies how to calculate per-EVSE load:
- *   "The load for one EVSE shall be calculated at the larger of:
- *    (1) 7,200 volt-amperes, or
- *    (2) The nameplate rating of the EVSE"
+ * Per-EVSE load is edition-specific — see data/nec/evse-load.ts:
+ * - NEC 2023: 220.57(A) max(7,200 VA, nameplate)
+ * - NEC 2020: 220.14(A) nameplate (220.57 does not exist in NEC 2020)
  *
  * For service/feeder calculations:
  * - WITHOUT EVEMS: Use full connected EV load (sum of per-EVSE loads)
  * - WITH EVEMS (NEC 625.42): Size to EVEMS setpoint, treated as continuous
- *
- * Source: NFPA 70-2023 Article 220.57, Captain Code 2023
  */
-const NEC_220_57_MINIMUM_VA = 7200; // 7,200 VA minimum per EVSE
 
 /**
  * NEC Table 220.12 - General Lighting Loads
@@ -236,6 +231,13 @@ export interface MultiFamilyEVInput {
 
   /** Whether to use EVEMS load management */
   useEVEMS?: boolean;
+
+  /**
+   * NEC edition governing the per-EVSE load rule. Defaults to '2020' — the
+   * edition Florida enforces (FBC 8th Ed.). '2023' applies the 220.57(A)
+   * 7,200 VA floor.
+   */
+  necEdition?: NecEdition;
 
   /** Capacity reserve in VA (for EV panel auxiliary loads: spare, lighting, EVEMS controller) */
   capacityReserveVA?: number;
@@ -418,16 +420,26 @@ export interface MultiFamilyEVResult {
     utilityCompany?: string;
   };
 
-  /** EV load calculation per NEC 220.57 */
+  /** EV load calculation (per-EVSE rule per `necEdition`) */
   evLoad: {
     /** Total EV connected load (VA) */
     totalConnectedVA: number;
 
-    /** EV demand load after NEC 220.57 factor (VA) */
+    /** EV demand load after EVEMS clamp, if any (VA) */
     demandVA: number;
 
-    /** NEC 220.57 demand factor applied */
+    /** Demand factor applied (always 1.0 — no NEC demand factor for EVSE) */
     demandFactor: number;
+
+    /**
+     * NEC edition the per-EVSE load was computed under. Optional so results
+     * persisted before 2026-09-27 (always 220.57 / 2023 math) still type-check;
+     * absent means '2023'.
+     */
+    necEdition?: NecEdition;
+
+    /** Article governing the per-EVSE load ('NEC 220.57(A)' or 'NEC 220.14(A)') */
+    perEVSENecReference?: string;
 
     /** EV load in amps */
     loadAmps: number;
@@ -524,12 +536,11 @@ export function getMultiFamilyDemandFactor(unitCount: number): number {
 }
 
 /**
- * Calculate per-EVSE load per NEC 220.57(A)
- * Load = max(7,200 VA, nameplate VA)
+ * Calculate per-EVSE load for the given NEC edition
+ * (2023: max(7,200 VA, nameplate) per 220.57(A); 2020: nameplate per 220.14(A))
  */
-function calculatePerEVSELoad(nameplateAmps: number, voltage: number): number {
-  const nameplateVA = nameplateAmps * voltage;
-  return Math.max(NEC_220_57_MINIMUM_VA, nameplateVA);
+function calculatePerEVSELoad(nameplateAmps: number, voltage: number, edition: NecEdition) {
+  return getEvseLoadVA(nameplateAmps * voltage, edition);
 }
 
 /**
@@ -953,6 +964,7 @@ export function calculateMultiFamilyEV(input: MultiFamilyEVInput): MultiFamilyEV
     transformer,
     useEVEMS = false,
     evemsMode = 'power_sharing',
+    necEdition = '2020',
     // NEC 220.87 - Existing Load Determination Method
     existingLoadMethod = 'calculated',
     measuredPeakDemandKW,
@@ -962,7 +974,7 @@ export function calculateMultiFamilyEV(input: MultiFamilyEVInput): MultiFamilyEV
 
   const warnings: string[] = [];
   const recommendations: string[] = [];
-  const necArticles: string[] = ['NEC 220.84', 'NEC 220.57', 'NEC 625.42'];
+  const necArticles: string[] = ['NEC 220.84', 'NEC 625.42'];
 
   // =========================================================================
   // STEP 1: Determine Building Load
@@ -1203,15 +1215,17 @@ export function calculateMultiFamilyEV(input: MultiFamilyEVInput): MultiFamilyEV
   const buildingLoadAmps = calculateAmps(buildingDemandVA, voltage, phase);
 
   // =========================================================================
-  // STEP 2: Calculate EV Load per NEC 220.57
+  // STEP 2: Calculate EV Load (per-EVSE rule depends on NEC edition)
   // =========================================================================
 
-  // EV charger load calculation per NEC 220.57(A)
   // Level 2 charger voltage depends on system (240V single-phase, 208V 3-phase)
   const evVoltage = phase === 3 ? 208 : 240;
 
-  // Per NEC 220.57(A): each EVSE load = max(7,200 VA, nameplate rating)
-  const perEVSELoad = calculatePerEVSELoad(evChargers.ampsPerCharger, evVoltage);
+  // NEC 2023 220.57(A): max(7,200 VA, nameplate). NEC 2020 220.14(A): nameplate.
+  const perEVSE = calculatePerEVSELoad(evChargers.ampsPerCharger, evVoltage, necEdition);
+  const perEVSELoad = perEVSE.loadVA;
+  necArticles.push(perEVSE.necReference);
+  if (necEdition === '2020') necArticles.push('NEC 625.41');
   const totalEVConnectedVA = perEVSELoad * evChargers.count;
 
   // Service capacity numbers — computed BEFORE evDemandVA so the EVEMS
@@ -1231,7 +1245,7 @@ export function calculateMultiFamilyEV(input: MultiFamilyEVInput): MultiFamilyEV
   const evemsSetpointAmps = availableCapacityAmps * EVEMS_EFFICIENCY;
   const evemsSetpointVA = calculateServiceCapacityVA(evemsSetpointAmps, voltage, phase);
 
-  // NEC 220.57 does NOT provide demand factors for multiple EVSE.
+  // The NEC provides no demand factors for multiple EVSE (either edition).
   // - Without EVEMS: Use FULL connected EV load in service calculation
   // - With EVEMS (NEC 625.42): Size feeder/service to the EVEMS setpoint
   //   ("the maximum load permitted by the ALMS"), clamped down from full
@@ -1294,7 +1308,7 @@ export function calculateMultiFamilyEV(input: MultiFamilyEVInput): MultiFamilyEV
   const perEVSEServiceEquivalentAmps = calculateAmps(perEVSELoad, voltage, phase); // For capacity calc
 
   // Scenario A: Without EVEMS (Direct Connection)
-  // Per NEC 220.57: Each EVSE at full nameplate/7200VA, no demand factor
+  // Each EVSE at its full per-EVSE load, no demand factor
   // Use service-equivalent amps for capacity calculation
   const maxChargersNoEVEMS = availableCapacityAmps > 0
     ? Math.floor(availableCapacityAmps / perEVSEServiceEquivalentAmps)
@@ -1305,7 +1319,7 @@ export function calculateMultiFamilyEV(input: MultiFamilyEVInput): MultiFamilyEV
     maxChargers: Math.max(0, maxChargersNoEVEMS),
     powerPerCharger_kW: perEVSELoad / 1000,
     notes: [
-      'Per NEC 220.57: Each EVSE at full load (no demand factor)',
+      `Per ${evseLoadCitation(necEdition)}: Each EVSE at full load (no demand factor)`,
       `Per-EVSE load: ${(perEVSELoad / 1000).toFixed(1)} kVA (${Math.round(perEVSEAmpsAtCharger)}A @ ${evVoltage}V)`,
       `Service-equivalent: ${perEVSEServiceEquivalentAmps.toFixed(1)}A per EVSE @ ${voltage}V ${phase}φ`,
       `Available service capacity: ${Math.round(Math.max(0, availableCapacityAmps))}A`,
@@ -1554,6 +1568,8 @@ export function calculateMultiFamilyEV(input: MultiFamilyEVInput): MultiFamilyEV
       demandVA: Math.round(evDemandVA),
       demandFactor: evDemandFactor,
       loadAmps: Math.round(evLoadAmps),
+      necEdition,
+      perEVSENecReference: perEVSE.necReference,
     },
     serviceAnalysis: {
       existingCapacityVA: Math.round(existingCapacityVA),
