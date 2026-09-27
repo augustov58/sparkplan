@@ -92,6 +92,7 @@ import type {
   ResidentialAppliances,
 } from '../types';
 import { ExistingLoadDeterminationMethod } from '../types';
+import { getNEC22087NarrativeCopy } from '../services/pdfExport/PermitPacketDocuments';
 
 // ============================================================================
 // 1. SHORT CIRCUIT — NEC 110.9, IEEE 141
@@ -1483,6 +1484,33 @@ describe('Upstream Load Aggregation — NEC 220.84 Optional Method (C1)', () => 
       const ev = result.demandBreakdown.find(d => d.loadType.includes('EV'));
       expect(ev?.demandFactor).toBe(1.0);
       expect(ev?.necReference).toContain('625.42');
+    });
+
+    it('narrative cites Part IV (220.84) only when the 220.84 path actually ran (PE 2026-09-27)', () => {
+      // The calculated-method narrative cites the aggregate's own
+      // necReferences. Same dwelling occupancy, two paths: with a 220.84
+      // context the page must say Part IV; without one, the standard cascade
+      // ran and the page must say Part III with no Optional Method section.
+      const { panels, circuits, transformers, mdp } = buildFixture();
+      const ctx = buildMultiFamilyContext(mdp, panels, circuits, transformers, {
+        occupancyType: 'dwelling',
+        residential: { dwellingType: 'multi_family', totalUnits: 12 },
+      });
+
+      // Same union PermitPacketGenerator.tsx passes: the top-level list omits
+      // some applied sections that only appear on breakdown rows.
+      const refsOf = (agg: ReturnType<typeof calculateAggregatedLoad>) =>
+        [...agg.necReferences, ...agg.demandBreakdown.map(r => r.necReference)];
+
+      const optional = calculateAggregatedLoad(mdp.id, panels, circuits, transformers, 'dwelling', ctx);
+      const optionalCopy = getNEC22087NarrativeCopy('calculated', 'dwelling_multi_family', refsOf(optional));
+      expect(optionalCopy.calculationBasis).toBe('NEC 220 Part IV Optional Method (NEC 220.84)');
+
+      const standard = calculateAggregatedLoad(mdp.id, panels, circuits, transformers, 'dwelling');
+      const standardCopy = getNEC22087NarrativeCopy('calculated', 'dwelling_multi_family', refsOf(standard));
+      expect(standardCopy.calculationBasis).toBe('NEC 220 Part III demand factors');
+      expect(standardCopy.methodNecRef).toContain('220.14');
+      expect(standardCopy.methodNecRef).not.toMatch(/220\.8[234]/);
     });
 
     it('REGRESSION: without context falls back to NEC 220.14 Other @100% (the C1 bug)', () => {

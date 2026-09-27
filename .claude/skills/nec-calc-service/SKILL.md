@@ -50,4 +50,4 @@ Electrical calculations here end up on permit documents reviewed by AHJs and sta
 - [ ] Result has `necReferences`, severity-prefixed `warnings`, `breakdown`
 - [ ] No magic numbers — every constant traceable to `data/nec/`
 - [ ] Tests cover table boundaries and the over-table fallback
-- [ ] If the calc feeds the permit packet, the narrative wording matches the method actually used (NEC 220 Part III language for calculated, 220.87 for measured)
+- [ ] If the calc feeds the permit packet, the narrative wording matches the method actually used (NEC 220 Part III for the standard calculation, Part IV only when an Optional Method 220.82–220.84 ran, 220.87 for measured) — and every applied section appears in the result's `necReferences` or a breakdown row's `necReference`

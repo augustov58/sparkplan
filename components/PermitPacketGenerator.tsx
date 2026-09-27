@@ -294,10 +294,10 @@ export const PermitPacketGenerator: React.FC<PermitPacketGeneratorProps> = ({ pr
   // required" on the narrative even when LoadCalculationSummary said the
   // service was adequate. NEC 220.87 "max demand" for the calculated
   // method means NEC-demanded existing load, not raw connected sum.
-  const aggregatedDemandSplit = React.useMemo<{ existingKVA: number; proposedKVA: number }>(() => {
-    if (!currentProject) return { existingKVA: 0, proposedKVA: 0 };
+  const aggregatedDemandSplit = React.useMemo<{ existingKVA: number; proposedKVA: number; necReferences: string[] }>(() => {
+    if (!currentProject) return { existingKVA: 0, proposedKVA: 0, necReferences: [] };
     const mdp = panels.find(p => p.is_main);
-    if (!mdp) return { existingKVA: 0, proposedKVA: 0 };
+    if (!mdp) return { existingKVA: 0, proposedKVA: 0, necReferences: [] };
     const mfCtx = buildMultiFamilyContext(
       mdp,
       panels,
@@ -325,6 +325,9 @@ export const PermitPacketGenerator: React.FC<PermitPacketGeneratorProps> = ({ pr
     return {
       existingKVA: agg.existingDemandVA / 1000,
       proposedKVA: agg.proposedDemandVA / 1000,
+      // Union with the per-row references: the top-level list omits some
+      // applied sections (e.g. 220.14 "Other", 220.51 water heater).
+      necReferences: [...agg.necReferences, ...agg.demandBreakdown.map(r => r.necReference)],
     };
   }, [currentProject, panels, circuits, transformers]);
 
@@ -1093,6 +1096,11 @@ export const PermitPacketGenerator: React.FC<PermitPacketGeneratorProps> = ({ pr
         const narrative: NEC22087NarrativeData = {
           method: nec22087Method,
           occupancy: deriveNarrativeOccupancy(currentProject),
+          // PE ruling 2026-09-27: cite the sections the calculation that
+          // produced maxDemandKVA actually applied (Part IV only when 220.84 ran).
+          calculationNecReferences: useCalculatedSource
+            ? aggregatedDemandSplit.necReferences
+            : undefined,
           dataSourceCitation: nec22087DataSource.trim(),
           dateRangeFrom: nec22087DateFrom || new Date(Date.now() - 365 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]!,
           dateRangeTo: nec22087DateTo || new Date().toISOString().split('T')[0]!,
@@ -1806,11 +1814,11 @@ export const PermitPacketGenerator: React.FC<PermitPacketGeneratorProps> = ({ pr
                 >
                   <option value="utility_bill">Utility billing — 12-month peak (preferred)</option>
                   <option value="load_study">Recording load study — 30-day at 15-min intervals</option>
-                  <option value="calculated">Calculated from existing panel schedule (NEC 220.82/220.84)</option>
+                  <option value="calculated">Calculated from existing panel schedule (NEC Article 220 demand factors)</option>
                   <option value="manual">Manual entry (informational only)</option>
                 </select>
                 <p className="text-xs text-gray-500 mt-1">
-                  Measured methods (bill / study) skip the 125% multiplier. Calculated/manual apply 125%.
+                  Measured methods (bill / study) apply 125% per NEC 220.87(2). Calculated is used directly (demand factors already applied); manual applies 125%.
                 </p>
               </div>
               <div>
