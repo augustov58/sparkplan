@@ -34,7 +34,7 @@ const TEMPLATES: Record<TemplateType, ProjectTemplate> = {
     name: 'Residential - Single Family Home',
     description: '2,400 sq ft single-family home with electric range, dryer, and A/C',
     type: ProjectType.RESIDENTIAL,
-    necEdition: '2023',
+    necEdition: '2020',
     settings: {
       serviceVoltage: 240,
       servicePhase: 1,
@@ -138,7 +138,7 @@ const TEMPLATES: Record<TemplateType, ProjectTemplate> = {
     name: 'Commercial - Small Office Building',
     description: '5,000 sq ft office space with HVAC and general loads',
     type: ProjectType.COMMERCIAL,
-    necEdition: '2023',
+    necEdition: '2020',
     settings: {
       serviceVoltage: 208,
       servicePhase: 3,
@@ -223,7 +223,7 @@ const TEMPLATES: Record<TemplateType, ProjectTemplate> = {
     name: 'Industrial - Light Manufacturing',
     description: '10,000 sq ft light manufacturing facility with machinery',
     type: ProjectType.INDUSTRIAL,
-    necEdition: '2023',
+    necEdition: '2020',
     settings: {
       serviceVoltage: 480,
       servicePhase: 3,
@@ -315,7 +315,7 @@ const TEMPLATES: Record<TemplateType, ProjectTemplate> = {
     name: 'EV Charging - Residential Installation',
     description: 'Residential home with Tesla Wall Connector (48A Level 2)',
     type: ProjectType.RESIDENTIAL,
-    necEdition: '2023',
+    necEdition: '2020',
     settings: {
       serviceVoltage: 240,
       servicePhase: 1,

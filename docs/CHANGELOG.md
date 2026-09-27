@@ -4,9 +4,17 @@ All notable changes to SparkPlan.
 
 ---
 
+## 2026-09-27: EVSE load follows the adopted NEC edition — no more NEC 220.57 on Florida packets
+
+**NEC citation + calc fix (user-facing)**: Florida enforces NEC 2020 (FBC 8th Ed.), which has no §220.57 — Article 220 Part III ends at 220.56. SparkPlan was printing "NEC 220.84 + 220.57 + 625.42" on every Multi-Family EV packet and applying the 2023-only 7,200 VA per-EVSE floor. The per-EVSE rule now follows the project's NEC edition, resolved from the AHJ manifest first, then the project's `nec_edition` setting (all 10 Florida manifests → NEC 2020): **NEC 2020** = nameplate per 220.14(A) (cited with 625.41); **NEC 2023** = max(7,200 VA, nameplate) per 220.57(A). Both at 100% in the load calc — 625.41's 125% stays on breaker/conductor sizing (PE-confirmed). Numeric impact on NEC 2020 projects: only chargers below 7,200 VA nameplate change — under 30 A at 240 V, under ~34.6 A at 208 V (so a 32 A charger on a 208 V 3φ building drops 7,200 → 6,656 VA). Saved calculator results from before this change keep their 2023 citation (it matches their math) and the packet prints an advisory "recompute" note on E-403 when the result's edition differs from the packet's. New projects now default to NEC 2020. The chatbot/load-calc Gemini prompts state the edition split. New `data/nec/evse-load.ts` + `resolveNecEdition()`; +16 tests (1051 passing).
+
+---
+
 ## 2026-09-27: Calculated-method narrative cites the NEC 220 Part that actually ran
 
 **Permit packet citation fix (PE ruling 2026-09-27)**: The calculated-method existing-service page (E-102) cited NEC sections from a fixed per-occupancy map and labeled them all "NEC 220 Part III". For dwellings that was wrong twice over: the Optional Methods (220.82 / 220.83 / 220.84) are NEC 220 **Part IV**, and single-family pages cited 220.83 / 220.82 even though the page's calculated source (`calculateAggregatedLoad`) never runs them — it runs the standard Part III cascade. The page now cites the sections the calculation actually applied (its `necReferences` plus every demand-breakdown row's reference), and says **Part IV Optional Method (NEC 220.84)** only when the 220.84 path ran; otherwise Part III with the runtime section list (e.g. `220.14 / 220.40 / 220.42 / 220.51 / 220.55`). The E-101 single-family Optional Method note now reads "per NEC 220 Part IV". Direct API callers without runtime references fall back to occupancy (multifamily → 220.84 Part IV; single-family → Part III 220.40 / 220.42; commercial / industrial unchanged). No numbers change. Visual proofs at `example_reports/NEC22087_Narrative_{MF_220-84_PartIV,SF_Existing_Standard_PartIII}_2026-09-27.pdf`. Follow-up: single-family E-101 vs E-102 method mismatch filed separately.
+
+---
 
 ## 2026-07-07 → 2026-07-09: NEC 220.87(2) measured-demand fix + agent operating manual (PR #118)
 

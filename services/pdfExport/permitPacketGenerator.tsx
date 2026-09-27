@@ -131,7 +131,7 @@ export interface PermitPacketData {
   // Multi-Family: Meter Stack Schedule (NEC 408)
   meterStacks?: MeterStack[];
   meters?: MeterDB[];
-  // Multi-Family EV Analysis (NEC 220.84 + 220.57)
+  // Multi-Family EV Analysis (NEC 220.84 + per-EVSE load + 625.42)
   multiFamilyEVAnalysis?: {
     result: MultiFamilyEVResult;
     buildingName?: string;
@@ -990,6 +990,7 @@ export const generatePermitPacket = async (data: PermitPacketData): Promise<void
           buildingName={mfevData.buildingName || data.projectName}
           {...contractor}
           sheetIds={sheetIds as [string, string]}
+          packetNecEdition={data.necEdition}
         />
       ),
     });

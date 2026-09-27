@@ -61,7 +61,7 @@ import {
 } from '../services/calculations/multiFamilyEV';
 
 // ── EV Panel Templates (NEC 220.57 / 625.42) ───────────────────────────────
-import { generateCustomEVPanel } from '../data/ev-panel-templates';
+import { generateCustomEVPanel, type ChargerTypeOption } from '../data/ev-panel-templates';
 
 // ── Multi-Family Autogen (NEC 220.82 unit panel sizing) ────────────────────
 import { generateBasicMultiFamilyProject } from '../services/autogeneration/multiFamilyProjectGenerator';
@@ -1019,7 +1019,7 @@ describe('Demand Factor (NEC Article 220)', () => {
 // 5. MULTI-FAMILY EV — NEC 220.57, 625.42
 // ============================================================================
 
-describe('Multi-Family EV (NEC 220.57 / 625.42)', () => {
+describe('Multi-Family EV (per-EVSE load / 625.42)', () => {
   describe('getMultiFamilyDemandFactor', () => {
     it('should return 1.0 for < 3 units', () => {
       expect(getMultiFamilyDemandFactor(1)).toBe(1.0);
@@ -1047,33 +1047,62 @@ describe('Multi-Family EV (NEC 220.57 / 625.42)', () => {
       evChargers: { count: 10, level: 'Level2', ampsPerCharger: 32 },
     };
 
-    it('should calculate per-EVSE load as max(7200VA, nameplate) per NEC 220.57', () => {
-      const result = calculateMultiFamilyEV(baseInput);
+    it('NEC 2023: per-EVSE load = max(7200VA, nameplate) per 220.57(A)', () => {
+      const result = calculateMultiFamilyEV({ ...baseInput, necEdition: '2023' });
       // 32A × 208V = 6656 VA < 7200 VA → use 7200 VA
       expect(result.evLoad.totalConnectedVA).toBe(7200 * 10);
-      expect(result.compliance.necArticles).toContain('NEC 220.57');
+      expect(result.evLoad.necEdition).toBe('2023');
+      expect(result.evLoad.perEVSENecReference).toBe('NEC 220.57(A)');
+      expect(result.compliance.necArticles).toContain('NEC 220.57(A)');
     });
 
-    it('should use nameplate when > 7200 VA per NEC 220.57', () => {
+    it('NEC 2020: per-EVSE load = nameplate per 220.14(A) — no 7,200 VA floor', () => {
+      const result = calculateMultiFamilyEV({ ...baseInput, necEdition: '2020' });
+      // 32A × 208V = 6656 VA; 220.57 does not exist in NEC 2020
+      expect(result.evLoad.totalConnectedVA).toBe(6656 * 10);
+      expect(result.evLoad.necEdition).toBe('2020');
+      expect(result.evLoad.perEVSENecReference).toBe('NEC 220.14(A)');
+    });
+
+    it('defaults to NEC 2020 (Florida) when necEdition is omitted', () => {
+      const result = calculateMultiFamilyEV(baseInput);
+      expect(result.evLoad.necEdition).toBe('2020');
+      expect(result.evLoad.totalConnectedVA).toBe(6656 * 10);
+    });
+
+    it('should use nameplate when > 7200 VA — identical in both editions', () => {
       const input: MultiFamilyEVInput = {
         ...baseInput,
         evChargers: { count: 5, level: 'Level2', ampsPerCharger: 48 },
       };
-      const result = calculateMultiFamilyEV(input);
       // 48A × 208V = 9984 VA > 7200 VA → use 9984 VA
-      expect(result.evLoad.totalConnectedVA).toBe(9984 * 5);
+      expect(calculateMultiFamilyEV({ ...input, necEdition: '2023' }).evLoad.totalConnectedVA).toBe(9984 * 5);
+      expect(calculateMultiFamilyEV({ ...input, necEdition: '2020' }).evLoad.totalConnectedVA).toBe(9984 * 5);
     });
 
-    it('should use demand factor of 1.0 for EV loads (NEC 220.57 has no DF)', () => {
+    it('should use demand factor of 1.0 for EV loads (no NEC demand factor for EVSE)', () => {
       const result = calculateMultiFamilyEV(baseInput);
       expect(result.evLoad.demandFactor).toBe(1.0);
     });
 
-    it('should include all key NEC articles', () => {
-      const result = calculateMultiFamilyEV(baseInput);
+    it('NEC 2020 articles cite 220.14(A) + 625.41 and never 220.57', () => {
+      const result = calculateMultiFamilyEV({ ...baseInput, necEdition: '2020' });
       expect(result.compliance.necArticles).toContain('NEC 220.84');
-      expect(result.compliance.necArticles).toContain('NEC 220.57');
+      expect(result.compliance.necArticles).toContain('NEC 220.14(A)');
+      expect(result.compliance.necArticles).toContain('NEC 625.41');
       expect(result.compliance.necArticles).toContain('NEC 625.42');
+      expect(result.compliance.necArticles.some(a => a.includes('220.57'))).toBe(false);
+      for (const scenario of Object.values(result.scenarios)) {
+        expect(scenario.notes.some(n => n.includes('220.57'))).toBe(false);
+      }
+    });
+
+    it('NEC 2023 articles cite 220.57(A)', () => {
+      const result = calculateMultiFamilyEV({ ...baseInput, necEdition: '2023' });
+      expect(result.compliance.necArticles).toContain('NEC 220.84');
+      expect(result.compliance.necArticles).toContain('NEC 220.57(A)');
+      expect(result.compliance.necArticles).toContain('NEC 625.42');
+      expect(result.compliance.necArticles).not.toContain('NEC 220.14(A)');
     });
 
     it('should produce three scenarios (noEVEMS, withEVEMS, withUpgrade)', () => {
@@ -2629,12 +2658,12 @@ describe('Panel schedule PDF — split-phase balancing (PDF-PHASE fix)', () => {
 //   2. EVEMS reduction is applied at the feeder/service level (clamping
 //      totalDemandVA to panel.main_breaker_amps × voltage).
 
-describe('C4 — Per-EVSE branch row VA (NEC 220.57)', () => {
+describe('C4 — Per-EVSE branch row VA (nameplate, NEC 625.40)', () => {
   describe('generateCustomEVPanel — branch loadVA', () => {
     it('REGRESSION: 12× Level-2 (48A) with EVEMS — each branch row = 11,520 VA, not 3,996', () => {
       // The exact configuration from the audit packet page 14: 12 chargers,
       // 48A @ 240V, EVEMS managed. Pre-fix: each branch loadVA = ~3,996.
-      // Post-fix: each branch loadVA = 11,520 (full nameplate per NEC 220.57).
+      // Post-fix: each branch loadVA = 11,520 (full nameplate).
       const result = generateCustomEVPanel({
         projectId: 'proj-c4',
         config: {
@@ -2652,7 +2681,7 @@ describe('C4 — Per-EVSE branch row VA (NEC 220.57)', () => {
       const evChargerCircuits = result.circuits.filter(c => c.isEvCharger);
       expect(evChargerCircuits).toHaveLength(12);
       for (const c of evChargerCircuits) {
-        expect(c.loadVA).toBe(11520); // 48A × 240V — NEC 220.57 nameplate
+        expect(c.loadVA).toBe(11520); // 48A × 240V — nameplate
       }
     });
 
@@ -2674,19 +2703,25 @@ describe('C4 — Per-EVSE branch row VA (NEC 220.57)', () => {
       }
     });
 
-    it('NEC 220.57 minimum: nameplate < 7,200 VA gets bumped to 7,200 VA per 220.57(A)', () => {
-      // Synthetic: a 24A @ 240V hypothetical = 5,760 VA nameplate, < 7,200.
-      // NEC 220.57(A) requires the LARGER of 7,200 VA or nameplate as the
-      // branch-circuit load. We simulate this by checking the helper inside
-      // ev-panel-templates honors the floor. Since generateCustomEVPanel only
-      // exposes 48A / 80A / DCFC presets, we exercise the floor by calling
-      // calculatePerEVSELoad directly via multiFamilyEV which already applies it.
-      // This test pins the contract: any branch VA written into circuits.load_watts
-      // for an EVSE must respect max(7200, nameplate).
-      const evCharger48ABranchVA = 48 * 240; // 11,520 — nameplate dominates
-      const evCharger24ABranchVA = Math.max(7200, 24 * 240); // 7,200 — floor dominates
-      expect(evCharger48ABranchVA).toBe(11520);
-      expect(evCharger24ABranchVA).toBe(7200);
+    it('every preset is ≥ 7,200 VA, so branch VA is identical under NEC 2020 and 2023', () => {
+      // generateCustomEVPanel writes nameplate with no edition input. That is
+      // only correct while no preset falls below the NEC 2023 220.57(A)
+      // 7,200 VA floor. If this fails, a sub-7,200 VA preset was added —
+      // route the template through getEvseLoadVA() with the project edition.
+      // `satisfies` makes tsc fail if a preset is added without listing it here.
+      const presets = Object.keys({
+        'Level 2 (48A)': true,
+        'Level 2 (80A)': true,
+        'DC Fast Charge (150kW)': true,
+      } satisfies Record<ChargerTypeOption, true>) as ChargerTypeOption[];
+      for (const chargerType of presets) {
+        const result = generateCustomEVPanel({
+          projectId: 'proj-edition',
+          config: { chargerType, numberOfChargers: 1, useEVEMS: false, includeSpare: false, includeLighting: false },
+        });
+        const [charger] = result.circuits.filter(c => c.isEvCharger);
+        expect(charger?.loadVA, chargerType).toBeGreaterThanOrEqual(7200);
+      }
     });
 
     it('panel rating sizes to NEC 625.42 setpoint × 1.25 when explicit setpoint provided', () => {

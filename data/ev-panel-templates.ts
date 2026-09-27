@@ -446,7 +446,7 @@ export interface CustomEVPanelConfig {
   /**
    * @deprecated Pre-C4 (2026-05-06) this value overrode per-branch loadVA when
    * EVEMS was active. That collapsed the NEC 625.42 service-level reduction
-   * onto branch circuits in violation of NEC 220.57(A) + 625.40. Branch
+   * onto branch circuits in violation of NEC 625.40. Branch
    * conductors must always carry full nameplate. Field accepted for callers
    * but ignored.
    */
@@ -580,12 +580,15 @@ export function generateCustomEVPanel(input: CustomEVPanelInput): ApplyTemplateO
   const circuits: TemplateCircuit[] = [];
   let circuitNumber = 1;
 
-  // NEC 220.57(A): Per-EVSE branch-circuit load = max(7,200 VA, nameplate).
+  // Per-EVSE branch-circuit load = nameplate. Every preset above is
+  // ≥ 11,520 VA, so the NEC 2023 220.57(A) 7,200 VA floor never binds and
+  // the value is identical under NEC 2020 (220.14(A)) and NEC 2023. If a
+  // preset below 7,200 VA is ever added, route this through getEvseLoadVA()
+  // in data/nec/evse-load.ts with the project's edition.
   // EVEMS reduction (NEC 625.42) applies at the feeder/service level only;
   // branch conductors must still handle full continuous nameplate per
   // NEC 625.40 + 210.19. So `circuitLoadVA` is independent of `useEVEMS`.
-  const NEC_220_57_MINIMUM_VA = 7200;
-  const circuitLoadVA = Math.max(NEC_220_57_MINIMUM_VA, loadVA);
+  const circuitLoadVA = loadVA;
 
   // Add EV charger circuits
   // Multi-pole slot formula: 2-pole at slot N occupies N and N+2.

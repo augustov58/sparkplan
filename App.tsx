@@ -967,7 +967,7 @@ function AppContent() {
       name: template ? template.name : `New ${selectedType} Project ${projects.length + 1}`,
       address: 'TBD',
       type: selectedType,
-      necEdition: '2023',
+      necEdition: '2020',
       status: ProjectStatus.PLANNING,
       progress: 0,
       serviceVoltage: template ? template.serviceVoltage : defaultServiceVoltage,

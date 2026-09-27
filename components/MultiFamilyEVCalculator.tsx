@@ -1,6 +1,6 @@
 /**
  * Multi-Family EV Readiness Calculator Component
- * NEC 220.84 + NEC 220.57 + NEC 625.42
+ * NEC 220.84 + per-EVSE load (NEC 220.14(A) in 2020 / 220.57 in 2023) + NEC 625.42
  *
  * Automates the $2-10K engineering calculation for multi-family EV charging.
  * Forum-validated feature addressing the complexity contractors are turning away.
@@ -40,6 +40,13 @@ import {
   projectHasPanels,
   type PopulationProgress
 } from '../services/autogeneration/projectPopulationOrchestrator';
+import { useJurisdictions } from '../hooks/useJurisdictions';
+import {
+  findManifestForJurisdiction,
+  getManifestById,
+  resolveNecEdition,
+} from '../data/ahj/registry';
+import { evseLoadCitation } from '../data/nec/evse-load';
 
 interface MultiFamilyEVCalculatorProps {
   projectId?: string;
@@ -279,6 +286,20 @@ export const MultiFamilyEVCalculator: React.FC<MultiFamilyEVCalculatorProps> = (
     return () => clearTimeout(timer);
   }, [evChargerCount, evChargerLevel, evAmpsPerCharger, useEVEMS, capacityReserveVA, existingServiceAmps, selectedScenario, voltage, phase]);
 
+  // NEC edition for the per-EVSE load rule: AHJ manifest (template pick or
+  // jurisdiction match) first, then the project's own setting, then 2020.
+  // Same resolution the permit packet uses, so the math matches the citations.
+  const { getJurisdictionById } = useJurisdictions();
+  const necEdition = useMemo(() => {
+    const jurisdiction = project?.jurisdiction_id
+      ? getJurisdictionById(project.jurisdiction_id)
+      : undefined;
+    const manifest =
+      getManifestById(project?.settings?.manifest_template_id)
+      ?? findManifestForJurisdiction(jurisdiction);
+    return resolveNecEdition(manifest, 'multi_family', project?.necEdition);
+  }, [project?.jurisdiction_id, project?.settings?.manifest_template_id, project?.necEdition, getJurisdictionById]);
+
   // Calculate results
   const result = useMemo<MultiFamilyEVResult | null>(() => {
     try {
@@ -312,6 +333,7 @@ export const MultiFamilyEVCalculator: React.FC<MultiFamilyEVCalculatorProps> = (
         commonAreaLoads: useItemizedCommonArea && commonAreaItems.length > 0 ? commonAreaItems : undefined,
         transformer: hasTransformer ? { kvaRating: transformerKVA } : undefined,
         useEVEMS,
+        necEdition,
         capacityReserveVA: capacityReserveVA > 0 ? capacityReserveVA : undefined,
         // NEC 220.87 - Existing Load Determination Method
         existingLoadMethod,
@@ -332,7 +354,7 @@ export const MultiFamilyEVCalculator: React.FC<MultiFamilyEVCalculatorProps> = (
     hasElectricHeat, hasElectricCooking, commonAreaLoadVA,
     useItemizedCommonArea, commonAreaItems,
     hasTransformer, transformerKVA, useEVEMS, capacityReserveVA,
-    existingLoadMethod, measuredPeakDemandKW, storedMFLoad
+    existingLoadMethod, measuredPeakDemandKW, storedMFLoad, necEdition
   ]);
 
   // Sprint 2C M3 (2026-05-17): persist the computed MF-EV result so the
@@ -498,7 +520,7 @@ export const MultiFamilyEVCalculator: React.FC<MultiFamilyEVCalculatorProps> = (
           Multi-Family EV Readiness Calculator
         </h3>
         <p className="text-sm text-gray-500 mt-1">
-          NEC 220.84 + NEC 220.57 + NEC 625.42 - Determine EV charging capacity for apartment buildings
+          NEC 220.84 + {evseLoadCitation(necEdition)} + NEC 625.42 (NEC {necEdition}) - Determine EV charging capacity for apartment buildings
         </p>
       </div>
 
@@ -1283,7 +1305,7 @@ export const MultiFamilyEVCalculator: React.FC<MultiFamilyEVCalculatorProps> = (
                     </div>
                   </div>
                   <div>
-                    <span className="text-gray-600">EV Load (NEC 220.57):</span>
+                    <span className="text-gray-600">EV Load ({evseLoadCitation(necEdition)}):</span>
                     <div className="text-2xl font-bold text-green-700 mt-1">
                       {result.evLoad.loadAmps} A
                     </div>
@@ -1721,9 +1743,11 @@ export const MultiFamilyEVCalculator: React.FC<MultiFamilyEVCalculatorProps> = (
             NEC allows significant demand factors (23-45%) on unit loads, recognizing that not all loads operate simultaneously.
           </p>
           <p>
-            <strong>NEC 220.57 - Per-EVSE Load (2023 NEC):</strong> Specifies that each EVSE load shall be
-            calculated as the larger of 7,200 VA or the nameplate rating. This does NOT provide demand factors
-            for multiple EVSEs - the full connected load must be used without EVEMS.
+            <strong>Per-EVSE Load (this project: NEC {necEdition}):</strong> Under NEC 2023 220.57(A), each EVSE
+            load is the larger of 7,200 VA or the nameplate rating. NEC 2020 has no 220.57 — each EVSE is taken at
+            its nameplate rating per 220.14(A), with the 125% continuous-duty factor of 625.41 applied to breaker
+            and conductor sizing. Neither edition provides demand factors for multiple EVSEs - the full connected
+            load must be used without EVEMS.
           </p>
           <p>
             <strong>NEC 625.42 - EVEMS:</strong> Electric Vehicle Energy Management Systems allow sizing

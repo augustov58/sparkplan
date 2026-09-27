@@ -1,12 +1,13 @@
 /**
  * Multi-Family EV Readiness PDF Document Components
  * React PDF document structure for multi-family EV calculations
- * NEC 220.84 + NEC 220.57 + NEC 625.42
+ * NEC 220.84 + per-EVSE load (220.14(A) in NEC 2020 / 220.57 in NEC 2023) + NEC 625.42
  */
 
 import React from 'react';
 import { Document, Page, Text, View, StyleSheet } from '@react-pdf/renderer';
 import type { MultiFamilyEVResult } from '../calculations/multiFamilyEV';
+import { evseLoadCitation, type NecEdition } from '../../data/nec/evse-load';
 import {
   BrandBar,
   Footer as BrandFooter,
@@ -288,6 +289,13 @@ interface MultiFamilyEVDocumentProps {
    * standalone document export (outside the permit packet) still works.
    */
   sheetIds?: [string, string];
+  /**
+   * NEC edition the surrounding permit packet is prepared under. When it
+   * differs from the edition the saved EV result was computed under, an
+   * advisory note tells the contractor to recompute. Advisory only — the
+   * page still renders.
+   */
+  packetNecEdition?: NecEdition;
 }
 
 /**
@@ -315,7 +323,13 @@ export const MultiFamilyEVPages: React.FC<MultiFamilyEVDocumentProps> = ({
   contractorName,
   contractorLicense,
   sheetIds,
+  packetNecEdition,
 }) => {
+  // Results saved before 2026-09-27 carry no edition; they were always
+  // computed with the NEC 2023 220.57(A) rule.
+  const evEdition: NecEdition = result.evLoad.necEdition ?? '2023';
+  const evCitation = evseLoadCitation(evEdition);
+  const editionMismatch = packetNecEdition !== undefined && packetNecEdition !== evEdition;
   const currentDate = new Date().toLocaleDateString('en-US', {
     year: 'numeric',
     month: 'long',
@@ -330,7 +344,7 @@ export const MultiFamilyEVPages: React.FC<MultiFamilyEVDocumentProps> = ({
           <Text style={themeStyles.docTitle}>Multi-Family EV Readiness Analysis</Text>
           <Text style={themeStyles.docSubtitle}>
             {buildingName || 'Building Analysis'}
-            {` \u2022 NEC 220.84 + 220.57 + 625.42`}
+            {` \u2022 NEC 220.84 + ${evCitation.replace('NEC ', '')} + 625.42`}
             {preparedFor ? ` \u2022 For: ${preparedFor}` : ''}
             {preparedBy ? ` \u2022 By: ${preparedBy}` : ''}
             {` \u2022 ${currentDate}`}
@@ -374,7 +388,7 @@ export const MultiFamilyEVPages: React.FC<MultiFamilyEVDocumentProps> = ({
               </Text>
             </View>
             <View style={styles.gridItem}>
-              <Text style={styles.label}>EV LOAD (NEC 220.57)</Text>
+              <Text style={styles.label}>EV LOAD ({evCitation})</Text>
               <Text style={styles.value}>{result.evLoad.loadAmps}A</Text>
               <Text style={styles.subValue}>
                 {/* PR-2 Polish A (2026-05-26): label tracks the math — the
@@ -384,7 +398,7 @@ export const MultiFamilyEVPages: React.FC<MultiFamilyEVDocumentProps> = ({
                     EVEMS-enabled projects look mis-calculated. EVEMS
                     engagement is inferred from clamping evidence
                     (demandVA < totalConnectedVA) because the result.input
-                    narrowing doesn't carry useEVEMS through. NEC 220.57
+                    narrowing doesn't carry useEVEMS through. The NEC
                     provides no multi-EVSE demand factor, so any clamping
                     below nameplate must be EVEMS per NEC 625.42. */}
                 {(result.evLoad.demandVA / 1000).toFixed(1)} kVA ({result.input.evChargersRequested} EVSE @ {result.evLoad.demandVA < result.evLoad.totalConnectedVA ? 'EVEMS setpoint' : 'full load'})
@@ -579,6 +593,18 @@ export const MultiFamilyEVPages: React.FC<MultiFamilyEVDocumentProps> = ({
         {/* Compliance Summary */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>NEC Compliance Summary</Text>
+          {/* Edition-mismatch advisory lives on this page, not E-402: E-402
+              is full, and an extra line there spills the phase-balance box
+              onto a third page (breaks the packet's fixed 2-page count). */}
+          {editionMismatch && (
+            <View style={styles.notesBox}>
+              <Text style={styles.notesText}>
+                NOTE: This EV analysis was computed under NEC {evEdition}, but this packet is prepared
+                under NEC {packetNecEdition}. Re-open the Multi-Family EV calculator to recompute
+                before submission.
+              </Text>
+            </View>
+          )}
           <View style={[styles.complianceBox, result.compliance.isCompliant ? styles.complianceBoxPass : styles.complianceBoxWarning]}>
             <Text
               style={[
@@ -666,17 +692,19 @@ export const MultiFamilyEVPages: React.FC<MultiFamilyEVDocumentProps> = ({
 
         {/* EV Load Calculation */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>EV Load Calculation (NEC 220.57)</Text>
+          <Text style={styles.sectionTitle}>EV Load Calculation ({evCitation})</Text>
           <View style={styles.table}>
             <View style={styles.tableRow}>
               <Text style={styles.tableCellLabel}>Number of EV Chargers</Text>
               <Text style={styles.tableCellValue}>{result.input.evChargersRequested}</Text>
             </View>
             <View style={styles.tableRow}>
-              <Text style={styles.tableCellLabel}>Per-EVSE Load (NEC 220.57(A))</Text>
+              <Text style={styles.tableCellLabel}>
+                Per-EVSE Load ({result.evLoad.perEVSENecReference ?? 'NEC 220.57(A)'})
+              </Text>
               <Text style={styles.tableCellValue}>
                 {(result.evLoad.totalConnectedVA / result.input.evChargersRequested / 1000).toFixed(1)} kVA each
-                (max of 7.2 kVA or nameplate)
+                {evEdition === '2023' ? ' (max of 7.2 kVA or nameplate)' : ' (nameplate)'}
               </Text>
             </View>
             <View style={styles.tableRow}>
@@ -700,14 +728,14 @@ export const MultiFamilyEVPages: React.FC<MultiFamilyEVDocumentProps> = ({
             </View>
           </View>
           <Text style={{ fontSize: 8, color: '#666', marginTop: 5 }}>
-            Note: NEC 220.57 does not provide demand factors for multiple EVSE. Use full connected load unless
+            Note: The NEC does not provide demand factors for multiple EVSE. Use full connected load unless
             EVEMS (NEC 625.42) is installed, which allows sizing to the EVEMS setpoint.
           </Text>
         </View>
 
         {/* Notes Box — trimmed to the 3 notes that aren't already
             visible in the tables above. Removed:
-              "EV demand factors per NEC Table 220.57…" (NEC 220.57 does
+              "EV demand factors per NEC Table 220.57…" (the NEC does
               not provide demand factors for multi-EVSE — misleading)
               "Per-EVSE load calculation uses NEC 220.57(A)…" (already
               shown in the EV Load Calculation table on this page) */}

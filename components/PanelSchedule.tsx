@@ -2098,7 +2098,7 @@ export const PanelSchedule: React.FC<PanelScheduleProps> = ({ project }) => {
                 </h4>
                 <p className="text-xs text-amber-900/80 mb-3">
                   EVEMS controller-permitted maximum simultaneous demand for this panel. Branch
-                  conductors stay at full continuous nameplate per NEC 625.40 + 220.57(A); the
+                  conductors stay at full continuous nameplate per NEC 625.40 + 210.19; the
                   feeder serving this panel may be sized to the setpoint per NEC 625.42.
                 </p>
                 <div className="grid grid-cols-2 gap-3">
