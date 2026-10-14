@@ -51,6 +51,7 @@ import type { LoadTemplate } from '../types';
 import { isExistingConstructionProject } from '../lib/projectSettings';
 import { usePanels } from '../hooks/usePanels';
 import { useCircuits } from '../hooks/useCircuits';
+import { useProjectNecEdition } from '../hooks/useProjectNecEdition';
 import {
   generateBasicMultiFamilyProject,
   type BasicGenerationOptions,
@@ -211,6 +212,7 @@ export const DwellingLoadCalculator: React.FC<DwellingLoadCalculatorProps> = ({
   }, [appliances, proposedLoads]);
 
   // Calculate load
+  const necEdition = useProjectNecEdition(project, isSingleFamily ? 'single_family_residential' : 'multi_family');
   const loadResult: ResidentialLoadResult | null = useMemo(() => {
     try {
       if (isSingleFamily) {
@@ -228,19 +230,21 @@ export const DwellingLoadCalculator: React.FC<DwellingLoadCalculatorProps> = ({
           laundryCircuit: residentialSettings?.laundryCircuit ?? true,
           appliances: appliancesForCalc,
           existingDwelling,
-          useTrueOptionalMethod
+          useTrueOptionalMethod,
+          necEdition
         });
       } else {
         return calculateMultiFamilyLoad({
           unitTemplates: unitTemplates.map(t => ({ ...t, appliances: appliancesForCalc })),
-          housePanelLoad
+          housePanelLoad,
+          necEdition
         });
       }
     } catch (error) {
       console.error('Load calculation error:', error);
       return null;
     }
-  }, [isSingleFamily, residentialSettings, appliancesForCalc, unitTemplates, housePanelLoad, project.settings?.service_modification_type, project.settings?.dwelling_calc_mode]);
+  }, [isSingleFamily, residentialSettings, appliancesForCalc, unitTemplates, housePanelLoad, project.settings?.service_modification_type, project.settings?.dwelling_calc_mode, necEdition]);
 
   // Persist multi-family load result to project settings so MF EV Calculator can read it
   // Uses value comparison to avoid infinite re-render loop (updateProject changes project → loadResult recomputes → useEffect fires)
@@ -1461,7 +1465,7 @@ export const DwellingLoadCalculator: React.FC<DwellingLoadCalculatorProps> = ({
                         <option value={120}>120V (1P)</option>
                         <option value={240}>240V (2P)</option>
                       </select>
-                      <label className="inline-flex items-center gap-1 text-xs text-gray-600" title="NEC 100 continuous load — operates 3+ hours. Applies ×1.25 per NEC 210.20(A) / 220.18(B).">
+                      <label className="inline-flex items-center gap-1 text-xs text-gray-600" title="NEC 100 continuous load — operates 3+ hours. Sizes the branch circuit at 125% per NEC 210.20(A); the load calculation uses nameplate.">
                         <input
                           type="checkbox"
                           checked={!!other.continuous}
@@ -1567,7 +1571,7 @@ export const DwellingLoadCalculator: React.FC<DwellingLoadCalculatorProps> = ({
                           </select>
                           <label
                             className="inline-flex items-center gap-1 text-xs text-gray-600"
-                            title="NEC 100 continuous load — operates 3+ hours. Applies ×1.25 per NEC 210.20(A) / 220.18(B)."
+                            title="NEC 100 continuous load — operates 3+ hours. Sizes the branch circuit at 125% per NEC 210.20(A); the load calculation uses nameplate."
                           >
                             <input
                               type="checkbox"

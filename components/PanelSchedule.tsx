@@ -13,6 +13,7 @@ import type { ExtractedCircuit } from '@/services/panelOcrService';
 import { usePanels } from '../hooks/usePanels';
 import { useCircuits } from '../hooks/useCircuits';
 import { useTransformers } from '../hooks/useTransformers';
+import { useProjectNecEdition } from '../hooks/useProjectNecEdition';
 import { exportPanelSchedulePDF, exportAllPanelsPDF } from '../services/pdfExport/panelSchedulePDF';
 import { 
   calculatePanelDemand, 
@@ -293,6 +294,7 @@ export const PanelSchedule: React.FC<PanelScheduleProps> = ({ project }) => {
   //     regardless of whether the appliance toggles were updated.
   //  2. Sub-panel of a multi-family dwelling unit → run
   //     calculateDwellingUnitDemandVA over its circuits.
+  const necEdition = useProjectNecEdition(project, 'single_family_residential');
   const dwellingUnitDemand = useMemo(() => {
     if (!selectedPanel) return null;
     const occupancy = project.settings?.occupancyType;
@@ -319,6 +321,7 @@ export const PanelSchedule: React.FC<PanelScheduleProps> = ({ project }) => {
         laundryCircuit: residential?.laundryCircuit ?? true,
         voltage: selectedPanel.voltage || 240,
         existingDwelling,
+        necEdition,
       });
       return {
         totalConnectedVA: result.totalConnectedVA,
@@ -347,7 +350,7 @@ export const PanelSchedule: React.FC<PanelScheduleProps> = ({ project }) => {
       generalDemandVA: result.generalDemandVA,
       climateDemandVA: result.climateDemandVA,
     };
-  }, [selectedPanel, panelCircuits, project.settings]);
+  }, [selectedPanel, panelCircuits, project.settings, necEdition]);
 
   // Calculate aggregated load including downstream panels
   // Uses occupancyType from project settings for correct demand factor selection

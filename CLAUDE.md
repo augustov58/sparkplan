@@ -93,7 +93,9 @@ Florida enforces NEC 2020 (FBC 8th Ed.) — 220.57 DOES NOT EXIST in NEC 2020.
 Both at 100% in the Article 220 load calc — the 125% of 625.41 is for
 OCPD/conductor sizing only. Neither is a demand factor.
 ```
-PE-confirmed 2026-09-27. Single source: `data/nec/evse-load.ts::getEvseLoadVA`.
+PE-confirmed 2026-09-27; extended 2026-10-14 to the single-family Optional Method
+(220.82/220.83 bucket, 2023 floor included) and to all continuous loads — no ×1.25
+in any Article 220 load calc. Single source: `data/nec/evse-load.ts::getEvseLoadVA`.
 Edition resolves manifest → project `nec_edition` → '2020' via
 `data/ahj/registry.ts::resolveNecEdition` (used by the calculator AND the packet).
 
@@ -278,6 +280,7 @@ Real mistakes made in this repo, each paired with the rule that prevents recurre
 | Cited NEC 220.57 (a 2023-only section) on every Florida EV packet, while Florida enforces NEC 2020; a test asserted the wrong citation | Check every cited section exists in the edition the AHJ adopted. EVSE load goes through `getEvseLoadVA(nameplate, edition)`, never an inline 7,200 VA floor. |
 | Calculated-method narrative cited dwelling Optional Methods (220.82/220.83) as "Part III" by occupancy, though they're Part IV and the narrative's calc never ran them | Cite from the calculation's runtime references (`summarizeCalculationRefs`), never a fixed per-occupancy string. Part IV only when an Optional Method section actually ran. (PE ruling 2026-09-27) |
 | Single-family E-102 ran the Part III cascade while E-101 ran NEC 220.83; the same packet passed the service on one page and failed it on the next (#121) | Pages reporting the same quantity call the same function behind the same gate helper (`buildSingleFamilyDwellingContext`). Existing dwelling → 220.83, new → 220.82, on every page. |
+| Single-family calc applied ×1.25 to EVSE and other "continuous" loads inside the 220.82/220.83 load calc, citing "220.18(B)" for it; the #123 edition fix covered only the multifamily path | The 125% is OCPD/conductor sizing, never the Article 220 load. When a rule changes, grep every calc that computes the same quantity (MF, SF Optional Method, Dwelling Calculator, Panel Summary), not just the one in the bug report. |
 | Docs updated with stale "Last Updated" dates; completed features left as "NEXT UP" | Every doc touch updates its date to today; every shipped feature flips its ROADMAP status in the same PR. |
 
 ---

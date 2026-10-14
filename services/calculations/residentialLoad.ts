@@ -8,6 +8,7 @@
  */
 
 import { ResidentialAppliances, DwellingUnitTemplate } from '../../types';
+import { getEvseLoadVA, type NecEdition } from '../../data/nec/evse-load';
 
 // ============================================================================
 // NEC CONSTANTS AND TABLES
@@ -110,13 +111,14 @@ export interface LoadBreakdown {
   demandFactor: number;
   necReference: string;
   /**
-   * NEC 100 continuous load — when true, the 220.83 / 220.82 bucket
-   * post-processor multiplies this row's connectedVA by 1.25 before
-   * bucketing so the service-sizing per NEC 220.18(B) is preserved
-   * even after per-category demands are zeroed and rolled into
-   * "General Loads Subtotal".
+   * VA this row feeds into the 220.82 / 220.83 general-loads bucket when it
+   * differs from connectedVA — the EVSE under NEC 2023 §220.57(A)
+   * (max(7,200 VA, nameplate)). Continuous loads are NOT uplifted here:
+   * the 125% of 625.41 / 210.20(A) is OCPD and conductor sizing, not the
+   * Article 220 load (PE ruling 2026-09-27, extended to the single-family
+   * Optional Method 2026-10-14).
    */
-  continuous?: boolean;
+  loadCalcVA?: number;
 }
 
 export interface ResidentialLoadResult {
@@ -177,12 +179,16 @@ export interface SingleFamilyInput {
    * existingDwelling is true (220.83 bucket method already applies).
    */
   useTrueOptionalMethod?: boolean;
+  /** Edition for the per-EVSE load rule (`getEvseLoadVA`). Default '2020'. */
+  necEdition?: NecEdition;
 }
 
 export interface MultiFamilyInput {
   unitTemplates: DwellingUnitTemplate[];
   housePanelLoad?: number;  // Common area loads (parking, laundry, etc.)
   serviceVoltage?: number;  // Default 240V
+  /** Edition for the per-unit EVSE load (`getEvseLoadVA`). Default '2020'. */
+  necEdition?: NecEdition;
 }
 
 // ============================================================================
@@ -428,7 +434,8 @@ export function calculateSingleFamilyLoad(input: SingleFamilyInput): Residential
     appliances,
     serviceVoltage = 240,
     existingDwelling = false,
-    useTrueOptionalMethod = false
+    useTrueOptionalMethod = false,
+    necEdition = '2020'
   } = input;
 
   // Resolve which bucket-method post-process (if any) applies.
@@ -640,26 +647,25 @@ export function calculateSingleFamilyLoad(input: SingleFamilyInput): Residential
     totalDemand += dispVA;
   }
 
-  // EV Charger — NEC 625.41 declares EVSE a continuous load, so per
-  // NEC 220.18(B) the service-demand contribution is the nameplate ×125%.
-  // (The branch-circuit 125% per 210.20(A) is applied separately in the
-  // circuit-generation path below.) Without this multiplier the calc
-  // underestimated service current by ~3.6 kVA per 32 A EV.
+  // EV Charger — per-EVSE load by edition (getEvseLoadVA): NEC 2020 =
+  // nameplate per 220.14(A); NEC 2023 = max(7,200 VA, nameplate) per
+  // 220.57(A). At 100% — the 625.41 125% is applied to the branch circuit
+  // in the circuit-generation path below, not to the load calc.
   if (appliances.evCharger?.enabled) {
     const evNameplateVA = appliances.evCharger.kw * 1000;
-    const evDemandVA = evNameplateVA * 1.25;
+    const evse = getEvseLoadVA(evNameplateVA, necEdition);
     breakdown.push({
       category: 'EV Charger',
-      description: `Level ${appliances.evCharger.level} - ${appliances.evCharger.kw} kW (continuous ×1.25)`,
+      description: `Level ${appliances.evCharger.level} - ${appliances.evCharger.kw} kW${evse.floorApplied ? ' (7,200 VA minimum)' : ''}`,
       connectedVA: evNameplateVA,
-      demandVA: evDemandVA,
-      demandFactor: 1.25,
-      necReference: 'NEC 625.41 / 220.18(B) - Continuous Load ×1.25',
-      continuous: true,
+      demandVA: evse.loadVA,
+      demandFactor: evNameplateVA > 0 ? evse.loadVA / evNameplateVA : 1,
+      necReference: `${evse.necReference} - EVSE load`,
+      loadCalcVA: evse.loadVA,
     });
     totalConnected += evNameplateVA;
-    totalDemand += evDemandVA;
-    necReferences.push('NEC 625.41 - EVSE Continuous Load');
+    totalDemand += evse.loadVA;
+    necReferences.push(`${evse.necReference} - EVSE load`);
   }
 
   // Pool Pump
@@ -722,30 +728,23 @@ export function calculateSingleFamilyLoad(input: SingleFamilyInput): Residential
     totalDemand += wellPumpVA;
   }
 
-  // Other Custom Appliances. Continuous loads (e.g. water-heating, pool
-  // pumps, EV chargers added through this path) get the NEC 220.18(B) ×1.25
-  // factor on the demand contribution; non-continuous loads contribute at
-  // nameplate (1.0×). Voltage is documentation here; it affects breaker
-  // poles in the circuit-generation path below, not the kVA math.
+  // Other Custom Appliances at nameplate. The `continuous` flag sizes the
+  // branch circuit at 125% (circuit-generation path below) but does not
+  // change the load calc. Voltage is documentation here; it affects breaker
+  // poles in the circuit-generation path, not the kVA math.
   if (appliances.otherAppliances?.length) {
     for (const other of appliances.otherAppliances) {
       const otherVA = other.kw * 1000;
-      const continuous = !!other.continuous;
-      const factor = continuous ? 1.25 : 1.0;
-      const demandVA = otherVA * factor;
       breakdown.push({
         category: other.proposed ? 'Proposed Load' : 'Other Appliance',
-        description: `${other.description} - ${other.kw} kW${continuous ? ' (continuous ×1.25)' : ''}`,
+        description: `${other.description} - ${other.kw} kW`,
         connectedVA: otherVA,
-        demandVA,
-        demandFactor: factor,
-        necReference: continuous
-          ? 'NEC 220.18(B) - Continuous Load ×1.25'
-          : 'NEC 220.82(B)(2)',
-        continuous,
+        demandVA: otherVA,
+        demandFactor: 1.0,
+        necReference: 'NEC 220.82(B)(2)',
       });
       totalConnected += otherVA;
-      totalDemand += demandVA;
+      totalDemand += otherVA;
     }
   }
 
@@ -770,18 +769,14 @@ export function calculateSingleFamilyLoad(input: SingleFamilyInput): Residential
     // Re-aggregate using CONNECTED VA so the 220.83 8 kVA / 40 % math is
     // applied to nameplate (not 220.82's already-discounted demand).
     //
-    // CONTINUOUS-LOAD EXCEPTION (NEC 220.18(B) + 625.41): rows flagged
-    // `continuous: true` contribute connectedVA × 1.25 to the bucket math.
-    // Without this, a continuous EV at 11.5 kVA nameplate would enter the
-    // bucket at 11.5 (raw) — the 125 % applied at the per-category demand
-    // row gets erased by the bucket's per-category-demand zeroing below.
-    // We track raw vs bucketed separately so the displayed "General Loads
-    // Subtotal" stays additive (sum of nameplate rows) while the bucket
-    // math operates on the uplifted total.
+    // Rows with `loadCalcVA` (the EVSE under the NEC 2023 7,200 VA floor)
+    // feed that value into the bucket instead. We track raw vs bucketed
+    // separately so the displayed "General Loads Subtotal" stays additive
+    // (sum of nameplate rows) while the bucket math uses the load-calc value.
     let hvacConnectedVA = 0;
     let hvacDemandVA = 0;
     let generalConnectedVA_raw = 0;       // displayed on Subtotal row
-    let generalConnectedVA_bucketed = 0;  // fed into bucket math (continuous-uplifted)
+    let generalConnectedVA_bucketed = 0;  // fed into bucket math (EVSE at its load-calc value)
 
     for (const row of breakdown) {
       // Skip the 'General Loads Subtotal' synthetic row to avoid double-counting
@@ -791,9 +786,8 @@ export function calculateSingleFamilyLoad(input: SingleFamilyInput): Residential
         hvacConnectedVA += row.connectedVA;
         hvacDemandVA += row.demandVA;
       } else {
-        const continuousFactor = row.continuous ? 1.25 : 1.0;
         generalConnectedVA_raw += row.connectedVA;
-        generalConnectedVA_bucketed += row.connectedVA * continuousFactor;
+        generalConnectedVA_bucketed += row.loadCalcVA ?? row.connectedVA;
       }
     }
 
@@ -815,8 +809,8 @@ export function calculateSingleFamilyLoad(input: SingleFamilyInput): Residential
         row.description = `Lighting + Small Appliance + Laundry + Appliances (first ${kneeKva} kVA @ 100%, remainder @ 40%)`;
         row.necReference = `${articleLabel} - General Loads (${kneeKva} kVA / 40%)`;
         // Display the raw nameplate sum on the Subtotal row so the
-        // breakdown stays additive against its component rows. Continuous
-        // uplift is internal to the bucket math (see _bucketed above).
+        // breakdown stays additive against its component rows. The EVSE
+        // floor is internal to the bucket math (see _bucketed above).
         row.connectedVA = generalConnectedVA_raw;
       } else {
         // Individual non-HVAC rows show their nameplate (connected) only;
@@ -830,7 +824,7 @@ export function calculateSingleFamilyLoad(input: SingleFamilyInput): Residential
 
     // Rewrite totals to reflect bucket semantics. Connected total displays
     // raw nameplate (additive). Demand total uses bucketed math (which
-    // already accounts for continuous uplift via generalConnectedVA_bucketed).
+    // already accounts for the EVSE floor via generalConnectedVA_bucketed).
     totalConnected = generalConnectedVA_raw + hvacConnectedVA;
     totalDemand = generalDemandVA + hvacDemandVA;
 
@@ -944,7 +938,8 @@ export function calculateMultiFamilyLoad(input: MultiFamilyInput): ResidentialLo
       smallApplianceCircuits: 2,
       laundryCircuit: true,
       appliances: template.appliances,
-      serviceVoltage
+      serviceVoltage,
+      necEdition: input.necEdition
     });
     template.calculatedLoadVA = unitLoad.totalDemandVA;
     template.panelSize = recommendServiceSize(unitLoad.serviceAmps);
@@ -1542,18 +1537,22 @@ export function calculateDwellingUnitDemandVA(circuits: DwellingCircuitInput[]):
  *   'C' Cooling         — HVAC bucket (NEC 220.60 larger-of)
  *   'H' Heating         — HVAC bucket (NEC 220.60 larger-of)
  *   'K' Kitchen / fixed — General loads pool
- *   'W' Water Heater    — General loads pool (continuous heuristic: +25 %)
+ *   'W' Water Heater    — General loads pool
  *   'D' Dryer           — General loads pool
  *   'M' Motor           — General loads pool
- *   'O' Other           — General loads pool (continuous heuristic on breaker / load × V)
+ *   'O' Other           — General loads pool (EVSE by description → getEvseLoadVA)
  *
- * Continuous heuristic: if a circuit's breaker rating is >= 1.20× its
- * load amperage (breaker_amps >= load_watts / voltage × 1.20), assume the
- * branch was sized for a continuous load per NEC 210.20(A) — apply the
- * 1.25 uplift to its contribution to the bucket input. This catches the
- * generated EV circuit (60 A breaker on 48 A nameplate = 1.25×) without
- * needing an explicit continuous flag on the circuit row.
+ * All loads enter the bucket at nameplate — no continuous-load uplift (the
+ * 125% of 625.41 / 210.20(A) sizes the branch circuit, not the load calc).
+ * EVSE circuits (matched by description) go through `getEvseLoadVA`, which
+ * under NEC 2023 raises them to the §220.57(A) 7,200 VA minimum.
  */
+/** EVSE circuit by description — circuits carry no EV flag. */
+const EVSE_DESCRIPTION = /\b(ev|evse|ev charger)\b|electric vehicle|charger/;
+function isEvseDescription(lowerDescription: string): boolean {
+  return EVSE_DESCRIPTION.test(lowerDescription);
+}
+
 export interface PanelDemandCircuit {
   description?: string;
   load_watts?: number | null;
@@ -1578,14 +1577,16 @@ export function calculateDwellingPanelDemand(opts: {
   laundryCircuit: boolean;
   voltage: number;
   existingDwelling: boolean;
+  /** Edition for the per-EVSE load rule (`getEvseLoadVA`). Default '2020'. */
+  necEdition?: NecEdition;
 }): PanelDemandResult {
   const {
     circuits,
     squareFootage,
     smallApplianceCircuits,
     laundryCircuit,
-    voltage,
     existingDwelling,
+    necEdition = '2020',
   } = opts;
 
   const lightingVA = squareFootage * LIGHTING_LOAD_VA_PER_SQFT;
@@ -1608,20 +1609,10 @@ export function calculateDwellingPanelDemand(opts: {
     if (type === 'C') { acVA += watts; continue; }
     if (type === 'H') { heatVA += watts; continue; }
 
-    // Continuous-load uplift — only Other-type (load_type='O') circuits where
-    // the breaker is sized at >=1.20× the load amps qualify. NEC 625.41
-    // mandates EV continuous sizing (breaker = 1.25× load) which is the
-    // primary use-case here. Ordinary appliances (Range/Dryer/WH/Disposal/
-    // Pool) carry a generous breaker margin for inrush or rounding but are
-    // intermittent loads, so we keep them at 1.0×.
-    const breaker = c.breaker_amps ?? 0;
-    const loadAmps = voltage > 0 ? watts / voltage : 0;
-    const isContinuous =
-      type === 'O' && breaker > 0 && loadAmps > 0 && breaker / loadAmps >= 1.20;
-    const factor = isContinuous ? 1.25 : 1.0;
-
     generalRawVA += watts;
-    generalBucketedVA += watts * factor;
+    generalBucketedVA += isEvseDescription(desc)
+      ? getEvseLoadVA(watts, necEdition).loadVA
+      : watts;
   }
 
   // Add NEC structural loads (these aren't categorized as continuous)
@@ -1677,6 +1668,7 @@ export function calculateDwellingDemandSplit(opts: {
   laundryCircuit: boolean;
   voltage: number;
   existingDwelling: boolean;
+  necEdition?: NecEdition;
 }): DwellingDemandSplitResult {
   const { circuits, ...rest } = opts;
   const total = calculateDwellingPanelDemand({ ...rest, circuits });

@@ -608,13 +608,13 @@ describe('Residential Load (NEC 220.82 / 220.84)', () => {
     });
   });
 
-  // NEC 625.41 declares EVSE a continuous load; NEC 220.18(B) requires the
-  // service-demand contribution to be ×1.25. These tests pin the 125% factor
-  // on both the breakdown demandVA and the necReferences citation — a
-  // regression here means we're under-sizing service current for any
-  // EV-equipped dwelling.
-  describe('calculateSingleFamilyLoad — NEC 625.41 EV 125% continuous factor', () => {
-    it('applies 125% to EV demandVA (vs raw nameplate connectedVA)', () => {
+  // EVSE load in the single-family calc is edition-aware and at 100%:
+  // NEC 2020 = nameplate per 220.14(A); NEC 2023 = max(7,200 VA, nameplate)
+  // per 220.57(A). The 125% of 625.41 sizes OCPD/conductors only — it is not
+  // added to the Article 220 load (PE ruling 2026-09-27, extended to the
+  // single-family Optional Method 2026-10-14).
+  describe('calculateSingleFamilyLoad — EVSE load by NEC edition, at 100%', () => {
+    it('NEC 2020 (default): EV demandVA = nameplate, cited 220.14(A)', () => {
       const result = calculateSingleFamilyLoad({
         squareFootage: 2000,
         smallApplianceCircuits: 2,
@@ -625,25 +625,47 @@ describe('Residential Load (NEC 220.82 / 220.84)', () => {
       });
       const evRow = result.breakdown.find(b => b.category === 'EV Charger');
       expect(evRow).toBeDefined();
-      expect(evRow!.connectedVA).toBe(11500);       // nameplate unchanged
-      expect(evRow!.demandVA).toBeCloseTo(14375, 0); // 11500 × 1.25 per 220.18(B)
-      expect(evRow!.demandFactor).toBe(1.25);
-      expect(evRow!.necReference).toContain('625.41');
+      expect(evRow!.connectedVA).toBe(11500);
+      expect(evRow!.demandVA).toBe(11500);
+      expect(evRow!.demandFactor).toBe(1);
+      expect(evRow!.necReference).toContain('220.14(A)');
     });
 
-    it('cites NEC 625.41 in the result necReferences when EV is enabled', () => {
+    it('NEC 2023: small charger raised to the 220.57(A) 7,200 VA minimum', () => {
       const result = calculateSingleFamilyLoad({
         squareFootage: 2000,
         smallApplianceCircuits: 2,
         laundryCircuit: true,
+        necEdition: '2023',
         appliances: {
-          evCharger: { enabled: true, level: 2, kw: 7.7 }
+          evCharger: { enabled: true, level: 2, kw: 3.84 }  // 16A L2 charger
         }
       });
-      expect(result.necReferences.some(r => r.includes('625.41'))).toBe(true);
+      const evRow = result.breakdown.find(b => b.category === 'EV Charger');
+      expect(evRow!.connectedVA).toBe(3840);
+      expect(evRow!.demandVA).toBe(7200);
+      expect(evRow!.necReference).toContain('220.57(A)');
     });
 
-    it('does NOT apply 125% when there is no EV charger', () => {
+    it('never cites the retired "220.18(B) continuous ×1.25" rule', () => {
+      for (const necEdition of ['2020', '2023'] as const) {
+        const result = calculateSingleFamilyLoad({
+          squareFootage: 2000,
+          smallApplianceCircuits: 2,
+          laundryCircuit: true,
+          necEdition,
+          appliances: {
+            evCharger: { enabled: true, level: 2, kw: 7.7 },
+            otherAppliances: [{ description: 'Pool heater', kw: 5, voltage: 240, continuous: true }],
+          }
+        });
+        const refs = [...result.necReferences, ...result.breakdown.map(b => b.necReference)];
+        expect(refs.some(r => r.includes('220.18'))).toBe(false);
+        expect(refs.some(r => r.includes('×1.25'))).toBe(false);
+      }
+    });
+
+    it('no EV charger → no EVSE row or citation', () => {
       const result = calculateSingleFamilyLoad({
         squareFootage: 2000,
         smallApplianceCircuits: 2,
@@ -653,60 +675,39 @@ describe('Residential Load (NEC 220.82 / 220.84)', () => {
         }
       });
       expect(result.breakdown.find(b => b.category === 'EV Charger')).toBeUndefined();
-      expect(result.necReferences.every(r => !r.includes('625.41'))).toBe(true);
+      expect(result.necReferences.every(r => !r.includes('EVSE'))).toBe(true);
     });
 
-    // The 125% continuous factor must survive the 220.83 bucket post-processor.
-    // Before this fix, an EV added via otherAppliances (Proposed Loads path)
-    // had its ×1.25 erased when the bucket zeroed per-category demands and
-    // aggregated raw connectedVA. Now continuous-flagged rows enter the
-    // bucket at connectedVA × 1.25.
-    it('proposed EV via otherAppliances applies 1.25 inside the 220.83 bucket', () => {
+    // The `continuous` flag on a custom appliance sizes its branch circuit at
+    // 125%; it must not change the 220.83 bucket input.
+    it('proposed EV via otherAppliances enters the 220.83 bucket at nameplate, continuous or not', () => {
+      const appliances = {
+        range: { enabled: true, type: 'electric' as const, kw: 12 },
+        dryer: { enabled: true, type: 'electric' as const, kw: 5.5 },
+        waterHeater: { enabled: true, type: 'electric' as const, kw: 4.5 },
+        hvac: { enabled: true, type: 'ac_only' as const, coolingKw: 5, heatingKw: 0 },
+        disposal: { enabled: true, kw: 0.5 },
+        poolPump: { enabled: true, hp: 1.5 },
+      };
+      const base = { squareFootage: 1000, smallApplianceCircuits: 2, laundryCircuit: true, existingDwelling: true };
+      const noEV = calculateSingleFamilyLoad({ ...base, appliances });
       const withEV = calculateSingleFamilyLoad({
-        squareFootage: 1000,
-        smallApplianceCircuits: 2,
-        laundryCircuit: true,
-        existingDwelling: true,
-        appliances: {
-          range: { enabled: true, type: 'electric', kw: 12 },
-          dryer: { enabled: true, type: 'electric', kw: 5.5 },
-          waterHeater: { enabled: true, type: 'electric', kw: 4.5 },
-          hvac: { enabled: true, type: 'ac_only', coolingKw: 5, heatingKw: 0 },
-          disposal: { enabled: true, kw: 0.5 },
-          poolPump: { enabled: true, hp: 1.5 },
-          otherAppliances: [
-            { description: 'EV Charger 48A', kw: 11.5, voltage: 240, continuous: true }
-          ]
-        }
+        ...base,
+        appliances: { ...appliances, otherAppliances: [{ description: 'EV Charger 48A', kw: 11.5, voltage: 240, continuous: true }] },
       });
-      const noEV = calculateSingleFamilyLoad({
-        squareFootage: 1000,
-        smallApplianceCircuits: 2,
-        laundryCircuit: true,
-        existingDwelling: true,
-        appliances: {
-          range: { enabled: true, type: 'electric', kw: 12 },
-          dryer: { enabled: true, type: 'electric', kw: 5.5 },
-          waterHeater: { enabled: true, type: 'electric', kw: 4.5 },
-          hvac: { enabled: true, type: 'ac_only', coolingKw: 5, heatingKw: 0 },
-          disposal: { enabled: true, kw: 0.5 },
-          poolPump: { enabled: true, hp: 1.5 },
-        }
+      const withEVNotContinuous = calculateSingleFamilyLoad({
+        ...base,
+        appliances: { ...appliances, otherAppliances: [{ description: 'EV Charger 48A', kw: 11.5, voltage: 240, continuous: false }] },
       });
-      // 220.83 with EV (continuous ×1.25): the EV's 11.5 kVA nameplate
-      // enters the bucket as 14.375 kVA (×1.25), so the bucket math sees
-      // ~3 kVA more general-loads pool than the no-EV case, producing
-      // ~5.5 kVA more service demand. Pool pump VA uses the NEC motor
-      // table value, not raw HP×1000, so we pin a wide range rather than
-      // an exact number.
-      expect(withEV.totalDemandVA).toBeGreaterThan(noEV.totalDemandVA + 4500);
-      expect(withEV.totalDemandVA).toBeLessThan(noEV.totalDemandVA + 7000);
+      // Bucket is already past the 8 kVA knee, so the EV adds 11,500 × 40%.
+      expect(withEV.totalDemandVA).toBe(noEV.totalDemandVA + 4600);
+      expect(withEV.totalDemandVA).toBe(withEVNotContinuous.totalDemandVA);
     });
 
     it('calculateDwellingPanelDemand: includes EV from panel circuits (Panel Summary fix)', async () => {
       const { calculateDwellingPanelDemand } = await import('../services/calculations/residentialLoad');
       // Same project as the user's screenshot: 1000 sq ft, range/dryer/WH/AC/disposal/poolpump
-      // + a proposed Level 2 EV (48 A continuous) on slot 20 with 60 A breaker.
+      // + a proposed Level 2 EV (48 A) on slot 20 with 60 A breaker.
       const result = calculateDwellingPanelDemand({
         circuits: [
           { description: 'Lighting Circuit 1', load_watts: 1500, load_type: 'L', breaker_amps: 15 },
@@ -724,7 +725,7 @@ describe('Residential Load (NEC 220.82 / 220.84)', () => {
           { description: 'Air Conditioning',   load_watts: 5000, load_type: 'C', breaker_amps: 30 },
           { description: 'Garbage Disposal',   load_watts:  500, load_type: 'K', breaker_amps: 20 },
           { description: 'Pool Pump',          load_watts: 1500, load_type: 'M', breaker_amps: 10 },
-          { description: 'Level 2 EV Charger (48A)', load_watts:11500, load_type: 'O', breaker_amps: 60 }, // breaker/load×V = 60 / 48 = 1.25 → continuous
+          { description: 'Level 2 EV Charger (48A)', load_watts:11500, load_type: 'O', breaker_amps: 60 },
         ],
         squareFootage: 1000,
         smallApplianceCircuits: 2,
@@ -733,24 +734,37 @@ describe('Residential Load (NEC 220.82 / 220.84)', () => {
         existingDwelling: true,
       });
 
-      // Demand should INCLUDE the EV (the bug was Panel Summary showing
-      // demand without the EV at 22.4 kVA). With EV uplift via continuous
-      // heuristic, expect ~28 kVA range.
+      // Demand must INCLUDE the EV (the bug was Panel Summary showing
+      // demand without the EV at 22.4 kVA).
       expect(result.necArticle).toBe('NEC 220.83');
-      expect(result.totalDemandVA).toBeGreaterThan(26_000);
-      expect(result.totalDemandVA).toBeLessThan(30_000);
-      // HVAC tracked separately
       expect(result.hvacVA).toBe(5000);
-
-      // Exact match with the Dwelling Load Calculator output (single source
-      // of truth). The Calc reports 48.0 kVA connected / 28.15 kVA demand
-      // for this scenario; the Panel Summary derivation must match.
       // Connected: 12000 + 500 + 5500 + 4500 + 1500 + 11500 (EV) + 7500
       //            (NEC structural: lighting+SA+laundry) + 5000 (HVAC) = 48000
       expect(result.totalConnectedVA).toBe(48_000);
-      // Demand: bucket = 8000 + ((38375 + 7500) - 8000) × 0.4 = 23150
-      //         + HVAC 5000 = 28150
-      expect(result.totalDemandVA).toBe(28_150);
+      // Demand: bucket = 8000 + (43000 - 8000) × 0.4 = 22000 (EV at nameplate)
+      //         + HVAC 5000 = 27000
+      expect(result.totalDemandVA).toBe(27_000);
+    });
+
+    it('calculateDwellingPanelDemand: NEC 2023 raises a small EVSE to 7,200 VA; NEC 2020 keeps nameplate', async () => {
+      const { calculateDwellingPanelDemand } = await import('../services/calculations/residentialLoad');
+      const input = {
+        circuits: [
+          { description: 'Electric Range', load_watts: 12000, load_type: 'K', breaker_amps: 50 },
+          { description: 'EV Charger 16A', load_watts: 3840, load_type: 'O', breaker_amps: 20 },
+        ],
+        squareFootage: 1000,
+        smallApplianceCircuits: 2,
+        laundryCircuit: true,
+        voltage: 240,
+        existingDwelling: true,
+      };
+      const nec2020 = calculateDwellingPanelDemand({ ...input, necEdition: '2020' });
+      const nec2023 = calculateDwellingPanelDemand({ ...input, necEdition: '2023' });
+      // Connected (display) is nameplate in both editions.
+      expect(nec2023.totalConnectedVA).toBe(nec2020.totalConnectedVA);
+      // Bucket past the knee: (7200 - 3840) × 40% = 1344 VA more demand under 2023.
+      expect(nec2023.totalDemandVA - nec2020.totalDemandVA).toBe(1344);
     });
 
     it('calculateDwellingPanelDemand: refrigerator on K-type circuit is subsumed in general allowance', async () => {
@@ -784,11 +798,10 @@ describe('Residential Load (NEC 220.82 / 220.84)', () => {
       expect(withFridge.totalDemandVA).toBe(noFridge.totalDemandVA);
     });
 
-    it('calculateDwellingPanelDemand: tightened continuous heuristic — only Other-type loads get ×1.25 uplift', async () => {
+    it('calculateDwellingPanelDemand: no continuous uplift — loads enter the bucket at nameplate', async () => {
       const { calculateDwellingPanelDemand } = await import('../services/calculations/residentialLoad');
-      // Dryer/WH/Pool carry generous breaker margin (>1.20× load amps) but
-      // are intermittent loads per NEC — they must NOT receive the ×1.25
-      // uplift reserved for continuous loads. Only the EV (type 'O') does.
+      // Breaker margin (>1.20× load amps) must not inflate the load calc —
+      // branch-circuit sizing is separate from the Article 220 load.
       const intermittentOnly = calculateDwellingPanelDemand({
         circuits: [
           { description: 'Electric Dryer',   load_watts: 5500, load_type: 'D', breaker_amps: 30 }, // 30/22.9 = 1.31
@@ -802,10 +815,7 @@ describe('Residential Load (NEC 220.82 / 220.84)', () => {
         voltage: 240,
         existingDwelling: true,
       });
-      // With the bug (1.20 threshold on all types), bucket would inflate by
-      // ~3 kVA via false-positive uplifts → demand ~+1.2 kVA too high. The
-      // tightened heuristic keeps these at 1.0×, so connectedVA equals the
-      // raw nameplate sum (no inflation).
+      // connectedVA equals the raw nameplate sum (no inflation).
       // generalRawVA = 5500 + 4500 + 1500 + 500 + 7500 (structural) = 19500
       expect(intermittentOnly.totalConnectedVA).toBe(19_500);
       // bucket = 8000 + (19500 - 8000) × 0.4 = 12600 demand

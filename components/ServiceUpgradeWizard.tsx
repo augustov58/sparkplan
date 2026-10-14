@@ -21,6 +21,7 @@ import { ExistingLoadDeterminationMethod, DwellingType } from '../types';
 import { useProjects } from '../hooks/useProjects';
 import { usePanels } from '../hooks/usePanels';
 import { useCircuits } from '../hooks/useCircuits';
+import { useProjectNecEdition } from '../hooks/useProjectNecEdition';
 import {
   calculateSingleFamilyLoad,
   calculateMultiFamilyLoad,
@@ -61,6 +62,7 @@ export const ServiceUpgradeWizard: React.FC<ServiceUpgradeWizardProps> = ({ proj
   const [selectedTemplate, setSelectedTemplate] = useState('');
 
   // Calculate load from Dwelling Calculator data if available
+  const necEdition = useProjectNecEdition(project, 'single_family_residential');
   const dwellingLoadResult: ResidentialLoadResult | null = useMemo(() => {
     try {
       if (!project?.settings?.residential?.appliances) {
@@ -85,19 +87,21 @@ export const ServiceUpgradeWizard: React.FC<ServiceUpgradeWizardProps> = ({ proj
           appliances: residentialSettings.appliances ?? {},
           existingDwelling: isExistingDwelling,
           useTrueOptionalMethod: useTrueOptional,
+          necEdition,
         });
       } else {
         // Multi-family
         return calculateMultiFamilyLoad({
           unitTemplates: residentialSettings.unitTemplates || [],
-          housePanelLoad: 0
+          housePanelLoad: 0,
+          necEdition,
         });
       }
     } catch (error) {
       console.error('[ServiceUpgradeWizard] Error calculating dwelling load:', error);
       return null;
     }
-  }, [project]);
+  }, [project, necEdition]);
 
   // Track if using dwelling data
   const [usingDwellingData, setUsingDwellingData] = useState(false);

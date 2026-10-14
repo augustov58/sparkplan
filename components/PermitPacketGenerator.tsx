@@ -48,6 +48,7 @@ import { useShortCircuitCalculations } from '../hooks/useShortCircuitCalculation
 import { useMeterStacks } from '../hooks/useMeterStacks';
 import { useMeters } from '../hooks/useMeters';
 import { useProfile } from '../hooks/useProfile';
+import { useProjectNecEdition } from '../hooks/useProjectNecEdition';
 import { JurisdictionAndAHJPanel } from './JurisdictionAndAHJPanel';
 import type { MultiFamilyEVResult } from '../services/calculations/multiFamilyEV';
 import {
@@ -295,6 +296,9 @@ export const PermitPacketGenerator: React.FC<PermitPacketGeneratorProps> = ({ pr
   // required" on the narrative even when LoadCalculationSummary said the
   // service was adequate. NEC 220.87 "max demand" for the calculated
   // method means NEC-demanded existing load, not raw connected sum.
+  // Same edition resolution as the packet's `necEdition` (manifest → project
+  // → '2020'), so E-102's EVSE load matches E-101's.
+  const sfNecEdition = useProjectNecEdition(currentProject, 'single_family_residential');
   const aggregatedDemandSplit = React.useMemo<{ existingKVA: number; proposedKVA: number; necReferences: string[] }>(() => {
     if (!currentProject) return { existingKVA: 0, proposedKVA: 0, necReferences: [] };
     const mdp = panels.find(p => p.is_main);
@@ -323,6 +327,7 @@ export const PermitPacketGenerator: React.FC<PermitPacketGeneratorProps> = ({ pr
             is_proposed: c.is_proposed,
           })),
         voltage: mdp.voltage || 240,
+        necEdition: sfNecEdition,
         ...sfCtx,
       });
       return {
@@ -355,7 +360,7 @@ export const PermitPacketGenerator: React.FC<PermitPacketGeneratorProps> = ({ pr
       // applied sections (e.g. 220.14 "Other", 220.51 water heater).
       necReferences: [...agg.necReferences, ...agg.demandBreakdown.map(r => r.necReference)],
     };
-  }, [currentProject, panels, circuits, transformers]);
+  }, [currentProject, panels, circuits, transformers, sfNecEdition]);
 
   // Auto-fill from profile (only on first load, before user edits)
   useEffect(() => {

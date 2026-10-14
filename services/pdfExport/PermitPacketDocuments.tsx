@@ -1701,6 +1701,8 @@ interface LoadSummaryProps {
     laundryCircuit: boolean;
     existingDwelling: boolean;
   };
+  /** Edition for the per-EVSE load in the 220.82 / 220.83 bucket. Default '2020'. */
+  necEdition?: '2020' | '2023';
   // Sprint 2A C8: per-sheet contractor signature block
   contractorName?: string;
   contractorLicense?: string;
@@ -1718,6 +1720,7 @@ export const LoadCalculationSummary: React.FC<LoadSummaryProps> = ({
   projectType,
   multiFamilyContext,
   singleFamilyDwellingContext,
+  necEdition,
   contractorName,
   contractorLicense,
   sheetId,
@@ -1766,6 +1769,7 @@ export const LoadCalculationSummary: React.FC<LoadSummaryProps> = ({
         laundryCircuit: singleFamilyDwellingContext.laundryCircuit,
         voltage: mdp.voltage || 240,
         existingDwelling: singleFamilyDwellingContext.existingDwelling,
+        necEdition,
       })
     : null;
 

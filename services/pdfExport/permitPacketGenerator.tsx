@@ -671,6 +671,7 @@ export const generatePermitPacket = async (data: PermitPacketData): Promise<void
           projectType={data.projectType}
           multiFamilyContext={data.multiFamilyContext}
           singleFamilyDwellingContext={data.singleFamilyDwellingContext}
+          necEdition={resolvedNecEdition}
           {...contractor}
           sheetId={sheetIds[0]}
         />
@@ -1803,6 +1804,7 @@ export const generateLightweightPermitPacket = async (data: PermitPacketData): P
           projectType={data.projectType}
           multiFamilyContext={data.multiFamilyContext}
           singleFamilyDwellingContext={data.singleFamilyDwellingContext}
+          necEdition={lwResolvedNecEdition}
           {...contractor}
         />
         <ComplianceSummary
