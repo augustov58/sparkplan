@@ -10,6 +10,12 @@ All notable changes to SparkPlan.
 
 ---
 
+## 2026-09-27: NEC 220.87 help text no longer states the multiplier rule backwards (PR #120)
+
+**Copy fix (user-facing)**: In the Permit Packet Generator, the Existing-Load Method help text said measured demand skips the 125% factor and calculated load gets it. That is the reverse of the corrected rule from PR #118. It now reads: `utility_bill` / `load_study` × 1.25 per NEC 220.87(2); `calculated` direct (demand factors already applied); `manual` × 1.25 as a defensive default. The `calculated` option label changes from "(NEC 220.82/220.84)", which was wrong for commercial/industrial and omitted 220.83, to "(NEC Article 220 demand factors)". The math was already correct; only the form text changed. Nothing changes in the packet PDF.
+
+---
+
 ## 2026-09-27: Calculated-method narrative cites the NEC 220 Part that actually ran
 
 **Permit packet citation fix (PE ruling 2026-09-27)**: The calculated-method existing-service page (E-102) cited NEC sections from a fixed per-occupancy map and labeled them all "NEC 220 Part III". For dwellings that was wrong twice over: the Optional Methods (220.82 / 220.83 / 220.84) are NEC 220 **Part IV**, and single-family pages cited 220.83 / 220.82 even though the page's calculated source (`calculateAggregatedLoad`) never runs them — it runs the standard Part III cascade. The page now cites the sections the calculation actually applied (its `necReferences` plus every demand-breakdown row's reference), and says **Part IV Optional Method (NEC 220.84)** only when the 220.84 path ran; otherwise Part III with the runtime section list (e.g. `220.14 / 220.40 / 220.42 / 220.51 / 220.55`). The E-101 single-family Optional Method note now reads "per NEC 220 Part IV". Direct API callers without runtime references fall back to occupancy (multifamily → 220.84 Part IV; single-family → Part III 220.40 / 220.42; commercial / industrial unchanged). No numbers change. Visual proofs at `example_reports/NEC22087_Narrative_{MF_220-84_PartIV,SF_Existing_Standard_PartIII}_2026-09-27.pdf`. Follow-up: single-family E-101 vs E-102 method mismatch filed separately.

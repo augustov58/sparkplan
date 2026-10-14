@@ -1,7 +1,7 @@
 # Database Architecture
 ## SparkPlan Application
 
-**Last Updated**: 2026-05-17
+**Last Updated**: 2026-10-13
 **Database**: Supabase PostgreSQL 15
 **Schema Version**: 2.3
 **Location**: `/supabase/schema.sql` and migration files
@@ -1402,6 +1402,19 @@ pg_dump -h db.project.supabase.co -U postgres -W --schema-only > schema_backup.s
 # Export data
 pg_dump -h db.project.supabase.co -U postgres -W --data-only > data_backup.sql
 ```
+
+### Scheduled Jobs (pg_cron)
+
+Migration `20260921_cron_maintenance.sql` (PR #119). It supersedes the one-minute schedule from `20260417000001_support_inbound_cron.sql`.
+
+| Job | Schedule | What |
+|---|---|---|
+| `support-inbound-poll` | `*/5 * * * *` | Polls the support inbox via pg_net (was `* * * * *`) |
+| `prune-cron-history` | `0 3 * * *` | Deletes `cron.job_run_details` rows older than 7 days |
+| `vacuum-cron-history` | `30 3 * * 0` | `VACUUM FULL cron.job_run_details` |
+| `vacuum-net-responses` | `45 3 * * 0` | `VACUUM FULL net._http_response` |
+
+**Why**: pg_cron logs one row per run and never prunes. pg_net's 6-hour TTL deletes rows, but autovacuum never returns the freed pages to the OS. By 2026-09-21 these two tables were 357 MB of a 376 MB database, against the Free plan's 500 MB read-only ceiling. Per-table autovacuum tuning would be better, but it fails with `must be owner of table` because both tables belong to `supabase_admin`. **Any new cron job adds rows to `cron.job_run_details`; check its frequency against the 7-day prune.**
 
 ### Data Retention
 

@@ -1,16 +1,36 @@
 # SparkPlan - Roadmap
 
-**Last Updated:** 2026-05-24
+**Last Updated:** 2026-10-13
 
-## Current Phase: 3.13 (Post-Sprint-2C panel-PDF demand surfacing + type baseline + CI gate) - ✅ COMPLETE 2026-05-24
+## Current Phase: 3.14 (PE-review NEC correctness + cron storage fix) - ✅ COMPLETE 2026-09-27
 
-## Latest Completed Phase: 3.13 (PRs #94, #95, #96, #97, #98, #99 all merged 2026-05-23/24)
-## Also Recently Shipped: 3.12 (Sprint 2C M2) + 3.11 (220.83 routing) + 3.10 (Sprint 2C M1) + 3.9 (Sprint 2B) + 3.8 (T&M Billing) + 3.7 (Estimating) + 3.6 (Permits) — all complete or Phase 1 implemented (May 2026)
+## Latest Completed Phase: 3.14 (PRs #118, #119, #120, #122, #123 merged 2026-07-09 → 2026-09-27)
+## Also Recently Shipped: 3.13 (panel-PDF demand + CI gate) + 3.12 (Sprint 2C M2) + 3.11 (220.83 routing) + 3.10 (Sprint 2C M1) + 3.9 (Sprint 2B) + 3.8 (T&M Billing) + 3.7 (Estimating) + 3.6 (Permits) — all complete or Phase 1 implemented (May 2026)
 ## Sprint 2A: ✅ COMPLETE (19/19 findings; 5 themed PRs merged)
 ## Sprint 2B: ✅ COMPLETE (4 PRs merged — PR #45 + PR #47 + PR #49 + PR #51 Orlando manifest scaffold)
 ## Sprint 2C M1: ✅ COMPLETE 2026-05-14 (PR #54 engine + PR #56 4 manifests — Pompano / Miami-Dade / Davie / Hillsborough-Tampa)
 ## Sprint 2C M2: ✅ COMPLETE 2026-05-16 (6 PRs merged #70–#75 — Orlando-populate + 4 Tier 1 AHJs + flexibility gaps)
 ## Sprint 2C M3: ✅ COMPLETE 2026-05-17 (3 stacked PRs #79/#80/#81 — Existing/New construction end-to-end across SF / MF / Commercial)
+
+---
+
+## Phase 3.14: PE-review NEC correctness + cron storage fix - ✅ COMPLETE 2026-09-27
+
+Five PRs (2026-07-09 → 2026-09-27). Four came out of PE review of packet output and fix NEC correctness: the math or citations were wrong on documents that get stamped. The fifth fixed a database-storage problem that would have made the DB read-only. Each NEC fix has a Mistake Ledger row in CLAUDE.md and a write-up in `docs/solutions/`.
+
+| PR | Status | What it shipped |
+|---|---|---|
+| **PR #118** (NEC 220.87(2) measured demand + agent operating manual) | ✅ Merged 2026-07-09 (`44ca8bc`) | Measured demand (`utility_bill` / `load_study`) now taken at 125% per 220.87(2). Before, it was used direct, understating existing load (the unsafe direction). The fix touches 3 sites that must stay in sync: `serviceUpgrade.ts`, `NEC22087NarrativePage`, `multiFamilyEV.ts`. Also: CLAUDE.md rewritten as an operating manual, 4 subsystem skills, `docs/solutions/`. |
+| **PR #119** (Cron maintenance) | ✅ Merged 2026-09-21 (`e8919bc`) | DB was at 376 / 500 MB (Free-plan read-only ceiling), 95% of it cron/pg_net bookkeeping. `support-inbound-poll` now runs `*/5`, with a 7-day prune of `cron.job_run_details` and a weekly `VACUUM FULL`. DB down to 27 MB after a one-off repair. |
+| **PR #120** (220.87 help text + method label) | ✅ Merged 2026-09-27 (`76a5ebf`) | Generator form copy stated the multiplier rule backwards; the `calculated` label cited 220.82/220.84 for every occupancy. Copy-only. |
+| **PR #122** (Narrative cites the Part that ran) | ✅ Merged 2026-09-27 (`94bf7a6`) | E-102 cites the runtime references from the calculation (`summarizeCalculationRefs`): Part IV only when 220.84 actually ran, otherwise Part III with the applied sections. No numbers change. |
+| **PR #123** (EVSE load follows NEC edition) | ✅ Merged 2026-09-27 (`de2b151`) | FL = NEC 2020, which has no §220.57. Per-EVSE load = nameplate on 2020, max(7,200 VA, nameplate) on 2023, both at 100%. Single source `data/nec/evse-load.ts`; edition resolved via `resolveNecEdition()`. New projects default to NEC 2020. |
+
+**Open follow-ups**:
+1. **#121**: single-family E-101 (220.82/220.83) vs E-102 (Part III) existing-load method mismatch. Needs a PE presentation ruling.
+2. Playwright packet-verification pass on `new 4-plex` + a single-family existing project. Left unchecked in the #122 / #123 test plans.
+3. The chatbot prompts still default to "2023 edition unless specified" (`services/geminiService.ts`).
+4. FBC 9th Ed. takes effect 2026-12-31. Update the manifests' `necEdition` once its NEC edition is confirmed.
 
 ---
 
