@@ -1646,6 +1646,56 @@ export function calculateDwellingPanelDemand(opts: {
   };
 }
 
+export interface DwellingDemandSplitResult {
+  /** Optional Method demand with the proposed circuits excluded */
+  existingDemandVA: number;
+  /** Demand the proposed circuits add: total − existing (after the 40% remainder factor) */
+  proposedDemandVA: number;
+  /** Optional Method demand on all circuits — equals the E-101 Load Calculation Summary total */
+  totalDemandVA: number;
+  necArticle: 'NEC 220.82' | 'NEC 220.83';
+  necReferences: string[];
+  warnings: string[];
+  breakdown: { existing: PanelDemandResult; total: PanelDemandResult };
+}
+
+/**
+ * Existing / proposed split of the single-family Optional Method demand
+ * (NEC 220.83 existing dwelling, 220.82 new) for the existing-service
+ * capacity page (E-102).
+ *
+ * 220.83 computes the whole dwelling *including* the new load, so there is
+ * no native existing/proposed split. Existing = the method run on the
+ * existing circuits only; proposed = the increase when the proposed
+ * circuits are added. existing + proposed equals the total by construction,
+ * so E-102 and E-101 report the same figure.
+ */
+export function calculateDwellingDemandSplit(opts: {
+  circuits: (PanelDemandCircuit & { is_proposed?: boolean | null })[];
+  squareFootage: number;
+  smallApplianceCircuits: number;
+  laundryCircuit: boolean;
+  voltage: number;
+  existingDwelling: boolean;
+}): DwellingDemandSplitResult {
+  const { circuits, ...rest } = opts;
+  const total = calculateDwellingPanelDemand({ ...rest, circuits });
+  const existing = calculateDwellingPanelDemand({
+    ...rest,
+    circuits: circuits.filter(c => !c.is_proposed),
+  });
+  return {
+    existingDemandVA: existing.totalDemandVA,
+    proposedDemandVA: total.totalDemandVA - existing.totalDemandVA,
+    totalDemandVA: total.totalDemandVA,
+    necArticle: total.necArticle,
+    // 220.60: the HVAC bucket takes the larger of heating / cooling.
+    necReferences: [total.necArticle, ...(total.hvacVA > 0 ? ['NEC 220.60'] : [])],
+    warnings: [...total.warnings],
+    breakdown: { existing, total },
+  };
+}
+
 /**
  * Heuristic — detect a dwelling unit panel from name + circuit shape.
  *
