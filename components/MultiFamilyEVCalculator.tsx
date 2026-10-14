@@ -1310,7 +1310,7 @@ export const MultiFamilyEVCalculator: React.FC<MultiFamilyEVCalculatorProps> = (
                       {result.evLoad.loadAmps} A
                     </div>
                     <div className="text-xs text-gray-500 mt-1">
-                      {(result.evLoad.demandVA / 1000).toFixed(1)} kVA (full connected load)
+                      {(result.evLoad.demandVA / 1000).toFixed(1)} kVA ({result.evLoad.demandFactor > 1 ? 'full connected load × 125% — NEC 220.87(2) / 625.42' : 'full connected load'})
                     </div>
                   </div>
                 </div>

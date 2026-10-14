@@ -57,6 +57,7 @@ import {
   isEVEMSManagedPanel,
 } from '../services/calculations/upstreamLoadAggregation';
 import { calculateDwellingDemandSplit } from '../services/calculations/residentialLoad';
+import { EVSE_CONTINUOUS_FACTOR, isEvseDescription } from '../data/nec/evse-load';
 import { screenContractorExemption } from '../services/permitMode/exemptionScreening';
 import {
   projectAddressSchema,
@@ -456,6 +457,28 @@ export const PermitPacketGenerator: React.FC<PermitPacketGeneratorProps> = ({ pr
     if (stored.proposedNewLoadKVA != null) setNec22087ProposedKVA(stored.proposedNewLoadKVA);
     nec22087HydratedRef.current = true;
   }, [currentProject?.id]);
+
+  // NEC 220.87(2) new load for the measured / manual methods (typed field):
+  // suggest it from the project's proposed circuits — EVSE at 125% (continuous
+  // per NEC 625.42, sized per 625.41; PE ruling 2026-10-14), other loads at
+  // nameplate. Prefilled once per project, only into an empty field (the
+  // functional update runs after hydration, so a saved value always wins).
+  const suggestedProposedKVA = React.useMemo(() => {
+    const va = circuits
+      .filter(c => c.is_proposed)
+      .reduce((sum, c) => {
+        const watts = c.load_watts || 0;
+        return sum + (isEvseDescription(c.description) ? watts * EVSE_CONTINUOUS_FACTOR : watts);
+      }, 0);
+    return va / 1000;
+  }, [circuits]);
+  const nec22087PrefilledProjectRef = React.useRef<string | null>(null);
+  useEffect(() => {
+    if (!currentProject?.id || nec22087Method === 'calculated' || suggestedProposedKVA <= 0) return;
+    if (nec22087PrefilledProjectRef.current === currentProject.id) return;
+    nec22087PrefilledProjectRef.current = currentProject.id;
+    setNec22087ProposedKVA(prev => (prev === '' ? suggestedProposedKVA.toFixed(2) : prev));
+  }, [currentProject?.id, nec22087Method, suggestedProposedKVA]);
 
   // Persist NEC 220.87 narrative inputs (debounced 500ms). Skipped until
   // hydration completes so the first paint doesn't blow over stored values
@@ -1941,9 +1964,16 @@ export const PermitPacketGenerator: React.FC<PermitPacketGeneratorProps> = ({ pr
                         placeholder="e.g., 48.0"
                         className={isCalculatedMode ? calcInputClass : userInputClass}
                       />
-                      {isCalculatedMode && (
+                      {isCalculatedMode ? (
                         <p className="text-xs text-gray-500 mt-1">
                           NEC-demanded proposed load (EVEMS-clamped where applicable per NEC 625.42).
+                        </p>
+                      ) : (
+                        <p className="text-xs text-gray-500 mt-1">
+                          Enter continuous loads at 125% — EV charging is continuous per NEC 625.42 (sized per 625.41).
+                          {suggestedProposedKVA > 0 && (
+                            <> From proposed circuits: {suggestedProposedKVA.toFixed(2)} kVA (EVSE at 125%, others at nameplate).</>
+                          )}
                         </p>
                       )}
                     </div>

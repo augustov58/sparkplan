@@ -14,7 +14,7 @@
  * @module services/calculations/multiFamilyEV
  */
 
-import { getEvseLoadVA, evseLoadCitation, type NecEdition } from '../../data/nec/evse-load';
+import { getEvseLoadVA, evseLoadCitation, EVSE_CONTINUOUS_FACTOR, type NecEdition } from '../../data/nec/evse-load';
 
 // ============================================================================
 // NEC CONSTANTS AND TABLES
@@ -1256,10 +1256,16 @@ export function calculateMultiFamilyEV(input: MultiFamilyEVInput): MultiFamilyEV
   //   Summary page (E-101) correctly shows the EVEMS-clamped 387A because
   //   it uses calculateAggregatedLoad, which IS EVEMS-aware via the
   //   setpoint marker. This fix brings the MF-EV page in line.
-  const evDemandFactor = 1.0; // No NEC-based demand factor for EV loads
+  //
+  // Measured path (NEC 220.87): the new EV load enters the 220.87(2)
+  // comparison at 125% — EV charging is continuous per NEC 625.42, sized per
+  // 625.41 (PE ruling 2026-10-14). The calculated (220.84) path doesn't
+  // invoke 220.87 and stays at 100%; the EVEMS setpoint clamp is unchanged.
+  const directConnectionFactor = useMeasuredData ? EVSE_CONTINUOUS_FACTOR : 1.0;
+  const evDemandFactor = useEVEMS ? 1.0 : directConnectionFactor;
   const evDemandVA = useEVEMS
     ? Math.min(totalEVConnectedVA, evemsSetpointVA)
-    : totalEVConnectedVA;
+    : totalEVConnectedVA * evDemandFactor;
   const evLoadAmps = calculateAmps(evDemandVA, voltage, phase);
 
   // =========================================================================
@@ -1305,7 +1311,8 @@ export function calculateMultiFamilyEV(input: MultiFamilyEVInput): MultiFamilyEV
   // Its service-equivalent contribution is: VA / (√3 × V_service)
   // NOT: VA / V_evse (which would be the single-phase L-L current)
   const perEVSEAmpsAtCharger = perEVSELoad / evVoltage; // For charger spec display
-  const perEVSEServiceEquivalentAmps = calculateAmps(perEVSELoad, voltage, phase); // For capacity calc
+  const perEVSEServiceEquivalentAmps =
+    calculateAmps(perEVSELoad, voltage, phase) * directConnectionFactor; // For capacity calc (×1.25 on the 220.87 path)
 
   // Scenario A: Without EVEMS (Direct Connection)
   // Each EVSE at its full per-EVSE load, no demand factor
@@ -1321,7 +1328,7 @@ export function calculateMultiFamilyEV(input: MultiFamilyEVInput): MultiFamilyEV
     notes: [
       `Per ${evseLoadCitation(necEdition)}: Each EVSE at full load (no demand factor)`,
       `Per-EVSE load: ${(perEVSELoad / 1000).toFixed(1)} kVA (${Math.round(perEVSEAmpsAtCharger)}A @ ${evVoltage}V)`,
-      `Service-equivalent: ${perEVSEServiceEquivalentAmps.toFixed(1)}A per EVSE @ ${voltage}V ${phase}φ`,
+      `Service-equivalent: ${perEVSEServiceEquivalentAmps.toFixed(1)}A per EVSE @ ${voltage}V ${phase}Ø${useMeasuredData ? ' (×1.25 per 220.87(2))' : ''}`,
       `Available service capacity: ${Math.round(Math.max(0, availableCapacityAmps))}A`,
       maxChargersNoEVEMS >= evChargers.count
         ? `Can accommodate all ${evChargers.count} requested chargers`

@@ -8,7 +8,7 @@
  */
 
 import { ResidentialAppliances, DwellingUnitTemplate } from '../../types';
-import { getEvseLoadVA, type NecEdition } from '../../data/nec/evse-load';
+import { getEvseLoadVA, isEvseDescription, type NecEdition } from '../../data/nec/evse-load';
 
 // ============================================================================
 // NEC CONSTANTS AND TABLES
@@ -1547,12 +1547,6 @@ export function calculateDwellingUnitDemandVA(circuits: DwellingCircuitInput[]):
  * EVSE circuits (matched by description) go through `getEvseLoadVA`, which
  * under NEC 2023 raises them to the §220.57(A) 7,200 VA minimum.
  */
-/** EVSE circuit by description — circuits carry no EV flag. */
-const EVSE_DESCRIPTION = /\b(ev|evse|ev charger)\b|electric vehicle|charger/;
-function isEvseDescription(lowerDescription: string): boolean {
-  return EVSE_DESCRIPTION.test(lowerDescription);
-}
-
 export interface PanelDemandCircuit {
   description?: string;
   load_watts?: number | null;

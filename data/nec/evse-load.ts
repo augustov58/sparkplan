@@ -53,6 +53,21 @@ export function getEvseLoadVA(nameplateVA: number, edition: NecEdition): EvseLoa
 }
 
 /**
+ * NEC 625.42: EV charging loads are continuous loads; 625.41 sizes feeder
+ * and service OCPD at 125% of them. Applies to the NEW load in the NEC
+ * 220.87(2) existing-service comparison ("maximum demand at 125 percent
+ * plus the new load" ≤ ampacity/rating) — PE ruling 2026-10-14. NOT applied
+ * inside Article 220 load totals (getEvseLoadVA stays at 100%).
+ */
+export const EVSE_CONTINUOUS_FACTOR = 1.25;
+
+/** EVSE circuit by description — circuits carry no EV flag. */
+const EVSE_DESCRIPTION = /\b(ev|evse|ev charger)\b|electric vehicle|charger/i;
+export function isEvseDescription(description: string | null | undefined): boolean {
+  return EVSE_DESCRIPTION.test(description ?? '');
+}
+
+/**
  * Short citation for the per-EVSE load rule, for labels and PDF headings.
  * 2020 cites 625.41 alongside 220.14(A) because 625.41 is where the reviewer
  * will look for EVSE continuous-duty treatment.
