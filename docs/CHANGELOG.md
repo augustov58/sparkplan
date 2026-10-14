@@ -10,6 +10,18 @@ All notable changes to SparkPlan.
 
 ---
 
+## 2026-10-14: NEC 220.87 existing-service check takes new EV load at 125%
+
+**Calculation fix (user-facing, PE ruling 2026-10-14)**: EV charging is a continuous load (NEC 625.42), and feeder/service sizing takes continuous loads at 125% (625.41). In the NEC 220.87(2) check ("maximum demand at 125 percent plus the new load" ≤ service), the new EV load now enters at 125% everywhere 220.87 is used:
+- **Multi-Family EV Calculator, measured existing demand (utility bill / load study):** direct-connected EV load and the "max chargers without upgrade" count now use 125%. That can lower the charger count. Example: a 32 A / 208 V charger counts as 23.1 A of service capacity instead of 18.5 A. Calculated-method (NEC 220.84) projects and EVEMS setpoints are unchanged.
+- **Permit packet, measured/manual existing-service page:** "Proposed New Load" is now prefilled from the project's proposed circuits (EV chargers at 125%, other loads at nameplate). It's still editable, with help text, and the page's math line states that continuous loads are included at 125%.
+- **Service Upgrade Wizard:** already used 125%; its citation changes from "NEC 210.19" to NEC 625.42 / 625.41.
+- **Multi-Family EV packet page (E-401):** measured-data projects now label building demand "NEC 220.87, MEASURED" instead of "NEC 220.84". The phase symbol in the charger note prints as "3Ø" instead of a broken glyph.
+
+This 125% applies only to the 220.87 comparison. Inside NEC 220 load totals (E-101, Dwelling Calculator, 220.82/220.83/220.84), EV chargers stay at 100% (see the entry below).
+
+---
+
 ## 2026-10-14: Single-family EV chargers counted at 100% in the load calculation, by NEC edition
 
 **Load calc fix (user-facing, PE ruling 2026-10-14)**: The single-family calculations (Dwelling Load Calculator, Panel Summary, and the permit packet's E-101 / E-102 pages) counted EV chargers and any load marked "continuous" at 125% of nameplate, citing "NEC 220.18(B)". The 125% of NEC 625.41 / 210.20(A) sizes the breaker and conductors; it is not part of the Article 220 load. EV chargers now enter the 220.82 / 220.83 Optional Method at their per-edition load: nameplate under NEC 2020 (Florida), max(7,200 VA, nameplate) under NEC 2023 §220.57(A). This matches the multifamily calculator (PR #123). The "continuous" checkbox on custom appliances still sizes the branch circuit at 125%. Numbers go down slightly. Example: a 9.6 kVA charger on an existing 2,000 sq ft home goes from 32.88 to 31.92 kVA (137 A → 133 A). Multifamily per-unit loads in the Dwelling Calculator follow the same rule. Visual proof: `example_reports/Permit_Packet_SF_Existing_EVSE100pct_2026-10-14.pdf`.

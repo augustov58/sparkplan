@@ -89,3 +89,18 @@ describe('resolveNecEdition', () => {
     }
   });
 });
+
+describe('isEvseDescription', () => {
+  it('matches EV charger circuit descriptions', async () => {
+    const { isEvseDescription } = await import('../data/nec/evse-load');
+    for (const d of ['EV Charger 48A', 'Level 2 EV Charger (48A)', 'EVSE - Garage', 'Electric Vehicle Charger', 'Tesla Wall Charger']) {
+      expect(isEvseDescription(d)).toBe(true);
+    }
+  });
+  it('does not match ordinary loads', async () => {
+    const { isEvseDescription } = await import('../data/nec/evse-load');
+    for (const d of ['Electric Range', 'Water Heater', 'Pool Pump', 'Dishwasher', 'Bevel saw', '', null]) {
+      expect(isEvseDescription(d)).toBe(false);
+    }
+  });
+});

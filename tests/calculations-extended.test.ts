@@ -380,10 +380,9 @@ describe('Service Upgrade (NEC 220.87)', () => {
       // 125% on top of NEC 220.84/220.42 demand-factored values).
       expect(result.existingDemand_kVA).toBe(30);
 
-      // Proposed continuous load still gets NEC 210.19's 1.25×:
-      // 9.6 × 1.25 = 12 kVA. NEC 210.19 (continuous branch-circuit)
-      // is a different code section than NEC 220.87 — both can apply
-      // simultaneously on different loads.
+      // Proposed continuous load (EVSE, NEC 625.42) enters the 220.87(2)
+      // comparison at 125% per 625.41: 9.6 × 1.25 = 12 kVA (PE ruling
+      // 2026-10-14). Separate from the measured-demand 125% of 220.87(2).
       expect(result.proposedAdditionalLoad_kVA).toBe(12);
 
       // NEC references still include 220.87 (the section names the
@@ -1142,6 +1141,45 @@ describe('Multi-Family EV (per-EVSE load / 625.42)', () => {
       expect(result.buildingLoad.loadDeterminationMethod).toBe('utility_bill');
       expect(result.buildingLoad.buildingDemandVA).toBe(125000); // 100 kW × 1000 × 1.25
       expect(result.buildingLoad.buildingDemandFactor).toBe(1.25);
+    });
+
+    // PE ruling 2026-10-14: on the measured (NEC 220.87) path the NEW EV load
+    // enters the 220.87(2) comparison at 125% — EV charging is continuous per
+    // NEC 625.42, sized per 625.41. The calculated (220.84) path stays at 100%.
+    describe('220.87 new EV load at 125% (measured path only)', () => {
+      const measured: MultiFamilyEVInput = {
+        ...baseInput,
+        necEdition: '2020',
+        existingLoadMethod: 'utility_bill',
+        measuredPeakDemandKW: 100,
+      };
+
+      it('measured, direct connection: EV demand = connected × 1.25', () => {
+        const result = calculateMultiFamilyEV(measured);
+        expect(result.evLoad.totalConnectedVA).toBe(6656 * 10);
+        expect(result.evLoad.demandVA).toBe(6656 * 10 * 1.25);
+        expect(result.evLoad.demandFactor).toBe(1.25);
+      });
+
+      it('calculated (220.84): EV demand stays at 100%', () => {
+        const result = calculateMultiFamilyEV({ ...baseInput, necEdition: '2020' });
+        expect(result.evLoad.demandVA).toBe(6656 * 10);
+        expect(result.evLoad.demandFactor).toBe(1);
+      });
+
+      it('measured with EVEMS: setpoint clamp unchanged, no ×1.25', () => {
+        const result = calculateMultiFamilyEV({ ...measured, useEVEMS: true });
+        expect(result.evLoad.demandFactor).toBe(1);
+        expect(result.evLoad.demandVA).toBeLessThanOrEqual(result.evLoad.totalConnectedVA);
+      });
+
+      it('direct-connection charger count uses 125% per-EVSE amps on the measured path', () => {
+        const result = calculateMultiFamilyEV(measured);
+        // 6,656 VA / (208 V × √3) = 18.5 A; × 1.25 = 23.1 A
+        const note = result.scenarios.noEVEMS.notes.find(n => n.startsWith('Service-equivalent'));
+        expect(note).toContain('23.1A per EVSE');
+        expect(note).toContain('×1.25 per 220.87(2)');
+      });
     });
 
     it('should include phase balance for 3-phase systems', () => {

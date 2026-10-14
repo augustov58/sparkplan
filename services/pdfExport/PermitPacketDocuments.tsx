@@ -2734,10 +2734,10 @@ export const NEC22087NarrativePage: React.FC<NEC22087NarrativePageProps> = ({
             </Text>
             <Text style={{ fontSize: 8.5, color: '#374151', lineHeight: 1.4 }}>
               {data.method === 'utility_bill' || data.method === 'load_study'
-                ? `${data.maxDemandKVA.toFixed(2)} kVA (measured peak) x 1.25 = ${adjustedExisting.toFixed(2)} kVA per NEC 220.87(2) + ${data.proposedNewLoadKVA.toFixed(2)} kVA (new) = ${totalFutureDemand.toFixed(2)} kVA`
+                ? `${data.maxDemandKVA.toFixed(2)} kVA (measured peak) x 1.25 = ${adjustedExisting.toFixed(2)} kVA per NEC 220.87(2) + ${data.proposedNewLoadKVA.toFixed(2)} kVA (new; continuous loads incl. EVSE at 125% per NEC 625.42) = ${totalFutureDemand.toFixed(2)} kVA`
                 : data.method === 'calculated'
                   ? `${data.maxDemandKVA.toFixed(2)} kVA (existing demand \u2014 ${copy.calculationBasis} already applied; no additional 125% multiplier) + ${data.proposedNewLoadKVA.toFixed(2)} kVA (new) = ${totalFutureDemand.toFixed(2)} kVA`
-                  : `${data.maxDemandKVA.toFixed(2)} kVA x 1.25 = ${adjustedExisting.toFixed(2)} kVA (adjusted, manual-entry default) + ${data.proposedNewLoadKVA.toFixed(2)} kVA (new) = ${totalFutureDemand.toFixed(2)} kVA`}
+                  : `${data.maxDemandKVA.toFixed(2)} kVA x 1.25 = ${adjustedExisting.toFixed(2)} kVA (adjusted, manual-entry default) + ${data.proposedNewLoadKVA.toFixed(2)} kVA (new; continuous loads incl. EVSE at 125% per NEC 625.42) = ${totalFutureDemand.toFixed(2)} kVA`}
             </Text>
             <Text style={{ fontSize: 8.5, color: '#374151', lineHeight: 1.4, marginTop: 1 }}>
               {`Service ampacity: ${data.serviceCapacityAmps}A x ${data.serviceVoltage}V${data.servicePhase === 3 ? ' x sqrt(3)' : ''} = ${capacityKVA.toFixed(2)} kVA`}
