@@ -47,6 +47,36 @@ export function isExistingConstructionProject(project: ProjectLike | Project): b
 }
 
 /**
+ * NEC 220.82 / 220.83 single-family-dwelling context, or undefined when the
+ * project is not a single-family dwelling (multi-family context present,
+ * commercial, industrial, or no residential block). Shared by the E-101
+ * Load Calculation Summary and the E-102 existing-service page so both
+ * pick the Optional Method under the same conditions.
+ */
+export function buildSingleFamilyDwellingContext(
+  project: Project,
+  hasMultiFamilyContext: boolean,
+): {
+  squareFootage: number;
+  smallApplianceCircuits: number;
+  laundryCircuit: boolean;
+  existingDwelling: boolean;
+} | undefined {
+  const residentialSettings = project.settings?.residential;
+  const isSingleFamilyDwelling =
+    project.settings?.occupancyType === 'dwelling'
+    && (residentialSettings?.dwellingType ?? 'single_family') === 'single_family'
+    && !hasMultiFamilyContext;
+  if (!isSingleFamilyDwelling) return undefined;
+  return {
+    squareFootage: residentialSettings?.squareFootage ?? 2000,
+    smallApplianceCircuits: residentialSettings?.smallApplianceCircuits ?? 2,
+    laundryCircuit: residentialSettings?.laundryCircuit ?? true,
+    existingDwelling: project.settings?.service_modification_type !== 'new-service',
+  };
+}
+
+/**
  * Sprint 3 (2026-05-27): derive the narrative occupancy kind from a Project.
  *
  * Fallback axis for the NEC 220 sections cited on the calculated-method

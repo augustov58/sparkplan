@@ -10,6 +10,12 @@ All notable changes to SparkPlan.
 
 ---
 
+## 2026-10-13: Single-family existing-service page uses NEC 220.83, matching the load calculation (#121)
+
+**Permit packet fix (user-facing)**: On single-family projects, the existing-service capacity page (E-102, calculated method) ran the NEC 220 Part III cascade and ignored the project's existing/new dwelling choice. The Load Calculation Summary (E-101) correctly used NEC 220.83 (existing) / 220.82 (new). Totals could differ enough to flip the verdict. Example: a 2,000 sq ft existing dwelling on 200 A adding a 40 A EV charger showed 137 A on E-101 and 203 A "SERVICE UPGRADE REQUIRED" on E-102. E-102 now runs the same Optional Method on the same circuits. Existing = the method on existing circuits; proposed = the increase from the new circuits; existing + proposed = the E-101 total. The page now cites "NEC 220 Part IV Optional Method (NEC 220.83)". Multifamily and commercial packets are unchanged. Visual proof: `example_reports/Permit_Packet_SF_Existing_Issue121{,_Fixed}_2026-10-13.pdf`.
+
+---
+
 ## 2026-09-27: NEC 220.87 help text no longer states the multiplier rule backwards (PR #120)
 
 **Copy fix (user-facing)**: In the Permit Packet Generator, the Existing-Load Method help text said measured demand skips the 125% factor and calculated load gets it. That is the reverse of the corrected rule from PR #118. It now reads: `utility_bill` / `load_study` × 1.25 per NEC 220.87(2); `calculated` direct (demand factors already applied); `manual` × 1.25 as a defensive default. The `calculated` option label changes from "(NEC 220.82/220.84)", which was wrong for commercial/industrial and omitted 220.83, to "(NEC Article 220 demand factors)". The math was already correct; only the form text changed. Nothing changes in the packet PDF.

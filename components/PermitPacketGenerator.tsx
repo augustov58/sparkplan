@@ -9,7 +9,7 @@ import { generatePermitPacket, generateLightweightPermitPacket, type PermitPacke
 import { AttachmentUploadCard } from './AttachmentUploadCard';
 import { useProjectAttachments, downloadAttachmentBytes, type ArtifactType, type CoverMode } from '../hooks/useProjectAttachments';
 import type { NEC22087NarrativeData, NEC22087Method } from '../services/pdfExport/PermitPacketDocuments';
-import { deriveNarrativeOccupancy } from '../lib/projectSettings';
+import { buildSingleFamilyDwellingContext, deriveNarrativeOccupancy } from '../lib/projectSettings';
 import {
   DEFAULT_SECTIONS,
   resolveSections,
@@ -55,6 +55,7 @@ import {
   calculateAggregatedLoad,
   isEVEMSManagedPanel,
 } from '../services/calculations/upstreamLoadAggregation';
+import { calculateDwellingDemandSplit } from '../services/calculations/residentialLoad';
 import { screenContractorExemption } from '../services/permitMode/exemptionScreening';
 import {
   projectAddressSchema,
@@ -305,6 +306,31 @@ export const PermitPacketGenerator: React.FC<PermitPacketGeneratorProps> = ({ pr
       transformers,
       currentProject.settings,
     );
+    // Single-family dwellings: E-101 runs the NEC 220.82 / 220.83 Optional
+    // Method, so E-102 must too — the Part III cascade below gave a different
+    // total and could fail a service E-101 showed as adequate (#121).
+    const sfCtx = buildSingleFamilyDwellingContext(currentProject, !!mfCtx);
+    if (sfCtx) {
+      const split = calculateDwellingDemandSplit({
+        // Same circuit set as E-101 (LoadCalculationSummary): MDP circuits.
+        circuits: circuits
+          .filter(c => c.panel_id === mdp.id)
+          .map(c => ({
+            description: c.description,
+            load_watts: c.load_watts,
+            load_type: c.load_type,
+            breaker_amps: c.breaker_amps,
+            is_proposed: c.is_proposed,
+          })),
+        voltage: mdp.voltage || 240,
+        ...sfCtx,
+      });
+      return {
+        existingKVA: split.existingDemandVA / 1000,
+        proposedKVA: split.proposedDemandVA / 1000,
+        necReferences: split.necReferences,
+      };
+    }
     // Match the orchestrator's occupancyType derivation
     // (services/pdfExport/permitPacketGenerator.tsx:1116) so the demand
     // factor cascade picks the same branch.
@@ -904,21 +930,9 @@ export const PermitPacketGenerator: React.FC<PermitPacketGeneratorProps> = ({ pr
       // Load Calculation Summary PDF page to the Optional Method when the
       // project is a residential single-family dwelling MDP, so the AHJ
       // number matches the Dwelling Calculator and Panel Summary in-app.
-      // Suppressed for multi-family (multiFamilyContext takes precedence),
-      // commercial, industrial, or projects without a residential block.
-      const residentialSettings = currentProject.settings?.residential;
-      const isSingleFamilyDwelling =
-        currentProject.settings?.occupancyType === 'dwelling'
-        && (residentialSettings?.dwellingType ?? 'single_family') === 'single_family'
-        && !multiFamilyContext;
-      const singleFamilyDwellingContext = isSingleFamilyDwelling && mdp
-        ? {
-            squareFootage: residentialSettings?.squareFootage ?? 2000,
-            smallApplianceCircuits: residentialSettings?.smallApplianceCircuits ?? 2,
-            laundryCircuit: residentialSettings?.laundryCircuit ?? true,
-            existingDwelling:
-              currentProject.settings?.service_modification_type !== 'new-service',
-          }
+      // Same gate as the E-102 source (`aggregatedDemandSplit`).
+      const singleFamilyDwellingContext = mdp
+        ? buildSingleFamilyDwellingContext(currentProject, !!multiFamilyContext)
         : undefined;
 
       // Sprint 2A PR 5 / H17: FL contractor-exemption screening. Lane drives
