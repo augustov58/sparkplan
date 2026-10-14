@@ -570,14 +570,17 @@ function calculateRangeDemand(rangeLoads: number[], occupancyType: OccupancyType
     };
   }
   
-  // NEC 220.55 applies primarily to dwelling units
+  // NEC 220.55 covers cooking appliances in dwelling units only. Non-dwelling
+  // 'K' circuits (ranges, dishwashers, disposals, other kitchen equipment)
+  // are taken at nameplate per 220.14 — labeled as kitchen equipment, not
+  // "ranges", so a dishwasher isn't printed as a range (#127).
   if (occupancyType !== 'dwelling') {
     return {
-      loadType: 'Ranges/Ovens',
+      loadType: 'Kitchen Equipment',
       connectedVA: totalConnected,
       demandVA: totalConnected,
       demandFactor: 1.0,
-      necReference: 'NEC 220.55 (Non-dwelling - 100%)',
+      necReference: 'NEC 220.14 (Kitchen equipment @100%)',
     };
   }
   
@@ -715,7 +718,13 @@ function applyDemandFactors(
     totalDemandVA += loads.other;
   }
   
-  return { demandBreakdown, totalDemandVA: Math.round(totalDemandVA), necReferences: [...new Set(necReferences)] };
+  // Every applied section, including rows that don't push their own
+  // reference above (e.g. 220.14 "Other", 220.51 water heater) — #127.
+  return {
+    demandBreakdown,
+    totalDemandVA: Math.round(totalDemandVA),
+    necReferences: [...new Set([...necReferences, ...demandBreakdown.map(r => r.necReference)])],
+  };
 }
 
 /**
@@ -903,9 +912,19 @@ export function calculateAggregatedLoad(
   }
 
   // PR-2 Step 3 (2026-05-26): existing/proposed split — standard NEC 220 path.
+  // #127: existing demand = the same cascade run on the existing circuits
+  // only; proposed = the increase. The proportional split spread the blended
+  // factor over both, so a 100%-demand new load printed below its nameplate.
   const stdSplit = computeProposedSplit(
     panelId, panels, circuits, transformers, totalConnectedVA, totalDemandVA,
   );
+  if (stdSplit.proposedConnectedVA > 0) {
+    const existingOnly = calculateAggregatedLoad(
+      panelId, panels, circuits.filter(c => !c.is_proposed), transformers, occupancyType,
+    );
+    stdSplit.existingDemandVA = Math.round(existingOnly.totalDemandVA);
+    stdSplit.proposedDemandVA = Math.round(totalDemandVA) - stdSplit.existingDemandVA;
+  }
 
   return {
     panelId,

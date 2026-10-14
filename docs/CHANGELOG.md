@@ -4,6 +4,17 @@ All notable changes to SparkPlan.
 
 ---
 
+## 2026-10-14: Commercial packets — kitchen equipment label, existing/new split, complete citations (#127)
+
+**Permit packet fixes (user-facing, no pass/fail changes)**, for projects calculated with the standard NEC 220 Part III method (commercial / industrial):
+- **Existing vs new split** on the Load Calculation Summary (E-101) and the calculated-method existing-service page (E-102). "Existing" is now the same calculation run on the existing circuits only, and "new" is the increase. Before, the overall demand factor was spread across both, so a new EV charger at 100% demand printed below its nameplate (8.08 instead of 9.60 kVA). Totals and verdicts are unchanged.
+- **Kitchen circuits** on non-dwelling projects print as "Kitchen Equipment, NEC 220.14 @100%" instead of "Ranges/Ovens, NEC 220.55 (Non-dwelling)". 220.55 covers dwelling units, and a dishwasher isn't a range. Demand is unchanged (100% before and after).
+- **Citations:** the calculation's list of applied NEC sections now includes every breakdown row (e.g. 220.51 water heater, 220.14 other loads). Before, some appeared only on the rows.
+
+Dwelling projects outside the 220.82/220.83/220.84 paths (e.g. 2-unit) are unchanged pending a PE ruling (#127 item 4). Visual proof: `example_reports/Permit_Packet_Commercial_127_LabelsSplit_2026-10-14.pdf`.
+
+---
+
 ## 2026-09-27: EVSE load follows the adopted NEC edition — no more NEC 220.57 on Florida packets
 
 **NEC citation + calc fix (user-facing)**: Florida enforces NEC 2020 (FBC 8th Ed.), which has no §220.57 — Article 220 Part III ends at 220.56. SparkPlan was printing "NEC 220.84 + 220.57 + 625.42" on every Multi-Family EV packet and applying the 2023-only 7,200 VA per-EVSE floor. The per-EVSE rule now follows the project's NEC edition, resolved from the AHJ manifest first, then the project's `nec_edition` setting (all 10 Florida manifests → NEC 2020): **NEC 2020** = nameplate per 220.14(A) (cited with 625.41); **NEC 2023** = max(7,200 VA, nameplate) per 220.57(A). Both at 100% in the load calc — 625.41's 125% stays on breaker/conductor sizing (PE-confirmed). Numeric impact on NEC 2020 projects: only chargers below 7,200 VA nameplate change — under 30 A at 240 V, under ~34.6 A at 208 V (so a 32 A charger on a 208 V 3φ building drops 7,200 → 6,656 VA). Saved calculator results from before this change keep their 2023 citation (it matches their math) and the packet prints an advisory "recompute" note on E-403 when the result's edition differs from the packet's. New projects now default to NEC 2020. The chatbot/load-calc Gemini prompts state the edition split. New `data/nec/evse-load.ts` + `resolveNecEdition()`; +16 tests (1051 passing).
