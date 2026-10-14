@@ -3,7 +3,34 @@
 **Purpose**: Tracks recent work for seamless handoff between Claude instances.
 **Maintenance Rule**: Keep only the last 2 sessions. At the start of a new session, delete older entries — git history preserves everything.
 
-**Last Updated**: 2026-07-09
+**Last Updated**: 2026-10-13
+
+---
+
+### Session: 2026-09-21 → 2026-10-13 — PE-review citation fixes + cron storage fix + housekeeping (PRs #119, #120, #122, #123 merged)
+
+**Focus**: Four independent PRs landed after PR #118. Three are NEC-correctness fixes that came out of PE review, and one is a database-storage emergency. This entry is post-merge housekeeping: doc sync and local cleanup.
+
+| PR | Commit on main | What |
+|---|---|---|
+| **#119** `fix/cron-maintenance` | `e8919bc` (merge) | The DB was at 376 MB of the Free plan's 500 MB read-only ceiling; 95% of it was output from the every-minute `support-inbound-poll` cron. The poll now runs `*/5`, `cron.job_run_details` keeps 7 days (`prune-cron-history`), and both bookkeeping tables get a weekly `VACUUM FULL`. A one-off repair (not in the migration) took the DB from 376 MB to 27 MB. Migration `20260921_cron_maintenance.sql`. |
+| **#120** `fix/nec22087-help-text` | `76a5ebf` | Copy-only. The Existing-Load Method help text in the Permit Packet Generator stated the 220.87 multiplier rule backwards (a string left over from Sprint 2A that the PR #118 sweep missed), and the `calculated` option label cited 220.82/220.84 for every occupancy. |
+| **#122** `fix/nec22087-dwelling-citation` | `94bf7a6` | E-102 now cites the NEC 220 Part the calculation actually ran, via `summarizeCalculationRefs()`. It shows Part IV (220.84) only when the Optional Method ran; otherwise Part III with the runtime section list. No numbers change. PE ruling 2026-09-27. |
+| **#123** `fix/nec2020-evse-load` | `de2b151` | Florida enforces NEC 2020, which has no §220.57. Per-EVSE load now goes through `getEvseLoadVA(nameplate, edition)`: nameplate on 2020, max(7,200 VA, nameplate) on 2023, both at 100%. The edition resolves through `resolveNecEdition()`. New projects default to `nec_edition = '2020'`. Tests: 1,051 passing. |
+
+**Process lessons**:
+- **Cite from runtime, not from a lookup keyed on occupancy.** The narrative page cited sections that its own calculation never ran. Taking references from the result object makes the citation match the math by construction (Mistake Ledger row, `docs/solutions/2026-09-27-narrative-cites-method-that-ran.md`).
+- **Check a section exists in the adopted edition before citing it.** 220.57 is 2023-only. A test asserted the wrong citation, so the suite was enforcing the bug (`docs/solutions/2026-09-27-evse-load-nec-edition.md`).
+- **Background jobs cost storage, not just API quota.** The 2026-04-17 migration justified a one-minute poll by Gmail quota alone. pg_cron history and pg_net responses grew to 95% of the database without anyone noticing.
+- **Squash merges hide shipped branches from `git log origin/main..HEAD`.** Check `gh pr list --head <branch> --state all` before treating a branch as unmerged.
+
+**Housekeeping (2026-10-13)**: switched the main checkout to `main`; removed the stale locked worktree `.claude/worktrees/fix-nec2020-evse-load` (its lock-holder process was gone) and the two merged local branches. Committed the `.gitignore` entries for `.outreach/` and Apify credentials (keeps lead PII and scraper tokens out of git). Synced ROADMAP (Phase 3.14), CHANGELOG (#120 entry), and `database-architecture.md` (scheduled jobs).
+
+**Next steps**:
+1. Issue **#121**: single-family E-101 (220.82/220.83) and E-102 (Part III) compute existing load with different methods. Needs a PE presentation ruling.
+2. Playwright packet-verification pass on `new 4-plex`, plus a single-family existing project. The test plans for #122 and #123 left this unchecked.
+3. The chatbot system prompt still says "2023 edition unless specified" (`services/geminiService.ts`, 3 sites). This conflicts with the NEC 2020 default that #123 introduced.
+4. FBC 9th Ed. takes effect 2026-12-31. Update the manifests' `necEdition` once its NEC edition is confirmed.
 
 ---
 
@@ -24,52 +51,3 @@
 **Next steps**: (1) optional in-app e2e pass of the Service Upgrade Wizard once Augusto refreshes the Playwright auth state; (2) the article's remaining runtime workflows on request — consultant audit (repo + business → executable roadmap), second-brain research runs into Obsidian.
 
 ---
-
-### Session: 2026-05-23 / 2026-05-24 — Post-Sprint-2C panel-PDF demand surfacing + type baseline + CI gate (PRs #94, #95, #96, #97, #98, #99 all merged)
-
-**Focus**: Two-day arc closing three threads deferred during Sprint 2C. Day 1 (2026-05-23): cleaned the TypeScript baseline (447 → 0 errors), added the first CI workflow in the repo with a `tsc --noEmit` gate, regenerated `database.types.ts` from the Supabase MCP. Day 2 (2026-05-24): three layered panel-schedule PDF improvements driven by user visual review of multifamily + commercial generated packets — surface NEC demand kVA/amps inline on the Load Summary, add a per-load-type NEC 220 audit breakdown table, and route the dwelling card's NEC article (220.82 vs 220.83) by construction context.
-
-**Status**: 6 PRs merged sequentially. Build green. 995/995 tests passing throughout (zero net test count change — all production code, no test additions other than the two opt-in PDF disk-dump blocks in `permitPacketE2E.test.ts`).
-
-**Architecture decisions worth carrying forward**:
-
-- **Trust-the-aggregator pattern beats reimplementing NEC math at every render site.** The panel-schedule PDF doesn't redo any NEC 220 cascade math — it asks `calculateAggregatedLoad` (the single source of truth for the in-app Panel Summary) and trusts the result. The `necReferences` array on the result drives the inline article annotation in the card title; the `demandBreakdown` array drives the audit table. If a future NEC update changes how the aggregator computes demand, the PDF automatically picks up the new behavior without renderer changes. Replicable pattern for any rendered NEC artifact: the calc service is the source of truth, the renderer is dumb-but-structured.
-- **The per-row tightening is the load-bearing fix when fighting tabular overflow.** PR #98's third sub-change recovered ~80pt total by tightening panel-schedule spacing. One-time fixes (header marginBottom 20→8, paddingBottom 10→4, infoRow marginBottom 3→1, tableContainer margins, etc.) saved ~48pt. But the load-bearing change was `tableRow.paddingVertical 4→2.5` × 21 rows = 31.5pt — the multiplied-cost source. **Lesson for future overflow fights: identify the multiplied-cost line first; fixed-cost savings rarely accumulate enough alone.**
-- **Reuse existing semantic props rather than introducing new ones with overlapping meaning.** PR #99 needed a signal for "is this existing construction or new" to route between NEC 220.82 and 220.83. `showExistingNewMarkers` was already plumbed for the "* = Proposed new circuit" decorator from Sprint 2C. Same boolean semantically, two distinct uses. No new prop. **General rule**: when an upstream signal already encodes the answer to a downstream question, route off it directly even if the original use was visual-only.
-- **Postgres enums > CHECK constraints when narrow-typed columns matter.** PR #96's regen surfaced that `cover_mode` widened from a 3-literal union to `string` because Supabase's gen-types doesn't introspect CHECK constraints — the runtime safety is there, but the type system can't see it. Fixed inline with `as CoverMode` casts at two call sites, but the deeper lesson is for the next narrow-typed text column: use `CREATE TYPE x AS ENUM (...)` so gen-types can narrow it. Already at least one such column on the schema worth migrating; documented as a low-stakes high-leverage cleanup for a future session.
-- **The audit-breakdown pattern is a data → UI evolution worth replicating.** Inspector ergonomics shifted measurably: an AHJ reviewer now sees the NEC 220 cascade application on the same page as the panel schedule, eliminating the cross-reference flip to the separate Load Calculation Summary. The breakdown table's compact 5-col layout (`Load Type | Connected | Demand | Factor | NEC`) fits below a 42-row schedule with ~30% page room to spare. **Same pattern applies anywhere we have a "summary number that was derived from a multi-rule cascade"** — short circuit AIC, voltage drop %, conductor sizing, etc. Each renders today as a single result number with no per-rule visibility. The breakdown pattern is the next polish layer.
-
-**Process gotchas worth remembering**:
-
-- **Vite skipping type validation is a real production hazard.** PR #94 surfaced one real bug among 447 type errors: `MultiFamilyEVInput.evChargersPerUnit` was a stale field that Vite's transpile-only build had silently shipped past the broken type checker. Without PR #95's CI gate, the 0-error baseline would have drifted right back up. **For any new repo / monorepo additions: include `npx tsc --noEmit` in CI from day one.**
-- **The Supabase MCP `generate_typescript_types` works identically to the CLI but without local auth state.** PR #96 used `mcp__plugin_supabase_supabase__generate_typescript_types({project_id: "..."})` — output is byte-identical to `supabase gen types typescript --project-id` from the CLI. For future regens, either path works; the MCP path is one tool invocation if already authenticated, the CLI path is one shell line. No need to lean on one over the other.
-- **Visual review (PDFs converted to PNG + sent via SendUserFile) is a real bug-finding tool.** User caught the dwelling false-positive on commercial MDPs (kitchen-shape circuits triggering single-family-MDP detection) on a Commercial Building generated packet — would have shipped uncaught without the visual review cycle. Same cycle caught the 42-circuit overflow in PR #98 and led to the spacing-tightening third sub-change. **Pattern: send each generated PDF as a SendUserFile artifact (status: normal) so the user opens it natively; user names a specific visual issue → renderer site located via grep → minimal targeted edit → regenerate + re-send → user confirms or names the next thing.** Scales far better than trying to anticipate every visual detail upfront.
-- **Fold related fixes into the open PR, not as land-and-followup.** Mid-PR-#98 review surfaced the layout overflow on 42-circuit panels (NOT a regression — PR #97 was clean, but #98's added breakdown row pushed it over). Folded the tightening into the same PR per the user's saved preference (`feedback_scope_during_review.md`) rather than opening a separate PR. Three commits in one PR vs three separate PRs is the right call when the fixes are in the same architectural area.
-
-**Deliverables**:
-
-| PR | Branch | Files | Result |
-|---|---|---|---|
-| **#94** | `fix/types-baseline` | many files, 447→0 tsc errors | ✅ Merged 2026-05-23 |
-| **#95** | `ci/add-tsc-gate` | `.github/workflows/ci.yml` (new) | ✅ Merged 2026-05-23 |
-| **#96** | `chore/regen-database-types` | `lib/database.types.ts` + 2 cover_mode call sites | ✅ Merged 2026-05-23 |
-| **#97** | `fix/panel-pdf-demand-display` | 4 files, +321 / -98 LOC | ✅ Merged 2026-05-23 |
-| **#98** | `fix/panel-pdf-commercial-demand` | 4 files, +190 / -29 LOC across 2 commits | ✅ Merged 2026-05-24 |
-| **#99** | `fix/panel-pdf-dwelling-breakdown` | 2 files, +188 / -49 LOC | ✅ Merged 2026-05-24 |
-
-**No DB migrations.** All six PRs are pure-code: type cleanup, CI infrastructure, types regen, and PDF rendering changes. Backward compat preserved everywhere.
-
-**Visual proofs in `example_reports/`** (regeneratable via `E2E_DUMP_PDFS=1 npm test`):
-- `Permit_Packet_MF_EV_Existing_2026-05-17.pdf` — multifamily packet with MDP + H1 sub-panel pages showing the new aggregator card + breakdown table
-- `PanelSchedule_Dwelling_Existing_22083.pdf` — single-page dwelling MDP showing the NEC 220.83 card + tier-split breakdown
-- `PanelSchedule_Dwelling_New_22082.pdf` — same fixture rendered as new-construction, NEC 220.82 routing
-
-**Follow-ups not on this session's queue**:
-1. **STRATEGIC_ANALYSIS.md + DISTRIBUTION_PLAYBOOK.md feature-inventory sweep** — still owed from the prior session; now also needs the audit-breakdown story added as a competitive differentiator (no competing SaaS surfaces the NEC 220 cascade on the panel page itself).
-2. **Commercial demand-factor coverage extension** — `calculateAggregatedLoad`'s per-load-type helpers cover Receptacles / Motors / HVAC / Range / Dryer. Specialty commercial loads (welders @ NEC 220.55, restaurant kitchen equipment @ 220.56) currently bucket into "Other @ 100%" — not wrong but conservative. Extend coverage if a real packet surfaces it.
-3. **Migrate CHECK-constrained text columns to Postgres enums** — surfaced by PR #96. `cover_mode` is the known one; grep the schema for other narrow-typed text columns with CHECK constraints and migrate them so the next gen-types regen produces narrow unions automatically.
-4. **Apply audit-breakdown pattern to other multi-rule results** — short circuit AIC, voltage drop, conductor sizing all currently render as single numbers without per-rule visibility. Same pattern would surface those derivations on their respective PDF pages.
-
----
-
-<!-- Earlier sessions (2026-05-17 Sprint 2C M3 Existing/New construction PRs #79/#80/#81, 2026-05-16 Sprint 2C M2 AHJ expansion PRs #70–#75, 2026-05-15 docs cleanup + JurisdictionRequirements font hotfix + dwelling-load follow-up PRs #63/#64/#65, 2026-05-13 Sprint 2B PR-4 Orlando manifest scaffold + AHJ-aware visibility, 2026-05-12 Sprint 2B PR-3 merge engine, 2026-05-10 Sprint 2A final 2 PRs, 2026-05-09 contractor-pivot + T&M Phase 1) rotated out per "keep last 2 sessions" rule. Git history preserves them. -->
