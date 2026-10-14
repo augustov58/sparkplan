@@ -47,9 +47,10 @@ describe('calculateDwellingDemandSplit', () => {
     expect(split.necArticle).toBe('NEC 220.83');
     // Existing general 33,200 VA → 8,000 + 40% × 25,200 = 18,080; + 10,000 HVAC.
     expect(split.existingDemandVA).toBe(28_080);
-    expect(split.totalDemandVA).toBe(32_880);
-    expect(split.proposedDemandVA).toBe(4_800);
-    // 32.88 kVA / 240 V = 137 A ≤ 200 A — E-102 now agrees with E-101.
+    // EV at nameplate (NEC 2020): 9,600 × 40% = 3,840 added.
+    expect(split.totalDemandVA).toBe(31_920);
+    expect(split.proposedDemandVA).toBe(3_840);
+    // 31.92 kVA / 240 V = 133 A ≤ 200 A — E-102 agrees with E-101.
     expect(split.totalDemandVA / 240).toBeLessThan(200);
   });
 

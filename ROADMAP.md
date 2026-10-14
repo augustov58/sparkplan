@@ -27,7 +27,7 @@ Five PRs (2026-07-09 → 2026-09-27). Four came out of PE review of packet outpu
 | **PR #123** (EVSE load follows NEC edition) | ✅ Merged 2026-09-27 (`de2b151`) | FL = NEC 2020, which has no §220.57. Per-EVSE load = nameplate on 2020, max(7,200 VA, nameplate) on 2023, both at 100%. Single source `data/nec/evse-load.ts`; edition resolved via `resolveNecEdition()`. New projects default to NEC 2020. |
 
 **Open follow-ups**:
-1. ~~**#121**: single-family E-101 vs E-102 existing-load method mismatch.~~ Fixed 2026-10-13 (`fix/sf-e102-dwelling-optional-method`): E-102 uses 220.83/220.82 like E-101. Still open: whether the 2023 §220.57 floor carries into the Part IV bucket, and the EV ×1.25 in `calculateDwellingPanelDemand` (PE ruling pending).
+1. ~~**#121**: single-family E-101 vs E-102 existing-load method mismatch.~~ Fixed 2026-10-13 (`fix/sf-e102-dwelling-optional-method`): E-102 uses 220.83/220.82 like E-101. EVSE follow-up fixed 2026-10-14 (`fix/sf-optional-method-evse-100pct`): EVSE at `getEvseLoadVA` in the 220.82/220.83 bucket (2023 floor included), no continuous ×1.25 in the single-family calc (PE ruling).
 2. Playwright packet-verification pass on `new 4-plex` + a single-family existing project. Left unchecked in the #122 / #123 test plans.
 3. The chatbot prompts still default to "2023 edition unless specified" (`services/geminiService.ts`).
 4. FBC 9th Ed. takes effect 2026-12-31. Update the manifests' `necEdition` once its NEC edition is confirmed.

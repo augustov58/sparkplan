@@ -27,3 +27,9 @@
 ## Reusable rule
 
 Before printing any NEC section on a packet, confirm it exists in the edition the AHJ manifest declares; route edition-dependent rules through a `(value, edition)` helper, never an inline constant.
+
+## Follow-up 2026-10-14: the single-family path was missed
+
+This fix covered `multiFamilyEV.ts` only. `services/calculations/residentialLoad.ts` (Dwelling Calculator, Panel Summary, packet E-101 and E-102) still put EVSE and any "continuous" load in at ×1.25, citing "NEC 220.18(B)" for the uplift. PE ruling 2026-10-14: no continuous ×1.25 in any Article 220 calc. In the single-family Optional Method, the EVSE enters the 220.82/220.83 bucket at `getEvseLoadVA` (2023 floor included, matching multifamily 220.84). Edition is threaded via `hooks/useProjectNecEdition`.
+
+**Lesson**: the search for this fix started from the citation (`220.57`) instead of the quantity (EVSE load). Grep for every function that computes the quantity: `evCharger`, `continuous`, `1.25` across `services/calculations/`.

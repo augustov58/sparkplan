@@ -10,6 +10,12 @@ All notable changes to SparkPlan.
 
 ---
 
+## 2026-10-14: Single-family EV chargers counted at 100% in the load calculation, by NEC edition
+
+**Load calc fix (user-facing, PE ruling 2026-10-14)**: The single-family calculations (Dwelling Load Calculator, Panel Summary, and the permit packet's E-101 / E-102 pages) counted EV chargers and any load marked "continuous" at 125% of nameplate, citing "NEC 220.18(B)". The 125% of NEC 625.41 / 210.20(A) sizes the breaker and conductors; it is not part of the Article 220 load. EV chargers now enter the 220.82 / 220.83 Optional Method at their per-edition load: nameplate under NEC 2020 (Florida), max(7,200 VA, nameplate) under NEC 2023 §220.57(A). This matches the multifamily calculator (PR #123). The "continuous" checkbox on custom appliances still sizes the branch circuit at 125%. Numbers go down slightly. Example: a 9.6 kVA charger on an existing 2,000 sq ft home goes from 32.88 to 31.92 kVA (137 A → 133 A). Multifamily per-unit loads in the Dwelling Calculator follow the same rule. Visual proof: `example_reports/Permit_Packet_SF_Existing_EVSE100pct_2026-10-14.pdf`.
+
+---
+
 ## 2026-10-13: Single-family existing-service page uses NEC 220.83, matching the load calculation (#121)
 
 **Permit packet fix (user-facing)**: On single-family projects, the existing-service capacity page (E-102, calculated method) ran the NEC 220 Part III cascade and ignored the project's existing/new dwelling choice. The Load Calculation Summary (E-101) correctly used NEC 220.83 (existing) / 220.82 (new). Totals could differ enough to flip the verdict. Example: a 2,000 sq ft existing dwelling on 200 A adding a 40 A EV charger showed 137 A on E-101 and 203 A "SERVICE UPGRADE REQUIRED" on E-102. E-102 now runs the same Optional Method on the same circuits. Existing = the method on existing circuits; proposed = the increase from the new circuits; existing + proposed = the E-101 total. The page now cites "NEC 220 Part IV Optional Method (NEC 220.83)". Multifamily and commercial packets are unchanged. Visual proof: `example_reports/Permit_Packet_SF_Existing_Issue121{,_Fixed}_2026-10-13.pdf`.
