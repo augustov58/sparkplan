@@ -882,7 +882,7 @@ export const ServiceUpgradeWizard: React.FC<ServiceUpgradeWizardProps> = ({ proj
                 <div className="text-xs text-gray-700 space-y-1">
                   <div>• NEC 230.42 - Service Conductor Sizing</div>
                   <div>• NEC 210.19 - Continuous Load (80% rule)</div>
-                  <div>• NEC 625.41 - EV Charger Continuous Load (125% factor)</div>
+                  <div>• NEC 625.42 / 625.41 - EV charging is a continuous load: new load at 125% in the 220.87 check</div>
                 </div>
               </div>
 

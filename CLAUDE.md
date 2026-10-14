@@ -71,12 +71,16 @@ CRITICAL: only `calculated` skips the 1.25× multiplier.
 - Calculated (panel schedule / NEC 220 Part III): use value directly — diversity
   is already in the demand factors; adding 1.25× double-counts
 - Manual (unknown provenance): value × 1.25 as a defensive default
+- NEW load: continuous loads at 125% — EV charging is continuous per NEC 625.42,
+  sized per 625.41 (PE ruling 2026-10-14). This is the 220.87(2) comparison
+  only; inside Article 220 load totals the EVSE stays at 100% (see EVSE below).
 ```
 PE-confirmed 2026-07-09 (PR #118 review), superseding both prior interpretations
 (pre-Sprint-2 multiplied calculated; Sprint 2 wrongly exempted measured).
 Implementation: `services/calculations/serviceUpgrade.ts`, mirrored in
-`services/pdfExport/PermitPacketDocuments.tsx::NEC22087NarrativePage` and
-`services/calculations/multiFamilyEV.ts` — all three must stay in sync.
+`services/pdfExport/PermitPacketDocuments.tsx::NEC22087NarrativePage` (new load
+prefilled in `PermitPacketGenerator.tsx`) and `services/calculations/multiFamilyEV.ts`
+(measured path) — all three must stay in sync. Factor: `EVSE_CONTINUOUS_FACTOR`.
 
 ### Short Circuit Analysis
 ```

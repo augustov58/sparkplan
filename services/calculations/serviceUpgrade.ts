@@ -231,7 +231,9 @@ export function analyzeServiceUpgrade(input: ServiceUpgradeInput): ServiceUpgrad
   const breakdown: ServiceUpgradeResult['breakdown'] = [];
 
   for (const load of input.proposedLoads) {
-    // Apply 125% continuous load factor per NEC 210.19
+    // NEC 220.87(2) new load: continuous loads (EVSE per NEC 625.42) at 125%,
+    // per 625.41 feeder/service sizing (PE ruling 2026-10-14). The measured
+    // existing demand's own 125% is applied separately above.
     const effectiveKW = load.continuous ? load.kw * 1.25 : load.kw;
     proposedAdditionalLoad_kVA += effectiveKW;
 
@@ -243,7 +245,7 @@ export function analyzeServiceUpgrade(input: ServiceUpgradeInput): ServiceUpgrad
     });
 
     if (load.continuous) {
-      necReferences.push('NEC 625.41 - EV Charger Continuous Load');
+      necReferences.push('NEC 625.42 / 625.41 - Continuous new load at 125%');
     }
   }
 
@@ -789,7 +791,8 @@ export const LOAD_TEMPLATES: LoadTemplate[] = [
 
 /**
  * Convert load template to quick check amps (for Quick Mode)
- * Applies 125% continuous factor and converts to amps
+ * Applies the 125% continuous factor (NEC 625.42 / 625.41, 220.87(2) new
+ * load — PE ruling 2026-10-14) and converts to amps
  */
 export function templateToQuickAmps(template: LoadTemplate, voltage: number = 240): number {
   const effectiveKW = template.continuous ? template.kw * 1.25 : template.kw;
