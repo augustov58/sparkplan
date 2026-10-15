@@ -18,7 +18,7 @@
 
 import { supabase } from '@/lib/supabase';
 import type { Database } from '@/lib/database.types';
-import type { GeneratedProject, EVInfrastructureProject } from './multiFamilyProjectGenerator';
+import { selectEVPanelIdsToReplace, type GeneratedProject, type EVInfrastructureProject } from './multiFamilyProjectGenerator';
 
 type Panel = Database['public']['Tables']['panels']['Row'];
 type MeterStack = Database['public']['Tables']['meter_stacks']['Row'];
@@ -423,15 +423,16 @@ export async function addEVInfrastructure(
     // ================================================================
     report('Preparing EV infrastructure...');
 
-    // Find and remove any existing EV panel + its circuits/feeders
-    const { data: existingEVPanels } = await supabase
-      .from('panels')
-      .select('id')
-      .eq('project_id', projectId)
-      .ilike('name', '%ev%');
+    // Find and remove any existing EV panel + its circuits/feeders. Read the
+    // EV meters' panel links before any delete (meters.panel_id is ON DELETE
+    // SET NULL).
+    const [{ data: projectPanels }, { data: evMeters }] = await Promise.all([
+      supabase.from('panels').select('id, name, is_main').eq('project_id', projectId),
+      supabase.from('meters').select('panel_id').eq('project_id', projectId).eq('meter_type', 'ev'),
+    ]);
+    const evPanelIds = selectEVPanelIdsToReplace(projectPanels ?? [], (evMeters ?? []).map(m => m.panel_id));
 
-    if (existingEVPanels && existingEVPanels.length > 0) {
-      const evPanelIds = existingEVPanels.map(p => p.id);
+    if (evPanelIds.length > 0) {
 
       // Delete circuits in EV panels
       for (const epId of evPanelIds) {
