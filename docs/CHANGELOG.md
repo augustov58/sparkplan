@@ -4,6 +4,12 @@ All notable changes to SparkPlan.
 
 ---
 
+## 2026-10-14: Add EV Infrastructure no longer deletes the MDP or other panels (#130)
+
+**Data-loss fix (user-facing)**: re-running **Add EV Infrastructure** in the Multi-Family EV Calculator replaced every panel whose name contained "ev". The MDP is named after the building, so a building like "Seven Oaks" or "… + EV" lost its MDP, its circuits and its feeder; panels like "Elevator" were deleted too. It now replaces only the EV panel it generated (matched by its generated name or the EV meter's panel link), and never the main panel.
+
+---
+
 ## 2026-10-14: Commercial packets — kitchen equipment label, existing/new split, complete citations (#127)
 
 **Permit packet fixes (user-facing, no pass/fail changes)**, for projects calculated with the standard NEC 220 Part III method (commercial / industrial):
