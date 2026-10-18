@@ -4,6 +4,17 @@ All notable changes to SparkPlan.
 
 ---
 
+## 2026-10-18: Dwelling calculator and packet follow-ups (#142, #143, #159, #160, #161, #162)
+
+- **Heat kW is now calculated as shown (#142, unsafe direction).** The Dwelling Load Calculator displayed 10 kW of heat but calculated 0 until the field was edited, so an electric heat strip could drop out of the load. Every appliance input now shows the value the calculation uses, and switching HVAC to Heat Pump / Electric Furnace sets 10 kW of heat in the calculation.
+- **Multifamily neutral (#143).** The neutral skipped the NEC 220.84 demand factor and printed values above the phase demand (1,145 A neutral on a 672 A service). It is now the 220.84-factored load of neutral-using loads plus house loads, with the 220.61(B) reduction, and never above the phase demand.
+- **Heat-pump connected load (#159)** shows the larger of heat or cool, matching the demand and E-101.
+- **E-101 multifamily table adds up (#160).** The HVAC non-coincident row now shows the omitted smaller load at 0%, so the columns sum to the printed totals.
+- **Panel Schedule references (#161).** A single-family service panel sized by NEC 220.82/220.83 lists that method's references instead of the Standard Method sections.
+- **E-102 observation window (#162)** prints only for measured demand, and an empty window prints "NOT PROVIDED" instead of an invented 12-month range.
+
+---
+
 ## 2026-10-18: PE rulings on EVEMS setpoint, 220.83(A)/(B), and 220.84 electric heat (#131, #132, #133, #137)
 
 **Load calculation changes (user-facing; some verdicts change)**, per PE rulings of 2026-10-17/18:

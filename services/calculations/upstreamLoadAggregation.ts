@@ -850,12 +850,14 @@ export function calculateAggregatedLoad(
 
     // Surface the HVAC reduction as its own breakdown row so the user can
     // see WHY the dwelling base shrank below the raw connected nameplate.
+    // The row carries the omitted smaller load at 0% so the table's columns
+    // sum to the totals (#160); the dwelling row already holds the larger.
     if (climateReductionVA > 0) {
       demandBreakdown.push({
-        loadType: 'HVAC non-coincident reduction',
-        connectedVA: climateNameplateVA,
-        demandVA: climateDemandVA,
-        demandFactor: climateNameplateVA > 0 ? climateDemandVA / climateNameplateVA : 1.0,
+        loadType: 'HVAC non-coincident (smaller of heat/cool, omitted)',
+        connectedVA: climateReductionVA,
+        demandVA: 0,
+        demandFactor: 0,
         necReference: 'NEC 220.84(C)(5) (larger of A/C or electric heat) + 220.60 (non-coincident)',
       });
       necRefs.push('NEC 220.60 (Non-Coincident Loads)');
