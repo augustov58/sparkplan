@@ -41,17 +41,33 @@ describe('calculateDwellingDemandSplit', () => {
     expect(split.existingDemandVA + split.proposedDemandVA).toBe(split.totalDemandVA);
   });
 
-  it('existing dwelling → NEC 220.83 figures for the fixture', () => {
+  it('existing dwelling, no HVAC added → NEC 220.83(A) figures for the fixture', () => {
     const split = calculateDwellingDemandSplit({ circuits, ...dwelling, existingDwelling: true });
 
     expect(split.necArticle).toBe('NEC 220.83');
-    // Existing general 33,200 VA → 8,000 + 40% × 25,200 = 18,080; + 10,000 HVAC.
-    expect(split.existingDemandVA).toBe(28_080);
+    // 220.83(A) (PE ruling 2026-10-18, #132): the existing HVAC (larger of
+    // heat/cool = 10,000) joins the bucket. Existing 33,200 + 10,000 = 43,200
+    // → 8,000 + 40% × 35,200 = 22,080.
+    expect(split.existingDemandVA).toBe(22_080);
     // EV at nameplate (NEC 2020): 9,600 × 40% = 3,840 added.
-    expect(split.totalDemandVA).toBe(31_920);
+    expect(split.totalDemandVA).toBe(25_920);
     expect(split.proposedDemandVA).toBe(3_840);
-    // 31.92 kVA / 240 V = 133 A ≤ 200 A — E-102 agrees with E-101.
+    // 25.92 kVA / 240 V = 108 A ≤ 200 A — E-102 agrees with E-101.
     expect(split.totalDemandVA / 240).toBeLessThan(200);
+  });
+
+  it('proposed HVAC (incl. a like-for-like replacement) → NEC 220.83(B) on both runs', () => {
+    // The 5 kW AC condenser is being replaced: the permit adds HVAC.
+    const withHvac = circuits.map(c => c.load_type === 'C' ? { ...c, is_proposed: true } : c);
+    const split = calculateDwellingDemandSplit({ circuits: withHvac, ...dwelling, existingDwelling: true });
+
+    // Existing run (no AC, heat strip existing) stays on (B): HVAC 10,000 at 100%.
+    // General 33,200 → 8,000 + 40% × 25,200 = 18,080; + 10,000 = 28,080.
+    expect(split.existingDemandVA).toBe(28_080);
+    // Total: larger of heat 10,000 / cool 5,000 at 100% + EV 3,840 in the bucket.
+    expect(split.totalDemandVA).toBe(31_920);
+    expect(split.existingDemandVA + split.proposedDemandVA).toBe(split.totalDemandVA);
+    expect(split.necReferences).toEqual(['NEC 220.83(B)', 'NEC 220.60']);
   });
 
   it('new dwelling → NEC 220.82', () => {
@@ -74,7 +90,7 @@ describe('calculateDwellingDemandSplit', () => {
     const split = calculateDwellingDemandSplit({ circuits, ...dwelling, existingDwelling: true });
     const citation = summarizeCalculationRefs(split.necReferences);
 
-    expect(split.necReferences).toEqual(['NEC 220.83', 'NEC 220.60']);
+    expect(split.necReferences).toEqual(['NEC 220.83(A)', 'NEC 220.60']);
     expect(citation.part).toBe('IV');
     expect(citation.optionalSection).toBe('220.83');
   });

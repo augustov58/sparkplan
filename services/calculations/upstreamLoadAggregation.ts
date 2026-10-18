@@ -20,6 +20,7 @@
 import type { Database } from '@/lib/database.types';
 import { getLightingDemandFactor } from '@/data/nec/table-220-42';
 import { getMultiFamilyDemandFactor } from './multiFamilyEV';
+import { EVSE_CONTINUOUS_FACTOR, isEvseDescription } from '@/data/nec/evse-load';
 
 type Panel = Database['public']['Tables']['panels']['Row'];
 type Transformer = Database['public']['Tables']['transformers']['Row'];
@@ -80,7 +81,7 @@ export function isEVEMSManagedPanel(panelId: string, circuits: Circuit[]): boole
  * be drawn as physical branch circuits (e.g. a 47 kVA aggregate-setpoint
  * marker on a "20A 2P" placeholder breaker is misleading to AHJ reviewers).
  */
-export function isEVEMSMarkerCircuit(circuit: Circuit): boolean {
+export function isEVEMSMarkerCircuit(circuit: Pick<Circuit, 'description'>): boolean {
   const desc = circuit.description?.toLowerCase() ?? '';
   return (
     desc.includes('evems aggregate setpoint') ||
@@ -88,8 +89,44 @@ export function isEVEMSMarkerCircuit(circuit: Circuit): boolean {
   );
 }
 
-function isEVEMSExplicitSetpointMarker(circuit: Circuit): boolean {
+function isEVEMSExplicitSetpointMarker(circuit: Pick<Circuit, 'description'>): boolean {
   return circuit.description?.toLowerCase().includes('evems aggregate setpoint') ?? false;
+}
+
+/**
+ * NEC 220.87(2) new load from the project's proposed circuits, in VA.
+ *
+ * - EVSE at 125% — EV charging is continuous per NEC 625.42, sized per
+ *   625.41 (PE ruling 2026-10-14); other proposed loads at nameplate.
+ * - EVEMS marker circuits are metadata, not load (#137).
+ * - On a panel with an explicit "EVEMS Aggregate Setpoint" marker, that
+ *   panel's proposed EVSE sum is clamped to the setpoint (NEC 625.42), and
+ *   the setpoint takes the same 125% (PE ruling 2026-10-18, #131).
+ *
+ * Mirrors the measured path of `calculateMultiFamilyEV`.
+ */
+export function calculateProposedNewLoadVA(
+  circuits: Pick<Circuit, 'panel_id' | 'description' | 'load_watts' | 'is_proposed'>[],
+): number {
+  const byPanel = new Map<string, { evseVA: number; otherVA: number }>();
+  for (const c of circuits) {
+    if (!c.is_proposed || isEVEMSMarkerCircuit(c)) continue;
+    const panelId = c.panel_id ?? '';
+    const entry = byPanel.get(panelId) ?? { evseVA: 0, otherVA: 0 };
+    if (isEvseDescription(c.description ?? '')) entry.evseVA += c.load_watts || 0;
+    else entry.otherVA += c.load_watts || 0;
+    byPanel.set(panelId, entry);
+  }
+
+  let totalVA = 0;
+  for (const [panelId, { evseVA, otherVA }] of byPanel) {
+    const setpointVA = circuits.find(
+      c => (c.panel_id ?? '') === panelId && isEVEMSExplicitSetpointMarker(c),
+    )?.load_watts;
+    const evDemandVA = setpointVA && setpointVA > 0 ? Math.min(evseVA, setpointVA) : evseVA;
+    totalVA += evDemandVA * EVSE_CONTINUOUS_FACTOR + otherVA;
+  }
+  return totalVA;
 }
 
 /**
@@ -787,17 +824,16 @@ export function calculateAggregatedLoad(
     const nonDwellingConnectedVA = evLoadVA + housePanelLoadVA;
     const dwellingConnectedVA = totalConnectedVA - nonDwellingConnectedVA;
 
-    // NEC 220.84(C)(4): electric space heating at 65% of connected.
-    // NEC 220.60: heating and cooling are non-coincident — count the larger.
-    // Combined effect: the dwelling demand base counts max(heating × 0.65,
-    // cooling) instead of summing both at nameplate. Without this, the MDP
+    // NEC 220.84(C)(5): the larger of the A/C load or the fixed electric
+    // space-heating load, at nameplate (no 65% heat factor — that is 220.82(C)
+    // only; PE ruling 2026-10-18, #133). The dwelling demand base counts
+    // max(heating, cooling) instead of summing both. Without this, the MDP
     // overstates demand vs. the DLC's calculateMultiFamilyLoad result.
     // Loads here are summed across ALL downstream panels (including any HVAC
     // accidentally tagged on the house panel); for the basic MF generator
     // that's just unit panels, which is exactly the dwelling base we want.
-    const heatingAt65 = loads.heating * 0.65;
     const climateNameplateVA = loads.heating + loads.cooling;
-    const climateDemandVA = Math.max(heatingAt65, loads.cooling);
+    const climateDemandVA = Math.max(loads.heating, loads.cooling);
     const climateReductionVA = Math.max(0, climateNameplateVA - climateDemandVA);
     const dwellingDemandBaseVA = Math.max(0, dwellingConnectedVA - climateReductionVA);
     const dwellingDemandVA = Math.round(dwellingDemandBaseVA * demandFactor);
@@ -820,10 +856,10 @@ export function calculateAggregatedLoad(
         connectedVA: climateNameplateVA,
         demandVA: climateDemandVA,
         demandFactor: climateNameplateVA > 0 ? climateDemandVA / climateNameplateVA : 1.0,
-        necReference: 'NEC 220.60 (non-coincident) + 220.84(C)(4) (electric heat @ 65%)',
+        necReference: 'NEC 220.84(C)(5) (larger of A/C or electric heat) + 220.60 (non-coincident)',
       });
       necRefs.push('NEC 220.60 (Non-Coincident Loads)');
-      necRefs.push('NEC 220.84(C)(4) (Electric Space Heating @ 65%)');
+      necRefs.push('NEC 220.84(C)(5) (Larger of A/C or Electric Space Heating)');
     }
 
     if (housePanelLoadVA > 0) {

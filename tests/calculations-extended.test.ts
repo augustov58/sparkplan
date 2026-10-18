@@ -736,13 +736,25 @@ describe('Residential Load (NEC 220.82 / 220.84)', () => {
       // Demand must INCLUDE the EV (the bug was Panel Summary showing
       // demand without the EV at 22.4 kVA).
       expect(result.necArticle).toBe('NEC 220.83');
-      expect(result.hvacVA).toBe(5000);
+      // No proposed HVAC → 220.83(A) (PE ruling 2026-10-18, #132): the A/C
+      // joins the bucket instead of a separate 100% row.
+      expect(result.generalNecReference).toBe('NEC 220.83(A)');
+      expect(result.hvacVA).toBe(0);
       // Connected: 12000 + 500 + 5500 + 4500 + 1500 + 11500 (EV) + 7500
       //            (NEC structural: lighting+SA+laundry) + 5000 (HVAC) = 48000
       expect(result.totalConnectedVA).toBe(48_000);
-      // Demand: bucket = 8000 + (43000 - 8000) × 0.4 = 22000 (EV at nameplate)
-      //         + HVAC 5000 = 27000
-      expect(result.totalDemandVA).toBe(27_000);
+      // Demand: bucket = 8000 + (48000 - 8000) × 0.4 = 24000 (EV at nameplate,
+      //         A/C in the bucket)
+      expect(result.totalDemandVA).toBe(24_000);
+
+      // Same panel with HVAC proposed → 220.83(B): bucket 22,000 + HVAC 5,000.
+      const withHvac = calculateDwellingPanelDemand({
+        circuits: [{ description: 'Air Conditioning', load_watts: 5000, load_type: 'C', breaker_amps: 30, is_proposed: true }],
+        squareFootage: 1000, smallApplianceCircuits: 2, laundryCircuit: true, voltage: 240,
+        existingDwelling: true,
+      });
+      expect(withHvac.generalNecReference).toBe('NEC 220.83(B)');
+      expect(withHvac.hvacVA).toBe(5000);
     });
 
     it('calculateDwellingPanelDemand: NEC 2023 raises a small EVSE to 7,200 VA; NEC 2020 keeps nameplate', async () => {
@@ -1167,10 +1179,13 @@ describe('Multi-Family EV (per-EVSE load / 625.42)', () => {
         expect(result.evLoad.demandFactor).toBe(1);
       });
 
-      it('measured with EVEMS: setpoint clamp unchanged, no ×1.25', () => {
+      it('measured with EVEMS: setpoint × 1.25 and the setpoint sized to still fit (#131)', () => {
+        // PE ruling 2026-10-18: the setpoint is a capped continuous load, so
+        // it takes the 220.87(2) 125% like direct-connected EVSE.
         const result = calculateMultiFamilyEV({ ...measured, useEVEMS: true });
-        expect(result.evLoad.demandFactor).toBe(1);
-        expect(result.evLoad.demandVA).toBeLessThanOrEqual(result.evLoad.totalConnectedVA);
+        expect(result.evLoad.demandFactor).toBe(1.25);
+        expect(result.evLoad.demandVA).toBeLessThanOrEqual(result.evLoad.totalConnectedVA * 1.25);
+        expect(result.serviceAnalysis.totalDemandVA).toBeLessThanOrEqual(result.serviceAnalysis.existingCapacityVA);
       });
 
       it('direct-connection charger count uses 125% per-EVSE amps on the measured path', () => {
@@ -1592,7 +1607,7 @@ describe('Upstream Load Aggregation — NEC 220.84 Optional Method (C1)', () => 
     });
 
     // -----------------------------------------------------------------
-    // NEC 220.60 + 220.84(C)(4) climate non-coincident reduction
+    // NEC 220.84(C)(5) + 220.60 climate non-coincident reduction
     // -----------------------------------------------------------------
     // Regression for the multi-family MDP demand mismatch reported on the
     // basic MF generator: unit-panel circuits without load_type tags fell
@@ -1601,18 +1616,20 @@ describe('Upstream Load Aggregation — NEC 220.84 Optional Method (C1)', () => 
     // calculateMultiFamilyLoad service calc reported.
     //
     // After the fix: when H/C circuits are present on dwelling panels, the
-    // aggregator counts max(heating × 0.65, cooling) toward the dwelling
-    // demand base instead of summing both at nameplate.
-    it('applies NEC 220.60 + 220.84(C)(4): max(heat × 0.65, cool) toward dwelling base', () => {
+    // aggregator counts max(heating, cooling) at nameplate toward the dwelling
+    // demand base instead of summing both. No 65% heat factor in 220.84 —
+    // that is 220.82(C) only (PE ruling 2026-10-18, #133).
+    it('applies NEC 220.84(C)(5): max(heat, cool) at nameplate toward dwelling base, no 65% heat factor', () => {
       // 4-unit MF, 240V/1Φ. Each unit has tagged HVAC:
       //   10 kVA general 'O' + 5 kVA heat 'H' + 3.5 kVA cool 'C' = 18.5 kVA/unit
-      //   Per-unit climate (NEC 220.60 + 220.84(C)(4)): max(5×0.65, 3.5) = 3.5
-      //   Per-unit reduction = (5 + 3.5) - 3.5 = 5 kVA
+      //   Per-unit climate (NEC 220.84(C)(5)): max(5, 3.5) = 5
+      //   Per-unit reduction = (5 + 3.5) - 5 = 3.5 kVA
       //   Total connected dwelling = 4 × 18.5 = 74 kVA
-      //   Total reduction = 4 × 5 = 20 kVA
-      //   Dwelling demand base = 74 - 20 = 54 kVA
+      //   Total reduction = 4 × 3.5 = 14 kVA
+      //   Dwelling demand base = 74 - 14 = 60 kVA
       //   Demand factor (4 units, Table 220.84) = 45%
-      //   Dwelling demand = 54 × 0.45 = 24.3 kVA
+      //   Dwelling demand = 60 × 0.45 = 27 kVA
+      //   (The retired 65% rule gave max(3.25, 3.5) = 3.5 → 24.3 kVA.)
       const mdp = makePanel({ id: 'mdp', name: 'MF MDP', is_main: true, bus_rating: 400 });
       const unitPanels: Panel[] = Array.from({ length: 4 }, (_, i) =>
         makePanel({
@@ -1641,16 +1658,15 @@ describe('Upstream Load Aggregation — NEC 220.84 Optional Method (C1)', () => 
       // Raw connected nameplate is unchanged — display still shows reality.
       expect(result.totalConnectedVA).toBe(74_000);
 
-      // Dwelling demand reflects the climate reduction: 54 kVA × 45% = 24.3 kVA.
-      expect(result.totalDemandVA).toBeGreaterThanOrEqual(24_200);
-      expect(result.totalDemandVA).toBeLessThanOrEqual(24_400);
+      // Dwelling demand reflects the climate reduction: 60 kVA × 45% = 27 kVA.
+      expect(result.totalDemandVA).toBe(27_000);
 
       // Breakdown surfaces both the dwelling row (with the reduced base) and
       // an explicit climate-reduction row so the AHJ can see the math.
       const dwellingRow = result.demandBreakdown.find(d =>
         d.loadType.includes('Multi-Family Dwelling'),
       );
-      expect(dwellingRow?.connectedVA).toBe(54_000);
+      expect(dwellingRow?.connectedVA).toBe(60_000);
       expect(dwellingRow?.demandFactor).toBeCloseTo(0.45, 2);
 
       const climateRow = result.demandBreakdown.find(d =>
@@ -1658,9 +1674,11 @@ describe('Upstream Load Aggregation — NEC 220.84 Optional Method (C1)', () => 
       );
       expect(climateRow).toBeDefined();
       // Aggregated across 4 units: 4 × (5k heat + 3.5k cool) = 34 kVA nameplate.
-      // Demand: max(4 × 5k × 0.65, 4 × 3.5k) = max(13 kVA, 14 kVA) = 14 kVA.
+      // Demand: max(4 × 5k, 4 × 3.5k) = 20 kVA.
       expect(climateRow?.connectedVA).toBe(34_000);
-      expect(climateRow?.demandVA).toBe(14_000);
+      expect(climateRow?.demandVA).toBe(20_000);
+      expect(climateRow?.necReference).toContain('220.84(C)(5)');
+      expect(result.necReferences.join(' ')).not.toMatch(/65%|220\.84\(C\)\(4\)/);
     });
 
     it('all-O circuits (no HVAC tags) → climate reduction is zero, legacy math preserved', () => {

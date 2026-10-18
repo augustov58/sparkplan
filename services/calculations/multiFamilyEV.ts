@@ -1149,19 +1149,21 @@ export function calculateMultiFamilyEV(input: MultiFamilyEVInput): MultiFamilyEV
       });
     }
 
-    // 1e. Electric heat (if applicable) - 65% of largest unit per NEC 220.84(C)(4)
+    // 1e. Electric heat (if applicable) at nameplate per NEC 220.84(C)(5) —
+    // no 65% factor in 220.84 (that is 220.82(C) only; PE ruling 2026-10-18,
+    // #133). This simplified path has no per-unit HVAC data, so it assumes
+    // 10 kW per unit; the Dwelling Load Calculator path (C) uses real data.
     let heatingLoadVA = 0;
     if (hasElectricHeat) {
-      // Assume 10 kW per unit, apply 65% demand
       const unitHeatingVA = 10000;
-      heatingLoadVA = dwellingUnits * unitHeatingVA * 0.65;
+      heatingLoadVA = dwellingUnits * unitHeatingVA;
       breakdown.push({
         category: 'Electric Heat',
-        description: `${dwellingUnits} units @ 65% demand`,
-        connectedVA: dwellingUnits * unitHeatingVA,
+        description: `${dwellingUnits} units × 10 kW (assumed) at nameplate`,
+        connectedVA: heatingLoadVA,
         demandVA: heatingLoadVA,
-        demandFactor: 0.65,
-        necReference: 'NEC 220.84(C)(4)',
+        demandFactor: 1.0,
+        necReference: 'NEC 220.84(C)(5)',
       });
     }
 
@@ -1241,8 +1243,16 @@ export function calculateMultiFamilyEV(input: MultiFamilyEVInput): MultiFamilyEV
   // once here so both (a) the top-level service-analysis numbers and (b)
   // the per-scenario withEVEMS block below pull from the same value.
   // 90% efficiency factor leaves headroom for ALMS overhead + safety margin.
+  //
+  // Measured path (NEC 220.87): new EV load enters the 220.87(2) comparison
+  // at 125% — EV charging is continuous per NEC 625.42, sized per 625.41 (PE
+  // ruling 2026-10-14). The EVEMS setpoint is the same continuous load,
+  // capped, so it takes the 125% too (PE ruling 2026-10-18, #131); the
+  // setpoint is sized so setpoint × 125% fits in 90% of available capacity.
+  // The calculated (220.84) path doesn't invoke 220.87 and stays at 100%.
+  const directConnectionFactor = useMeasuredData ? EVSE_CONTINUOUS_FACTOR : 1.0;
   const EVEMS_EFFICIENCY = 0.90;
-  const evemsSetpointAmps = availableCapacityAmps * EVEMS_EFFICIENCY;
+  const evemsSetpointAmps = availableCapacityAmps * EVEMS_EFFICIENCY / directConnectionFactor;
   const evemsSetpointVA = calculateServiceCapacityVA(evemsSetpointAmps, voltage, phase);
 
   // The NEC provides no demand factors for multiple EVSE (either edition).
@@ -1257,14 +1267,10 @@ export function calculateMultiFamilyEV(input: MultiFamilyEVInput): MultiFamilyEV
   //   it uses calculateAggregatedLoad, which IS EVEMS-aware via the
   //   setpoint marker. This fix brings the MF-EV page in line.
   //
-  // Measured path (NEC 220.87): the new EV load enters the 220.87(2)
-  // comparison at 125% — EV charging is continuous per NEC 625.42, sized per
-  // 625.41 (PE ruling 2026-10-14). The calculated (220.84) path doesn't
-  // invoke 220.87 and stays at 100%; the EVEMS setpoint clamp is unchanged.
-  const directConnectionFactor = useMeasuredData ? EVSE_CONTINUOUS_FACTOR : 1.0;
-  const evDemandFactor = useEVEMS ? 1.0 : directConnectionFactor;
+  // On the measured path both branches take the 125% (see the setpoint above).
+  const evDemandFactor = directConnectionFactor;
   const evDemandVA = useEVEMS
-    ? Math.min(totalEVConnectedVA, evemsSetpointVA)
+    ? Math.min(totalEVConnectedVA, evemsSetpointVA) * evDemandFactor
     : totalEVConnectedVA * evDemandFactor;
   const evLoadAmps = calculateAmps(evDemandVA, voltage, phase);
 

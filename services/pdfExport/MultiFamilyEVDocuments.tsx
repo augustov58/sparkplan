@@ -401,7 +401,7 @@ export const MultiFamilyEVPages: React.FC<MultiFamilyEVDocumentProps> = ({
                     narrowing doesn't carry useEVEMS through. The NEC
                     provides no multi-EVSE demand factor, so any clamping
                     below nameplate must be EVEMS per NEC 625.42. */}
-                {(result.evLoad.demandVA / 1000).toFixed(1)} kVA ({result.input.evChargersRequested} EVSE @ {result.evLoad.demandVA < result.evLoad.totalConnectedVA ? 'EVEMS setpoint' : result.evLoad.demandFactor > 1 ? 'full load × 125%, NEC 220.87(2) / 625.42' : 'full load'})
+                {(result.evLoad.demandVA / 1000).toFixed(1)} kVA ({result.input.evChargersRequested} EVSE @ {result.evLoad.demandVA < result.evLoad.totalConnectedVA * result.evLoad.demandFactor ? (result.evLoad.demandFactor > 1 ? 'EVEMS setpoint × 125%, NEC 220.87(2) / 625.42' : 'EVEMS setpoint') : result.evLoad.demandFactor > 1 ? 'full load × 125%, NEC 220.87(2) / 625.42' : 'full load'})
               </Text>
             </View>
           </View>
@@ -723,7 +723,7 @@ export const MultiFamilyEVPages: React.FC<MultiFamilyEVDocumentProps> = ({
                 {result.evLoad.demandVA < result.evLoad.totalConnectedVA ? 'Service Demand (EVEMS managed)' : 'Service Demand (No EVEMS)'}
               </Text>
               <Text style={[styles.tableCellValue, { fontFamily: 'Helvetica-Bold' }]}>
-                {(result.evLoad.demandVA / 1000).toFixed(1)} kVA ({result.evLoad.loadAmps}A) - {result.evLoad.demandVA < result.evLoad.totalConnectedVA ? 'EVEMS setpoint' : result.evLoad.demandFactor > 1 ? 'Full load × 125% (NEC 220.87(2) / 625.42)' : 'Full load'}
+                {(result.evLoad.demandVA / 1000).toFixed(1)} kVA ({result.evLoad.loadAmps}A) - {result.evLoad.demandVA < result.evLoad.totalConnectedVA * result.evLoad.demandFactor ? (result.evLoad.demandFactor > 1 ? 'EVEMS setpoint × 125% (NEC 220.87(2) / 625.42)' : 'EVEMS setpoint') : result.evLoad.demandFactor > 1 ? 'Full load × 125% (NEC 220.87(2) / 625.42)' : 'Full load'}
               </Text>
             </View>
           </View>

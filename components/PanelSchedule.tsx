@@ -315,6 +315,7 @@ export const PanelSchedule: React.FC<PanelScheduleProps> = ({ project }) => {
           load_watts: c.load_watts,
           load_type: c.load_type,
           breaker_amps: c.breaker_amps,
+          is_proposed: c.is_proposed,
         })),
         squareFootage: residential?.squareFootage || 2000,
         smallApplianceCircuits: residential?.smallApplianceCircuits || 2,

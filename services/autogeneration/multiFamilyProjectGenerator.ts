@@ -810,8 +810,8 @@ function generateSingleUnitPanel(
   // switch in upstreamLoadAggregation.collectCircuitLoads):
   //   L lighting, R receptacles, M motors, H heating, C cooling,
   //   W water heater, D dryer, K kitchen (range/oven/DW/disposal), O other.
-  // These are what lets the MDP aggregator apply NEC 220.84(C)(4) heating @
-  // 65% and NEC 220.60 non-coincident HVAC at the system level — without
+  // These are what lets the MDP aggregator apply NEC 220.84(C)(5) (larger of
+  // A/C or electric heat) non-coincident HVAC at the system level — without
   // them, every circuit falls into the "Other" bucket at 100% nameplate
   // and the MDP demand inflates above the DLC's service calc.
 

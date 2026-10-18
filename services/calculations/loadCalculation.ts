@@ -303,6 +303,14 @@ function calculateExistingDwellingLoad(loads: LoadItem[], settings: ProjectSetti
       'separately-controlled space-heating units, and 40% for four or more separately-controlled units. ' +
       'This calc applies 100% by default — adjust manually if the heating scenario qualifies for the credit.'
     );
+    // 220.83(A) applies when the permit adds no HVAC (PE ruling 2026-10-18,
+    // #132), but LoadItem has no existing/new flag, so this path can't tell
+    // and stays on the conservative (B) branch.
+    notes.push(
+      'This load list does not record which loads are new, so HVAC is taken at 100% per NEC 220.83(B). ' +
+      'If the permit adds no heating or A/C equipment, NEC 220.83(A) applies (HVAC in the 8 kVA / 40% bucket) — ' +
+      'use the Dwelling Load Calculator, which tracks proposed loads.'
+    );
   }
 
   const totalConnectedVA = loads.reduce((sum, load) => sum + load.watts, 0);

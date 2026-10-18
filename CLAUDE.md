@@ -74,13 +74,30 @@ CRITICAL: only `calculated` skips the 1.25× multiplier.
 - NEW load: continuous loads at 125% — EV charging is continuous per NEC 625.42,
   sized per 625.41 (PE ruling 2026-10-14). This is the 220.87(2) comparison
   only; inside Article 220 load totals the EVSE stays at 100% (see EVSE below).
+- EVEMS: the setpoint is the new EV load and ALSO takes the 125% (PE ruling
+  2026-10-18, #131). Size it as available × 0.90 ÷ 1.25 so EVEMS designs pass.
 ```
 PE-confirmed 2026-07-09 (PR #118 review), superseding both prior interpretations
 (pre-Sprint-2 multiplied calculated; Sprint 2 wrongly exempted measured).
 Implementation: `services/calculations/serviceUpgrade.ts`, mirrored in
 `services/pdfExport/PermitPacketDocuments.tsx::NEC22087NarrativePage` (new load
-prefilled in `PermitPacketGenerator.tsx`) and `services/calculations/multiFamilyEV.ts`
-(measured path) — all three must stay in sync. Factor: `EVSE_CONTINUOUS_FACTOR`.
+prefilled in `PermitPacketGenerator.tsx` via `upstreamLoadAggregation.ts::calculateProposedNewLoadVA`)
+and `services/calculations/multiFamilyEV.ts` (measured path) — all three must
+stay in sync. Factor: `EVSE_CONTINUOUS_FACTOR`.
+
+### Dwelling Optional Methods — HVAC (PE rulings 2026-10-18)
+```
+220.83 (existing single-family):
+- No proposed heating/A/C → 220.83(A): existing HVAC (larger of heat/cool
+  only, per 220.60) goes INTO the 8 kVA / 40% bucket.
+- Any proposed heating/A/C, INCLUDING a like-for-like replacement → 220.83(B):
+  HVAC at 100%. (#132)
+220.84 (multifamily): the larger of A/C or fixed electric heat at NAMEPLATE per
+220.84(C)(5). No 65% heat factor — that is 220.82(C) only. (#133)
+```
+Implementation: `residentialLoad.ts` (`calculateSingleFamilyLoad`,
+`calculateDwellingPanelDemand` + `hasProposedHvac`, `calculateMultiFamilyLoad`),
+`upstreamLoadAggregation.ts` (MDP 220.84), `multiFamilyEV.ts` (simplified path).
 
 ### Short Circuit Analysis
 ```
@@ -285,6 +302,7 @@ Real mistakes made in this repo, each paired with the rule that prevents recurre
 | Calculated-method narrative cited dwelling Optional Methods (220.82/220.83) as "Part III" by occupancy, though they're Part IV and the narrative's calc never ran them | Cite from the calculation's runtime references (`summarizeCalculationRefs`), never a fixed per-occupancy string. Part IV only when an Optional Method section actually ran. (PE ruling 2026-09-27) |
 | Single-family E-102 ran the Part III cascade while E-101 ran NEC 220.83; the same packet passed the service on one page and failed it on the next (#121) | Pages reporting the same quantity call the same function behind the same gate helper (`buildSingleFamilyDwellingContext`). Existing dwelling → 220.83, new → 220.82, on every page. |
 | Single-family calc applied ×1.25 to EVSE and other "continuous" loads inside the 220.82/220.83 load calc, citing "220.18(B)" for it; the #123 edition fix covered only the multifamily path | The 125% is OCPD/conductor sizing, never the Article 220 load. When a rule changes, grep every calc that computes the same quantity (MF, SF Optional Method, Dwelling Calculator, Panel Summary), not just the one in the bug report. |
+| Multifamily 220.84 took electric heat at 65% and cited "220.84(C)(4)" for it — a 220.82(C) single-dwelling factor carried into a section that has none, understating demand (#133) | A factor valid in one Optional Method is not valid in another. Before applying any factor, find it in the text of the section you cite. 220.84(C)(5) = larger of A/C or heat at nameplate. |
 | Docs updated with stale "Last Updated" dates; completed features left as "NEXT UP" | Every doc touch updates its date to today; every shipped feature flips its ROADMAP status in the same PR. |
 
 ---

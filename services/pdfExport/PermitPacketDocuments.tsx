@@ -1763,6 +1763,7 @@ export const LoadCalculationSummary: React.FC<LoadSummaryProps> = ({
             load_watts: c.load_watts,
             load_type: c.load_type,
             breaker_amps: c.breaker_amps,
+            is_proposed: c.is_proposed,
           })),
         squareFootage: singleFamilyDwellingContext.squareFootage,
         smallApplianceCircuits: singleFamilyDwellingContext.smallApplianceCircuits,
@@ -1786,20 +1787,22 @@ export const LoadCalculationSummary: React.FC<LoadSummaryProps> = ({
   const dwellingBreakdown = dwellingResult
     ? [
         {
-          loadType: 'General Loads (Lighting + SABC + Laundry + Appliances)',
+          loadType: dwellingResult.hvacVA === 0 && dwellingResult.necReferences.includes('NEC 220.60')
+            ? 'General Loads (Lighting + SABC + Laundry + Appliances + HVAC)'
+            : 'General Loads (Lighting + SABC + Laundry + Appliances)',
           connectedVA: dwellingResult.generalConnectedVA,
           demandFactor: dwellingResult.generalConnectedVA > 0
             ? dwellingResult.generalDemandVA / dwellingResult.generalConnectedVA
             : 0,
           demandVA: dwellingResult.generalDemandVA,
-          necReference: `${dwellingResult.necArticle}(A) — first 8 kVA @ 100%, remainder @ 40%`,
+          necReference: `${dwellingResult.generalNecReference} — first ${singleFamilyDwellingContext?.existingDwelling ? 8 : 10} kVA @ 100%, remainder @ 40%`,
         },
         ...(dwellingResult.hvacVA > 0 ? [{
           loadType: 'HVAC (non-coincident, larger of heat/cool)',
           connectedVA: dwellingResult.hvacVA,
           demandFactor: 1.0,
           demandVA: dwellingResult.hvacVA,
-          necReference: `${dwellingResult.necArticle}(B) / NEC 220.60`,
+          necReference: `${dwellingResult.hvacNecReference} / NEC 220.60`,
         }] : []),
       ]
     : null;

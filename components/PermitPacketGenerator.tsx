@@ -54,10 +54,10 @@ import type { MultiFamilyEVResult } from '../services/calculations/multiFamilyEV
 import {
   buildMultiFamilyContext,
   calculateAggregatedLoad,
+  calculateProposedNewLoadVA,
   isEVEMSManagedPanel,
 } from '../services/calculations/upstreamLoadAggregation';
 import { calculateDwellingDemandSplit } from '../services/calculations/residentialLoad';
-import { EVSE_CONTINUOUS_FACTOR, isEvseDescription } from '../data/nec/evse-load';
 import { screenContractorExemption } from '../services/permitMode/exemptionScreening';
 import {
   projectAddressSchema,
@@ -463,15 +463,10 @@ export const PermitPacketGenerator: React.FC<PermitPacketGeneratorProps> = ({ pr
   // per NEC 625.42, sized per 625.41; PE ruling 2026-10-14), other loads at
   // nameplate. Prefilled once per project, only into an empty field (the
   // functional update runs after hydration, so a saved value always wins).
-  const suggestedProposedKVA = React.useMemo(() => {
-    const va = circuits
-      .filter(c => c.is_proposed)
-      .reduce((sum, c) => {
-        const watts = c.load_watts || 0;
-        return sum + (isEvseDescription(c.description) ? watts * EVSE_CONTINUOUS_FACTOR : watts);
-      }, 0);
-    return va / 1000;
-  }, [circuits]);
+  const suggestedProposedKVA = React.useMemo(
+    () => calculateProposedNewLoadVA(circuits) / 1000,
+    [circuits],
+  );
   const nec22087PrefilledProjectRef = React.useRef<string | null>(null);
   useEffect(() => {
     if (!currentProject?.id || nec22087Method === 'calculated' || suggestedProposedKVA <= 0) return;
@@ -1972,7 +1967,7 @@ export const PermitPacketGenerator: React.FC<PermitPacketGeneratorProps> = ({ pr
                         <p className="text-xs text-gray-500 mt-1">
                           Enter continuous loads at 125% — EV charging is continuous per NEC 625.42 (sized per 625.41).
                           {suggestedProposedKVA > 0 && (
-                            <> From proposed circuits: {suggestedProposedKVA.toFixed(2)} kVA (EVSE at 125%, others at nameplate).</>
+                            <> From proposed circuits: {suggestedProposedKVA.toFixed(2)} kVA (EVSE at 125% — clamped to the EVEMS setpoint where one is set — others at nameplate).</>
                           )}
                         </p>
                       )}

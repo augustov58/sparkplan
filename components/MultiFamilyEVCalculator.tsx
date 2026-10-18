@@ -972,7 +972,7 @@ export const MultiFamilyEVCalculator: React.FC<MultiFamilyEVCalculatorProps> = (
                         onChange={e => setHasElectricHeat(e.target.checked)}
                         className="rounded border-gray-300 text-[#2d3b2d] focus:ring-[#2d3b2d]/20"
                       />
-                      <span className="text-sm text-gray-700">Electric Heat (65% demand factor)</span>
+                      <span className="text-sm text-gray-700">Electric Heat (10 kW/unit nameplate)</span>
                     </label>
 
                     <label className="flex items-center gap-2 cursor-pointer">
@@ -1310,7 +1310,9 @@ export const MultiFamilyEVCalculator: React.FC<MultiFamilyEVCalculatorProps> = (
                       {result.evLoad.loadAmps} A
                     </div>
                     <div className="text-xs text-gray-500 mt-1">
-                      {(result.evLoad.demandVA / 1000).toFixed(1)} kVA ({result.evLoad.demandFactor > 1 ? 'full connected load × 125% — NEC 220.87(2) / 625.42' : 'full connected load'})
+                      {(result.evLoad.demandVA / 1000).toFixed(1)} kVA ({result.evLoad.demandVA < result.evLoad.totalConnectedVA * result.evLoad.demandFactor
+                        ? (result.evLoad.demandFactor > 1 ? 'EVEMS setpoint × 125% — NEC 220.87(2) / 625.42' : 'EVEMS setpoint — NEC 625.42')
+                        : (result.evLoad.demandFactor > 1 ? 'full connected load × 125% — NEC 220.87(2) / 625.42' : 'full connected load')})
                     </div>
                   </div>
                 </div>
@@ -1327,9 +1329,12 @@ export const MultiFamilyEVCalculator: React.FC<MultiFamilyEVCalculatorProps> = (
                   ? result.serviceAnalysis.existingCapacityVA / result.serviceAnalysis.existingCapacityAmps
                   : voltage;
 
-                // Compute EV amps for the selected scenario
+                // Compute EV amps for the selected scenario. On the measured
+                // (220.87) path, EV load — direct or the EVEMS setpoint — is
+                // taken at 125% (evLoad.demandFactor; PE rulings 2026-10-14
+                // and 2026-10-18 #131).
                 const evAmps = (scenario.powerPerCharger_kW != null && vaPerAmp > 0)
-                  ? Math.round((scenario.powerPerCharger_kW * 1000 * chargerCount) / vaPerAmp)
+                  ? Math.round((scenario.powerPerCharger_kW * 1000 * chargerCount * result.evLoad.demandFactor) / vaPerAmp)
                   : result.evLoad.loadAmps;
 
                 // Service capacity: use upgraded size if that scenario, else existing

@@ -22,7 +22,7 @@ import {
 const MF_OPTIONAL_REFS = [
   'NEC 220.84 (Optional Calculation — Multifamily Dwelling)',
   'NEC 220.60 (Non-Coincident Loads)',
-  'NEC 220.84(C)(4) (Electric Space Heating @ 65%)',
+  'NEC 220.84(C)(5) (Larger of A/C or Electric Space Heating)',
   'NEC 625.42 (EVEMS Load)',
 ];
 const STANDARD_DWELLING_REFS = [
@@ -33,7 +33,7 @@ const STANDARD_DWELLING_REFS = [
 ];
 
 describe('summarizeCalculationRefs', () => {
-  it('classifies a 220.84 run as Part IV and collapses 220.84(C)(4) into 220.84', () => {
+  it('classifies a 220.84 run as Part IV and collapses 220.84(C)(5) into 220.84', () => {
     expect(summarizeCalculationRefs(MF_OPTIONAL_REFS)).toEqual({
       part: 'IV',
       optionalSection: '220.84',
