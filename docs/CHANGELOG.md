@@ -4,6 +4,16 @@ All notable changes to SparkPlan.
 
 ---
 
+## 2026-10-18: EV feeders, EVEMS marker and charger sizing (#139, #144, #156, #164)
+
+- **Feeder Manager sizes EV feeders like the packet (#144).** Recalculate counted the EVEMS setpoint marker as a load and lost the NEC 625.42 clamp, sizing an EVEMS feeder at 686 A / 500 kcmil where the packet's E-103 showed 189 A. It now uses the destination panel's EVEMS-clamped demand with the same continuous split as E-103, saves the number of parallel sets, and warns when a feeder's design load exceeds the destination panel's rating.
+- **EVEMS clamp keeps the panel's other loads (#144).** The setpoint limits the chargers only; lighting and receptacles on the EV panel now add on top of it instead of disappearing (e.g. +1.8 kVA on the QA project).
+- **The EVEMS marker no longer counts as load (#156)** on E-101's "Connected Load by Panel", the Copilot's project summary, Inspector Mode's panel-load check, and the feeder stale check.
+- **Generated EV chargers match the calculator (#139).** A 40 A charger now generates a 40 A / 50 A-breaker / 8 AWG / 9.6 kVA circuit instead of the 48 A / 60 A / 11.52 kVA preset.
+- **Fewer false EV matches (#164).** A circuit is an EV charger when it says "charger", "EVSE" or "electric vehicle", or a bare "EV" not naming another load ("EV Area Lighting" is no longer a charger). Multifamily EV panels are recognized by "EV" as a word or by their charger circuits, so "Elevator" and "Riverview" panels no longer count as EV.
+
+---
+
 ## 2026-10-18: PE rulings on EVEMS setpoint, 220.83(A)/(B), and 220.84 electric heat (#131, #132, #133, #137)
 
 **Load calculation changes (user-facing; some verdicts change)**, per PE rulings of 2026-10-17/18:

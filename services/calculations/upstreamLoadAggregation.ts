@@ -933,15 +933,23 @@ export function calculateAggregatedLoad(
   // the FEEDER serving the EV panel benefits from the EVEMS reduction.
   if (isEVEMSManagedPanel(panelId, circuits)) {
     const setpointVA = evemsSetpointVA(panel, circuits);
-    if (setpointVA !== null && totalDemandVA > setpointVA) {
+    // The EVEMS limits the chargers only; the panel's other loads (lighting,
+    // receptacles) add on top of the setpoint (#144 — the clamp used to
+    // replace the whole panel demand and dropped them).
+    const evseVA = circuits
+      .filter(c => c.panel_id === panelId && !isEVEMSMarkerCircuit(c) && isEvseDescription(c.description))
+      .reduce((sum, c) => sum + (c.load_watts || 0), 0);
+    const nonEvseDemandVA = Math.max(0, totalDemandVA - evseVA);
+    const clampedVA = setpointVA !== null ? setpointVA + nonEvseDemandVA : null;
+    if (clampedVA !== null && evseVA > setpointVA! && totalDemandVA > clampedVA) {
       const preClampVA = totalDemandVA;
-      totalDemandVA = setpointVA;
+      totalDemandVA = clampedVA;
       necReferences.push('NEC 625.42 (EVEMS — feeder demand clamped to setpoint)');
       demandBreakdown.push({
         loadType: 'EVEMS feeder reduction',
         connectedVA: preClampVA,
-        demandVA: setpointVA,
-        demandFactor: preClampVA > 0 ? setpointVA / preClampVA : 1.0,
+        demandVA: clampedVA,
+        demandFactor: preClampVA > 0 ? clampedVA / preClampVA : 1.0,
         necReference: 'NEC 625.42 (EVEMS — branch conductors at nameplate; feeder at setpoint)',
       });
     }
@@ -1296,7 +1304,13 @@ export function buildMultiFamilyContext(
   //   - evLoadVA: raw connected sum (subtracted from dwelling base before 220.84 demand)
   //   - evDemandVA: post-NEC-625.42 demand (added back at 100%; EVEMS-clamped
   //     for EVEMS-managed panels via the clamp inside calculateAggregatedLoad)
-  const evPanels = downstreamFromMDP.filter(p => p.name.toLowerCase().includes('ev'));
+  // EV panel = "EV" as a word in the name ("EV Sub-Panel"), or a panel
+  // carrying EVSE circuits / an EVEMS marker. The old substring match on "ev"
+  // also caught "Elevator" / "Riverview" panels (#164, the #26 pattern).
+  const evPanels = downstreamFromMDP.filter(p =>
+    /\bev\b/i.test(p.name) ||
+    circuits.some(c => c.panel_id === p.id && (isEVEMSMarkerCircuit(c) || isEvseDescription(c.description))),
+  );
   let evLoadVA = 0;
   let evDemandVA = 0;
   for (const p of evPanels) {

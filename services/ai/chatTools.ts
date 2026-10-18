@@ -13,7 +13,7 @@ import type { Database } from '@/lib/database.types';
 import { analyzeChangeImpact, draftRFI, predictInspection } from '../api/pythonBackend';
 import { supabase } from '@/lib/supabase';
 import { notifyDataRefresh } from '@/lib/dataRefreshEvents';
-import { computeFeederLoadVA } from '@/services/feeder/feederLoadSync';
+import { computeFeederLoadVA, splitFeederDesignLoad } from '@/services/feeder/feederLoadSync';
 import { calculateFeederSizing } from '@/services/calculations/feederSizing';
 import {
   calculateAllCumulativeVoltageDrops,
@@ -587,8 +587,8 @@ Returns the feeder's voltage drop percentage if already calculated in the projec
           destination_voltage: voltage,
           destination_phase: phase,
           total_load_va: liveLoadVA,
-          continuous_load_va: liveLoadVA * 0.8,
-          noncontinuous_load_va: liveLoadVA * 0.2,
+          continuous_load_va: splitFeederDesignLoad(liveLoadVA).continuousVA,
+          noncontinuous_load_va: splitFeederDesignLoad(liveLoadVA).noncontinuousVA,
           distance_ft: rawFeeder!.distance_ft || 0,
           conductor_material: (rawFeeder!.conductor_material as 'Cu' | 'Al') || 'Cu',
           ambient_temperature_c: 30,

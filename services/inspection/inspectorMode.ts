@@ -21,6 +21,7 @@
  */
 
 import type { Database } from '@/lib/database.types';
+import { isEVEMSMarkerCircuit } from '@/services/calculations/upstreamLoadAggregation';
 
 type Panel = Database['public']['Tables']['panels']['Row'];
 type Circuit = Database['public']['Tables']['circuits']['Row'];
@@ -179,8 +180,9 @@ function getRequiredEgcSize(ocpdAmps: number, material: 'Cu' | 'Al' = 'Cu'): str
  * Calculate total load on a panel from circuits
  */
 function calculatePanelLoad(panelId: string, circuits: Circuit[]): number {
+  // EVEMS marker circuits are metadata, not load (#156).
   return circuits
-    .filter(c => c.panel_id === panelId)
+    .filter(c => c.panel_id === panelId && !isEVEMSMarkerCircuit(c))
     .reduce((sum, c) => sum + (c.load_watts || 0), 0);
 }
 

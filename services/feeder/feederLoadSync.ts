@@ -13,7 +13,7 @@
 
 import type { Feeder } from '@/types';
 import type { Database } from '@/lib/database.types';
-import { calculateAggregatedLoad } from '@/services/calculations/upstreamLoadAggregation';
+import { calculateAggregatedLoad, isEVEMSMarkerCircuit } from '@/services/calculations/upstreamLoadAggregation';
 
 type Circuit = Database['public']['Tables']['circuits']['Row'];
 type Panel = Database['public']['Tables']['panels']['Row'];
@@ -41,7 +41,7 @@ function calculatePanelCurrentConnectedLoad(
   circuits: Circuit[]
 ): number {
   return circuits
-    .filter(c => c.panel_id === panelId)
+    .filter(c => c.panel_id === panelId && !isEVEMSMarkerCircuit(c))
     .reduce((sum, c) => sum + (c.load_watts || 0), 0);
 }
 
@@ -212,4 +212,14 @@ export function computeFeederLoadVA(
     undefined,
   );
   return aggregate.totalDemandVA;
+}
+
+/**
+ * Continuous / non-continuous split for feeder sizing from a demand load:
+ * 80% continuous (×1.25 in calculateFeederSizing) / 20% non-continuous. One
+ * definition for the packet's E-103, the Copilot, and the Feeder Manager so
+ * the app and the packet size the same feeder the same way (#144).
+ */
+export function splitFeederDesignLoad(loadVA: number): { continuousVA: number; noncontinuousVA: number } {
+  return { continuousVA: loadVA * 0.8, noncontinuousVA: loadVA * 0.2 };
 }

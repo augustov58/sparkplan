@@ -8,6 +8,7 @@
  */
 
 import type { Database } from '@/lib/database.types';
+import { isEVEMSMarkerCircuit } from '@/services/calculations/upstreamLoadAggregation';
 import {
   calculateAllCumulativeVoltageDrops,
   calculateCumulativeForFeeder,
@@ -184,7 +185,7 @@ export function buildProjectContext(
 ): ProjectContext {
   // Build panel summaries with hierarchy information
   const panelSummaries: PanelSummary[] = panels.map(panel => {
-    const panelCircuits = circuits.filter(c => c.panel_id === panel.id);
+    const panelCircuits = circuits.filter(c => c.panel_id === panel.id && !isEVEMSMarkerCircuit(c));
     const totalLoadVA = panelCircuits.reduce((sum, c) => sum + (c.load_watts || 0), 0);
     
     // Find what feeds this panel
@@ -302,13 +303,13 @@ export function buildProjectContext(
   });
 
   // Calculate total load
-  const totalConnectedVA = circuits.reduce((sum, c) => sum + (c.load_watts || 0), 0);
+  const totalConnectedVA = circuits.reduce((sum, c) => (isEVEMSMarkerCircuit(c) ? sum : sum + (c.load_watts || 0)), 0);
   // Estimate demand load (simplified - actual calculation is more complex)
   const totalDemandVA = totalConnectedVA * 0.8; // Rough 80% demand factor estimate
 
   // Helper to get panel load
   const getPanelLoad = (panelId: string) => {
-    const panelCircuits = circuits.filter(c => c.panel_id === panelId);
+    const panelCircuits = circuits.filter(c => c.panel_id === panelId && !isEVEMSMarkerCircuit(c));
     return panelCircuits.reduce((sum, c) => sum + (c.load_watts || 0), 0);
   };
 
