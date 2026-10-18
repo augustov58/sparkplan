@@ -162,7 +162,10 @@ export interface SingleFamilyInput {
    * optional method for *existing* dwelling units adding loads:
    *   - General-loads bucket (everything except HVAC): first 8 kVA at 100%,
    *     remainder at 40%.
-   *   - HVAC contribution (larger of heating/cooling per 220.60) added at 100%.
+   *   - HVAC contribution (larger of heating/cooling per 220.60) added at
+   *     100% per 220.83(B) when a proposed HVAC load is present (new or
+   *     replacement); otherwise 220.83(A) folds it into the bucket.
+   *     (PE ruling 2026-10-18, #132)
    *
    * When false/undefined the canonical 220.82 standard method is used
    * (per-category demand factors).
@@ -735,9 +738,12 @@ export function calculateSingleFamilyLoad(input: SingleFamilyInput): Residential
   if (appliances.otherAppliances?.length) {
     for (const other of appliances.otherAppliances) {
       const otherVA = other.kw * 1000;
+      // A proposed HVAC load is HVAC for the 220.82(C) / 220.83(B) treatment
+      // (100%, outside the 40% bucket), not a general appliance.
+      const isProposedHvac = other.proposed && other.category === 'HVAC';
       breakdown.push({
-        category: other.proposed ? 'Proposed Load' : 'Other Appliance',
-        description: `${other.description} - ${other.kw} kW`,
+        category: isProposedHvac ? 'HVAC' : other.proposed ? 'Proposed Load' : 'Other Appliance',
+        description: `${isProposedHvac ? 'Proposed: ' : ''}${other.description} - ${other.kw} kW`,
         connectedVA: otherVA,
         demandVA: otherVA,
         demandFactor: 1.0,
@@ -757,12 +763,21 @@ export function calculateSingleFamilyLoad(input: SingleFamilyInput): Residential
   // bucket:
   //   - 220.82 (new):       first 10 kVA at 100 %, remainder at 40 %
   //   - 220.83 (existing):  first 8 kVA at 100 %, remainder at 40 %
-  // HVAC is added at 100 % of the larger of heating/cooling per 220.60 in
-  // both cases. The block below applies whichever knee is active and
-  // re-tags the breakdown citations accordingly.
+  // HVAC is added at 100 % of the larger of heating/cooling per 220.60 —
+  // except 220.83(A): when the permit adds no heating/air-conditioning
+  // equipment, the existing HVAC (larger of heat/cool only) goes into the
+  // 8 kVA / 40 % bucket. Any proposed HVAC, including a like-for-like
+  // replacement, keeps 220.83(B) (PE ruling 2026-10-18, #132). The block
+  // below applies whichever knee is active and re-tags the breakdown
+  // citations accordingly.
   if (bucketMethod !== 'none') {
+    const hvacProposed = (appliances.otherAppliances ?? [])
+      .some(o => o.proposed && o.category === 'HVAC');
+    const hvacInBucket = bucketMethod === '220-83' && !hvacProposed; // 220.83(A)
     const FIRST_TIER_VA = bucketMethod === '220-83' ? 8_000 : 10_000;
-    const articleLabel = bucketMethod === '220-83' ? 'NEC 220.83' : 'NEC 220.82';
+    const articleLabel = bucketMethod === '220-83'
+      ? (hvacInBucket ? 'NEC 220.83(A)' : 'NEC 220.83(B)')
+      : 'NEC 220.82';
     const hvacReference = bucketMethod === '220-83'
       ? 'NEC 220.83(B) - HVAC at 100% (larger of heat/cool)'
       : 'NEC 220.82(C) - HVAC at 100% (larger of heat/cool)';
@@ -782,7 +797,12 @@ export function calculateSingleFamilyLoad(input: SingleFamilyInput): Residential
       // Skip the 'General Loads Subtotal' synthetic row to avoid double-counting
       // with its component rows (General Lighting, Small Appliance, Laundry).
       if (row.category === 'General Loads Subtotal') continue;
-      if (row.category === 'HVAC') {
+      if (row.category === 'HVAC' && hvacInBucket) {
+        // 220.83(A): the larger of heat/cool (the row's demandVA) enters the
+        // bucket; connectedVA stays the displayed nameplate.
+        generalConnectedVA_raw += row.connectedVA;
+        generalConnectedVA_bucketed += row.demandVA;
+      } else if (row.category === 'HVAC') {
         hvacConnectedVA += row.connectedVA;
         hvacDemandVA += row.demandVA;
       } else {
@@ -801,12 +821,12 @@ export function calculateSingleFamilyLoad(input: SingleFamilyInput): Residential
     // Re-tag the per-category necReference so the breakdown reads as the
     // active Optional Method article.
     for (const row of breakdown) {
-      if (row.category === 'HVAC') {
+      if (row.category === 'HVAC' && !hvacInBucket) {
         row.necReference = hvacReference;
       } else if (row.category === 'General Loads Subtotal') {
         row.demandVA = generalDemandVA;
         row.demandFactor = generalConnectedVA_bucketed > 0 ? generalDemandVA / generalConnectedVA_bucketed : 0;
-        row.description = `Lighting + Small Appliance + Laundry + Appliances (first ${kneeKva} kVA @ 100%, remainder @ 40%)`;
+        row.description = `Lighting + Small Appliance + Laundry + Appliances${hvacInBucket ? ' + HVAC' : ''} (first ${kneeKva} kVA @ 100%, remainder @ 40%)`;
         row.necReference = `${articleLabel} - General Loads (${kneeKva} kVA / 40%)`;
         // Display the raw nameplate sum on the Subtotal row so the
         // breakdown stays additive against its component rows. The EVSE
@@ -829,6 +849,13 @@ export function calculateSingleFamilyLoad(input: SingleFamilyInput): Residential
     totalDemand = generalDemandVA + hvacDemandVA;
 
     necReferences.push(bucketLabel);
+    if (hvacInBucket && breakdown.some(r => r.category === 'HVAC')) {
+      warnings.push(
+        'ℹ️ NEC 220.83(A): no heating or air-conditioning equipment is being added, so the existing ' +
+        'HVAC (larger of heat/cool) is included in the general loads bucket. Adding or replacing ' +
+        'HVAC equipment switches the calculation to NEC 220.83(B) (HVAC at 100%).'
+      );
+    }
     if (hvacConnectedVA > 0) {
       necReferences.push(hvacReference);
       if (bucketMethod === '220-83') {
@@ -991,8 +1018,9 @@ export function calculateMultiFamilyLoad(input: MultiFamilyInput): ResidentialLo
 
   // 2d. Appliance loads at NAMEPLATE (no 220.55 / 220.54 reductions)
   // Per NEC 220.84(C)(3): cooking equipment at nameplate, not per Table 220.55
-  // Per NEC 220.84(C)(4): electric heat at 65%
-  // Per NEC 220.60: non-coincident heating/cooling — use the larger
+  // Per NEC 220.84(C)(5): the larger of A/C or fixed electric space heating,
+  // at nameplate. No 65% heat factor — that is 220.82(C) only (PE ruling
+  // 2026-10-18, #133); Table 220.84 supplies the diversity.
   let totalApplianceVA = 0;
   for (const template of unitTemplates) {
     const app = template.appliances;
@@ -1018,12 +1046,11 @@ export function calculateMultiFamilyLoad(input: MultiFamilyInput): ResidentialLo
     if (app.disposal?.enabled) unitApplianceVA += app.disposal.kw * 1000;
     if (app.microwave?.enabled) unitApplianceVA += app.microwave.kw * 1000;
 
-    // HVAC: non-coincident per NEC 220.60 (use larger of heating / cooling)
-    // Electric heat at 65% per NEC 220.84(C)(4)
+    // HVAC per NEC 220.84(C)(5): larger of A/C or electric heat, at nameplate
     if (app.hvac?.enabled) {
       const coolingVA = (app.hvac.coolingKw || 0) * 1000;
       const isElectricHeat = app.hvac.type === 'heat_pump' || app.hvac.type === 'electric_heat';
-      const heatingVA = isElectricHeat ? (app.hvac.heatingKw || 0) * 1000 * 0.65 : 0;
+      const heatingVA = isElectricHeat ? (app.hvac.heatingKw || 0) * 1000 : 0;
       unitApplianceVA += Math.max(coolingVA, heatingVA); // Non-coincident
     }
 
@@ -1552,6 +1579,7 @@ export interface PanelDemandCircuit {
   load_watts?: number | null;
   load_type?: string | null;
   breaker_amps?: number | null;
+  is_proposed?: boolean | null;
 }
 
 export interface PanelDemandResult {
@@ -1561,7 +1589,20 @@ export interface PanelDemandResult {
   totalConnectedVA: number;
   totalDemandVA: number;
   necArticle: 'NEC 220.82' | 'NEC 220.83';
+  /** Citation for the general-loads bucket row, e.g. "NEC 220.83(A)" */
+  generalNecReference: string;
+  /** Citation for the HVAC-at-100% row (empty when hvacVA is 0) */
+  hvacNecReference: string;
+  necReferences: string[];
   warnings: string[];
+}
+
+/** True when any proposed circuit is heating or A/C (load_type H or C). */
+export function hasProposedHvac(circuits: PanelDemandCircuit[]): boolean {
+  return circuits.some(c => {
+    const type = (c.load_type ?? '').toUpperCase();
+    return !!c.is_proposed && (type === 'C' || type === 'H');
+  });
 }
 
 export function calculateDwellingPanelDemand(opts: {
@@ -1573,6 +1614,13 @@ export function calculateDwellingPanelDemand(opts: {
   existingDwelling: boolean;
   /** Edition for the per-EVSE load rule (`getEvseLoadVA`). Default '2020'. */
   necEdition?: NecEdition;
+  /**
+   * Whether the permit adds (or replaces) heating / A/C equipment. Selects
+   * NEC 220.83(B) over 220.83(A) for existing dwellings (PE ruling
+   * 2026-10-18, #132). Defaults to `hasProposedHvac(circuits)`; pass it
+   * explicitly when `circuits` is a subset (the existing-only split run).
+   */
+  hvacProposed?: boolean;
 }): PanelDemandResult {
   const {
     circuits,
@@ -1581,7 +1629,10 @@ export function calculateDwellingPanelDemand(opts: {
     laundryCircuit,
     existingDwelling,
     necEdition = '2020',
+    hvacProposed = hasProposedHvac(opts.circuits),
   } = opts;
+  // 220.83(A): existing dwelling, no HVAC added → HVAC joins the 8 kVA / 40% bucket.
+  const hvacInBucket = existingDwelling && !hvacProposed;
 
   const lightingVA = squareFootage * LIGHTING_LOAD_VA_PER_SQFT;
   const saVA = smallApplianceCircuits * SMALL_APPLIANCE_VA_PER_CIRCUIT;
@@ -1613,12 +1664,32 @@ export function calculateDwellingPanelDemand(opts: {
   generalRawVA += lightingVA + saVA + laundryVA;
   generalBucketedVA += lightingVA + saVA + laundryVA;
 
+  // 220.60: heating and cooling are non-coincident — the larger counts.
+  const largerHvacVA = Math.max(acVA, heatVA);
+  if (hvacInBucket) {
+    generalRawVA += largerHvacVA;
+    generalBucketedVA += largerHvacVA;
+  }
+
   const KNEE_VA = existingDwelling ? 8_000 : 10_000;
   const REMAINDER_FACTOR = 0.4;
   const firstTier = Math.min(generalBucketedVA, KNEE_VA);
   const remainder = Math.max(0, generalBucketedVA - KNEE_VA);
   const generalDemandVA = Math.round(firstTier + remainder * REMAINDER_FACTOR);
-  const hvacVA = Math.max(acVA, heatVA);
+  const hvacVA = hvacInBucket ? 0 : largerHvacVA;
+
+  const necArticle = existingDwelling ? 'NEC 220.83' : 'NEC 220.82';
+  const generalNecReference = existingDwelling
+    ? (hvacInBucket ? 'NEC 220.83(A)' : 'NEC 220.83(B)')
+    : 'NEC 220.82(B)';
+  const hvacNecReference = hvacVA > 0
+    ? (existingDwelling ? 'NEC 220.83(B)' : 'NEC 220.82(C)')
+    : '';
+  const necReferences = [
+    generalNecReference,
+    ...(hvacNecReference && hvacNecReference !== generalNecReference ? [hvacNecReference] : []),
+    ...(largerHvacVA > 0 ? ['NEC 220.60'] : []),
+  ];
 
   return {
     generalConnectedVA: Math.round(generalRawVA),
@@ -1626,7 +1697,10 @@ export function calculateDwellingPanelDemand(opts: {
     hvacVA: Math.round(hvacVA),
     totalConnectedVA: Math.round(generalRawVA + hvacVA),
     totalDemandVA: Math.round(generalDemandVA + hvacVA),
-    necArticle: existingDwelling ? 'NEC 220.83' : 'NEC 220.82',
+    necArticle,
+    generalNecReference,
+    hvacNecReference,
+    necReferences,
     warnings: [],
   };
 }
@@ -1665,18 +1739,20 @@ export function calculateDwellingDemandSplit(opts: {
   necEdition?: NecEdition;
 }): DwellingDemandSplitResult {
   const { circuits, ...rest } = opts;
-  const total = calculateDwellingPanelDemand({ ...rest, circuits });
+  // One 220.83(A)/(B) decision for both runs, so existing + proposed = total.
+  const hvacProposed = hasProposedHvac(circuits);
+  const total = calculateDwellingPanelDemand({ ...rest, circuits, hvacProposed });
   const existing = calculateDwellingPanelDemand({
     ...rest,
     circuits: circuits.filter(c => !c.is_proposed),
+    hvacProposed,
   });
   return {
     existingDemandVA: existing.totalDemandVA,
     proposedDemandVA: total.totalDemandVA - existing.totalDemandVA,
     totalDemandVA: total.totalDemandVA,
     necArticle: total.necArticle,
-    // 220.60: the HVAC bucket takes the larger of heating / cooling.
-    necReferences: [total.necArticle, ...(total.hvacVA > 0 ? ['NEC 220.60'] : [])],
+    necReferences: total.necReferences,
     warnings: [...total.warnings],
     breakdown: { existing, total },
   };

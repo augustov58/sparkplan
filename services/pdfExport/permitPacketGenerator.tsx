@@ -1320,6 +1320,8 @@ export const generatePermitPacket = async (data: PermitPacketData): Promise<void
             showExistingNewMarkers={data.serviceModificationType !== 'new-service'}
             buildingType={data.buildingType}
             aggregatedLoad={aggregatedLoad}
+            singleFamilyDwellingContext={data.singleFamilyDwellingContext}
+            necEdition={resolvedNecEdition}
           />
         ),
       });

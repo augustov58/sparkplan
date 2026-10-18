@@ -13,6 +13,7 @@ import {
 } from './permitPacketTheme';
 import { getCircuitPhase } from '../calculations/demandFactor';
 import {
+  calculateDwellingPanelDemand,
   calculateDwellingUnitDemandVA,
   isDwellingUnitPanel,
 } from '../calculations/residentialLoad';
@@ -351,6 +352,19 @@ interface PanelSchedulePDFProps {
       necReference: string;
     }>;
   };
+  /**
+   * Single-family dwelling context (same as the packet's E-101). When set and
+   * this is the single-family service panel, the Load Summary runs
+   * `calculateDwellingPanelDemand` — the function E-101 / E-102 use — so the
+   * three pages agree, including the 220.83(A)/(B) branch (#132).
+   */
+  singleFamilyDwellingContext?: {
+    squareFootage: number;
+    smallApplianceCircuits: number;
+    laundryCircuit: boolean;
+    existingDwelling: boolean;
+  };
+  necEdition?: '2020' | '2023';
 }
 
 // Main PDF Component for single panel — page-level fragment for embedding.
@@ -366,6 +380,8 @@ export const PanelSchedulePages: React.FC<PanelSchedulePDFProps> = ({
   showExistingNewMarkers = false,
   buildingType,
   aggregatedLoad,
+  singleFamilyDwellingContext,
+  necEdition,
 }) => {
   // Helper: append " *" to a description when (a) markers are enabled AND
   // (b) the circuit is flagged as a proposed new addition. Returns the raw
@@ -444,9 +460,42 @@ export const PanelSchedulePages: React.FC<PanelSchedulePDFProps> = ({
     buildingType === 'single_family_residential' || buildingType === undefined;
   const isSingleFamilyMDP =
     panel.is_main === true && hasDwellingShape && isSingleFamilyContext;
-  const dwellingUnitDemand = (isUnitPanel || isSingleFamilyMDP)
-    ? calculateDwellingUnitDemandVA(dwellingCircuitsForCalc)
+  // Single-family service panel with the packet's dwelling context: same
+  // calculation as E-101 / E-102 (8 kVA knee for 220.83, 3 VA/ft² baseline,
+  // 220.83(A)/(B) branch). Otherwise the per-panel heuristic below.
+  const sfPanelDemand = isSingleFamilyMDP && singleFamilyDwellingContext
+    ? calculateDwellingPanelDemand({
+        circuits: realCircuits.map(c => ({
+          description: c.description,
+          load_watts: c.load_watts,
+          load_type: c.load_type,
+          breaker_amps: c.breaker_amps,
+          is_proposed: c.is_proposed,
+        })),
+        ...singleFamilyDwellingContext,
+        voltage: panel.voltage || 240,
+        necEdition,
+      })
     : null;
+  const dwellingUnitDemand = sfPanelDemand
+    ? {
+        generalConnectedVA: sfPanelDemand.generalConnectedVA,
+        generalDemandVA: sfPanelDemand.generalDemandVA,
+        climateDemandVA: sfPanelDemand.hvacVA,
+        totalDemandVA: sfPanelDemand.totalDemandVA,
+      }
+    : (isUnitPanel || isSingleFamilyMDP)
+      ? calculateDwellingUnitDemandVA(dwellingCircuitsForCalc)
+      : null;
+  // Tier knee and citations for the breakdown rows. The heuristic path keeps
+  // its historical 10 kVA knee and bare-section labels.
+  const dwellingKneeVA = sfPanelDemand && singleFamilyDwellingContext?.existingDwelling ? 8_000 : 10_000;
+  const dwellingGeneralRef = sfPanelDemand
+    ? sfPanelDemand.generalNecReference.replace(/^NEC /, '')
+    : showExistingNewMarkers ? '220.83' : '220.82';
+  const dwellingHvacRef = sfPanelDemand?.hvacNecReference
+    ? `${sfPanelDemand.hvacNecReference.replace(/^NEC /, '')} / 220.60`
+    : '220.60';
 
   const phaseBalancing = calculatePhaseBalancing(sortedCircuits, panel.phase);
   const voltage = panel.voltage;
@@ -745,7 +794,9 @@ export const PanelSchedulePages: React.FC<PanelSchedulePDFProps> = ({
                   without re-running the calc. Climate row appears only
                   when at least one of heating/cooling is present. */}
               {(() => {
-                const necRef = showExistingNewMarkers ? '220.83' : '220.82';
+                const necRef = dwellingGeneralRef;
+                const kneeVA = dwellingKneeVA;
+                const kneeKva = kneeVA / 1000;
                 const genConnVA = dwellingUnitDemand.generalConnectedVA;
                 const genDemVA = dwellingUnitDemand.generalDemandVA;
                 const rows: Array<{
@@ -755,7 +806,7 @@ export const PanelSchedulePages: React.FC<PanelSchedulePDFProps> = ({
                   demandFactor: number;
                   necReference: string;
                 }> = [];
-                if (genConnVA <= 10_000) {
+                if (genConnVA <= kneeVA) {
                   rows.push({
                     loadType: 'General loads (under tier threshold)',
                     connectedVA: genConnVA,
@@ -765,16 +816,16 @@ export const PanelSchedulePages: React.FC<PanelSchedulePDFProps> = ({
                   });
                 } else {
                   rows.push({
-                    loadType: 'General loads (first 10 kVA @ 100%)',
-                    connectedVA: 10_000,
-                    demandVA: 10_000,
+                    loadType: `General loads (first ${kneeKva} kVA @ 100%)`,
+                    connectedVA: kneeVA,
+                    demandVA: kneeVA,
                     demandFactor: 1.0,
                     necReference: necRef,
                   });
                   rows.push({
                     loadType: 'General loads (remainder @ 40%)',
-                    connectedVA: genConnVA - 10_000,
-                    demandVA: genDemVA - 10_000,
+                    connectedVA: genConnVA - kneeVA,
+                    demandVA: genDemVA - kneeVA,
                     demandFactor: 0.4,
                     necReference: necRef,
                   });
@@ -785,7 +836,7 @@ export const PanelSchedulePages: React.FC<PanelSchedulePDFProps> = ({
                     connectedVA: dwellingUnitDemand.climateDemandVA,
                     demandVA: dwellingUnitDemand.climateDemandVA,
                     demandFactor: 1.0,
-                    necReference: '220.60',
+                    necReference: dwellingHvacRef,
                   });
                 }
                 return (

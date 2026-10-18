@@ -204,6 +204,7 @@ export const DwellingLoadCalculator: React.FC<DwellingLoadCalculatorProps> = ({
       voltage: p.voltage,
       continuous: p.continuous,
       proposed: true,
+      category: p.category,
     }));
     return {
       ...appliances,

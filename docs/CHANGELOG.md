@@ -4,6 +4,17 @@ All notable changes to SparkPlan.
 
 ---
 
+## 2026-10-18: PE rulings on EVEMS setpoint, 220.83(A)/(B), and 220.84 electric heat (#131, #132, #133, #137)
+
+**Load calculation changes (user-facing; some verdicts change)**, per PE rulings of 2026-10-17/18:
+- **EVEMS setpoint at 125% in the NEC 220.87 check (#131).** On measured-demand projects (utility bill / load study), the EVEMS setpoint now counts at 125% like any continuous EV load. The Multi-Family EV Calculator sizes the setpoint to fit (90% of available capacity ÷ 1.25), so a configured EVEMS still passes; chargers share less power at peak (QA example: 157.5 A → 126 A). Calculated-method projects are unchanged.
+- **E-102 "Proposed New Load" prefill on EVEMS projects (#137).** The prefill no longer counts the EVEMS setpoint marker as a load and clamps the EV chargers to the setpoint. A 12-unit EVEMS design that showed 154.8 kVA (FAIL) now prefills 39.6 kVA (pass) once the project is regenerated with the new setpoint.
+- **Single-family existing dwellings: NEC 220.83(A) when no HVAC is added (#132).** If the permit adds no heating or A/C, existing HVAC (the larger of heat or cool) goes into the 8 kVA / 40% bucket instead of counting at 100%. Adding or replacing HVAC keeps 220.83(B). QA example (EV-only permit): 33.2 kVA / 138 A → 27.2 kVA / 113 A. Applies to the Dwelling Load Calculator, the Panel Schedule summary, and packet E-101/E-102. The legacy Load Calculator can't tell new from existing loads, so it stays on 220.83(B) and says so.
+- **Single-family panel schedule page (E-301) matches E-101/E-102.** The service panel's Load Summary used a separate shortcut (10 kVA first tier, no 3 VA/ft² baseline, HVAC always at 100%) and could print a different demand than the Load Calculation Summary on the same packet (QA example: 35.9 kVA / 150 A vs 27.2 kVA / 113 A). It now runs the same NEC 220.82/220.83 calculation.
+- **Multifamily NEC 220.84: electric heat at nameplate (#133).** The larger of A/C or electric heat now counts at nameplate per 220.84(C)(5). The 65% heat factor belongs to the single-dwelling 220.82(C) and was applied by mistake, understating demand (a 12-unit building with 10 kW heat strips: +17.2 kVA, about 72 A at 240 V).
+
+---
+
 ## 2026-10-14: Add EV Infrastructure no longer deletes the MDP or other panels (#130)
 
 **Data-loss fix (user-facing)**: re-running **Add EV Infrastructure** in the Multi-Family EV Calculator replaced every panel whose name contained "ev". The MDP is named after the building, so a building like "Seven Oaks" or "… + EV" lost its MDP, its circuits and its feeder; panels like "Elevator" were deleted too. It now replaces only the EV panel it generated (matched by its generated name or the EV meter's panel link), and never the main panel.

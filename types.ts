@@ -63,6 +63,12 @@ export interface ResidentialAppliances {
      * "Other Appliance" row.
      */
     proposed?: boolean;
+    /**
+     * Category of a proposed load (from proposedLoads). A proposed 'HVAC'
+     * entry — new or replacement — switches an existing dwelling from
+     * NEC 220.83(A) to 220.83(B) (PE ruling 2026-10-18, #132).
+     */
+    category?: string;
   }>;
 
   // Proposed new loads — staging area for additions on existing-construction
