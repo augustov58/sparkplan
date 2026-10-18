@@ -4,6 +4,14 @@ All notable changes to SparkPlan.
 
 ---
 
+## 2026-10-18: Saved jurisdiction no longer reverts; Copilot sees new projects (#134, #145, #146)
+
+- **Jurisdiction and packet settings stay saved (#134).** Each screen kept its own copy of the project, and nothing re-synced them. Saving a jurisdiction in the AHJ panel was then overwritten by the Permit Packet's next autosave, and the packet came out generic; the reverse could revert packet settings. The app now holds one shared project list, and delayed autosaves apply their change to the latest saved project.
+- **Copilot works on new and empty projects (#145).** It no longer says "No project selected" on a project created in the same session, or on a project with no panels yet.
+- **Copilot-added circuits are marked new (#146).** On existing-building projects, circuits the Copilot adds are now proposed (NEW, "*" on the packet), like circuits added in Panel Schedules; it records a circuit as existing only when asked to.
+
+---
+
 ## 2026-10-18: PE rulings on EVEMS setpoint, 220.83(A)/(B), and 220.84 electric heat (#131, #132, #133, #137)
 
 **Load calculation changes (user-facing; some verdicts change)**, per PE rulings of 2026-10-17/18:

@@ -272,7 +272,7 @@ export const PermitPacketGenerator: React.FC<PermitPacketGeneratorProps> = ({ pr
   const [sectionPrefs, setSectionPrefs] = useState<Partial<PacketSections>>({});
 
   // Fetch project data - hooks must be called unconditionally
-  const { projects, updateProject } = useProjects();
+  const { projects, updateProject, patchProject } = useProjects();
   const currentProject = projectId ? projects.find(p => p.id === projectId) : undefined;
   const { panels, loading: panelsLoading } = usePanels(projectId || '');
   const { circuits, loading: circuitsLoading } = useCircuits(projectId || '');
@@ -424,14 +424,16 @@ export const PermitPacketGenerator: React.FC<PermitPacketGeneratorProps> = ({ pr
     };
     const stored = currentProject.settings?.permitPacketDefaults;
     if (JSON.stringify(next) === JSON.stringify(stored ?? {})) return;
+    // patchProject reads the latest project when the timer fires, so a save
+    // made elsewhere during the debounce (e.g. the jurisdiction) survives (#134).
     const timer = setTimeout(() => {
-      updateProject({
-        ...currentProject,
+      patchProject(currentProject.id, latest => ({
+        ...latest,
         settings: {
-          ...currentProject.settings,
+          ...latest.settings,
           permitPacketDefaults: next,
         },
-      });
+      }));
     }, 750);
     return () => clearTimeout(timer);
   }, [preparedBy, permitNumber, contractorLicense, scopeOfWork, serviceType, meterLocation, serviceConductorRouting]);
@@ -491,14 +493,16 @@ export const PermitPacketGenerator: React.FC<PermitPacketGeneratorProps> = ({ pr
     };
     const stored = currentProject.settings?.nec22087Narrative;
     if (JSON.stringify(next) === JSON.stringify(stored ?? {})) return;
+    // patchProject reads the latest project when the timer fires, so a save
+    // made elsewhere during the debounce (e.g. the jurisdiction) survives (#134).
     const timer = setTimeout(() => {
-      updateProject({
-        ...currentProject,
+      patchProject(currentProject.id, latest => ({
+        ...latest,
         settings: {
-          ...currentProject.settings,
+          ...latest.settings,
           nec22087Narrative: next,
         },
-      });
+      }));
     }, 500);
     return () => clearTimeout(timer);
   }, [includeNEC22087, nec22087Method, nec22087DataSource, nec22087DateFrom, nec22087DateTo, nec22087MaxDemandKVA, nec22087ProposedKVA]);

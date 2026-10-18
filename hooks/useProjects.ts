@@ -3,7 +3,7 @@
  * CRUD operations for projects with Supabase
  */
 
-import { useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
 import { supabase } from '@/lib/supabase';
 import type { Database } from '@/lib/database.types';
 import { Project } from '@/types';
@@ -19,15 +19,45 @@ export interface UseProjectsReturn {
   error: string | null;
   createProject: (project: Partial<Project>) => Promise<Project | null>;
   updateProject: (project: Project) => Promise<void>;
+  /**
+   * Update a project from its LATEST stored state at call time. Use this for
+   * debounced / deferred saves: spreading a `project` captured earlier can
+   * revert a change another component saved in the meantime (#134).
+   */
+  patchProject: (id: string, update: (latest: Project) => Project) => Promise<void>;
   deleteProject: (id: string) => Promise<void>;
   getProjectById: (id: string) => Project | undefined;
 }
 
+/**
+ * One shared project list for the whole app (#134, #145). Every component
+ * used to call this hook directly and keep its own copy; `projects` is not in
+ * the realtime publication, so the copies never re-synced — a jurisdiction
+ * save in one component was reverted by another component's stale autosave,
+ * and the Copilot never saw projects created after it mounted.
+ */
+const ProjectsContext = createContext<UseProjectsReturn | null>(null);
+
+export function ProjectsProvider({ children }: { children: React.ReactNode }) {
+  const value = useProjectsState();
+  return React.createElement(ProjectsContext.Provider, { value }, children);
+}
+
 export function useProjects(): UseProjectsReturn {
+  const ctx = useContext(ProjectsContext);
+  if (!ctx) throw new Error('useProjects must be used inside <ProjectsProvider>');
+  return ctx;
+}
+
+function useProjectsState(): UseProjectsReturn {
   const { user } = useAuthContext();
   const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  // Latest list, updated synchronously by patchProject so back-to-back
+  // patches (two timers firing before a re-render) build on each other.
+  const projectsRef = useRef<Project[]>(projects);
+  projectsRef.current = projects;
 
   useEffect(() => {
     if (!user) {
@@ -147,6 +177,14 @@ export function useProjects(): UseProjectsReturn {
     }
   };
 
+  const patchProject = async (id: string, update: (latest: Project) => Project) => {
+    const latest = projectsRef.current.find(p => p.id === id);
+    if (!latest) return;
+    const next = update(latest);
+    projectsRef.current = projectsRef.current.map(p => (p.id === id ? next : p));
+    await updateProject(next);
+  };
+
   const deleteProject = async (id: string) => {
     // ISSUE FIX: Optimistically remove from local state immediately
     // This prevents the need to refresh the page after deletion
@@ -176,6 +214,7 @@ export function useProjects(): UseProjectsReturn {
     error,
     createProject,
     updateProject,
+    patchProject,
     deleteProject,
     getProjectById,
   };
