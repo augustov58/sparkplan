@@ -1409,18 +1409,35 @@ export function calculateMultiFamilyEV(input: MultiFamilyEVInput): MultiFamilyEV
     if (actualKWPerChargerWithEVEMS >= perEVSEMaxKW * 0.99) {
       // Chargers can run at full power
       evemsNotes.push(`${actualChargersWithEVEMS} chargers at full power: ${perEVSEMaxKW.toFixed(1)} kW each`);
+    } else if (actualChargersWithEVEMS > maxChargersWithEVEMSAtMinPower) {
+      // #163: sharing would push every charger below the 12 A minimum —
+      // report the supported count instead of an unusable share.
+      evemsNotes.push(
+        `WARNING: ${actualChargersWithEVEMS} chargers would share ~${Math.round(actualAmpsPerChargerWithEVEMS)}A each, below the ${minViableAmpsPerCharger}A minimum`,
+      );
+      evemsNotes.push(`EVEMS supports ${maxChargersWithEVEMSAtMinPower} chargers at ${minViableAmpsPerCharger}A minimum`);
+      warnings.push(
+        `WARNING: The EVEMS setpoint supports ${maxChargersWithEVEMSAtMinPower} of ${evChargers.count} requested chargers at the ${minViableAmpsPerCharger}A minimum; the rest need more service capacity.`,
+      );
     } else {
       // Power sharing required
       evemsNotes.push(`${actualChargersWithEVEMS} chargers share capacity: ~${Math.round(actualAmpsPerChargerWithEVEMS)}A each (${actualKWPerChargerWithEVEMS.toFixed(1)} kW)`);
       evemsNotes.push(`Estimated charge rate: ~${Math.round(actualKWPerChargerWithEVEMS * 3)} mi/hr when all active`);
+      evemsNotes.push(`Max chargers at ${minViableAmpsPerCharger}A minimum: ${maxChargersWithEVEMSAtMinPower}`);
     }
-    evemsNotes.push(`Max chargers at ${minViableAmpsPerCharger}A minimum: ${maxChargersWithEVEMSAtMinPower}`);
   }
 
+  const evemsSupportedChargers = directAlreadySufficient
+    ? maxChargersWithEVEMSAtMinPower
+    : Math.min(actualChargersWithEVEMS, maxChargersWithEVEMSAtMinPower);
   const withEVEMSScenario: EVCapacityScenario = {
     name: 'With EVEMS (NEC 625.42 Load Management)',
-    maxChargers: directAlreadySufficient ? maxChargersWithEVEMSAtMinPower : actualChargersWithEVEMS,
-    powerPerCharger_kW: actualKWPerChargerWithEVEMS,
+    maxChargers: evemsSupportedChargers,
+    // Share across the chargers EVEMS supports, so power × count equals the
+    // setpoint (the generator's EVEMS marker is built from this product).
+    powerPerCharger_kW: evemsSupportedChargers < actualChargersWithEVEMS && evemsSupportedChargers > 0
+      ? Math.min(perEVSEMaxKW, (evVoltage * evemsSetpointAmps) / evemsSupportedChargers / 1000)
+      : actualKWPerChargerWithEVEMS,
     notes: evemsNotes,
     requiresServiceUpgrade: false, // EVEMS by definition avoids service upgrade
     recommendedServiceAmps: undefined,
@@ -1456,10 +1473,15 @@ export function calculateMultiFamilyEV(input: MultiFamilyEVInput): MultiFamilyEV
       `Available capacity after upgrade: ${Math.round(upgradeAvailableAmps)}A`,
       'Full power to all chargers simultaneously (no load sharing)',
       'Utility coordination required - contact utility before proceeding',
-    ] : [
+    ] : directAlreadySufficient ? [
       'Service upgrade not required',
       `Existing ${existingServiceAmps}A service is adequate`,
       'Consider EVEMS for optimal charger utilization',
+    ] : [
+      // #138: direct connection doesn't fit — the existing service only
+      // suffices WITH load management, so say so instead of "adequate".
+      'Service upgrade not required if EVEMS is used (NEC 625.42)',
+      `Without EVEMS, the existing ${existingServiceAmps}A service supports ${Math.max(0, maxChargersNoEVEMS)} of ${evChargers.count} chargers`,
     ],
     requiresServiceUpgrade: upgradeNeeded,
     recommendedServiceAmps: upgradeNeeded ? upgradeServiceAmps : undefined,

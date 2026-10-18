@@ -42,6 +42,7 @@ import {
   calculateAggregatedLoad,
   isEVEMSManagedPanel,
   findEVEMSSetpointMarker,
+  describeEvDesignDrift,
 } from '../calculations/upstreamLoadAggregation';
 import { EquipmentSpecsPages } from './EquipmentSpecsDocuments';
 import { VoltageDropPages } from './VoltageDropDocuments';
@@ -992,6 +993,16 @@ export const generatePermitPacket = async (data: PermitPacketData): Promise<void
           {...contractor}
           sheetIds={sheetIds as [string, string]}
           packetNecEdition={data.necEdition}
+          evDesignDrift={describeEvDesignDrift(
+            {
+              chargerCount: mfevData.result.input.evChargersRequested,
+              // Per-charger VA is comparable only without the NEC 2023 7,200 VA floor.
+              perChargerVA: mfevData.result.evLoad.necEdition === '2023' || mfevData.result.input.evChargersRequested === 0
+                ? undefined
+                : mfevData.result.evLoad.totalConnectedVA / mfevData.result.input.evChargersRequested,
+            },
+            data.circuits,
+          )}
         />
       ),
     });

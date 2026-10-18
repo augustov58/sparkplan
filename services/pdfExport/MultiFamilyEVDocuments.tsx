@@ -296,6 +296,12 @@ interface MultiFamilyEVDocumentProps {
    * page still renders.
    */
   packetNecEdition?: NecEdition;
+  /**
+   * #157: advisory note when the analysis' charger count / rating differs
+   * from the EV charger circuits actually on the project
+   * (`describeEvDesignDrift`). Rendered on page 1; never blocks.
+   */
+  evDesignDrift?: string | null;
 }
 
 /**
@@ -324,6 +330,7 @@ export const MultiFamilyEVPages: React.FC<MultiFamilyEVDocumentProps> = ({
   contractorLicense,
   sheetIds,
   packetNecEdition,
+  evDesignDrift,
 }) => {
   // Results saved before 2026-09-27 carry no edition; they were always
   // computed with the NEC 2023 220.57(A) rule.
@@ -350,6 +357,11 @@ export const MultiFamilyEVPages: React.FC<MultiFamilyEVDocumentProps> = ({
             {` \u2022 ${currentDate}`}
           </Text>
         </View>
+        {evDesignDrift && (
+          <View style={styles.notesBox}>
+            <Text style={styles.notesText}>NOTE: {evDesignDrift}</Text>
+          </View>
+        )}
 
         {/* Building Summary */}
         <View style={styles.section}>

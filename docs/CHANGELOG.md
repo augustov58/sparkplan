@@ -4,6 +4,14 @@ All notable changes to SparkPlan.
 
 ---
 
+## 2026-10-18: Multi-Family EV page agrees with itself and with the panels (#138, #157, #163)
+
+- **One EVEMS choice (#138).** The "Design uses EVEMS" checkbox and the scenario picker were separate settings, so E-402 could print "Upgrade Required: 1600A" and "800A service is adequate" for the same design. They are now one choice: picking the EVEMS scenario turns EVEMS on, and turning EVEMS off moves the scenario to Direct. When the existing service only works with load management, the Upgrade scenario now says "not required if EVEMS is used" instead of "adequate".
+- **EVEMS below the 12 A minimum (#163).** When the setpoint can't give every requested charger 12 A, the EVEMS scenario reports how many it supports, with a warning, instead of printing "~6 A each" next to "max 9 at 12 A". Add EV Infrastructure builds that supported count, as the Direct scenario already does.
+- **Analysis vs installed chargers (#157).** The calculator and E-402 show a note when the EV analysis' charger count or rating differs from the charger circuits on the project's panels (e.g. 20 analysed vs 8 installed). Advisory only.
+
+---
+
 ## 2026-10-18: PE rulings on EVEMS setpoint, 220.83(A)/(B), and 220.84 electric heat (#131, #132, #133, #137)
 
 **Load calculation changes (user-facing; some verdicts change)**, per PE rulings of 2026-10-17/18:
