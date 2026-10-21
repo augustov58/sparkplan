@@ -580,6 +580,7 @@ Returns the feeder's voltage drop percentage if already calculated in the projec
           context.rawPanels!,
           context.rawCircuits!,
           context.rawTransformers!,
+          context.projectContext.necEdition,
         );
 
         const input: FeederCalculationInput = {

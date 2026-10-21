@@ -745,6 +745,7 @@ export const generatePermitPacket = async (data: PermitPacketData): Promise<void
           panels={data.panels}
           transformers={data.transformers}
           circuits={data.circuits}
+          necEdition={resolvedNecEdition}
           includeNECReferences={true}
           {...contractor}
           sheetId={sheetIds[0]}
@@ -1233,6 +1234,8 @@ export const generatePermitPacket = async (data: PermitPacketData): Promise<void
         data.circuits,
         data.transformers,
         occupancyType,
+        undefined,
+        resolvedNecEdition,
       );
       const breakerAmps = dp.feeder_breaker_amps || dp.main_breaker_amps || 100;
       const pole = (dp.phase === 3 ? 3 : 2) as 1 | 2 | 3;
@@ -1286,6 +1289,7 @@ export const generatePermitPacket = async (data: PermitPacketData): Promise<void
         data.transformers,
         occupancyType,
         isMDP ? data.multiFamilyContext : undefined,
+        resolvedNecEdition,
       );
       const dominantNec = aggResult.necReferences.find(r => r.includes('625.42'))
         ?? aggResult.necReferences.find(r => r.includes('220.84'))

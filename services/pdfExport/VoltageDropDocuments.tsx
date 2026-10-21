@@ -19,6 +19,7 @@ import type { Database } from '../../lib/database.types';
 import { calculateFeederSizing } from '../calculations/feederSizing';
 import { calculateAllCumulativeVoltageDrops, calculateCumulativeForFeeder } from '../calculations/cumulativeVoltageDrop';
 import { computeFeederLoadVA, splitFeederDesignLoad } from '../feeder/feederLoadSync';
+import type { NecEdition } from '../../data/nec/evse-load';
 import type { FeederCalculationInput, FeederCalculationResult } from '../../types';
 import {
   BrandBar,
@@ -212,6 +213,8 @@ export interface VoltageDropDocumentProps {
    * downstream circuits have changed since the feeder was last recalculated.
    */
   circuits?: Circuit[];
+  /** EVSE load rule for the live feeder load (NEC 2023 220.57 floor). */
+  necEdition?: NecEdition;
   includeNECReferences?: boolean;
   // Sprint 2A C8: per-sheet contractor signature block
   contractorName?: string;
@@ -279,12 +282,13 @@ function calculateAllFeederVoltageDrops(
   feeders: Feeder[],
   panels: Panel[],
   transformers: Transformer[],
-  circuits?: Circuit[]
+  circuits?: Circuit[],
+  necEdition?: NecEdition,
 ): FeederVoltageDropData[] {
   // First pass: compute every feeder's fresh VD result so we can build
   // a temporary feeder array that reflects the report's current values
   // (not the cached ones), and feed THAT into the cumulative walker.
-  const baseRows = feeders.map((feeder, idx) => buildBaseFeederRow(feeder, idx, panels, transformers, circuits));
+  const baseRows = feeders.map((feeder, idx) => buildBaseFeederRow(feeder, idx, panels, transformers, circuits, necEdition));
   const feedersWithFreshVd = baseRows.map(row => ({
     ...row.feeder,
     voltage_drop_percent: row.calculation.voltage_drop_percent,
@@ -312,7 +316,8 @@ function buildBaseFeederRow(
   idx: number,
   panels: Panel[],
   transformers: Transformer[],
-  circuits?: Circuit[]
+  circuits?: Circuit[],
+  necEdition?: NecEdition,
 ): Omit<FeederVoltageDropData, 'cumulativeVdPercent' | 'cumulativeCrossesTransformer'> {
   try {
       const fromName = getEquipmentName(feeder.source_panel_id, panels, transformers);
@@ -335,7 +340,7 @@ function buildBaseFeederRow(
       // the boundary — the runtime only reads stable fields that both
       // shapes share.
       const liveLoadVA = circuits
-        ? computeFeederLoadVA(feeder as never, panels, circuits, transformers)
+        ? computeFeederLoadVA(feeder as never, panels, circuits, transformers, necEdition)
         : (feeder.total_load_va || 0);
 
       const input: FeederCalculationInput = {
@@ -634,6 +639,7 @@ export const VoltageDropPages: React.FC<VoltageDropDocumentProps> = ({
   panels,
   transformers,
   circuits,
+  necEdition,
   includeNECReferences = true,
   contractorName,
   contractorLicense,
@@ -642,7 +648,7 @@ export const VoltageDropPages: React.FC<VoltageDropDocumentProps> = ({
   // Calculate voltage drop for all feeders. Pass circuits so each feeder's
   // load is live-derived from the destination panel's demand (C2) instead of
   // the potentially-stale cached `feeder.total_load_va`.
-  const feederData = calculateAllFeederVoltageDrops(feeders, panels, transformers, circuits);
+  const feederData = calculateAllFeederVoltageDrops(feeders, panels, transformers, circuits, necEdition);
   const stats = getSummaryStats(feederData);
 
   return (

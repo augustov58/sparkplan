@@ -117,7 +117,10 @@ OCPD/conductor sizing only. Neither is a demand factor.
 ```
 PE-confirmed 2026-09-27; extended 2026-10-14 to the single-family Optional Method
 (220.82/220.83 bucket, 2023 floor included) and to all continuous loads — no ×1.25
-in any Article 220 load calc. Single source: `data/nec/evse-load.ts::getEvseLoadVA`.
+in any Article 220 load calc; extended 2026-10-21 to the Part III aggregate (panels,
+feeders, MDP), the 220.84 total and the 220.87(2) new load. EVEMS under 2023: the
+setpoint, capped at N × 7,200 VA. Single source: `data/nec/evse-load.ts::getEvseLoadVA`;
+circuit-based calcs go through `upstreamLoadAggregation.ts::withEvseLoadForEdition`.
 Edition = project-page pick (`settings.nec_edition_override`) → Automatic: Florida's
 code cycle by date (a non-FL jurisdiction's own row edition), via
 `data/ahj/codeCycle.ts::resolveNecEdition` / `hooks/useProjectNecEdition` — used by
@@ -308,6 +311,7 @@ Real mistakes made in this repo, each paired with the rule that prevents recurre
 | Single-family E-102 ran the Part III cascade while E-101 ran NEC 220.83; the same packet passed the service on one page and failed it on the next (#121) | Pages reporting the same quantity call the same function behind the same gate helper (`buildSingleFamilyDwellingContext`). Existing dwelling → 220.83, new → 220.82, on every page. |
 | Single-family calc applied ×1.25 to EVSE and other "continuous" loads inside the 220.82/220.83 load calc, citing "220.18(B)" for it; the #123 edition fix covered only the multifamily path | The 125% is OCPD/conductor sizing, never the Article 220 load. When a rule changes, grep every calc that computes the same quantity (MF, SF Optional Method, Dwelling Calculator, Panel Summary), not just the one in the bug report. |
 | Multifamily 220.84 took electric heat at 65% and cited "220.84(C)(4)" for it — a 220.82(C) single-dwelling factor carried into a section that has none, understating demand (#133) | A factor valid in one Optional Method is not valid in another. Before applying any factor, find it in the text of the section you cite. 220.84(C)(5) = larger of A/C or heat at nameplate. |
+| The Part III aggregator, feeder sizing, the 220.84 total and the 220.87(2) new load read EVSE `load_watts` raw; the NEC 2023 7,200 VA floor reached only the MF-EV calc and the SF Optional Method | Every calc that turns an EVSE into load calls `getEvseLoadVA` (circuits: `withEvseLoadForEdition`) with the project edition. A new edition parameter with a default needs a grep of every production caller — tsc can't see a missing optional argument. |
 | Docs updated with stale "Last Updated" dates; completed features left as "NEXT UP" | Every doc touch updates its date to today; every shipped feature flips its ROADMAP status in the same PR. |
 
 ---

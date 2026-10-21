@@ -27,6 +27,8 @@ export interface ProjectContext {
   projectId: string;
   projectName: string;
   projectType: 'Residential' | 'Commercial' | 'Industrial';
+  /** The project's NEC edition (`resolveNecEdition`); tools that compute load use it. */
+  necEdition?: NecEdition;
   serviceVoltage: number;
   servicePhase: 1 | 3;
   summary: string;
@@ -500,6 +502,7 @@ ${transformers.length > 0 ? `Transformers: ${transformers.length}` : ''}${permit
     },
     estimating: estimatingSummary,
     shortCircuits,
+    necEdition,
   };
 }
 

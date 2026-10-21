@@ -124,9 +124,12 @@ export const PanelSchedule: React.FC<PanelScheduleProps> = ({ project }) => {
   // NEC 220.84: Multi-family MDP gets blanket demand factor instead of per-load-type factors.
   // Gate logic + EV/house exclusion lives in `buildMultiFamilyContext` so the same rule
   // is reused by the permit-packet PDF generator (no drift between UI and PDF).
+  // Project NEC edition: EVSE loads (NEC 2023 220.57 floor) in every
+  // aggregate below, and the dwelling-unit demand further down.
+  const necEdition = useProjectNecEdition(project);
   const multiFamilyCtx: MultiFamilyContext | undefined = useMemo(() => {
-    return buildMultiFamilyContext(selectedPanel, panels, circuits, transformers, project.settings);
-  }, [selectedPanel, panels, circuits, transformers, project.settings?.occupancyType, project.settings?.residential]);
+    return buildMultiFamilyContext(selectedPanel, panels, circuits, transformers, project.settings, necEdition);
+  }, [selectedPanel, panels, circuits, transformers, project.settings?.occupancyType, project.settings?.residential, necEdition]);
 
   // Create "virtual feeder circuits" for downstream equipment
   // These represent the feeder breakers in this panel that feed downstream equipment
@@ -150,7 +153,7 @@ export const PanelSchedule: React.FC<PanelScheduleProps> = ({ project }) => {
     // the MDP aggregate, not for individual feeder sizing. Each feeder uses standard
     // NEC 220 demand factors for its own panel load.
     downstreamPanels.forEach(panel => {
-      const panelLoad = calculateAggregatedLoad(panel.id, panels, circuits, transformers, occupancy);
+      const panelLoad = calculateAggregatedLoad(panel.id, panels, circuits, transformers, occupancy, undefined, necEdition);
 
       feeders.push({
         id: `feeder-panel-${panel.id}`,
@@ -171,7 +174,7 @@ export const PanelSchedule: React.FC<PanelScheduleProps> = ({ project }) => {
       const xfmrPanels = panels.filter(p => p.fed_from_transformer_id === xfmr.id);
       let totalLoad = 0;
       xfmrPanels.forEach(p => {
-        const pLoad = calculateAggregatedLoad(p.id, panels, circuits, transformers, occupancy);
+        const pLoad = calculateAggregatedLoad(p.id, panels, circuits, transformers, occupancy, undefined, necEdition);
         totalLoad += pLoad.totalDemandVA;
       });
       // If no panels, use transformer kVA rating
@@ -193,7 +196,7 @@ export const PanelSchedule: React.FC<PanelScheduleProps> = ({ project }) => {
     });
 
     return feeders;
-  }, [downstreamPanels, downstreamTransformers, panels, circuits, transformers, selectedPanel, project.settings?.occupancyType]);
+  }, [downstreamPanels, downstreamTransformers, panels, circuits, transformers, selectedPanel, project.settings?.occupancyType, necEdition]);
 
   // Split feeder circuits into breaker-fed (assigned to specific slot) and lug-fed (feed-thru lug)
   const { breakerFedPanels, lugFedPanels } = useMemo(() => {
@@ -294,7 +297,6 @@ export const PanelSchedule: React.FC<PanelScheduleProps> = ({ project }) => {
   //     regardless of whether the appliance toggles were updated.
   //  2. Sub-panel of a multi-family dwelling unit → run
   //     calculateDwellingUnitDemandVA over its circuits.
-  const necEdition = useProjectNecEdition(project);
   const dwellingUnitDemand = useMemo(() => {
     if (!selectedPanel) return null;
     const occupancy = project.settings?.occupancyType;
@@ -359,8 +361,8 @@ export const PanelSchedule: React.FC<PanelScheduleProps> = ({ project }) => {
   const aggregatedLoad = useMemo(() => {
     if (!selectedPanel) return null;
     const occupancy = project.settings?.occupancyType || 'commercial';
-    return calculateAggregatedLoad(selectedPanel.id, panels, circuits, transformers, occupancy, multiFamilyCtx);
-  }, [selectedPanel, panels, circuits, transformers, project.settings?.occupancyType, multiFamilyCtx]);
+    return calculateAggregatedLoad(selectedPanel.id, panels, circuits, transformers, occupancy, multiFamilyCtx, necEdition);
+  }, [selectedPanel, panels, circuits, transformers, project.settings?.occupancyType, multiFamilyCtx, necEdition]);
 
   // Panel slot count is stored per-panel in panels.num_spaces.
   // Fallback mirrors the legacy inference for any row that predates the column.
@@ -483,7 +485,7 @@ export const PanelSchedule: React.FC<PanelScheduleProps> = ({ project }) => {
 
         children.forEach((child, idx) => {
           const childLoad = calculateAggregatedLoad(
-            child.id, panels, circuits, transformers, occupancyForCalc
+            child.id, panels, circuits, transformers, occupancyForCalc, undefined, necEdition
           );
           synthesized.push({
             id: `synth-feeder-panel-${child.id}`,
@@ -508,7 +510,7 @@ export const PanelSchedule: React.FC<PanelScheduleProps> = ({ project }) => {
           let totalLoad = 0;
           xfmrPanels.forEach(p => {
             totalLoad += calculateAggregatedLoad(
-              p.id, panels, circuits, transformers, occupancyForCalc
+              p.id, panels, circuits, transformers, occupancyForCalc, undefined, necEdition
             ).totalDemandVA;
           });
           if (xfmrPanels.length === 0 && xfmr.kva_rating) {
@@ -566,7 +568,7 @@ export const PanelSchedule: React.FC<PanelScheduleProps> = ({ project }) => {
       panels.forEach(panel => {
         const ctx = panel.is_main ? multiFamilyCtx : undefined;
         const r = calculateAggregatedLoad(
-          panel.id, panels, circuits, transformers, occupancyForCalc, ctx,
+          panel.id, panels, circuits, transformers, occupancyForCalc, ctx, necEdition,
         );
         const dominantNec = r.necReferences.find(ref => ref.includes('625.42'))
           ?? r.necReferences.find(ref => ref.includes('220.84'))

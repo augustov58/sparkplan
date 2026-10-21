@@ -310,6 +310,7 @@ export const PermitPacketGenerator: React.FC<PermitPacketGeneratorProps> = ({ pr
       circuits,
       transformers,
       currentProject.settings,
+      projectEdition,
     );
     // Single-family dwellings: E-101 runs the NEC 220.82 / 220.83 Optional
     // Method, so E-102 must too — the Part III cascade below gave a different
@@ -353,6 +354,7 @@ export const PermitPacketGenerator: React.FC<PermitPacketGeneratorProps> = ({ pr
       transformers,
       occupancyType,
       mfCtx,
+      projectEdition,
     );
     return {
       existingKVA: agg.existingDemandVA / 1000,
@@ -461,13 +463,14 @@ export const PermitPacketGenerator: React.FC<PermitPacketGeneratorProps> = ({ pr
   }, [currentProject?.id]);
 
   // NEC 220.87(2) new load for the measured / manual methods (typed field):
-  // suggest it from the project's proposed circuits — EVSE at 125% (continuous
+  // suggest it from the project's proposed circuits — EVSE at its edition load
+  // (NEC 2023 7,200 VA floor) × 125% (continuous
   // per NEC 625.42, sized per 625.41; PE ruling 2026-10-14), other loads at
   // nameplate. Prefilled once per project, only into an empty field (the
   // functional update runs after hydration, so a saved value always wins).
   const suggestedProposedKVA = React.useMemo(
-    () => calculateProposedNewLoadVA(circuits) / 1000,
-    [circuits],
+    () => calculateProposedNewLoadVA(circuits, projectEdition) / 1000,
+    [circuits, projectEdition],
   );
   const nec22087PrefilledProjectRef = React.useRef<string | null>(null);
   useEffect(() => {
@@ -951,6 +954,7 @@ export const PermitPacketGenerator: React.FC<PermitPacketGeneratorProps> = ({ pr
         circuits,
         transformers,
         currentProject.settings,
+        projectEdition,
       );
 
       // NEC 220.82 / 220.83 single-family-dwelling context — flips the

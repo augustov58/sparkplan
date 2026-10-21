@@ -14,6 +14,7 @@
 import type { Feeder } from '@/types';
 import type { Database } from '@/lib/database.types';
 import { calculateAggregatedLoad, isEVEMSMarkerCircuit } from '@/services/calculations/upstreamLoadAggregation';
+import type { NecEdition } from '@/data/nec/evse-load';
 
 type Circuit = Database['public']['Tables']['circuits']['Row'];
 type Panel = Database['public']['Tables']['panels']['Row'];
@@ -195,6 +196,8 @@ export function computeFeederLoadVA(
   panels: Panel[],
   circuits: Circuit[],
   transformers: Transformer[],
+  /** EVSE load rule (NEC 2023 220.57 floor); the project's `resolveNecEdition`. */
+  necEdition: NecEdition = '2020',
 ): number {
   if (!feeder.destination_panel_id) {
     return feeder.total_load_va || 0;
@@ -210,6 +213,7 @@ export function computeFeederLoadVA(
     transformers,
     'commercial',
     undefined,
+    necEdition,
   );
   return aggregate.totalDemandVA;
 }

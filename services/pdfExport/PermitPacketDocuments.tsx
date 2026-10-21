@@ -1785,7 +1785,7 @@ export const LoadCalculationSummary: React.FC<LoadSummaryProps> = ({
   // missing dwelling context) — single-family dwellings shouldn't use the
   // per-load-type cascade at all per NEC 220.82/220.83.
   const aggregate: AggregatedLoad | null = !useDwellingOptional && mdp
-    ? calculateAggregatedLoad(mdp.id, panels, circuits, transformers, occupancy, multiFamilyContext)
+    ? calculateAggregatedLoad(mdp.id, panels, circuits, transformers, occupancy, multiFamilyContext, necEdition)
     : null;
 
   // Synthesize a 220.82/220.83-shaped breakdown when the dwelling gate fired,
