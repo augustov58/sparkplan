@@ -12,6 +12,7 @@ import type { ToolResult, ToolResultDisplay, Feeder, FeederCalculationInput } fr
 import type { Database } from '@/lib/database.types';
 import { analyzeChangeImpact, draftRFI, predictInspection } from '../api/pythonBackend';
 import { supabase } from '@/lib/supabase';
+import { isExistingConstructionProject } from '@/lib/projectSettings';
 import { notifyDataRefresh } from '@/lib/dataRefreshEvents';
 import { computeFeederLoadVA } from '@/services/feeder/feederLoadSync';
 import { calculateFeederSizing } from '@/services/calculations/feederSizing';
@@ -1299,6 +1300,10 @@ Examples:
         load_watts: { type: 'number', description: 'Circuit load in watts. Overrides load_type default.' },
         poles: { type: 'number', description: 'Number of poles (1, 2, or 3). Overrides load_type default.' },
         wire_size: { type: 'string', description: 'Conductor size (e.g., "12 AWG"). Auto-sized from breaker if omitted.' },
+        is_proposed: {
+          type: 'boolean',
+          description: 'true = a NEW/proposed circuit being added by this permit; false = an EXISTING circuit already installed. Pass true when the user says "add", "new", "proposed", or "install"; pass false only when they are recording an existing circuit ("existing", "already there", "document"). Omit when unclear: existing-construction projects then default to proposed (same as Panel Schedules).',
+        },
       },
       required: ['panel_name'],
     },
@@ -1313,6 +1318,7 @@ Examples:
         load_watts,
         poles,
         wire_size,
+        is_proposed,
       } = params as {
         panel_name: string;
         description?: string;
@@ -1322,6 +1328,7 @@ Examples:
         load_watts?: number;
         poles?: number;
         wire_size?: string;
+        is_proposed?: boolean;
       };
 
       if (!context.projectId) {
@@ -1422,6 +1429,16 @@ Examples:
         }
       }
 
+      let finalIsProposed = is_proposed;
+      if (finalIsProposed === undefined) {
+        const { data: projectRow } = await supabase
+          .from('projects')
+          .select('settings')
+          .eq('id', context.projectId)
+          .single();
+        finalIsProposed = projectRow ? isExistingConstructionProject(projectRow as never) : false;
+      }
+
       try {
         const { error } = await supabase
           .from('circuits')
@@ -1435,6 +1452,9 @@ Examples:
             pole: finalPoles,
             conductor_size: finalWireSize,
             load_type: finalLoadTypeCode,
+            // #146: new circuits on existing-construction projects are
+            // proposed, matching PanelSchedule.tsx's manual add.
+            ...(finalIsProposed ? { is_proposed: true } : {}),
           } as any)
           .select()
           .single();

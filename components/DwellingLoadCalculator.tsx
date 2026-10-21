@@ -50,6 +50,7 @@ import { LOAD_TEMPLATES } from '../services/calculations/serviceUpgrade';
 import type { LoadTemplate } from '../types';
 import { isExistingConstructionProject } from '../lib/projectSettings';
 import { usePanels } from '../hooks/usePanels';
+import { useProjects } from '../hooks/useProjects';
 import { useCircuits } from '../hooks/useCircuits';
 import { useProjectNecEdition } from '../hooks/useProjectNecEdition';
 import {
@@ -100,6 +101,8 @@ export const DwellingLoadCalculator: React.FC<DwellingLoadCalculatorProps> = ({
   project, 
   updateProject 
 }) => {
+  // Deferred saves patch the latest stored project (#134).
+  const { patchProject } = useProjects();
   // Hooks
   const { panels, createPanel, updatePanel } = usePanels(project.id);
   const mainPanel = panels.find(p => p.is_main);
@@ -174,18 +177,18 @@ export const DwellingLoadCalculator: React.FC<DwellingLoadCalculatorProps> = ({
     ) return;
 
     const timer = setTimeout(() => {
-      updateProject({
-        ...project,
+      patchProject(project.id, latest => ({
+        ...latest,
         settings: {
-          ...project.settings,
+          ...latest.settings,
           residential: {
-            ...project.settings.residential,
+            ...latest.settings.residential,
             appliances,
             unitTemplates: !isSingleFamily ? unitTemplates : undefined,
             proposedLoads,
           } as any
         }
-      });
+      }));
     }, 500);
     return () => clearTimeout(timer);
   }, [appliances, unitTemplates, proposedLoads]);
@@ -277,12 +280,12 @@ export const DwellingLoadCalculator: React.FC<DwellingLoadCalculatorProps> = ({
     }
 
     const timer = setTimeout(() => {
-      updateProject({
-        ...project,
+      patchProject(project.id, latest => ({
+        ...latest,
         settings: {
-          ...project.settings,
+          ...latest.settings,
           residential: {
-            ...project.settings.residential,
+            ...latest.settings.residential,
             multiFamilyLoadResult: {
               totalDemandVA: loadResult.totalDemandVA,
               totalConnectedVA: loadResult.totalConnectedVA,
@@ -298,7 +301,7 @@ export const DwellingLoadCalculator: React.FC<DwellingLoadCalculatorProps> = ({
             },
           } as any,
         },
-      });
+      }));
     }, 600);
     return () => clearTimeout(timer);
   }, [loadResult, isSingleFamily]);

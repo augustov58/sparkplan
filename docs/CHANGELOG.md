@@ -4,6 +4,14 @@ All notable changes to SparkPlan.
 
 ---
 
+## 2026-10-18: Saved jurisdiction no longer reverts; Copilot sees new projects (#134, #145, #146)
+
+- **Jurisdiction and packet settings stay saved (#134).** Each screen kept its own copy of the project, and nothing re-synced them. Saving a jurisdiction in the AHJ panel was then overwritten by the Permit Packet's next autosave, and the packet came out generic; the reverse could revert packet settings. The app now holds one shared project list, and delayed autosaves apply their change to the latest saved project.
+- **Copilot works on new and empty projects (#145).** It no longer says "No project selected" on a project created in the same session, or on a project with no panels yet.
+- **Copilot-added circuits are marked new (#146).** On existing-building projects, circuits the Copilot adds are now proposed (NEW, "*" on the packet), like circuits added in Panel Schedules; it records a circuit as existing only when asked to.
+
+---
+
 ## 2026-10-18: Dwelling calculator and packet follow-ups (#142, #143, #159, #160, #161, #162)
 
 - **Heat kW is now calculated as shown (#142, unsafe direction).** The Dwelling Load Calculator displayed 10 kW of heat but calculated 0 until the field was edited, so an electric heat strip could drop out of the load. Every appliance input now shows the value the calculation uses, and switching HVAC to Heat Pump / Electric Furnace sets 10 kW of heat in the calculation.
