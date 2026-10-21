@@ -10,6 +10,7 @@ import type { Panel, Circuit, Feeder, Transformer } from '../../lib/database.typ
 import { PanelScheduleDocument } from './PanelScheduleDocuments';
 import {
   calculateAggregatedLoad,
+  isEVEMSMarkerCircuit,
   type AggregatedLoad,
   type MultiFamilyContext,
 } from '../calculations/upstreamLoadAggregation';
@@ -1728,9 +1729,10 @@ export const LoadCalculationSummary: React.FC<LoadSummaryProps> = ({
   const mdp = panels.find(p => p.is_main);
   const occupancy = mapProjectTypeToOccupancy(projectType);
 
-  // Per-panel connected load (unchanged visibility)
+  // Per-panel connected load. EVEMS marker circuits are metadata, not load
+  // (#156) — same filter as the panel schedule page.
   const panelLoads = panels.map(panel => {
-    const panelCircuits = circuits.filter(c => c.panel_id === panel.id);
+    const panelCircuits = circuits.filter(c => c.panel_id === panel.id && !isEVEMSMarkerCircuit(c));
     const panelLoadVA = panelCircuits.reduce(
       (sum, c) => sum + (c.load_watts || 0),
       0
@@ -1811,7 +1813,7 @@ export const LoadCalculationSummary: React.FC<LoadSummaryProps> = ({
     ? dwellingResult.totalConnectedVA
     : aggregate
     ? aggregate.totalConnectedVA
-    : circuits.reduce((sum, c) => sum + (c.load_watts || 0), 0);
+    : circuits.reduce((sum, c) => (isEVEMSMarkerCircuit(c) ? sum : sum + (c.load_watts || 0)), 0);
   const totalDemandVA = dwellingResult
     ? dwellingResult.totalDemandVA
     : aggregate

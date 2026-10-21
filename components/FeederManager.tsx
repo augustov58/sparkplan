@@ -24,7 +24,7 @@ import { calculateAggregatedLoad } from '../services/calculations/upstreamLoadAg
 import { useCumulativeVoltageDrop } from '../hooks/useCumulativeVoltageDrop';
 import { calculateCumulativeForFeeder } from '../services/calculations/cumulativeVoltageDrop';
 import { exportVoltageDropReport, hasVoltageDropData } from '../services/pdfExport/voltageDropPDF';
-import { computeFeederLoadVA } from '../services/feeder/feederLoadSync';
+import { computeFeederLoadVA, splitFeederDesignLoad } from '../services/feeder/feederLoadSync';
 import type { Feeder, FeederCalculationResult } from '../types';
 
 interface FeederManagerProps {
@@ -183,35 +183,12 @@ export const FeederManager: React.FC<FeederManagerProps> = ({
     // Pass occupancyType for correct demand factor selection
     const aggregated = calculateAggregatedLoad(panelId, panels, circuits, transformers, occupancyType);
     
-    // Calculate continuous vs non-continuous from direct circuits
-    const panelCircuits = circuits.filter(c => c.panel_id === panelId);
-    let continuousVA = 0;
-    let noncontinuousVA = 0;
-
-    panelCircuits.forEach(circuit => {
-      const loadVA = circuit.load_watts || 0;
-      // Assume circuits >20A or HVAC/Motor are continuous
-      if (circuit.breaker_amps >= 20 || circuit.load_type === 'M' || circuit.load_type === 'H') {
-        continuousVA += loadVA;
-      } else {
-        noncontinuousVA += loadVA;
-      }
-    });
-
-    // Add downstream loads as non-continuous (already factored).
-    // NOTE: `downstreamPanelsDemandVA` / `transformerLoadVA` were removed when
-    // upstreamLoadAggregation was refactored to apply demand factors system-wide
-    // (commit 88b0f8a). The aggregated `totalDemandVA` now bakes in downstream
-    // and transformer contributions, so we derive the downstream portion as
-    // (system demand) − (direct circuit VA) and treat it as non-continuous.
-    // Clamp to 0 to guard against negative deltas when demand factors reduce
-    // the system below direct connected.
-    const directConnectedVA = continuousVA + noncontinuousVA;
-    const downstreamDemandContributionVA = Math.max(
-      0,
-      aggregated.totalDemandVA - directConnectedVA,
-    );
-    noncontinuousVA += downstreamDemandContributionVA;
+    // #144: size from the destination's demand — EVEMS marker excluded and the
+    // 625.42 setpoint clamp kept — split exactly like the packet's E-103.
+    // The old direct-circuit classification counted the marker as load and
+    // lost the clamp (downstream term max(0, demand − direct) = 0), sizing an
+    // EVEMS feeder at 686 A where the packet showed 189 A.
+    const { continuousVA, noncontinuousVA } = splitFeederDesignLoad(aggregated.totalDemandVA);
 
     return {
       totalVA: aggregated.totalConnectedVA,
@@ -297,6 +274,7 @@ export const FeederManager: React.FC<FeederManagerProps> = ({
         ambient_temperature_c: feeder.ambient_temperature_c || 30,
         num_current_carrying: feeder.num_current_carrying || 4,
         max_voltage_drop_percent: 3,
+        sets_in_parallel: feeder.sets_in_parallel ?? 1,
         // Add transformer parameters if feeding a transformer.
         // DB stores primary_phase as `number`; FeederCalculationInput narrows
         // it to `1 | 3`. Cast at the boundary — only 1 and 3 are valid runtime
@@ -331,6 +309,8 @@ export const FeederManager: React.FC<FeederManagerProps> = ({
         continuous_load_va: loads.continuousVA,
         noncontinuous_load_va: loads.noncontinuousVA,
         design_load_va: result.design_load_va,
+        // Effective parallel sets (the calc may bump them for large loads).
+        sets_in_parallel: result.sets_in_parallel,
         phase_conductor_size: result.phase_conductor_size,
         neutral_conductor_size: result.neutral_conductor_size,
         egc_size: egcSize,
@@ -1555,6 +1535,24 @@ const FeederCard: React.FC<FeederCardProps> = ({
           </span>
         </div>
       )}
+      {/* #144: advisory — a feeder designed above its destination's rating
+          (e.g. 686 A into a 300 A panel) means the load or the equipment is wrong. */}
+      {(() => {
+        if (!destPanel || !feeder.design_load_va) return null;
+        const ratingA = destPanel.main_breaker_amps || destPanel.feeder_breaker_amps || destPanel.bus_rating;
+        const volts = destPanel.voltage;
+        if (!ratingA || !volts) return null;
+        const designA = feeder.design_load_va / (destPanel.phase === 3 ? Math.sqrt(3) * volts : volts);
+        if (designA <= ratingA) return null;
+        return (
+          <div className="flex items-center gap-1.5 px-2 py-1.5 rounded text-xs bg-red-50 border border-red-200 mb-2">
+            <AlertTriangle className="w-3.5 h-3.5 text-red-600" />
+            <span className="text-red-900 font-medium">
+              Design load {designA.toFixed(0)} A exceeds {destPanel.name}'s {ratingA} A rating. Recalculate, or check the panel and its feeder OCPD (NEC 215.3).
+            </span>
+          </div>
+        );
+      })()}
 
       {/* Voltage Drop Indicator - Compact */}
       {feeder.voltage_drop_percent != null && (

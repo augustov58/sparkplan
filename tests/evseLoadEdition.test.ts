@@ -103,4 +103,13 @@ describe('isEvseDescription', () => {
       expect(isEvseDescription(d)).toBe(false);
     }
   });
+  it('#164: a bare "EV" naming another load is not a charger; "EV 50A" still is', async () => {
+    const { isEvseDescription } = await import('../data/nec/evse-load');
+    for (const d of ['EV Area Lighting', 'EV Panel Receptacle', 'EV Sub-Panel Feeder', 'EVEMS Load Management System', 'Lighting Circuit']) {
+      expect(isEvseDescription(d)).toBe(false);
+    }
+    for (const d of ['EV 50A', 'EV - Garage', 'EV Charger #1 - Level 2 (48A continuous)', 'DC Fast Charger #1 - 150kW']) {
+      expect(isEvseDescription(d)).toBe(true);
+    }
+  });
 });

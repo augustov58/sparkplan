@@ -18,7 +18,7 @@ import {
 import type { Database } from '../../lib/database.types';
 import { calculateFeederSizing } from '../calculations/feederSizing';
 import { calculateAllCumulativeVoltageDrops, calculateCumulativeForFeeder } from '../calculations/cumulativeVoltageDrop';
-import { computeFeederLoadVA } from '../feeder/feederLoadSync';
+import { computeFeederLoadVA, splitFeederDesignLoad } from '../feeder/feederLoadSync';
 import type { FeederCalculationInput, FeederCalculationResult } from '../../types';
 import {
   BrandBar,
@@ -344,8 +344,8 @@ function buildBaseFeederRow(
         destination_voltage: voltage,
         destination_phase: phase,
         total_load_va: liveLoadVA,
-        continuous_load_va: liveLoadVA * 0.8,
-        noncontinuous_load_va: liveLoadVA * 0.2,
+        continuous_load_va: splitFeederDesignLoad(liveLoadVA).continuousVA,
+        noncontinuous_load_va: splitFeederDesignLoad(liveLoadVA).noncontinuousVA,
         distance_ft: feeder.distance_ft || 0,
         conductor_material: (feeder.conductor_material as 'Cu' | 'Al') || 'Cu',
         ambient_temperature_c: 30,
