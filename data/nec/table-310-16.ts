@@ -37,7 +37,7 @@ export const TABLE_310_16: AmpacityEntry[] = [
   // Aluminum/Copper-Clad Aluminum conductors
   { size: '12 AWG', material: 'Al', temp60C: 15, temp75C: 20, temp90C: 25 },
   { size: '10 AWG', material: 'Al', temp60C: 25, temp75C: 30, temp90C: 35 },
-  { size: '8 AWG', material: 'Al', temp60C: 30, temp75C: 40, temp90C: 45 },
+  { size: '8 AWG', material: 'Al', temp60C: 35, temp75C: 40, temp90C: 45 },
   { size: '6 AWG', material: 'Al', temp60C: 40, temp75C: 50, temp90C: 55 },
   { size: '4 AWG', material: 'Al', temp60C: 55, temp75C: 65, temp90C: 75 },
   { size: '3 AWG', material: 'Al', temp60C: 65, temp75C: 75, temp90C: 85 },
@@ -48,12 +48,12 @@ export const TABLE_310_16: AmpacityEntry[] = [
   { size: '3/0 AWG', material: 'Al', temp60C: 130, temp75C: 155, temp90C: 175 },
   { size: '4/0 AWG', material: 'Al', temp60C: 150, temp75C: 180, temp90C: 205 },
   { size: '250 kcmil', material: 'Al', temp60C: 170, temp75C: 205, temp90C: 230 },
-  { size: '300 kcmil', material: 'Al', temp60C: 190, temp75C: 230, temp90C: 255 },
+  { size: '300 kcmil', material: 'Al', temp60C: 195, temp75C: 230, temp90C: 260 },
   { size: '350 kcmil', material: 'Al', temp60C: 210, temp75C: 250, temp90C: 280 },
   { size: '400 kcmil', material: 'Al', temp60C: 225, temp75C: 270, temp90C: 305 },
   { size: '500 kcmil', material: 'Al', temp60C: 260, temp75C: 310, temp90C: 350 },
   { size: '600 kcmil', material: 'Al', temp60C: 285, temp75C: 340, temp90C: 385 },
-  { size: '750 kcmil', material: 'Al', temp60C: 315, temp75C: 375, temp90C: 425 },
+  { size: '750 kcmil', material: 'Al', temp60C: 320, temp75C: 385, temp90C: 435 },
   { size: '1000 kcmil', material: 'Al', temp60C: 375, temp75C: 445, temp90C: 500 }
 ];
 

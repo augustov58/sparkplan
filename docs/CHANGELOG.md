@@ -7,6 +7,7 @@ All notable changes to SparkPlan.
 ## 2026-10-21: Conductor ampacity table corrections (NEC Table 310.16)
 
 - **Four ampacities were stored above the code value**, so conductor sizing could pick a wire one size too small: 14 AWG copper at 60 °C (20 A → 15 A), 12 AWG aluminum at 60 °C (20 A → 15 A), 6 AWG aluminum at 90 °C (60 A → 55 A, affects derating) and 600 kcmil copper at 60 °C (355 A → 350 A). On 60 °C terminations, a 16–20 A load now sizes 12 AWG copper instead of 14 AWG.
+- **Six aluminum ampacities were stored below the code value** (checked against the NEC 2023 code book): 8 AWG at 60 °C (30 → 35 A), 300 kcmil (190/255 → 195/260 A at 60/90 °C) and 750 kcmil (315/375/425 → 320/385/435 A, which were the 700 kcmil values). Aluminum sizing could pick a conductor one size larger than needed; every row in the table now matches the code book.
 
 ---
 
