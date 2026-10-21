@@ -319,8 +319,14 @@ function calculateNeutralLoad(
     }
   }
 
-  // NEC 220.61(B) - Dwelling Unit Neutral Load Reduction
-  // First 200A at 100%, remainder at 70%
+  return applyNeutralReduction(neutralDemandVA, serviceVoltage);
+}
+
+/** NEC 220.61(B): first 200 A of neutral load at 100%, the remainder at 70%. */
+function applyNeutralReduction(
+  neutralDemandVA: number,
+  serviceVoltage: number
+): { neutralVA: number; neutralAmps: number; reductionPercent: number } {
   const neutralAmpsBeforeReduction = neutralDemandVA / serviceVoltage;
 
   let neutralAmps: number;
@@ -605,7 +611,9 @@ export function calculateSingleFamilyLoad(input: SingleFamilyInput): Residential
       breakdown.push({
         category: 'HVAC',
         description: `${hvacType} ${(hvacConnected / 1000).toFixed(1)} kW (larger of heat/cool)`,
-        connectedVA: Math.max(coolingVA, effectiveHeating, coolingVA + effectiveHeating),
+        // Connected = the larger of heat/cool (220.60), the same quantity the
+        // demand uses; the sum overstated the header connected load (#159).
+        connectedVA: hvacConnected,
         demandVA: hvacDemand,
         demandFactor: 1.0,
         necReference: 'NEC 220.60'
@@ -1022,6 +1030,9 @@ export function calculateMultiFamilyLoad(input: MultiFamilyInput): ResidentialLo
   // at nameplate. No 65% heat factor — that is 220.82(C) only (PE ruling
   // 2026-10-18, #133); Table 220.84 supplies the diversity.
   let totalApplianceVA = 0;
+  // 240 V-only appliances (no neutral) — same set calculateNeutralLoad
+  // excludes for single-family; used for the 220.61 neutral below (#143).
+  let totalNonNeutralApplianceVA = 0;
   for (const template of unitTemplates) {
     const app = template.appliances;
     let unitApplianceVA = 0;
@@ -1072,6 +1083,17 @@ export function calculateMultiFamilyLoad(input: MultiFamilyInput): ResidentialLo
     }
 
     totalApplianceVA += unitApplianceVA * template.unitCount;
+    const unitNonNeutralVA =
+      (app.range?.enabled && app.range.type === 'electric' ? app.range.kw * 1000 : 0) +
+      (app.dryer?.enabled && app.dryer.type === 'electric' ? Math.max(app.dryer.kw * 1000, 5000) : 0) +
+      (app.waterHeater?.enabled && app.waterHeater.type === 'electric' ? app.waterHeater.kw * 1000 : 0) +
+      (app.evCharger?.enabled ? app.evCharger.kw * 1000 : 0) +
+      (app.poolPump?.enabled ? hpToVA(app.poolPump.hp) : 0) +
+      (app.poolHeater?.enabled ? app.poolHeater.kw * 1000 : 0) +
+      (app.hotTub?.enabled ? app.hotTub.kw * 1000 : 0) +
+      (app.sauna?.enabled ? app.sauna.kw * 1000 : 0) +
+      (app.wellPump?.enabled ? hpToVA(app.wellPump.hp) : 0);
+    totalNonNeutralApplianceVA += unitNonNeutralVA * template.unitCount;
   }
 
   if (totalApplianceVA > 0) {
@@ -1121,8 +1143,16 @@ export function calculateMultiFamilyLoad(input: MultiFamilyInput): ResidentialLo
   const serviceAmps = finalDemand / serviceVoltage;
   const recommendedSize = recommendServiceSize(serviceAmps);
 
-  // Neutral load (NEC 220.61)
-  const neutralLoad = calculateNeutralLoad(breakdown, serviceVoltage);
+  // Neutral load (NEC 220.61): the maximum unbalance of the load as
+  // calculated — the 220.84-factored dwelling load minus 240 V-only
+  // appliances, plus house loads. Never above the phase demand (#143: the
+  // breakdown-row sum skipped the 220.84 factor and printed 1,145 A neutral
+  // against a 672 A phase).
+  const neutralDwellingVA = (unitLoadsSubtotal - totalNonNeutralApplianceVA) * demandFactor;
+  const reducedNeutral = applyNeutralReduction(neutralDwellingVA + housePanelLoad, serviceVoltage);
+  const neutralLoad = reducedNeutral.neutralVA > finalDemand
+    ? { ...reducedNeutral, neutralVA: Math.round(finalDemand), neutralAmps: Math.round(serviceAmps * 10) / 10 }
+    : reducedNeutral;
   if (neutralLoad.reductionPercent > 0) {
     necReferences.push('NEC 220.61(B) - Neutral Load Reduction');
     warnings.push(

@@ -1673,10 +1673,14 @@ describe('Upstream Load Aggregation — NEC 220.84 Optional Method (C1)', () => 
         d.loadType.includes('HVAC non-coincident'),
       );
       expect(climateRow).toBeDefined();
-      // Aggregated across 4 units: 4 × (5k heat + 3.5k cool) = 34 kVA nameplate.
-      // Demand: max(4 × 5k, 4 × 3.5k) = 20 kVA.
-      expect(climateRow?.connectedVA).toBe(34_000);
-      expect(climateRow?.demandVA).toBe(20_000);
+      // The row carries the omitted smaller load (4 × 3.5k cool = 14 kVA) at
+      // 0% so the columns sum to the totals (#160).
+      expect(climateRow?.connectedVA).toBe(14_000);
+      expect(climateRow?.demandVA).toBe(0);
+      const rowSum = (k: 'connectedVA' | 'demandVA') =>
+        result.demandBreakdown.reduce((sum, d) => sum + d[k], 0);
+      expect(rowSum('connectedVA')).toBe(result.totalConnectedVA);
+      expect(rowSum('demandVA')).toBeCloseTo(result.totalDemandVA, 0);
       expect(climateRow?.necReference).toContain('220.84(C)(5)');
       expect(result.necReferences.join(' ')).not.toMatch(/65%|220\.84\(C\)\(4\)/);
     });

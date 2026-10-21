@@ -328,6 +328,7 @@ export const PanelSchedule: React.FC<PanelScheduleProps> = ({ project }) => {
         totalConnectedVA: result.totalConnectedVA,
         totalDemandVA: result.totalDemandVA,
         necArticle: result.necArticle,
+        necReferences: result.necReferences,
       };
     }
 
@@ -2192,19 +2193,25 @@ export const PanelSchedule: React.FC<PanelScheduleProps> = ({ project }) => {
               </div>
             )}
 
-            {/* NEC References */}
-            {(demandResult.necReferences?.length || 0) > 0 && (
+            {/* NEC References — the Optional Method's own references when
+                it sized the panel, not the Standard Method list (#161). */}
+            {(() => {
+              const appliedRefs = (dwellingUnitDemand && 'necReferences' in dwellingUnitDemand
+                ? dwellingUnitDemand.necReferences
+                : undefined) ?? demandResult.necReferences ?? [];
+              return appliedRefs.length > 0 && (
               <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
                 <h4 className="font-semibold text-sm text-blue-800 mb-2 flex items-center gap-2">
                   <Info className="w-4 h-4" /> NEC References Applied
                 </h4>
                 <ul className="text-xs text-blue-700 space-y-1">
-                  {(demandResult.necReferences || []).map((ref, i) => (
+                  {appliedRefs.map((ref, i) => (
                     <li key={i}>• {ref}</li>
                   ))}
                 </ul>
               </div>
-            )}
+              );
+            })()}
 
             {/* Load Type Legend */}
             <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
