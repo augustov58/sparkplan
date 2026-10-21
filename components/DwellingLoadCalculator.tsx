@@ -1215,7 +1215,7 @@ export const DwellingLoadCalculator: React.FC<DwellingLoadCalculatorProps> = ({
                         <div className="flex items-center gap-2">
                           <label className="text-xs text-gray-500 flex-shrink-0">kW:</label>
                           <NumberInput
-                            value={appliances.range?.kw || 12}
+                            value={appliances.range?.kw ?? 0}
                             onChange={v => updateAppliance('range', { ...appliances.range!, kw: v })}
                             className="w-24 text-sm border-gray-200 rounded"
                             step={0.5}
@@ -1241,7 +1241,7 @@ export const DwellingLoadCalculator: React.FC<DwellingLoadCalculatorProps> = ({
                         <div className="flex items-center gap-2 flex-wrap">
                           <label className="text-xs text-gray-500 flex-shrink-0">kW:</label>
                           <NumberInput
-                            value={appliances.dryer?.kw || 5.5}
+                            value={appliances.dryer?.kw ?? 0}
                             onChange={v => updateAppliance('dryer', { ...appliances.dryer!, kw: v })}
                             className="w-24 text-sm border-gray-200 rounded"
                             step={0.5}
@@ -1269,7 +1269,7 @@ export const DwellingLoadCalculator: React.FC<DwellingLoadCalculatorProps> = ({
                         <div className="flex items-center gap-2">
                           <label className="text-xs text-gray-500 flex-shrink-0">kW:</label>
                           <NumberInput
-                            value={appliances.waterHeater?.kw || 4.5}
+                            value={appliances.waterHeater?.kw ?? 0}
                             onChange={v => updateAppliance('waterHeater', { ...appliances.waterHeater!, kw: v })}
                             className="w-24 text-sm border-gray-200 rounded"
                             step={0.5}
@@ -1285,7 +1285,17 @@ export const DwellingLoadCalculator: React.FC<DwellingLoadCalculatorProps> = ({
                     <>
                       <select
                         value={appliances.hvac?.type || 'ac_only'}
-                        onChange={e => updateAppliance('hvac', { ...appliances.hvac!, type: e.target.value as any })}
+                        onChange={e => {
+                          const type = e.target.value as NonNullable<ResidentialAppliances['hvac']>['type'];
+                          const hasElectricHeat = type === 'heat_pump' || type === 'electric_heat';
+                          // #142: seed the heat strip into state (not just the
+                          // input) so the displayed and calculated values match.
+                          updateAppliance('hvac', {
+                            ...appliances.hvac!,
+                            type,
+                            heatingKw: hasElectricHeat && !appliances.hvac?.heatingKw ? 10 : appliances.hvac?.heatingKw,
+                          });
+                        }}
                         className="w-full text-sm border-gray-200 rounded mb-2"
                       >
                         <option value="ac_only">A/C Only</option>
@@ -1297,7 +1307,7 @@ export const DwellingLoadCalculator: React.FC<DwellingLoadCalculatorProps> = ({
                         <div className="flex items-center gap-1">
                           <label className="text-xs text-gray-500 flex-shrink-0">A/C kW:</label>
                           <NumberInput
-                            value={appliances.hvac?.coolingKw || 5}
+                            value={appliances.hvac?.coolingKw ?? 0}
                             onChange={v => updateAppliance('hvac', { ...appliances.hvac!, coolingKw: v })}
                             className="w-20 text-sm border-gray-200 rounded"
                             step={0.5}
@@ -1308,7 +1318,7 @@ export const DwellingLoadCalculator: React.FC<DwellingLoadCalculatorProps> = ({
                           <div className="flex items-center gap-1">
                             <label className="text-xs text-gray-500 flex-shrink-0">Heat kW:</label>
                             <NumberInput
-                              value={appliances.hvac?.heatingKw || 10}
+                              value={appliances.hvac?.heatingKw ?? 0}
                               onChange={v => updateAppliance('hvac', { ...appliances.hvac!, heatingKw: v })}
                               className="w-20 text-sm border-gray-200 rounded"
                               step={0.5}
@@ -1328,7 +1338,7 @@ export const DwellingLoadCalculator: React.FC<DwellingLoadCalculatorProps> = ({
                     <div className="flex items-center gap-2">
                       <label className="text-xs text-gray-500 flex-shrink-0">kW:</label>
                       <NumberInput
-                        value={appliances.dishwasher?.kw || 1.5}
+                        value={appliances.dishwasher?.kw ?? 0}
                         onChange={v => updateAppliance('dishwasher', { ...appliances.dishwasher!, kw: v })}
                         className="w-24 text-sm border-gray-200 rounded"
                         step={0.1}
@@ -1342,7 +1352,7 @@ export const DwellingLoadCalculator: React.FC<DwellingLoadCalculatorProps> = ({
                     <div className="flex items-center gap-2">
                       <label className="text-xs text-gray-500 flex-shrink-0">kW:</label>
                       <NumberInput
-                        value={appliances.disposal?.kw || 0.5}
+                        value={appliances.disposal?.kw ?? 0}
                         onChange={v => updateAppliance('disposal', { ...appliances.disposal!, kw: v })}
                         className="w-24 text-sm border-gray-200 rounded"
                         step={0.1}
@@ -1365,7 +1375,7 @@ export const DwellingLoadCalculator: React.FC<DwellingLoadCalculatorProps> = ({
                       <div className="flex items-center gap-2">
                         <label className="text-xs text-gray-500 flex-shrink-0">kW:</label>
                         <NumberInput
-                          value={appliances.evCharger?.kw || 7.7}
+                          value={appliances.evCharger?.kw ?? 0}
                           onChange={v => updateAppliance('evCharger', { ...appliances.evCharger!, kw: v })}
                           className="w-24 text-sm border-gray-200 rounded"
                           step={0.1}
@@ -1380,7 +1390,7 @@ export const DwellingLoadCalculator: React.FC<DwellingLoadCalculatorProps> = ({
                     <div className="flex items-center gap-2">
                       <label className="text-xs text-gray-500 flex-shrink-0">HP:</label>
                       <NumberInput
-                        value={appliances.poolPump?.hp || 1.5}
+                        value={appliances.poolPump?.hp ?? 0}
                         onChange={v => updateAppliance('poolPump', { ...appliances.poolPump!, hp: v })}
                         className="w-24 text-sm border-gray-200 rounded"
                         step={0.5}
@@ -1394,7 +1404,7 @@ export const DwellingLoadCalculator: React.FC<DwellingLoadCalculatorProps> = ({
                     <div className="flex items-center gap-2">
                       <label className="text-xs text-gray-500 flex-shrink-0">kW:</label>
                       <NumberInput
-                        value={appliances.poolHeater?.kw || 11}
+                        value={appliances.poolHeater?.kw ?? 0}
                         onChange={v => updateAppliance('poolHeater', { ...appliances.poolHeater!, kw: v })}
                         className="w-24 text-sm border-gray-200 rounded"
                         step={1}
@@ -1408,7 +1418,7 @@ export const DwellingLoadCalculator: React.FC<DwellingLoadCalculatorProps> = ({
                     <div className="flex items-center gap-2">
                       <label className="text-xs text-gray-500 flex-shrink-0">kW:</label>
                       <NumberInput
-                        value={appliances.hotTub?.kw || 6}
+                        value={appliances.hotTub?.kw ?? 0}
                         onChange={v => updateAppliance('hotTub', { ...appliances.hotTub!, kw: v })}
                         className="w-24 text-sm border-gray-200 rounded"
                         step={0.5}
@@ -1422,7 +1432,7 @@ export const DwellingLoadCalculator: React.FC<DwellingLoadCalculatorProps> = ({
                     <div className="flex items-center gap-2">
                       <label className="text-xs text-gray-500 flex-shrink-0">HP:</label>
                       <NumberInput
-                        value={appliances.wellPump?.hp || 1}
+                        value={appliances.wellPump?.hp ?? 0}
                         onChange={v => updateAppliance('wellPump', { ...appliances.wellPump!, hp: v })}
                         className="w-24 text-sm border-gray-200 rounded"
                         step={0.5}

@@ -1143,8 +1143,9 @@ export const PermitPacketGenerator: React.FC<PermitPacketGeneratorProps> = ({ pr
             ? aggregatedDemandSplit.necReferences
             : undefined,
           dataSourceCitation: nec22087DataSource.trim(),
-          dateRangeFrom: nec22087DateFrom || new Date(Date.now() - 365 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]!,
-          dateRangeTo: nec22087DateTo || new Date().toISOString().split('T')[0]!,
+          // No invented dates: an empty window prints "NOT PROVIDED" (#162).
+          dateRangeFrom: nec22087DateFrom,
+          dateRangeTo: nec22087DateTo,
           maxDemandKVA: maxDemandFinal,
           proposedNewLoadKVA: proposedFinal,
           serviceCapacityAmps,
