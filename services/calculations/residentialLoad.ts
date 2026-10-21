@@ -9,6 +9,8 @@
 
 import { ResidentialAppliances, DwellingUnitTemplate } from '../../types';
 import { getEvseLoadVA, isEvseDescription, type NecEdition } from '../../data/nec/evse-load';
+import { getNextStandardBreakerSize } from '../../data/nec/standard-breakers';
+import { sizeConductor } from './conductorSizing';
 
 // ============================================================================
 // NEC CONSTANTS AND TABLES
@@ -1209,6 +1211,23 @@ export interface GeneratedCircuit {
 }
 
 /**
+ * Copper conductor for a generated dwelling branch circuit: ampacity ≥ the
+ * breaker rating from the 60 °C column of Table 310.16 (NEC 110.14(C)(1)(a)
+ * default; also NM-B's limit per 334.80). No 240.4(B) next-size-up — the
+ * breaker may be sized for a continuous load the wire must carry.
+ */
+export function dwellingBranchConductorSize(breakerAmps: number): string {
+  return sizeConductor(
+    breakerAmps,
+    { serviceVoltage: 240, servicePhase: 1, occupancyType: 'dwelling', conductorMaterial: 'Cu', temperatureRating: 60 },
+    30,
+    3,
+    false,
+    breakerAmps,
+  ).conductorSize;
+}
+
+/**
  * Generate a residential panel schedule based on dwelling characteristics
  */
 export function generateResidentialPanelSchedule(input: SingleFamilyInput): GeneratedCircuit[] {
@@ -1333,7 +1352,7 @@ export function generateResidentialPanelSchedule(input: SingleFamilyInput): Gene
     const whAmps = Math.ceil((appliances.waterHeater.kw * 1000) / 240);
     circuits.push({
       description: 'Electric Water Heater',
-      breakerAmps: Math.ceil(whAmps * 1.25 / 5) * 5, // 125% for continuous
+      breakerAmps: getNextStandardBreakerSize(whAmps * 1.25), // 125% for continuous
       pole: 2,
       loadWatts: appliances.waterHeater.kw * 1000,
       loadType: 'W',
@@ -1346,7 +1365,7 @@ export function generateResidentialPanelSchedule(input: SingleFamilyInput): Gene
     const acAmps = Math.ceil((appliances.hvac.coolingKw * 1000) / 240);
     circuits.push({
       description: 'Air Conditioning Compressor',
-      breakerAmps: Math.ceil(acAmps * 1.25 / 5) * 5,
+      breakerAmps: getNextStandardBreakerSize(acAmps * 1.25),
       pole: 2,
       loadWatts: appliances.hvac.coolingKw * 1000,
       loadType: 'C',
@@ -1360,7 +1379,7 @@ export function generateResidentialPanelSchedule(input: SingleFamilyInput): Gene
     const heatAmps = Math.ceil((appliances.hvac.heatingKw * 1000) / 240);
     circuits.push({
       description: 'Electric Heat / Heat Pump',
-      breakerAmps: Math.ceil(heatAmps * 1.25 / 5) * 5,
+      breakerAmps: getNextStandardBreakerSize(heatAmps * 1.25),
       pole: 2,
       loadWatts: appliances.hvac.heatingKw * 1000,
       loadType: 'H',
@@ -1420,7 +1439,7 @@ export function generateResidentialPanelSchedule(input: SingleFamilyInput): Gene
     const pumpAmps = Math.ceil(pumpWatts / 240);
     circuits.push({
       description: 'Pool Pump',
-      breakerAmps: Math.ceil(pumpAmps * 1.25 / 5) * 5,
+      breakerAmps: getNextStandardBreakerSize(pumpAmps * 1.25),
       pole: 2,
       loadWatts: pumpWatts,
       loadType: 'M',
@@ -1433,7 +1452,7 @@ export function generateResidentialPanelSchedule(input: SingleFamilyInput): Gene
     const heaterAmps = Math.ceil((appliances.poolHeater.kw * 1000) / 240);
     circuits.push({
       description: 'Pool Heater',
-      breakerAmps: Math.ceil(heaterAmps * 1.25 / 5) * 5,
+      breakerAmps: getNextStandardBreakerSize(heaterAmps * 1.25),
       pole: 2,
       loadWatts: appliances.poolHeater.kw * 1000,
       loadType: 'H',
@@ -1446,7 +1465,7 @@ export function generateResidentialPanelSchedule(input: SingleFamilyInput): Gene
     const spaAmps = Math.ceil((appliances.hotTub.kw * 1000) / 240);
     circuits.push({
       description: 'Hot Tub / Spa',
-      breakerAmps: Math.ceil(spaAmps * 1.25 / 5) * 5,
+      breakerAmps: getNextStandardBreakerSize(spaAmps * 1.25),
       pole: 2,
       loadWatts: appliances.hotTub.kw * 1000,
       loadType: 'O',
@@ -1460,7 +1479,7 @@ export function generateResidentialPanelSchedule(input: SingleFamilyInput): Gene
     const wellAmps = Math.ceil(wellWatts / 240);
     circuits.push({
       description: 'Well Pump',
-      breakerAmps: Math.ceil(wellAmps * 1.25 / 5) * 5,
+      breakerAmps: getNextStandardBreakerSize(wellAmps * 1.25),
       pole: 2,
       loadWatts: wellWatts,
       loadType: 'M',
@@ -1479,7 +1498,7 @@ export function generateResidentialPanelSchedule(input: SingleFamilyInput): Gene
       const continuous = !!other.continuous;
       const baseAmps = (other.kw * 1000) / voltage;
       const sizedAmps = continuous ? baseAmps * 1.25 : baseAmps;
-      const breakerAmps = Math.max(15, Math.ceil(sizedAmps / 5) * 5);
+      const breakerAmps = getNextStandardBreakerSize(Math.max(15, sizedAmps));
       circuits.push({
         description: other.description + (continuous ? ' (continuous)' : ''),
         breakerAmps,

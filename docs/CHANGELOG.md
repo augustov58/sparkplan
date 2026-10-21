@@ -8,6 +8,7 @@ All notable changes to SparkPlan.
 
 - **Four ampacities were stored above the code value**, so conductor sizing could pick a wire one size too small: 14 AWG copper at 60 °C (20 A → 15 A), 12 AWG aluminum at 60 °C (20 A → 15 A), 6 AWG aluminum at 90 °C (60 A → 55 A, affects derating) and 600 kcmil copper at 60 °C (355 A → 350 A). On 60 °C terminations, a 16–20 A load now sizes 12 AWG copper instead of 14 AWG.
 - **Six aluminum ampacities were stored below the code value** (checked against the NEC 2023 code book): 8 AWG at 60 °C (30 → 35 A), 300 kcmil (190/255 → 195/260 A at 60/90 °C) and 750 kcmil (315/375/425 → 320/385/435 A, which were the 700 kcmil values). Aluminum sizing could pick a conductor one size larger than needed; every row in the table now matches the code book.
+- **Dwelling Calculator circuits: wire sized from the code table, breakers at standard sizes.** "Generate panel schedule" picked wire from a short built-in list that gave 6 AWG on a 60 A breaker and 3 AWG on 100 A (55 A and 85 A at 60 °C) and 1 AWG for anything above 100 A. It now uses the app's conductor sizer at 60 °C copper with ampacity at least the breaker rating (60 A → 4 AWG, 100 A → 1 AWG, 150 A → 3/0). Breakers round up to NEC 240.6(A) standard sizes instead of the next 5 A, so there are no more 55 / 65 / 75 A breakers. Circuits already on a panel are unchanged until it is regenerated.
 
 ---
 
