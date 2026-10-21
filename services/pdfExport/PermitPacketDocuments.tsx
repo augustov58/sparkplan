@@ -2705,11 +2705,16 @@ export const NEC22087NarrativePage: React.FC<NEC22087NarrativePageProps> = ({
             <Text style={{ fontSize: 8.5, color: '#374151', lineHeight: 1.4 }}>
               {`Method: ${copy.methodLabel}. ${copy.methodNecRef}.`}
             </Text>
-            <Text
-              style={{ fontSize: 8.5, color: '#374151', lineHeight: 1.4, marginTop: 1 }}
-            >
-              {`Observation window: ${data.dateRangeFrom} to ${data.dateRangeTo}.`}
-            </Text>
+            {/* An observation window applies to measured demand only (#162). */}
+            {data.method !== 'calculated' && (
+              <Text
+                style={{ fontSize: 8.5, color: '#374151', lineHeight: 1.4, marginTop: 1 }}
+              >
+                {data.dateRangeFrom && data.dateRangeTo
+                  ? `Observation window: ${data.dateRangeFrom} to ${data.dateRangeTo}.`
+                  : 'Observation window: \u2014 NOT PROVIDED \u2014'}
+              </Text>
+            )}
             <Text
               style={{
                 fontSize: 8.5,
