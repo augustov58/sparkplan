@@ -42,6 +42,8 @@ import {
 } from '../services/autogeneration/projectPopulationOrchestrator';
 import { useJurisdictions } from '../hooks/useJurisdictions';
 import { useProjects } from '../hooks/useProjects';
+import { useCircuits } from '../hooks/useCircuits';
+import { describeEvDesignDrift } from '../services/calculations/upstreamLoadAggregation';
 import {
   findManifestForJurisdiction,
   getManifestById,
@@ -137,6 +139,7 @@ const BUILDING_PRESETS: Record<BuildingPresetType, BuildingPreset> = {
 export const MultiFamilyEVCalculator: React.FC<MultiFamilyEVCalculatorProps> = ({ projectId, project, updateProject }) => {
   // Deferred saves patch the latest stored project (#134).
   const { patchProject } = useProjects();
+  const { circuits: projectCircuits } = useCircuits(projectId);
   // Read pre-calculated building load from DwellingLoadCalculator (stored in project settings)
   const storedMFLoad = project?.settings?.residential?.multiFamilyLoadResult as {
     totalDemandVA: number;
@@ -209,7 +212,9 @@ export const MultiFamilyEVCalculator: React.FC<MultiFamilyEVCalculatorProps> = (
   const [transformerKVA, setTransformerKVA] = useState(500);
 
   // EVEMS toggle
-  const [useEVEMS, setUseEVEMS] = useState(storedEvInputs?.useEVEMS || false);
+  const [useEVEMS, setUseEVEMS] = useState(
+    storedEvInputs?.selectedScenario ? storedEvInputs.selectedScenario === 'withEVEMS' : (storedEvInputs?.useEVEMS || false),
+  );
 
   // Capacity reserve for EV panel auxiliary loads (spare, lighting, EVEMS controller)
   const [capacityReserveVA, setCapacityReserveVA] = useState(storedEvInputs?.capacityReserveVA || 0);
@@ -245,7 +250,12 @@ export const MultiFamilyEVCalculator: React.FC<MultiFamilyEVCalculatorProps> = (
       if (storedEvInputs.useEVEMS != null) setUseEVEMS(storedEvInputs.useEVEMS);
       if (storedEvInputs.capacityReserveVA != null) setCapacityReserveVA(storedEvInputs.capacityReserveVA);
       if (storedEvInputs.existingServiceAmps != null) setExistingServiceAmps(storedEvInputs.existingServiceAmps);
-      if (storedEvInputs.selectedScenario) setSelectedScenario(storedEvInputs.selectedScenario);
+      if (storedEvInputs.selectedScenario) {
+        setSelectedScenario(storedEvInputs.selectedScenario);
+        // #138: the scenario is what Add EV Infrastructure builds; reconcile a
+        // stored EVEMS flag that disagrees with it.
+        setUseEVEMS(storedEvInputs.selectedScenario === 'withEVEMS');
+      }
       if (storedEvInputs.voltage != null) setVoltage(storedEvInputs.voltage as any);
       if (storedEvInputs.phase != null) setPhase(storedEvInputs.phase as any);
     }
@@ -263,6 +273,17 @@ export const MultiFamilyEVCalculator: React.FC<MultiFamilyEVCalculatorProps> = (
   const [applyError, setApplyError] = useState<string | null>(null);
   const [applySuccess, setApplySuccess] = useState(false);
   const [selectedScenario, setSelectedScenario] = useState<ScenarioKey>(storedEvInputs?.selectedScenario || 'noEVEMS');
+  // #138: the EVEMS checkbox (drives the service analysis) and the scenario
+  // radio (drives what gets built) are one choice — keep them in sync so the
+  // packet can't print "upgrade required" and "adequate" for the same design.
+  const chooseScenario = (key: ScenarioKey) => {
+    setSelectedScenario(key);
+    setUseEVEMS(key === 'withEVEMS');
+  };
+  const toggleEVEMS = (on: boolean) => {
+    setUseEVEMS(on);
+    setSelectedScenario(prev => (on ? 'withEVEMS' : prev === 'withEVEMS' ? 'noEVEMS' : prev));
+  };
 
   // Persist MF EV inputs to project settings (debounced, skip until restore completes)
   useEffect(() => {
@@ -926,11 +947,11 @@ export const MultiFamilyEVCalculator: React.FC<MultiFamilyEVCalculatorProps> = (
                   type="checkbox"
                   id="useEVEMS"
                   checked={useEVEMS}
-                  onChange={e => setUseEVEMS(e.target.checked)}
+                  onChange={e => toggleEVEMS(e.target.checked)}
                   className="rounded border-gray-300 text-[#2d3b2d] focus:ring-[#2d3b2d]/20"
                 />
                 <label htmlFor="useEVEMS" className="font-semibold text-gray-900 text-sm cursor-pointer">
-                  Include EVEMS Analysis (NEC 625.42)
+                  Design uses EVEMS (NEC 625.42)
                 </label>
               </div>
               <p className="text-xs text-blue-700 mt-1 ml-5">
@@ -1295,6 +1316,25 @@ export const MultiFamilyEVCalculator: React.FC<MultiFamilyEVCalculatorProps> = (
 
           {result ? (
             <>
+              {/* #157: analysis vs the EV circuits actually on the project */}
+              {(() => {
+                const drift = describeEvDesignDrift(
+                  {
+                    chargerCount: result.input.evChargersRequested,
+                    perChargerVA: result.evLoad.necEdition === '2023' || result.input.evChargersRequested === 0
+                      ? undefined
+                      : result.evLoad.totalConnectedVA / result.input.evChargersRequested,
+                  },
+                  projectCircuits,
+                );
+                return drift && (
+                  <div className="flex items-start gap-2 text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded p-2.5">
+                    <AlertTriangle className="w-4 h-4 flex-shrink-0 mt-0.5" />
+                    <span>{drift}</span>
+                  </div>
+                );
+              })()}
+
               {/* Service Capacity Summary */}
               <div className="bg-gradient-to-br from-blue-50 to-indigo-50 border-2 border-blue-200 rounded-lg p-6">
                 <div className="grid grid-cols-2 gap-4 text-sm">
@@ -1514,7 +1554,7 @@ export const MultiFamilyEVCalculator: React.FC<MultiFamilyEVCalculatorProps> = (
                                 name="applyScenario"
                                 value={key}
                                 checked={selectedScenario === key}
-                                onChange={() => setSelectedScenario(key)}
+                                onChange={() => chooseScenario(key)}
                                 className="text-indigo-600"
                               />
                               <div className="flex-1 min-w-0">

@@ -4,6 +4,14 @@ All notable changes to SparkPlan.
 
 ---
 
+## 2026-10-18: Multi-Family EV page agrees with itself and with the panels (#138, #157, #163)
+
+- **One EVEMS choice (#138).** The "Design uses EVEMS" checkbox and the scenario picker were separate settings, so E-402 could print "Upgrade Required: 1600A" and "800A service is adequate" for the same design. They are now one choice: picking the EVEMS scenario turns EVEMS on, and turning EVEMS off moves the scenario to Direct. When the existing service only works with load management, the Upgrade scenario now says "not required if EVEMS is used" instead of "adequate".
+- **EVEMS below the 12 A minimum (#163).** When the setpoint can't give every requested charger 12 A, the EVEMS scenario reports how many it supports, with a warning, instead of printing "~6 A each" next to "max 9 at 12 A". Add EV Infrastructure builds that supported count, as the Direct scenario already does.
+- **Analysis vs installed chargers (#157).** The calculator and E-402 show a note when the EV analysis' charger count or rating differs from the charger circuits on the project's panels (e.g. 20 analysed vs 8 installed). Advisory only.
+
+---
+
 ## 2026-10-18: EV feeders, EVEMS marker and charger sizing (#139, #144, #156, #164)
 
 - **Feeder Manager sizes EV feeders like the packet (#144).** Recalculate counted the EVEMS setpoint marker as a load and lost the NEC 625.42 clamp, sizing an EVEMS feeder at 686 A / 500 kcmil where the packet's E-103 showed 189 A. It now uses the destination panel's EVEMS-clamped demand with the same continuous split as E-103, saves the number of parallel sets, and warns when a feeder's design load exceeds the destination panel's rating.

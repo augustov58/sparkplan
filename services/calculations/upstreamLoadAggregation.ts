@@ -130,6 +130,31 @@ export function calculateProposedNewLoadVA(
 }
 
 /**
+ * #157: compare a Multi-Family EV analysis with the EV charger circuits that
+ * actually exist on the project. Returns an advisory note when they differ
+ * (count, or per-charger nameplate VA when given), or null when they match
+ * or no chargers are on the panels yet. Advisory only — never blocks.
+ */
+export function describeEvDesignDrift(
+  analysis: { chargerCount: number; perChargerVA?: number },
+  circuits: Pick<Circuit, 'description' | 'load_watts'>[],
+): string | null {
+  const chargers = circuits.filter(c => !isEVEMSMarkerCircuit(c) && isEvseDescription(c.description));
+  if (chargers.length === 0) return null;
+  const builtVAs = [...new Set(chargers.map(c => Math.round(c.load_watts || 0)))];
+  const countDiffers = chargers.length !== analysis.chargerCount;
+  const vaDiffers = analysis.perChargerVA !== undefined
+    && builtVAs.some(va => Math.abs(va - analysis.perChargerVA!) > 1);
+  if (!countDiffers && !vaDiffers) return null;
+  const builtDesc = builtVAs.map(va => `${(va / 1000).toFixed(2)} kVA`).join(' / ');
+  const analysisDesc = analysis.perChargerVA !== undefined
+    ? `${analysis.chargerCount} chargers at ${(analysis.perChargerVA / 1000).toFixed(2)} kVA`
+    : `${analysis.chargerCount} chargers`;
+  return `The EV analysis assumes ${analysisDesc}, but the project's panels have ${chargers.length} EV charger circuits (${builtDesc}). ` +
+    'Re-run the Multi-Family EV calculator or regenerate the EV infrastructure so they match.';
+}
+
+/**
  * Locate the explicit EVEMS Aggregate Setpoint marker circuit on the panel
  * (if present) — used by UI/PDF callouts to show the NEC 625.42 setpoint
  * prominently in its own info card instead of in the regular circuit table.
