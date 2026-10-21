@@ -4,6 +4,12 @@ All notable changes to SparkPlan.
 
 ---
 
+## 2026-10-21: Conductor ampacity table corrections (NEC Table 310.16)
+
+- **Four ampacities were stored above the code value**, so conductor sizing could pick a wire one size too small: 14 AWG copper at 60 °C (20 A → 15 A), 12 AWG aluminum at 60 °C (20 A → 15 A), 6 AWG aluminum at 90 °C (60 A → 55 A, affects derating) and 600 kcmil copper at 60 °C (355 A → 350 A). On 60 °C terminations, a 16–20 A load now sizes 12 AWG copper instead of 14 AWG.
+
+---
+
 ## 2026-10-18: Multi-Family EV page agrees with itself and with the panels (#138, #157, #163)
 
 - **One EVEMS choice (#138).** The "Design uses EVEMS" checkbox and the scenario picker were separate settings, so E-402 could print "Upgrade Required: 1600A" and "800A service is adequate" for the same design. They are now one choice: picking the EVEMS scenario turns EVEMS on, and turning EVEMS off moves the scenario to Direct. When the existing service only works with load management, the Upgrade scenario now says "not required if EVEMS is used" instead of "adequate".
