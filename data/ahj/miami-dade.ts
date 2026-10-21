@@ -91,6 +91,21 @@ const MIAMI_DADE_CODE_REFERENCES: string[] = [
   'NFPA-70E (2024) — Standard for Electrical Safety in the Workplace',
 ];
 
+/**
+ * FBC 9th Edition (2026) cycle: NEC 2023 statewide, single-family included,
+ * so the NEC 2014 / NEC 2020 lane split above ends. Only the lines carrying
+ * that split are replaced; the rest go through `applyCodeCycle`.
+ */
+const MIAMI_DADE_GENERAL_NOTES_NEC_2023: string[] = [
+  'All electrical work shall comply with NFPA-70 (2023 NEC) and the Florida Building Code, 9th edition (2026), as adopted by Miami-Dade County.',
+  ...MIAMI_DADE_GENERAL_NOTES.slice(1),
+];
+
+const MIAMI_DADE_CODE_REFERENCES_NEC_2023: string[] = [
+  'NFPA-70 (2023 NEC)',
+  ...MIAMI_DADE_CODE_REFERENCES.slice(2),
+];
+
 // ============================================================================
 // MANIFEST
 // ============================================================================
@@ -129,7 +144,9 @@ export const miamiDadeManifest: AHJManifest = {
   sheetIdPrefix: 'EL-',
 
   generalNotes: MIAMI_DADE_GENERAL_NOTES,
+  generalNotesByEdition: { '2023': MIAMI_DADE_GENERAL_NOTES_NEC_2023 },
   codeReferences: MIAMI_DADE_CODE_REFERENCES,
+  codeReferencesByEdition: { '2023': MIAMI_DADE_CODE_REFERENCES_NEC_2023 },
 
   // -------------------------------------------------------------------------
   // RELEVANT SECTIONS — Miami-Dade wants the full electrical stack + HVHZ

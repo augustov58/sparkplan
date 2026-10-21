@@ -4,6 +4,15 @@ All notable changes to SparkPlan.
 
 ---
 
+## 2026-10-21: NEC edition picker — Automatic follows Florida's code cycle (#141)
+
+- **One edition control.** The project page's NEC Edition picker now offers **Automatic** (default for every project, new and existing) plus explicit 2020 / 2023. Automatic follows Florida's adoption: NEC 2020 (FBC 8th Edition) through Dec 30, 2026, NEC 2023 (FBC 9th Edition) from Dec 31, 2026, Miami-Dade single-family included. A non-Florida jurisdiction uses its own adopted edition.
+- **Everything follows it.** Load calculations, the permit packet (cover, applicable codes, general notes, design review checklist), the commercial load PDF/CSV, the load report, Dashboard and Compliance Report badges, the AHJ panel, the Copilot, and the photo analyzer all use the same edition. Under NEC 2023, AHJ notes and code references switch to "2023 NEC" and "Florida Building Code, 9th edition (2026)"; Miami-Dade's NEC 2014/2020 split becomes a single NEC 2023 cite.
+- **E-502 prints the design edition (#141).** The Jurisdiction Requirements page printed "NEC 2023 Adopted" from the jurisdiction record next to an NEC 2020 checklist; it now prints the packet's edition.
+- The one-line diagram export footer no longer prints "NEC <current year> Edition" (it printed a nonexistent "NEC 2026").
+
+---
+
 ## 2026-10-18: Multi-Family EV page agrees with itself and with the panels (#138, #157, #163)
 
 - **One EVEMS choice (#138).** The "Design uses EVEMS" checkbox and the scenario picker were separate settings, so E-402 could print "Upgrade Required: 1600A" and "800A service is adequate" for the same design. They are now one choice: picking the EVEMS scenario turns EVEMS on, and turning EVEMS off moves the scenario to Direct. When the existing service only works with load management, the Upgrade scenario now says "not required if EVEMS is used" instead of "adequate".

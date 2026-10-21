@@ -108,7 +108,8 @@ Implementation: `services/calculations/shortCircuit.ts`
 
 ### EVSE Load — edition-specific (NEC 2020 vs 2023)
 ```
-Florida enforces NEC 2020 (FBC 8th Ed.) — 220.57 DOES NOT EXIST in NEC 2020.
+Florida enforces NEC 2020 (FBC 8th Ed.) until 2026-12-31, then NEC 2023
+(FBC 9th Ed.) — 220.57 DOES NOT EXIST in NEC 2020.
 - NEC 2020: per-EVSE load = nameplate per 220.14(A). No 7,200 VA floor.
 - NEC 2023: per-EVSE load = max(7,200 VA, nameplate) per 220.57(A).
 Both at 100% in the Article 220 load calc — the 125% of 625.41 is for
@@ -117,8 +118,12 @@ OCPD/conductor sizing only. Neither is a demand factor.
 PE-confirmed 2026-09-27; extended 2026-10-14 to the single-family Optional Method
 (220.82/220.83 bucket, 2023 floor included) and to all continuous loads — no ×1.25
 in any Article 220 load calc. Single source: `data/nec/evse-load.ts::getEvseLoadVA`.
-Edition resolves manifest → project `nec_edition` → '2020' via
-`data/ahj/registry.ts::resolveNecEdition` (used by the calculator AND the packet).
+Edition = project-page pick (`settings.nec_edition_override`) → Automatic: Florida's
+code cycle by date (a non-FL jurisdiction's own row edition), via
+`data/ahj/codeCycle.ts::resolveNecEdition` / `hooks/useProjectNecEdition` — used by
+every calc, the packet, exports and the Copilot. Never read `project.necEdition`
+(legacy column) or `jurisdiction.nec_edition` for the edition. AHJ text written for
+the 2020 cycle goes through `applyCodeCycle` / `manifestTextForEdition`.
 
 ### EVEMS Sizing (NEC 625.42)
 Size to setpoint, not full connected load. EVEMS allows service capacity reduction.
@@ -170,7 +175,7 @@ Per-AHJ packet defaults live in `data/ahj/` as **pure data + pure predicates** �
 - `data/ahj/visibility.ts` — `computeDefaultVisibility(manifest, ctx)` implements the **two-layer visibility model**: Layer 1 (manifest defaults from the arrays + predicates) overlaid with Layer 2 (user overrides from `projects.settings.section_overrides` jsonb). When no manifest is registered for a project's jurisdiction, returns `null` and Sprint 2A's `resolveSections(sectionPrefs)` path runs unchanged.
 - `data/ahj/registry.ts` — `getManifestById(id)` (case-insensitive) + `findManifestForJurisdiction(jurisdictionName, ahjName)` (case-insensitive substring on either field). Sprint 2C M1 will replace the registry with an explicit `jurisdictions.manifest_id` FK once that table is populated.
 
-The orchestrator threads `manifest?: AHJManifest` + `buildingType?: BuildingType` through `PermitPacketData`. Resolution chain for `generalNotes` / `codeReferences` / `necEdition`: explicit data field → manifest fallback → Sprint 2A baseline. Backward compat is preserved by null-coalescing — projects without a `jurisdiction_id`, or with one not in the registry, render exactly as they did pre-PR-#51.
+The orchestrator threads `manifest?: AHJManifest` + `buildingType?: BuildingType` through `PermitPacketData`. Resolution chain for `generalNotes` / `codeReferences`: explicit data field → per-project override → manifest fallback (in the project's edition via `manifestTextForEdition`) → Sprint 2A baseline. `necEdition` comes from `resolveNecEdition` (see EVSE Load above), never the manifest. Backward compat is preserved by null-coalescing — projects without a `jurisdiction_id`, or with one not in the registry, render exactly as they did pre-PR-#51.
 
 When adding a new AHJ: drop in `data/ahj/{newAhj}.ts` matching the manifest shape, register it in `registry.ts`, populate `requirements: []` if the M1 engine is wired. **No engine changes required** — Sprint 2C is pure-data + engine; manifest scaffold is done.
 

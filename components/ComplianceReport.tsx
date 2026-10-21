@@ -1,5 +1,6 @@
 import React from 'react';
 import { Project } from '../types';
+import { useProjectNecEdition } from '../hooks/useProjectNecEdition';
 import { FileText, CheckCircle2, AlertTriangle, UserCheck } from 'lucide-react';
 
 interface ReportProps {
@@ -7,6 +8,7 @@ interface ReportProps {
 }
 
 export const ComplianceReport: React.FC<ReportProps> = ({ project }) => {
+  const necEdition = useProjectNecEdition(project);
   const totalItems = (project.inspectionList || []).length;
   const passedItems = (project.inspectionList || []).filter(i => i.status === 'Pass').length;
   const progress = totalItems ? Math.round((passedItems / totalItems) * 100) : 0;
@@ -42,7 +44,7 @@ export const ComplianceReport: React.FC<ReportProps> = ({ project }) => {
                     <div className="space-y-2">
                         <div className="flex justify-between text-sm border-b border-gray-50 pb-2">
                             <span className="text-gray-600">Edition</span>
-                            <span className="font-medium">NEC {project.necEdition}</span>
+                            <span className="font-medium">NEC {necEdition}</span>
                         </div>
                         <div className="flex justify-between text-sm border-b border-gray-50 pb-2">
                             <span className="text-gray-600">Project Type</span>

@@ -9,6 +9,7 @@ import { CalculationBreakdown } from './CalculationBreakdown';
 import { exportLoadCalculationPDF } from '../services/pdfExport';
 import { loadItemSchema, type LoadItemFormData } from '../lib/validation';
 import { useLoads } from '../hooks/useLoads';
+import { useProjectNecEdition } from '../hooks/useProjectNecEdition';
 
 interface LoadCalculatorProps {
   project: Project;
@@ -16,6 +17,7 @@ interface LoadCalculatorProps {
 }
 
 export const LoadCalculator: React.FC<LoadCalculatorProps> = ({ project, updateProject }) => {
+  const necEdition = useProjectNecEdition(project);
   // Use loads from database instead of project prop
   const { loads, createLoad, deleteLoad, error: loadsError } = useLoads(project.id);
   const {
@@ -46,7 +48,7 @@ export const LoadCalculator: React.FC<LoadCalculatorProps> = ({ project, updateP
   const handleExportPDF = async () => {
     setIsExporting(true);
     try {
-      await exportLoadCalculationPDF(project);
+      await exportLoadCalculationPDF(project, necEdition);
     } catch (error) {
       alert('Export failed: ' + (error instanceof Error ? error.message : 'Unknown error'));
     } finally {
@@ -386,6 +388,7 @@ export const LoadCalculator: React.FC<LoadCalculatorProps> = ({ project, updateP
               return (
                 <CalculationBreakdown
                   title="Detailed NEC Load Calculation"
+                  necEdition={necEdition}
                   summary={[
                     {
                       label: 'Connected Load',

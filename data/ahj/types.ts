@@ -38,6 +38,7 @@
  */
 
 import type { PacketSections } from '../../services/pdfExport/packetSections';
+import type { NecEdition } from '../nec/evse-load';
 import type { ArtifactType } from '../../hooks/useProjectAttachments';
 
 // ============================================================================
@@ -253,12 +254,12 @@ export interface AHJManifest {
   // -------------------------------------------------------------------------
 
   /**
-   * NEC edition cited per building type. Miami-Dade Residential PRG cites
-   * NEC 2014; Commercial PRG cites NEC 2020. The code-basis block renderer
-   * (Sprint 2A C7/H4) reads from THIS map (not from a global constant) so
-   * the right edition shows on residential vs commercial packets. Manifest
-   * authors must provide a value for every BuildingType, even if the AHJ
-   * uses the same edition uniformly (Orlando uniformly cites NEC 2020).
+   * NEC edition the AHJ cites per building type in the FBC 8th Edition
+   * cycle. Miami-Dade Residential PRG cites NEC 2014; Commercial PRG cites
+   * NEC 2020. Reference data only: the edition a project is designed and
+   * printed under comes from `resolveNecEdition` in data/ahj/codeCycle.ts
+   * (project pick, else Florida's code cycle by date). Manifest authors must
+   * provide a value for every BuildingType.
    */
   necEdition: Record<BuildingType, string>;
 
@@ -299,6 +300,16 @@ export interface AHJManifest {
    *   ['NFPA-70 (2020 NEC)', 'FBC 8th ed (2023)', 'Orlando City Code Ch. 14']
    */
   codeReferences: string[];
+
+  /**
+   * Per-edition replacements for `generalNotes` / `codeReferences`, for text
+   * `applyCodeCycle` (data/ahj/codeCycle.ts) can't rewrite safely. Notes and
+   * references are authored for the NEC 2020 / FBC 8th cycle and rewritten
+   * for NEC 2023 automatically; set an entry only when that rewrite would be
+   * wrong (Miami-Dade's NEC 2014 / NEC 2020 lane split ends with FBC 9th).
+   */
+  generalNotesByEdition?: Partial<Record<NecEdition, string[]>>;
+  codeReferencesByEdition?: Partial<Record<NecEdition, string[]>>;
 
   // -------------------------------------------------------------------------
   // AHJ-aware visibility (two-layer model: manifest defaults + user overrides)

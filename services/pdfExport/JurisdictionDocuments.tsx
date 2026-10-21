@@ -42,6 +42,8 @@ import type {
   AttachmentSummary,
   PacketAST,
 } from '../../data/ahj/types';
+import { applyCodeCycle, resolveNecEdition } from '../../data/ahj/codeCycle';
+import type { NecEdition } from '../../data/nec/evse-load';
 import { evaluatePacket } from '../jurisdictionChecklist/checklistEngine';
 import type {
   ChecklistResult,
@@ -415,6 +417,12 @@ interface JurisdictionRequirementsDocumentProps {
    * upload-detection predicates. Defaults to `[]` when not supplied.
    */
   attachments?: AttachmentSummary[];
+  /**
+   * The packet's NEC edition (`resolveNecEdition`). Printed in the info box
+   * instead of the jurisdiction row's `nec_edition` (#141) and applied to
+   * checklist names written for the NEC 2020 cycle.
+   */
+  necEdition?: NecEdition;
 }
 
 export const JurisdictionRequirementsPages: React.FC<JurisdictionRequirementsDocumentProps> = ({
@@ -427,13 +435,19 @@ export const JurisdictionRequirementsPages: React.FC<JurisdictionRequirementsDoc
   ahjContext,
   packet,
   attachments,
+  necEdition,
 }) => {
+  const edition: NecEdition = necEdition ?? resolveNecEdition(undefined, jurisdiction);
   // Sprint 2C M1: when a manifest is supplied, run the engine. Engine is
   // pure / never throws, but we still defensively shape the input.
-  const engineResult: ChecklistResult | null =
+  const rawEngineResult: ChecklistResult | null =
     manifest && ahjContext
       ? evaluatePacket(packet ?? {}, attachments ?? [], manifest, ahjContext)
       : null;
+  const engineResult: ChecklistResult | null = rawEngineResult && {
+    ...rawEngineResult,
+    items: rawEngineResult.items.map((item) => ({ ...item, name: applyCodeCycle(item.name, edition) })),
+  };
 
   return (
     <Page size="LETTER" orientation="portrait" style={themeStyles.page}>
@@ -454,7 +468,7 @@ export const JurisdictionRequirementsPages: React.FC<JurisdictionRequirementsDoc
             </Text>
           )}
           <Text style={{ ...styles.infoText, marginTop: 4 }}>
-            NEC {jurisdiction.nec_edition} Adopted
+            Design code: NEC {edition}
             {jurisdiction.estimated_review_days &&
               ` • Typical Review: ${jurisdiction.estimated_review_days} days`}
           </Text>

@@ -10,6 +10,8 @@ import { EmptyState } from './LoadingSpinner';
 import { ProjectExportImportCompact } from './ProjectExportImport';
 import { TemplateType, createProjectFromTemplate } from '../services/sampleTemplates';
 import { useProjects } from '../hooks/useProjects';
+import { useJurisdictions } from '../hooks/useJurisdictions';
+import { projectNecEdition } from '../data/ahj/codeCycle';
 import { supabase } from '../lib/supabase';
 
 interface DashboardProps {
@@ -23,6 +25,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ projects, createNewProject
   const { user } = useAuth();
   const { openItems, loading: loadingOpenItems } = useAllOpenItems();
   const { createProject } = useProjects();
+  const { getJurisdictionById } = useJurisdictions();
 
   // Filter and sort state
   const [selectedProject, setSelectedProject] = useState<string>('all');
@@ -249,7 +252,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ projects, createNewProject
                   <div>
                     <div className="flex gap-2 mb-1">
                         <span className="text-xs font-bold text-[#888] uppercase tracking-wider bg-[#f0eeeb] px-2 py-0.5 rounded">{project.type}</span>
-                        <span className="text-xs font-bold text-[#3d6b3d] uppercase tracking-wider bg-[#e8f5e8] px-2 py-0.5 rounded">NEC {project.necEdition}</span>
+                        <span className="text-xs font-bold text-[#3d6b3d] uppercase tracking-wider bg-[#e8f5e8] px-2 py-0.5 rounded">NEC {projectNecEdition(project, project.jurisdiction_id ? getJurisdictionById(project.jurisdiction_id) : undefined)}</span>
                     </div>
                     <h3 className="font-serif text-lg font-medium text-[#1a1a1a] mt-2 group-hover:text-[#2d3b2d] transition-colors">{project.name}</h3>
                     <p className="text-sm text-[#666] mt-1">{project.address}</p>

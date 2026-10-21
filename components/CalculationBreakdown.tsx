@@ -28,6 +28,8 @@ export interface CalculationBreakdownProps {
   notes?: string[];
   isCompliant?: boolean;
   complianceMessage?: string;
+  /** Project NEC edition for the references heading; omitted = no edition shown */
+  necEdition?: '2020' | '2023';
 }
 
 export const CalculationBreakdown: React.FC<CalculationBreakdownProps> = ({
@@ -38,7 +40,8 @@ export const CalculationBreakdown: React.FC<CalculationBreakdownProps> = ({
   warnings = [],
   notes = [],
   isCompliant,
-  complianceMessage
+  complianceMessage,
+  necEdition
 }) => {
   return (
     <div className="bg-white border border-gray-200 rounded-lg shadow-sm">
@@ -136,7 +139,7 @@ export const CalculationBreakdown: React.FC<CalculationBreakdownProps> = ({
         <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
           <div className="flex items-center gap-2 text-sm font-bold text-blue-900 mb-3">
             <BookOpen className="w-4 h-4" />
-            NEC 2023 References
+            {necEdition ? `NEC ${necEdition} References` : 'NEC References'}
           </div>
           <ul className="space-y-1 text-sm text-blue-800">
             {necReferences.map((ref, idx) => (

@@ -6,6 +6,7 @@ These functions are exposed as tools that agents can call to fetch data from Sup
 
 from supabase import Client
 from typing import List, Optional, Dict, Any
+from datetime import date
 import logging
 
 logger = logging.getLogger(__name__)
@@ -456,3 +457,39 @@ async def get_grounding_system(supabase: Client, project_id: str) -> Optional[Di
             "gec_size": "Error fetching data",
             "notes": ""
         }
+
+
+# Florida code cycles — mirror of data/ahj/codeCycle.ts (keep in sync).
+FLORIDA_CODE_CYCLES = [("2023-12-31", "2020"), ("2026-12-31", "2023")]
+
+
+async def resolve_nec_edition(supabase: Client, project: Dict[str, Any], today: Optional[date] = None) -> str:
+    """
+    NEC edition a project is designed under, as the frontend resolves it:
+    the project-page pick (settings.nec_edition_override), else Automatic —
+    a non-Florida jurisdiction's own nec_edition, otherwise Florida's code
+    cycle by date. The projects.nec_edition column is not used.
+    """
+    override = (project.get('settings') or {}).get('nec_edition_override')
+    if override in ('2020', '2023'):
+        return override
+
+    jurisdiction_id = project.get('jurisdiction_id')
+    if jurisdiction_id:
+        try:
+            row = (
+                supabase.table('jurisdictions').select('state, nec_edition')
+                .eq('id', jurisdiction_id).single().execute().data
+            )
+            state = ((row or {}).get('state') or '').strip().upper()
+            if state and state != 'FL' and row.get('nec_edition') in ('2020', '2023'):
+                return row['nec_edition']
+        except Exception as e:
+            logger.error(f"Error fetching jurisdiction {jurisdiction_id}: {e}")
+
+    day = (today or date.today()).isoformat()
+    edition = FLORIDA_CODE_CYCLES[0][1]
+    for effective, nec in FLORIDA_CODE_CYCLES:
+        if day >= effective:
+            edition = nec
+    return edition

@@ -294,7 +294,7 @@ export const PanelSchedule: React.FC<PanelScheduleProps> = ({ project }) => {
   //     regardless of whether the appliance toggles were updated.
   //  2. Sub-panel of a multi-family dwelling unit → run
   //     calculateDwellingUnitDemandVA over its circuits.
-  const necEdition = useProjectNecEdition(project, 'single_family_residential');
+  const necEdition = useProjectNecEdition(project);
   const dwellingUnitDemand = useMemo(() => {
     if (!selectedPanel) return null;
     const occupancy = project.settings?.occupancyType;

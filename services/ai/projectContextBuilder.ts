@@ -9,6 +9,7 @@
 
 import type { Database } from '@/lib/database.types';
 import { isEVEMSMarkerCircuit } from '@/services/calculations/upstreamLoadAggregation';
+import type { NecEdition } from '../../data/nec/evse-load';
 import {
   calculateAllCumulativeVoltageDrops,
   calculateCumulativeForFeeder,
@@ -182,6 +183,8 @@ export function buildProjectContext(
    * compliance status in its first-message context.
    */
   shortCircuitCalculations?: ShortCircuitCalculation[],
+  /** The project's NEC edition (`resolveNecEdition`), so answers cite the right code. */
+  necEdition?: NecEdition,
 ): ProjectContext {
   // Build panel summaries with hierarchy information
   const panelSummaries: PanelSummary[] = panels.map(panel => {
@@ -415,7 +418,7 @@ export function buildProjectContext(
   const summary = `
 PROJECT: ${projectName}
 Type: ${projectType}
-Service: ${serviceVoltage}V ${servicePhase === 3 ? '3-phase' : 'single-phase'}
+${necEdition ? `NEC Edition: NEC ${necEdition} (cite this edition's section numbers)\n` : ''}Service: ${serviceVoltage}V ${servicePhase === 3 ? '3-phase' : 'single-phase'}
 ${mainPanel ? `Main Panel: ${mainPanel.name} (${mainPanel.bus_rating}A bus, ${mainPanel.main_breaker_amps || 'MLO'}A main)` : 'No main panel configured'}
 Total Panels: ${panels.length}
 Total Circuits: ${circuits.length}

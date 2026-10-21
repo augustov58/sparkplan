@@ -62,7 +62,7 @@ export const ServiceUpgradeWizard: React.FC<ServiceUpgradeWizardProps> = ({ proj
   const [selectedTemplate, setSelectedTemplate] = useState('');
 
   // Calculate load from Dwelling Calculator data if available
-  const necEdition = useProjectNecEdition(project, 'single_family_residential');
+  const necEdition = useProjectNecEdition(project);
   const dwellingLoadResult: ResidentialLoadResult | null = useMemo(() => {
     try {
       if (!project?.settings?.residential?.appliances) {

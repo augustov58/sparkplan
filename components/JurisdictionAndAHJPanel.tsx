@@ -43,6 +43,7 @@ import {
   findManifestForJurisdiction,
 } from '../data/ahj/registry';
 import type { AHJManifest, AHJSheetIdPrefix } from '../data/ahj/types';
+import { automaticNecEdition } from '../data/ahj/codeCycle';
 
 // ============================================================================
 // COMPONENT PROPS
@@ -309,7 +310,7 @@ export const JurisdictionAndAHJPanel: React.FC<JurisdictionAndAHJPanelProps> = (
                       </div>
                       {j.ahj_name && (
                         <div className="text-xs text-gray-500">
-                          {j.ahj_name} • NEC {j.nec_edition}
+                          {j.ahj_name} • NEC {automaticNecEdition(j)}
                         </div>
                       )}
                     </button>
@@ -380,7 +381,7 @@ export const JurisdictionAndAHJPanel: React.FC<JurisdictionAndAHJPanelProps> = (
                     </p>
                   )}
                   <div className="flex items-center gap-3 mt-1 text-xs text-[#2d3b2d]">
-                    <span>NEC {selectedJurisdiction.nec_edition}</span>
+                    <span>NEC {automaticNecEdition(selectedJurisdiction)}</span>
                     {selectedJurisdiction.estimated_review_days && (
                       <>
                         <span>•</span>

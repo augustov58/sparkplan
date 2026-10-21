@@ -16,8 +16,8 @@
  * - Source: NEC 2017 / 2020 / 2023 Table 250.66 — values are unchanged
  *   across these editions. Florida currently adopts NEC 2020 via FBC 8th
  *   ed. (2023); the table is forward-compatible with the 2023 edition that
- *   FBC 9th ed. will adopt (anticipated ~2027). Project-level NEC edition
- *   is read from `projects.settings.nec_edition` (default '2020').
+ *   FBC 9th ed. (2026) adopts from 2026-12-31. Project-level NEC edition
+ *   comes from `resolveNecEdition` in data/ahj/codeCycle.ts.
  *
  * Cross-checked against the NEC 2020 + 2023 code books (CLAUDE.md "NEC
  * table data is safety-critical" rule).

@@ -216,7 +216,7 @@ export const DwellingLoadCalculator: React.FC<DwellingLoadCalculatorProps> = ({
   }, [appliances, proposedLoads]);
 
   // Calculate load
-  const necEdition = useProjectNecEdition(project, isSingleFamily ? 'single_family_residential' : 'multi_family');
+  const necEdition = useProjectNecEdition(project);
   const loadResult: ResidentialLoadResult | null = useMemo(() => {
     try {
       if (isSingleFamily) {
