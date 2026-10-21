@@ -3,6 +3,7 @@ import React from 'react';
 import { createRoot } from 'react-dom/client';
 import App from './App';
 import { AuthProvider } from './components/Auth/AuthProvider';
+import { ProjectsProvider } from './hooks/useProjects';
 import { ErrorBoundary } from './components/ErrorBoundary';
 
 const root = createRoot(document.getElementById('root') as HTMLElement);
@@ -15,7 +16,9 @@ root.render(
       }}
     >
       <AuthProvider>
-        <App />
+        <ProjectsProvider>
+          <App />
+        </ProjectsProvider>
       </AuthProvider>
     </ErrorBoundary>
   </React.StrictMode>

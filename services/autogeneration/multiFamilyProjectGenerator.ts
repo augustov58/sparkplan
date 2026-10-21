@@ -702,6 +702,9 @@ function generateEVPanel(
     useEVEMS,
     simultaneousChargers: useEVEMS ? Math.ceil(chargerCount * 0.5) : undefined,
     evemsSetpointVA,
+    // #139: size the chargers to the calculator's actual rating, not the
+    // nearest preset bucket.
+    chargerAmps: ampsPerCharger <= 80 ? ampsPerCharger : undefined,
     includeSpare: true,
     includeLighting: true,
     panelName: 'EV Sub-Panel',

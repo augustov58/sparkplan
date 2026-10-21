@@ -13,6 +13,8 @@
 
 import type { Panel } from '../types';
 import { nanoid } from 'nanoid';
+import { getNextStandardBreakerSize } from './nec/standard-breakers';
+import { findConductorByAmpacity } from './nec/table-310-16';
 
 // Template-time circuit shape — camelCase, distinct from the snake_case
 // DB Circuit row type. These templates are display fixtures; the
@@ -462,6 +464,15 @@ export interface CustomEVPanelConfig {
    * an over-generous `panel.main_breaker × voltage` proxy.
    */
   evemsSetpointVA?: number;
+  /**
+   * Actual Level 2 charger rating in amps (at 240 V, 1Ø). Overrides the
+   * preset's amps / breaker / conductor / load so the generated panel
+   * matches the calculator (#139 — every charger ≤ 48 A used to become the
+   * 48 A / 60 A / 11,520 VA preset). Breaker = next standard size ≥ 125% of
+   * the rating (NEC 625.41, 240.6(A)); conductor ampacity ≥ the breaker at
+   * 75 °C (same basis as the presets).
+   */
+  chargerAmps?: number;
   includeSpare: boolean;
   includeLighting: boolean;
   panelName?: string;
@@ -485,7 +496,8 @@ export function generateCustomEVPanel(input: CustomEVPanelInput): ApplyTemplateO
     evemsSetpointVA,
     includeSpare,
     includeLighting,
-    panelName
+    panelName,
+    chargerAmps: chargerAmpsOverride,
   } = config;
 
   // Determine charger specifications based on type
@@ -527,6 +539,19 @@ export function generateCustomEVPanel(input: CustomEVPanelInput): ApplyTemplateO
       break;
   }
 
+  let chargerLabel: string = chargerType;
+  if (chargerType !== 'DC Fast Charge (150kW)' && chargerAmpsOverride && chargerAmpsOverride > 0) {
+    chargerAmps = chargerAmpsOverride;
+    voltage = 240;
+    phase = 1;
+    loadVA = chargerAmps * voltage;
+    chargerKW = loadVA / 1000;
+    breakerSize = getNextStandardBreakerSize(chargerAmps * 1.25);
+    const conductor = findConductorByAmpacity(breakerSize, 'Cu', 75);
+    conductorSize = conductor ? `${conductor.size} Cu` : conductorSize;
+    chargerLabel = `Level 2 (${chargerAmps}A)`;
+  }
+
   // Panel rating (amps) per NEC 215.2(A)(1): feeder ampacity ≥ 1.25 ×
   // continuous demand. Three sizing paths in priority order:
   //
@@ -562,7 +587,7 @@ export function generateCustomEVPanel(input: CustomEVPanelInput): ApplyTemplateO
   const panelRating = standardSizes.find(size => size >= totalLoad) || 2000;
 
   // Generate panel name
-  const defaultName = `${numberOfChargers}× ${chargerType}${useEVEMS ? ' with EVEMS' : ''} Panel`;
+  const defaultName = `${numberOfChargers}× ${chargerLabel}${useEVEMS ? ' with EVEMS' : ''} Panel`;
 
   // Create panel
   const panel: Partial<Omit<Panel, 'id' | 'created_at'>> = {
@@ -605,7 +630,7 @@ export function generateCustomEVPanel(input: CustomEVPanelInput): ApplyTemplateO
       breakerAmps: breakerSize,
       poles: chargerPoles,
       voltage: voltage,
-      description: `EV Charger #${i} - ${chargerType}${useEVEMS ? ' (EVEMS managed)' : ''}`,
+      description: `EV Charger #${i} - ${chargerLabel}${useEVEMS ? ' (EVEMS managed)' : ''}`,
       conductorSize: conductorSize,
       conductorType: 'THHN',
       loadVA: circuitLoadVA,

@@ -12,6 +12,35 @@ All notable changes to SparkPlan.
 
 ---
 
+## 2026-10-18: EV feeders, EVEMS marker and charger sizing (#139, #144, #156, #164)
+
+- **Feeder Manager sizes EV feeders like the packet (#144).** Recalculate counted the EVEMS setpoint marker as a load and lost the NEC 625.42 clamp, sizing an EVEMS feeder at 686 A / 500 kcmil where the packet's E-103 showed 189 A. It now uses the destination panel's EVEMS-clamped demand with the same continuous split as E-103, saves the number of parallel sets, and warns when a feeder's design load exceeds the destination panel's rating.
+- **EVEMS clamp keeps the panel's other loads (#144).** The setpoint limits the chargers only; lighting and receptacles on the EV panel now add on top of it instead of disappearing (e.g. +1.8 kVA on the QA project).
+- **The EVEMS marker no longer counts as load (#156)** on E-101's "Connected Load by Panel", the Copilot's project summary, Inspector Mode's panel-load check, and the feeder stale check.
+- **Generated EV chargers match the calculator (#139).** A 40 A charger now generates a 40 A / 50 A-breaker / 8 AWG / 9.6 kVA circuit instead of the 48 A / 60 A / 11.52 kVA preset.
+- **Fewer false EV matches (#164).** A circuit is an EV charger when it says "charger", "EVSE" or "electric vehicle", or a bare "EV" not naming another load ("EV Area Lighting" is no longer a charger). Multifamily EV panels are recognized by "EV" as a word or by their charger circuits, so "Elevator" and "Riverview" panels no longer count as EV.
+
+---
+
+## 2026-10-18: Saved jurisdiction no longer reverts; Copilot sees new projects (#134, #145, #146)
+
+- **Jurisdiction and packet settings stay saved (#134).** Each screen kept its own copy of the project, and nothing re-synced them. Saving a jurisdiction in the AHJ panel was then overwritten by the Permit Packet's next autosave, and the packet came out generic; the reverse could revert packet settings. The app now holds one shared project list, and delayed autosaves apply their change to the latest saved project.
+- **Copilot works on new and empty projects (#145).** It no longer says "No project selected" on a project created in the same session, or on a project with no panels yet.
+- **Copilot-added circuits are marked new (#146).** On existing-building projects, circuits the Copilot adds are now proposed (NEW, "*" on the packet), like circuits added in Panel Schedules; it records a circuit as existing only when asked to.
+
+---
+
+## 2026-10-18: Dwelling calculator and packet follow-ups (#142, #143, #159, #160, #161, #162)
+
+- **Heat kW is now calculated as shown (#142, unsafe direction).** The Dwelling Load Calculator displayed 10 kW of heat but calculated 0 until the field was edited, so an electric heat strip could drop out of the load. Every appliance input now shows the value the calculation uses, and switching HVAC to Heat Pump / Electric Furnace sets 10 kW of heat in the calculation.
+- **Multifamily neutral (#143).** The neutral skipped the NEC 220.84 demand factor and printed values above the phase demand (1,145 A neutral on a 672 A service). It is now the 220.84-factored load of neutral-using loads plus house loads, with the 220.61(B) reduction, and never above the phase demand.
+- **Heat-pump connected load (#159)** shows the larger of heat or cool, matching the demand and E-101.
+- **E-101 multifamily table adds up (#160).** The HVAC non-coincident row now shows the omitted smaller load at 0%, so the columns sum to the printed totals.
+- **Panel Schedule references (#161).** A single-family service panel sized by NEC 220.82/220.83 lists that method's references instead of the Standard Method sections.
+- **E-102 observation window (#162)** prints only for measured demand, and an empty window prints "NOT PROVIDED" instead of an invented 12-month range.
+
+---
+
 ## 2026-10-18: PE rulings on EVEMS setpoint, 220.83(A)/(B), and 220.84 electric heat (#131, #132, #133, #137)
 
 **Load calculation changes (user-facing; some verdicts change)**, per PE rulings of 2026-10-17/18:

@@ -61,10 +61,19 @@ export function getEvseLoadVA(nameplateVA: number, edition: NecEdition): EvseLoa
  */
 export const EVSE_CONTINUOUS_FACTOR = 1.25;
 
-/** EVSE circuit by description — circuits carry no EV flag. */
-const EVSE_DESCRIPTION = /\b(ev|evse|ev charger)\b|electric vehicle|charger/i;
+/**
+ * EVSE circuit by description — circuits carry no EV flag.
+ * "charger", "EVSE" or "electric vehicle" always count. A bare "EV" counts
+ * unless the description names another load type, so "EV Area Lighting" or
+ * "EV Panel Receptacle" aren't taken as chargers (#164), while a hand-typed
+ * "EV 50A" still is (the conservative default).
+ */
+const EVSE_STRONG = /\bevse\b|electric vehicle|charger/i;
+const EV_WORD = /\bev\b/i;
+const NON_EVSE_LOAD = /\b(lighting|lights?|receptacles?|outlets?|panel|sub-?panel|feeder|signs?|signage)\b/i;
 export function isEvseDescription(description: string | null | undefined): boolean {
-  return EVSE_DESCRIPTION.test(description ?? '');
+  const d = description ?? '';
+  return EVSE_STRONG.test(d) || (EV_WORD.test(d) && !NON_EVSE_LOAD.test(d));
 }
 
 /**

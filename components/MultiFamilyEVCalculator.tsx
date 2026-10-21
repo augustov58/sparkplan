@@ -41,6 +41,7 @@ import {
   type PopulationProgress
 } from '../services/autogeneration/projectPopulationOrchestrator';
 import { useJurisdictions } from '../hooks/useJurisdictions';
+import { useProjects } from '../hooks/useProjects';
 import { useCircuits } from '../hooks/useCircuits';
 import { describeEvDesignDrift } from '../services/calculations/upstreamLoadAggregation';
 import {
@@ -136,6 +137,8 @@ const BUILDING_PRESETS: Record<BuildingPresetType, BuildingPreset> = {
 };
 
 export const MultiFamilyEVCalculator: React.FC<MultiFamilyEVCalculatorProps> = ({ projectId, project, updateProject }) => {
+  // Deferred saves patch the latest stored project (#134).
+  const { patchProject } = useProjects();
   const { circuits: projectCircuits } = useCircuits(projectId);
   // Read pre-calculated building load from DwellingLoadCalculator (stored in project settings)
   const storedMFLoad = project?.settings?.residential?.multiFamilyLoadResult as {
@@ -293,16 +296,16 @@ export const MultiFamilyEVCalculator: React.FC<MultiFamilyEVCalculatorProps> = (
     if (JSON.stringify(current) === JSON.stringify(stored)) return;
 
     const timer = setTimeout(() => {
-      updateProject({
-        ...project,
+      patchProject(project.id, latest => ({
+        ...latest,
         settings: {
-          ...project.settings,
+          ...latest.settings,
           residential: {
-            ...project.settings?.residential,
+            ...latest.settings?.residential,
             mfEvInputs: current,
           } as any,
         },
-      });
+      }));
     }, 500);
     return () => clearTimeout(timer);
   }, [evChargerCount, evChargerLevel, evAmpsPerCharger, useEVEMS, capacityReserveVA, existingServiceAmps, selectedScenario, voltage, phase]);
@@ -415,12 +418,12 @@ export const MultiFamilyEVCalculator: React.FC<MultiFamilyEVCalculatorProps> = (
     }
 
     const timer = setTimeout(() => {
-      updateProject({
-        ...project,
+      patchProject(project.id, latest => ({
+        ...latest,
         settings: {
-          ...project.settings,
+          ...latest.settings,
           residential: {
-            ...project.settings?.residential,
+            ...latest.settings?.residential,
             mfEvCalculation: {
               result,
               buildingName: buildingName || undefined,
@@ -428,7 +431,7 @@ export const MultiFamilyEVCalculator: React.FC<MultiFamilyEVCalculatorProps> = (
             },
           } as any,
         },
-      });
+      }));
     }, 750);
     return () => clearTimeout(timer);
   }, [result, buildingName]);
