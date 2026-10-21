@@ -15,6 +15,7 @@ import {
   withEvseLoadForEdition,
 } from '../services/calculations/upstreamLoadAggregation';
 import { calculateMultiFamilyLoad } from '../services/calculations/residentialLoad';
+import { calculateMultiFamilyEV } from '../services/calculations/multiFamilyEV';
 import { computeFeederLoadVA } from '../services/feeder/feederLoadSync';
 import type { Database } from '../lib/database.types';
 
@@ -134,5 +135,34 @@ describe('calculateMultiFamilyLoad (220.84 total)', () => {
     const r = run('2020');
     expect(appliancesRow(r)).toBeCloseTo(12 * 3_840, 6);
     expect(r.necReferences).toContain('NEC 220.14(A) - EVSE load');
+  });
+});
+
+describe('EVEMS notes show what a small charger can draw (NEC 2023)', () => {
+  // 400 A service → 230 A setpoint shared by 10 × 16 A chargers (23 A share).
+  const run = (necEdition: '2020' | '2023') => calculateMultiFamilyEV({
+    dwellingUnits: 12, avgUnitSqFt: 850, voltage: 240, phase: 1, existingServiceAmps: 400,
+    evChargers: { count: 10, level: 'Level2', ampsPerCharger: 16 }, necEdition, useEVEMS: true,
+  });
+
+  it('load stays the setpoint; notes cap the share at the 3.84 kW nameplate', () => {
+    const r = run('2023');
+    const e = r.scenarios.withEVEMS;
+    expect(e.notes).toContain('EVEMS setpoint: 230A (service demand load per NEC 625.42)');
+    expect(e.notes).toContain('10 chargers at full power: 3.8 kW each');
+    expect(e.notes.some(n => n.includes('~23A each'))).toBe(false);
+    expect(e.chargingPowerPerCharger_kW).toBeCloseTo(3.84, 6);
+    // Load: the setpoint (~230 A × 240 V ≈ 55.2 kVA), below N × 7,200 —
+    // unchanged by the display cap.
+    expect(r.evLoad.demandVA).toBeCloseTo(e.powerPerCharger_kW! * 10 * 1000, 0);
+    expect(r.evLoad.demandVA).toBeGreaterThan(55_000);
+    expect(r.evLoad.demandVA).toBeLessThan(72_000);
+  });
+
+  it('direct-connection note gives the 220.57 load and the charger rating', () => {
+    expect(run('2023').scenarios.noEVEMS.notes).toContain(
+      'Per-EVSE load: 7.2 kVA (NEC 220.57(A) minimum; charger 16A @ 240V = 3.8 kW)',
+    );
+    expect(run('2020').scenarios.noEVEMS.notes).toContain('Per-EVSE load: 3.8 kVA (16A @ 240V)');
   });
 });

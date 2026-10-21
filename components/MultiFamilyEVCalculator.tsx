@@ -1453,7 +1453,7 @@ export const MultiFamilyEVCalculator: React.FC<MultiFamilyEVCalculatorProps> = (
                         <div className="font-medium text-gray-900 text-sm">{result.scenarios.withEVEMS.name}</div>
                         <div className="text-xs text-gray-500">
                           {result.scenarios.withEVEMS.powerPerCharger_kW
-                            ? `~${result.scenarios.withEVEMS.powerPerCharger_kW.toFixed(1)} kW per charger when sharing`
+                            ? `~${(result.scenarios.withEVEMS.chargingPowerPerCharger_kW ?? result.scenarios.withEVEMS.powerPerCharger_kW).toFixed(1)} kW per charger when sharing`
                             : 'Dynamic power sharing'}
                         </div>
                       </div>
