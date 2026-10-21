@@ -6,7 +6,8 @@ These functions are exposed as tools that agents can call to fetch data from Sup
 
 from supabase import Client
 from typing import List, Optional, Dict, Any
-from datetime import date
+from datetime import date, datetime
+from zoneinfo import ZoneInfo
 import logging
 
 logger = logging.getLogger(__name__)
@@ -487,7 +488,8 @@ async def resolve_nec_edition(supabase: Client, project: Dict[str, Any], today: 
         except Exception as e:
             logger.error(f"Error fetching jurisdiction {jurisdiction_id}: {e}")
 
-    day = (today or date.today()).isoformat()
+    # Florida's calendar day, not the server's (UTC) — matches the browser-side resolver.
+    day = (today or datetime.now(ZoneInfo('America/New_York')).date()).isoformat()
     edition = FLORIDA_CODE_CYCLES[0][1]
     for effective, nec in FLORIDA_CODE_CYCLES:
         if day >= effective:
