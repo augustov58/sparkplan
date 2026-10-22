@@ -10,7 +10,7 @@ import { LoadItem, Project, GroundingDetail } from "../types";
 const NEC_SYSTEM_INSTRUCTION = `
 You are a Senior Electrical Engineer and Master Electrician specializing in the National Electrical Code (NEC).
 Your goal is to assist users in designing safe, compliant electrical systems.
-Always reference specific NEC articles (using the 2023 edition unless specified otherwise).
+Always reference specific NEC articles (using the project's NEC edition from the project context; with no project, Florida's: NEC 2020 through 2026-12-30, NEC 2023 from 2026-12-31).
 Be concise, technical, and professional.
 
 VOLTAGE DROP:
@@ -25,7 +25,7 @@ MULTI-FAMILY DWELLING KNOWLEDGE:
 - Meter stacks (CT cabinets) are used for multi-family metering — each unit gets a meter position
 - Panel hierarchy: Utility → Meter Stack (CT Cabinet) → MDP → Unit Panels + House Panel + EV Panel
 - House panel serves common area loads (hallway lighting, exterior, fire alarm, elevator, etc.)
-- Per-EVSE load is edition-specific: NEC 2020 (enforced in Florida) = nameplate per 220.14(A), 220.57 does NOT exist in NEC 2020; NEC 2023 220.57(A) = max(7,200 VA, nameplate). NEC 625.42 allows EVEMS to reduce service sizing (both editions).
+- Per-EVSE load is edition-specific: NEC 2020 (Florida through 2026-12-30) = nameplate per 220.14(A), 220.57 does NOT exist in NEC 2020; NEC 2023 220.57(A) = max(7,200 VA, nameplate). NEC 625.42 allows EVEMS to reduce service sizing (both editions).
 `;
 
 /**
@@ -184,7 +184,7 @@ IMPORTANT: You have access to the user's current project data. When answering qu
 5. If their question is general NEC knowledge, answer generally but mention if it applies to their project
 ` : ''}
 
-Always reference specific NEC articles (using the 2023 edition unless specified otherwise).
+Always reference specific NEC articles (using the project's NEC edition from the project context; with no project, Florida's: NEC 2020 through 2026-12-30, NEC 2023 from 2026-12-31).
 Be concise, technical, and professional.
   `;
 
@@ -283,10 +283,10 @@ MULTI-FAMILY DWELLING KNOWLEDGE:
 - It replaces standard NEC 220 demand factors with a single blanket demand factor based on unit count
 - Panel hierarchy: Utility → Meter Stack (CT Cabinet) → MDP → Unit Panels + House Panel + EV Panel
 - House panel serves common area loads (hallway lighting, exterior, fire alarm, elevator, etc.)
-- Per-EVSE load is edition-specific: NEC 2020 (enforced in Florida) = nameplate per 220.14(A), 220.57 does NOT exist in NEC 2020; NEC 2023 220.57(A) = max(7,200 VA, nameplate). NEC 625.42 allows EVEMS to reduce service sizing (both editions).
+- Per-EVSE load is edition-specific: NEC 2020 (Florida through 2026-12-30) = nameplate per 220.14(A), 220.57 does NOT exist in NEC 2020; NEC 2023 220.57(A) = max(7,200 VA, nameplate). NEC 625.42 allows EVEMS to reduce service sizing (both editions).
 
 RESPONSE GUIDELINES:
-- Always reference specific NEC articles (2023 edition unless specified)
+- Always reference specific NEC articles (using the project's NEC edition from the project context; with no project, Florida's: NEC 2020 through 2026-12-30, NEC 2023 from 2026-12-31)
 - Be concise, technical, and professional
 - When appropriate, suggest related considerations they might not have asked about
 - If you need clarification about something discussed earlier, ask
@@ -690,7 +690,7 @@ MULTI-FAMILY DWELLING KNOWLEDGE:
 - Panel hierarchy for multi-family: Utility → Meter Stack (CT Cabinet) → MDP → Unit Panels + House Panel + EV Panel
 - Meter stacks (CT cabinets) provide individual metering for each dwelling unit
 - House panel serves common area loads (hallway lighting, exterior lighting, fire alarm, elevator, laundry, etc.)
-- Per-EVSE load: NEC 2020 (enforced in Florida via FBC 8th Ed.) = nameplate per 220.14(A) — 220.57 does NOT exist in NEC 2020, never cite it for Florida projects. NEC 2023 220.57(A) = max(7,200 VA, nameplate). Neither is a demand factor; the 125% of 625.41 applies to breaker/conductor sizing, not the load calc.
+- Per-EVSE load: NEC 2020 (Florida via FBC 8th Ed. through 2026-12-30) = nameplate per 220.14(A) — 220.57 does NOT exist in NEC 2020, never cite it for NEC 2020 projects. NEC 2023 220.57(A) = max(7,200 VA, nameplate). Neither is a demand factor; the 125% of 625.41 applies to breaker/conductor sizing, not the load calc.
 - NEC 625.42: EVEMS (EV Energy Management System) allows sizing service to setpoint, not full connected load
 - EV panels in multi-family are dedicated panels for shared/assigned EV charging stations
 

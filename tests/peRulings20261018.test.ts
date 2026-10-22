@@ -60,15 +60,15 @@ describe('#131/#137 calculateProposedNewLoadVA (E-102 prefill)', () => {
 
   it('EVEMS panel: marker is not load; EVSE clamped to the setpoint, × 1.25', () => {
     // min(92,160, 30,240) × 1.25 + 1,800 = 39,600 VA (was 154,800 before #137).
-    expect(calculateProposedNewLoadVA([...chargers, lighting, marker])).toBe(39_600);
+    expect(calculateProposedNewLoadVA([...chargers, lighting, marker], '2020')).toBe(39_600);
   });
 
   it('no EVEMS: every EVSE at 125%, other loads at nameplate', () => {
-    expect(calculateProposedNewLoadVA([...chargers, lighting])).toBe(8 * 11_520 * 1.25 + 1_800);
+    expect(calculateProposedNewLoadVA([...chargers, lighting], '2020')).toBe(8 * 11_520 * 1.25 + 1_800);
   });
 
   it('existing circuits are ignored', () => {
-    expect(calculateProposedNewLoadVA([{ ...evse(1), is_proposed: false }])).toBe(0);
+    expect(calculateProposedNewLoadVA([{ ...evse(1), is_proposed: false }], '2020')).toBe(0);
   });
 });
 

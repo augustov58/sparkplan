@@ -10,10 +10,15 @@ import { describe, it, expect } from 'vitest';
 import {
   getEvseLoadVA,
   evseLoadCitation,
-  necEditionFromManifestString,
   NEC_2023_220_57_MINIMUM_VA,
 } from '../data/nec/evse-load';
-import { ALL_MANIFESTS, getManifestById, resolveNecEdition } from '../data/ahj/registry';
+import { ALL_MANIFESTS, getManifestById } from '../data/ahj/registry';
+import {
+  applyCodeCycle,
+  floridaNecEdition,
+  projectNecEdition,
+  resolveNecEdition,
+} from '../data/ahj/codeCycle';
 
 describe('getEvseLoadVA', () => {
   it('NEC 2023 applies the 7,200 VA floor below it', () => {
@@ -47,46 +52,79 @@ describe('getEvseLoadVA', () => {
   });
 });
 
-describe('necEditionFromManifestString', () => {
-  it('maps manifest strings', () => {
-    expect(necEditionFromManifestString('NEC 2020')).toBe('2020');
-    expect(necEditionFromManifestString('NEC 2023')).toBe('2023');
+describe('resolveNecEdition (Florida code cycle)', () => {
+  const day = (y: number, m: number, d: number) => new Date(y, m - 1, d, 12);
+
+  it('Automatic: NEC 2020 through 2026-12-30, NEC 2023 from 2026-12-31', () => {
+    expect(floridaNecEdition(day(2026, 10, 21))).toBe('2020');
+    expect(floridaNecEdition(day(2026, 12, 30))).toBe('2020');
+    expect(floridaNecEdition(day(2026, 12, 31))).toBe('2023');
+    expect(floridaNecEdition(day(2027, 6, 1))).toBe('2023');
   });
 
-  it('returns undefined for editions outside the calc union (e.g. NEC 2014) and empty input', () => {
-    expect(necEditionFromManifestString('NEC 2014')).toBeUndefined();
-    expect(necEditionFromManifestString(undefined)).toBeUndefined();
-    expect(necEditionFromManifestString('')).toBeUndefined();
+  it('an explicit pick wins over the date', () => {
+    expect(resolveNecEdition('2023', null, day(2026, 10, 21))).toBe('2023');
+    expect(resolveNecEdition('2020', null, day(2027, 6, 1))).toBe('2020');
+    expect(resolveNecEdition(undefined, null, day(2027, 6, 1))).toBe('2023');
+  });
+
+  it('Automatic ignores a Florida row\'s nec_edition and uses the cycle', () => {
+    expect(resolveNecEdition(undefined, { state: 'FL', nec_edition: '2023' }, day(2026, 10, 21))).toBe('2020');
+  });
+
+  it('Automatic uses the row\'s edition outside Florida; an explicit pick still wins', () => {
+    expect(resolveNecEdition(undefined, { state: 'TX', nec_edition: '2023' }, day(2026, 10, 21))).toBe('2023');
+    expect(resolveNecEdition('2020', { state: 'TX', nec_edition: '2023' }, day(2026, 10, 21))).toBe('2020');
+  });
+
+  it('projectNecEdition reads settings.nec_edition_override; the legacy column is ignored', () => {
+    expect(projectNecEdition({ settings: {} }, null, day(2026, 10, 21))).toBe('2020');
+    expect(projectNecEdition({ settings: { nec_edition_override: '2023' } }, null, day(2026, 10, 21))).toBe('2023');
+    expect(projectNecEdition(null, null, day(2026, 10, 21))).toBe('2020');
   });
 });
 
-describe('resolveNecEdition', () => {
-  const pompano = getManifestById('pompano');
-
-  it('manifest edition wins over the project setting', () => {
-    expect(pompano).not.toBeNull();
-    expect(resolveNecEdition(pompano, 'multi_family', '2023')).toBe('2020');
+describe('applyCodeCycle', () => {
+  it('is a no-op under NEC 2020', () => {
+    const s = 'All electrical work shall comply with NFPA-70 (2020 NEC) and the Florida Building Code 8th edition (2023).';
+    expect(applyCodeCycle(s, '2020')).toBe(s);
   });
 
-  it('falls through to the project setting when no manifest', () => {
-    expect(resolveNecEdition(null, 'multi_family', '2023')).toBe('2023');
+  it('moves NEC 2020 / FBC 8th text to NEC 2023 / FBC 9th (2026)', () => {
+    expect(applyCodeCycle('NFPA-70 (2020 NEC) and the Florida Building Code 8th edition (2023), as adopted', '2023'))
+      .toBe('NFPA-70 (2023 NEC) and the Florida Building Code 9th edition (2026), as adopted');
+    expect(applyCodeCycle('Florida Building Code, 8th edition (2023)', '2023')).toBe('Florida Building Code, 9th edition (2026)');
+    expect(applyCodeCycle('Cover-sheet code basis block (NEC 2020 + FBC 8th ed + Pompano)', '2023'))
+      .toBe('Cover-sheet code basis block (NEC 2023 + FBC 9th ed + Pompano)');
+    expect(applyCodeCycle('per FBC 8th ed (2023). Outdoor', '2023')).toBe('per FBC 9th ed (2026). Outdoor');
+    expect(applyCodeCycle('NFPA-70 (NEC) 2020', '2023')).toBe('NFPA-70 (NEC) 2023');
   });
 
-  it('falls through to the project setting when the manifest edition is outside the union', () => {
-    const miamiDade = getManifestById('miami-dade');
-    expect(miamiDade?.necEdition.single_family_residential).toContain('2014');
-    expect(resolveNecEdition(miamiDade, 'single_family_residential', '2023')).toBe('2023');
+  it('leaves other codes alone', () => {
+    const s = 'Florida Fire Prevention Code, 8th edition (NFPA 1, 2021)';
+    expect(applyCodeCycle(s, '2023')).toBe(s);
+    expect(applyCodeCycle('NFPA-70E (2024)', '2023')).toBe('NFPA-70E (2024)');
   });
 
-  it('defaults to 2020 when nothing is set', () => {
-    expect(resolveNecEdition(null, 'multi_family', undefined)).toBe('2020');
-  });
-
-  it('every registered (Florida) manifest resolves multi-family to NEC 2020', () => {
-    expect(ALL_MANIFESTS.length).toBeGreaterThan(0);
+  it('no manifest text still cites NEC 2020 or FBC 8th under NEC 2023', () => {
     for (const m of ALL_MANIFESTS) {
-      expect(resolveNecEdition(m, 'multi_family', '2023'), m.id).toBe('2020');
+      const texts = [
+        ...(m.generalNotesByEdition?.['2023'] ?? m.generalNotes),
+        ...(m.codeReferencesByEdition?.['2023'] ?? m.codeReferences),
+        ...m.requirements.map((r) => r.name),
+      ].map((t) => applyCodeCycle(t, '2023'));
+      for (const t of texts) {
+        expect(t, `${m.id}: ${t}`).not.toMatch(/NEC 20(14|20)|20(14|20) NEC|8th ed(ition)? \(2023\)|FBC 8th/i);
+      }
     }
+  });
+
+  it('Miami-Dade drops its NEC 2014 single-family lane under NEC 2023', () => {
+    const md = getManifestById('miami-dade');
+    const refs = md?.codeReferencesByEdition?.['2023'] ?? [];
+    expect(refs.join('\n')).not.toContain('2014');
+    expect(refs.join('\n')).not.toContain('single-family residential scope');
+    expect(refs).toContain('NFPA-70 (2023 NEC)');
   });
 });
 

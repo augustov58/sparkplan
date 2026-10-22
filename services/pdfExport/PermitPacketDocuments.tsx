@@ -15,6 +15,7 @@ import {
   type MultiFamilyContext,
 } from '../calculations/upstreamLoadAggregation';
 import { calculateDwellingPanelDemand } from '../calculations/residentialLoad';
+import { applyCodeCycleList } from '../../data/ahj/codeCycle';
 import { calculateAllCumulativeVoltageDrops } from '../calculations/cumulativeVoltageDrop';
 import {
   BrandBar,
@@ -224,7 +225,7 @@ export const CoverPage: React.FC<CoverPageProps> = ({
   meterLocation,
   serviceConductorRouting,
   necEdition = DEFAULT_NEC_EDITION,
-  codeReferences = DEFAULT_CODE_REFERENCES,
+  codeReferences = applyCodeCycleList(DEFAULT_CODE_REFERENCES, necEdition)!,
   sheetId,
   permitMode,
   jurisdictionName,
@@ -411,6 +412,8 @@ const DEFAULT_GENERAL_NOTES: string[] = [
 interface GeneralNotesPageProps {
   projectName: string;
   generalNotes?: string[];
+  /** Edition the default notes are written for (data/ahj/codeCycle.ts). */
+  necEdition?: '2020' | '2023';
   contractorName?: string;
   contractorLicense?: string;
   sheetId?: string;
@@ -418,7 +421,8 @@ interface GeneralNotesPageProps {
 
 export const GeneralNotesPage: React.FC<GeneralNotesPageProps> = ({
   projectName,
-  generalNotes = DEFAULT_GENERAL_NOTES,
+  necEdition = DEFAULT_NEC_EDITION,
+  generalNotes = applyCodeCycleList(DEFAULT_GENERAL_NOTES, necEdition)!,
   contractorName,
   contractorLicense,
   sheetId,
@@ -1781,7 +1785,7 @@ export const LoadCalculationSummary: React.FC<LoadSummaryProps> = ({
   // missing dwelling context) — single-family dwellings shouldn't use the
   // per-load-type cascade at all per NEC 220.82/220.83.
   const aggregate: AggregatedLoad | null = !useDwellingOptional && mdp
-    ? calculateAggregatedLoad(mdp.id, panels, circuits, transformers, occupancy, multiFamilyContext)
+    ? calculateAggregatedLoad(mdp.id, panels, circuits, transformers, occupancy, multiFamilyContext, necEdition)
     : null;
 
   // Synthesize a 220.82/220.83-shaped breakdown when the dwelling gate fired,

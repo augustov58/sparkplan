@@ -86,6 +86,8 @@ import type {
   PacketAST,
   SectionKey,
 } from '../../data/ahj/types';
+import { manifestTextForEdition, resolveNecEdition } from '../../data/ahj/codeCycle';
+import type { NecEdition } from '../../data/nec/evse-load';
 
 export interface PermitPacketData {
   projectId: string;
@@ -410,30 +412,21 @@ export const generatePermitPacket = async (data: PermitPacketData): Promise<void
   // FL-pilot stack inside each page component).
   const manifestBuildingType: BuildingType =
     data.buildingType ?? 'single_family_residential';
-  // NEC-edition fallback: prefer the explicit top-level field; otherwise
-  // ask the manifest. Map "NEC 2020" / "NEC 2014" strings down to the
-  // limited '2020' | '2023' union the page components accept (Sprint 2C
-  // M1 will widen this when Miami-Dade's NEC 2014 residential lane lands).
-  const necFromManifest =
-    data.manifest?.necEdition[manifestBuildingType] ?? null;
-  const resolvedNecEdition: '2020' | '2023' | undefined =
-    data.necEdition
-    ?? (necFromManifest && necFromManifest.includes('2023')
-      ? '2023'
-      : necFromManifest && necFromManifest.includes('2020')
-      ? '2020'
-      : undefined);
+  // NEC edition: the caller's resolved edition (project pick, else Florida's
+  // code cycle — see data/ahj/codeCycle.ts); Automatic when not supplied.
+  const resolvedNecEdition: NecEdition = data.necEdition ?? resolveNecEdition(undefined, data.jurisdiction);
+  const manifestText = manifestTextForEdition(data.manifest, resolvedNecEdition);
   // Gap 3 (2026-05-16): three-step fallback so per-project overrides win
   // over the manifest default but lose to an explicit top-level field.
   // Empty arrays in the override fields count as "set" (intentional — the
   // contractor may want to suppress every general note); use ?? so only
   // null/undefined falls through.
   const resolvedGeneralNotes =
-    data.generalNotes ?? data.generalNotesOverride ?? data.manifest?.generalNotes;
+    data.generalNotes ?? data.generalNotesOverride ?? manifestText.generalNotes;
   const resolvedCodeReferences =
     data.codeReferences
     ?? data.codeReferencesOverride
-    ?? data.manifest?.codeReferences;
+    ?? manifestText.codeReferences;
 
   // Build a shadow `data` reference that uses the manifest-resolved values
   // when the explicit top-level fields are missing. Keep the original
@@ -646,6 +639,7 @@ export const generatePermitPacket = async (data: PermitPacketData): Promise<void
         <GeneralNotesPage
           projectName={data.projectName}
           generalNotes={data.generalNotes}
+          necEdition={data.necEdition}
           {...contractor}
           sheetId={sheetIds[0]}
         />
@@ -751,6 +745,7 @@ export const generatePermitPacket = async (data: PermitPacketData): Promise<void
           panels={data.panels}
           transformers={data.transformers}
           circuits={data.circuits}
+          necEdition={resolvedNecEdition}
           includeNECReferences={true}
           {...contractor}
           sheetId={sheetIds[0]}
@@ -1054,6 +1049,7 @@ export const generatePermitPacket = async (data: PermitPacketData): Promise<void
           ahjContext={ahjCtx}
           packet={packetAstRef.current}
           attachments={attachmentSummaries}
+          necEdition={data.necEdition}
         />
       ),
     });
@@ -1238,6 +1234,8 @@ export const generatePermitPacket = async (data: PermitPacketData): Promise<void
         data.circuits,
         data.transformers,
         occupancyType,
+        undefined,
+        resolvedNecEdition,
       );
       const breakerAmps = dp.feeder_breaker_amps || dp.main_breaker_amps || 100;
       const pole = (dp.phase === 3 ? 3 : 2) as 1 | 2 | 3;
@@ -1291,6 +1289,7 @@ export const generatePermitPacket = async (data: PermitPacketData): Promise<void
         data.transformers,
         occupancyType,
         isMDP ? data.multiFamilyContext : undefined,
+        resolvedNecEdition,
       );
       const dominantNec = aggResult.necReferences.find(r => r.includes('625.42'))
         ?? aggResult.necReferences.find(r => r.includes('220.84'))
@@ -1749,17 +1748,8 @@ export const generateLightweightPermitPacket = async (data: PermitPacketData): P
     // the lightweight path picks up Orlando general notes / code refs etc.
     // when only the manifest is supplied. Same behavior as
     // generatePermitPacket; kept here so the two paths stay aligned.
-    const lwBuildingType: BuildingType =
-      data.buildingType ?? 'single_family_residential';
-    const lwNecFromManifest =
-      data.manifest?.necEdition[lwBuildingType] ?? null;
-    const lwResolvedNecEdition: '2020' | '2023' | undefined =
-      data.necEdition
-      ?? (lwNecFromManifest && lwNecFromManifest.includes('2023')
-        ? '2023'
-        : lwNecFromManifest && lwNecFromManifest.includes('2020')
-        ? '2020'
-        : undefined);
+    const lwResolvedNecEdition: NecEdition = data.necEdition ?? resolveNecEdition(undefined, data.jurisdiction);
+    const lwManifestText = manifestTextForEdition(data.manifest, lwResolvedNecEdition);
     // Gap 3 (2026-05-16): per-project overrides win over manifest defaults
     // on the lightweight path too (kept aligned with the full generator).
     // PR-2 Step 1 (2026-05-26): mirror full-generator's serviceModificationType
@@ -1770,11 +1760,11 @@ export const generateLightweightPermitPacket = async (data: PermitPacketData): P
       generalNotes:
         data.generalNotes
         ?? data.generalNotesOverride
-        ?? data.manifest?.generalNotes,
+        ?? lwManifestText.generalNotes,
       codeReferences:
         data.codeReferences
         ?? data.codeReferencesOverride
-        ?? data.manifest?.codeReferences,
+        ?? lwManifestText.codeReferences,
       serviceModificationType: data.serviceModificationType ?? 'existing',
     };
 

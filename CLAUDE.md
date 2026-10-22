@@ -108,7 +108,8 @@ Implementation: `services/calculations/shortCircuit.ts`
 
 ### EVSE Load — edition-specific (NEC 2020 vs 2023)
 ```
-Florida enforces NEC 2020 (FBC 8th Ed.) — 220.57 DOES NOT EXIST in NEC 2020.
+Florida enforces NEC 2020 (FBC 8th Ed.) until 2026-12-31, then NEC 2023
+(FBC 9th Ed.) — 220.57 DOES NOT EXIST in NEC 2020.
 - NEC 2020: per-EVSE load = nameplate per 220.14(A). No 7,200 VA floor.
 - NEC 2023: per-EVSE load = max(7,200 VA, nameplate) per 220.57(A).
 Both at 100% in the Article 220 load calc — the 125% of 625.41 is for
@@ -116,9 +117,16 @@ OCPD/conductor sizing only. Neither is a demand factor.
 ```
 PE-confirmed 2026-09-27; extended 2026-10-14 to the single-family Optional Method
 (220.82/220.83 bucket, 2023 floor included) and to all continuous loads — no ×1.25
-in any Article 220 load calc. Single source: `data/nec/evse-load.ts::getEvseLoadVA`.
-Edition resolves manifest → project `nec_edition` → '2020' via
-`data/ahj/registry.ts::resolveNecEdition` (used by the calculator AND the packet).
+in any Article 220 load calc; extended 2026-10-21 to the Part III aggregate (panels,
+feeders, MDP), the 220.84 total and the 220.87(2) new load. EVEMS under 2023: the
+setpoint, capped at N × 7,200 VA. Single source: `data/nec/evse-load.ts::getEvseLoadVA`;
+circuit-based calcs go through `upstreamLoadAggregation.ts::withEvseLoadForEdition`.
+Edition = project-page pick (`settings.nec_edition_override`) → Automatic: Florida's
+code cycle by date (a non-FL jurisdiction's own row edition), via
+`data/ahj/codeCycle.ts::resolveNecEdition` / `hooks/useProjectNecEdition` — used by
+every calc, the packet, exports and the Copilot. Never read `project.necEdition`
+(legacy column) or `jurisdiction.nec_edition` for the edition. AHJ text written for
+the 2020 cycle goes through `applyCodeCycle` / `manifestTextForEdition`.
 
 ### EVEMS Sizing (NEC 625.42)
 Size to setpoint, not full connected load. EVEMS allows service capacity reduction.
@@ -170,7 +178,7 @@ Per-AHJ packet defaults live in `data/ahj/` as **pure data + pure predicates** �
 - `data/ahj/visibility.ts` — `computeDefaultVisibility(manifest, ctx)` implements the **two-layer visibility model**: Layer 1 (manifest defaults from the arrays + predicates) overlaid with Layer 2 (user overrides from `projects.settings.section_overrides` jsonb). When no manifest is registered for a project's jurisdiction, returns `null` and Sprint 2A's `resolveSections(sectionPrefs)` path runs unchanged.
 - `data/ahj/registry.ts` — `getManifestById(id)` (case-insensitive) + `findManifestForJurisdiction(jurisdictionName, ahjName)` (case-insensitive substring on either field). Sprint 2C M1 will replace the registry with an explicit `jurisdictions.manifest_id` FK once that table is populated.
 
-The orchestrator threads `manifest?: AHJManifest` + `buildingType?: BuildingType` through `PermitPacketData`. Resolution chain for `generalNotes` / `codeReferences` / `necEdition`: explicit data field → manifest fallback → Sprint 2A baseline. Backward compat is preserved by null-coalescing — projects without a `jurisdiction_id`, or with one not in the registry, render exactly as they did pre-PR-#51.
+The orchestrator threads `manifest?: AHJManifest` + `buildingType?: BuildingType` through `PermitPacketData`. Resolution chain for `generalNotes` / `codeReferences`: explicit data field → per-project override → manifest fallback (in the project's edition via `manifestTextForEdition`) → Sprint 2A baseline. `necEdition` comes from `resolveNecEdition` (see EVSE Load above), never the manifest. Backward compat is preserved by null-coalescing — projects without a `jurisdiction_id`, or with one not in the registry, render exactly as they did pre-PR-#51.
 
 When adding a new AHJ: drop in `data/ahj/{newAhj}.ts` matching the manifest shape, register it in `registry.ts`, populate `requirements: []` if the M1 engine is wired. **No engine changes required** — Sprint 2C is pure-data + engine; manifest scaffold is done.
 
@@ -303,6 +311,7 @@ Real mistakes made in this repo, each paired with the rule that prevents recurre
 | Single-family E-102 ran the Part III cascade while E-101 ran NEC 220.83; the same packet passed the service on one page and failed it on the next (#121) | Pages reporting the same quantity call the same function behind the same gate helper (`buildSingleFamilyDwellingContext`). Existing dwelling → 220.83, new → 220.82, on every page. |
 | Single-family calc applied ×1.25 to EVSE and other "continuous" loads inside the 220.82/220.83 load calc, citing "220.18(B)" for it; the #123 edition fix covered only the multifamily path | The 125% is OCPD/conductor sizing, never the Article 220 load. When a rule changes, grep every calc that computes the same quantity (MF, SF Optional Method, Dwelling Calculator, Panel Summary), not just the one in the bug report. |
 | Multifamily 220.84 took electric heat at 65% and cited "220.84(C)(4)" for it — a 220.82(C) single-dwelling factor carried into a section that has none, understating demand (#133) | A factor valid in one Optional Method is not valid in another. Before applying any factor, find it in the text of the section you cite. 220.84(C)(5) = larger of A/C or heat at nameplate. |
+| The Part III aggregator, feeder sizing, the 220.84 total and the 220.87(2) new load read EVSE `load_watts` raw; the NEC 2023 7,200 VA floor reached only the MF-EV calc and the SF Optional Method | Every calc that turns an EVSE into load calls `getEvseLoadVA` (circuits: `withEvseLoadForEdition`) with the project edition. A new edition parameter with a default needs a grep of every production caller — tsc can't see a missing optional argument. |
 | Table 310.16 stored 14 AWG Cu at 20 A in the 60 °C column (code: 15 A), plus three other rows above the code value (and six aluminum cells below it); a 20 A load on 60 °C terminals sized 14 AWG | Every corrected `data/nec/` row gets a pinned test (`tests/table-310-16.test.ts`). Cross-check against the code book, not a web chart: some charts print aluminum as ~0.8 × copper. The test pins the whole table, so any edit must match the book. |
 | Docs updated with stale "Last Updated" dates; completed features left as "NEXT UP" | Every doc touch updates its date to today; every shipped feature flips its ROADMAP status in the same PR. |
 

@@ -4,6 +4,7 @@ One note per hard problem, written by the model that solved it via the `extract-
 Each entry: `- [title](file.md) — reusable rule`.
 
 <!-- Newest first -->
+- [NEC edition came from four sources that disagreed](2026-10-21-nec-edition-single-resolver.md) — compute a jurisdiction/date-dependent value from one resolver at read time; count and classify every reader; never store the resolved value
 - [PE rulings: EVEMS setpoint ×1.25, 220.83(A)/(B), 220.84 heat at nameplate](2026-10-18-pe-rulings-hvac-evems.md) — find a factor in the cited section's text before applying it; when a ruling changes a quantity, grep every function and label for it, and decide a branch once when a calc runs twice (existing/total)
 - [Single-family E-102 ignored the existing/new dwelling choice](2026-10-13-sf-e102-ignored-existing-dwelling.md) — two pages reporting the same quantity must call the same function behind the same gate helper; test every occupancy branch
 - [NEC 220.57 cited on Florida (NEC 2020) EV packets](2026-09-27-evse-load-nec-edition.md) — confirm every cited section exists in the manifest's NEC edition; route edition-dependent rules through a `(value, edition)` helper

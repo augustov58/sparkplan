@@ -19,7 +19,6 @@ import {
   ALL_MANIFESTS,
   findManifestForJurisdiction,
   getManifestById,
-  resolveNecEdition,
 } from '../data/ahj/registry';
 import {
   ALL_ARTIFACT_TYPE_KEYS,
@@ -49,6 +48,7 @@ import { useMeterStacks } from '../hooks/useMeterStacks';
 import { useMeters } from '../hooks/useMeters';
 import { useProfile } from '../hooks/useProfile';
 import { useProjectNecEdition } from '../hooks/useProjectNecEdition';
+import { manifestTextForEdition } from '../data/ahj/codeCycle';
 import { JurisdictionAndAHJPanel } from './JurisdictionAndAHJPanel';
 import type { MultiFamilyEVResult } from '../services/calculations/multiFamilyEV';
 import {
@@ -297,9 +297,9 @@ export const PermitPacketGenerator: React.FC<PermitPacketGeneratorProps> = ({ pr
   // required" on the narrative even when LoadCalculationSummary said the
   // service was adequate. NEC 220.87 "max demand" for the calculated
   // method means NEC-demanded existing load, not raw connected sum.
-  // Same edition resolution as the packet's `necEdition` (manifest → project
-  // → '2020'), so E-102's EVSE load matches E-101's.
-  const sfNecEdition = useProjectNecEdition(currentProject, 'single_family_residential');
+  // Same edition as the packet's `necEdition` (project pick, else Florida's
+  // code cycle), so E-102's EVSE load matches E-101's.
+  const projectEdition = useProjectNecEdition(currentProject);
   const aggregatedDemandSplit = React.useMemo<{ existingKVA: number; proposedKVA: number; necReferences: string[] }>(() => {
     if (!currentProject) return { existingKVA: 0, proposedKVA: 0, necReferences: [] };
     const mdp = panels.find(p => p.is_main);
@@ -310,6 +310,7 @@ export const PermitPacketGenerator: React.FC<PermitPacketGeneratorProps> = ({ pr
       circuits,
       transformers,
       currentProject.settings,
+      projectEdition,
     );
     // Single-family dwellings: E-101 runs the NEC 220.82 / 220.83 Optional
     // Method, so E-102 must too — the Part III cascade below gave a different
@@ -328,7 +329,7 @@ export const PermitPacketGenerator: React.FC<PermitPacketGeneratorProps> = ({ pr
             is_proposed: c.is_proposed,
           })),
         voltage: mdp.voltage || 240,
-        necEdition: sfNecEdition,
+        necEdition: projectEdition,
         ...sfCtx,
       });
       return {
@@ -353,6 +354,7 @@ export const PermitPacketGenerator: React.FC<PermitPacketGeneratorProps> = ({ pr
       transformers,
       occupancyType,
       mfCtx,
+      projectEdition,
     );
     return {
       existingKVA: agg.existingDemandVA / 1000,
@@ -361,7 +363,7 @@ export const PermitPacketGenerator: React.FC<PermitPacketGeneratorProps> = ({ pr
       // applied sections (e.g. 220.14 "Other", 220.51 water heater).
       necReferences: [...agg.necReferences, ...agg.demandBreakdown.map(r => r.necReference)],
     };
-  }, [currentProject, panels, circuits, transformers, sfNecEdition]);
+  }, [currentProject, panels, circuits, transformers, projectEdition]);
 
   // Auto-fill from profile (only on first load, before user edits)
   useEffect(() => {
@@ -461,13 +463,14 @@ export const PermitPacketGenerator: React.FC<PermitPacketGeneratorProps> = ({ pr
   }, [currentProject?.id]);
 
   // NEC 220.87(2) new load for the measured / manual methods (typed field):
-  // suggest it from the project's proposed circuits — EVSE at 125% (continuous
+  // suggest it from the project's proposed circuits — EVSE at its edition load
+  // (NEC 2023 7,200 VA floor) × 125% (continuous
   // per NEC 625.42, sized per 625.41; PE ruling 2026-10-14), other loads at
   // nameplate. Prefilled once per project, only into an empty field (the
   // functional update runs after hydration, so a saved value always wins).
   const suggestedProposedKVA = React.useMemo(
-    () => calculateProposedNewLoadVA(circuits) / 1000,
-    [circuits],
+    () => calculateProposedNewLoadVA(circuits, projectEdition) / 1000,
+    [circuits, projectEdition],
   );
   const nec22087PrefilledProjectRef = React.useRef<string | null>(null);
   useEffect(() => {
@@ -951,6 +954,7 @@ export const PermitPacketGenerator: React.FC<PermitPacketGeneratorProps> = ({ pr
         circuits,
         transformers,
         currentProject.settings,
+        projectEdition,
       );
 
       // NEC 220.82 / 220.83 single-family-dwelling context — flips the
@@ -1051,13 +1055,9 @@ export const PermitPacketGenerator: React.FC<PermitPacketGeneratorProps> = ({ pr
         // is computed once from AHJContext.
         manifest: activeManifest ?? undefined,
         buildingType: ahjContext.buildingType,
-        generalNotes: activeManifest?.generalNotes,
-        codeReferences: activeManifest?.codeReferences,
-        necEdition: resolveNecEdition(
-          activeManifest,
-          ahjContext.buildingType,
-          currentProject.necEdition,
-        ),
+        // Notes / code refs in the project's edition (data/ahj/codeCycle.ts).
+        ...manifestTextForEdition(activeManifest, projectEdition),
+        necEdition: projectEdition,
         // Gap 3 (2026-05-16): per-project AHJ-string overrides. Render-time
         // resolution chain inside permitPacketGenerator.tsx:
         //   data.X ?? data.XOverride ?? data.manifest?.X

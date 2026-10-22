@@ -952,7 +952,7 @@ export function calculateSingleFamilyLoad(input: SingleFamilyInput): Residential
  * all of those. This matches the methodology in multiFamilyEV.ts.
  */
 export function calculateMultiFamilyLoad(input: MultiFamilyInput): ResidentialLoadResult {
-  const { unitTemplates, housePanelLoad = 0, serviceVoltage = 240 } = input;
+  const { unitTemplates, housePanelLoad = 0, serviceVoltage = 240, necEdition = '2020' } = input;
 
   const breakdown: LoadBreakdown[] = [];
   const necReferences: string[] = ['NEC 220.84 - Multi-Family Optional Method'];
@@ -1067,8 +1067,15 @@ export function calculateMultiFamilyLoad(input: MultiFamilyInput): ResidentialLo
       unitApplianceVA += Math.max(coolingVA, heatingVA); // Non-coincident
     }
 
-    // EV charger at nameplate
-    if (app.evCharger?.enabled) unitApplianceVA += app.evCharger.kw * 1000;
+    // EV charger at its edition load (NEC 2023 220.57(A) 7,200 VA floor)
+    const unitEvse = app.evCharger?.enabled
+      ? getEvseLoadVA(app.evCharger.kw * 1000, necEdition)
+      : null;
+    const unitEvseVA = unitEvse?.loadVA ?? 0;
+    unitApplianceVA += unitEvseVA;
+    if (unitEvse && !necReferences.includes(`${unitEvse.necReference} - EVSE load`)) {
+      necReferences.push(`${unitEvse.necReference} - EVSE load`);
+    }
 
     // Pool / hot tub / sauna
     if (app.poolPump?.enabled) unitApplianceVA += hpToVA(app.poolPump.hp);
@@ -1089,7 +1096,7 @@ export function calculateMultiFamilyLoad(input: MultiFamilyInput): ResidentialLo
       (app.range?.enabled && app.range.type === 'electric' ? app.range.kw * 1000 : 0) +
       (app.dryer?.enabled && app.dryer.type === 'electric' ? Math.max(app.dryer.kw * 1000, 5000) : 0) +
       (app.waterHeater?.enabled && app.waterHeater.type === 'electric' ? app.waterHeater.kw * 1000 : 0) +
-      (app.evCharger?.enabled ? app.evCharger.kw * 1000 : 0) +
+      unitEvseVA +
       (app.poolPump?.enabled ? hpToVA(app.poolPump.hp) : 0) +
       (app.poolHeater?.enabled ? app.poolHeater.kw * 1000 : 0) +
       (app.hotTub?.enabled ? app.hotTub.kw * 1000 : 0) +

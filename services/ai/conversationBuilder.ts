@@ -184,7 +184,7 @@ You have access to the user's current project data. When answering questions:
 ` : ''}
 
 RESPONSE GUIDELINES:
-- Always reference specific NEC articles (using the 2023 edition unless specified otherwise)
+- Always reference specific NEC articles (using the project's NEC edition from the project context; with no project, Florida's: NEC 2020 through 2026-12-30, NEC 2023 from 2026-12-31)
 - Be concise, technical, and professional
 - When referencing earlier discussion points, use phrases like "As we discussed..." or "Building on the earlier analysis..."
 - If you need clarification about something discussed earlier, ask

@@ -10,6 +10,7 @@
 import { pdf } from '@react-pdf/renderer';
 import { VoltageDropDocument } from './VoltageDropDocuments';
 import { computeFeederLoadVA } from '../feeder/feederLoadSync';
+import type { NecEdition } from '../../data/nec/evse-load';
 import type { Database } from '../../lib/database.types';
 
 // Type aliases from database schema
@@ -74,7 +75,8 @@ export async function exportVoltageDropReport(
   transformers: Transformer[],
   projectAddress?: string,
   includeNECReferences: boolean = true,
-  circuits?: Circuit[]
+  circuits?: Circuit[],
+  necEdition?: NecEdition,
 ): Promise<void> {
   // Validation
   if (!projectName || projectName.trim() === '') {
@@ -95,6 +97,7 @@ export async function exportVoltageDropReport(
         panels={panels}
         transformers={transformers}
         circuits={circuits}
+        necEdition={necEdition}
         includeNECReferences={includeNECReferences}
       />
     ).toBlob();

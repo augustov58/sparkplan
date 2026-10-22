@@ -504,7 +504,7 @@ export const MultiFamilyEVPages: React.FC<MultiFamilyEVDocumentProps> = ({
               <Text style={styles.label}>POWER PER CHARGER</Text>
               <Text style={styles.value}>
                 {result.scenarios.withEVEMS.powerPerCharger_kW
-                  ? `${result.scenarios.withEVEMS.powerPerCharger_kW.toFixed(1)} kW`
+                  ? `${(result.scenarios.withEVEMS.chargingPowerPerCharger_kW ?? result.scenarios.withEVEMS.powerPerCharger_kW).toFixed(1)} kW`
                   : 'Dynamic'}
               </Text>
             </View>

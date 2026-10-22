@@ -20,7 +20,7 @@
 import type { Database } from '@/lib/database.types';
 import { getLightingDemandFactor } from '@/data/nec/table-220-42';
 import { getMultiFamilyDemandFactor } from './multiFamilyEV';
-import { EVSE_CONTINUOUS_FACTOR, isEvseDescription } from '@/data/nec/evse-load';
+import { EVSE_CONTINUOUS_FACTOR, getEvseLoadVA, isEvseDescription, type NecEdition } from '@/data/nec/evse-load';
 
 type Panel = Database['public']['Tables']['panels']['Row'];
 type Transformer = Database['public']['Tables']['transformers']['Row'];
@@ -94,9 +94,29 @@ function isEVEMSExplicitSetpointMarker(circuit: Pick<Circuit, 'description'>): b
 }
 
 /**
+ * The circuits with each EVSE's `load_watts` at its Article 220 load for the
+ * edition (`getEvseLoadVA`): NEC 2023 220.57(A) = max(7,200 VA, nameplate);
+ * NEC 2020 = nameplate, so the circuits come back unchanged. Applies to the
+ * aggregate and to the 220.87(2) new load (PE ruling 2026-10-21). EVEMS
+ * markers are metadata, not EVSE. Idempotent.
+ */
+export function withEvseLoadForEdition<T extends Pick<Circuit, 'description' | 'load_watts'>>(
+  circuits: T[],
+  necEdition: NecEdition,
+): T[] {
+  if (necEdition === '2020') return circuits;
+  return circuits.map(c =>
+    !isEVEMSMarkerCircuit(c) && isEvseDescription(c.description)
+      ? { ...c, load_watts: getEvseLoadVA(c.load_watts || 0, necEdition).loadVA }
+      : c,
+  );
+}
+
+/**
  * NEC 220.87(2) new load from the project's proposed circuits, in VA.
  *
- * - EVSE at 125% — EV charging is continuous per NEC 625.42, sized per
+ * - EVSE at its edition load (`withEvseLoadForEdition`: NEC 2023 7,200 VA
+ *   floor) × 125% — EV charging is continuous per NEC 625.42, sized per
  *   625.41 (PE ruling 2026-10-14); other proposed loads at nameplate.
  * - EVEMS marker circuits are metadata, not load (#137).
  * - On a panel with an explicit "EVEMS Aggregate Setpoint" marker, that
@@ -106,8 +126,10 @@ function isEVEMSExplicitSetpointMarker(circuit: Pick<Circuit, 'description'>): b
  * Mirrors the measured path of `calculateMultiFamilyEV`.
  */
 export function calculateProposedNewLoadVA(
-  circuits: Pick<Circuit, 'panel_id' | 'description' | 'load_watts' | 'is_proposed'>[],
+  allCircuits: Pick<Circuit, 'panel_id' | 'description' | 'load_watts' | 'is_proposed'>[],
+  necEdition: NecEdition,
 ): number {
+  const circuits = withEvseLoadForEdition(allCircuits, necEdition);
   const byPanel = new Map<string, { evseVA: number; otherVA: number }>();
   for (const c of circuits) {
     if (!c.is_proposed || isEVEMSMarkerCircuit(c)) continue;
@@ -806,8 +828,11 @@ export function calculateAggregatedLoad(
   circuits: Circuit[],
   transformers: Transformer[],
   occupancyType: OccupancyType = 'commercial',
-  multiFamilyContext?: MultiFamilyContext
+  multiFamilyContext?: MultiFamilyContext,
+  necEdition: NecEdition = '2020',
 ): AggregatedLoad {
+  // Every sum below reads EVSE circuits at their edition load (220.57 floor).
+  circuits = withEvseLoadForEdition(circuits, necEdition);
   const panel = panels.find(p => p.id === panelId);
   if (!panel) {
     return createEmptyAggregatedLoad(panelId, 'Panel not found', occupancyType);
@@ -991,7 +1016,7 @@ export function calculateAggregatedLoad(
   );
   if (stdSplit.proposedConnectedVA > 0) {
     const existingOnly = calculateAggregatedLoad(
-      panelId, panels, circuits.filter(c => !c.is_proposed), transformers, occupancyType,
+      panelId, panels, circuits.filter(c => !c.is_proposed), transformers, occupancyType, undefined, necEdition,
     );
     stdSplit.existingDemandVA = Math.round(existingOnly.totalDemandVA);
     stdSplit.proposedDemandVA = Math.round(totalDemandVA) - stdSplit.existingDemandVA;
@@ -1271,10 +1296,11 @@ export function getAllPanelAggregatedLoads(
   panels: Panel[],
   circuits: Circuit[],
   transformers: Transformer[],
-  occupancyType: OccupancyType = 'commercial'
+  occupancyType: OccupancyType = 'commercial',
+  necEdition: NecEdition = '2020',
 ): AggregatedLoad[] {
   return panels.map(panel => 
-    calculateAggregatedLoad(panel.id, panels, circuits, transformers, occupancyType)
+    calculateAggregatedLoad(panel.id, panels, circuits, transformers, occupancyType, undefined, necEdition)
   );
 }
 
@@ -1316,6 +1342,7 @@ export function buildMultiFamilyContext(
   circuits: Circuit[],
   transformers: Transformer[],
   settings: BuildMultiFamilyContextSettings | null | undefined,
+  necEdition: NecEdition = '2020',
 ): MultiFamilyContext | undefined {
   if (!panel?.is_main) return undefined;
   if (settings?.occupancyType !== 'dwelling') return undefined;
@@ -1341,7 +1368,7 @@ export function buildMultiFamilyContext(
   let evLoadVA = 0;
   let evDemandVA = 0;
   for (const p of evPanels) {
-    const result = calculateAggregatedLoad(p.id, panels, circuits, transformers, 'dwelling');
+    const result = calculateAggregatedLoad(p.id, panels, circuits, transformers, 'dwelling', undefined, necEdition);
     evLoadVA += result.totalConnectedVA;
     evDemandVA += result.totalDemandVA;
   }
@@ -1350,7 +1377,7 @@ export function buildMultiFamilyContext(
   const housePanelLoadVA = housePanels.reduce(
     (sum, p) =>
       sum +
-      calculateAggregatedLoad(p.id, panels, circuits, transformers, 'dwelling').totalConnectedVA,
+      calculateAggregatedLoad(p.id, panels, circuits, transformers, 'dwelling', undefined, necEdition).totalConnectedVA,
     0,
   );
 

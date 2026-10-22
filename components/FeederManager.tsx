@@ -16,6 +16,8 @@ import { useFeeders } from '../hooks/useFeeders';
 import { usePanels } from '../hooks/usePanels';
 import { useTransformers } from '../hooks/useTransformers';
 import { useCircuits } from '../hooks/useCircuits';
+import { useProjects } from '../hooks/useProjects';
+import { useProjectNecEdition } from '../hooks/useProjectNecEdition';
 import { calculateFeederSizing } from '../services/calculations';
 import { validateFeederForm, showValidationErrors } from '../lib/validation-utils';
 import { validateFeederConnectivityEnhanced, getValidFeederDestinations, getValidPanelDestinationsFromTransformer } from '../services/validation/panelConnectivityValidation';
@@ -44,6 +46,9 @@ export const FeederManager: React.FC<FeederManagerProps> = ({
   const { panels } = usePanels(projectId);
   const { transformers } = useTransformers(projectId);
   const { circuits } = useCircuits(projectId);
+  // EVSE loads in feeder demand follow the project's NEC edition (220.57 floor).
+  const { getProjectById } = useProjects();
+  const necEdition = useProjectNecEdition(getProjectById(projectId));
 
   // Cumulative VD per panel — used to annotate each feeder card with the
   // chain-total at the destination panel (the one this run lands on).
@@ -181,7 +186,7 @@ export const FeederManager: React.FC<FeederManagerProps> = ({
   const calculatePanelLoads = (panelId: string) => {
     // Use aggregated load calculation to include downstream panels
     // Pass occupancyType for correct demand factor selection
-    const aggregated = calculateAggregatedLoad(panelId, panels, circuits, transformers, occupancyType);
+    const aggregated = calculateAggregatedLoad(panelId, panels, circuits, transformers, occupancyType, undefined, necEdition);
     
     // #144: size from the destination's demand — EVEMS marker excluded and the
     // 625.42 setpoint clamp kept — split exactly like the packet's E-103.
@@ -697,6 +702,7 @@ export const FeederManager: React.FC<FeederManagerProps> = ({
         projectAddress,
         true, // Include NEC references
         circuits, // C2: live-derive feeder load from destination panel demand
+        necEdition,
       );
     } catch (error) {
       console.error('Failed to export voltage drop report:', error);
@@ -783,7 +789,7 @@ export const FeederManager: React.FC<FeederManagerProps> = ({
               <Info className="w-3 h-3" />
               Voltage drop export requires at least one feeder with length and calculated load.
               {' '}({feeders.filter(f => f.distance_ft && f.distance_ft > 0).length} of {feeders.length} have length,
-              {' '}{feeders.filter(f => computeFeederLoadVA(f, panels, circuits, transformers) > 0).length} of {feeders.length} have load)
+              {' '}{feeders.filter(f => computeFeederLoadVA(f, panels, circuits, transformers, necEdition) > 0).length} of {feeders.length} have load)
             </p>
           )}
         </div>

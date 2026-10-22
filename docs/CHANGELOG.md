@@ -4,6 +4,16 @@ All notable changes to SparkPlan.
 
 ---
 
+## 2026-10-21: NEC edition picker — Automatic follows Florida's code cycle (#141)
+
+- **One edition control.** The project page's NEC Edition picker now offers **Automatic** (default for every project, new and existing) plus explicit 2020 / 2023. Automatic follows Florida's adoption: NEC 2020 (FBC 8th Edition) through Dec 30, 2026, NEC 2023 (FBC 9th Edition) from Dec 31, 2026, Miami-Dade single-family included. A non-Florida jurisdiction uses its own adopted edition.
+- **Everything follows it.** Load calculations, the permit packet (cover, applicable codes, general notes, design review checklist), the commercial load PDF/CSV, the load report, Dashboard and Compliance Report badges, the AHJ panel, the Copilot, and the photo analyzer all use the same edition. Under NEC 2023, AHJ notes and code references switch to "2023 NEC" and "Florida Building Code, 9th edition (2026)"; Miami-Dade's NEC 2014/2020 split becomes a single NEC 2023 cite.
+- **E-502 prints the design edition (#141).** The Jurisdiction Requirements page printed "NEC 2023 Adopted" from the jurisdiction record next to an NEC 2020 checklist; it now prints the packet's edition.
+- **NEC 2023 EV charger floor everywhere (PE ruling 2026-10-21).** Under NEC 2023, each charger counts at least 7,200 VA (220.57(A)) in panel and feeder demand, the multifamily MDP (220.84), the voltage-drop report, and the 220.87(2) new-load prefill — before, only the Multi-Family EV calculator and the single-family dwelling calc applied it. With EVEMS the load is the setpoint, capped at 7,200 VA per charger. Projects on NEC 2020 (Automatic until Dec 31, 2026) are unchanged. Chargers rated below 7,200 VA now show their real charging power in the EVEMS notes and "power per charger" (e.g. 3.8 kW for a 16 A charger, not a 5.5 kW share); the load still counts 7,200 VA each.
+- The one-line diagram export footer no longer prints "NEC <current year> Edition" (it printed a nonexistent "NEC 2026").
+
+---
+
 ## 2026-10-21: Conductor ampacity table corrections (NEC Table 310.16)
 
 - **Four ampacities were stored above the code value**, so conductor sizing could pick a wire one size too small: 14 AWG copper at 60 °C (20 A → 15 A), 12 AWG aluminum at 60 °C (20 A → 15 A), 6 AWG aluminum at 90 °C (60 A → 55 A, affects derating) and 600 kcmil copper at 60 °C (355 A → 350 A). On 60 °C terminations, a 16–20 A load now sizes 12 AWG copper instead of 14 AWG.

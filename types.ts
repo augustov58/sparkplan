@@ -290,6 +290,14 @@ export interface ProjectSettings {
   manifest_template_id?: string;
 
   /**
+   * NEC edition picked on the project page. Unset = Automatic: Florida's
+   * code cycle by date (NEC 2020 until 2026-12-31, then NEC 2023), via
+   * `data/ahj/codeCycle.ts::resolveNecEdition`. Supersedes the legacy
+   * `projects.nec_edition` column, which nothing reads for the edition.
+   */
+  nec_edition_override?: '2020' | '2023';
+
+  /**
    * Per-project string overrides for cover-sheet identity (Gap 3,
    * 2026-05-16). Render-time resolution chain mirrors the `necEdition`
    * fallback pattern already used in `services/pdfExport/permitPacketGenerator.tsx`:

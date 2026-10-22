@@ -7,6 +7,7 @@
 import { pdf } from '@react-pdf/renderer';
 import { Project } from '../types';
 import { calculateLoad } from './calculations';
+import type { NecEdition } from '../data/nec/evse-load';
 
 /**
  * Generate and download PDF load calculation report
@@ -14,7 +15,7 @@ import { calculateLoad } from './calculations';
  * @param project - Project data to export
  * @returns Promise that resolves when PDF is downloaded
  */
-export async function exportLoadCalculationPDF(project: Project): Promise<void> {
+export async function exportLoadCalculationPDF(project: Project, necEdition: NecEdition): Promise<void> {
   // For now, generate a simple text-based report
   // Full React PDF implementation would go here in production
 
@@ -26,7 +27,7 @@ export async function exportLoadCalculationPDF(project: Project): Promise<void> 
     const result = calculateLoad(project.loads, project.settings);
 
     // Generate report content
-    const reportContent = generateReportText(project, result);
+    const reportContent = generateReportText(project, result, necEdition);
 
     // Create blob and download
     const blob = new Blob([reportContent], { type: 'text/plain' });
@@ -49,7 +50,7 @@ export async function exportLoadCalculationPDF(project: Project): Promise<void> 
  * Generate formatted text report
  * TODO: Replace with React PDF Document in production
  */
-function generateReportText(project: Project, result: ReturnType<typeof calculateLoad>): string {
+function generateReportText(project: Project, result: ReturnType<typeof calculateLoad>, necEdition: NecEdition): string {
   const date = new Date().toLocaleDateString();
 
   return `
@@ -60,7 +61,7 @@ function generateReportText(project: Project, result: ReturnType<typeof calculat
 Project: ${project.name}
 Address: ${project.address}
 Date: ${date}
-NEC Edition: ${project.necEdition}
+NEC Edition: ${necEdition}
 
 ───────────────────────────────────────────────────────────────────────
 ELECTRICAL SERVICE PARAMETERS

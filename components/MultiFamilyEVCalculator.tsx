@@ -40,15 +40,10 @@ import {
   projectHasPanels,
   type PopulationProgress
 } from '../services/autogeneration/projectPopulationOrchestrator';
-import { useJurisdictions } from '../hooks/useJurisdictions';
 import { useProjects } from '../hooks/useProjects';
 import { useCircuits } from '../hooks/useCircuits';
 import { describeEvDesignDrift } from '../services/calculations/upstreamLoadAggregation';
-import {
-  findManifestForJurisdiction,
-  getManifestById,
-  resolveNecEdition,
-} from '../data/ahj/registry';
+import { useProjectNecEdition } from '../hooks/useProjectNecEdition';
 import { evseLoadCitation } from '../data/nec/evse-load';
 
 interface MultiFamilyEVCalculatorProps {
@@ -310,19 +305,9 @@ export const MultiFamilyEVCalculator: React.FC<MultiFamilyEVCalculatorProps> = (
     return () => clearTimeout(timer);
   }, [evChargerCount, evChargerLevel, evAmpsPerCharger, useEVEMS, capacityReserveVA, existingServiceAmps, selectedScenario, voltage, phase]);
 
-  // NEC edition for the per-EVSE load rule: AHJ manifest (template pick or
-  // jurisdiction match) first, then the project's own setting, then 2020.
-  // Same resolution the permit packet uses, so the math matches the citations.
-  const { getJurisdictionById } = useJurisdictions();
-  const necEdition = useMemo(() => {
-    const jurisdiction = project?.jurisdiction_id
-      ? getJurisdictionById(project.jurisdiction_id)
-      : undefined;
-    const manifest =
-      getManifestById(project?.settings?.manifest_template_id)
-      ?? findManifestForJurisdiction(jurisdiction);
-    return resolveNecEdition(manifest, 'multi_family', project?.necEdition);
-  }, [project?.jurisdiction_id, project?.settings?.manifest_template_id, project?.necEdition, getJurisdictionById]);
+  // NEC edition for the per-EVSE load rule: project pick, else Florida's code
+  // cycle. Same resolution the permit packet uses, so the math matches the citations.
+  const necEdition = useProjectNecEdition(project);
 
   // Calculate results
   const result = useMemo<MultiFamilyEVResult | null>(() => {
@@ -1468,7 +1453,7 @@ export const MultiFamilyEVCalculator: React.FC<MultiFamilyEVCalculatorProps> = (
                         <div className="font-medium text-gray-900 text-sm">{result.scenarios.withEVEMS.name}</div>
                         <div className="text-xs text-gray-500">
                           {result.scenarios.withEVEMS.powerPerCharger_kW
-                            ? `~${result.scenarios.withEVEMS.powerPerCharger_kW.toFixed(1)} kW per charger when sharing`
+                            ? `~${(result.scenarios.withEVEMS.chargingPowerPerCharger_kW ?? result.scenarios.withEVEMS.powerPerCharger_kW).toFixed(1)} kW per charger when sharing`
                             : 'Dynamic power sharing'}
                         </div>
                       </div>

@@ -24,6 +24,7 @@ import {
   exportCommercialLoadCSV,
 } from '../services/pdfExport/commercialLoadExport';
 import { useProfile } from '../hooks/useProfile';
+import { useProjectNecEdition } from '../hooks/useProjectNecEdition';
 
 interface CommercialLoadCalculatorProps {
   projectId?: string;
@@ -48,6 +49,7 @@ export const CommercialLoadCalculator: React.FC<CommercialLoadCalculatorProps> =
   onResultCalculated,
 }) => {
   const pk = `commercial-load-calc-${projectId ?? project?.id ?? 'global'}`;
+  const necEdition = useProjectNecEdition(project);
 
   // User profile for "Prepared By" line on exported report (optional, quiet failure if absent)
   const { profile } = useProfile();
@@ -365,7 +367,7 @@ export const CommercialLoadCalculator: React.FC<CommercialLoadCalculatorProps> =
         id: project.id,
         name: project.name,
         address: project.address,
-        necEdition: project.necEdition,
+        necEdition,
       },
       occupancyType,
       totalFloorArea,

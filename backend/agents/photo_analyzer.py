@@ -7,7 +7,7 @@ This is a UNIQUE capability that competitors don't have.
 
 from pydantic_ai import Agent, RunContext, BinaryContent
 from models.schemas import PhotoAnalysis, NecViolation, Equipment
-from tools.database import get_project_data, get_all_panels
+from tools.database import get_project_data, get_all_panels, resolve_nec_edition
 from supabase import Client
 from typing import Dict, Any
 import logging
@@ -74,6 +74,7 @@ async def add_project_context(ctx: RunContext[Dict[str, Any]]) -> str:
 
     # Get panels for reference
     panels = await get_all_panels(supabase, project_id)
+    nec_edition = await resolve_nec_edition(supabase, project)
 
     context = f"""
 ## Project Context
@@ -81,7 +82,7 @@ async def add_project_context(ctx: RunContext[Dict[str, Any]]) -> str:
 **Project:** {project.get('name', 'Unnamed')}
 **Type:** {project.get('type', 'Unknown')} Installation
 **Service:** {project.get('service_size', 200)}A, {project.get('voltage', 240)}V, {project.get('phases', 1)}-Phase
-**NEC Edition:** {project.get('nec_edition', '2023')}
+**NEC Edition:** {nec_edition}
 
 **Panels in System:**
 {chr(10).join([f"- {p.get('name')}: {p.get('bus_rating', 0)}A, {p.get('voltage', 240)}V" for p in panels[:5]]) if panels else "No panels configured"}

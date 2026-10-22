@@ -61,6 +61,7 @@ import { TemplateSelector } from './components/TemplateSelector';
 import type { ProjectTemplate } from './data/project-templates';
 import { Toaster } from 'react-hot-toast';
 import { TemplateType, createProjectFromTemplate } from './services/sampleTemplates';
+import { useProjectNecEdition } from './hooks/useProjectNecEdition';
 
 const SupportWidget = lazy(() =>
   import('./components/SupportWidget').then((m) => ({ default: m.SupportWidget }))
@@ -376,6 +377,7 @@ const NecAssistant = () => {
 
     const { projects } = useProjects();
     const currentProject = projectId ? projects.find(p => p.id === projectId) : undefined;
+    const necEdition = useProjectNecEdition(currentProject);
 
     // A project with no panels yet still has context (#145): the Copilot's
     // tools need its id to add the first panel or circuit.
@@ -398,7 +400,8 @@ const NecAssistant = () => {
             undefined, // estimates - not yet wired into Copilot
             undefined, // permits
             undefined, // inspections
-            shortCircuitCalculations
+            shortCircuitCalculations,
+            necEdition
           )
         : null;
 

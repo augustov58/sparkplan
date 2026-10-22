@@ -10,6 +10,7 @@ import { useTransformers } from '../hooks/useTransformers';
 import { useGrounding } from '../hooks/useGrounding';
 import { useShortCircuitCalculations } from '../hooks/useShortCircuitCalculations';
 import { buildProjectContext, formatContextForAI } from '../services/ai/projectContextBuilder';
+import { useProjectNecEdition } from '../hooks/useProjectNecEdition';
 
 interface InspectionProps {
   project: Project;
@@ -27,6 +28,7 @@ export const PreInspection: React.FC<InspectionProps> = ({ project }) => {
   const { feeders } = useFeeders(project.id);
   const { transformers } = useTransformers(project.id);
   const { grounding } = useGrounding(project.id);
+  const necEdition = useProjectNecEdition(project);
   const { calculations: shortCircuitCalculations } = useShortCircuitCalculations(project.id);
 
   console.log('PreInspection - items:', items, 'loading:', itemsLoading, 'error:', error);
@@ -66,7 +68,8 @@ export const PreInspection: React.FC<InspectionProps> = ({ project }) => {
         undefined, // estimates
         undefined, // permits
         undefined, // inspections
-        shortCircuitCalculations
+        shortCircuitCalculations,
+        necEdition
       );
       projectContext = formatContextForAI(context);
       console.log('Built project context with:', panels.length, 'panels,', circuits.length, 'circuits');

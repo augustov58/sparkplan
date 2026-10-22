@@ -4,6 +4,8 @@ import { useNavigate } from 'react-router-dom';
 import { Project, ProjectType, ProjectStatus, DwellingType, ResidentialSettings, ProjectScopeFlags } from '../types';
 import { Save, AlertTriangle, Building, Zap, Trash2, Home, Users, Lock, ClipboardCheck, DollarSign } from 'lucide-react';
 import { usePanels } from '../hooks/usePanels';
+import { useJurisdictions } from '../hooks/useJurisdictions';
+import { automaticNecEdition } from '../data/ahj/codeCycle';
 
 interface ProjectSetupProps {
   project: Project;
@@ -17,6 +19,11 @@ export const ProjectSetup: React.FC<ProjectSetupProps> = ({ project, updateProje
 
   // Local state for immediate UI updates
   const [localProject, setLocalProject] = useState<Project>(project);
+  // Edition the "Automatic" option resolves to today (data/ahj/codeCycle.ts).
+  const { getJurisdictionById } = useJurisdictions();
+  const automaticEdition = automaticNecEdition(
+    localProject.jurisdiction_id ? getJurisdictionById(localProject.jurisdiction_id) : undefined,
+  );
   const updateTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   // Sync local state when project prop changes from database
@@ -275,13 +282,17 @@ export const ProjectSetup: React.FC<ProjectSetupProps> = ({ project, updateProje
                <div>
                 <label className="block text-xs font-semibold text-[#888] uppercase mb-1">NEC Edition</label>
                 <select
-                  value={localProject.necEdition}
-                  onChange={e => handleMetaChange('necEdition', e.target.value)}
+                  value={localProject.settings.nec_edition_override ?? 'auto'}
+                  onChange={e => handleSettingChange('nec_edition_override', e.target.value === 'auto' ? undefined : e.target.value)}
                   className="w-full border-[#e8e6e3] rounded-md text-sm"
                 >
-                  <option value="2023">2023 Edition</option>
+                  <option value="auto">Automatic (NEC {automaticEdition})</option>
                   <option value="2020">2020 Edition</option>
+                  <option value="2023">2023 Edition</option>
                 </select>
+                <p className="text-xs text-[#888] mt-1">
+                  Automatic follows the jurisdiction's adopted code. Florida: NEC 2020 through Dec 30, 2026, NEC 2023 from Dec 31, 2026.
+                </p>
                </div>
             </div>
             <div>

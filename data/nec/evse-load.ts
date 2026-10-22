@@ -16,8 +16,9 @@
  * applies to OCPD and conductor sizing, not to the Article 220 load total —
  * adding it here would double-count. PE-confirmed 2026-09-27.
  *
- * Florida enforces NEC 2020 via FBC 8th Edition (2023), so every Florida AHJ
- * manifest in data/ahj/ resolves to the 2020 branch.
+ * Florida enforces NEC 2020 via FBC 8th Edition (2023) until 2026-12-31,
+ * then NEC 2023 via FBC 9th Edition (2026). The project's edition comes from
+ * `resolveNecEdition` in data/ahj/codeCycle.ts.
  */
 
 export type NecEdition = '2020' | '2023';
@@ -83,16 +84,4 @@ export function isEvseDescription(description: string | null | undefined): boole
  */
 export function evseLoadCitation(edition: NecEdition): string {
   return edition === '2023' ? 'NEC 220.57' : 'NEC 220.14(A) + 625.41';
-}
-
-/**
- * Map an AHJ manifest edition string ("NEC 2020", "NEC 2023") onto the
- * calc-layer edition. Returns undefined for anything else (e.g. Miami-Dade's
- * residential "NEC 2014") so callers fall through to the project setting.
- */
-export function necEditionFromManifestString(value: string | null | undefined): NecEdition | undefined {
-  if (!value) return undefined;
-  if (value.includes('2023')) return '2023';
-  if (value.includes('2020')) return '2020';
-  return undefined;
 }
