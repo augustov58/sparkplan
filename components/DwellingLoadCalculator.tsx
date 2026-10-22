@@ -42,11 +42,13 @@ import {
   calculateSingleFamilyLoad,
   calculateMultiFamilyLoad,
   generateResidentialPanelSchedule,
+  dwellingBranchConductorSize,
   ResidentialLoadResult,
   LoadBreakdown,
   GeneratedCircuit
 } from '../services/calculations/residentialLoad';
 import { LOAD_TEMPLATES } from '../services/calculations/serviceUpgrade';
+import { getNextStandardBreakerSize } from '../data/nec/standard-breakers';
 import type { LoadTemplate } from '../types';
 import { isExistingConstructionProject } from '../lib/projectSettings';
 import { usePanels } from '../hooks/usePanels';
@@ -476,7 +478,7 @@ export const DwellingLoadCalculator: React.FC<DwellingLoadCalculatorProps> = ({
         const pole: 1 | 2 = p.voltage === 240 ? 2 : 1;
         const baseAmps = (p.kw * 1000) / p.voltage;
         const sizedAmps = p.continuous ? baseAmps * 1.25 : baseAmps;
-        const breakerAmps = Math.max(15, Math.ceil(sizedAmps / 5) * 5);
+        const breakerAmps = getNextStandardBreakerSize(Math.max(15, sizedAmps));
         const loadType: GeneratedCircuit['loadType'] =
           p.category === 'HVAC' ? 'C' :
           p.category === 'EV' ? 'O' : 'O';
@@ -525,18 +527,6 @@ export const DwellingLoadCalculator: React.FC<DwellingLoadCalculatorProps> = ({
         await deleteCircuitsByPanel(mainPanel.id);
       }
 
-      // Conductor sizing per NEC Table 310.16 (60C copper).
-      const getConductorSize = (amps: number): string => {
-        if (amps <= 15) return '14 AWG';
-        if (amps <= 20) return '12 AWG';
-        if (amps <= 30) return '10 AWG';
-        if (amps <= 40) return '8 AWG';
-        if (amps <= 50) return '6 AWG';
-        if (amps <= 60) return '6 AWG';
-        if (amps <= 100) return '3 AWG';
-        return '1 AWG';
-      };
-
       // Slot allocation — respects pole continuations so a 2P breaker at
       // slot N occupies N and N+2, and the next breaker is placed at the
       // smallest slot S where every {S, S+2, ..., S+2(p-1)} is still free.
@@ -580,7 +570,7 @@ export const DwellingLoadCalculator: React.FC<DwellingLoadCalculatorProps> = ({
           breaker_amps: circuit.breakerAmps,
           pole: circuit.pole,
           load_watts: circuit.loadWatts,
-          conductor_size: getConductorSize(circuit.breakerAmps),
+          conductor_size: dwellingBranchConductorSize(circuit.breakerAmps),
           load_type: circuit.loadType,
           is_proposed: !!circuit.isProposed,
         });
