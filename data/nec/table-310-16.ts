@@ -3,7 +3,7 @@ import { AmpacityEntry } from '../../types/nec-types';
 /**
  * NEC Table 310.16 - Allowable Ampacities of Insulated Conductors
  * Based on 30°C (86°F) ambient temperature
- * 2023 NEC Edition (previously Table 310.15(B)(16) in 2020 NEC)
+ * NEC 2020 and 2023 (numbered Table 310.15(B)(16) in NEC 2017 and earlier)
  *
  * This table shows the maximum current-carrying capacity (ampacity) of
  * insulated conductors based on conductor size, material, and insulation
@@ -12,7 +12,7 @@ import { AmpacityEntry } from '../../types/nec-types';
  */
 export const TABLE_310_16: AmpacityEntry[] = [
   // Copper conductors
-  { size: '14 AWG', material: 'Cu', temp60C: 20, temp75C: 20, temp90C: 25 },
+  { size: '14 AWG', material: 'Cu', temp60C: 15, temp75C: 20, temp90C: 25 },
   { size: '12 AWG', material: 'Cu', temp60C: 20, temp75C: 25, temp90C: 30 },
   { size: '10 AWG', material: 'Cu', temp60C: 30, temp75C: 35, temp90C: 40 },
   { size: '8 AWG', material: 'Cu', temp60C: 40, temp75C: 50, temp90C: 55 },
@@ -30,15 +30,15 @@ export const TABLE_310_16: AmpacityEntry[] = [
   { size: '350 kcmil', material: 'Cu', temp60C: 260, temp75C: 310, temp90C: 350 },
   { size: '400 kcmil', material: 'Cu', temp60C: 280, temp75C: 335, temp90C: 380 },
   { size: '500 kcmil', material: 'Cu', temp60C: 320, temp75C: 380, temp90C: 430 },
-  { size: '600 kcmil', material: 'Cu', temp60C: 355, temp75C: 420, temp90C: 475 },
+  { size: '600 kcmil', material: 'Cu', temp60C: 350, temp75C: 420, temp90C: 475 },
   { size: '750 kcmil', material: 'Cu', temp60C: 400, temp75C: 475, temp90C: 535 },
   { size: '1000 kcmil', material: 'Cu', temp60C: 455, temp75C: 545, temp90C: 615 },
 
   // Aluminum/Copper-Clad Aluminum conductors
-  { size: '12 AWG', material: 'Al', temp60C: 20, temp75C: 20, temp90C: 25 },
+  { size: '12 AWG', material: 'Al', temp60C: 15, temp75C: 20, temp90C: 25 },
   { size: '10 AWG', material: 'Al', temp60C: 25, temp75C: 30, temp90C: 35 },
-  { size: '8 AWG', material: 'Al', temp60C: 30, temp75C: 40, temp90C: 45 },
-  { size: '6 AWG', material: 'Al', temp60C: 40, temp75C: 50, temp90C: 60 },
+  { size: '8 AWG', material: 'Al', temp60C: 35, temp75C: 40, temp90C: 45 },
+  { size: '6 AWG', material: 'Al', temp60C: 40, temp75C: 50, temp90C: 55 },
   { size: '4 AWG', material: 'Al', temp60C: 55, temp75C: 65, temp90C: 75 },
   { size: '3 AWG', material: 'Al', temp60C: 65, temp75C: 75, temp90C: 85 },
   { size: '2 AWG', material: 'Al', temp60C: 75, temp75C: 90, temp90C: 100 },
@@ -48,12 +48,12 @@ export const TABLE_310_16: AmpacityEntry[] = [
   { size: '3/0 AWG', material: 'Al', temp60C: 130, temp75C: 155, temp90C: 175 },
   { size: '4/0 AWG', material: 'Al', temp60C: 150, temp75C: 180, temp90C: 205 },
   { size: '250 kcmil', material: 'Al', temp60C: 170, temp75C: 205, temp90C: 230 },
-  { size: '300 kcmil', material: 'Al', temp60C: 190, temp75C: 230, temp90C: 255 },
+  { size: '300 kcmil', material: 'Al', temp60C: 195, temp75C: 230, temp90C: 260 },
   { size: '350 kcmil', material: 'Al', temp60C: 210, temp75C: 250, temp90C: 280 },
   { size: '400 kcmil', material: 'Al', temp60C: 225, temp75C: 270, temp90C: 305 },
   { size: '500 kcmil', material: 'Al', temp60C: 260, temp75C: 310, temp90C: 350 },
   { size: '600 kcmil', material: 'Al', temp60C: 285, temp75C: 340, temp90C: 385 },
-  { size: '750 kcmil', material: 'Al', temp60C: 315, temp75C: 375, temp90C: 425 },
+  { size: '750 kcmil', material: 'Al', temp60C: 320, temp75C: 385, temp90C: 435 },
   { size: '1000 kcmil', material: 'Al', temp60C: 375, temp75C: 445, temp90C: 500 }
 ];
 
