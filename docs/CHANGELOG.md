@@ -4,6 +4,16 @@ All notable changes to SparkPlan.
 
 ---
 
+## 2026-10-24: Jurisdiction checklist and notes match the packet and the job (#140, #147, #148)
+
+- **E-502 no longer marks missing pages as satisfied (#140).** The checklist read the section toggles, so a toggled-on page that wasn't built (voltage drop without feeders, fault current without a short-circuit calc, EVEMS or EVSE labeling without an EV panel) still printed [X]. It now reads the pages actually in the packet.
+- **"Partial" instead of a false [X].** The equipment specs sheet cites UL listings but isn't a manufacturer cut sheet: cut-sheet items now print `[~] PARTIAL` until one is uploaded. One-line items that call for AIC labels print `[~] PARTIAL` when a panel has no AIC rating.
+- **EV, EVEMS and transformer items only on jobs that have them (#148).** EVSE listings, anchoring, wet-location, labeling and Knox-box items, EVEMS narratives, NEC 450.3, the matching general notes and the HVHZ anchoring upload slot drop out when the project has no EV charger, EVEMS or transformer. The panel-schedule footer cites NEC 625.40 only on panels with EV chargers.
+- **Service-scope notes follow the project (#147).** Orlando's and the City of Miami's fault-current notes print only on new-service jobs; the checklist now takes existing vs new service from the project setting, as the packet page does.
+- The EVSE labeling page (NEC 625.43) now prints for any panel feeding a charger, not only panels named "EV…".
+
+---
+
 ## 2026-10-21: NEC edition picker — Automatic follows Florida's code cycle (#141)
 
 - **One edition control.** The project page's NEC Edition picker now offers **Automatic** (default for every project, new and existing) plus explicit 2020 / 2023. Automatic follows Florida's adoption: NEC 2020 (FBC 8th Edition) through Dec 30, 2026, NEC 2023 (FBC 9th Edition) from Dec 31, 2026, Miami-Dade single-family included. A non-Florida jurisdiction uses its own adopted edition.

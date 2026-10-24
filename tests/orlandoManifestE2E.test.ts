@@ -27,6 +27,7 @@ import {
 import { findManifestForJurisdiction, getManifestById } from '../data/ahj/registry';
 import { resolveSections } from '../services/pdfExport/packetSections';
 import type { AHJContext } from '../data/ahj/types';
+import { noteText } from '../data/ahj/codeCycle';
 
 // ----------------------------------------------------------------------------
 // Test contexts — both Orlando paths
@@ -50,7 +51,7 @@ const orlandoNewServiceCommercial: AHJContext = {
 
 describe('Orlando manifest — narrative content', () => {
   it('has Orlando-specific general notes (NEC 2020 + VD 3/3/5 + EVSE UL listings)', () => {
-    const notes = orlandoManifest.generalNotes.join(' ');
+    const notes = orlandoManifest.generalNotes.map(noteText).join(' ');
     expect(notes).toMatch(/NFPA-70\s*\(2020 NEC\)/);
     expect(notes).toMatch(/3%/); // VD limits
     expect(notes).toMatch(/UL-2202/); // EVSE UL listing requirement

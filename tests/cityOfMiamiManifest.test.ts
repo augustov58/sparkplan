@@ -30,6 +30,7 @@ import type {
   AttachmentSummary,
   PacketAST,
 } from '../data/ahj/types';
+import { noteText } from '../data/ahj/codeCycle';
 
 // ----------------------------------------------------------------------------
 // Representative contexts
@@ -92,7 +93,7 @@ describe('City of Miami manifest — structural shape', () => {
   });
 
   it('has HVHZ-aware general notes (175 mph 3-sec gust callout)', () => {
-    const joined = cityOfMiamiManifest.generalNotes.join('\n').toLowerCase();
+    const joined = cityOfMiamiManifest.generalNotes.map(noteText).join('\n').toLowerCase();
     expect(joined).toContain('hvhz');
     expect(joined).toContain('175 mph');
     expect(joined).toContain('city of miami');
@@ -416,7 +417,7 @@ describe('City of Miami manifest — requirement detection', () => {
     ).toBe(true);
   });
 
-  it('detects installation manual via cut_sheet OR manufacturer_data OR equipmentSpecs section', () => {
+  it('detects installation manual via cut_sheet OR manufacturer_data upload; equipmentSpecs alone is partial', () => {
     const req = find('city-of-miami-installation-manual');
     expect(req.detect(emptyPacket, [])).toBe(false);
 
@@ -428,7 +429,9 @@ describe('City of Miami manifest — requirement detection', () => {
         { artifactType: 'manufacturer_data', sheetId: 'X-202' },
       ]),
     ).toBe(true);
-    expect(req.detect({ sectionKeys: ['equipmentSpecs'] }, [])).toBe(true);
+    // #140: the specs sheet only cites listings — partial, not satisfied.
+    expect(req.detect({ sectionKeys: ['equipmentSpecs'] }, [])).toBe(false);
+    expect(req.partial?.({ sectionKeys: ['equipmentSpecs'] }, [])).toMatch(/cut sheet not attached/);
   });
 
   it('detects Private Provider NTBO via the private_provider_documentation artifact slot', () => {

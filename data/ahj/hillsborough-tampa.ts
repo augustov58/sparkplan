@@ -49,7 +49,8 @@
  * @module data/ahj/hillsborough-tampa
  */
 
-import type { AHJManifest, AHJContext } from './types';
+import type { AHJManifest, AHJContext, ManifestNote } from './types';
+import { evInScope, evemsInScope } from './checks';
 
 // ============================================================================
 // PREDICATE HELPERS
@@ -85,14 +86,14 @@ const isFullPlanReviewLane = (ctx: AHJContext): boolean =>
  * not render most of these (handled by section predicates), but the
  * notes themselves are AHJ-uniform.
  */
-const HILLSBOROUGH_TAMPA_GENERAL_NOTES: string[] = [
+const HILLSBOROUGH_TAMPA_GENERAL_NOTES: ManifestNote[] = [
   'All electrical work shall comply with NFPA-70 (2020 NEC) and the Florida Building Code 8th edition (2023), as adopted by Hillsborough County and the City of Tampa.',
   'Voltage drop shall not exceed 3% on feeders, 3% on branch circuits, and 5% combined feeder + branch (NEC 215.2(A)(1) FPN; NEC 210.19(A)(1) FPN).',
   'All grounding and bonding shall comply with NEC Article 250. Grounding electrode conductor sized per NEC Table 250.66; equipment grounding conductor sized per NEC Table 250.122.',
   'All service equipment, panelboards, and overcurrent devices shall be labeled with voltage, phase, amperage, and AIC rating per NEC 110.9 and 110.10.',
   'Building plans shall be digitally signed and sealed by a State of Florida Registered Architect or Engineer for commercial / multi-family scope, per Hillsborough Commercial Electrical Permit Requirements.',
   'Recorded certified copy of Notice of Commencement (Florida Statutes 713.13) required prior to the first inspection for any job > $5,000.',
-  'EVSE equipment shall bear UL-2202 and UL-2594 listings; manufacturer cut sheets attached.',
+  { text: 'EVSE equipment shall bear UL-2202 and UL-2594 listings; manufacturer cut sheets attached.', when: evInScope },
   'Fire-rated penetrations shall use a UL-listed firestop assembly. Firestop schedule attached where applicable.',
   'For projects in a FEMA Special Flood Hazard Area, equipment elevation shall be demonstrated above the Design Flood Elevation per Florida Building Code.',
 ];
@@ -503,7 +504,7 @@ export const hillsboroughTampaManifest: AHJManifest = {
       category: 'upload',
       // Useful at any scope — even the residential trade-permit lane
       // benefits from the cut sheet as listing evidence. Always required.
-      required: () => true,
+      required: evInScope,
       detect: (_packet, attachments) =>
         attachments.some((a) => a.artifactType === 'cut_sheet'),
     },
@@ -524,7 +525,7 @@ export const hillsboroughTampaManifest: AHJManifest = {
       name: 'EVSE labeling per NEC 625.43 (visible at disconnect)',
       category: 'inspection',
       // Required on all lanes per the line-by-line cross-walk.
-      required: () => true,
+      required: evInScope,
       detect: (packet) =>
         Boolean(packet.sectionKeys?.includes('evseLabeling')),
     },
@@ -535,7 +536,7 @@ export const hillsboroughTampaManifest: AHJManifest = {
       // Conditional on EVEMS scope — we don't model "EVEMS present?" on
       // context yet, so leave required across all lanes and let the
       // section's data predicate hide it when irrelevant.
-      required: () => true,
+      required: evemsInScope,
       detect: (packet) =>
         Boolean(packet.sectionKeys?.includes('evemsNarrative')),
     },

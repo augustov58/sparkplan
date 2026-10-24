@@ -55,7 +55,8 @@
  * @module data/ahj/miami-dade
  */
 
-import type { AHJManifest } from './types';
+import type { AHJManifest, ManifestNote } from './types';
+import { evInScope, evemsInScope, hasCutSheetUpload, specsCitedOnly, transformerInScope } from './checks';
 
 // ============================================================================
 // NARRATIVE CONTENT
@@ -66,15 +67,15 @@ import type { AHJManifest } from './types';
  * MD-specific HVHZ wind-anchoring callout, dual-edition NEC reference, and
  * MD digital signing/sealing policy.
  */
-const MIAMI_DADE_GENERAL_NOTES: string[] = [
+const MIAMI_DADE_GENERAL_NOTES: ManifestNote[] = [
   'All electrical work shall comply with the Florida Building Code, 8th edition (2023), as adopted by Miami-Dade County. Commercial scope work shall additionally comply with NFPA-70 (2020 NEC); single-family residential scope work shall additionally comply with NFPA-70 (2014 NEC) per the published Miami-Dade Residential Electrical Plan Review Guidelines.',
-  'All of Miami-Dade County lies within the High-Velocity Hurricane Zone (HVHZ) per FBC 8th ed (2023). Outdoor pedestal- or bollard-mounted EVSE shall be anchored per Florida Product Approval, Miami-Dade Notice of Acceptance (NOA) tie-down detail, or original signed-and-sealed structural anchorage plans rated for 175 mph (3-sec gust) Risk Category II minimum.',
+  { text: 'All of Miami-Dade County lies within the High-Velocity Hurricane Zone (HVHZ) per FBC 8th ed (2023). Outdoor pedestal- or bollard-mounted EVSE shall be anchored per Florida Product Approval, Miami-Dade Notice of Acceptance (NOA) tie-down detail, or original signed-and-sealed structural anchorage plans rated for 175 mph (3-sec gust) Risk Category II minimum.', when: evInScope },
   'Voltage drop shall not exceed 3% on feeders, 3% on branch circuits, and 5% combined feeder + branch (NEC 215.2(A)(1) FPN; NEC 210.19(A)(1) FPN).',
   'All grounding and bonding shall comply with NEC Article 250. Grounding electrode conductor sized per NEC Table 250.66; equipment grounding conductor sized per NEC Table 250.122.',
   'Available fault current shall be calculated and labeled at the service main per NEC 110.9 and 110.10 (Miami-Dade Commercial PRG item: "Available fault current").',
   'Working space, dedicated equipment space, and clearance shall comply with NEC 110.26 (commercial scope only; not enforced as a separate line item on single-family residential per the Miami-Dade Residential PRG).',
   'Contractor name and Florida DBPR license number shall appear on each drawing sheet. Plans subject to PE seal trigger (commercial / multi-family / ≥277-480V scope) shall be digitally signed and sealed per Miami-Dade Digital Signing & Sealing policy.',
-  'EVSE equipment shall bear UL-2202 and UL-2594 listings; manufacturer cut sheets attached. Outdoor EVSE shall be rated for wet locations per NEC 210.8, 210.63, and 625.50.',
+  { text: 'EVSE equipment shall bear UL-2202 and UL-2594 listings; manufacturer cut sheets attached. Outdoor EVSE shall be rated for wet locations per NEC 210.8, 210.63, and 625.50.', when: evInScope },
   'Electrical plan sheets are identified with the discipline prefix "EL-" followed by the drawing number, per Miami-Dade Commercial Plan Review Guidelines convention.',
 ];
 
@@ -96,7 +97,7 @@ const MIAMI_DADE_CODE_REFERENCES: string[] = [
  * so the NEC 2014 / NEC 2020 lane split above ends. Only the lines carrying
  * that split are replaced; the rest go through `applyCodeCycle`.
  */
-const MIAMI_DADE_GENERAL_NOTES_NEC_2023: string[] = [
+const MIAMI_DADE_GENERAL_NOTES_NEC_2023: ManifestNote[] = [
   'All electrical work shall comply with NFPA-70 (2023 NEC) and the Florida Building Code, 9th edition (2026), as adopted by Miami-Dade County.',
   ...MIAMI_DADE_GENERAL_NOTES.slice(1),
 ];
@@ -240,7 +241,7 @@ export const miamiDadeManifest: AHJManifest = {
     // 2026-05-12, all 34 munis + unincorporated). Required for outdoor
     // pedestal/bollard EVSE statewide; default ON for any MD project. User
     // toggles off for indoor wall-mount-only installs.
-    hvhz_anchoring: () => true,
+    hvhz_anchoring: evInScope,
   },
 
   // -------------------------------------------------------------------------
@@ -305,10 +306,9 @@ export const miamiDadeManifest: AHJManifest = {
       id: 'md-equipment-listing',
       name: 'Equipment approval, listing & installation instructions (NEC 110.2-3) — EVSE UL listings',
       category: 'narrative',
-      required: () => true,
-      detect: (packet, attachments) =>
-        (packet.sectionKeys ?? []).includes('equipmentSpecs') ||
-        attachments.some((a) => a.artifactType === 'cut_sheet'),
+      required: evInScope,
+      detect: hasCutSheetUpload,
+      partial: specsCitedOnly,
     },
     {
       id: 'md-services-conductor-sizing',
@@ -350,11 +350,11 @@ export const miamiDadeManifest: AHJManifest = {
       name: 'Transformer overcurrent protection (NEC 450.3) — when xfmr in scope',
       category: 'plan',
       // Commercial / multi-family only — SFR typically lacks dedicated xfmrs.
-      // The M1 engine refines further on actual transformer-presence detection
-      // in a later commit; PR-4 manifest gates on building type.
-      required: (ctx) => ctx.buildingType !== 'single_family_residential',
+      // Required only with a transformer on the job (#148); the equipment
+      // schedule lists its OCPD only when there is one.
+      required: (ctx) => transformerInScope(ctx) && ctx.buildingType !== 'single_family_residential',
       detect: (packet) =>
-        (packet.sectionKeys ?? []).includes('equipmentSchedule'),
+        (packet.sectionKeys ?? []).includes('equipmentSchedule') && (packet.transformerCount ?? 0) > 0,
     },
     {
       id: 'md-wet-location',
@@ -362,9 +362,11 @@ export const miamiDadeManifest: AHJManifest = {
       category: 'narrative',
       // Commercial PRG explicit line item; Residential PRG covers indirectly
       // via NEC 210 but does not call it out as a standalone item.
-      required: (ctx) => ctx.buildingType !== 'single_family_residential',
+      required: (ctx) => evInScope(ctx) && ctx.buildingType !== 'single_family_residential',
+      // The wet-location sentence is in general note 8, which prints only on EV jobs.
       detect: (packet) =>
-        (packet.sectionKeys ?? []).includes('generalNotes'),
+        (packet.sectionKeys ?? []).includes('generalNotes')
+        && (packet.generalNotes ?? []).some((n) => /wet location/i.test(n)),
     },
     {
       id: 'md-noc',
@@ -381,7 +383,7 @@ export const miamiDadeManifest: AHJManifest = {
       category: 'upload',
       // ALL of MD County is HVHZ — required for any outdoor EVSE install.
       // Default-ON; user toggles off for indoor-only projects (Layer 2).
-      required: () => true,
+      required: evInScope,
       detect: (_packet, attachments) =>
         attachments.some((a) => a.artifactType === 'hvhz_anchoring'),
     },
@@ -425,7 +427,7 @@ export const miamiDadeManifest: AHJManifest = {
       name: 'EVEMS operational narrative (NEC 625.42) — when service-capacity-managed',
       category: 'narrative',
       // Always relevant when EVEMS is used; detect handles the conditional.
-      required: () => true,
+      required: evemsInScope,
       detect: (packet) =>
         (packet.sectionKeys ?? []).includes('evemsNarrative'),
     },
@@ -433,7 +435,7 @@ export const miamiDadeManifest: AHJManifest = {
       id: 'md-evse-labeling',
       name: 'EVSE labeling per NEC 625.43',
       category: 'plan',
-      required: () => true,
+      required: evInScope,
       detect: (packet) =>
         (packet.sectionKeys ?? []).includes('evseLabeling'),
     },

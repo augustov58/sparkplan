@@ -180,6 +180,8 @@ Per-AHJ packet defaults live in `data/ahj/` as **pure data + pure predicates** �
 
 The orchestrator threads `manifest?: AHJManifest` + `buildingType?: BuildingType` through `PermitPacketData`. Resolution chain for `generalNotes` / `codeReferences`: explicit data field → per-project override → manifest fallback (in the project's edition via `manifestTextForEdition`) → Sprint 2A baseline. `necEdition` comes from `resolveNecEdition` (see EVSE Load above), never the manifest. Backward compat is preserved by null-coalescing — projects without a `jurisdiction_id`, or with one not in the registry, render exactly as they did pre-PR-#51.
 
+Requirements and notes about EV, EVEMS or transformers gate on `evInScope` / `evemsInScope` / `transformerInScope` (`data/ahj/checks.ts`); a note with a condition is `{ text, when }`. A `detect()` checks content in the built packet (`PacketAST.sectionKeys` = pages actually rendered), and `partial` reports what's there when it isn't enough.
+
 When adding a new AHJ: drop in `data/ahj/{newAhj}.ts` matching the manifest shape, register it in `registry.ts`, populate `requirements: []` if the M1 engine is wired. **No engine changes required** — Sprint 2C is pure-data + engine; manifest scaffold is done.
 
 ---
@@ -313,6 +315,7 @@ Real mistakes made in this repo, each paired with the rule that prevents recurre
 | Multifamily 220.84 took electric heat at 65% and cited "220.84(C)(4)" for it — a 220.82(C) single-dwelling factor carried into a section that has none, understating demand (#133) | A factor valid in one Optional Method is not valid in another. Before applying any factor, find it in the text of the section you cite. 220.84(C)(5) = larger of A/C or heat at nameplate. |
 | The Part III aggregator, feeder sizing, the 220.84 total and the 220.87(2) new load read EVSE `load_watts` raw; the NEC 2023 7,200 VA floor reached only the MF-EV calc and the SF Optional Method | Every calc that turns an EVSE into load calls `getEvseLoadVA` (circuits: `withEvseLoadForEdition`) with the project edition. A new edition parameter with a default needs a grep of every production caller — tsc can't see a missing optional argument. |
 | Table 310.16 stored 14 AWG Cu at 20 A in the 60 °C column (code: 15 A), plus three other rows above the code value (and six aluminum cells below it); a 20 A load on 60 °C terminals sized 14 AWG | Every corrected `data/nec/` row gets a pinned test (`tests/table-310-16.test.ts`). Cross-check against the code book, not a web chart: some charts print aluminum as ~0.8 × copper. The test pins the whole table, so any edit must match the book. |
+| The jurisdiction checklist detected sections by their toggles and by pages that only cite a requirement, and had no EV/transformer axis: E-502 printed [X] for absent pages and EVSE items on a café build-out (#140, #148) | `PacketAST.sectionKeys` comes from the built pages; a `detect()` checks the content it names (`partial` when only cited). EV / EVEMS / transformer items gate on `AHJContext.hasEV` / `hasEVEMS` / `hasTransformer` from `data/ahj/checks.ts`. |
 | Docs updated with stale "Last Updated" dates; completed features left as "NEXT UP" | Every doc touch updates its date to today; every shipped feature flips its ROADMAP status in the same PR. |
 
 ---

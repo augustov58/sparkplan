@@ -21,6 +21,7 @@ import type {
   PacketAST,
   AttachmentSummary,
 } from '../data/ahj/types';
+import { noteText } from '../data/ahj/codeCycle';
 
 // ----------------------------------------------------------------------------
 // Fixtures
@@ -82,7 +83,7 @@ describe('Miami-Dade manifest — shape', () => {
   });
 
   it('lists at least one HVHZ-related general note (regression guard for H19/HVHZ-statewide-in-MD scope)', () => {
-    const joined = miamiDadeManifest.generalNotes.join('\n').toLowerCase();
+    const joined = miamiDadeManifest.generalNotes.map(noteText).join('\n').toLowerCase();
     expect(joined).toContain('hvhz');
     expect(joined).toContain('175 mph');
   });

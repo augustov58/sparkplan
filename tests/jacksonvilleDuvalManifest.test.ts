@@ -13,6 +13,7 @@ import type {
   AttachmentSummary,
   PacketAST,
 } from '../data/ahj/types';
+import { noteText } from '../data/ahj/codeCycle';
 
 // ----------------------------------------------------------------------------
 // Representative contexts
@@ -81,7 +82,7 @@ describe('Jacksonville/Duval manifest — structural shape', () => {
   });
 
   it('has Jacksonville-specific general notes (JaxEPICS, sub-permit, FFPC, flood)', () => {
-    const notes = jacksonvilleDuvalManifest.generalNotes.join(' ');
+    const notes = jacksonvilleDuvalManifest.generalNotes.map(noteText).join(' ');
     expect(notes).toMatch(/NFPA-70\s*\(2020 NEC\)/);
     expect(notes).toMatch(/Jacksonville Building Inspection Division/);
     expect(notes).toMatch(/JaxEPICS/);
@@ -477,10 +478,12 @@ describe('Jacksonville/Duval manifest — requirement detection', () => {
     ).toBe(true);
   });
 
-  it('detects riser diagram via section key', () => {
+  it('detects riser diagram via section key + AIC on every panel (#140)', () => {
     const req = find('jacksonville-duval-riser-diagram');
     expect(req.detect(emptyPacket, [])).toBe(false);
-    expect(req.detect({ sectionKeys: ['riserDiagram'] }, [])).toBe(true);
+    expect(req.detect({ sectionKeys: ['riserDiagram'], riserAIC: true }, [])).toBe(true);
+    expect(req.detect({ sectionKeys: ['riserDiagram'] }, [])).toBe(false);
+    expect(req.partial?.({ sectionKeys: ['riserDiagram'] }, [])).toBe('one-line present; panel AIC ratings missing');
   });
 
   it('detects panel schedule via section key', () => {

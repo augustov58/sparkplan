@@ -28,7 +28,7 @@ import {
 import { computeDefaultVisibility } from '../data/ahj/visibility';
 import { orlandoManifest } from '../data/ahj/orlando';
 import { pompanoManifest } from '../data/ahj/pompano';
-import type { AHJContext, AHJManifest } from '../data/ahj/types';
+import type { AHJContext, AHJManifest, ManifestNote } from '../data/ahj/types';
 
 const ctxOrlandoExistingSFR: AHJContext = {
   scope: 'existing-service',
@@ -157,7 +157,7 @@ interface OverrideResolutionInput {
 const resolveStringArray = (
   field: 'generalNotes' | 'codeReferences',
   input: OverrideResolutionInput,
-): string[] | undefined => {
+): ManifestNote[] | undefined => {
   return input.explicit ?? input.override ?? input.manifest?.[field];
 };
 

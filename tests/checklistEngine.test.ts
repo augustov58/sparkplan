@@ -100,6 +100,7 @@ describe('evaluatePacket — empty requirements (Orlando today)', () => {
       totalRequired: 0,
       passing: 0,
       failing: 0,
+      partial: 0,
     });
     expect(result.warnings).toEqual([]);
   });

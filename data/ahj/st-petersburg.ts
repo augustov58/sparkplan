@@ -67,7 +67,8 @@
  * @module data/ahj/st-petersburg
  */
 
-import type { AHJManifest, AHJContext } from './types';
+import type { AHJManifest, AHJContext, ManifestNote } from './types';
+import { evInScope, evemsInScope } from './checks';
 
 // ============================================================================
 // PREDICATE HELPERS
@@ -106,7 +107,7 @@ const isFullPlanReviewLane = (ctx: AHJContext): boolean =>
  *   - FL Statute 713.135 ($5,000 NOC threshold)
  *   - Pinellas Construction Licensing Board (pcclb.com)
  */
-const ST_PETERSBURG_GENERAL_NOTES: string[] = [
+const ST_PETERSBURG_GENERAL_NOTES: ManifestNote[] = [
   'All electrical work shall comply with NFPA-70 (2020 NEC) and the Florida Building Code 8th edition (2023), as adopted by the City of St. Petersburg.',
   'Voltage drop shall not exceed 3% on feeders, 3% on branch circuits, and 5% combined feeder + branch (NEC 215.2(A)(1) FPN; NEC 210.19(A)(1) FPN).',
   'All grounding and bonding shall comply with NEC Article 250. Grounding electrode conductor sized per NEC Table 250.66; equipment grounding conductor sized per NEC Table 250.122.',
@@ -114,8 +115,8 @@ const ST_PETERSBURG_GENERAL_NOTES: string[] = [
   'Contractor name and Florida DBPR license number, plus Pinellas County Construction Licensing Board (PCCLB) registration where applicable, shall appear on each drawing sheet.',
   'Recorded Notice of Commencement (Florida Statute 713.135) is required prior to the first inspection for any building-trade job exceeding $5,000.',
   'Permits are submitted electronically via the City of St. Petersburg Click2Gov / ePlan portal; applicants have ten (10) business days to upload plans after application acceptance.',
-  'EVSE equipment shall bear UL-2202 and UL-2594 listings; manufacturer cut sheets attached.',
-  'Mounted EVSE in outdoor / pedestal applications shall be anchored per a Florida Product Approval or original signed-and-sealed plans by a Florida-licensed Architect or Engineer. Pinellas County is in the Wind-Borne Debris Region (140 mph ultimate design wind speed per FBC 8th ed) but is NOT within the High-Velocity Hurricane Zone — Miami-Dade NOA tie-down details are acceptable but not required.',
+  { text: 'EVSE equipment shall bear UL-2202 and UL-2594 listings; manufacturer cut sheets attached.', when: evInScope },
+  { text: 'Mounted EVSE in outdoor / pedestal applications shall be anchored per a Florida Product Approval or original signed-and-sealed plans by a Florida-licensed Architect or Engineer. Pinellas County is in the Wind-Borne Debris Region (140 mph ultimate design wind speed per FBC 8th ed) but is NOT within the High-Velocity Hurricane Zone — Miami-Dade NOA tie-down details are acceptable but not required.', when: evInScope },
   'For projects in a FEMA Special Flood Hazard Area (St. Petersburg coastal AE zones, BFE = 9 ft), service equipment elevation shall be demonstrated above the Design Flood Elevation per Florida Building Code.',
 ];
 
@@ -291,7 +292,7 @@ export const stPetersburgManifest: AHJManifest = {
     // bollard installs; SFR wall-mount typically doesn't need separate
     // anchoring detail.
     hvhz_anchoring: (ctx) =>
-      ctx?.buildingType !== 'single_family_residential',
+      evInScope(ctx) && ctx?.buildingType !== 'single_family_residential',
     // Flood elevation: St. Pete coastal AE zones with BFE 9 ft.
     // AHJContext doesn't model flood zone — defensible default ON for
     // commercial (where waterfront sites are common); user can toggle
@@ -476,7 +477,7 @@ export const stPetersburgManifest: AHJManifest = {
       // Pinellas is WBDR but NOT HVHZ — FL Product Approval path. Gate
       // to non-SFR (outdoor pedestal / bollard EVSE); SFR wall-mount
       // typically does not require a separate anchoring detail.
-      required: (ctx) => ctx?.buildingType !== 'single_family_residential',
+      required: (ctx) => evInScope(ctx) && ctx?.buildingType !== 'single_family_residential',
       detect: (_packet, attachments) =>
         attachments.some((a) => a.artifactType === 'hvhz_anchoring'),
     },
@@ -504,7 +505,7 @@ export const stPetersburgManifest: AHJManifest = {
       category: 'upload',
       // Useful at any scope — even residential trade-permit lane
       // benefits from the cut sheet as listing evidence.
-      required: () => true,
+      required: evInScope,
       detect: (_packet, attachments) =>
         attachments.some((a) => a.artifactType === 'cut_sheet'),
     },
@@ -524,7 +525,7 @@ export const stPetersburgManifest: AHJManifest = {
       id: 'st-petersburg-evse-labeling',
       name: 'EVSE labeling per NEC 625.43 (visible at disconnect)',
       category: 'inspection',
-      required: () => true,
+      required: evInScope,
       detect: (packet) =>
         Boolean(packet.sectionKeys?.includes('evseLabeling')),
     },
@@ -535,7 +536,7 @@ export const stPetersburgManifest: AHJManifest = {
       // Conditional on EVEMS scope — context doesn't model "EVEMS
       // present?" yet, so leave required across all lanes and let the
       // section's data predicate hide it when irrelevant.
-      required: () => true,
+      required: evemsInScope,
       detect: (packet) =>
         Boolean(packet.sectionKeys?.includes('evemsNarrative')),
     },

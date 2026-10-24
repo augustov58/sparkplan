@@ -25,21 +25,22 @@
  * @module data/ahj/orlando
  */
 
-import type { AHJManifest } from './types';
+import type { AHJManifest, ManifestNote } from './types';
+import { evInScope, hasCutSheetUpload, labeledOneLine, oneLineMissingLabels, specsCitedOnly } from './checks';
 
 /**
  * Orlando-specific general notes — superset of Sprint 2A H12 + H13 with
  * Orlando-specific phrasing for permit submittal. Numbered list rendered
  * on the dedicated General Notes page.
  */
-const ORLANDO_GENERAL_NOTES: string[] = [
+const ORLANDO_GENERAL_NOTES: ManifestNote[] = [
   'All electrical work shall comply with NFPA-70 (2020 NEC) and the Florida Building Code 8th edition (2023), as adopted by the City of Orlando.',
   'Voltage drop shall not exceed 3% on feeders, 3% on branch circuits, and 5% combined feeder + branch (NEC 215.2(A)(1) FPN; NEC 210.19(A)(1) FPN).',
   'All grounding and bonding shall comply with NEC Article 250. Grounding electrode conductor sized per NEC Table 250.66; equipment grounding conductor sized per NEC Table 250.122.',
   'All raceways, conductors, and overcurrent protective devices shall be labeled with voltage, phase, amperage, and AIC rating per Orlando EV Permit Checklist #4.',
-  'Available fault current calculation provided per Orlando EV Permit Checklist #5 (new-service path) — see service-main fault current page.',
+  { text: 'Available fault current calculation provided per Orlando EV Permit Checklist #5 (new-service path) — see service-main fault current page.', when: (ctx) => ctx.scope === 'new-service' },
   'Contractor name and Florida DBPR license number shall appear on each drawing sheet per Orlando EV Permit Checklist #1.',
-  'EVSE equipment shall bear UL-2202 and UL-2594 listings; manufacturer cut sheets attached per Orlando EV Permit Checklist #7.',
+  { text: 'EVSE equipment shall bear UL-2202 and UL-2594 listings; manufacturer cut sheets attached per Orlando EV Permit Checklist #7.', when: evInScope },
   'Fire-rated penetrations shall use a UL-listed firestop assembly. Firestop schedule attached per Orlando EV Permit Checklist #8.',
 ];
 
@@ -199,7 +200,7 @@ export const orlandoManifest: AHJManifest = {
     // surfaces on intake when the design includes outdoor mounting. We
     // don't yet model "outdoor EVSE present?" on the context, so default
     // ON and let the user toggle off for indoor-only projects.
-    hvhz_anchoring: () => true,
+    hvhz_anchoring: evInScope,
   },
 
   // -------------------------------------------------------------------------
@@ -233,8 +234,8 @@ export const orlandoManifest: AHJManifest = {
       // Orlando checklist #4 — required on both existing-service and
       // new-service paths.
       required: () => true,
-      detect: (packet) =>
-        (packet.sectionKeys ?? []).includes('riserDiagram'),
+      detect: labeledOneLine(true),
+      partial: oneLineMissingLabels(true),
     },
     {
       id: 'orlando-load-calculation',
@@ -306,21 +307,11 @@ export const orlandoManifest: AHJManifest = {
       name: 'EVSE manufacturer cut sheets with UL-2202 + UL-2594 listings',
       category: 'upload',
       // Orlando checklist #7 — required on both paths.
-      required: () => true,
-      // Satisfied by either a cut_sheet / manufacturer_data upload OR by
-      // the SparkPlan-generated equipmentSpecs section (which embeds the
-      // UL-listing line items per H15).
-      detect: (packet, attachments) => {
-        const hasUpload = attachments.some(
-          (a) =>
-            a.artifactType === 'cut_sheet' ||
-            a.artifactType === 'manufacturer_data',
-        );
-        const hasSection = (packet.sectionKeys ?? []).includes(
-          'equipmentSpecs',
-        );
-        return hasUpload || hasSection;
-      },
+      required: evInScope,
+      // Satisfied by a cut_sheet / manufacturer_data upload. The equipmentSpecs
+      // sheet only cites the listings: 'partial' (#140).
+      detect: hasCutSheetUpload,
+      partial: specsCitedOnly,
     },
     {
       id: 'orlando-fire-stopping',
@@ -339,7 +330,7 @@ export const orlandoManifest: AHJManifest = {
       // bollard EVSE. Orlando is not in HVHZ proper, but the documentation
       // requirement still surfaces on intake when the design includes
       // outdoor mounting. Mirrors the `hvhz_anchoring` artifactTypePredicate.
-      required: () => true,
+      required: evInScope,
       detect: (_packet, attachments) =>
         attachments.some((a) => a.artifactType === 'hvhz_anchoring'),
     },

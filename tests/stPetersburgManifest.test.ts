@@ -21,6 +21,7 @@ import type {
   AttachmentSummary,
   PacketAST,
 } from '../data/ahj/types';
+import { noteText } from '../data/ahj/codeCycle';
 
 // ----------------------------------------------------------------------------
 // Representative contexts
@@ -85,7 +86,7 @@ describe('St. Petersburg manifest — structural shape', () => {
   });
 
   it('has St. Pete-specific general notes (NEC 2020 + Click2Gov + WBDR + AE flood)', () => {
-    const notes = stPetersburgManifest.generalNotes.join(' ');
+    const notes = stPetersburgManifest.generalNotes.map(noteText).join(' ');
     expect(notes).toMatch(/NFPA-70\s*\(2020 NEC\)/);
     expect(notes).toMatch(/St\.\s*Petersburg/);
     expect(notes).toMatch(/Click2Gov/);
@@ -96,7 +97,7 @@ describe('St. Petersburg manifest — structural shape', () => {
   });
 
   it('explicitly notes Pinellas is OUT of HVHZ (anchoring via FL Product Approval, not NOA)', () => {
-    const notes = stPetersburgManifest.generalNotes.join(' ');
+    const notes = stPetersburgManifest.generalNotes.map(noteText).join(' ');
     expect(notes).toMatch(/NOT within the High-Velocity Hurricane Zone/);
   });
 

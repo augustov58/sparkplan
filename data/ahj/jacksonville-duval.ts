@@ -95,7 +95,8 @@
  * @module data/ahj/jacksonville-duval
  */
 
-import type { AHJManifest } from './types';
+import type { AHJManifest, ManifestNote } from './types';
+import { evInScope, evemsInScope, labeledOneLine, oneLineMissingLabels } from './checks';
 
 // ============================================================================
 // NARRATIVE CONTENT
@@ -106,7 +107,7 @@ import type { AHJManifest } from './types';
  * (NEC 2020, FBC 8th ed, FFPC 8th ed) plus Jacksonville-specific intake
  * reminders (JaxEPICS routing, sub-permit model, NOC threshold).
  */
-const JACKSONVILLE_DUVAL_GENERAL_NOTES: string[] = [
+const JACKSONVILLE_DUVAL_GENERAL_NOTES: ManifestNote[] = [
   'All electrical work shall comply with NFPA-70 (2020 NEC) and the Florida Building Code 8th edition (2023), as adopted and enforced by the City of Jacksonville Building Inspection Division (Duval County consolidated jurisdiction).',
   'Voltage drop shall not exceed 3% on feeders, 3% on branch circuits, and 5% combined feeder + branch (NEC 215.2(A)(1) FPN; NEC 210.19(A)(1) FPN).',
   'All grounding and bonding shall comply with NEC Article 250. Grounding electrode conductor sized per NEC Table 250.66; equipment grounding conductor sized per NEC Table 250.122.',
@@ -116,7 +117,7 @@ const JACKSONVILLE_DUVAL_GENERAL_NOTES: string[] = [
   'Electrical work shall be filed as an electrical sub-permit associated with the primary building permit when applicable. Licensed electrical contractors shall pull their own sub-permit; owner-builder is permitted only for 1- or 2-family owner-occupied dwellings per Jacksonville Residential Permits guidance.',
   'Notice of Commencement (Florida Statute 713.13) is required and shall be recorded with the Duval County Clerk of Courts (or filed at BID) prior to the first inspection for any electrical job exceeding $5,000 contract value.',
   'For projects within a FEMA Special Flood Hazard Area, equipment elevation shall be demonstrated above the Design Flood Elevation per Florida Building Code. Elevation Certificates may be required prior to slab inspection and again at final inspection for construction in AO/AE/VE zones per Jacksonville Development Services floodplain regulations.',
-  'EVSE equipment shall bear UL-2202 and UL-2594 listings; manufacturer cut sheets attached. EVSE labeling shall comply with NEC 625.43; EVEMS narrative shall comply with NEC 625.42 where applicable.',
+  { text: 'EVSE equipment shall bear UL-2202 and UL-2594 listings; manufacturer cut sheets attached. EVSE labeling shall comply with NEC 625.43; EVEMS narrative shall comply with NEC 625.42 where applicable.', when: evInScope },
 ];
 
 /**
@@ -388,8 +389,8 @@ export const jacksonvilleDuvalManifest: AHJManifest = {
       name: 'One-line / riser diagram with AIC labels per node (NEC 110.9/110.10)',
       category: 'plan',
       required: () => true,
-      detect: (packet) =>
-        Boolean(packet.sectionKeys?.includes('riserDiagram')),
+      detect: labeledOneLine(false),
+      partial: oneLineMissingLabels(false),
     },
     {
       id: 'jacksonville-duval-panel-schedule',
@@ -468,7 +469,7 @@ export const jacksonvilleDuvalManifest: AHJManifest = {
       category: 'upload',
       // Useful at any scope; cut sheets are the standard listing evidence
       // for EVSE intake regardless of lane.
-      required: () => true,
+      required: evInScope,
       detect: (_packet, attachments) =>
         attachments.some((a) => a.artifactType === 'cut_sheet'),
     },
@@ -539,7 +540,7 @@ export const jacksonvilleDuvalManifest: AHJManifest = {
       id: 'jacksonville-duval-evse-labeling',
       name: 'EVSE labeling per NEC 625.43 (visible at disconnect)',
       category: 'inspection',
-      required: () => true,
+      required: evInScope,
       detect: (packet) =>
         Boolean(packet.sectionKeys?.includes('evseLabeling')),
     },
@@ -550,7 +551,7 @@ export const jacksonvilleDuvalManifest: AHJManifest = {
       // Conditional on EVEMS scope. AHJContext doesn't model "EVEMS
       // present?" — leave required across all lanes and let the section's
       // data predicate hide it when irrelevant.
-      required: () => true,
+      required: evemsInScope,
       detect: (packet) =>
         Boolean(packet.sectionKeys?.includes('evemsNarrative')),
     },

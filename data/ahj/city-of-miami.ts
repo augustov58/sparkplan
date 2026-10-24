@@ -78,7 +78,8 @@
  * @module data/ahj/city-of-miami
  */
 
-import type { AHJManifest } from './types';
+import type { AHJManifest, ManifestNote } from './types';
+import { evInScope, hasCutSheetUpload, labeledOneLine, oneLineMissingLabels, specsCitedOnly } from './checks';
 
 // ============================================================================
 // NARRATIVE CONTENT
@@ -89,14 +90,14 @@ import type { AHJManifest } from './types';
  * Miami HVHZ wind-anchoring callout, FL Statute 713 NOC threshold, and a
  * pointer to the City's iBuild digital permit portal.
  */
-const CITY_OF_MIAMI_GENERAL_NOTES: string[] = [
+const CITY_OF_MIAMI_GENERAL_NOTES: ManifestNote[] = [
   'All electrical work shall comply with NFPA-70 (2020 NEC) and the Florida Building Code, 8th edition (2023), as adopted by the City of Miami Building Department.',
-  'The City of Miami lies entirely within the High-Velocity Hurricane Zone (HVHZ) per FBC 8th ed (2023). Outdoor pedestal- or bollard-mounted EVSE shall be anchored per Florida Product Approval, Miami-Dade Notice of Acceptance (NOA) tie-down detail, or original signed-and-sealed structural anchorage plans rated for 175 mph (3-sec gust) Risk Category II minimum.',
+  { text: 'The City of Miami lies entirely within the High-Velocity Hurricane Zone (HVHZ) per FBC 8th ed (2023). Outdoor pedestal- or bollard-mounted EVSE shall be anchored per Florida Product Approval, Miami-Dade Notice of Acceptance (NOA) tie-down detail, or original signed-and-sealed structural anchorage plans rated for 175 mph (3-sec gust) Risk Category II minimum.', when: evInScope },
   'Voltage drop shall not exceed 3% on feeders, 3% on branch circuits, and 5% combined feeder + branch (NEC 215.2(A)(1) FPN; NEC 210.19(A)(1) FPN).',
   'All grounding and bonding shall comply with NEC Article 250. Grounding electrode conductor sized per NEC Table 250.66; equipment grounding conductor sized per NEC Table 250.122.',
-  'Available fault current shall be calculated and labeled at the service main per NEC 110.9 and 110.10 when new service is installed.',
+  { text: 'Available fault current shall be calculated and labeled at the service main per NEC 110.9 and 110.10 when new service is installed.', when: (ctx) => ctx.scope === 'new-service' },
   'Working space, dedicated equipment space, and clearance shall comply with NEC 110.26 (commercial / multi-family scope).',
-  'EVSE equipment shall bear UL-2202 / UL-2594 listings; manufacturer cut sheets shall be attached. Outdoor EVSE shall be rated for wet locations per NEC 210.8, 210.63, and 625.50.',
+  { text: 'EVSE equipment shall bear UL-2202 / UL-2594 listings; manufacturer cut sheets shall be attached. Outdoor EVSE shall be rated for wet locations per NEC 210.8, 210.63, and 625.50.', when: evInScope },
   'Contractor name and Florida DBPR license number shall appear on each drawing sheet. Plans subject to PE seal triggers (commercial / multi-family / ≥277-480V scope) shall be signed and sealed by a Florida-licensed Professional Engineer.',
   'Permit applications are submitted through the City of Miami iBuild digital permit portal. Notice of Commencement (Florida Statute 713) is required when the contract price exceeds $5,000.00.',
   'Plan review may be performed by the City of Miami Building Department or, at the applicant\'s election, by a private provider per Florida Statute 553.791 (Notice to Building Official + Certificate of Compliance required).',
@@ -247,7 +248,7 @@ export const cityOfMiamiManifest: AHJManifest = {
     // is inside the HVHZ. Required for outdoor pedestal/bollard EVSE.
     // Default ON regardless of context; user toggles off for indoor-only
     // wall-mount installs (Layer 2).
-    hvhz_anchoring: () => true,
+    hvhz_anchoring: evInScope,
 
     // NOC required for jobs > $5,000 per FL Statute 713. Defensible default
     // matches Orlando + Pompano + MD: non-SFR projects default ON; SFR
@@ -345,8 +346,8 @@ export const cityOfMiamiManifest: AHJManifest = {
       name: 'Riser diagram (one-line) with AIC labels per node',
       category: 'plan',
       required: () => true,
-      detect: (packet) =>
-        (packet.sectionKeys ?? []).includes('riserDiagram'),
+      detect: labeledOneLine(false),
+      partial: oneLineMissingLabels(false),
     },
     {
       id: 'city-of-miami-electrical-plan',
@@ -378,7 +379,7 @@ export const cityOfMiamiManifest: AHJManifest = {
       // ALL of Miami-Dade (including City of Miami) is HVHZ. Required for
       // any outdoor EVSE install. Default-ON; user toggles off via Layer 2
       // for indoor-only wall-mount projects.
-      required: () => true,
+      required: evInScope,
       detect: (_packet, attachments) =>
         attachments.some((a) => a.artifactType === 'hvhz_anchoring'),
     },
@@ -408,20 +409,11 @@ export const cityOfMiamiManifest: AHJManifest = {
       category: 'upload',
       // Required on every intake per NEC 110.2-3 + the published Miami EV
       // installation guidance.
-      required: () => true,
-      // Satisfied by either cut_sheet OR manufacturer_data upload, OR by
-      // the SparkPlan-generated equipmentSpecs section.
-      detect: (packet, attachments) => {
-        const hasUpload = attachments.some(
-          (a) =>
-            a.artifactType === 'cut_sheet' ||
-            a.artifactType === 'manufacturer_data',
-        );
-        const hasSection = (packet.sectionKeys ?? []).includes(
-          'equipmentSpecs',
-        );
-        return hasUpload || hasSection;
-      },
+      required: evInScope,
+      // Satisfied by a cut_sheet / manufacturer_data upload. The equipmentSpecs
+      // sheet only cites the listings: 'partial' (#140).
+      detect: hasCutSheetUpload,
+      partial: specsCitedOnly,
     },
 
     // -- Narrative / code-basis (category: 'narrative') -------------------

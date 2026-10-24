@@ -90,6 +90,14 @@ export interface AHJContext {
    * not fork on this — pass `undefined`.
    */
   subjurisdiction?: string;
+  /**
+   * Equipment on the job (#148), from `ahjEquipmentFlags` in `./checks`.
+   * EV / EVEMS / transformer requirements and notes apply only when set.
+   * `undefined` means the caller didn't say: those items stay in.
+   */
+  hasEV?: boolean;
+  hasEVEMS?: boolean;
+  hasTransformer?: boolean;
 }
 
 // ============================================================================
@@ -148,8 +156,16 @@ export type ArtifactTypePredicate = (ctx: AHJContext) => boolean;
 export interface PacketAST {
   /** Sheet IDs in render order (e.g., ['E-001', 'E-002', 'C-201', ...]). */
   sheetIds?: string[];
-  /** TOC entries by section key, for "is this section present?" detection. */
+  /** Sections whose pages the packet actually contains (#140), not the toggles. */
   sectionKeys?: SectionKey[];
+  /** Every feeder on the riser shows a conductor size (vacuously true with no feeders). */
+  riserConductors?: boolean;
+  /** Every panel on the riser shows an AIC rating. */
+  riserAIC?: boolean;
+  /** The general notes as printed (after `when` filtering). */
+  generalNotes?: string[];
+  /** Transformers on the equipment schedule and riser. */
+  transformerCount?: number;
   /** Pass-through hook for AST extensions the engine may want to inspect. */
   [key: string]: unknown;
 }
@@ -198,6 +214,13 @@ export interface AHJRequirement {
    */
   detect: (packet: PacketAST, attachments: AttachmentSummary[]) => boolean;
   /**
+   * Optional, checked when `detect` is false: what the packet has toward the
+   * requirement without satisfying it (e.g. listings cited, cut sheet not
+   * attached). A string makes the item 'partial' with that note; null keeps
+   * it 'fail'.
+   */
+  partial?: (packet: PacketAST, attachments: AttachmentSummary[]) => string | null;
+  /**
    * Optional: where the requirement is satisfied (sheet ID). Used by the
    * M1 renderer to link "✓ Site plan" → "C-201". Returns null when the
    * requirement is satisfied by something other than a sheet (e.g., a
@@ -220,6 +243,12 @@ export interface AHJRequirement {
  * (`C-`, `X-`, etc.) per Sprint 2B PR-3 v5; that system is independent.
  */
 export type AHJSheetIdPrefix = 'E-' | 'EL-' | 'ES-';
+
+/**
+ * A general note. `when` limits it to the projects it applies to (#147 a
+ * new-service-only note, #148 EVSE notes on non-EV jobs).
+ */
+export type ManifestNote = string | { text: string; when: (ctx: AHJContext) => boolean };
 
 /**
  * A jurisdiction's permit-packet manifest. Captures everything that varies
@@ -292,7 +321,7 @@ export interface AHJManifest {
    * (Sprint 2A H12 + H13). Override Sprint 2A's static FL-pilot stack here
    * with the AHJ's specific phrasing.
    */
-  generalNotes: string[];
+  generalNotes: ManifestNote[];
 
   /**
    * Applicable model-code references shown on the cover sheet's
@@ -308,7 +337,7 @@ export interface AHJManifest {
    * for NEC 2023 automatically; set an entry only when that rewrite would be
    * wrong (Miami-Dade's NEC 2014 / NEC 2020 lane split ends with FBC 9th).
    */
-  generalNotesByEdition?: Partial<Record<NecEdition, string[]>>;
+  generalNotesByEdition?: Partial<Record<NecEdition, ManifestNote[]>>;
   codeReferencesByEdition?: Partial<Record<NecEdition, string[]>>;
 
   // -------------------------------------------------------------------------

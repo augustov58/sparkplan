@@ -20,10 +20,11 @@ import type { AHJRequirement } from '../../data/ahj/types';
  *   required && !present  → 'fail'   (blocks AHJ acceptance — must fix)
  *   !required && present  → 'warn'   (optional artifact submitted; fine)
  *   !required && !present → 'na'     (not applicable, render dimmed/N/A)
+ *   required && partial   → 'partial' (some of it is in the packet — see `note`)
  *
  * The renderer maps these to the visual symbols ([X] / [ ] / MISSING / N/A).
  */
-export type ChecklistSeverity = 'pass' | 'warn' | 'fail' | 'na';
+export type ChecklistSeverity = 'pass' | 'warn' | 'fail' | 'partial' | 'na';
 
 /**
  * One evaluated requirement. Mirrors `AHJRequirement.id / name / category`
@@ -42,6 +43,8 @@ export interface ChecklistResultItem {
   present: boolean;
   /** Where it's satisfied (sheet ID). `null` when locator absent or NA. */
   location: string | null;
+  /** What's there toward an unmet requirement (`requirement.partial`); null otherwise. */
+  note?: string | null;
   /** Derived from (required, present) — see {@link ChecklistSeverity}. */
   severity: ChecklistSeverity;
 }
@@ -59,6 +62,8 @@ export interface ChecklistSummary {
   passing: number;
   /** items.filter(i => i.severity === 'fail').length */
   failing: number;
+  /** items.filter(i => i.severity === 'partial').length */
+  partial: number;
 }
 
 /**
