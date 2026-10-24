@@ -16,6 +16,13 @@ All notable changes to SparkPlan.
 
 ---
 
+## 2026-10-23: Right AHJ for City of Miami and City of Tampa; symbols print correctly (#135, #153)
+
+- **City of Miami projects get the City of Miami manifest (#135).** A project bound to the City of Miami printed the Miami-Dade County (Unincorporated — RER) manifest: County notes, "EL-" sheet numbers and a County header on the jurisdiction checklist. Projects bound to the City of Tampa matched no manifest. Jurisdictions now match on their city and building department, so a county building department gets the county manifest and a city its own; a city SparkPlan doesn't model yet gets the generic defaults rather than its county's.
+- **Symbols print correctly in every PDF (#153).** The PDF font has no "→", "≤", "≥", "√" or "Ω", so they printed as wrong characters: every subpanel row on a panel schedule read "’ PANEL Unit 101", and checklist items read "d3% feeder". They now print as "->", "<=", ">=", "sqrt" and "ohm", and warning icons are dropped, on the permit packet and every standalone PDF export.
+
+---
+
 ## 2026-10-21: NEC edition picker — Automatic follows Florida's code cycle (#141)
 
 - **One edition control.** The project page's NEC Edition picker now offers **Automatic** (default for every project, new and existing) plus explicit 2020 / 2023. Automatic follows Florida's adoption: NEC 2020 (FBC 8th Edition) through Dec 30, 2026, NEC 2023 (FBC 9th Edition) from Dec 31, 2026, Miami-Dade single-family included. A non-Florida jurisdiction uses its own adopted edition.

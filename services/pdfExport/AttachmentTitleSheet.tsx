@@ -68,7 +68,8 @@
  */
 
 import React from 'react';
-import { Page, View, Text, StyleSheet } from '@react-pdf/renderer';
+import { Page, View, StyleSheet } from '@react-pdf/renderer';
+import { Text } from './PdfText';
 import {
   BrandBar,
   themeStyles,

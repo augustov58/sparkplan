@@ -4,7 +4,8 @@
  */
 
 import React from 'react';
-import { Document, Page, Text, View, StyleSheet, Svg, G, Rect, Line } from '@react-pdf/renderer';
+import { Document, Page, View, StyleSheet, Svg, G, Rect, Line } from '@react-pdf/renderer';
+import { Text } from './PdfText';
 import type { Database } from '../../lib/database.types';
 import type { Panel, Circuit, Feeder, Transformer } from '../../lib/database.types';
 import { PanelScheduleDocument } from './PanelScheduleDocuments';

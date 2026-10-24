@@ -78,6 +78,7 @@ export const pompanoManifest: AHJManifest = {
   name: 'City of Pompano Beach',
   jurisdictionType: 'city',
   subjurisdiction: undefined,
+  coverage: { state: 'FL', cities: ['Pompano Beach'] },
 
   // Pompano uniformly cites NEC 2020 across all building types. No H34-style
   // residential/commercial fork (that's Miami-Dade).

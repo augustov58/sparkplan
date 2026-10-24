@@ -28,7 +28,8 @@
  */
 
 import React from 'react';
-import { Page, Text, View, StyleSheet, Document } from '@react-pdf/renderer';
+import { Page, View, StyleSheet, Document } from '@react-pdf/renderer';
+import { Text } from './PdfText';
 import type { Jurisdiction } from '../../types';
 import { DOCUMENT_LABELS, CALCULATION_LABELS } from '../../types';
 import {

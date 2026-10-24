@@ -128,6 +128,7 @@ export const orangeCountyManifest: AHJManifest = {
   name: 'Orange County (Unincorporated)',
   jurisdictionType: 'county',
   subjurisdiction: 'unincorporated',
+  coverage: { state: 'FL', county: 'Orange' },
 
   // Uniform NEC 2020 across building types. No H34-style residential/
   // commercial fork (that's Miami-Dade).

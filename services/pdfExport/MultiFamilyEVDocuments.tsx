@@ -5,7 +5,8 @@
  */
 
 import React from 'react';
-import { Document, Page, Text, View, StyleSheet } from '@react-pdf/renderer';
+import { Document, Page, View, StyleSheet } from '@react-pdf/renderer';
+import { Text } from './PdfText';
 import type { MultiFamilyEVResult } from '../calculations/multiFamilyEV';
 import { evseLoadCitation, type NecEdition } from '../../data/nec/evse-load';
 import {

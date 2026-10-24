@@ -41,10 +41,12 @@ The three merge services follow the calc-service contract: **pure, no DB, never 
 - One literal `AHJManifest` per jurisdiction; `orlando.ts` is the reference shape.
 - 4-axis `AHJContext`: `scope` / `lane` / `buildingType` / `subjurisdiction` — all baked in even when unused.
 - `visibility.ts::computeDefaultVisibility(manifest, ctx)` = Layer 1 (manifest defaults + predicates) overlaid by Layer 2 (user overrides in `projects.settings.section_overrides`). Returns `null` when no manifest matches → legacy `resolveSections(sectionPrefs)` path runs unchanged. **Preserve this null-coalescing backward compat in any change.**
-- **Adding an AHJ = data only.** Drop `data/ahj/<name>.ts` matching the manifest shape, register in `registry.ts`, add a `tests/<name>Manifest.test.ts` (copy an existing one). No engine changes.
+- **Adding an AHJ = data only.** Drop `data/ahj/<name>.ts` matching the manifest shape (set `coverage`: state + cities and/or county — `findManifestForJurisdiction` matches rows on it), register in `registry.ts`, add a `tests/<name>Manifest.test.ts` (copy an existing one). No engine changes.
 - Adding an artifact type: extend the `artifact_type` CHECK in a migration + add the upload card in `PermitPacketGenerator.tsx`. The merge pipeline picks it up generically.
 
 ## Hard rules
+
+- **`Text` comes from `services/pdfExport/PdfText`**, never `@react-pdf/renderer` — Helvetica is WinAnsi; the wrapper spells out → ≤ ≥ √ Ω Φ and emoji (#153).
 
 - **No procurement data on the packet.** Cost/pricing/$ fields belong on the Bid PDF only. AHJs never see money. (PR #43)
 - Sheet IDs use category bands with the `E-` prefix; Miami-Dade reserves `EL-` via `sheetIdPrefix`.

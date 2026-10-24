@@ -160,6 +160,7 @@ export const jacksonvilleDuvalManifest: AHJManifest = {
   name: 'City of Jacksonville / Duval County (Consolidated)',
   jurisdictionType: 'city',
   subjurisdiction: undefined,
+  coverage: { state: 'FL', cities: ['Jacksonville'], county: 'Duval' },
 
   necEdition: {
     single_family_residential: 'NEC 2020',

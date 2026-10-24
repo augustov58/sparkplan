@@ -69,6 +69,7 @@ export const orlandoManifest: AHJManifest = {
   name: 'City of Orlando',
   jurisdictionType: 'city',
   subjurisdiction: undefined,
+  coverage: { state: 'FL', cities: ['Orlando'] },
 
   // Orlando uniformly cites NEC 2020 across all building types (no Miami-Dade
   // -style H34 fork). Same value for SFR / multi-family / commercial.

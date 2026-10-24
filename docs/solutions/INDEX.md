@@ -5,6 +5,7 @@ Each entry: `- [title](file.md) — reusable rule`.
 
 <!-- Newest first -->
 - [Jurisdiction checklist reported pages and content the packet didn't have](2026-10-24-checklist-reports-what-was-built.md) — detect the content a requirement names in the built packet, never a toggle or a page that could hold it; after gating `required`, a not-required item that still detects is a proxy check
+- [Packet printed "’ PANEL" / "d3%"; City of Miami got the County manifest](2026-10-23-pdf-glyphs-and-manifest-match.md) — import `Text` from `services/pdfExport/PdfText`, never react-pdf; put an "every X" transform where every X passes (the render primitive), not at an entry point; match jurisdiction rows on city/state/ahj_name, never display-name substrings
 - [NEC edition came from four sources that disagreed](2026-10-21-nec-edition-single-resolver.md) — compute a jurisdiction/date-dependent value from one resolver at read time; count and classify every reader; never store the resolved value
 - [PE rulings: EVEMS setpoint ×1.25, 220.83(A)/(B), 220.84 heat at nameplate](2026-10-18-pe-rulings-hvac-evems.md) — find a factor in the cited section's text before applying it; when a ruling changes a quantity, grep every function and label for it, and decide a branch once when a calc runs twice (existing/total)
 - [Single-family E-102 ignored the existing/new dwelling choice](2026-10-13-sf-e102-ignored-existing-dwelling.md) — two pages reporting the same quantity must call the same function behind the same gate helper; test every occupancy branch
