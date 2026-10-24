@@ -87,7 +87,8 @@ import type {
   SectionKey,
 } from '../../data/ahj/types';
 import { manifestTextForEdition, resolveNecEdition } from '../../data/ahj/codeCycle';
-import type { NecEdition } from '../../data/nec/evse-load';
+import { ahjEquipmentFlags, serviceScope } from '../../data/ahj/checks';
+import { isEvseDescription, type NecEdition } from '../../data/nec/evse-load';
 
 export interface PermitPacketData {
   projectId: string;
@@ -415,7 +416,21 @@ export const generatePermitPacket = async (data: PermitPacketData): Promise<void
   // NEC edition: the caller's resolved edition (project pick, else Florida's
   // code cycle — see data/ahj/codeCycle.ts); Automatic when not supplied.
   const resolvedNecEdition: NecEdition = data.necEdition ?? resolveNecEdition(undefined, data.jurisdiction);
-  const manifestText = manifestTextForEdition(data.manifest, resolvedNecEdition);
+  // Sprint 2C M1: the AHJContext the checklist engine and the manifest's
+  // conditional notes read. Scope from the project's service modification
+  // (as the UI maps it, #140), lane from `data.permitMode` (Sprint 2A H17),
+  // equipment flags from the circuits and transformers (#148).
+  const ahjCtx: AHJContext = {
+    scope: serviceScope(data.serviceModificationType),
+    lane:
+      data.permitMode?.lane === 'pe-required'
+        ? 'pe_required'
+        : 'contractor_exemption',
+    buildingType: manifestBuildingType,
+    subjurisdiction: data.manifest?.subjurisdiction,
+    ...ahjEquipmentFlags(data.circuits, data.transformers?.length ?? 0, !!data.multiFamilyEVAnalysis),
+  };
+  const manifestText = manifestTextForEdition(data.manifest, resolvedNecEdition, ahjCtx);
   // Gap 3 (2026-05-16): three-step fallback so per-project overrides win
   // over the manifest default but lose to an explicit top-level field.
   // Empty arrays in the override fields count as "set" (intentional — the
@@ -482,23 +497,6 @@ export const generatePermitPacket = async (data: PermitPacketData): Promise<void
   // Sprint 2A H1+H2+H3: resolve section toggles. Cover is always-on (not in
   // the config). Default is all-on.
   const sections = resolveSections(data.sections);
-
-  // Sprint 2C M1: assemble the AHJContext the checklist engine consumes
-  // (`required(ctx)` forks on these axes). We derive scope from
-  // `data.nec22087Narrative` presence (the existing-service narrative is
-  // opt-in and gates the existing-service path) and lane from
-  // `data.permitMode` (Sprint 2A H17 contractor-exemption screening). When
-  // either upstream field is absent, conservative defaults keep the engine
-  // running — predicates can detect via ctx.buildingType regardless.
-  const ahjCtx: AHJContext = {
-    scope: data.nec22087Narrative ? 'existing-service' : 'new-service',
-    lane:
-      data.permitMode?.lane === 'pe-required'
-        ? 'pe_required'
-        : 'contractor_exemption',
-    buildingType: manifestBuildingType,
-    subjurisdiction: data.manifest?.subjurisdiction,
-  };
 
   // Sprint 2C M1: project attachments → AttachmentSummary[] for the engine.
   // The engine doesn't need the bytes; it only inspects artifactType (for
@@ -1103,14 +1101,17 @@ export const generatePermitPacket = async (data: PermitPacketData): Promise<void
 
   // Sprint 2A H11: EVSE labeling reference — applies to any EV-bank panel
   // (EVEMS-managed or not). Detection mirrors the H15 EquipmentSpecs card:
-  // EVEMS marker circuit OR panel name pattern. The labeling page itself
+  // EVEMS marker circuit OR panel name pattern, plus any panel with an EVSE
+  // circuit (#148: hasEV puts 625.43 labeling on the checklist, so a
+  // charger on "LP-1" needs the page too). The labeling page itself
   // is generic enough that even false positives just produce a useful
   // contractor reference.
   if (sections.evseLabeling) {
     const evNamePattern = /\b(ev|evse|charger|charging|level\s*2|l2)\b/i;
     const evseLabelingPanels: EVSELabelingPanelEntry[] = sortedPanels
       .filter(
-        p => isEVEMSManagedPanel(p.id, data.circuits) || evNamePattern.test(p.name),
+        p => isEVEMSManagedPanel(p.id, data.circuits) || evNamePattern.test(p.name)
+          || data.circuits.some(c => c.panel_id === p.id && isEvseDescription(c.description)),
       )
       .map(p => {
         // Count the charger branch circuits for this panel (filter out the
@@ -1389,21 +1390,25 @@ export const generatePermitPacket = async (data: PermitPacketData): Promise<void
   // Sprint 2C M1: assemble the read-only PacketAST the checklist engine
   // consumes. `sheetIds` is the flattened list of every allocated ID in
   // render order (engine locators walk this to find specific sheets);
-  // `sectionKeys` is the list of section toggles currently ON (engine
-  // detect predicates use this to check "is the load-calc section in the
-  // packet?"). We compute this AFTER allocation so it's authoritative,
-  // then mutate `packetAstRef.current` so the jurisdiction builder's
-  // render lambda (which closed over the ref above) sees the populated
-  // value when invoked below.
+  // `sectionKeys` lists the sections whose pages were built — not the
+  // toggles, since a builder skips its page when the data is missing (#140).
+  // We compute this AFTER allocation so it's authoritative, then mutate
+  // `packetAstRef.current` so the jurisdiction builder's render lambda
+  // (which closed over the ref above) sees the populated value when
+  // invoked below.
   const allSheetIds: string[] = allocatedIds.flat();
-  const enabledSectionKeys: SectionKey[] = (
-    Object.entries(sections) as Array<[SectionKey, boolean]>
-  )
-    .filter(([, on]) => on === true)
-    .map(([key]) => key);
+  const sectionKeyOf = (kind: PageKind): SectionKey | null =>
+    kind === 'cover' ? null : kind === 'panelSchedule' ? 'panelSchedules' : kind;
+  const builtSectionKeys: SectionKey[] = [
+    ...new Set(builders.map((b) => sectionKeyOf(b.kind)).filter((k): k is SectionKey => k !== null)),
+  ];
   packetAstRef.current = {
     sheetIds: allSheetIds,
-    sectionKeys: enabledSectionKeys,
+    sectionKeys: builtSectionKeys,
+    riserConductors: (data.feeders ?? []).every((f) => !!f.phase_conductor_size),
+    riserAIC: data.panels.length > 0 && data.panels.every((p) => !!p.aic_rating),
+    generalNotes: data.generalNotes ?? [],
+    transformerCount: data.transformers?.length ?? 0,
   };
 
   const pages: Array<{ name: string; element: React.ReactElement }> = builders.map((b, i) => ({

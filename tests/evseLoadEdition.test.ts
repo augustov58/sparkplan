@@ -16,6 +16,7 @@ import { ALL_MANIFESTS, getManifestById } from '../data/ahj/registry';
 import {
   applyCodeCycle,
   floridaNecEdition,
+  noteText,
   projectNecEdition,
   resolveNecEdition,
 } from '../data/ahj/codeCycle';
@@ -109,7 +110,7 @@ describe('applyCodeCycle', () => {
   it('no manifest text still cites NEC 2020 or FBC 8th under NEC 2023', () => {
     for (const m of ALL_MANIFESTS) {
       const texts = [
-        ...(m.generalNotesByEdition?.['2023'] ?? m.generalNotes),
+        ...(m.generalNotesByEdition?.['2023'] ?? m.generalNotes).map(noteText),
         ...(m.codeReferencesByEdition?.['2023'] ?? m.codeReferences),
         ...m.requirements.map((r) => r.name),
       ].map((t) => applyCodeCycle(t, '2023'));

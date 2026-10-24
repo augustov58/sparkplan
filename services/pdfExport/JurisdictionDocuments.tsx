@@ -250,6 +250,7 @@ const CATEGORY_ORDER: ChecklistResultItem['category'][] = [
  *   pass → `[X]` green
  *   fail → `MISSING` red (the renderer's blocker — caller MUST fix before AHJ)
  *   warn → `[+]` amber (optional artifact submitted; fine)
+ *   partial → `[~]` amber + "PARTIAL: <note>" (some of it is in the packet)
  *   na   → dimmed `—` gray  (not applicable; rendered for completeness)
  */
 const ChecklistRow: React.FC<{ item: ChecklistResultItem }> = ({ item }) => {
@@ -273,6 +274,11 @@ const ChecklistRow: React.FC<{ item: ChecklistResultItem }> = ({ item }) => {
       glyph = '[+]';
       textStyle = styles.itemText;
       break;
+    case 'partial':
+      glyphStyle = styles.glyphWarn;
+      glyph = '[~]';
+      textStyle = styles.itemText;
+      break;
     case 'na':
       glyphStyle = styles.glyphNa;
       glyph = '—';
@@ -290,6 +296,9 @@ const ChecklistRow: React.FC<{ item: ChecklistResultItem }> = ({ item }) => {
         ) : null}
         {item.severity === 'fail' ? (
           <Text style={styles.itemLocation}> — MISSING</Text>
+        ) : null}
+        {item.severity === 'partial' && item.note ? (
+          <Text style={styles.itemLocation}> — PARTIAL: {item.note}</Text>
         ) : null}
       </Text>
     </View>
@@ -351,12 +360,12 @@ const EngineDrivenChecklist: React.FC<{
 
 /**
  * Top-of-page summary banner: "X / Y required satisfied". Color-codes the
- * banner green when 0 failing, red when ≥1 failing.
+ * banner green when nothing is missing or partial, red otherwise.
  */
 const SummaryBanner: React.FC<{ result: ChecklistResult }> = ({ result }) => {
   const { summary } = result;
   if (summary.total === 0) return null;
-  const ok = summary.failing === 0;
+  const ok = summary.failing === 0 && summary.partial === 0;
   const bannerStyle = ok
     ? { ...styles.summaryBanner, ...styles.summaryBannerOk }
     : { ...styles.summaryBanner, ...styles.summaryBannerFail };
@@ -366,8 +375,11 @@ const SummaryBanner: React.FC<{ result: ChecklistResult }> = ({ result }) => {
         {summary.passing} of {summary.totalRequired} required items satisfied
       </Text>
       <Text style={styles.summaryLabel}>
-        {summary.failing > 0
-          ? `${summary.failing} missing — packet incomplete`
+        {!ok
+          ? `${[
+              summary.failing > 0 ? `${summary.failing} missing` : '',
+              summary.partial > 0 ? `${summary.partial} partial` : '',
+            ].filter(Boolean).join(', ')} — packet incomplete`
           : 'Packet complete'}
       </Text>
     </View>

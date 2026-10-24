@@ -30,7 +30,8 @@
  * @module data/ahj/davie
  */
 
-import type { AHJManifest } from './types';
+import type { AHJManifest, ManifestNote } from './types';
+import { evInScope, hasCutSheetUpload, specsCitedOnly } from './checks';
 
 /**
  * Davie-specific general notes — superset of the Sprint 2A FL-pilot stack with
@@ -38,7 +39,7 @@ import type { AHJManifest } from './types';
  * (M1 engine surfaces them conditionally on the checklist page, not as
  * blanket notes that would appear on residential packets too).
  */
-const DAVIE_GENERAL_NOTES: string[] = [
+const DAVIE_GENERAL_NOTES: ManifestNote[] = [
   'All electrical work shall comply with NFPA-70 (2020 NEC) and the Florida Building Code 8th edition (2023), as adopted by the Town of Davie.',
   'Voltage drop shall not exceed 3% on feeders, 3% on branch circuits, and 5% combined feeder + branch (NEC 215.2(A)(1) FPN; NEC 210.19(A)(1) FPN).',
   'All grounding and bonding shall comply with NEC Article 250. Grounding electrode conductor sized per NEC Table 250.66; equipment grounding conductor sized per NEC Table 250.122.',
@@ -46,7 +47,7 @@ const DAVIE_GENERAL_NOTES: string[] = [
   'Notice of Commencement required to be recorded for any job exceeding $5,000 per Florida Statute 713.',
   'A signed and notarized addendum form executed by both the contractor and the owner shall be submitted with the permit application (Town of Davie intake requirement).',
   'A copy of the property search / ownership record from the Broward County Property Appraiser (BCPA.NET) shall be included with the permit application.',
-  'EVSE equipment shall bear UL-2202 and UL-2594 listings; manufacturer submittals attached.',
+  { text: 'EVSE equipment shall bear UL-2202 and UL-2594 listings; manufacturer submittals attached.', when: evInScope },
   'Plan review stops include Electrical, Fire, and Planning & Zoning. Permits are submitted electronically via the Town of Davie Online Application Submittal portal (avolvecloud) per the mandatory 2026 submission policy.',
 ];
 
@@ -192,7 +193,7 @@ export const davieManifest: AHJManifest = {
 
     // HVHZ anchoring statewide for outdoor pedestal/bollard EVSE (H19).
     // Davie is in Broward (HVHZ zone) so this is firmly on.
-    hvhz_anchoring: () => true,
+    hvhz_anchoring: evInScope,
   },
 
   // -------------------------------------------------------------------------
@@ -248,6 +249,7 @@ export const davieManifest: AHJManifest = {
     {
       id: 'davie-electrical-floor-plan',
       name: 'Electrical floor plan with EV charger + panel location, conduit and wire size',
+      nameWithoutEV: 'Electrical floor plan with panel location, conduit and wire size',
       category: 'plan',
       required: () => true,
       detect: (_packet, attachments) =>
@@ -256,6 +258,7 @@ export const davieManifest: AHJManifest = {
     {
       id: 'davie-riser-and-load-calc',
       name: 'Riser diagram and load calculations (service + EV panel)',
+      nameWithoutEV: 'Riser diagram and load calculations (service + panels)',
       category: 'plan',
       required: () => true,
       detect: (packet) =>
@@ -268,14 +271,9 @@ export const davieManifest: AHJManifest = {
       id: 'davie-manufacturer-submittals',
       name: 'Manufacturer submittals for EV charger',
       category: 'plan',
-      required: () => true,
-      detect: (packet, attachments) =>
-        (packet.sectionKeys?.includes('equipmentSpecs') ?? false) ||
-        attachments.some(
-          (a) =>
-            a.artifactType === 'cut_sheet' ||
-            a.artifactType === 'manufacturer_data',
-        ),
+      required: evInScope,
+      detect: hasCutSheetUpload,
+      partial: specsCitedOnly,
     },
 
     // -----------------------------------------------------------------------
@@ -316,7 +314,7 @@ export const davieManifest: AHJManifest = {
       category: 'narrative',
       // Statewide H19 — applies to any outdoor pedestal/bollard EVSE. Davie
       // is in Broward (HVHZ), so the documentation requirement is firm.
-      required: () => true,
+      required: evInScope,
       detect: (_packet, attachments) =>
         attachments.some((a) => a.artifactType === 'hvhz_anchoring'),
     },
@@ -332,7 +330,7 @@ export const davieManifest: AHJManifest = {
       //   1. Knox Box (KLS-4505) callout on plans
       //   2. Signage on switchboard: "main breaker = emergency disconnect"
       //   3. Breaker locking-means per NEC 625.42 (Davie quotes this directly)
-      required: (ctx) => ctx.buildingType === 'commercial',
+      required: (ctx) => evInScope(ctx) && ctx.buildingType === 'commercial',
       // Engine detects via the EVEMS narrative section being present (Sprint
       // 2A H10 covers NEC 625.42 narrative) — the explicit Knox/signage
       // callouts ride on the commercial-conditional notes block.
@@ -360,7 +358,7 @@ export const davieManifest: AHJManifest = {
       // returns false by default → surfaces as "Action required" until the
       // contractor confirms via site-plan annotation. Future enhancement: read
       // EVSE count and only require when >= 2 dispensers.
-      required: (ctx) => ctx.buildingType === 'commercial',
+      required: (ctx) => evInScope(ctx) && ctx.buildingType === 'commercial',
       detect: () => false,
     },
   ],

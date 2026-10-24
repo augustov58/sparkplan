@@ -49,6 +49,7 @@ import { useMeters } from '../hooks/useMeters';
 import { useProfile } from '../hooks/useProfile';
 import { useProjectNecEdition } from '../hooks/useProjectNecEdition';
 import { manifestTextForEdition } from '../data/ahj/codeCycle';
+import { ahjEquipmentFlags, serviceScope } from '../data/ahj/checks';
 import { JurisdictionAndAHJPanel } from './JurisdictionAndAHJPanel';
 import type { MultiFamilyEVResult } from '../services/calculations/multiFamilyEV';
 import {
@@ -580,9 +581,7 @@ export const PermitPacketGenerator: React.FC<PermitPacketGeneratorProps> = ({ pr
     // 'service-upgrade' folds into 'existing-service' because Orlando's
     // EV-fed-from-existing path requires the NEC 220.87 narrative; new-service
     // is the only path that triggers the available-fault-current calc.
-    const rawScope = currentProject?.settings?.service_modification_type;
-    const scope: ServiceModificationType =
-      rawScope === 'new-service' ? 'new-service' : 'existing-service';
+    const scope: ServiceModificationType = serviceScope(currentProject?.settings?.service_modification_type);
 
     // Map exemption-screening lane ('exempt' | 'pe-required') into the
     // manifest's ContractorLane axis. Defaults to 'contractor_exemption' for
@@ -623,7 +622,15 @@ export const PermitPacketGenerator: React.FC<PermitPacketGeneratorProps> = ({ pr
       buildingType = 'single_family_residential';
     }
 
-    return { scope, lane, buildingType, subjurisdiction: undefined };
+    // #148: EV / EVEMS / transformer items apply only when the job has them
+    // (same derivation as the generator's context).
+    const hasEvAnalysis = !!(currentProject?.settings?.residential as
+      | { mfEvCalculation?: { result?: unknown } }
+      | undefined)?.mfEvCalculation?.result;
+    return {
+      scope, lane, buildingType, subjurisdiction: undefined,
+      ...ahjEquipmentFlags(circuits, transformers.length, hasEvAnalysis),
+    };
   })();
 
   // Compute visibility: manifest defaults + user overrides. When no
@@ -1056,7 +1063,7 @@ export const PermitPacketGenerator: React.FC<PermitPacketGeneratorProps> = ({ pr
         manifest: activeManifest ?? undefined,
         buildingType: ahjContext.buildingType,
         // Notes / code refs in the project's edition (data/ahj/codeCycle.ts).
-        ...manifestTextForEdition(activeManifest, projectEdition),
+        ...manifestTextForEdition(activeManifest, projectEdition, ahjContext),
         necEdition: projectEdition,
         // Gap 3 (2026-05-16): per-project AHJ-string overrides. Render-time
         // resolution chain inside permitPacketGenerator.tsx:

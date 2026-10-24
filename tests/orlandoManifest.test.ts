@@ -284,7 +284,7 @@ describe('Orlando manifest — requirement detection', () => {
     ).toBe(true);
   });
 
-  it('detects EVSE cut sheets via cut_sheet OR manufacturer_data OR equipmentSpecs section', () => {
+  it('detects EVSE cut sheets via cut_sheet OR manufacturer_data upload; equipmentSpecs alone is partial', () => {
     const req = find('orlando-evse-cut-sheets');
     expect(req.detect(emptyPacket, [])).toBe(false);
 
@@ -298,8 +298,9 @@ describe('Orlando manifest — requirement detection', () => {
       ]),
     ).toBe(true);
 
-    // Section-only path
-    expect(req.detect({ sectionKeys: ['equipmentSpecs'] }, [])).toBe(true);
+    // #140: the specs sheet only cites listings — partial, not satisfied.
+    expect(req.detect({ sectionKeys: ['equipmentSpecs'] }, [])).toBe(false);
+    expect(req.partial?.({ sectionKeys: ['equipmentSpecs'] }, [])).toMatch(/cut sheet not attached/);
   });
 
   it('detects HVHZ anchoring via hvhz_anchoring attachment', () => {

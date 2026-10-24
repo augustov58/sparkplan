@@ -72,7 +72,8 @@
  * @module data/ahj/orange-county
  */
 
-import type { AHJManifest } from './types';
+import type { AHJManifest, ManifestNote } from './types';
+import { evInScope, hasCutSheetUpload, labeledOneLine, oneLineMissingLabels, specsCitedOnly } from './checks';
 
 // ============================================================================
 // NARRATIVE CONTENT
@@ -83,14 +84,14 @@ import type { AHJManifest } from './types';
  * OC-specific NOC threshold ($2,500), FastTrack submittal callout, and
  * Section 9-86 electrical-permit-trigger reference.
  */
-const ORANGE_COUNTY_GENERAL_NOTES: string[] = [
+const ORANGE_COUNTY_GENERAL_NOTES: ManifestNote[] = [
   'All electrical work shall comply with NFPA-70 (2020 NEC) and the Florida Building Code 8th edition (2023), as adopted by Orange County via Chapter 9 of the Code of Ordinances and enforced by the Orange County Division of Building Safety.',
   'An electrical permit is required for any electrical construction, installation, extension, or change to existing wiring per Orange County Code of Ordinances Section 9-86(a). Permits are submitted through the OC FastTrack online portal.',
   'Notice of Commencement (Florida Statute 713) is required when the value of work exceeds $2,500.00 per the Orange County Electrical Permit application — note this threshold is LOWER than the $5,000 default cited by most Florida AHJs.',
   'Voltage drop shall not exceed 3% on feeders, 3% on branch circuits, and 5% combined feeder + branch (NEC 215.2(A)(1) FPN; NEC 210.19(A)(1) FPN).',
   'All grounding and bonding shall comply with NEC Article 250. Grounding electrode conductor sized per NEC Table 250.66; equipment grounding conductor sized per NEC Table 250.122.',
   'Contractor name and Florida DBPR license number, plus Orange County Qualifying Business (QB) license number and the Master Electrician active certificate-holder name, shall appear on each drawing sheet and on the electrical permit application (form 23-30).',
-  'EVSE equipment shall bear UL-2202 and UL-2594 listings; manufacturer cut sheets attached.',
+  { text: 'EVSE equipment shall bear UL-2202 and UL-2594 listings; manufacturer cut sheets attached.', when: evInScope },
   'Mounted equipment shall comply with Florida Product Approval requirements per the Florida Building Code. Orange County is NOT within the High-Velocity Hurricane Zone — design wind speed is approximately 130–140 mph (3-sec gust, Risk Cat II) per ASCE 7-22 / FBC 8th ed (2023).',
 ];
 
@@ -259,7 +260,7 @@ export const orangeCountyManifest: AHJManifest = {
     // overwhelmingly wall-mount in attached garages, not pedestal).
     // Contrast: Pompano + Miami-Dade default ON everywhere.
     hvhz_anchoring: (ctx) =>
-      ctx.buildingType !== 'single_family_residential',
+      evInScope(ctx) && ctx.buildingType !== 'single_family_residential',
   },
 
   // -------------------------------------------------------------------------
@@ -321,12 +322,13 @@ export const orangeCountyManifest: AHJManifest = {
       name: 'Riser diagram (one-line) with AIC labels per node',
       category: 'plan',
       required: () => true,
-      detect: (packet) =>
-        (packet.sectionKeys ?? []).includes('riserDiagram'),
+      detect: labeledOneLine(false),
+      partial: oneLineMissingLabels(false),
     },
     {
       id: 'orange-county-load-calculation',
       name: 'Load calculations for the EVSE (NEC 220 + 625)',
+      nameWithoutEV: 'Load calculations (NEC Article 220)',
       category: 'plan',
       required: () => true,
       detect: (packet) =>
@@ -368,6 +370,7 @@ export const orangeCountyManifest: AHJManifest = {
     {
       id: 'orange-county-site-plan',
       name: 'Site plan showing EV charger + panel locations',
+      nameWithoutEV: 'Site plan showing panel locations',
       category: 'upload',
       // OC FastTrack accepts a single set of signed-and-sealed construction
       // documents; site plan included for new circuits / EVSE location.
@@ -414,14 +417,9 @@ export const orangeCountyManifest: AHJManifest = {
       id: 'orange-county-equipment-listing',
       name: 'Equipment approval, listing & installation instructions (NEC 110.2-3) — EVSE UL-2202 / UL-2594',
       category: 'narrative',
-      required: () => true,
-      detect: (packet, attachments) =>
-        (packet.sectionKeys ?? []).includes('equipmentSpecs') ||
-        attachments.some(
-          (a) =>
-            a.artifactType === 'cut_sheet' ||
-            a.artifactType === 'manufacturer_data',
-        ),
+      required: evInScope,
+      detect: hasCutSheetUpload,
+      partial: specsCitedOnly,
     },
 
     // -- Conditional anchoring (category: 'upload') -----------------------
@@ -434,7 +432,7 @@ export const orangeCountyManifest: AHJManifest = {
       // installs are overwhelmingly indoor wall-mount and don't need
       // separate anchoring documentation. (Contrast Pompano + Miami-Dade
       // where this defaults ON regardless of building type.)
-      required: (ctx) => ctx.buildingType !== 'single_family_residential',
+      required: (ctx) => evInScope(ctx) && ctx.buildingType !== 'single_family_residential',
       detect: (_packet, attachments) =>
         attachments.some((a) => a.artifactType === 'hvhz_anchoring'),
     },

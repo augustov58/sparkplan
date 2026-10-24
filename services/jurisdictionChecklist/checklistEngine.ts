@@ -41,8 +41,9 @@ import type {
  * Derive the (required, present) → severity mapping. Centralized so the
  * renderer + tests agree on a single source of truth.
  */
-function deriveSeverity(required: boolean, present: boolean): ChecklistSeverity {
+function deriveSeverity(required: boolean, present: boolean, partial: boolean): ChecklistSeverity {
   if (required && present) return 'pass';
+  if (required && partial) return 'partial';
   if (required && !present) return 'fail';
   if (!required && present) return 'warn';
   return 'na';
@@ -102,6 +103,18 @@ function evaluateRequirement(
     `requirement '${req.id}'.detect`,
   );
 
+  // `partial(packet, attachments)` is optional and only asked when the
+  // requirement isn't met. On throw, no note: the item stays 'fail'.
+  let note: string | null = null;
+  if (required && !present && typeof req.partial === 'function') {
+    note = safeInvoke(
+      () => req.partial!(packet, attachments) || null,
+      null,
+      warnings,
+      `requirement '${req.id}'.partial`,
+    );
+  }
+
   // `locator(packet)` is optional. On throw OR when not supplied, the
   // location is `null` — the renderer simply omits the "see X-NNN" link.
   let location: string | null = null;
@@ -119,12 +132,13 @@ function evaluateRequirement(
 
   return {
     id: req.id,
-    name: req.name,
+    name: ctx?.hasEV === false && req.nameWithoutEV ? req.nameWithoutEV : req.name,
     category: req.category,
     required,
     present,
     location,
-    severity: deriveSeverity(required, present),
+    note,
+    severity: deriveSeverity(required, present, note !== null),
   };
 }
 
@@ -135,16 +149,19 @@ function buildSummary(items: ChecklistResultItem[]): ChecklistSummary {
   let totalRequired = 0;
   let passing = 0;
   let failing = 0;
+  let partial = 0;
   for (const item of items) {
     if (item.required) totalRequired += 1;
     if (item.severity === 'pass') passing += 1;
     if (item.severity === 'fail') failing += 1;
+    if (item.severity === 'partial') partial += 1;
   }
   return {
     total: items.length,
     totalRequired,
     passing,
     failing,
+    partial,
   };
 }
 

@@ -17,6 +17,7 @@ import type {
   AHJManifest,
   AHJRequirement,
 } from '../data/ahj/types';
+import { noteText } from '../data/ahj/codeCycle';
 
 // ----------------------------------------------------------------------------
 // Context fixtures
@@ -103,7 +104,7 @@ describe('hillsboroughTampaManifest — shape', () => {
     expect(hillsboroughTampaManifest.generalNotes.length).toBeGreaterThan(0);
     // Trade-permit lane satisfies the "scope narrative" requirement via
     // generalNotes — make sure NEC + FBC references are present.
-    const notes = hillsboroughTampaManifest.generalNotes.join(' ');
+    const notes = hillsboroughTampaManifest.generalNotes.map(noteText).join(' ');
     expect(notes).toMatch(/NFPA-70/);
     expect(notes).toMatch(/Florida Building Code/);
   });

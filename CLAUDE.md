@@ -181,6 +181,8 @@ Per-AHJ packet defaults live in `data/ahj/` as **pure data + pure predicates** �
 
 The orchestrator threads `manifest?: AHJManifest` + `buildingType?: BuildingType` through `PermitPacketData`. Resolution chain for `generalNotes` / `codeReferences`: explicit data field → per-project override → manifest fallback (in the project's edition via `manifestTextForEdition`) → Sprint 2A baseline. `necEdition` comes from `resolveNecEdition` (see EVSE Load above), never the manifest. Backward compat is preserved by null-coalescing — projects without a `jurisdiction_id`, or with one not in the registry, render exactly as they did pre-PR-#51.
 
+Requirements and notes about EV, EVEMS or transformers gate on `evInScope` / `evemsInScope` / `transformerInScope` (`data/ahj/checks.ts`); a note with a condition is `{ text, when }`. A `detect()` checks content in the built packet (`PacketAST.sectionKeys` = pages actually rendered), and `partial` reports what's there when it isn't enough.
+
 When adding a new AHJ: drop in `data/ahj/{newAhj}.ts` matching the manifest shape (including `coverage`), register it in `registry.ts`, populate `requirements: []` if the M1 engine is wired. **No engine changes required** — Sprint 2C is pure-data + engine; manifest scaffold is done.
 
 ---
@@ -316,6 +318,7 @@ Real mistakes made in this repo, each paired with the rule that prevents recurre
 | Table 310.16 stored 14 AWG Cu at 20 A in the 60 °C column (code: 15 A), plus three other rows above the code value (and six aluminum cells below it); a 20 A load on 60 °C terminals sized 14 AWG | Every corrected `data/nec/` row gets a pinned test (`tests/table-310-16.test.ts`). Cross-check against the code book, not a web chart: some charts print aluminum as ~0.8 × copper. The test pins the whole table, so any edit must match the book. |
 | Manifest lookup substring-matched display names in registry order: City of Miami got the Miami-Dade County manifest, City of Tampa got none (#135); tests used made-up names, never the real rows | Match jurisdiction rows on `state` / `city` / `ahj_name` via each manifest's `coverage`. Tests of a lookup use the real rows' strings. |
 | `→`, `≤`, `≥`, `√` printed as `’`, `d`, `e` in the packet (Helvetica is WinAnsi); "→ PANEL x" is stored in the DB, so fixing source strings could never cover it (#153) | Import `Text` from `services/pdfExport/PdfText`. A transform meant for every X goes where every X passes, not at an entry point. |
+| The jurisdiction checklist detected sections by their toggles and by pages that only cite a requirement, and had no EV/transformer axis: E-502 printed [X] for absent pages and EVSE items on a café build-out (#140, #148) | `PacketAST.sectionKeys` comes from the built pages; a `detect()` checks the content it names (`partial` when only cited). EV / EVEMS / transformer items gate on `AHJContext.hasEV` / `hasEVEMS` / `hasTransformer` from `data/ahj/checks.ts`. |
 | Docs updated with stale "Last Updated" dates; completed features left as "NEXT UP" | Every doc touch updates its date to today; every shipped feature flips its ROADMAP status in the same PR. |
 
 ---

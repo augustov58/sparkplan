@@ -36,19 +36,20 @@
  * @module data/ahj/pompano
  */
 
-import type { AHJManifest } from './types';
+import type { AHJManifest, ManifestNote } from './types';
+import { evInScope, hasCutSheetUpload, labeledOneLine, oneLineMissingLabels, specsCitedOnly } from './checks';
 
 /**
  * Pompano-specific general notes. Includes statewide statutory language
  * (NEC 2020, FBC 8th ed) plus Broward / Pompano-specific intake reminders
  * (3-permit-form, HOA letter, anchoring documentation path).
  */
-const POMPANO_GENERAL_NOTES: string[] = [
+const POMPANO_GENERAL_NOTES: ManifestNote[] = [
   'All electrical work shall comply with NFPA-70 (2020 NEC) and the Florida Building Code 8th edition (2023), as adopted by the City of Pompano Beach and Broward County.',
   'Voltage drop shall not exceed 3% on feeders, 3% on branch circuits, and 5% combined feeder + branch (NEC 215.2(A)(1) FPN; NEC 210.19(A)(1) FPN).',
   'All grounding and bonding shall comply with NEC Article 250. Grounding electrode conductor sized per NEC Table 250.66; equipment grounding conductor sized per NEC Table 250.122.',
   'Contractor name and Florida DBPR license number shall appear on each drawing sheet (Sprint 2A C8).',
-  'Anchoring of all mounted EVSE shall be documented via a Florida Product Approval, a Miami-Dade Notice of Acceptance (NOA) tie-down detail, OR original signed-and-sealed plans by a Florida-licensed Architect or Engineer per Pompano Beach Vehicle Charging Station Checklist item #6.',
+  { text: 'Anchoring of all mounted EVSE shall be documented via a Florida Product Approval, a Miami-Dade Notice of Acceptance (NOA) tie-down detail, OR original signed-and-sealed plans by a Florida-licensed Architect or Engineer per Pompano Beach Vehicle Charging Station Checklist item #6.', when: evInScope },
   'Permit intake requires TWO Broward County Uniform Permit Applications (Building-Checked + Electric-Checked) plus a Zoning Compliance Permit Application. Multi-family and commercial installs additionally require a Fire Review Application.',
   'Notice of Commencement (Florida Statute 713) is required when the contract price exceeds $5,000.00 per Pompano Beach Vehicle Charging Station Checklist.',
   'Inspections will be scheduled across multiple trades: Building (footings, tie-downs, final structural), Zoning final, Electrical (rough + final), and Fire final (when applicable).',
@@ -199,7 +200,7 @@ export const pompanoManifest: AHJManifest = {
     // per Pompano #6. Default ON regardless of context; the user can toggle
     // off if the install is purely indoor wall-mount with no separate
     // anchoring detail required (rare).
-    hvhz_anchoring: () => true,
+    hvhz_anchoring: evInScope,
 
     // Zoning Compliance Permit Application required on every Pompano
     // intake regardless of building type (Sprint 2C H21).
@@ -295,6 +296,7 @@ export const pompanoManifest: AHJManifest = {
     {
       id: 'pompano-site-plan',
       name: 'Site plan or survey showing EVSE location',
+      nameWithoutEV: 'Site plan or survey showing electrical equipment locations',
       category: 'plan',
       // Pompano #9 — required on every intake.
       required: () => true,
@@ -318,8 +320,8 @@ export const pompanoManifest: AHJManifest = {
       name: 'Riser diagram (one-line) with AIC labels per node',
       category: 'plan',
       required: () => true,
-      detect: (packet) =>
-        (packet.sectionKeys ?? []).includes('riserDiagram'),
+      detect: labeledOneLine(false),
+      partial: oneLineMissingLabels(false),
     },
     {
       id: 'pompano-electrical-plan',
@@ -339,6 +341,7 @@ export const pompanoManifest: AHJManifest = {
     {
       id: 'pompano-load-calculation',
       name: 'Load calculations for the EVSE',
+      nameWithoutEV: 'Load calculations (NEC Article 220)',
       category: 'plan',
       required: () => true,
       detect: (packet) =>
@@ -350,7 +353,7 @@ export const pompanoManifest: AHJManifest = {
       category: 'plan',
       // Pompano #6 — required for any mounted EVSE (default ON statewide
       // per Sprint 2C H19 cross-validation).
-      required: () => true,
+      required: evInScope,
       detect: (_packet, attachments) =>
         attachments.some((a) => a.artifactType === 'hvhz_anchoring'),
     },
@@ -361,20 +364,11 @@ export const pompanoManifest: AHJManifest = {
       name: 'Installation manual and manufacturer specifications',
       category: 'upload',
       // Pompano #8 — required on every intake.
-      required: () => true,
-      // Satisfied by either cut_sheet OR manufacturer_data upload, OR by
-      // the SparkPlan-generated equipmentSpecs section.
-      detect: (packet, attachments) => {
-        const hasUpload = attachments.some(
-          (a) =>
-            a.artifactType === 'cut_sheet' ||
-            a.artifactType === 'manufacturer_data',
-        );
-        const hasSection = (packet.sectionKeys ?? []).includes(
-          'equipmentSpecs',
-        );
-        return hasUpload || hasSection;
-      },
+      required: evInScope,
+      // Satisfied by a cut_sheet / manufacturer_data upload. The equipmentSpecs
+      // sheet only cites the listings: 'partial' (#140).
+      detect: hasCutSheetUpload,
+      partial: specsCitedOnly,
     },
 
     // -- Narrative / code-basis (category: 'narrative') -------------------

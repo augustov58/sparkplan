@@ -14,7 +14,7 @@
  */
 
 import type { NecEdition } from '../nec/evse-load';
-import type { AHJManifest } from './types';
+import type { AHJContext, AHJManifest, ManifestNote } from './types';
 
 export interface CodeCycle {
   /** First day (local, YYYY-MM-DD) the cycle applies */
@@ -113,18 +113,26 @@ export function applyCodeCycleList(
   return list?.map((s) => applyCodeCycle(s, edition));
 }
 
+/** A general note's text, conditional or not. */
+export const noteText = (n: ManifestNote): string => (typeof n === 'string' ? n : n.text);
+
 /**
  * A manifest's general notes and code references for `edition`: the
  * per-edition replacement when the manifest has one, else the authored text,
- * then `applyCodeCycle`.
+ * then `applyCodeCycle`. Notes with a `when` are kept only if it holds for
+ * `ctx` (all kept when no ctx is given).
  */
 export function manifestTextForEdition(
   manifest: Pick<AHJManifest, 'generalNotes' | 'codeReferences' | 'generalNotesByEdition' | 'codeReferencesByEdition'> | null | undefined,
   edition: NecEdition,
+  ctx?: AHJContext,
 ): { generalNotes?: string[]; codeReferences?: string[] } {
   if (!manifest) return {};
+  const notes = (manifest.generalNotesByEdition?.[edition] ?? manifest.generalNotes)
+    .filter((n) => typeof n === 'string' || !ctx || n.when(ctx))
+    .map(noteText);
   return {
-    generalNotes: applyCodeCycleList(manifest.generalNotesByEdition?.[edition] ?? manifest.generalNotes, edition),
+    generalNotes: applyCodeCycleList(notes, edition),
     codeReferences: applyCodeCycleList(manifest.codeReferencesByEdition?.[edition] ?? manifest.codeReferences, edition),
   };
 }

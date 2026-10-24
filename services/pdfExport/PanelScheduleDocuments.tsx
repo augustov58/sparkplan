@@ -23,6 +23,7 @@ import {
   findEVEMSSetpointMarker,
 } from '../calculations/upstreamLoadAggregation';
 import { lineToNeutralVoltage } from '../../lib/electricalDisplay';
+import { isEvseDescription } from '../../data/nec/evse-load';
 
 // Helvetica + Helvetica-Bold are built-in PDF standard fonts in react-pdf —
 // calling Font.register() on them corrupts the font cache and causes
@@ -224,6 +225,10 @@ export const styles = StyleSheet.create({
 });
 
 // Calculate phase totals
+/** #148: 625.40 is an EVSE branch-circuit rule; cite it only on panels with EVSE circuits. */
+const branchConductorCitation = (circuits: Circuit[]): string =>
+  circuits.some((c) => isEvseDescription(c.description)) ? 'NEC 625.40 + 210.19' : 'NEC 210.19';
+
 export const calculatePhaseBalancing = (
   circuits: Circuit[],
   panelPhase: number
@@ -900,7 +905,7 @@ export const PanelSchedulePages: React.FC<PanelSchedulePDFProps> = ({
               <Text style={[styles.summaryLabel, { marginTop: 4, fontSize: 7, fontStyle: 'italic' }]}>
                 {aggregatedLoad?.downstreamPanelCount && aggregatedLoad.downstreamPanelCount > 0
                   ? `Aggregated demand across ${aggregatedLoad.downstreamPanelCount} downstream panel${aggregatedLoad.downstreamPanelCount === 1 ? '' : 's'} per ${aggregatedLoad.necReference || 'NEC 220'} — verify bus rating against Demand Amps, not the nameplate sum.`
-                  : `Demand reflects ${aggregatedLoad?.necReference || 'NEC 220'} — feeder/service sizing uses Demand Amps; branch conductors stay at full nameplate per NEC 625.40 + 210.19.`}
+                  : `Demand reflects ${aggregatedLoad?.necReference || 'NEC 220'} — feeder/service sizing uses Demand Amps; branch conductors stay at full nameplate per ${branchConductorCitation(realCircuits)}.`}
               </Text>
               {showBreakdown && (
                 <View style={styles.breakdownTable}>
@@ -1427,7 +1432,7 @@ export const MultiPanelDocument: React.FC<MultiPanelDocumentProps> = ({
                     <Text style={[styles.summaryLabel, { marginTop: 4, fontSize: 7, fontStyle: 'italic' }]}>
                       {aggLoad?.downstreamPanelCount && aggLoad.downstreamPanelCount > 0
                         ? `Aggregated demand across ${aggLoad.downstreamPanelCount} downstream panel${aggLoad.downstreamPanelCount === 1 ? '' : 's'} per ${aggLoad.necReference || 'NEC 220'} — verify bus rating against Demand Amps, not the nameplate sum.`
-                        : `Demand reflects ${aggLoad?.necReference || 'NEC 220'} — feeder/service sizing uses Demand Amps; branch conductors stay at full nameplate per NEC 625.40 + 210.19.`}
+                        : `Demand reflects ${aggLoad?.necReference || 'NEC 220'} — feeder/service sizing uses Demand Amps; branch conductors stay at full nameplate per ${branchConductorCitation(circuits)}.`}
                     </Text>
                     {showBreakdown2 && (
                       <View style={styles.breakdownTable}>

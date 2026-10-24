@@ -21,6 +21,7 @@ import type {
   PacketAST,
   AttachmentSummary,
 } from '../data/ahj/types';
+import { noteText } from '../data/ahj/codeCycle';
 
 // ----------------------------------------------------------------------------
 // Fixtures
@@ -82,7 +83,7 @@ describe('Miami-Dade manifest — shape', () => {
   });
 
   it('lists at least one HVHZ-related general note (regression guard for H19/HVHZ-statewide-in-MD scope)', () => {
-    const joined = miamiDadeManifest.generalNotes.join('\n').toLowerCase();
+    const joined = miamiDadeManifest.generalNotes.map(noteText).join('\n').toLowerCase();
     expect(joined).toContain('hvhz');
     expect(joined).toContain('175 mph');
   });
@@ -184,9 +185,10 @@ describe('Miami-Dade manifest — requirement predicates', () => {
     expect(hvhz.required(ctxMultiFamilyExisting)).toBe(true);
   });
 
-  it('Available fault current required on BOTH service paths (MD differs from Orlando which gates by scope)', () => {
+  it('Available fault current required on the new-service path only (owner decision 2026-10-24)', () => {
     const afc = getRequirement('md-available-fault-current');
-    expect(afc.required(ctxSFRExisting)).toBe(true);
+    expect(afc.required(ctxSFRExisting)).toBe(false);
+    expect(afc.required(ctxMultiFamilyExisting)).toBe(false);
     expect(afc.required(ctxCommercialNewService)).toBe(true);
   });
 

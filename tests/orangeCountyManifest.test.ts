@@ -29,6 +29,7 @@ import type {
   PacketAST,
   AttachmentSummary,
 } from '../data/ahj/types';
+import { noteText } from '../data/ahj/codeCycle';
 
 // ----------------------------------------------------------------------------
 // Representative contexts
@@ -102,7 +103,7 @@ describe('Orange County manifest — structural shape', () => {
   });
 
   it('has Orange-County-specific general notes (Section 9-86, NOC $2,500, FastTrack, non-HVHZ)', () => {
-    const notes = orangeCountyManifest.generalNotes.join(' ');
+    const notes = orangeCountyManifest.generalNotes.map(noteText).join(' ');
     expect(notes).toMatch(/NFPA-70\s*\(2020 NEC\)/);
     expect(notes).toMatch(/Section 9-86/);
     expect(notes).toMatch(/\$2,500/);
@@ -420,10 +421,12 @@ describe('Orange County manifest — requirement detect()', () => {
     ).toBe(true);
   });
 
-  it('Equipment-listing detect() accepts equipmentSpecs section OR cut_sheet/manufacturer_data upload', () => {
+  it('Equipment-listing detect() needs a cut_sheet/manufacturer_data upload; equipmentSpecs alone is partial', () => {
     const req = getRequirement('orange-county-equipment-listing');
     expect(req.detect(emptyPacket, [])).toBe(false);
-    expect(req.detect({ sectionKeys: ['equipmentSpecs'] }, [])).toBe(true);
+    // #140: the specs sheet only cites listings — partial, not satisfied.
+    expect(req.detect({ sectionKeys: ['equipmentSpecs'] }, [])).toBe(false);
+    expect(req.partial?.({ sectionKeys: ['equipmentSpecs'] }, [])).toMatch(/cut sheet not attached/);
     expect(req.detect(emptyPacket, [{ artifactType: 'cut_sheet' }])).toBe(
       true,
     );
