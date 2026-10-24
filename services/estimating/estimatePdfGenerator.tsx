@@ -17,7 +17,8 @@
  */
 
 import React from 'react';
-import { Document, Page, StyleSheet, Text, View } from '@react-pdf/renderer';
+import { Document, Page, StyleSheet, View } from '@react-pdf/renderer';
+import { Text } from '../pdfExport/PdfText';
 import type { Database } from '@/lib/database.types';
 import {
   BrandBar,
