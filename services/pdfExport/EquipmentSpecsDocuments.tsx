@@ -8,7 +8,8 @@
  */
 
 import React from 'react';
-import { Document, Page, View, Text, StyleSheet } from '@react-pdf/renderer';
+import { Document, Page, View, StyleSheet } from '@react-pdf/renderer';
+import { Text } from './PdfText';
 import type { PanelEquipmentSpecs, TransformerEquipmentSpecs } from '@/types';
 import type { Circuit } from '../../lib/database.types';
 import { isEVEMSManagedPanel } from '../calculations/upstreamLoadAggregation';

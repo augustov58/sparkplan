@@ -144,6 +144,8 @@ export const JurisdictionAndAHJPanel: React.FC<JurisdictionAndAHJPanelProps> = (
   }, [
     selectedJurisdiction?.jurisdiction_name,
     selectedJurisdiction?.ahj_name,
+    selectedJurisdiction?.city,
+    selectedJurisdiction?.state,
   ]);
 
   const hasAutoBoundManifest = !!wizardAutoBoundManifest;

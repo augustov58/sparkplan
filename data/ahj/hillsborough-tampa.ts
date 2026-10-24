@@ -132,6 +132,7 @@ export const hillsboroughTampaManifest: AHJManifest = {
   name: 'Hillsborough County / City of Tampa',
   jurisdictionType: 'county',
   subjurisdiction: undefined,
+  coverage: { state: 'FL', cities: ['Tampa'], county: 'Hillsborough' },
 
   // Hillsborough / Tampa cite NEC 2020 uniformly across SFR / multi-family
   // / commercial (no Miami-Dade-style H34 fork). FBC 8th ed (2023) statewide.

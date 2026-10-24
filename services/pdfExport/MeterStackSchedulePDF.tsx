@@ -9,7 +9,8 @@
  */
 
 import React from 'react';
-import { Page, Text, View, StyleSheet } from '@react-pdf/renderer';
+import { Page, View, StyleSheet } from '@react-pdf/renderer';
+import { Text } from './PdfText';
 import type { Database } from '../../lib/database.types';
 import {
   themeStyles,

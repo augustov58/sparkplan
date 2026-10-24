@@ -11,8 +11,9 @@
  *
  * Lookup strategy:
  *   1. `getManifestById('orlando')` — direct ID lookup (canonical).
- *   2. `findManifestForJurisdiction(jurisdiction)` — fuzzy match by
- *      jurisdiction_name / ahj_name. Returns null if no manifest exists
+ *   2. `findManifestForJurisdiction(jurisdiction)` — match a jurisdictions
+ *      row by its city / ahj_name against each manifest's `coverage`
+ *      (name-only input: most specific name). Returns null if no manifest exists
  *      for that jurisdiction; the renderer falls back to Sprint 2A
  *      static defaults.
  *
@@ -45,13 +46,8 @@ const MANIFEST_REGISTRY: Readonly<Record<string, AHJManifest>> = {
   davie: davieManifest,
   'hillsborough-tampa': hillsboroughTampaManifest,
   // Independent municipality inside Miami-Dade County. Distinct from
-  // `miami-dade` (which is County RER unincorporated-only). Listed after
-  // `miami-dade` because the substring lookup in `findManifestForJurisdiction`
-  // iterates in insertion order — putting `city-of-miami` later avoids any
-  // ambiguity between "City of Miami" jurisdiction strings and the
-  // "miami-dade" name needle (in practice the haystacks don't collide; the
-  // City of Miami name is "City of Miami" which does NOT contain
-  // "miami-dade", so order is documentation-only here).
+  // `miami-dade` (which is County RER unincorporated-only); the two are
+  // told apart by `coverage`, not by registry order.
   'city-of-miami': cityOfMiamiManifest,
   // Orange County Division of Building Safety — unincorporated areas only
   // (NOT City of Orlando, which is independent and registered above).
@@ -84,41 +80,77 @@ export function getManifestById(id: string | null | undefined): AHJManifest | nu
   return MANIFEST_REGISTRY[id.toLowerCase()] ?? null;
 }
 
+/** Lowercase, no periods, "saint" → "st", single spaces. */
+function normalizePlace(s: string): string {
+  return s.toLowerCase().replace(/\./g, '').replace(/\bsaint\b/g, 'st').replace(/\s+/g, ' ').trim();
+}
+
+const MUNICIPAL_AUTHORITY = /\b(city|town|village) of\b/;
+
 /**
- * Find a manifest by matching a Jurisdiction row's `jurisdiction_name` or
- * `ahj_name` (case-insensitive substring match). Used when the project
- * has a `jurisdiction_id` but the Jurisdictions table doesn't yet carry
- * an explicit `manifest_id` column. Sprint 2C M1 will likely add an
- * explicit FK to clean this up; for PR-4 the substring match is enough
- * to wire Orlando through.
+ * Find the manifest for a `jurisdictions` row (#135).
+ *
+ * A row with a `city` is matched on what it says, never on substrings of its
+ * display name ("Miami, Miami-Dade County, FL" contains "miami-dade" but is
+ * the City of Miami):
+ *   1. `ahj_name` names a county ("Orange County Division of Building
+ *      Safety") and no city/town/village → the manifest covering that county.
+ *   2. Otherwise the manifest whose `coverage.cities` lists the row's city.
+ *   3. Otherwise null — an unmodeled city inside a modeled county is its own
+ *      AHJ and must not inherit the county's manifest.
+ * The row's `state` must match `coverage.state` when present.
+ *
+ * Name-only input (no `city`) falls back to the most specific manifest
+ * name or id found in `jurisdiction_name` / `ahj_name`.
  *
  * Returns null if no manifest matches — caller falls back to Sprint 2A
  * static defaults.
  */
 export function findManifestForJurisdiction(
   jurisdiction:
-    | { jurisdiction_name?: string | null; ahj_name?: string | null }
+    | {
+        jurisdiction_name?: string | null;
+        ahj_name?: string | null;
+        city?: string | null;
+        county?: string | null;
+        state?: string | null;
+      }
     | null
     | undefined,
 ): AHJManifest | null {
   if (!jurisdiction) return null;
-  const haystacks = [
-    jurisdiction.jurisdiction_name,
-    jurisdiction.ahj_name,
-  ]
+  const manifests = Object.values(MANIFEST_REGISTRY);
+
+  if (jurisdiction.city) {
+    const state = jurisdiction.state?.trim().toUpperCase();
+    const inState = manifests.filter(
+      (m) => m.coverage && (!state || m.coverage.state === state),
+    );
+    const ahj = normalizePlace(jurisdiction.ahj_name ?? '');
+    if (ahj && !MUNICIPAL_AUTHORITY.test(ahj)) {
+      const byCounty = inState.find(
+        (m) => m.coverage?.county && ahj.includes(`${normalizePlace(m.coverage.county)} county`),
+      );
+      if (byCounty) return byCounty;
+    }
+    const city = normalizePlace(jurisdiction.city);
+    return inState.find((m) => m.coverage?.cities?.some((c) => normalizePlace(c) === city)) ?? null;
+  }
+
+  const haystacks = [jurisdiction.jurisdiction_name, jurisdiction.ahj_name]
     .filter((s): s is string => typeof s === 'string' && s.length > 0)
     .map((s) => s.toLowerCase());
-
-  for (const manifest of Object.values(MANIFEST_REGISTRY)) {
-    const needle = manifest.name.toLowerCase();
-    const idNeedle = manifest.id.toLowerCase();
-    for (const hay of haystacks) {
-      if (hay.includes(idNeedle) || hay.includes(needle)) {
-        return manifest;
+  let best: AHJManifest | null = null;
+  let bestLength = 0;
+  for (const manifest of manifests) {
+    for (const needle of [manifest.name.toLowerCase(), manifest.id.toLowerCase()]) {
+      if (needle.length > bestLength && haystacks.some((hay) => hay.includes(needle))) {
+        best = manifest;
+        bestLength = needle.length;
       }
     }
   }
-  return null;
+  return best;
 }
 
 /**

@@ -8,14 +8,15 @@
  * Font constraints (built-in Helvetica StandardEncoding only):
  * - PHASE uses "Ø" (U+00D8), which IS in Helvetica. "Φ", "φ", and
  *   "\u03C6" fall back to wrong glyphs (Æ) or render literal escapes.
- * - Ω, Σ, √, ≤, ≥, ✓, ✗, →, •: either spell out or use ASCII
- *   equivalents ("ohm", "sqrt", "<=", ">=", "Y/N", "->", "-").
+ * - Ω, Σ, √, ≤, ≥, ✓, ✗, →, emoji: `Text` from ./PdfText spells them out
+ *   ("ohm", "sqrt", "<=", ">=", "[X]", "->"); import it, not react-pdf's.
  * - JSX text vs JS string: "\u2022" inside JSX children renders
  *   literally; only JS string literals interpret escapes.
  */
 
 import React from 'react';
-import { Text, View, StyleSheet } from '@react-pdf/renderer';
+import { View, StyleSheet } from '@react-pdf/renderer';
+import { Text } from './PdfText';
 
 // ==================== BRAND CONSTANTS ====================
 

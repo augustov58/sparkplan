@@ -154,6 +154,7 @@ fed_from_transformer_id: UUID     // Only if type='transformer'
 
 ### PDF Generation
 Uses `@react-pdf/renderer`. Components are Page-level fragments (`<>...</>`), assembled in `permitPacketGenerator.tsx` Document.
+Import `Text` from `services/pdfExport/PdfText`, never from `@react-pdf/renderer`: Helvetica is WinAnsi, and the wrapper spells out →, ≤, ≥, √, Ω, Φ and emoji that would print as wrong glyphs (#153).
 
 ### One-line / riser diagram render paths
 There are **TWO independent render paths** for the same logical diagram, in **different files**:
@@ -176,11 +177,11 @@ Per-AHJ packet defaults live in `data/ahj/` as **pure data + pure predicates** �
 - `data/ahj/types.ts` — the `AHJManifest` interface + 4-axis `AHJContext` (`scope` / `lane` / `buildingType` / `subjurisdiction`). All 4 axes are baked in from day 1 even when a given manifest only uses a subset, so Sprint 2C M1 doesn't retrofit them across 5 AHJs.
 - `data/ahj/{id}.ts` — one literal `AHJManifest` per jurisdiction. `data/ahj/orlando.ts` is the reference shape. Captures `relevantSections` + `relevantArtifactTypes` (defaults) + optional `sectionPredicates` / `artifactTypePredicates` (`(ctx: AHJContext) => boolean`, pure) + `necEdition: Record<BuildingType, string>` (Miami-Dade H34 forks NEC 2014 vs 2020 by building type) + `sheetIdPrefix` (Miami-Dade H20 reserves `EL-`) + `generalNotes` + `codeReferences` + `requirements: AHJRequirement[]` (empty on Orlando; Sprint 2C M1 populates).
 - `data/ahj/visibility.ts` — `computeDefaultVisibility(manifest, ctx)` implements the **two-layer visibility model**: Layer 1 (manifest defaults from the arrays + predicates) overlaid with Layer 2 (user overrides from `projects.settings.section_overrides` jsonb). When no manifest is registered for a project's jurisdiction, returns `null` and Sprint 2A's `resolveSections(sectionPrefs)` path runs unchanged.
-- `data/ahj/registry.ts` — `getManifestById(id)` (case-insensitive) + `findManifestForJurisdiction(jurisdictionName, ahjName)` (case-insensitive substring on either field). Sprint 2C M1 will replace the registry with an explicit `jurisdictions.manifest_id` FK once that table is populated.
+- `data/ahj/registry.ts` — `getManifestById(id)` (case-insensitive) + `findManifestForJurisdiction(row)`: matches a `jurisdictions` row on its `state` / `city` / `ahj_name` against each manifest's `coverage` (county building department → county manifest; else the city), never on substrings of the display name (#135: "Miami, Miami-Dade County, FL" is the City of Miami).
 
 The orchestrator threads `manifest?: AHJManifest` + `buildingType?: BuildingType` through `PermitPacketData`. Resolution chain for `generalNotes` / `codeReferences`: explicit data field → per-project override → manifest fallback (in the project's edition via `manifestTextForEdition`) → Sprint 2A baseline. `necEdition` comes from `resolveNecEdition` (see EVSE Load above), never the manifest. Backward compat is preserved by null-coalescing — projects without a `jurisdiction_id`, or with one not in the registry, render exactly as they did pre-PR-#51.
 
-When adding a new AHJ: drop in `data/ahj/{newAhj}.ts` matching the manifest shape, register it in `registry.ts`, populate `requirements: []` if the M1 engine is wired. **No engine changes required** — Sprint 2C is pure-data + engine; manifest scaffold is done.
+When adding a new AHJ: drop in `data/ahj/{newAhj}.ts` matching the manifest shape (including `coverage`), register it in `registry.ts`, populate `requirements: []` if the M1 engine is wired. **No engine changes required** — Sprint 2C is pure-data + engine; manifest scaffold is done.
 
 ---
 
@@ -313,6 +314,8 @@ Real mistakes made in this repo, each paired with the rule that prevents recurre
 | Multifamily 220.84 took electric heat at 65% and cited "220.84(C)(4)" for it — a 220.82(C) single-dwelling factor carried into a section that has none, understating demand (#133) | A factor valid in one Optional Method is not valid in another. Before applying any factor, find it in the text of the section you cite. 220.84(C)(5) = larger of A/C or heat at nameplate. |
 | The Part III aggregator, feeder sizing, the 220.84 total and the 220.87(2) new load read EVSE `load_watts` raw; the NEC 2023 7,200 VA floor reached only the MF-EV calc and the SF Optional Method | Every calc that turns an EVSE into load calls `getEvseLoadVA` (circuits: `withEvseLoadForEdition`) with the project edition. A new edition parameter with a default needs a grep of every production caller — tsc can't see a missing optional argument. |
 | Table 310.16 stored 14 AWG Cu at 20 A in the 60 °C column (code: 15 A), plus three other rows above the code value (and six aluminum cells below it); a 20 A load on 60 °C terminals sized 14 AWG | Every corrected `data/nec/` row gets a pinned test (`tests/table-310-16.test.ts`). Cross-check against the code book, not a web chart: some charts print aluminum as ~0.8 × copper. The test pins the whole table, so any edit must match the book. |
+| Manifest lookup substring-matched display names in registry order: City of Miami got the Miami-Dade County manifest, City of Tampa got none (#135); tests used made-up names, never the real rows | Match jurisdiction rows on `state` / `city` / `ahj_name` via each manifest's `coverage`. Tests of a lookup use the real rows' strings. |
+| `→`, `≤`, `≥`, `√` printed as `’`, `d`, `e` in the packet (Helvetica is WinAnsi); "→ PANEL x" is stored in the DB, so fixing source strings could never cover it (#153) | Import `Text` from `services/pdfExport/PdfText`. A transform meant for every X goes where every X passes, not at an entry point. |
 | Docs updated with stale "Last Updated" dates; completed features left as "NEXT UP" | Every doc touch updates its date to today; every shipped feature flips its ROADMAP status in the same PR. |
 
 ---
