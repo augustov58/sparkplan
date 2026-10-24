@@ -126,6 +126,7 @@ export const miamiDadeManifest: AHJManifest = {
   name: 'Miami-Dade County (Unincorporated — RER)',
   jurisdictionType: 'county',
   subjurisdiction: 'unincorporated',
+  coverage: { state: 'FL', county: 'Miami-Dade' },
 
   // H34: Residential PRG cites NEC 2014; Commercial PRG cites NEC 2020.
   // Multi-family follows the commercial review track per the MD PRG routing

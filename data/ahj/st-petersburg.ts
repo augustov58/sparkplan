@@ -150,6 +150,7 @@ export const stPetersburgManifest: AHJManifest = {
   name: 'City of St. Petersburg',
   jurisdictionType: 'city',
   subjurisdiction: undefined,
+  coverage: { state: 'FL', cities: ['St. Petersburg'] },
 
   // St. Petersburg cites NEC 2020 uniformly across SFR / multi-family /
   // commercial (no Miami-Dade H34 fork). FBC 8th ed (2023) statewide.

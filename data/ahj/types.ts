@@ -249,6 +249,15 @@ export interface AHJManifest {
    */
   subjurisdiction?: string;
 
+  /**
+   * Which `jurisdictions` rows this manifest serves, matched on the row's
+   * `state` / `city` / `ahj_name` by `findManifestForJurisdiction` (#135).
+   * `cities`: incorporated cities whose own department is the AHJ.
+   * `county`: the county building department (unincorporated areas); a row
+   * matches it only when its `ahj_name` names that county and no city.
+   */
+  coverage?: { state: string; cities?: string[]; county?: string };
+
   // -------------------------------------------------------------------------
   // Code basis (varies by building type per Sprint 2C H34 finding)
   // -------------------------------------------------------------------------

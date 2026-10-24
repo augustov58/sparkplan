@@ -78,6 +78,7 @@ export const davieManifest: AHJManifest = {
   name: 'Town of Davie',
   jurisdictionType: 'city',
   subjurisdiction: undefined,
+  coverage: { state: 'FL', cities: ['Davie'] },
 
   // Davie uniformly cites NEC 2020 (no Miami-Dade-style H34 fork).
   necEdition: {

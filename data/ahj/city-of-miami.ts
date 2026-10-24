@@ -133,6 +133,7 @@ export const cityOfMiamiManifest: AHJManifest = {
   name: 'City of Miami',
   jurisdictionType: 'city',
   subjurisdiction: undefined,
+  coverage: { state: 'FL', cities: ['Miami'] },
 
   // City of Miami publishes no per-building-type PRG, so cites NEC 2020
   // uniformly per FBC 8th ed (2023) Electrical adoption. (Unlike MD County
