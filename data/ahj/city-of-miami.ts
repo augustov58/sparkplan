@@ -327,6 +327,7 @@ export const cityOfMiamiManifest: AHJManifest = {
     {
       id: 'city-of-miami-site-plan',
       name: 'Site plan showing EVSE + panel locations and feeder routing',
+      nameWithoutEV: 'Site plan showing panel locations and feeder routing',
       category: 'plan',
       // Required on every intake — City of Miami permit forms require a
       // site plan for any new electrical work involving exterior equipment.
@@ -367,6 +368,7 @@ export const cityOfMiamiManifest: AHJManifest = {
     {
       id: 'city-of-miami-load-calculation',
       name: 'Load calculations for the EVSE',
+      nameWithoutEV: 'Load calculations (NEC Article 220)',
       category: 'plan',
       required: () => true,
       detect: (packet) =>

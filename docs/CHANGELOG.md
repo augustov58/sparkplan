@@ -11,6 +11,8 @@ All notable changes to SparkPlan.
 - **EV, EVEMS and transformer items only on jobs that have them (#148).** EVSE listings, anchoring, wet-location, labeling and Knox-box items, EVEMS narratives, NEC 450.3, the matching general notes and the HVHZ anchoring upload slot drop out when the project has no EV charger, EVEMS or transformer. The panel-schedule footer cites NEC 625.40 only on panels with EV chargers.
 - **Service-scope notes follow the project (#147).** Orlando's and the City of Miami's fault-current notes print only on new-service jobs; the checklist now takes existing vs new service from the project setting, as the packet page does.
 - The EVSE labeling page (NEC 625.43) now prints for any panel feeding a charger, not only panels named "EV…".
+- **No charger wording on non-EV jobs.** The AHJ checklists come from each city's EV charging permit checklist, so plan items every packet needs were worded around the charger ("Site plan showing EVSE + panel locations", "Load calculations for the EVSE"). On a job without EV chargers these 16 items keep their place and print neutral wording ("Site plan showing panel locations and feeder routing", "Load calculations (NEC Article 220)"); EV jobs keep the AHJ's wording.
+- **Miami-Dade fault current on new service only.** The available-fault-current item and its general note now apply on the new-service path, like Orlando, City of Miami, Orange County and Jacksonville; an unchanged existing service no longer shows it as missing.
 
 ---
 

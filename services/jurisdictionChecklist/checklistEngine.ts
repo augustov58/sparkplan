@@ -132,7 +132,7 @@ function evaluateRequirement(
 
   return {
     id: req.id,
-    name: req.name,
+    name: ctx?.hasEV === false && req.nameWithoutEV ? req.nameWithoutEV : req.name,
     category: req.category,
     required,
     present,

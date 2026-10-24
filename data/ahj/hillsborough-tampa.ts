@@ -412,6 +412,7 @@ export const hillsboroughTampaManifest: AHJManifest = {
     {
       id: 'hillsborough-tampa-site-plan',
       name: 'Site plan with EVSE locations relative to property',
+      nameWithoutEV: 'Site plan with electrical equipment locations relative to property',
       category: 'plan',
       required: isFullPlanReviewLane,
       detect: (_packet, attachments) =>

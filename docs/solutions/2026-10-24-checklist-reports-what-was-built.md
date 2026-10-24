@@ -16,8 +16,8 @@
 
 ## Judgment calls
 
-- **Generic plan items keep their EV wording.** 16 required items still name EVSE (site plans, load calcs, Davie riser, Jacksonville equipment schedule); they're plan-set items every packet needs. `tests/ahjChecklistTruth.test.ts` pins that list so a new EV-only item can't slip in ungated.
-- **Miami-Dade note 5 (fault current) stays unconditional**: its requirement is unconditional too. Orlando / City of Miami gate it on `scope === 'new-service'`, matching their requirements.
+- **Generic plan items get neutral names, not N/A** (owner decision 2026-10-24). 16 required items name the charger (site plans, load calcs, Davie riser, Jacksonville equipment schedule) because the manifests come from EV permit checklists; every packet still needs them. `AHJRequirement.nameWithoutEV` prints when `ctx.hasEV === false`. `tests/ahjChecklistTruth.test.ts` asserts no required item on a non-EV job names a charger. Rejected: N/A without EV (the café would stop asking for a site plan), and keeping the EV wording.
+- **Miami-Dade fault current: new service only** (owner / PE decision 2026-10-24), requirement and note, matching Orlando, City of Miami, Orange and Jacksonville. It had been unconditional.
 - **Upload slots** (`hvhz_anchoring`) also gate on `evInScope`; they are collapsed by default, so this only changes the default toggle.
 - Undefined flags keep items in, so legacy callers and tests that build a context without them see the old behavior.
 

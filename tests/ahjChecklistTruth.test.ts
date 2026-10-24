@@ -161,24 +161,33 @@ describe('#148: AHJContext equipment flags', () => {
     }
   });
 
-  it('EV-subject requirements are N/A without EV; those left are generic plan items', () => {
-    // What still names EV after gating: plan-set items every packet carries
-    // (site plan, load calc, riser) written for the AHJs' EV checklists.
-    const stillRequired = ALL_MANIFESTS.flatMap((m) =>
-      evaluatePacket({}, [], m, noEquipment).items
-        .filter((i) => i.required && /\bEV(SE)?\b|EVEMS|charger|625\.4/i.test(i.name))
-        .map((i) => i.id));
-    expect(stillRequired.sort()).toEqual([
-      'city-of-miami-load-calculation', 'city-of-miami-site-plan',
-      'davie-electrical-floor-plan', 'davie-riser-and-load-calc',
-      'hillsborough-tampa-site-plan',
-      'jacksonville-duval-equipment-schedule', 'jacksonville-duval-load-calculations', 'jacksonville-duval-site-plan',
-      'md-site-plan',
-      'orange-county-load-calculation', 'orange-county-site-plan',
-      'orlando-load-calculation', 'orlando-site-plan',
-      'pompano-load-calculation', 'pompano-site-plan',
-      'st-petersburg-site-plan',
-    ]);
+  it('EV-worded plan items print neutral names without EV, the AHJ wording with EV', () => {
+    const names = (ctx: AHJContext) => Object.fromEntries(ALL_MANIFESTS.flatMap((m) =>
+      evaluatePacket({}, [], m, ctx).items.map((i) => [i.id, i.name])));
+    const without = names(noEquipment);
+    const withEV = names({ ...noEquipment, hasEV: true });
+    // Nothing still required on a non-EV job names a charger.
+    const leftover = ALL_MANIFESTS.flatMap((m) => evaluatePacket({}, [], m, noEquipment).items)
+      .filter((i) => i.required && /\bEV(SE)?\b|EVEMS|charger|625\.4/i.test(i.name));
+    expect(leftover.map((i) => `${i.id}: ${i.name}`)).toEqual([]);
+    expect(without['city-of-miami-site-plan']).toBe('Site plan showing panel locations and feeder routing');
+    expect(without['city-of-miami-load-calculation']).toBe('Load calculations (NEC Article 220)');
+    expect(withEV['city-of-miami-site-plan']).toBe('Site plan showing EVSE + panel locations and feeder routing');
+    // Unknown equipment (legacy callers) keeps the AHJ wording.
+    const { hasEV: _omit, ...unknown } = noEquipment;
+    expect(names(unknown)['orlando-site-plan']).toMatch(/EV charger/);
+  });
+
+  it('#147 follow-up: Miami-Dade fault current only on new service (requirement and note)', () => {
+    const md = getManifestById('miami-dade')!;
+    const afc = (ctx: AHJContext) => evaluatePacket({}, [], md, ctx).items.find((i) => i.id === 'md-available-fault-current')!.required;
+    expect(afc(noEquipment)).toBe(false);
+    expect(afc({ ...noEquipment, scope: 'new-service' })).toBe(true);
+    for (const edition of ['2020', '2023'] as const) {
+      const notes = (ctx: AHJContext) => manifestTextForEdition(md, edition, ctx).generalNotes!.filter((n) => /fault current/i.test(n));
+      expect(notes(noEquipment)).toEqual([]);
+      expect(notes({ ...noEquipment, scope: 'new-service' })).toHaveLength(1);
+    }
   });
 
   it('a transformer puts Miami-Dade 450.3 back on the checklist', () => {

@@ -197,6 +197,12 @@ export interface AHJRequirement {
   id: string;
   /** Display name shown on the jurisdiction-checklist page. */
   name: string;
+  /**
+   * Name printed when the job has no EV (`ctx.hasEV === false`), for plan
+   * items every packet needs whose AHJ wording names the charger (site plan,
+   * load calc). The manifests come from the AHJs' EV permit checklists.
+   */
+  nameWithoutEV?: string;
   /** Coarse grouping for the rendered checklist sections. */
   category: 'plan' | 'application' | 'narrative' | 'inspection' | 'upload';
   /**

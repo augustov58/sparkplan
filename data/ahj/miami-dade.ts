@@ -72,7 +72,7 @@ const MIAMI_DADE_GENERAL_NOTES: ManifestNote[] = [
   { text: 'All of Miami-Dade County lies within the High-Velocity Hurricane Zone (HVHZ) per FBC 8th ed (2023). Outdoor pedestal- or bollard-mounted EVSE shall be anchored per Florida Product Approval, Miami-Dade Notice of Acceptance (NOA) tie-down detail, or original signed-and-sealed structural anchorage plans rated for 175 mph (3-sec gust) Risk Category II minimum.', when: evInScope },
   'Voltage drop shall not exceed 3% on feeders, 3% on branch circuits, and 5% combined feeder + branch (NEC 215.2(A)(1) FPN; NEC 210.19(A)(1) FPN).',
   'All grounding and bonding shall comply with NEC Article 250. Grounding electrode conductor sized per NEC Table 250.66; equipment grounding conductor sized per NEC Table 250.122.',
-  'Available fault current shall be calculated and labeled at the service main per NEC 110.9 and 110.10 (Miami-Dade Commercial PRG item: "Available fault current").',
+  { text: 'Available fault current shall be calculated and labeled at the service main per NEC 110.9 and 110.10 (Miami-Dade Commercial PRG item: "Available fault current").', when: (ctx) => ctx.scope === 'new-service' },
   'Working space, dedicated equipment space, and clearance shall comply with NEC 110.26 (commercial scope only; not enforced as a separate line item on single-family residential per the Miami-Dade Residential PRG).',
   'Contractor name and Florida DBPR license number shall appear on each drawing sheet. Plans subject to PE seal trigger (commercial / multi-family / ≥277-480V scope) shall be digitally signed and sealed per Miami-Dade Digital Signing & Sealing policy.',
   { text: 'EVSE equipment shall bear UL-2202 and UL-2594 listings; manufacturer cut sheets attached. Outdoor EVSE shall be rated for wet locations per NEC 210.8, 210.63, and 625.50.', when: evInScope },
@@ -323,9 +323,10 @@ export const miamiDadeManifest: AHJManifest = {
       id: 'md-available-fault-current',
       name: 'Available fault current calculation at service main (NEC 110.9, 110.10)',
       category: 'plan',
-      // Miami-Dade Commercial PRG explicitly lists this; required on both
-      // service-modification paths (unlike Orlando which gates by scope).
-      required: () => true,
+      // Miami-Dade Commercial PRG lists this. New-service path only, like
+      // Orlando: an unchanged existing service keeps its available fault
+      // current (owner / PE decision 2026-10-24).
+      required: (ctx) => ctx.scope === 'new-service',
       detect: (packet) =>
         (packet.sectionKeys ?? []).includes('availableFaultCurrent'),
     },
@@ -390,6 +391,7 @@ export const miamiDadeManifest: AHJManifest = {
     {
       id: 'md-site-plan',
       name: 'Site plan showing EV charger + panel locations',
+      nameWithoutEV: 'Site plan showing panel locations',
       category: 'upload',
       // Required for commercial / multi-family; SFR requires it for new
       // service routing but not always for branch-circuit-only additions.

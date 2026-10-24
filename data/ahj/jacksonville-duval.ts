@@ -373,6 +373,7 @@ export const jacksonvilleDuvalManifest: AHJManifest = {
     {
       id: 'jacksonville-duval-site-plan',
       name: 'Site plan with EVSE location and flood-zone callouts (FEMA panel + BFE)',
+      nameWithoutEV: 'Site plan with electrical equipment locations and flood-zone callouts (FEMA panel + BFE)',
       category: 'plan',
       // Required on every Jacksonville intake — Development Services
       // routing checks the site plan for zoning + flood-zone compliance.
@@ -403,6 +404,7 @@ export const jacksonvilleDuvalManifest: AHJManifest = {
     {
       id: 'jacksonville-duval-load-calculations',
       name: 'Load calculations for the EVSE per NEC Article 220',
+      nameWithoutEV: 'Load calculations per NEC Article 220',
       category: 'plan',
       required: () => true,
       detect: (packet) =>
@@ -443,6 +445,7 @@ export const jacksonvilleDuvalManifest: AHJManifest = {
     {
       id: 'jacksonville-duval-equipment-schedule',
       name: 'Equipment schedule (EVSE, disconnects, conductors, OCPDs)',
+      nameWithoutEV: 'Equipment schedule (disconnects, conductors, OCPDs)',
       category: 'plan',
       required: () => true,
       detect: (packet) =>

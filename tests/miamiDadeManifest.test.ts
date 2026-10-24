@@ -185,9 +185,10 @@ describe('Miami-Dade manifest — requirement predicates', () => {
     expect(hvhz.required(ctxMultiFamilyExisting)).toBe(true);
   });
 
-  it('Available fault current required on BOTH service paths (MD differs from Orlando which gates by scope)', () => {
+  it('Available fault current required on the new-service path only (owner decision 2026-10-24)', () => {
     const afc = getRequirement('md-available-fault-current');
-    expect(afc.required(ctxSFRExisting)).toBe(true);
+    expect(afc.required(ctxSFRExisting)).toBe(false);
+    expect(afc.required(ctxMultiFamilyExisting)).toBe(false);
     expect(afc.required(ctxCommercialNewService)).toBe(true);
   });
 

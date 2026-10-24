@@ -327,6 +327,7 @@ export const orangeCountyManifest: AHJManifest = {
     {
       id: 'orange-county-load-calculation',
       name: 'Load calculations for the EVSE (NEC 220 + 625)',
+      nameWithoutEV: 'Load calculations (NEC Article 220)',
       category: 'plan',
       required: () => true,
       detect: (packet) =>
@@ -368,6 +369,7 @@ export const orangeCountyManifest: AHJManifest = {
     {
       id: 'orange-county-site-plan',
       name: 'Site plan showing EV charger + panel locations',
+      nameWithoutEV: 'Site plan showing panel locations',
       category: 'upload',
       // OC FastTrack accepts a single set of signed-and-sealed construction
       // documents; site plan included for new circuits / EVSE location.

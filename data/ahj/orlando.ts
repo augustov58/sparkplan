@@ -240,6 +240,7 @@ export const orlandoManifest: AHJManifest = {
     {
       id: 'orlando-load-calculation',
       name: 'NEC 220 load calculations for EVSE branch + feeder + service',
+      nameWithoutEV: 'NEC 220 load calculations for branch circuits, feeders and service',
       category: 'plan',
       // Implicit on every Orlando intake (closes C1 in the matrix).
       required: () => true,
@@ -286,6 +287,7 @@ export const orlandoManifest: AHJManifest = {
     {
       id: 'orlando-site-plan',
       name: 'Site plan showing existing electrical panel + new EV charger locations',
+      nameWithoutEV: 'Site plan showing existing electrical panel locations',
       category: 'plan',
       // Orlando checklist #6 (existing-service) and bundled into #7
       // (new-service). Required on both paths.

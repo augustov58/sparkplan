@@ -295,6 +295,7 @@ export const pompanoManifest: AHJManifest = {
     {
       id: 'pompano-site-plan',
       name: 'Site plan or survey showing EVSE location',
+      nameWithoutEV: 'Site plan or survey showing electrical equipment locations',
       category: 'plan',
       // Pompano #9 — required on every intake.
       required: () => true,
@@ -339,6 +340,7 @@ export const pompanoManifest: AHJManifest = {
     {
       id: 'pompano-load-calculation',
       name: 'Load calculations for the EVSE',
+      nameWithoutEV: 'Load calculations (NEC Article 220)',
       category: 'plan',
       required: () => true,
       detect: (packet) =>

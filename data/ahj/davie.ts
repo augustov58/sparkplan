@@ -248,6 +248,7 @@ export const davieManifest: AHJManifest = {
     {
       id: 'davie-electrical-floor-plan',
       name: 'Electrical floor plan with EV charger + panel location, conduit and wire size',
+      nameWithoutEV: 'Electrical floor plan with panel location, conduit and wire size',
       category: 'plan',
       required: () => true,
       detect: (_packet, attachments) =>
@@ -256,6 +257,7 @@ export const davieManifest: AHJManifest = {
     {
       id: 'davie-riser-and-load-calc',
       name: 'Riser diagram and load calculations (service + EV panel)',
+      nameWithoutEV: 'Riser diagram and load calculations (service + panels)',
       category: 'plan',
       required: () => true,
       detect: (packet) =>

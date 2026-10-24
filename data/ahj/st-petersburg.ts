@@ -402,6 +402,7 @@ export const stPetersburgManifest: AHJManifest = {
     {
       id: 'st-petersburg-site-plan',
       name: 'Site plan with EVSE locations + utility service entry',
+      nameWithoutEV: 'Site plan with electrical equipment locations + utility service entry',
       category: 'plan',
       required: isFullPlanReviewLane,
       detect: (_packet, attachments) =>
