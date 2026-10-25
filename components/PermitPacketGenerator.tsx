@@ -10,6 +10,7 @@ import { AttachmentUploadCard } from './AttachmentUploadCard';
 import { useProjectAttachments, downloadAttachmentBytes, type ArtifactType, type CoverMode } from '../hooks/useProjectAttachments';
 import { summarizeCalculationRefs, type NEC22087NarrativeData, type NEC22087Method } from '../services/pdfExport/PermitPacketDocuments';
 import { buildSingleFamilyDwellingContext, deriveNarrativeOccupancy } from '../lib/projectSettings';
+import { mfEvCalculationFromSettings } from '../lib/storedCalcs';
 import {
   BAND_CALCULATIONS,
   DEFAULT_SECTIONS,
@@ -54,7 +55,6 @@ import { useProjectNecEdition } from '../hooks/useProjectNecEdition';
 import { manifestTextForEdition } from '../data/ahj/codeCycle';
 import { ahjEquipmentFlags, serviceScope } from '../data/ahj/checks';
 import { JurisdictionAndAHJPanel } from './JurisdictionAndAHJPanel';
-import type { MultiFamilyEVResult } from '../services/calculations/multiFamilyEV';
 import {
   buildMultiFamilyContext,
   calculateAggregatedLoad,
@@ -304,6 +304,12 @@ export const PermitPacketGenerator: React.FC<PermitPacketGeneratorProps> = ({ pr
   // Same edition as the packet's `necEdition` (project pick, else Florida's
   // code cycle), so E-102's EVSE load matches E-101's.
   const projectEdition = useProjectNecEdition(currentProject);
+  // #158: the saved Multi-Family EV analysis, recomputed from its saved inputs
+  // under the current rules (as saved when it predates saved inputs).
+  const currentMfEv = React.useMemo(
+    () => mfEvCalculationFromSettings(currentProject?.settings?.residential, projectEdition),
+    [currentProject?.settings?.residential, projectEdition],
+  );
   const aggregatedDemandSplit = React.useMemo<{ existingKVA: number; proposedKVA: number; necReferences: string[] }>(() => {
     if (!currentProject) return { existingKVA: 0, proposedKVA: 0, necReferences: [] };
     const mdp = panels.find(p => p.is_main);
@@ -1170,13 +1176,12 @@ export const PermitPacketGenerator: React.FC<PermitPacketGeneratorProps> = ({ pr
       // instead of recomputing from an inline duplicated form. The Tools Hub
       // is the source of truth — what the user reviews there is what lands
       // in the packet, byte-for-byte.
-      const mfEvCalc = (currentProject.settings?.residential as
-        | { mfEvCalculation?: { result: MultiFamilyEVResult; buildingName?: string } }
-        | undefined)?.mfEvCalculation;
-      if (mfEvCalc?.result) {
+      // #158: recomputed from the saved inputs, so a rule change since the
+      // calculator last ran reaches the packet.
+      if (currentMfEv) {
         packetData.multiFamilyEVAnalysis = {
-          result: mfEvCalc.result,
-          buildingName: mfEvCalc.buildingName?.trim() || currentProject.name,
+          result: currentMfEv.result,
+          buildingName: currentMfEv.buildingName?.trim() || currentProject.name,
         };
       }
 
@@ -1797,8 +1802,17 @@ export const PermitPacketGenerator: React.FC<PermitPacketGeneratorProps> = ({ pr
               <p className="text-sm text-gray-500">NEC 220.84 + per-EVSE load + 625.42</p>
             </div>
           </div>
-          {(currentProject?.settings?.residential as { mfEvCalculation?: unknown } | undefined)
-            ?.mfEvCalculation ? (
+          {currentMfEv && !currentMfEv.recomputed ? (
+            <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 flex items-start gap-2">
+              <AlertTriangle className="w-4 h-4 text-amber-700 flex-shrink-0 mt-0.5" />
+              <p className="text-sm text-amber-800">
+                This analysis was saved by an earlier version of the Multi-Family EV
+                Calculator and prints as saved, under the calculation rules in effect then.
+                Open the <strong>Multi-Family EV Calculator</strong> in the Tools Hub once
+                to bring it up to date.
+              </p>
+            </div>
+          ) : currentMfEv ? (
             <div className="bg-green-50 border border-green-200 rounded-lg p-3 flex items-start gap-2">
               <CheckCircle className="w-4 h-4 text-green-700 flex-shrink-0 mt-0.5" />
               <p className="text-sm text-green-800">
@@ -1996,6 +2010,20 @@ export const PermitPacketGenerator: React.FC<PermitPacketGeneratorProps> = ({ pr
                           Enter continuous loads at 125% — EV charging is continuous per NEC 625.42 (sized per 625.41).
                           {suggestedProposedKVA > 0 && (
                             <> From proposed circuits: {suggestedProposedKVA.toFixed(2)} kVA (EVSE at 125% — clamped to the EVEMS setpoint where one is set — others at nameplate).</>
+                          )}
+                          {/* #158: a saved value can predate a calc fix; offer the current one. */}
+                          {suggestedProposedKVA > 0 && nec22087ProposedKVA !== ''
+                            && Math.abs((parseFloat(nec22087ProposedKVA) || 0) - suggestedProposedKVA) >= 0.005 && (
+                            <>
+                              {' '}Your entry differs.{' '}
+                              <button
+                                type="button"
+                                onClick={() => setNec22087ProposedKVA(suggestedProposedKVA.toFixed(2))}
+                                className="font-medium text-[#2d3b2d] underline"
+                              >
+                                Use {suggestedProposedKVA.toFixed(2)} kVA
+                              </button>
+                            </>
                           )}
                         </p>
                       )}

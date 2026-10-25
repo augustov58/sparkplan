@@ -10,6 +10,7 @@
 import type { Database } from '@/lib/database.types';
 import { isEVEMSMarkerCircuit } from '@/services/calculations/upstreamLoadAggregation';
 import type { NecEdition } from '../../data/nec/evse-load';
+import { multiFamilyLoadFromSettings } from '../../lib/storedCalcs';
 import {
   calculateAllCumulativeVoltageDrops,
   calculateCumulativeForFeeder,
@@ -377,7 +378,8 @@ export function buildProjectContext(
   // Multi-family context
   let multiFamilyText = '';
   if (residentialSettings?.dwellingType === 'multi_family' && residentialSettings.totalUnits) {
-    const mfLoad = residentialSettings.multiFamilyLoadResult;
+    // #158: recomputed from the saved calculator inputs under the current rules.
+    const mfLoad = multiFamilyLoadFromSettings(residentialSettings, necEdition);
     const mfEv = residentialSettings.mfEvInputs;
     multiFamilyText = `\nMulti-Family Dwelling: ${residentialSettings.totalUnits} units`;
     if (mfLoad) {

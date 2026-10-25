@@ -40,7 +40,6 @@ import {
 } from '../types';
 import {
   calculateSingleFamilyLoad,
-  calculateMultiFamilyLoad,
   generateResidentialPanelSchedule,
   dwellingBranchConductorSize,
   ResidentialLoadResult,
@@ -51,6 +50,12 @@ import { LOAD_TEMPLATES } from '../services/calculations/serviceUpgrade';
 import { getNextStandardBreakerSize } from '../data/nec/standard-breakers';
 import type { LoadTemplate } from '../types';
 import { isExistingConstructionProject } from '../lib/projectSettings';
+import {
+  DEFAULT_APPLIANCES,
+  appliancesWithProposed,
+  calculateMultiFamilyLoadForProject,
+  toStoredMultiFamilyLoad,
+} from '../lib/storedCalcs';
 import { usePanels } from '../hooks/usePanels';
 import { useProjects } from '../hooks/useProjects';
 import { useCircuits } from '../hooks/useCircuits';
@@ -74,22 +79,6 @@ interface DwellingLoadCalculatorProps {
 }
 
 // Default appliances for a new project
-const DEFAULT_APPLIANCES: ResidentialAppliances = {
-  range: { enabled: false, kw: 12, type: 'electric' },
-  dryer: { enabled: false, kw: 5.5, type: 'electric' },
-  waterHeater: { enabled: false, kw: 4.5, type: 'electric' },
-  hvac: { enabled: false, type: 'ac_only', coolingKw: 5, heatingKw: 0 },
-  dishwasher: { enabled: false, kw: 1.5 },
-  disposal: { enabled: false, kw: 0.5 },
-  microwave: { enabled: false, kw: 1.5 },
-  evCharger: { enabled: false, kw: 7.7, level: 2 },
-  poolPump: { enabled: false, hp: 1.5 },
-  poolHeater: { enabled: false, kw: 11 },
-  hotTub: { enabled: false, kw: 6 },
-  wellPump: { enabled: false, hp: 1 },
-  otherAppliances: []
-};
-
 // Default unit template for multi-family
 const DEFAULT_UNIT_TEMPLATE: DwellingUnitTemplate = {
   id: '',
@@ -201,21 +190,10 @@ export const DwellingLoadCalculator: React.FC<DwellingLoadCalculatorProps> = ({
   // continuous (×1.25). They retain their proposed identity in component
   // state so handleApplyToPanelSchedule can flag them is_proposed=true at
   // insert time without interfering with the demand math.
-  const appliancesForCalc = useMemo<ResidentialAppliances>(() => {
-    if (proposedLoads.length === 0) return appliances;
-    const proposedAsOther = proposedLoads.map(p => ({
-      description: p.description,
-      kw: p.kw,
-      voltage: p.voltage,
-      continuous: p.continuous,
-      proposed: true,
-      category: p.category,
-    }));
-    return {
-      ...appliances,
-      otherAppliances: [...(appliances.otherAppliances ?? []), ...proposedAsOther],
-    };
-  }, [appliances, proposedLoads]);
+  const appliancesForCalc = useMemo<ResidentialAppliances>(
+    () => appliancesWithProposed(appliances, proposedLoads),
+    [appliances, proposedLoads],
+  );
 
   // Calculate load
   const necEdition = useProjectNecEdition(project);
@@ -240,11 +218,8 @@ export const DwellingLoadCalculator: React.FC<DwellingLoadCalculatorProps> = ({
           necEdition
         });
       } else {
-        return calculateMultiFamilyLoad({
-          unitTemplates: unitTemplates.map(t => ({ ...t, appliances: appliancesForCalc })),
-          housePanelLoad,
-          necEdition
-        });
+        // Same function the packet and the MF EV calculator recompute with (#158).
+        return calculateMultiFamilyLoadForProject(unitTemplates, appliances, proposedLoads, housePanelLoad, necEdition);
       }
     } catch (error) {
       console.error('Load calculation error:', error);
@@ -256,13 +231,7 @@ export const DwellingLoadCalculator: React.FC<DwellingLoadCalculatorProps> = ({
   // Uses value comparison to avoid infinite re-render loop (updateProject changes project → loadResult recomputes → useEffect fires)
   useEffect(() => {
     if (isSingleFamily || !loadResult) return;
-    const totalUnits = unitTemplates.reduce((sum, t) => sum + t.unitCount, 0);
-    const avgSqFt = totalUnits > 0
-      ? Math.round(unitTemplates.reduce((sum, t) => sum + t.squareFootage * t.unitCount, 0) / totalUnits)
-      : 1000;
-    const hasElectricCooking = appliances.range?.enabled === true && appliances.range.type === 'electric';
-    const hasElectricHeat = appliances.hvac?.enabled === true &&
-      (appliances.hvac.type === 'heat_pump' || appliances.hvac.type === 'electric_heat');
+    const next = toStoredMultiFamilyLoad(loadResult, unitTemplates, appliances, housePanelLoad);
 
     // Compare key values to skip update if nothing changed. multiFamilyLoadResult
     // lives on settings.residential as an ad-hoc cache and isn't part of the
@@ -274,10 +243,10 @@ export const DwellingLoadCalculator: React.FC<DwellingLoadCalculatorProps> = ({
       commonAreaLoadVA: number;
     } } | undefined)?.multiFamilyLoadResult;
     if (stored &&
-        stored.totalDemandVA === loadResult.totalDemandVA &&
-        stored.serviceAmps === loadResult.serviceAmps &&
-        stored.dwellingUnits === totalUnits &&
-        stored.commonAreaLoadVA === housePanelLoad) {
+        stored.totalDemandVA === next.totalDemandVA &&
+        stored.serviceAmps === next.serviceAmps &&
+        stored.dwellingUnits === next.dwellingUnits &&
+        stored.commonAreaLoadVA === next.commonAreaLoadVA) {
       return;
     }
 
@@ -288,19 +257,7 @@ export const DwellingLoadCalculator: React.FC<DwellingLoadCalculatorProps> = ({
           ...latest.settings,
           residential: {
             ...latest.settings.residential,
-            multiFamilyLoadResult: {
-              totalDemandVA: loadResult.totalDemandVA,
-              totalConnectedVA: loadResult.totalConnectedVA,
-              demandFactor: loadResult.demandFactor,
-              serviceAmps: loadResult.serviceAmps,
-              recommendedServiceSize: loadResult.recommendedServiceSize,
-              breakdown: loadResult.breakdown,
-              dwellingUnits: totalUnits,
-              avgUnitSqFt: avgSqFt,
-              commonAreaLoadVA: housePanelLoad,
-              hasElectricCooking,
-              hasElectricHeat,
-            },
+            multiFamilyLoadResult: next,
           } as any,
         },
       }));
