@@ -4,6 +4,16 @@ All notable changes to SparkPlan.
 
 ---
 
+## 2026-10-24: Saved calculator results follow the current rules (#158)
+
+- **The packet recomputes the Multi-Family EV analysis.** The Multi-Family EV Calculator now saves every input with its result, and the packet recomputes the analysis from them under the current rules and the project's NEC edition. A change to the calculation reaches the packet without reopening the calculator.
+- **The NEC 220.84 building load is recomputed wherever it's read** (Multi-Family EV Calculator, packet, Copilot) from the Dwelling Load Calculator's saved unit templates and appliances, instead of the copy saved the last time that calculator was open.
+- **Analyses saved before this change** print as saved, and the permit packet form says so: open the Multi-Family EV Calculator once to bring them up to date.
+- **Proposed New Load (NEC 220.87).** When the saved value differs from the one computed from the proposed circuits, the form shows "Your entry differs. Use X kVA". Your value is kept until you click it.
+- Settings: `residential.mfEvCalculation.inputs` (JSONB, no migration).
+
+---
+
 ## 2026-10-24: AHJ pages print only what applies (#149, #150, #151, #152)
 
 - **Sheets print in sheet-number order (#152).** Panel schedules (E-301 …) printed after the E-4xx/5xx/6xx sheets; they now print between the diagrams and the multifamily / compliance sheets.

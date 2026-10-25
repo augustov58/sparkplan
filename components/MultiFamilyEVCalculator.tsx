@@ -25,7 +25,6 @@ import {
 import {
   calculateMultiFamilyEV,
   quickMultiFamilyEVCheck,
-  type MultiFamilyEVInput,
   type MultiFamilyEVResult,
   type CommonAreaLoadItem,
   type CommonAreaCategory
@@ -44,6 +43,7 @@ import { useProjects } from '../hooks/useProjects';
 import { useCircuits } from '../hooks/useCircuits';
 import { describeEvDesignDrift } from '../services/calculations/upstreamLoadAggregation';
 import { useProjectNecEdition } from '../hooks/useProjectNecEdition';
+import { buildMfEvInput, multiFamilyLoadFromSettings, sameMfEvInputs, type MfEvSavedInputs } from '../lib/storedCalcs';
 import { evseLoadCitation } from '../data/nec/evse-load';
 
 interface MultiFamilyEVCalculatorProps {
@@ -135,20 +135,18 @@ export const MultiFamilyEVCalculator: React.FC<MultiFamilyEVCalculatorProps> = (
   // Deferred saves patch the latest stored project (#134).
   const { patchProject } = useProjects();
   const { circuits: projectCircuits } = useCircuits(projectId);
-  // Read pre-calculated building load from DwellingLoadCalculator (stored in project settings)
-  const storedMFLoad = project?.settings?.residential?.multiFamilyLoadResult as {
-    totalDemandVA: number;
-    totalConnectedVA: number;
-    demandFactor: number;
-    serviceAmps: number;
-    recommendedServiceSize: number;
-    breakdown: { category: string; description: string; connectedVA: number; demandVA: number; demandFactor: number; necReference: string }[];
-    dwellingUnits: number;
-    avgUnitSqFt: number;
-    commonAreaLoadVA: number;
-    hasElectricCooking: boolean;
-    hasElectricHeat: boolean;
-  } | undefined;
+  // NEC edition for the per-EVSE load rule: project pick, else Florida's code
+  // cycle. Same resolution the permit packet uses, so the math matches the citations.
+  const necEdition = useProjectNecEdition(project);
+
+  // Building load from the DwellingLoadCalculator, recomputed from its saved
+  // inputs with the current rules (#158) — the saved copy can predate a rule change.
+  // Keyed on the values, not the settings object: every project save makes a
+  // new settings object, and a new reference would re-run the profile
+  // auto-populate effect below over the user's measured-method entries.
+  const freshMFLoad = multiFamilyLoadFromSettings(project?.settings?.residential, necEdition) ?? undefined;
+  const freshMFLoadKey = JSON.stringify(freshMFLoad ?? null);
+  const storedMFLoad = useMemo(() => freshMFLoad, [freshMFLoadKey]);
 
   // Restore persisted MF EV inputs (if any)
   const storedEvInputs = (project?.settings?.residential as any)?.mfEvInputs as {
@@ -305,66 +303,34 @@ export const MultiFamilyEVCalculator: React.FC<MultiFamilyEVCalculatorProps> = (
     return () => clearTimeout(timer);
   }, [evChargerCount, evChargerLevel, evAmpsPerCharger, useEVEMS, capacityReserveVA, existingServiceAmps, selectedScenario, voltage, phase]);
 
-  // NEC edition for the per-EVSE load rule: project pick, else Florida's code
-  // cycle. Same resolution the permit packet uses, so the math matches the citations.
-  const necEdition = useProjectNecEdition(project);
-
-  // Calculate results
-  const result = useMemo<MultiFamilyEVResult | null>(() => {
-    try {
-      // Build pre-calculated load from DwellingLoadCalculator if available and method is 'calculated'
-      const preCalculatedBuildingLoad = (existingLoadMethod === 'calculated' && storedMFLoad)
-        ? {
-            totalDemandVA: storedMFLoad.totalDemandVA,
-            totalConnectedVA: storedMFLoad.totalConnectedVA,
-            demandFactor: storedMFLoad.demandFactor,
-            serviceAmps: storedMFLoad.serviceAmps,
-            breakdown: storedMFLoad.breakdown,
-          }
-        : undefined;
-
-      const input: MultiFamilyEVInput = {
-        buildingName: buildingName || undefined,
-        dwellingUnits,
-        avgUnitSqFt,
-        voltage,
-        phase,
-        existingServiceAmps,
-        evChargers: {
-          count: evChargerCount,
-          level: evChargerLevel,
-          ampsPerCharger: evAmpsPerCharger,
-        },
-        hasElectricHeat,
-        hasElectricCooking,
-        // Use itemized loads if enabled and has items, otherwise use simple VA
-        commonAreaLoadVA: useItemizedCommonArea ? 0 : commonAreaLoadVA,
-        commonAreaLoads: useItemizedCommonArea && commonAreaItems.length > 0 ? commonAreaItems : undefined,
-        transformer: hasTransformer ? { kvaRating: transformerKVA } : undefined,
-        useEVEMS,
-        necEdition,
-        capacityReserveVA: capacityReserveVA > 0 ? capacityReserveVA : undefined,
-        // NEC 220.87 - Existing Load Determination Method
-        existingLoadMethod,
-        measuredPeakDemandKW: existingLoadMethod !== 'calculated' && measuredPeakDemandKW > 0 ? measuredPeakDemandKW : undefined,
-        measurementPeriod: existingLoadMethod !== 'calculated' && measurementPeriod ? measurementPeriod : undefined,
-        utilityCompany: existingLoadMethod !== 'calculated' && utilityCompany ? utilityCompany : undefined,
-        preCalculatedBuildingLoad,
-      };
-
-      return calculateMultiFamilyEV(input);
-    } catch (err) {
-      console.error('Multi-Family EV calculation error:', err);
-      return null;
-    }
-  }, [
+  // Every input the calculation reads, saved with the result so the packet
+  // can recompute it under the current rules (#158).
+  const savedInputs = useMemo<MfEvSavedInputs>(() => ({
+    buildingName: buildingName || undefined,
+    dwellingUnits, avgUnitSqFt, voltage, phase, existingServiceAmps,
+    evChargerCount, evChargerLevel, evAmpsPerCharger,
+    hasElectricHeat, hasElectricCooking, commonAreaLoadVA,
+    useItemizedCommonArea, commonAreaItems,
+    hasTransformer, transformerKVA, useEVEMS, capacityReserveVA,
+    existingLoadMethod, measuredPeakDemandKW, measurementPeriod, utilityCompany,
+  }), [
     buildingName, dwellingUnits, avgUnitSqFt, voltage, phase, existingServiceAmps,
     evChargerCount, evChargerLevel, evAmpsPerCharger,
     hasElectricHeat, hasElectricCooking, commonAreaLoadVA,
     useItemizedCommonArea, commonAreaItems,
     hasTransformer, transformerKVA, useEVEMS, capacityReserveVA,
-    existingLoadMethod, measuredPeakDemandKW, storedMFLoad, necEdition
+    existingLoadMethod, measuredPeakDemandKW, measurementPeriod, utilityCompany,
   ]);
+
+  // Calculate results
+  const result = useMemo<MultiFamilyEVResult | null>(() => {
+    try {
+      return calculateMultiFamilyEV(buildMfEvInput(savedInputs, storedMFLoad, necEdition));
+    } catch (err) {
+      console.error('Multi-Family EV calculation error:', err);
+      return null;
+    }
+  }, [savedInputs, storedMFLoad, necEdition]);
 
   // Sprint 2C M3 (2026-05-17): persist the computed MF-EV result so the
   // permit packet can include it without duplicating inputs. Source of
@@ -384,7 +350,7 @@ export const MultiFamilyEVCalculator: React.FC<MultiFamilyEVCalculatorProps> = (
     if (!evInputsRestoredRef.current && (project.settings?.residential as any)?.mfEvCalculation) return;
 
     const stored = (project.settings?.residential as any)?.mfEvCalculation as
-      | { result?: MultiFamilyEVResult; buildingName?: string; computedAt?: string }
+      | { result?: MultiFamilyEVResult; buildingName?: string; computedAt?: string; inputs?: MfEvSavedInputs }
       | undefined;
     // Cheap structural check — if the result payload matches what's stored,
     // skip the write. Compare on a small projection (building demand + EV
@@ -398,6 +364,7 @@ export const MultiFamilyEVCalculator: React.FC<MultiFamilyEVCalculatorProps> = (
     if (
       stored?.buildingName === (buildingName || undefined)
       && JSON.stringify(projection(stored?.result)) === JSON.stringify(projection(result))
+      && sameMfEvInputs(stored?.inputs, savedInputs)
     ) {
       return;
     }
@@ -413,13 +380,14 @@ export const MultiFamilyEVCalculator: React.FC<MultiFamilyEVCalculatorProps> = (
               result,
               buildingName: buildingName || undefined,
               computedAt: new Date().toISOString(),
+              inputs: savedInputs,
             },
           } as any,
         },
       }));
     }, 750);
     return () => clearTimeout(timer);
-  }, [result, buildingName]);
+  }, [result, buildingName, savedInputs]);
 
   // Add EV Infrastructure handler (must be after result useMemo)
   const handleAddEVInfrastructure = useCallback(async () => {
