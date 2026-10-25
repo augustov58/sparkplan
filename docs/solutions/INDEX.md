@@ -4,6 +4,7 @@ One note per hard problem, written by the model that solved it via the `extract-
 Each entry: `- [title](file.md) — reusable rule`.
 
 <!-- Newest first -->
+- [AHJ pages printed placeholders, vacuous "Compliant" rows and out-of-order sheets](2026-10-24-ahj-pages-print-what-applies.md) — check `list.length` before `list.every(...)` and print N/A for an empty list; when display order and numbering come from different sources, sort by the numbering key before rendering
 - [Jurisdiction checklist reported pages and content the packet didn't have](2026-10-24-checklist-reports-what-was-built.md) — detect the content a requirement names in the built packet, never a toggle or a page that could hold it; after gating `required`, a not-required item that still detects is a proxy check
 - [Packet printed "’ PANEL" / "d3%"; City of Miami got the County manifest](2026-10-23-pdf-glyphs-and-manifest-match.md) — import `Text` from `services/pdfExport/PdfText`, never react-pdf; put an "every X" transform where every X passes (the render primitive), not at an entry point; match jurisdiction rows on city/state/ahj_name, never display-name substrings
 - [NEC edition came from four sources that disagreed](2026-10-21-nec-edition-single-resolver.md) — compute a jurisdiction/date-dependent value from one resolver at read time; count and classify every reader; never store the resolved value

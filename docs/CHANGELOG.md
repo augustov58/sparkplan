@@ -4,6 +4,15 @@ All notable changes to SparkPlan.
 
 ---
 
+## 2026-10-24: AHJ pages print only what applies (#149, #150, #151, #152)
+
+- **Sheets print in sheet-number order (#152).** Panel schedules (E-301 …) printed after the E-4xx/5xx/6xx sheets; they now print between the diagrams and the multifamily / compliance sheets.
+- **No placeholder on bound packets (#149).** General Notes printed an "AHJ-specific notes will appear here when this packet is bound to an AHJ" box even when the notes above it were the AHJ's. It now prints only when no AHJ manifest applies.
+- **Compliance Summary (#150).** The Inspector Mode promo is gone from the AHJ sheet. A row with nothing to check (0 feeders, no circuits) prints N/A instead of "Compliant". Grounding & Bonding reads "Compliant" when the packet includes the grounding plan page.
+- **Packet form help text (#151).** In calculated mode, the Max Demand help text now cites the NEC method the calculation ran (Part III demand factors, or the 220.82/220.83/220.84 Optional Method) and the Load Calculation sheet with the packet's sheet prefix, instead of an internal function name and a fixed "220.84/220.42 … E-101".
+
+---
+
 ## 2026-10-24: Jurisdiction checklist and notes match the packet and the job (#140, #147, #148)
 
 - **E-502 no longer marks missing pages as satisfied (#140).** The checklist read the section toggles, so a toggled-on page that wasn't built (voltage drop without feeders, fault current without a short-circuit calc, EVEMS or EVSE labeling without an EV panel) still printed [X]. It now reads the pages actually in the packet.

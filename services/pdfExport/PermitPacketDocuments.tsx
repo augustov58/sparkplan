@@ -418,6 +418,8 @@ interface GeneralNotesPageProps {
   contractorName?: string;
   contractorLicense?: string;
   sheetId?: string;
+  /** An AHJ manifest resolved: the notes above are already its notes (#149). */
+  ahjBound?: boolean;
 }
 
 export const GeneralNotesPage: React.FC<GeneralNotesPageProps> = ({
@@ -427,6 +429,7 @@ export const GeneralNotesPage: React.FC<GeneralNotesPageProps> = ({
   contractorName,
   contractorLicense,
   sheetId,
+  ahjBound = false,
 }) => (
   <Page size="LETTER" style={themeStyles.page}>
     <BrandBar pageLabel="GENERAL NOTES" sheetId={sheetId} />
@@ -462,23 +465,25 @@ export const GeneralNotesPage: React.FC<GeneralNotesPageProps> = ({
       ))}
     </View>
 
-    <View style={[themeStyles.noteBox, { marginTop: 10 }]}>
-      <Text
-        style={{
-          fontSize: 9,
-          fontFamily: 'Helvetica-Bold',
-          marginBottom: 3,
-          color: '#1e3a8a',
-        }}
-      >
-        AHJ-SPECIFIC NOTES
-      </Text>
-      <Text style={themeStyles.noteText}>
-        Additional jurisdiction-specific notes from the AHJ manifest will appear
-        here when this packet is bound to a specific AHJ. Contact the local
-        building department for current submittal requirements.
-      </Text>
-    </View>
+    {!ahjBound && (
+      <View style={[themeStyles.noteBox, { marginTop: 10 }]}>
+        <Text
+          style={{
+            fontSize: 9,
+            fontFamily: 'Helvetica-Bold',
+            marginBottom: 3,
+            color: '#1e3a8a',
+          }}
+        >
+          AHJ-SPECIFIC NOTES
+        </Text>
+        <Text style={themeStyles.noteText}>
+          Additional jurisdiction-specific notes from the AHJ manifest will appear
+          here when this packet is bound to a specific AHJ. Contact the local
+          building department for current submittal requirements.
+        </Text>
+      </View>
+    )}
 
     <BrandFooter
       projectName={projectName}
@@ -2143,10 +2148,24 @@ export const ComplianceSummary: React.FC<ComplianceSummaryProps> = ({
 
   // Status values are ASCII-only; Helvetica StandardEncoding can't render
   // checkmark / x-mark / warning glyphs reliably across viewers.
+  type CheckState = 'pass' | 'fail' | 'warn' | 'na';
+  // `[].every()` is true: an empty list is N/A, not Compliant (#150).
+  const everyCheck = <T,>(
+    list: T[],
+    has: (x: T) => unknown,
+    missing: { status: string; ok: CheckState },
+  ): { status: string; ok: CheckState } =>
+    list.length === 0
+      ? { status: 'N/A', ok: 'na' }
+      : list.every(has)
+        ? { status: 'Compliant', ok: 'pass' }
+        : missing;
+  const incomplete = { status: 'Incomplete', ok: 'fail' as const };
+
   const complianceChecks: Array<{
     item: string;
     status: string;
-    ok: 'pass' | 'fail' | 'warn';
+    ok: CheckState;
     article: string;
   }> = [
     {
@@ -2157,20 +2176,17 @@ export const ComplianceSummary: React.FC<ComplianceSummaryProps> = ({
     },
     {
       item: 'Panel Bus Ratings Specified',
-      status: panels.every(p => p.bus_rating) ? 'Compliant' : 'Incomplete',
-      ok: panels.every(p => p.bus_rating) ? 'pass' : 'fail',
+      ...everyCheck(panels, p => p.bus_rating, incomplete),
       article: 'NEC 408.30',
     },
     {
       item: 'Circuit Overcurrent Protection',
-      status: circuits.every(c => c.breaker_amps) ? 'Compliant' : 'Incomplete',
-      ok: circuits.every(c => c.breaker_amps) ? 'pass' : 'fail',
+      ...everyCheck(circuits, c => c.breaker_amps, incomplete),
       article: 'NEC 240.4',
     },
     {
       item: 'Conductor Sizing Specified',
-      status: circuits.every(c => c.conductor_size) ? 'Compliant' : 'Incomplete',
-      ok: circuits.every(c => c.conductor_size) ? 'pass' : 'fail',
+      ...everyCheck(circuits, c => c.conductor_size, incomplete),
       article: 'NEC 310.16',
     },
     {
@@ -2181,14 +2197,13 @@ export const ComplianceSummary: React.FC<ComplianceSummaryProps> = ({
     },
     {
       item: 'Feeder Sizing Calculated',
-      status: feeders.every(f => f.phase_conductor_size) ? 'Compliant' : 'Partial',
-      ok: feeders.every(f => f.phase_conductor_size) ? 'pass' : 'warn',
+      ...everyCheck(feeders, f => f.phase_conductor_size, { status: 'Partial', ok: 'warn' }),
       article: 'NEC 215',
     },
   ];
 
-  const statusColor = (ok: 'pass' | 'fail' | 'warn') =>
-    ok === 'pass' ? '#166534' : ok === 'fail' ? '#991b1b' : '#92400e';
+  const statusColor = (ok: CheckState) =>
+    ok === 'pass' ? '#166534' : ok === 'fail' ? '#991b1b' : ok === 'na' ? '#6b7280' : '#92400e';
 
   const thCol = (w: string) => [themeStyles.th, { width: w }];
   const tdCol = (w: string) => [themeStyles.td, { width: w }];
@@ -2267,7 +2282,7 @@ export const ComplianceSummary: React.FC<ComplianceSummaryProps> = ({
           IMPORTANT NOTES
         </Text>
         <Text style={themeStyles.noteText}>
-          {`\u2022 This summary is based on the design data provided. Field verification is required.\n\u2022 All calculations comply with NEC ${necEdition}.\n\u2022 Final approval is subject to local building code requirements and inspector review.\n\u2022 For detailed compliance analysis, use the Inspector Mode AI feature.`}
+          {`\u2022 This summary is based on the design data provided. Field verification is required.\n\u2022 All calculations comply with NEC ${necEdition}.\n\u2022 Final approval is subject to local building code requirements and inspector review.`}
         </Text>
       </View>
 
