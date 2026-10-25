@@ -638,6 +638,7 @@ export const generatePermitPacket = async (data: PermitPacketData): Promise<void
           projectName={data.projectName}
           generalNotes={data.generalNotes}
           necEdition={data.necEdition}
+          ahjBound={!!data.manifest}
           {...contractor}
           sheetId={sheetIds[0]}
         />
@@ -1015,7 +1016,9 @@ export const generatePermitPacket = async (data: PermitPacketData): Promise<void
           circuits={data.circuits}
           feeders={data.feeders}
           projectName={data.projectName}
-          hasGrounding={data.hasGrounding}
+          // The grounding plan page builds from Table 250.66 even without a
+          // grounding_details row, so its presence in the packet counts (#150).
+          hasGrounding={data.hasGrounding || sections.grounding}
           necEdition={data.necEdition}
           {...contractor}
           sheetId={sheetIds[0]}
@@ -1363,6 +1366,11 @@ export const generatePermitPacket = async (data: PermitPacketData): Promise<void
   const generatedDiscipline = resolvedSheetIdPrefix
     ? disciplineFromSheetIdPrefix(resolvedSheetIdPrefix)
     : SHEET_DISCIPLINE_ELECTRICAL;
+
+  // Pages render in builder order, so order them by band: panel schedules
+  // (300) are pushed last but print before the 400/500/600 sheets (#152).
+  // Array sort is stable, so order within a band is kept.
+  builders.sort((a, b) => (a.band ?? 0) - (b.band ?? 0));
 
   const counters = newBandCounters();
   const allocatedIds: string[][] = builders.map((b) => {

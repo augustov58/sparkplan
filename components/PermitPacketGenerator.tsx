@@ -8,10 +8,13 @@ import { FileText, Download, Loader2, AlertCircle, CheckCircle, Info, Building2,
 import { generatePermitPacket, generateLightweightPermitPacket, type PermitPacketData, type PermitPacketAttachment } from '../services/pdfExport/permitPacketGenerator';
 import { AttachmentUploadCard } from './AttachmentUploadCard';
 import { useProjectAttachments, downloadAttachmentBytes, type ArtifactType, type CoverMode } from '../hooks/useProjectAttachments';
-import type { NEC22087NarrativeData, NEC22087Method } from '../services/pdfExport/PermitPacketDocuments';
+import { summarizeCalculationRefs, type NEC22087NarrativeData, type NEC22087Method } from '../services/pdfExport/PermitPacketDocuments';
 import { buildSingleFamilyDwellingContext, deriveNarrativeOccupancy } from '../lib/projectSettings';
 import {
+  BAND_CALCULATIONS,
   DEFAULT_SECTIONS,
+  disciplineFromSheetIdPrefix,
+  formatSheetId,
   resolveSections,
   type PacketSections,
 } from '../services/pdfExport/packetSections';
@@ -1946,11 +1949,24 @@ export const PermitPacketGenerator: React.FC<PermitPacketGeneratorProps> = ({ pr
                         placeholder="e.g., 145.5"
                         className={isCalculatedMode ? calcInputClass : userInputClass}
                       />
-                      {isCalculatedMode && (
-                        <p className="text-xs text-gray-500 mt-1">
-                          NEC-demanded existing load (via calculateAggregatedLoad → NEC 220.84/220.42 demand factors). Matches E-101.
-                        </p>
-                      )}
+                      {isCalculatedMode && (() => {
+                        // #151: cite what the calculation ran, and the load calc
+                        // sheet with the packet's prefix (EL- in Miami-Dade).
+                        const cite = summarizeCalculationRefs(aggregatedDemandSplit.necReferences);
+                        const method = cite.part === 'IV'
+                          ? `NEC 220 Part IV Optional Method, NEC ${cite.optionalSection}`
+                          : 'NEC 220 Part III demand factors';
+                        const sheetId = formatSheetId(BAND_CALCULATIONS, 1, disciplineFromSheetIdPrefix(
+                          currentProject.settings?.sheet_id_prefix_override ?? activeManifest?.sheetIdPrefix,
+                        ));
+                        return (
+                          <p className="text-xs text-gray-500 mt-1">
+                            Existing demand load from your panel schedules ({method}
+                            {cite.sections.length > 0 ? `; sections applied: NEC ${cite.sections.join(' / ')}` : ''}).
+                            {effectiveSections.loadCalculation ? ` Matches the Load Calculation Summary sheet (${sheetId}).` : ''}
+                          </p>
+                        );
+                      })()}
                     </div>
                     <div>
                       <label htmlFor="nec22087ProposedKVA" className="block text-sm font-medium text-gray-700 mb-2">
