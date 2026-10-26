@@ -55,3 +55,54 @@ export function getRangeDemand(numberOfRanges: number): RangeDemand {
   // Default to 1 range if invalid input
   return { numberOfRanges: 1, demandKW: 8, necReference: 'Table 220.55 Column C (default)' };
 }
+
+/** Table 220.55 covers household cooking appliances rated over 1¾ kW. */
+export const COOKING_APPLIANCE_TABLE_MIN_VA = 1750;
+const COLUMN_C_MAX_RATING_VA = 12_000;
+const NOTE_1_MAX_RATING_VA = 27_000;
+const NOTE_1_INCREASE_PER_KW = 0.05;
+
+/**
+ * Demand for the household cooking appliances of a dwelling feeder, by
+ * Column C — used in all cases (Note 3's Column A/B option is not taken;
+ * PE ruling 2026-10-26, #155).
+ *
+ * - All rated 12 kW or less: Column C for the count.
+ * - Any over 12 kW (Notes 1–2): average rating, counting each appliance under
+ *   12 kW as 12 kW; Column C raised 5% per kW or major fraction the average
+ *   exceeds 12 kW.
+ * - Any over 27 kW is outside the table: nameplate sum, with a warning.
+ *
+ * Callers pass only appliances rated over 1¾ kW.
+ */
+export function getCookingDemandVA(ratingsVA: number[]): {
+  demandVA: number;
+  necReference: string;
+  warnings: string[];
+} {
+  const count = ratingsVA.length;
+  if (count === 0) return { demandVA: 0, necReference: 'Table 220.55 Column C', warnings: [] };
+  const columnC_VA = getRangeDemand(count).demandKW * 1000;
+  const maxRatingVA = Math.max(...ratingsVA);
+
+  if (maxRatingVA > NOTE_1_MAX_RATING_VA) {
+    return {
+      demandVA: ratingsVA.reduce((a, b) => a + b, 0),
+      necReference: 'NEC 220.55 (over 27 kW — nameplate)',
+      warnings: ['WARNING: A cooking appliance over 27 kW is outside Table 220.55; taken at nameplate.'],
+    };
+  }
+  if (maxRatingVA <= COLUMN_C_MAX_RATING_VA) {
+    return { demandVA: columnC_VA, necReference: 'Table 220.55 Column C', warnings: [] };
+  }
+
+  const averageVA = ratingsVA.reduce((sum, va) => sum + Math.max(va, COLUMN_C_MAX_RATING_VA), 0) / count;
+  const excessKW = (averageVA - COLUMN_C_MAX_RATING_VA) / 1000;
+  // "each kilowatt or major fraction thereof"
+  const steps = Math.floor(excessKW) + (excessKW % 1 > 0.5 ? 1 : 0);
+  return {
+    demandVA: Math.round(columnC_VA * (1 + NOTE_1_INCREASE_PER_KW * steps)),
+    necReference: `Table 220.55 Column C, Note ${count > 1 ? '2' : '1'} (+${steps * 5}%)`,
+    warnings: [],
+  };
+}

@@ -15,15 +15,17 @@ import {
 import { getCircuitPhase } from '../calculations/demandFactor';
 import {
   calculateDwellingPanelDemand,
-  calculateDwellingUnitDemandVA,
+  calculateDwellingUnitPanelLoad,
+  dwellingSummaryFromOptionalMethod,
   isDwellingUnitPanel,
+  type DwellingPanelLoadSummary,
 } from '../calculations/residentialLoad';
 import {
   isEVEMSMarkerCircuit,
   findEVEMSSetpointMarker,
 } from '../calculations/upstreamLoadAggregation';
 import { lineToNeutralVoltage } from '../../lib/electricalDisplay';
-import { isEvseDescription } from '../../data/nec/evse-load';
+import { isEvseDescription, type NecEdition } from '../../data/nec/evse-load';
 
 // Helvetica + Helvetica-Bold are built-in PDF standard fonts in react-pdf —
 // calling Font.register() on them corrupts the font cache and causes
@@ -294,7 +296,7 @@ export const calculatePhaseBalancing = (
   return { phaseA_VA, phaseB_VA, phaseC_VA };
 };
 
-interface PanelSchedulePDFProps {
+export interface PanelSchedulePDFProps {
   panel: Panel;
   circuits: Circuit[];
   projectName: string;
@@ -373,6 +375,119 @@ interface PanelSchedulePDFProps {
   necEdition?: '2020' | '2023';
 }
 
+type SingleFamilyDwellingContext = NonNullable<PanelSchedulePDFProps['singleFamilyDwellingContext']>;
+
+/**
+ * Dwelling Load Summary for a panel page, or null when the panel is not a
+ * dwelling panel. Shared by the packet pages and the standalone export.
+ *
+ * - Single-family service panel (is_main, dwelling-shape circuits, single-
+ *   family or unset building type) with the dwelling context: E-301's
+ *   `calculateDwellingPanelDemand` (220.82 / 220.83, #132). The
+ *   `isDwellingUnitPanel` name check rejects "Main Panel" etc., so the MDP
+ *   is recognised by its circuits; multifamily aggregate MDPs carry feeders,
+ *   not these circuits.
+ * - Multifamily unit panel ("Unit 101"): `calculateDwellingUnitPanelLoad` —
+ *   Part III, or 220.83 when this permit adds load to it (#155).
+ * - Anything else (sub-panels, commercial): null.
+ */
+function dwellingLoadSummaryFor(
+  panel: Panel,
+  circuits: Circuit[],
+  opts: {
+    buildingType?: PanelSchedulePDFProps['buildingType'];
+    existingBuilding: boolean;
+    singleFamilyDwellingContext?: SingleFamilyDwellingContext;
+    necEdition?: NecEdition;
+  },
+): DwellingPanelLoadSummary | null {
+  const demandCircuits = circuits.map(c => ({
+    description: c.description,
+    load_watts: c.load_watts,
+    load_type: c.load_type,
+    breaker_amps: c.breaker_amps,
+    is_proposed: c.is_proposed,
+  }));
+  const hasDwellingShape = circuits.some(c => {
+    const d = (c.description ?? '').toLowerCase();
+    return (
+      d.includes('kitchen') ||
+      d.includes('range') ||
+      d.includes('laundry') ||
+      d.includes('dryer') ||
+      d.includes('water heater') ||
+      d.includes('dishwasher')
+    );
+  });
+  const isSingleFamilyContext =
+    opts.buildingType === 'single_family_residential' || opts.buildingType === undefined;
+  if (panel.is_main === true && hasDwellingShape && isSingleFamilyContext) {
+    if (!opts.singleFamilyDwellingContext) return null;
+    return dwellingSummaryFromOptionalMethod(calculateDwellingPanelDemand({
+      circuits: demandCircuits,
+      ...opts.singleFamilyDwellingContext,
+      voltage: panel.voltage || 240,
+      necEdition: opts.necEdition,
+    }));
+  }
+  const unitCircuits = circuits.map(c => ({ description: c.description, loadWatts: c.load_watts || 0 }));
+  if (!isDwellingUnitPanel(panel.name, unitCircuits)) return null;
+  return calculateDwellingUnitPanelLoad({
+    circuits: demandCircuits,
+    existingBuilding: opts.existingBuilding,
+    necEdition: opts.necEdition,
+  });
+}
+
+/** Summary grid, method note and breakdown table of a dwelling Load Summary. */
+const DwellingLoadSummaryBody: React.FC<{
+  summary: DwellingPanelLoadSummary;
+  circuitCount: number;
+  voltageDivisor: number;
+}> = ({ summary, circuitCount, voltageDivisor }) => (
+  <>
+    <View style={styles.summaryGrid}>
+      <View style={styles.summaryItem}>
+        <Text style={styles.summaryLabel}>Total Circuits</Text>
+        <Text style={styles.summaryValue}>{circuitCount}</Text>
+      </View>
+      <View style={styles.summaryItem}>
+        <Text style={styles.summaryLabel}>Connected Load</Text>
+        <Text style={styles.summaryValue}>{(summary.totalConnectedVA / 1000).toFixed(1)} kVA</Text>
+      </View>
+      <View style={styles.summaryItem}>
+        <Text style={styles.summaryLabel}>Demand Load</Text>
+        <Text style={styles.summaryValue}>{(summary.totalDemandVA / 1000).toFixed(1)} kVA</Text>
+      </View>
+      <View style={styles.summaryItem}>
+        <Text style={styles.summaryLabel}>Demand Amps</Text>
+        <Text style={styles.summaryValue}>{(summary.totalDemandVA / voltageDivisor).toFixed(1)}A</Text>
+      </View>
+    </View>
+    <Text style={[styles.summaryLabel, { marginTop: 4, fontSize: 7, fontStyle: 'italic' }]}>
+      {summary.note}
+    </Text>
+    <View style={styles.breakdownTable}>
+      <View style={styles.breakdownHeader}>
+        <Text style={styles.breakdownColType}>Load Type</Text>
+        <Text style={styles.breakdownColConnected}>Connected</Text>
+        <Text style={styles.breakdownColDemand}>Demand</Text>
+        <Text style={styles.breakdownColFactor}>Factor</Text>
+        <Text style={styles.breakdownColNec}>NEC</Text>
+      </View>
+      {summary.rows.map((r, i) => (
+        <View key={i} style={styles.breakdownRow}>
+          <Text style={styles.breakdownColType}>{r.loadType}</Text>
+          <Text style={styles.breakdownColConnected}>{(r.connectedVA / 1000).toFixed(1)} kVA</Text>
+          <Text style={styles.breakdownColDemand}>{(r.demandVA / 1000).toFixed(1)} kVA</Text>
+          <Text style={styles.breakdownColFactor}>{(r.demandFactor * 100).toFixed(0)}%</Text>
+          <Text style={styles.breakdownColNec}>{r.necReference.replace(/^NEC /, '')}</Text>
+        </View>
+      ))}
+    </View>
+  </>
+);
+
 // Main PDF Component for single panel — page-level fragment for embedding.
 export const PanelSchedulePages: React.FC<PanelSchedulePDFProps> = ({
   panel,
@@ -419,89 +534,15 @@ export const PanelSchedulePages: React.FC<PanelSchedulePDFProps> = ({
     (a, b) => a.circuit_number - b.circuit_number
   );
 
-  // NEC 220.82/.83 Optional Method demand for dwelling panels.
-  //
-  // Sprint 2C M6 fix-up #2 (2026-05-21): the upstream isDwellingUnitPanel
-  // helper is intentionally narrow — it matches ONLY multi-family unit
-  // panels ("Unit 101", "Apt 3B") and explicitly rejects single-family
-  // MDPs ("Main Panel", "House Panel", "Multifamily Test MDP"). That's
-  // correct for multi-family aggregate MDPs (which use NEC 220.84, not
-  // 220.82/.83) but excludes single-family service panels, which DO use
-  // 220.82/.83. So we layer a second check here: a panel marked is_main
-  // with dwelling-shape circuits (kitchen / range / laundry / dryer /
-  // water heater / dishwasher) is a single-family MDP and gets the
-  // dwelling demand. Multi-family aggregate MDPs DON'T have these
-  // circuits (their loads are feeders to unit panels), so this check
-  // doesn't false-positive on them. Sub-panels (is_main=false) keep the
-  // connected-sum + per-leg amps display since 220.82/.83 applies at the
-  // service level, not per sub-panel.
-  const dwellingCircuitsForCalc = realCircuits.map(c => ({
-    description: c.description,
-    loadWatts: c.load_watts || 0,
-  }));
-  const hasDwellingShape = dwellingCircuitsForCalc.some(c => {
-    const d = (c.description ?? '').toLowerCase();
-    return (
-      d.includes('kitchen') ||
-      d.includes('range') ||
-      d.includes('laundry') ||
-      d.includes('dryer') ||
-      d.includes('water heater') ||
-      d.includes('dishwasher')
-    );
+  // Dwelling Load Summary: single-family service panel (220.82 / 220.83,
+  // same function as E-101 / E-102) or multifamily unit panel (Part III, or
+  // 220.83 when the permit adds load to it, #155). See dwellingLoadSummaryFor.
+  const dwellingUnitDemand = dwellingLoadSummaryFor(panel, realCircuits, {
+    buildingType,
+    existingBuilding: showExistingNewMarkers,
+    singleFamilyDwellingContext,
+    necEdition,
   });
-  const isUnitPanel = isDwellingUnitPanel(panel.name, dwellingCircuitsForCalc);
-  // Gate single-family MDP detection on buildingType === 'single_family_residential'.
-  // - Multi-family aggregate MDPs (buildingType === 'multi_family') stay
-  //   on the non-dwelling display because they use NEC 220.84 (table demand
-  //   factors by unit count), not per-unit 220.82/.83.
-  // - Commercial buildings (buildingType === 'commercial') don't use the
-  //   dwelling method at all, even if they have "Kitchen Hood" circuits.
-  // - Multi-family UNIT panels still activate via isUnitPanel (which
-  //   doesn't depend on buildingType — it matches by panel name pattern).
-  // - Legacy callers (buildingType=undefined) default to single-family
-  //   behavior to preserve the dwelling display for projects that haven't
-  //   set buildingType yet; net effect for them matches Sprint 2C M5 behavior.
-  const isSingleFamilyContext =
-    buildingType === 'single_family_residential' || buildingType === undefined;
-  const isSingleFamilyMDP =
-    panel.is_main === true && hasDwellingShape && isSingleFamilyContext;
-  // Single-family service panel with the packet's dwelling context: same
-  // calculation as E-101 / E-102 (8 kVA knee for 220.83, 3 VA/ft² baseline,
-  // 220.83(A)/(B) branch). Otherwise the per-panel heuristic below.
-  const sfPanelDemand = isSingleFamilyMDP && singleFamilyDwellingContext
-    ? calculateDwellingPanelDemand({
-        circuits: realCircuits.map(c => ({
-          description: c.description,
-          load_watts: c.load_watts,
-          load_type: c.load_type,
-          breaker_amps: c.breaker_amps,
-          is_proposed: c.is_proposed,
-        })),
-        ...singleFamilyDwellingContext,
-        voltage: panel.voltage || 240,
-        necEdition,
-      })
-    : null;
-  const dwellingUnitDemand = sfPanelDemand
-    ? {
-        generalConnectedVA: sfPanelDemand.generalConnectedVA,
-        generalDemandVA: sfPanelDemand.generalDemandVA,
-        climateDemandVA: sfPanelDemand.hvacVA,
-        totalDemandVA: sfPanelDemand.totalDemandVA,
-      }
-    : (isUnitPanel || isSingleFamilyMDP)
-      ? calculateDwellingUnitDemandVA(dwellingCircuitsForCalc)
-      : null;
-  // Tier knee and citations for the breakdown rows. The heuristic path keeps
-  // its historical 10 kVA knee and bare-section labels.
-  const dwellingKneeVA = sfPanelDemand && singleFamilyDwellingContext?.existingDwelling ? 8_000 : 10_000;
-  const dwellingGeneralRef = sfPanelDemand
-    ? sfPanelDemand.generalNecReference.replace(/^NEC /, '')
-    : showExistingNewMarkers ? '220.83' : '220.82';
-  const dwellingHvacRef = sfPanelDemand?.hvacNecReference
-    ? `${sfPanelDemand.hvacNecReference.replace(/^NEC /, '')} / 220.60`
-    : '220.60';
 
   const phaseBalancing = calculatePhaseBalancing(sortedCircuits, panel.phase);
   const voltage = panel.voltage;
@@ -753,126 +794,18 @@ export const PanelSchedulePages: React.FC<PanelSchedulePDFProps> = ({
         <View style={styles.summarySection} wrap={false}>
           <Text style={styles.summaryTitle}>
             {dwellingUnitDemand
-              ? `Load Summary (NEC ${showExistingNewMarkers ? '220.83 — Existing Dwelling' : '220.82 — Optional Method'})`
+              ? `Load Summary (${dwellingUnitDemand.title})`
               : hasAggregatedDemand
                 ? `Load Summary (NEC Demand${aggregatedLoad?.necReference ? ` — ${aggregatedLoad.necReference}` : ''})`
                 : 'Load Summary & Phase Balance'}
           </Text>
 
           {dwellingUnitDemand ? (
-            <>
-              <View style={styles.summaryGrid}>
-                <View style={styles.summaryItem}>
-                  <Text style={styles.summaryLabel}>Total Circuits</Text>
-                  <Text style={styles.summaryValue}>{sortedCircuits.length}</Text>
-                </View>
-
-                <View style={styles.summaryItem}>
-                  <Text style={styles.summaryLabel}>Connected (general+climate)</Text>
-                  <Text style={styles.summaryValue}>
-                    {((dwellingUnitDemand.generalConnectedVA + dwellingUnitDemand.climateDemandVA) / 1000).toFixed(1)} kVA
-                  </Text>
-                </View>
-
-                <View style={styles.summaryItem}>
-                  <Text style={styles.summaryLabel}>Demand Load</Text>
-                  <Text style={styles.summaryValue}>
-                    {(dwellingUnitDemand.totalDemandVA / 1000).toFixed(1)} kVA
-                  </Text>
-                </View>
-
-                <View style={styles.summaryItem}>
-                  <Text style={styles.summaryLabel}>Demand Amps</Text>
-                  <Text style={styles.summaryValue}>
-                    {(dwellingUnitDemand.totalDemandVA / voltageDivisor).toFixed(1)}A
-                  </Text>
-                </View>
-              </View>
-              <Text style={[styles.summaryLabel, { marginTop: 4, fontSize: 7, fontStyle: 'italic' }]}>
-                {showExistingNewMarkers
-                  ? 'NEC 220.83 (Existing Dwelling Unit) — general loads tiered + largest of heating/cooling per 220.60. See breakdown below for per-category factor application.'
-                  : 'NEC 220.82 (Optional Method — New Dwelling Unit) — general loads tiered + largest of heating/cooling per 220.60. See breakdown below for per-category factor application.'}
-              </Text>
-              {/* NEC 220.82/.83 per-category breakdown — the dwelling
-                  equivalent of the commercial NEC 220 cascade table.
-                  Shows the tier split explicitly (first 10 kVA @ 100% +
-                  remainder @ 40%) so the inspector can verify the math
-                  without re-running the calc. Climate row appears only
-                  when at least one of heating/cooling is present. */}
-              {(() => {
-                const necRef = dwellingGeneralRef;
-                const kneeVA = dwellingKneeVA;
-                const kneeKva = kneeVA / 1000;
-                const genConnVA = dwellingUnitDemand.generalConnectedVA;
-                const genDemVA = dwellingUnitDemand.generalDemandVA;
-                const rows: Array<{
-                  loadType: string;
-                  connectedVA: number;
-                  demandVA: number;
-                  demandFactor: number;
-                  necReference: string;
-                }> = [];
-                if (genConnVA <= kneeVA) {
-                  rows.push({
-                    loadType: 'General loads (under tier threshold)',
-                    connectedVA: genConnVA,
-                    demandVA: genDemVA,
-                    demandFactor: 1.0,
-                    necReference: necRef,
-                  });
-                } else {
-                  rows.push({
-                    loadType: `General loads (first ${kneeKva} kVA @ 100%)`,
-                    connectedVA: kneeVA,
-                    demandVA: kneeVA,
-                    demandFactor: 1.0,
-                    necReference: necRef,
-                  });
-                  rows.push({
-                    loadType: 'General loads (remainder @ 40%)',
-                    connectedVA: genConnVA - kneeVA,
-                    demandVA: genDemVA - kneeVA,
-                    demandFactor: 0.4,
-                    necReference: necRef,
-                  });
-                }
-                if (dwellingUnitDemand.climateDemandVA > 0) {
-                  rows.push({
-                    loadType: 'Climate (largest of HVAC, non-coincident)',
-                    connectedVA: dwellingUnitDemand.climateDemandVA,
-                    demandVA: dwellingUnitDemand.climateDemandVA,
-                    demandFactor: 1.0,
-                    necReference: dwellingHvacRef,
-                  });
-                }
-                return (
-                  <View style={styles.breakdownTable}>
-                    <View style={styles.breakdownHeader}>
-                      <Text style={styles.breakdownColType}>Load Type</Text>
-                      <Text style={styles.breakdownColConnected}>Connected</Text>
-                      <Text style={styles.breakdownColDemand}>Demand</Text>
-                      <Text style={styles.breakdownColFactor}>Factor</Text>
-                      <Text style={styles.breakdownColNec}>NEC</Text>
-                    </View>
-                    {rows.map((r, i) => (
-                      <View key={i} style={styles.breakdownRow}>
-                        <Text style={styles.breakdownColType}>{r.loadType}</Text>
-                        <Text style={styles.breakdownColConnected}>
-                          {(r.connectedVA / 1000).toFixed(1)} kVA
-                        </Text>
-                        <Text style={styles.breakdownColDemand}>
-                          {(r.demandVA / 1000).toFixed(1)} kVA
-                        </Text>
-                        <Text style={styles.breakdownColFactor}>
-                          {(r.demandFactor * 100).toFixed(0)}%
-                        </Text>
-                        <Text style={styles.breakdownColNec}>{r.necReference}</Text>
-                      </View>
-                    ))}
-                  </View>
-                );
-              })()}
-            </>
+            <DwellingLoadSummaryBody
+              summary={dwellingUnitDemand}
+              circuitCount={sortedCircuits.length}
+              voltageDivisor={voltageDivisor}
+            />
           ) : hasAggregatedDemand ? (
             <>
               <View style={styles.summaryGrid}>
@@ -1067,6 +1000,9 @@ interface MultiPanelDocumentProps {
       necReference: string;
     }>;
   }>;
+  /** Mirrors PanelSchedulePDFProps.singleFamilyDwellingContext. */
+  singleFamilyDwellingContext?: SingleFamilyDwellingContext;
+  necEdition?: NecEdition;
 }
 
 export const MultiPanelDocument: React.FC<MultiPanelDocumentProps> = ({
@@ -1079,6 +1015,8 @@ export const MultiPanelDocument: React.FC<MultiPanelDocumentProps> = ({
   showExistingNewMarkers = false,
   buildingType,
   aggregatedLoadByPanel,
+  singleFamilyDwellingContext,
+  necEdition,
 }) => (
   <Document>
     {panels.map((panel) => {
@@ -1254,29 +1192,12 @@ export const MultiPanelDocument: React.FC<MultiPanelDocumentProps> = ({
             const phaseC_Amps = phaseBalancing.phaseC_VA / vLN;
             const voltageDivisor = panel.voltage * (panel.phase === 3 ? Math.sqrt(3) : 1);
 
-            const dwellingCircuitsForCalc = circuits.map(c => ({
-              description: c.description,
-              loadWatts: c.load_watts || 0,
-            }));
-            const hasDwellingShape2 = dwellingCircuitsForCalc.some(c => {
-              const d = (c.description ?? '').toLowerCase();
-              return (
-                d.includes('kitchen') ||
-                d.includes('range') ||
-                d.includes('laundry') ||
-                d.includes('dryer') ||
-                d.includes('water heater') ||
-                d.includes('dishwasher')
-              );
+            const dwellingDemand = dwellingLoadSummaryFor(panel, circuits, {
+              buildingType,
+              existingBuilding: showExistingNewMarkers,
+              singleFamilyDwellingContext,
+              necEdition,
             });
-            const isUnitPanel2 = isDwellingUnitPanel(panel.name, dwellingCircuitsForCalc);
-            const isSingleFamilyContext2 =
-              buildingType === 'single_family_residential' || buildingType === undefined;
-            const isSingleFamilyMDP2 =
-              panel.is_main === true && hasDwellingShape2 && isSingleFamilyContext2;
-            const dwellingDemand = (isUnitPanel2 || isSingleFamilyMDP2)
-              ? calculateDwellingUnitDemandVA(dwellingCircuitsForCalc)
-              : null;
 
             const aggLoad = aggregatedLoadByPanel?.get(panel.id);
             const hasAggregatedDemand =
@@ -1294,115 +1215,18 @@ export const MultiPanelDocument: React.FC<MultiPanelDocumentProps> = ({
               <View style={styles.summarySection} wrap={false}>
                 <Text style={styles.summaryTitle}>
                   {dwellingDemand
-                    ? `Load Summary (NEC ${showExistingNewMarkers ? '220.83 — Existing Dwelling' : '220.82 — Optional Method'})`
+                    ? `Load Summary (${dwellingDemand.title})`
                     : hasAggregatedDemand
                       ? `Load Summary (NEC Demand${aggLoad?.necReference ? ` — ${aggLoad.necReference}` : ''})`
                       : 'Load Summary & Phase Balance'}
                 </Text>
 
                 {dwellingDemand ? (
-                  <>
-                    <View style={styles.summaryGrid}>
-                      <View style={styles.summaryItem}>
-                        <Text style={styles.summaryLabel}>Total Circuits</Text>
-                        <Text style={styles.summaryValue}>{circuits.length}</Text>
-                      </View>
-                      <View style={styles.summaryItem}>
-                        <Text style={styles.summaryLabel}>Connected (general+climate)</Text>
-                        <Text style={styles.summaryValue}>
-                          {((dwellingDemand.generalConnectedVA + dwellingDemand.climateDemandVA) / 1000).toFixed(1)} kVA
-                        </Text>
-                      </View>
-                      <View style={styles.summaryItem}>
-                        <Text style={styles.summaryLabel}>Demand Load</Text>
-                        <Text style={styles.summaryValue}>
-                          {(dwellingDemand.totalDemandVA / 1000).toFixed(1)} kVA
-                        </Text>
-                      </View>
-                      <View style={styles.summaryItem}>
-                        <Text style={styles.summaryLabel}>Demand Amps</Text>
-                        <Text style={styles.summaryValue}>
-                          {(dwellingDemand.totalDemandVA / voltageDivisor).toFixed(1)}A
-                        </Text>
-                      </View>
-                    </View>
-                    <Text style={[styles.summaryLabel, { marginTop: 4, fontSize: 7, fontStyle: 'italic' }]}>
-                      {showExistingNewMarkers
-                        ? 'NEC 220.83 (Existing Dwelling Unit) — general loads tiered + largest of heating/cooling per 220.60. See breakdown below.'
-                        : 'NEC 220.82 (Optional Method — New Dwelling Unit) — general loads tiered + largest of heating/cooling per 220.60. See breakdown below.'}
-                    </Text>
-                    {(() => {
-                      const necRef = showExistingNewMarkers ? '220.83' : '220.82';
-                      const genConnVA = dwellingDemand.generalConnectedVA;
-                      const genDemVA = dwellingDemand.generalDemandVA;
-                      const rows: Array<{
-                        loadType: string;
-                        connectedVA: number;
-                        demandVA: number;
-                        demandFactor: number;
-                        necReference: string;
-                      }> = [];
-                      if (genConnVA <= 10_000) {
-                        rows.push({
-                          loadType: 'General loads (under tier threshold)',
-                          connectedVA: genConnVA,
-                          demandVA: genDemVA,
-                          demandFactor: 1.0,
-                          necReference: necRef,
-                        });
-                      } else {
-                        rows.push({
-                          loadType: 'General loads (first 10 kVA @ 100%)',
-                          connectedVA: 10_000,
-                          demandVA: 10_000,
-                          demandFactor: 1.0,
-                          necReference: necRef,
-                        });
-                        rows.push({
-                          loadType: 'General loads (remainder @ 40%)',
-                          connectedVA: genConnVA - 10_000,
-                          demandVA: genDemVA - 10_000,
-                          demandFactor: 0.4,
-                          necReference: necRef,
-                        });
-                      }
-                      if (dwellingDemand.climateDemandVA > 0) {
-                        rows.push({
-                          loadType: 'Climate (largest of HVAC, non-coincident)',
-                          connectedVA: dwellingDemand.climateDemandVA,
-                          demandVA: dwellingDemand.climateDemandVA,
-                          demandFactor: 1.0,
-                          necReference: '220.60',
-                        });
-                      }
-                      return (
-                        <View style={styles.breakdownTable}>
-                          <View style={styles.breakdownHeader}>
-                            <Text style={styles.breakdownColType}>Load Type</Text>
-                            <Text style={styles.breakdownColConnected}>Connected</Text>
-                            <Text style={styles.breakdownColDemand}>Demand</Text>
-                            <Text style={styles.breakdownColFactor}>Factor</Text>
-                            <Text style={styles.breakdownColNec}>NEC</Text>
-                          </View>
-                          {rows.map((r, i) => (
-                            <View key={i} style={styles.breakdownRow}>
-                              <Text style={styles.breakdownColType}>{r.loadType}</Text>
-                              <Text style={styles.breakdownColConnected}>
-                                {(r.connectedVA / 1000).toFixed(1)} kVA
-                              </Text>
-                              <Text style={styles.breakdownColDemand}>
-                                {(r.demandVA / 1000).toFixed(1)} kVA
-                              </Text>
-                              <Text style={styles.breakdownColFactor}>
-                                {(r.demandFactor * 100).toFixed(0)}%
-                              </Text>
-                              <Text style={styles.breakdownColNec}>{r.necReference}</Text>
-                            </View>
-                          ))}
-                        </View>
-                      );
-                    })()}
-                  </>
+                  <DwellingLoadSummaryBody
+                    summary={dwellingDemand}
+                    circuitCount={circuits.length}
+                    voltageDivisor={voltageDivisor}
+                  />
                 ) : hasAggregatedDemand ? (
                   <>
                     <View style={styles.summaryGrid}>

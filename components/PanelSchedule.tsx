@@ -6,7 +6,7 @@
 
 import React, { useState, useMemo, useCallback } from 'react';
 import { Project } from '../types';
-import { isExistingConstructionProject } from '../lib/projectSettings';
+import { buildSingleFamilyDwellingContext, isExistingConstructionProject } from '../lib/projectSettings';
 import { LayoutGrid, Download, Edit2, Save, X, Trash2, Settings, Calculator, Info, ArrowDown, Plus, Camera } from 'lucide-react';
 import { PanelPhotoImporter } from './PanelPhotoImporter';
 import type { ExtractedCircuit } from '@/services/panelOcrService';
@@ -30,7 +30,8 @@ import {
 } from '../services/calculations/upstreamLoadAggregation';
 import {
   calculateDwellingPanelDemand,
-  calculateDwellingUnitDemandVA,
+  calculateDwellingUnitPanelLoad,
+  type DwellingSummaryRow,
   isDwellingUnitPanel,
 } from '../services/calculations/residentialLoad';
 import type { LoadTypeCode } from '../types';
@@ -295,8 +296,9 @@ export const PanelSchedule: React.FC<PanelScheduleProps> = ({ project }) => {
   //     proposed loads, manually-added circuits, and photo-imported ones.
   //     The summary number now matches what's physically on the panel,
   //     regardless of whether the appliance toggles were updated.
-  //  2. Sub-panel of a multi-family dwelling unit → run
-  //     calculateDwellingUnitDemandVA over its circuits.
+  //  2. Sub-panel of a multi-family dwelling unit → NEC 220 Part III, or
+  //     220.83 when the permit adds load to it (calculateDwellingUnitPanelLoad,
+  //     the function the panel-schedule PDF uses; #155).
   const dwellingUnitDemand = useMemo(() => {
     if (!selectedPanel) return null;
     const occupancy = project.settings?.occupancyType;
@@ -335,24 +337,30 @@ export const PanelSchedule: React.FC<PanelScheduleProps> = ({ project }) => {
     }
 
     // Branch 2: sub-panel dwelling-unit detection (multi-family). Returns
-    // the calc shape merged with necArticle so the union with Branch 1
-    // stays single-shape — every reader can read .necArticle and
-    // .totalConnectedVA without narrowing.
+    // the same shape as Branch 1 plus the breakdown rows.
     if (selectedPanel.is_main) return null;
     const dwellingCircuits = panelCircuits.map(c => ({
       description: c.description,
       loadWatts: c.load_watts || 0,
     }));
     if (!isDwellingUnitPanel(selectedPanel.name, dwellingCircuits)) return null;
-    const result = calculateDwellingUnitDemandVA(dwellingCircuits);
+    const summary = calculateDwellingUnitPanelLoad({
+      circuits: panelCircuits.map(c => ({
+        description: c.description,
+        load_watts: c.load_watts,
+        load_type: c.load_type,
+        breaker_amps: c.breaker_amps,
+        is_proposed: c.is_proposed,
+      })),
+      existingBuilding: isExistingConstructionProject(project),
+      necEdition,
+    });
     return {
-      totalConnectedVA: result.generalConnectedVA,
-      totalDemandVA: result.totalDemandVA,
-      necArticle: 'NEC 220.82' as const,
-      // Preserve the granular fields for callers that read them.
-      generalConnectedVA: result.generalConnectedVA,
-      generalDemandVA: result.generalDemandVA,
-      climateDemandVA: result.climateDemandVA,
+      totalConnectedVA: summary.totalConnectedVA,
+      totalDemandVA: summary.totalDemandVA,
+      necArticle: summary.necArticle,
+      necReferences: summary.necReferences,
+      rows: summary.rows,
     };
   }, [selectedPanel, panelCircuits, project.settings, necEdition]);
 
@@ -437,6 +445,34 @@ export const PanelSchedule: React.FC<PanelScheduleProps> = ({ project }) => {
     await updateCircuit(circuit.id, { is_proposed: !circuit.is_proposed });
   }, [updateCircuit]);
 
+  // Building type and single-family dwelling context for the Load Summary
+  // of both PDF exports (same inputs as the permit packet's panel pages).
+  const exportOccupancy = project.settings?.occupancyType;
+  // Mirrors PermitPacketGenerator.tsx buildingType derivation so the
+  // multi-panel export's dwelling-demand gate matches the permit-packet
+  // gate for the same project. Without this, the MultiPanelDocument's
+  // buildingType prop would be undefined and the gate would default to
+  // single-family — false-positiving on commercial restaurants with
+  // "Kitchen Hood" / multi-family MDPs with "Common Laundry" feeders.
+  // ResidentialSettings.totalUnits is the canonical field for unit count;
+  // PR #93 originally used multi_family_units which doesn't exist on the
+  // interface — buildingType derivation always fell through to
+  // 'single_family' for multi-family projects. Fixed during the tsc
+  // baseline cleanup that exposed the field name drift.
+  const isMultiFamily =
+    (project.settings?.residential?.totalUnits ?? 0) >= 3;
+  const buildingType: 'single_family_residential' | 'multi_family' | 'commercial' =
+    isMultiFamily
+      ? 'multi_family'
+      : (exportOccupancy === 'commercial' || exportOccupancy === 'industrial')
+        ? 'commercial'
+        : 'single_family_residential';
+  const exportDwelling = {
+    buildingType,
+    singleFamilyDwellingContext: buildSingleFamilyDwellingContext(project, !!multiFamilyCtx),
+    necEdition,
+  };
+
   const handleExportPDF = async () => {
     if (!selectedPanel) return;
     try {
@@ -446,6 +482,7 @@ export const PanelSchedule: React.FC<PanelScheduleProps> = ({ project }) => {
         project.name,
         project.address,
         !!isExistingConstruction,
+        exportDwelling,
       );
     } catch (error) {
       alert(`Failed to export PDF: ${error instanceof Error ? error.message : 'Unknown error'}`);
@@ -583,25 +620,6 @@ export const PanelSchedule: React.FC<PanelScheduleProps> = ({ project }) => {
         });
       });
 
-      // Mirrors PermitPacketGenerator.tsx buildingType derivation so the
-      // multi-panel export's dwelling-demand gate matches the permit-packet
-      // gate for the same project. Without this, the MultiPanelDocument's
-      // buildingType prop would be undefined and the gate would default to
-      // single-family — false-positiving on commercial restaurants with
-      // "Kitchen Hood" / multi-family MDPs with "Common Laundry" feeders.
-      // ResidentialSettings.totalUnits is the canonical field for unit count;
-      // PR #93 originally used multi_family_units which doesn't exist on the
-      // interface — buildingType derivation always fell through to
-      // 'single_family' for multi-family projects. Fixed during the tsc
-      // baseline cleanup that exposed the field name drift.
-      const isMultiFamily =
-        (project.settings?.residential?.totalUnits ?? 0) >= 3;
-      const buildingType: 'single_family_residential' | 'multi_family' | 'commercial' =
-        isMultiFamily
-          ? 'multi_family'
-          : (occ === 'commercial' || occ === 'industrial')
-            ? 'commercial'
-            : 'single_family_residential';
       await exportAllPanelsPDF(
         panels,
         circuitsByPanel,
@@ -610,6 +628,7 @@ export const PanelSchedule: React.FC<PanelScheduleProps> = ({ project }) => {
         !!isExistingConstruction,
         buildingType,
         aggregatedLoadByPanel,
+        exportDwelling,
       );
     } catch (error) {
       alert(`Failed to export PDF: ${error instanceof Error ? error.message : 'Unknown error'}`);
@@ -1938,10 +1957,50 @@ export const PanelSchedule: React.FC<PanelScheduleProps> = ({ project }) => {
                 </div>
               </div>
             </div>
+          ) : dwellingUnitDemand?.rows ? (
+            /* Multifamily unit panel: the breakdown behind the Panel Summary
+               demand (NEC 220 Part III, or 220.83 when load is added; #155). */
+            <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
+              <div className="bg-gray-800 text-white px-4 py-2 flex items-center justify-between">
+                <span className="font-semibold text-sm">DWELLING UNIT LOAD ({dwellingUnitDemand.necArticle.toUpperCase()})</span>
+                <Calculator className="w-4 h-4" />
+              </div>
+              <table className="w-full text-xs">
+                <thead className="bg-gray-100">
+                  <tr>
+                    <th className="p-2 text-left">LOAD TYPE</th>
+                    <th className="p-2 text-center">CONN. LOAD (KVA)</th>
+                    <th className="p-2 text-center">DEMAND FACTOR</th>
+                    <th className="p-2 text-center">DEMAND LOAD (KVA)</th>
+                    <th className="p-2 text-left">NEC</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {dwellingUnitDemand.rows.map((r: DwellingSummaryRow, i: number) => (
+                    <tr key={i} className="border-t border-gray-100">
+                      <td className="p-2">{r.loadType}</td>
+                      <td className="p-2 text-center font-mono">{(r.connectedVA / 1000).toFixed(2)}</td>
+                      <td className="p-2 text-center font-mono">{r.demandFactor.toFixed(2)}</td>
+                      <td className="p-2 text-center font-mono font-semibold">{(r.demandVA / 1000).toFixed(2)}</td>
+                      <td className="p-2 text-gray-600">{r.necReference.replace(/^NEC /, '')}</td>
+                    </tr>
+                  ))}
+                </tbody>
+                <tfoot className="bg-gray-50 font-semibold">
+                  <tr className="border-t-2 border-gray-300">
+                    <td className="p-2">TOTALS</td>
+                    <td className="p-2 text-center font-mono">{(dwellingUnitDemand.totalConnectedVA / 1000).toFixed(2)}</td>
+                    <td className="p-2 text-center">—</td>
+                    <td className="p-2 text-center font-mono text-[#2d3b2d]">{(dwellingUnitDemand.totalDemandVA / 1000).toFixed(2)}</td>
+                    <td className="p-2" />
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
           ) : (
           /* Per-circuit-type Standard Method walk — for commercial /
-              industrial / multi-family unit sub-panels where the Standard
-              Method or the per-unit-panel cascade is the correct calc. */
+              industrial sub-panels where the per-circuit-type cascade is
+              the correct calc. */
           <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
             <div className="bg-gray-800 text-white px-4 py-2 flex items-center justify-between">
               <span className="font-semibold text-sm">DEMAND FACTOR CALCULATION (NEC ARTICLE 220)</span>

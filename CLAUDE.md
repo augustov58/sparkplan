@@ -99,6 +99,20 @@ Implementation: `residentialLoad.ts` (`calculateSingleFamilyLoad`,
 `calculateDwellingPanelDemand` + `hasProposedHvac`, `calculateMultiFamilyLoad`),
 `upstreamLoadAggregation.ts` (MDP 220.84), `multiFamilyEV.ts` (simplified path).
 
+### Dwelling Unit Panels — NEC 220 Part III (PE ruling 2026-10-26, #155)
+```
+A unit panel inside a 220.84 building = NEC 220 Part III (standard method).
+220.83 only when the permit adds load to that unit (proposed circuits on its
+panel, existing building). 220.82 is not the unit default.
+Part III, exact: Table 220.55 Column C always (Notes 1–2 over 12 kW; Note 3
+A/B not taken); 220.53 75% for 4+ fastened-in-place appliances ≥500 W (not
+cooking, dryers, heat, A/C, EVSE); +25% of the largest MOTOR CIRCUIT
+(220.50/430.24) — never the A/C. Generator unit panels: no ×1.25.
+```
+Implementation: `residentialLoad.ts::calculateDwellingStandardLoad` (the only
+Part III walk) ← `calculateSingleFamilyLoad` (toggles), `calculateDwellingUnitPanelLoad`
+(circuits; unit pages, in-app summary, exports, MF generator).
+
 ### Short Circuit Analysis
 ```
 CRITICAL: 3-phase impedance multiplier is 1× (not 1.732×).
@@ -320,6 +334,7 @@ Real mistakes made in this repo, each paired with the rule that prevents recurre
 | `→`, `≤`, `≥`, `√` printed as `’`, `d`, `e` in the packet (Helvetica is WinAnsi); "→ PANEL x" is stored in the DB, so fixing source strings could never cover it (#153) | Import `Text` from `services/pdfExport/PdfText`. A transform meant for every X goes where every X passes, not at an entry point. |
 | The jurisdiction checklist detected sections by their toggles and by pages that only cite a requirement, and had no EV/transformer axis: E-502 printed [X] for absent pages and EVSE items on a café build-out (#140, #148) | `PacketAST.sectionKeys` comes from the built pages; a `detect()` checks the content it names (`partial` when only cited). EV / EVEMS / transformer items gate on `AHJContext.hasEV` / `hasEVEMS` / `hasTransformer` from `data/ahj/checks.ts`. |
 | Saved calculator results (`multiFamilyLoadResult`, `mfEvCalculation`) were printed as saved; a rule change reached a project only after its calculator was reopened, and E-402 printed a full-load EV design for an EVEMS job (#158) | Save a calculator's inputs with its result; readers recompute through the calculator's own function (`lib/storedCalcs.ts`). Compare saved jsonb with sorted keys (jsonb reorders them) or a save effect loops. |
+| One unit's load had four implementations: unit pages printed a 10 kVA bucket labelled 220.83, the generator a 220.82 bucket ×1.25, and the calculator Part III math labelled "220.82 Optional Method" (#155) | List every function that computes a quantity and every reader before fixing it. Make the math match the label printed, then route all of them through one core (`calculateDwellingStandardLoad`). |
 | Docs updated with stale "Last Updated" dates; completed features left as "NEXT UP" | Every doc touch updates its date to today; every shipped feature flips its ROADMAP status in the same PR. |
 
 ---

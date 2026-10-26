@@ -2,6 +2,7 @@
  * Residential Load Calculation Service
  * Implements NEC Article 220 for Dwelling Units
  * 
+ * NEC 220 Part III - Standard Method for a dwelling unit (unit panels, #155)
  * NEC 220.82 - Optional Method for Single-Family Dwellings (new)
  * NEC 220.83 - Optional Method for Existing Dwelling Units
  * NEC 220.84 - Optional Method for Multi-Family Dwellings
@@ -10,6 +11,7 @@
 import { ResidentialAppliances, DwellingUnitTemplate } from '../../types';
 import { getEvseLoadVA, isEvseDescription, type NecEdition } from '../../data/nec/evse-load';
 import { getNextStandardBreakerSize } from '../../data/nec/standard-breakers';
+import { COOKING_APPLIANCE_TABLE_MIN_VA, getCookingDemandVA } from '../../data/nec/table-220-55';
 import { sizeConductor } from './conductorSizing';
 
 // ============================================================================
@@ -169,7 +171,7 @@ export interface SingleFamilyInput {
    *     replacement); otherwise 220.83(A) folds it into the bucket.
    *     (PE ruling 2026-10-18, #132)
    *
-   * When false/undefined the canonical 220.82 standard method is used
+   * When false/undefined the NEC 220 Part III standard method is used
    * (per-category demand factors).
    */
   existingDwelling?: boolean;
@@ -179,9 +181,8 @@ export interface SingleFamilyInput {
    *   - General loads: first 10 kVA at 100 %, remainder at 40 %.
    *   - HVAC at 100 % of larger of heating/cooling (NEC 220.60).
    *
-   * Reconciles the documented gap between calculateSingleFamilyLoad's 220.82
-   * label and its per-category implementation. Has no effect when
-   * existingDwelling is true (220.83 bucket method already applies).
+   * Has no effect when existingDwelling is true (220.83 bucket method
+   * already applies).
    */
   useTrueOptionalMethod?: boolean;
   /** Edition for the per-EVSE load rule (`getEvseLoadVA`). Default '2020'. */
@@ -420,22 +421,244 @@ function recommendGecSize(serviceConductorSize: string, material: 'Cu' | 'Al' = 
 }
 
 // ============================================================================
+// NEC 220 PART III — DWELLING UNIT STANDARD METHOD
+// ============================================================================
+
+/** 220.53: appliances rated 500 W (¼ hp) or more count toward the four. */
+const FASTENED_APPLIANCE_MIN_VA = 500;
+const FASTENED_APPLIANCE_MIN_COUNT = 4;
+const FASTENED_APPLIANCE_FACTOR = 0.75;
+/** 220.50 → 430.24: 25% of the largest motor is added. */
+const LARGEST_MOTOR_ADDER = 0.25;
+/** 220.54: 5,000 VA or nameplate, whichever is larger. */
+const DRYER_MIN_VA = 5000;
+
+/**
+ * How a dwelling load enters Part III:
+ * - cooking   household cooking appliance (Table 220.55 when over 1¾ kW)
+ * - dryer     220.54
+ * - heating / cooling   220.51 / 220.50, larger of the two per 220.60
+ * - appliance fastened in place, 220.53 (75% for four or more)
+ * - motor     a fastened-in-place appliance that is also the 25% largest-motor
+ *             candidate (220.50, 430.24) — motor circuits only, never the A/C
+ * - evse      `getEvseLoadVA`, 100%, outside 220.53
+ * - full      100% at its own citation, outside 220.53
+ */
+export type DwellingLoadKind =
+  'cooking' | 'dryer' | 'heating' | 'cooling' | 'appliance' | 'motor' | 'evse' | 'full';
+
+export interface DwellingLoadItem {
+  /** Breakdown row category; heating/cooling items share one 'HVAC' row. */
+  category: string;
+  description: string;
+  va: number;
+  kind: DwellingLoadKind;
+  /** Citation for a 'full' item. */
+  necReference?: string;
+}
+
+export interface DwellingStandardInput {
+  /** NEC 220.12 general lighting, VA (3 VA/ft²). */
+  lightingVA: number;
+  lightingDescription: string;
+  smallApplianceCircuits: number;
+  laundryCircuit: boolean;
+  items: DwellingLoadItem[];
+  necEdition?: NecEdition;
+}
+
+export interface DwellingStandardResult {
+  breakdown: LoadBreakdown[];
+  totalConnectedVA: number;
+  totalDemandVA: number;
+  necReferences: string[];
+  warnings: string[];
+}
+
+export const LARGEST_MOTOR_CATEGORY = 'Largest Motor (25%)';
+
+/**
+ * NEC 220 Part III standard method for one dwelling unit (PE ruling
+ * 2026-10-26, #155): Table 220.42 on lighting + small appliance + laundry,
+ * Table 220.55 Column C for cooking, 220.54 dryers, the larger of heat or A/C
+ * (220.60), 220.53 75% for four or more fastened-in-place appliances, EVSE
+ * per `getEvseLoadVA`, plus 25% of the largest motor.
+ *
+ * Rows keep each item's nameplate in `connectedVA` (dryers at the 5,000 VA
+ * minimum), so the 220.82 / 220.83 bucket in `calculateSingleFamilyLoad` can
+ * re-pool them. Rows come out in item order; the HVAC row sits where the
+ * first heating/cooling item was.
+ */
+export function calculateDwellingStandardLoad(input: DwellingStandardInput): DwellingStandardResult {
+  const { lightingVA, lightingDescription, smallApplianceCircuits, laundryCircuit, items, necEdition = '2020' } = input;
+  const breakdown: LoadBreakdown[] = [];
+  const necReferences: string[] = [];
+  const warnings: string[] = [];
+
+  const effectiveSmallAppliance = Math.max(2, smallApplianceCircuits);
+  if (smallApplianceCircuits < 2) {
+    warnings.push('Minimum 2 small appliance circuits required per NEC 210.11(C)(1)');
+  }
+  const smallApplianceVA = effectiveSmallAppliance * SMALL_APPLIANCE_VA_PER_CIRCUIT;
+  const laundryVA = laundryCircuit ? LAUNDRY_CIRCUIT_VA : 0;
+  const generalVA = lightingVA + smallApplianceVA + laundryVA;
+  const generalDemandVA = applyTieredDemand(generalVA, LIGHTING_DEMAND_TABLE);
+
+  breakdown.push({
+    category: 'General Lighting', description: lightingDescription,
+    connectedVA: lightingVA, demandVA: 0, demandFactor: 0, necReference: 'NEC Table 220.12',
+  });
+  breakdown.push({
+    category: 'Small Appliance Circuits', description: `${effectiveSmallAppliance} circuits @ 1,500 VA each`,
+    connectedVA: smallApplianceVA, demandVA: 0, demandFactor: 0, necReference: 'NEC 220.52(A)',
+  });
+  if (laundryCircuit) {
+    breakdown.push({
+      category: 'Laundry Circuit', description: '1 circuit @ 1,500 VA',
+      connectedVA: laundryVA, demandVA: 0, demandFactor: 0, necReference: 'NEC 220.52(B)',
+    });
+  }
+  breakdown.push({
+    category: 'General Loads Subtotal', description: 'Lighting + Small Appliance + Laundry',
+    connectedVA: generalVA, demandVA: generalDemandVA,
+    demandFactor: generalVA > 0 ? generalDemandVA / generalVA : 0, necReference: 'NEC Table 220.42',
+  });
+  necReferences.push('NEC Table 220.42');
+
+  // Cooking appliances at or under 1¾ kW are not in Table 220.55; they are
+  // fastened-in-place appliances under 220.53.
+  const kindOf = (item: DwellingLoadItem): DwellingLoadKind =>
+    item.kind === 'cooking' && item.va <= COOKING_APPLIANCE_TABLE_MIN_VA ? 'appliance' : item.kind;
+
+  const cooking = items.filter(i => kindOf(i) === 'cooking');
+  const cookingDemand = getCookingDemandVA(cooking.map(i => i.va));
+  const cookingConnectedVA = cooking.reduce((sum, i) => sum + i.va, 0);
+  warnings.push(...cookingDemand.warnings);
+
+  const dryers = items.filter(i => i.kind === 'dryer');
+  const dryerFactor = getDryerDemandFactor(dryers.length);
+
+  const fastened = items.filter(i => {
+    const kind = kindOf(i);
+    return (kind === 'appliance' || kind === 'motor') && i.va >= FASTENED_APPLIANCE_MIN_VA;
+  });
+  const fastenedFactorApplies = fastened.length >= FASTENED_APPLIANCE_MIN_COUNT;
+
+  const heatingVA = items.filter(i => i.kind === 'heating').reduce((sum, i) => sum + i.va, 0);
+  const coolingVA = items.filter(i => i.kind === 'cooling').reduce((sum, i) => sum + i.va, 0);
+  let hvacRowAdded = false;
+
+  for (const item of items) {
+    const kind = kindOf(item);
+    if (item.va <= 0) continue;
+    if (kind === 'heating' || kind === 'cooling') {
+      if (hvacRowAdded) continue;
+      hvacRowAdded = true;
+      const largerVA = Math.max(heatingVA, coolingVA);
+      if (largerVA <= 0) continue;
+      breakdown.push({
+        category: 'HVAC',
+        description: `${coolingVA > heatingVA ? 'A/C' : 'Electric Heat'} ${(largerVA / 1000).toFixed(1)} kW (larger of heat/cool)`,
+        // Connected = the larger of heat/cool (220.60), the same quantity the
+        // demand uses; the sum overstated the header connected load (#159).
+        connectedVA: largerVA, demandVA: largerVA, demandFactor: 1.0, necReference: 'NEC 220.60',
+      });
+      necReferences.push('NEC 220.60 - Non-coincident Loads');
+      continue;
+    }
+    if (kind === 'cooking') {
+      // Column C is a demand for all cooking appliances together; each row
+      // carries its share in proportion to its rating.
+      const demandVA = cookingConnectedVA > 0 ? cookingDemand.demandVA * (item.va / cookingConnectedVA) : 0;
+      breakdown.push({
+        category: item.category, description: item.description,
+        connectedVA: item.va, demandVA, demandFactor: demandVA / item.va,
+        necReference: `NEC ${cookingDemand.necReference}`,
+      });
+      necReferences.push(`NEC ${cookingDemand.necReference}`);
+      continue;
+    }
+    if (kind === 'dryer') {
+      const dryerVA = Math.max(item.va, DRYER_MIN_VA);
+      breakdown.push({
+        category: item.category, description: item.description,
+        connectedVA: dryerVA, demandVA: dryerVA * dryerFactor, demandFactor: dryerFactor,
+        necReference: dryers.length > 4 ? `NEC Table 220.54 (${dryers.length} dryers)` : 'NEC 220.54',
+      });
+      necReferences.push('NEC 220.54');
+      continue;
+    }
+    if (kind === 'evse') {
+      const evse = getEvseLoadVA(item.va, necEdition);
+      breakdown.push({
+        category: item.category,
+        description: `${item.description}${evse.floorApplied ? ' (7,200 VA minimum)' : ''}`,
+        connectedVA: item.va, demandVA: evse.loadVA, demandFactor: evse.loadVA / item.va,
+        necReference: `${evse.necReference} - EVSE load`, loadCalcVA: evse.loadVA,
+      });
+      necReferences.push(`${evse.necReference} - EVSE load`);
+      continue;
+    }
+    if (kind === 'full') {
+      const ref = item.necReference ?? 'NEC 220.14(A)';
+      breakdown.push({
+        category: item.category, description: item.description,
+        connectedVA: item.va, demandVA: item.va, demandFactor: 1.0, necReference: ref,
+      });
+      necReferences.push(ref);
+      continue;
+    }
+    // appliance / motor — fastened in place
+    const factor = fastenedFactorApplies && item.va >= FASTENED_APPLIANCE_MIN_VA ? FASTENED_APPLIANCE_FACTOR : 1.0;
+    const ref = factor < 1 ? `NEC 220.53 (${fastened.length} appliances @ 75%)` : 'NEC 220.14(A)';
+    breakdown.push({
+      category: item.category, description: item.description,
+      connectedVA: item.va, demandVA: item.va * factor, demandFactor: factor, necReference: ref,
+    });
+    necReferences.push(factor < 1 ? 'NEC 220.53' : 'NEC 220.14(A)');
+  }
+
+  const largestMotor = items
+    .filter(i => i.kind === 'motor' && i.va > 0)
+    .reduce<DwellingLoadItem | null>((max, i) => (!max || i.va > max.va ? i : max), null);
+  if (largestMotor) {
+    const adderVA = largestMotor.va * LARGEST_MOTOR_ADDER;
+    breakdown.push({
+      category: LARGEST_MOTOR_CATEGORY,
+      description: `25% of ${largestMotor.description} (${Math.round(largestMotor.va).toLocaleString()} VA)`,
+      connectedVA: 0, demandVA: adderVA, demandFactor: 0, necReference: 'NEC 220.50, 430.24',
+    });
+    necReferences.push('NEC 220.50, 430.24 - Largest Motor');
+  }
+
+  const totalConnectedVA = breakdown
+    .filter(r => r.category !== 'General Loads Subtotal')
+    .reduce((sum, r) => sum + r.connectedVA, 0);
+  const totalDemandVA = breakdown
+    .filter(r => !['General Lighting', 'Small Appliance Circuits', 'Laundry Circuit'].includes(r.category))
+    .reduce((sum, r) => sum + r.demandVA, 0);
+
+  return {
+    breakdown,
+    totalConnectedVA,
+    totalDemandVA,
+    necReferences: [...new Set(necReferences)],
+    warnings,
+  };
+}
+
+// ============================================================================
 // MAIN CALCULATION FUNCTIONS
 // ============================================================================
 
 /**
- * NEC 220.82 - Optional Method for Single-Family Dwellings
- *
- * KNOWN LABELING vs IMPLEMENTATION GAP: This function emits `NEC 220.82`
- * citations and is called the "Optional Method", but the per-category demand
- * factoring below (Table 220.42 for lighting, Table 220.55 for range, etc.)
- * actually mirrors the Standard Method walk in NEC 220.40–220.61. True 220.82
- * Optional Method uses a single 10 kVA / 40 % split on the general-loads
- * bucket. See `services/autogeneration/multiFamilyProjectGenerator.ts` for an
- * inline true-Optional implementation that produces ~30 % smaller demand.
- * Reconciling the two is a separate task; the breakdown citations below are
- * accurate to what the code computes (per-category factoring under 220.82's
- * Optional Method banner).
+ * Single-family dwelling load, three methods:
+ * - Default: NEC 220 Part III standard method (`calculateDwellingStandardLoad`).
+ *   Before #155 this walk was labelled "220.82 Optional Method"; it never
+ *   ran the 220.82 bucket.
+ * - `useTrueOptionalMethod` (new dwelling): NEC 220.82, 10 kVA / 40% bucket.
+ * - `existingDwelling`: NEC 220.83, 8 kVA / 40% bucket, (A)/(B) per #132.
+ * The bucket methods re-pool the Part III rows' nameplate values below.
  */
 export function calculateSingleFamilyLoad(input: SingleFamilyInput): ResidentialLoadResult {
   const {
@@ -459,309 +682,99 @@ export function calculateSingleFamilyLoad(input: SingleFamilyInput): Residential
       ? 'true-220-82'
       : 'none';
 
-  const breakdown: LoadBreakdown[] = [];
   const necReferences: string[] = [
     bucketMethod === '220-83'
       ? 'NEC 220.83 - Optional Method for Existing Dwelling Units'
       : bucketMethod === 'true-220-82'
         ? 'NEC 220.82 - Optional Method for Dwelling Units (10 kVA / 40% bucket)'
-        : 'NEC 220.82 - Optional Method for Dwelling Units'
+        : 'NEC 220 Part III - Standard Method (Dwelling Unit)'
   ];
   const warnings: string[] = [];
-
-  // =========================================
-  // Step 1: General Lighting Load (3 VA/sq ft)
-  // =========================================
-  const lightingConnectedVA = squareFootage * LIGHTING_LOAD_VA_PER_SQFT;
-  
-  // =========================================
-  // Step 2: Small Appliance Circuits (1,500 VA each, min 2)
-  // =========================================
-  const effectiveSmallAppliance = Math.max(2, smallApplianceCircuits);
-  const smallApplianceVA = effectiveSmallAppliance * SMALL_APPLIANCE_VA_PER_CIRCUIT;
-  if (smallApplianceCircuits < 2) {
-    warnings.push('Minimum 2 small appliance circuits required per NEC 210.11(C)(1)');
-  }
-
-  // =========================================
-  // Step 3: Laundry Circuit
-  // =========================================
-  const laundryVA = laundryCircuit ? LAUNDRY_CIRCUIT_VA : 0;
   if (!laundryCircuit) {
     warnings.push('Laundry circuit required per NEC 210.11(C)(2)');
   }
 
-  // =========================================
-  // Step 4: Apply Demand to General Lighting + SA + Laundry
-  // Per NEC 220.82(B)(1)
-  // =========================================
-  const generalLoadsTotal = lightingConnectedVA + smallApplianceVA + laundryVA;
-  const generalLoadsDemand = applyTieredDemand(generalLoadsTotal, LIGHTING_DEMAND_TABLE);
-  
-  breakdown.push({
-    category: 'General Lighting',
-    description: `${squareFootage} sq ft @ 3 VA/sq ft`,
-    connectedVA: lightingConnectedVA,
-    demandVA: 0, // Combined below
-    demandFactor: 0,
-    necReference: 'NEC Table 220.12'
-  });
-  
-  breakdown.push({
-    category: 'Small Appliance Circuits',
-    description: `${effectiveSmallAppliance} circuits @ 1,500 VA each`,
-    connectedVA: smallApplianceVA,
-    demandVA: 0,
-    demandFactor: 0,
-    necReference: 'NEC 220.52(A)'
-  });
-
-  if (laundryCircuit) {
-    breakdown.push({
-      category: 'Laundry Circuit',
-      description: '1 circuit @ 1,500 VA',
-      connectedVA: laundryVA,
-      demandVA: 0,
-      demandFactor: 0,
-      necReference: 'NEC 220.52(B)'
-    });
-  }
-
-  // Combined general loads entry
-  breakdown.push({
-    category: 'General Loads Subtotal',
-    description: 'Lighting + Small Appliance + Laundry',
-    connectedVA: generalLoadsTotal,
-    demandVA: generalLoadsDemand,
-    demandFactor: generalLoadsDemand / generalLoadsTotal,
-    necReference: 'NEC Table 220.42'
-  });
-
-  let totalConnected = generalLoadsTotal;
-  let totalDemand = generalLoadsDemand;
-
-  // =========================================
-  // Step 5: Appliances at 100% (NEC 220.82(B)(2))
-  // =========================================
-
-  // Range/Cooktop
+  // Appliance toggles → Part III items, in breakdown order.
+  const items: DwellingLoadItem[] = [];
   if (appliances.range?.enabled && appliances.range.type === 'electric') {
-    const rangeVA = appliances.range.kw * 1000;
-    // For single range <= 12 kW, use 8 kW
-    const rangeDemand = rangeVA <= 12000 ? Math.max(8000, rangeVA * 0.8) : rangeVA;
-    breakdown.push({
-      category: 'Electric Range',
-      description: `${appliances.range.kw} kW`,
-      connectedVA: rangeVA,
-      demandVA: rangeDemand,
-      demandFactor: rangeDemand / rangeVA,
-      necReference: 'NEC Table 220.55'
-    });
-    totalConnected += rangeVA;
-    totalDemand += rangeDemand;
-    necReferences.push('NEC Table 220.55');
+    items.push({ category: 'Electric Range', description: `${appliances.range.kw} kW`, va: appliances.range.kw * 1000, kind: 'cooking' });
   }
-
-  // Dryer
   if (appliances.dryer?.enabled && appliances.dryer.type === 'electric') {
-    const dryerVA = Math.max(appliances.dryer.kw * 1000, 5000); // Min 5 kW
-    breakdown.push({
-      category: 'Electric Dryer',
-      description: `${appliances.dryer.kw} kW (min 5 kW)`,
-      connectedVA: dryerVA,
-      demandVA: dryerVA, // 100% for single dryer
-      demandFactor: 1.0,
-      necReference: 'NEC 220.54'
-    });
-    totalConnected += dryerVA;
-    totalDemand += dryerVA;
+    items.push({ category: 'Electric Dryer', description: `${appliances.dryer.kw} kW (min 5 kW)`, va: appliances.dryer.kw * 1000, kind: 'dryer' });
   }
-
-  // Water Heater
   if (appliances.waterHeater?.enabled && appliances.waterHeater.type === 'electric') {
-    const whVA = appliances.waterHeater.kw * 1000;
-    breakdown.push({
-      category: 'Electric Water Heater',
-      description: `${appliances.waterHeater.kw} kW`,
-      connectedVA: whVA,
-      demandVA: whVA,
-      demandFactor: 1.0,
-      necReference: 'NEC 220.82(C)(3)'
-    });
-    totalConnected += whVA;
-    totalDemand += whVA;
+    items.push({ category: 'Electric Water Heater', description: `${appliances.waterHeater.kw} kW`, va: appliances.waterHeater.kw * 1000, kind: 'appliance' });
   }
-
-  // =========================================
-  // Step 6: HVAC - Non-coincident Loads (NEC 220.60)
-  // Use largest of heating or cooling
-  // =========================================
   if (appliances.hvac?.enabled) {
-    const coolingVA = (appliances.hvac.coolingKw || 0) * 1000;
-    const heatingVA = (appliances.hvac.heatingKw || 0) * 1000;
-    
     // Only electric heat counts if it's actually electric
     const isElectricHeat = appliances.hvac.type === 'electric_heat' || appliances.hvac.type === 'heat_pump';
-    const effectiveHeating = isElectricHeat ? heatingVA : 0;
-    
-    // Use larger of A/C or electric heat (non-coincident per NEC 220.60)
-    const hvacConnected = Math.max(coolingVA, effectiveHeating);
-    const hvacDemand = hvacConnected;
-    
-    if (hvacConnected > 0) {
-      const hvacType = coolingVA > effectiveHeating ? 'A/C' : 'Electric Heat';
-      breakdown.push({
-        category: 'HVAC',
-        description: `${hvacType} ${(hvacConnected / 1000).toFixed(1)} kW (larger of heat/cool)`,
-        // Connected = the larger of heat/cool (220.60), the same quantity the
-        // demand uses; the sum overstated the header connected load (#159).
-        connectedVA: hvacConnected,
-        demandVA: hvacDemand,
-        demandFactor: 1.0,
-        necReference: 'NEC 220.60'
-      });
-      totalConnected += hvacConnected;
-      totalDemand += hvacDemand;
-      necReferences.push('NEC 220.60 - Non-coincident Loads');
-    }
+    items.push({ category: 'HVAC', description: 'Cooling', va: (appliances.hvac.coolingKw || 0) * 1000, kind: 'cooling' });
+    items.push({ category: 'HVAC', description: 'Heating', va: isElectricHeat ? (appliances.hvac.heatingKw || 0) * 1000 : 0, kind: 'heating' });
   }
-
-  // =========================================
-  // Step 7: Other Fixed Appliances at 100%
-  // =========================================
-  
-  // Dishwasher
   if (appliances.dishwasher?.enabled) {
-    const dwVA = appliances.dishwasher.kw * 1000;
-    breakdown.push({
-      category: 'Dishwasher',
-      description: `${appliances.dishwasher.kw} kW`,
-      connectedVA: dwVA,
-      demandVA: dwVA,
-      demandFactor: 1.0,
-      necReference: 'NEC 220.82(B)(2)'
-    });
-    totalConnected += dwVA;
-    totalDemand += dwVA;
+    items.push({ category: 'Dishwasher', description: `${appliances.dishwasher.kw} kW`, va: appliances.dishwasher.kw * 1000, kind: 'appliance' });
   }
-
-  // Garbage Disposal
   if (appliances.disposal?.enabled) {
-    const dispVA = appliances.disposal.kw * 1000;
-    breakdown.push({
-      category: 'Garbage Disposal',
-      description: `${appliances.disposal.kw} kW`,
-      connectedVA: dispVA,
-      demandVA: dispVA,
-      demandFactor: 1.0,
-      necReference: 'NEC 220.82(B)(2)'
-    });
-    totalConnected += dispVA;
-    totalDemand += dispVA;
+    items.push({ category: 'Garbage Disposal', description: `${appliances.disposal.kw} kW`, va: appliances.disposal.kw * 1000, kind: 'motor' });
   }
-
   // EV Charger — per-EVSE load by edition (getEvseLoadVA): NEC 2020 =
   // nameplate per 220.14(A); NEC 2023 = max(7,200 VA, nameplate) per
   // 220.57(A). At 100% — the 625.41 125% is applied to the branch circuit
   // in the circuit-generation path below, not to the load calc.
   if (appliances.evCharger?.enabled) {
-    const evNameplateVA = appliances.evCharger.kw * 1000;
-    const evse = getEvseLoadVA(evNameplateVA, necEdition);
-    breakdown.push({
-      category: 'EV Charger',
-      description: `Level ${appliances.evCharger.level} - ${appliances.evCharger.kw} kW${evse.floorApplied ? ' (7,200 VA minimum)' : ''}`,
-      connectedVA: evNameplateVA,
-      demandVA: evse.loadVA,
-      demandFactor: evNameplateVA > 0 ? evse.loadVA / evNameplateVA : 1,
-      necReference: `${evse.necReference} - EVSE load`,
-      loadCalcVA: evse.loadVA,
-    });
-    totalConnected += evNameplateVA;
-    totalDemand += evse.loadVA;
-    necReferences.push(`${evse.necReference} - EVSE load`);
+    items.push({ category: 'EV Charger', description: `Level ${appliances.evCharger.level} - ${appliances.evCharger.kw} kW`, va: appliances.evCharger.kw * 1000, kind: 'evse' });
   }
-
-  // Pool Pump
   if (appliances.poolPump?.enabled) {
-    const poolPumpVA = hpToVA(appliances.poolPump.hp);
-    breakdown.push({
-      category: 'Pool Pump',
-      description: `${appliances.poolPump.hp} HP motor`,
-      connectedVA: poolPumpVA,
-      demandVA: poolPumpVA,
-      demandFactor: 1.0,
-      necReference: 'NEC 680.22'
-    });
-    totalConnected += poolPumpVA;
-    totalDemand += poolPumpVA;
+    items.push({ category: 'Pool Pump', description: `${appliances.poolPump.hp} HP motor`, va: hpToVA(appliances.poolPump.hp), kind: 'motor' });
   }
-
-  // Pool Heater
   if (appliances.poolHeater?.enabled) {
-    const poolHeatVA = appliances.poolHeater.kw * 1000;
-    breakdown.push({
-      category: 'Pool Heater',
-      description: `${appliances.poolHeater.kw} kW`,
-      connectedVA: poolHeatVA,
-      demandVA: poolHeatVA,
-      demandFactor: 1.0,
-      necReference: 'NEC 680.22'
-    });
-    totalConnected += poolHeatVA;
-    totalDemand += poolHeatVA;
+    items.push({ category: 'Pool Heater', description: `${appliances.poolHeater.kw} kW`, va: appliances.poolHeater.kw * 1000, kind: 'appliance' });
   }
-
-  // Hot Tub/Spa
   if (appliances.hotTub?.enabled) {
-    const hotTubVA = appliances.hotTub.kw * 1000;
-    breakdown.push({
-      category: 'Hot Tub/Spa',
-      description: `${appliances.hotTub.kw} kW`,
-      connectedVA: hotTubVA,
-      demandVA: hotTubVA,
-      demandFactor: 1.0,
-      necReference: 'NEC 680.44'
-    });
-    totalConnected += hotTubVA;
-    totalDemand += hotTubVA;
+    items.push({ category: 'Hot Tub/Spa', description: `${appliances.hotTub.kw} kW`, va: appliances.hotTub.kw * 1000, kind: 'appliance' });
   }
-
-  // Well Pump
   if (appliances.wellPump?.enabled) {
-    const wellPumpVA = hpToVA(appliances.wellPump.hp);
-    breakdown.push({
-      category: 'Well Pump',
-      description: `${appliances.wellPump.hp} HP motor`,
-      connectedVA: wellPumpVA,
-      demandVA: wellPumpVA,
-      demandFactor: 1.0,
-      necReference: 'NEC 220.82(B)(2)'
+    items.push({ category: 'Well Pump', description: `${appliances.wellPump.hp} HP motor`, va: hpToVA(appliances.wellPump.hp), kind: 'motor' });
+  }
+  // Other Custom Appliances at nameplate, outside 220.53 (not known to be
+  // fastened in place). The `continuous` flag sizes the branch circuit at
+  // 125% (circuit-generation path below) but does not change the load calc.
+  for (const other of appliances.otherAppliances ?? []) {
+    // A proposed HVAC load is HVAC for the 220.82(C) / 220.83(B) treatment
+    // (100%, outside the 40% bucket), not a general appliance.
+    const isProposedHvac = other.proposed && other.category === 'HVAC';
+    items.push({
+      category: isProposedHvac ? 'HVAC' : other.proposed ? 'Proposed Load' : 'Other Appliance',
+      description: `${isProposedHvac ? 'Proposed: ' : ''}${other.description} - ${other.kw} kW`,
+      va: other.kw * 1000,
+      kind: 'full',
+      necReference: isProposedHvac ? 'NEC 220.50, 220.51' : 'NEC 220.14(A)',
     });
-    totalConnected += wellPumpVA;
-    totalDemand += wellPumpVA;
   }
 
-  // Other Custom Appliances at nameplate. The `continuous` flag sizes the
-  // branch circuit at 125% (circuit-generation path below) but does not
-  // change the load calc. Voltage is documentation here; it affects breaker
-  // poles in the circuit-generation path, not the kVA math.
-  if (appliances.otherAppliances?.length) {
-    for (const other of appliances.otherAppliances) {
-      const otherVA = other.kw * 1000;
-      // A proposed HVAC load is HVAC for the 220.82(C) / 220.83(B) treatment
-      // (100%, outside the 40% bucket), not a general appliance.
-      const isProposedHvac = other.proposed && other.category === 'HVAC';
-      breakdown.push({
-        category: isProposedHvac ? 'HVAC' : other.proposed ? 'Proposed Load' : 'Other Appliance',
-        description: `${isProposedHvac ? 'Proposed: ' : ''}${other.description} - ${other.kw} kW`,
-        connectedVA: otherVA,
-        demandVA: otherVA,
-        demandFactor: 1.0,
-        necReference: 'NEC 220.82(B)(2)',
-      });
-      totalConnected += otherVA;
-      totalDemand += otherVA;
+  const partIII = calculateDwellingStandardLoad({
+    lightingVA: squareFootage * LIGHTING_LOAD_VA_PER_SQFT,
+    lightingDescription: `${squareFootage} sq ft @ 3 VA/sq ft`,
+    smallApplianceCircuits,
+    laundryCircuit,
+    items,
+    necEdition,
+  });
+  warnings.push(...partIII.warnings);
+  // The bucket methods re-pool nameplate; the largest-motor adder is Part III only.
+  const breakdown = bucketMethod === 'none'
+    ? partIII.breakdown
+    : partIII.breakdown.filter(r => r.category !== LARGEST_MOTOR_CATEGORY);
+  let totalConnected = partIII.totalConnectedVA;
+  let totalDemand = partIII.totalDemandVA;
+  if (bucketMethod === 'none') {
+    necReferences.push(...partIII.necReferences);
+  } else {
+    if (breakdown.some(r => r.category === 'Electric Range')) necReferences.push('NEC Table 220.55');
+    if (breakdown.some(r => r.category === 'HVAC' && r.necReference === 'NEC 220.60')) {
+      necReferences.push('NEC 220.60 - Non-coincident Loads');
     }
+    necReferences.push(...partIII.necReferences.filter(ref => ref.endsWith('- EVSE load')));
   }
 
   // =========================================
@@ -890,7 +903,7 @@ export function calculateSingleFamilyLoad(input: SingleFamilyInput): Residential
     } else {
       warnings.push(
         'ℹ️ Calculated per NEC 220.82 Optional Method (10 kVA / 40 % bucket). ' +
-        'Switch Calculation Method to "Per-Category" to use the legacy per-appliance demand factor walk.'
+        'Switch Calculation Method to "Per-Category" to use the NEC 220 Part III standard method.'
       );
     }
   }
@@ -1523,73 +1536,13 @@ export function generateResidentialPanelSchedule(input: SingleFamilyInput): Gene
 }
 
 // ============================================================================
-// NEC 220.82 OPTIONAL METHOD — per-unit display helper
+// Dwelling unit panels
 // ============================================================================
 
-/** Minimal circuit shape for dwelling-unit demand classification. */
+/** Minimal circuit shape for dwelling-unit panel detection. */
 export interface DwellingCircuitInput {
   description?: string | null;
   loadWatts: number;
-}
-
-/**
- * NEC 220.82 Optional Method demand from a dwelling unit's branch circuits.
- *
- * General loads pooled (lighting + small appliance + laundry + nameplate
- * appliances), tiered demand applied: first 10 kVA @ 100%, remainder @ 40%.
- * Plus the larger of A/C vs heat at 100% (NEC 220.60 non-coincident).
- *
- * Used by panel-summary displays (in-app + PDF) to show a NEC-correct demand
- * figure on dwelling unit panels — instead of the panel-local "Other @ 100%"
- * sum that misleadingly reports 150 A on a sized-correctly 125 A panel.
- *
- * A/C vs heat vs general detection is by description match. Anything not
- * matching A/C or heat patterns counts as general (conservative).
- */
-export function calculateDwellingUnitDemandVA(circuits: DwellingCircuitInput[]): {
-  generalConnectedVA: number;
-  generalDemandVA: number;
-  climateDemandVA: number;
-  totalDemandVA: number;
-} {
-  let generalVA = 0;
-  let acVA = 0;
-  let heatVA = 0;
-
-  for (const c of circuits) {
-    const desc = (c.description ?? '').toLowerCase();
-    const va = c.loadWatts || 0;
-    if (
-      desc.includes('a/c') ||
-      desc.includes('condensing') ||
-      desc.includes('cooling') ||
-      desc.includes('mini-split') ||
-      desc.includes('air condition')
-    ) {
-      acVA += va;
-    } else if (
-      desc.includes('heat pump') ||
-      desc.includes('electric heat') ||
-      desc.includes('strip heat') ||
-      desc.includes('baseboard heat') ||
-      (desc.includes('heat') && !desc.includes('water heater'))
-    ) {
-      heatVA += va;
-    } else {
-      generalVA += va;
-    }
-  }
-
-  const generalDemand =
-    generalVA <= 10_000 ? generalVA : 10_000 + (generalVA - 10_000) * 0.4;
-  const climateDemand = Math.max(acVA, heatVA);
-
-  return {
-    generalConnectedVA: generalVA,
-    generalDemandVA: Math.round(generalDemand),
-    climateDemandVA: Math.round(climateDemand),
-    totalDemandVA: Math.round(generalDemand + climateDemand),
-  };
 }
 
 /**
@@ -1811,6 +1764,200 @@ export function calculateDwellingDemandSplit(opts: {
     necReferences: total.necReferences,
     warnings: [...total.warnings],
     breakdown: { existing, total },
+  };
+}
+
+/** One row of a dwelling panel's Load Summary breakdown. */
+export interface DwellingSummaryRow {
+  loadType: string;
+  connectedVA: number;
+  demandVA: number;
+  demandFactor: number;
+  necReference: string;
+}
+
+/**
+ * Load Summary for a dwelling panel — the service panel of a single-family
+ * dwelling (220.82 / 220.83) or a unit panel in a multifamily building
+ * (Part III, or 220.83 when the permit adds load to it). The panel-schedule
+ * PDF and the in-app Panel Summary render this as-is.
+ */
+export interface DwellingPanelLoadSummary {
+  /** 'NEC 220 Part III' | 'NEC 220.82' | 'NEC 220.83' */
+  necArticle: string;
+  /** Load Summary heading, e.g. 'NEC 220 Part III — Standard Method (Dwelling Unit)' */
+  title: string;
+  /** One-line method note printed under the summary grid. */
+  note: string;
+  totalConnectedVA: number;
+  totalDemandVA: number;
+  rows: DwellingSummaryRow[];
+  necReferences: string[];
+  warnings: string[];
+}
+
+/** Optional Method (`calculateDwellingPanelDemand`) result as a Load Summary. */
+export function dwellingSummaryFromOptionalMethod(
+  result: PanelDemandResult,
+  unitPanel = false,
+): DwellingPanelLoadSummary {
+  const existing = result.necArticle === 'NEC 220.83';
+  const kneeVA = existing ? 8_000 : 10_000;
+  const generalRef = result.generalNecReference;
+  const rows: DwellingSummaryRow[] = result.generalConnectedVA <= kneeVA
+    ? [{
+        loadType: 'General loads (under tier threshold)',
+        connectedVA: result.generalConnectedVA, demandVA: result.generalDemandVA,
+        demandFactor: 1.0, necReference: generalRef,
+      }]
+    : [
+        {
+          loadType: `General loads (first ${kneeVA / 1000} kVA @ 100%)`,
+          connectedVA: kneeVA, demandVA: kneeVA, demandFactor: 1.0, necReference: generalRef,
+        },
+        {
+          loadType: 'General loads (remainder @ 40%)',
+          connectedVA: result.generalConnectedVA - kneeVA, demandVA: result.generalDemandVA - kneeVA,
+          demandFactor: 0.4, necReference: generalRef,
+        },
+      ];
+  if (result.hvacVA > 0) {
+    rows.push({
+      loadType: 'Climate (largest of HVAC, non-coincident)',
+      connectedVA: result.hvacVA, demandVA: result.hvacVA, demandFactor: 1.0,
+      necReference: `${result.hvacNecReference} / 220.60`,
+    });
+  }
+  const title = existing
+    ? (unitPanel ? 'NEC 220.83 — Existing Dwelling Unit, load added' : 'NEC 220.83 — Existing Dwelling')
+    : 'NEC 220.82 — Optional Method';
+  const note = existing
+    ? `NEC 220.83 (Existing Dwelling Unit${unitPanel ? ' — this permit adds load to it' : ''}) — general loads tiered + largest of heating/cooling per 220.60.`
+    : 'NEC 220.82 (Optional Method — New Dwelling Unit) — general loads tiered + largest of heating/cooling per 220.60.';
+  return {
+    necArticle: result.necArticle,
+    title,
+    note,
+    totalConnectedVA: result.totalConnectedVA,
+    totalDemandVA: result.totalDemandVA,
+    rows,
+    necReferences: result.necReferences,
+    warnings: result.warnings,
+  };
+}
+
+const SMALL_APPLIANCE_PATTERN = /small appliance/;
+const LAUNDRY_PATTERN = /laundry/;
+const REFRIGERATOR_PATTERN = /refrigerator|fridge/;
+const COOKING_PATTERN = /range|oven|cooktop|cooking/;
+const MOTOR_PATTERN = /disposal|disposer|pump/;
+
+/**
+ * A dwelling unit panel's circuits as Part III inputs. General lighting is
+ * the panel's lighting circuits (the generator writes them at 3 VA/ft²);
+ * small-appliance and laundry circuits are recognised by description in any
+ * load type (the multifamily generator stores small-appliance circuits as
+ * 'K', single-family panels as 'R') and enter as their 220.52 1,500 VA.
+ * Other receptacles and the refrigerator are inside the general lighting load.
+ */
+export function dwellingLoadsFromCircuits(circuits: PanelDemandCircuit[]): Omit<DwellingStandardInput, 'necEdition'> & {
+  warnings: string[];
+} {
+  let lightingVA = 0;
+  let smallApplianceCircuits = 0;
+  let laundryCircuit = false;
+  const items: DwellingLoadItem[] = [];
+
+  for (const c of circuits) {
+    const watts = c.load_watts ?? 0;
+    const type = (c.load_type ?? 'O').toUpperCase();
+    const description = c.description ?? '';
+    const desc = description.toLowerCase();
+    if (type === 'L') { lightingVA += watts; continue; }
+    if (SMALL_APPLIANCE_PATTERN.test(desc)) { smallApplianceCircuits++; continue; }
+    if (LAUNDRY_PATTERN.test(desc) && type !== 'D') { laundryCircuit = true; continue; }
+    if (type === 'R' || REFRIGERATOR_PATTERN.test(desc)) continue;
+    if (watts <= 0) continue;
+    const item = (kind: DwellingLoadKind, category = description): DwellingLoadItem =>
+      ({ category, description, va: watts, kind });
+    if (type === 'C') items.push(item('cooling', 'HVAC'));
+    else if (type === 'H') items.push(item('heating', 'HVAC'));
+    else if (type === 'D') items.push(item('dryer'));
+    else if (isEvseDescription(desc)) items.push(item('evse'));
+    else if (type === 'K' && COOKING_PATTERN.test(desc)) items.push(item('cooking'));
+    else if (type === 'M' || MOTOR_PATTERN.test(desc)) items.push(item('motor'));
+    else items.push(item('appliance'));
+  }
+
+  const warnings: string[] = [];
+  if (lightingVA <= 0) {
+    warnings.push('WARNING: No general lighting circuits on this panel — the 3 VA/ft² general lighting load (NEC 220.12) is not included.');
+  }
+  return {
+    lightingVA,
+    lightingDescription: 'Lighting circuits (3 VA/sq ft)',
+    smallApplianceCircuits,
+    laundryCircuit,
+    items,
+    warnings,
+  };
+}
+
+/**
+ * Load Summary for a dwelling unit panel inside a multifamily building (PE
+ * ruling 2026-10-26, #155): NEC 220 Part III by default; NEC 220.83 when the
+ * building is existing and this panel has proposed circuits (the permit adds
+ * load to the unit), with (A)/(B) per #132.
+ */
+export function calculateDwellingUnitPanelLoad(opts: {
+  circuits: PanelDemandCircuit[];
+  existingBuilding: boolean;
+  necEdition?: NecEdition;
+}): DwellingPanelLoadSummary {
+  const { circuits, existingBuilding, necEdition = '2020' } = opts;
+  const loads = dwellingLoadsFromCircuits(circuits);
+
+  if (existingBuilding && circuits.some(c => c.is_proposed)) {
+    const result = calculateDwellingPanelDemand({
+      // Small-appliance and laundry circuits enter through the structural
+      // parameters below, not as general loads.
+      circuits: circuits.filter(c => {
+        const desc = (c.description ?? '').toLowerCase();
+        return !SMALL_APPLIANCE_PATTERN.test(desc) && !(LAUNDRY_PATTERN.test(desc) && (c.load_type ?? '').toUpperCase() !== 'D');
+      }),
+      squareFootage: loads.lightingVA / LIGHTING_LOAD_VA_PER_SQFT,
+      smallApplianceCircuits: Math.max(2, loads.smallApplianceCircuits),
+      laundryCircuit: loads.laundryCircuit,
+      voltage: 240,
+      existingDwelling: true,
+      necEdition,
+    });
+    const summary = dwellingSummaryFromOptionalMethod(result, true);
+    return { ...summary, warnings: [...loads.warnings, ...summary.warnings] };
+  }
+
+  const result = calculateDwellingStandardLoad({ ...loads, necEdition });
+  const componentRows = new Set(['General Lighting', 'Small Appliance Circuits', 'Laundry Circuit']);
+  const rows: DwellingSummaryRow[] = result.breakdown
+    .filter(r => !componentRows.has(r.category))
+    .map(r => ({
+      loadType: r.category === 'General Loads Subtotal'
+        ? 'General lighting + small appliance + laundry'
+        : r.category === 'HVAC' ? `HVAC — ${r.description}` : r.category,
+      connectedVA: r.connectedVA,
+      demandVA: r.demandVA,
+      demandFactor: r.category === LARGEST_MOTOR_CATEGORY ? LARGEST_MOTOR_ADDER : r.demandFactor,
+      necReference: r.necReference,
+    }));
+  return {
+    necArticle: 'NEC 220 Part III',
+    title: 'NEC 220 Part III — Standard Method, Dwelling Unit',
+    note: 'NEC 220 Part III (Standard Method) — the unit feeder load; each load type takes its own demand factor (220.42, 220.53–220.55, 220.60).',
+    totalConnectedVA: Math.round(result.totalConnectedVA),
+    totalDemandVA: Math.round(result.totalDemandVA),
+    rows,
+    necReferences: ['NEC 220 Part III - Standard Method (Dwelling Unit)', ...result.necReferences],
+    warnings: [...loads.warnings, ...result.warnings],
   };
 }
 

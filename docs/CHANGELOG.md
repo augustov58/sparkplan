@@ -4,6 +4,15 @@ All notable changes to SparkPlan.
 
 ---
 
+## 2026-10-26: Dwelling unit panels use NEC 220 Part III (#155)
+
+- **Multifamily unit panels print NEC 220 Part III (PE ruling 2026-10-26).** The unit panel schedules (packet E-304 …, the in-app Panel Summary and both panel-schedule exports) printed a 10 kVA / 40% bucket labelled "NEC 220.83 — Existing Dwelling". They now print the Part III standard method with its breakdown. NEC 220.83 is used only when the permit adds load to that unit (proposed circuits on its panel in an existing building). On the QA 12-unit building, Unit 101 goes from 21.5 kVA / 89.6 A to 28.7 kVA / 119.8 A (125 A panel).
+- **Part III follows the code text.** Ranges take Table 220.55 Column C (a 12 kW range is 8 kW, not 9.6 kW; Notes 1–2 over 12 kW). Four or more fastened-in-place appliances take 75% (220.53; not cooking, dryers, heat, A/C or EVSE). 25% of the largest motor circuit is added (220.50, 430.24; not the A/C). The Dwelling Load Calculator's "Per-Category" mode runs the same function and is now labelled Part III instead of "220.82 Optional Method".
+- **New multifamily projects size unit panels by Part III**, without the ×1.25 the generator applied to the demand.
+- **Single-family panel-schedule export.** Exporting the service panel of an existing house printed a 10 kVA tier under a 220.83 label; it now runs the same calculation as the packet (8 kVA tier, 220.83(A)/(B)).
+
+---
+
 ## 2026-10-24: Saved calculator results follow the current rules (#158)
 
 - **The packet recomputes the Multi-Family EV analysis.** The Multi-Family EV Calculator now saves every input with its result, and the packet recomputes the analysis from them under the current rules and the project's NEC edition. A change to the calculation reaches the packet without reopening the calculator.

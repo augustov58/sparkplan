@@ -20,6 +20,7 @@
 import type { Database } from '@/lib/database.types';
 import type { MultiFamilyEVResult, EVCapacityScenario, CommonAreaLoadItem } from '@/services/calculations/multiFamilyEV';
 import { calculateCommonAreaLoads } from '@/services/calculations/multiFamilyEV';
+import { calculateDwellingUnitPanelLoad } from '@/services/calculations/residentialLoad';
 import { generateCustomEVPanel, type CustomEVPanelConfig } from '@/data/ev-panel-templates';
 
 type PanelInsert = Database['public']['Tables']['panels']['Insert'];
@@ -990,46 +991,14 @@ function generateSingleUnitPanel(
     });
   }
 
-  // Size unit panel using NEC 220.82 Optional Method demand × 1.25 (NEC 215.2(A)(1)
-  // continuous-load factor). The existing `calculateSingleFamilyLoad` claims
-  // 220.82 but actually implements the Standard Method (220.40 + individual
-  // demand factors per appliance), which produces a ~30% larger demand value
-  // and consequently oversized panels. Inline the true Optional Method here:
-  //
-  //   General loads = lighting + SA + laundry + nameplate appliances
-  //                   (range, dryer, WH, dishwasher, disposal — NOT A/C or heat)
-  //   General demand = first 10 kVA @ 100%, remainder @ 40%
-  //   + largest of A/C vs heat @ 100% per NEC 220.60 non-coincident
-  //   Total demand × 1.25 → panel ampacity per NEC 215.2(A)(1)
-  //
-  // For our user's typical apartment (12 kW range + 5.5 kW dryer + 4.5 kW WH
-  // + 5 kW A/C + 0.5 kW disposal, 900 sqft):
-  //   General = 2.7 + 3.0 + 1.5 + 12 + 5.5 + 4.5 + 0.5 = 29.7 kVA
-  //   General demand = 10 + (29.7-10)*0.4 = 17.88
-  //   + A/C 5 = 22.88 kVA
-  //   22.88/240 × 1.25 = 119 A → 125 A panel.
+  // Size the unit panel from the circuits above with the same NEC 220 Part III
+  // calculation the unit's panel-schedule Load Summary prints (PE ruling
+  // 2026-10-26, #155): the next standard size at or above the demand
+  // current. No ×1.25 — a dwelling load calc takes no continuous-load uplift.
   const unitVoltage = voltage === 208 ? 208 : 240;
-  const necLightingVA = sqFt * 3;
-  const smallApplianceVA = 2 * 1500;
-  const laundryVA = 1500;
-  const rangeVA = hasElectricCooking ? (applianceConfig?.rangeKW ?? 8) * 1000 : 0;
-  const dryerVA = applianceConfig?.dryerKW ? Math.max(applianceConfig.dryerKW * 1000, 5000) : 0;
-  const whVA = (applianceConfig?.waterHeaterKW ?? 4.5) * 1000;
-  const dishwasherVA = (applianceConfig?.dishwasherKW ?? 0) * 1000;
-  const disposalVA = (applianceConfig?.disposalKW ?? 0) * 1000;
-  const generalLoadsVA =
-    necLightingVA + smallApplianceVA + laundryVA +
-    rangeVA + dryerVA + whVA + dishwasherVA + disposalVA;
-  const generalDemandVA = generalLoadsVA <= 10_000
-    ? generalLoadsVA
-    : 10_000 + (generalLoadsVA - 10_000) * 0.4;
-  const acVA = (applianceConfig?.coolingKW ?? 3.5) * 1000;
-  const heatVA = hasElectricHeat ? ((applianceConfig?.heatingKW ?? 5) * 1000) : 0;
-  const climateDemandVA = Math.max(acVA, heatVA);
-  const necOptionalDemandVA = generalDemandVA + climateDemandVA;
-  const demandAmps = necOptionalDemandVA / unitVoltage;
+  const unitLoad = calculateDwellingUnitPanelLoad({ circuits, existingBuilding: false });
   const unitPanelRating = roundUpToStandardSize(
-    Math.ceil(demandAmps * 1.25),
+    unitLoad.totalDemandVA / unitVoltage,
     [100, 125, 150, 200],
   );
 
