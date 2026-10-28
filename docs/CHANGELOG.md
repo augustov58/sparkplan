@@ -4,6 +4,12 @@ All notable changes to SparkPlan.
 
 ---
 
+## 2026-10-27: A unit's own EV charger is in the 220.84 base (#180)
+
+- **PE ruling 2026-10-27.** On a building with 3 or more units, a unit panel with its own EV charger was classified as the building's EV panel. The whole unit (range, dryer, HVAC and charger) left the 220.84 base and was added at the generic cascade's demand. The unit now stays a unit, and its charger's edition load (nameplate under NEC 2020, 7,200 VA minimum under 2023) is in the 220.84 base at the Table 220.84 factor, as the Dwelling Load Calculator already did. The building's shared EV panel still adds after the factor.
+
+---
+
 ## 2026-10-27: Two-unit dwellings use NEC 220 Part III and 220.85 (#127)
 
 - **A two-unit building's service is one NEC 220 Part III walk (PE ruling 2026-10-27).** The packet's MDP load (E-101, the MDP schedule, feeders, the 220.87 narrative) ran the commercial cascade for 2 units. That cascade put small-appliance and laundry circuits under 220.44 and counted every kitchen circuit (dishwasher, disposal) as a range. The Dwelling Load Calculator and the Multi-Family EV Calculator printed "NEC 220.84 @ 100%" with a warning that 220.84 needs 3 units. All of them now run the same walk over both units: 220.42 tiers once on the combined lighting, small-appliance and laundry circuits; Table 220.55 Column C by the number of ranges; 220.54 dryers; 220.53 counted across both units; the larger of heat or A/C; and 25% of the largest motor.

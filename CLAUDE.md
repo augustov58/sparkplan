@@ -94,6 +94,8 @@ stay in sync. Factor: `EVSE_CONTINUOUS_FACTOR`.
   HVAC at 100%. (#132)
 220.84 (multifamily): the larger of A/C or fixed electric heat at NAMEPLATE per
 220.84(C)(5). No 65% heat factor — that is 220.82(C) only. (#133)
+A unit's own EV charger is a unit load: in the 220.84 base at getEvseLoadVA,
+factored. Only the shared EV panel adds after the factor. (#180, 2026-10-27)
 ```
 Implementation: `residentialLoad.ts` (`calculateSingleFamilyLoad`,
 `calculateDwellingPanelDemand` + `hasProposedHvac`, `calculateMultiFamilyLoad`),

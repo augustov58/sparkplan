@@ -1551,13 +1551,14 @@ export function buildMultiFamilyContext(
   // EV panel = "EV" as a word in the name ("EV Sub-Panel"), or a panel
   // carrying EVSE circuits / an EVEMS marker. The old substring match on "ev"
   // also caught "Elevator" / "Riverview" panels (#164, the #26 pattern).
-  // Two units (#127): a unit panel with its own charger stays a dwelling
-  // unit — the charger enters the Part III walk at getEvseLoadVA.
-  const isTwoUnitDwellingPanel = (p: Panel) => totalUnits === 2 && isDwellingUnitPanel(
+  // A unit panel with its own charger stays a dwelling unit: the charger is
+  // one of that unit's loads — in the 220.84 base at its edition load (PE
+  // ruling 2026-10-27, #180), or in the two-unit Part III walk (#127).
+  const isUnitPanel = (p: Panel) => isDwellingUnitPanel(
     p.name,
     circuits.filter(c => c.panel_id === p.id).map(c => ({ description: c.description, loadWatts: c.load_watts || 0 })),
   );
-  const evPanels = downstreamFromMDP.filter(p => !isTwoUnitDwellingPanel(p) && (
+  const evPanels = downstreamFromMDP.filter(p => !isUnitPanel(p) && (
     /\bev\b/i.test(p.name) ||
     circuits.some(c => c.panel_id === p.id && (isEVEMSMarkerCircuit(c) || isEvseDescription(c.description)))
   ));
