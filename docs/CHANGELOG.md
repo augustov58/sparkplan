@@ -4,6 +4,15 @@ All notable changes to SparkPlan.
 
 ---
 
+## 2026-10-27: Two-unit dwellings use NEC 220 Part III and 220.85 (#127)
+
+- **A two-unit building's service is one NEC 220 Part III walk (PE ruling 2026-10-27).** The packet's MDP load (E-101, the MDP schedule, feeders, the 220.87 narrative) ran the commercial cascade for 2 units. That cascade put small-appliance and laundry circuits under 220.44 and counted every kitchen circuit (dishwasher, disposal) as a range. The Dwelling Load Calculator and the Multi-Family EV Calculator printed "NEC 220.84 @ 100%" with a warning that 220.84 needs 3 units. All of them now run the same walk over both units: 220.42 tiers once on the combined lighting, small-appliance and laundry circuits; Table 220.55 Column C by the number of ranges; 220.54 dryers; 220.53 counted across both units; the larger of heat or A/C; and 25% of the largest motor.
+- **NEC 220.85.** When the two units are identical (same calculator template, or two unit panels with the same circuits), the lesser of Part III and 220.84 for three identical units is used and cited. On the QA duplex, Part III gives 47.3 kVA and 220.85 gives 42.2 kVA.
+- **A unit with its own EV charger stays a dwelling unit** on a two-unit building: the charger enters the Part III walk at its edition load. Before, the unit panel was treated as the building's EV panel.
+- **Labels.** The Panel Summary named any reduced MDP demand "NEC 625.42 EVEMS". It now names the method that ran (EVEMS, 220.85, 220.84 or Part III).
+
+---
+
 ## 2026-10-26: Dwelling unit panels use NEC 220 Part III (#155)
 
 - **Multifamily unit panels print NEC 220 Part III (PE ruling 2026-10-26).** The unit panel schedules (packet E-304 …, the in-app Panel Summary and both panel-schedule exports) printed a 10 kVA / 40% bucket labelled "NEC 220.83 — Existing Dwelling". They now print the Part III standard method with its breakdown. NEC 220.83 is used only when the permit adds load to that unit (proposed circuits on its panel in an existing building). On the QA 12-unit building, Unit 101 goes from 21.5 kVA / 89.6 A to 28.7 kVA / 119.8 A (125 A panel).

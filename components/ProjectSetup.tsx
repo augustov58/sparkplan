@@ -769,7 +769,9 @@ export const ProjectSetup: React.FC<ProjectSetupProps> = ({ project, updateProje
             <div className="mt-6 p-4 bg-[#e8f5e8]/50 border border-[#3d6b3d]/30 rounded-md">
               <p className="text-xs text-amber-800">
                 <strong>💡 Next Step:</strong> Use the <strong>Dwelling Calculator</strong> tab to add appliances and calculate 
-                your total service load per NEC {localProject.settings.residential?.dwellingType === DwellingType.MULTI_FAMILY ? '220.84' : '220.82'}.
+                your total service load per NEC {localProject.settings.residential?.dwellingType === DwellingType.MULTI_FAMILY
+                  ? (localProject.settings.residential?.totalUnits === 2 ? '220 Part III / 220.85' : '220.84')
+                  : '220.82'}.
               </p>
             </div>
           </div>

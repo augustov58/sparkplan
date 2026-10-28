@@ -960,9 +960,9 @@ export const PermitPacketGenerator: React.FC<PermitPacketGeneratorProps> = ({ pr
         ? getJurisdictionById(currentProject.jurisdiction_id)
         : undefined;
 
-      // NEC 220.84 multifamily context — passes through gate (returns undefined)
-      // for any project that is not a multi-family dwelling with 3+ units, leaving
-      // the PDF on the standard NEC 220 demand-factor cascade.
+      // Multifamily context — NEC 220.84 for 3+ units, the building-wide Part
+      // III walk / 220.85 for 2 (#127). Undefined for any other project,
+      // leaving the PDF on the standard NEC 220 demand-factor cascade.
       const mdp = panels.find(p => p.is_main);
       const multiFamilyContext = buildMultiFamilyContext(
         mdp,

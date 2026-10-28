@@ -113,6 +113,18 @@ Implementation: `residentialLoad.ts::calculateDwellingStandardLoad` (the only
 Part III walk) ← `calculateSingleFamilyLoad` (toggles), `calculateDwellingUnitPanelLoad`
 (circuits; unit pages, in-app summary, exports, MF generator).
 
+### Two Dwelling Units — Part III / 220.85 (PE ruling 2026-10-27, #127)
+```
+A two-unit service = ONE Part III walk over both units (220.42 once on the
+combined general loads, 220.53 counted across both, Column C by number of
+ranges) — not the commercial cascade, not a sum of unit results.
+220.85: the lesser of that and 220.84 for three identical units, only when
+the two units are identical and meet 220.84(A).
+```
+Implementation: `residentialLoad.ts::calculateTwoUnitDwellingLoad` ←
+`calculateMultiFamilyLoad` (2 units), `upstreamLoadAggregation.ts` (MDP with a
+2-unit `MultiFamilyContext`), `multiFamilyEV.ts` (calculated path).
+
 ### Short Circuit Analysis
 ```
 CRITICAL: 3-phase impedance multiplier is 1× (not 1.732×).
@@ -335,6 +347,7 @@ Real mistakes made in this repo, each paired with the rule that prevents recurre
 | The jurisdiction checklist detected sections by their toggles and by pages that only cite a requirement, and had no EV/transformer axis: E-502 printed [X] for absent pages and EVSE items on a café build-out (#140, #148) | `PacketAST.sectionKeys` comes from the built pages; a `detect()` checks the content it names (`partial` when only cited). EV / EVEMS / transformer items gate on `AHJContext.hasEV` / `hasEVEMS` / `hasTransformer` from `data/ahj/checks.ts`. |
 | Saved calculator results (`multiFamilyLoadResult`, `mfEvCalculation`) were printed as saved; a rule change reached a project only after its calculator was reopened, and E-402 printed a full-load EV design for an EVEMS job (#158) | Save a calculator's inputs with its result; readers recompute through the calculator's own function (`lib/storedCalcs.ts`). Compare saved jsonb with sorted keys (jsonb reorders them) or a save effect loops. |
 | One unit's load had four implementations: unit pages printed a 10 kVA bucket labelled 220.83, the generator a 220.82 bucket ×1.25, and the calculator Part III math labelled "220.82 Optional Method" (#155) | List every function that computes a quantity and every reader before fixing it. Make the math match the label printed, then route all of them through one core (`calculateDwellingStandardLoad`). |
+| A two-unit building ran the commercial cascade on the packet (220.44, dishwashers as ranges) and "220.84 @ 100%" in two calculators; adding the case, the context builder classified a unit with its own charger as the EV panel and pulled it out of the dwelling walk (#127) | When a calc gains a case, route every reader through one function and re-check the classifiers upstream of it (which panel is "EV" / "house" / a unit). |
 | Docs updated with stale "Last Updated" dates; completed features left as "NEXT UP" | Every doc touch updates its date to today; every shipped feature flips its ROADMAP status in the same PR. |
 
 ---

@@ -4,6 +4,7 @@ One note per hard problem, written by the model that solved it via the `extract-
 Each entry: `- [title](file.md) — reusable rule`.
 
 <!-- Newest first -->
+- [Two-unit dwelling service: a fourth method, three call sites](2026-10-27-two-unit-dwelling-part-iii.md) — when a calc gains a case, enumerate every function that computes that quantity (packet aggregate, calculator, side calculators) and every classifier upstream of it; a context builder's side decisions (which panel is "EV") can silently undo the new path
 - [One dwelling unit's load had four implementations](2026-10-26-unit-panels-part-iii.md) — list every function that computes a quantity and every reader before fixing it; make the math match the printed label, route all through one core, and prove untouched modes unchanged with the existing suite
 - [Saved calculator results printed old numbers after a rule change](2026-10-24-stored-results-recompute-on-read.md) — save a calculator's inputs with its result and recompute on read through the calculator's own function; compare saved jsonb with sorted keys or the save effect loops
 - [AHJ pages printed placeholders, vacuous "Compliant" rows and out-of-order sheets](2026-10-24-ahj-pages-print-what-applies.md) — check `list.length` before `list.every(...)` and print N/A for an empty list; when display order and numbering come from different sources, sort by the numbering key before rendering
