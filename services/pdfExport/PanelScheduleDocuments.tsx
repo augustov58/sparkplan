@@ -14,9 +14,8 @@ import {
 } from './permitPacketTheme';
 import { getCircuitPhase } from '../calculations/demandFactor';
 import {
-  calculateDwellingPanelDemand,
   calculateDwellingUnitPanelLoad,
-  dwellingSummaryFromOptionalMethod,
+  calculateSingleFamilyPanelLoad,
   isDwellingUnitPanel,
   type DwellingPanelLoadSummary,
 } from '../calculations/residentialLoad';
@@ -363,14 +362,16 @@ export interface PanelSchedulePDFProps {
   /**
    * Single-family dwelling context (same as the packet's E-101). When set and
    * this is the single-family service panel, the Load Summary runs
-   * `calculateDwellingPanelDemand` — the function E-101 / E-102 use — so the
-   * three pages agree, including the 220.83(A)/(B) branch (#132).
+   * `calculateSingleFamilyPanelLoad` — the function E-101 / E-102 use — so the
+   * three pages agree on the method (#178) and the 220.83(A)/(B) branch (#132).
    */
   singleFamilyDwellingContext?: {
     squareFootage: number;
     smallApplianceCircuits: number;
     laundryCircuit: boolean;
     existingDwelling: boolean;
+    /** New dwelling: NEC 220.82 when true, NEC 220 Part III otherwise (#178). */
+    useOptionalMethod?: boolean;
   };
   necEdition?: '2020' | '2023';
 }
@@ -382,8 +383,8 @@ type SingleFamilyDwellingContext = NonNullable<PanelSchedulePDFProps['singleFami
  * dwelling panel. Shared by the packet pages and the standalone export.
  *
  * - Single-family service panel (is_main, dwelling-shape circuits, single-
- *   family or unset building type) with the dwelling context: E-301's
- *   `calculateDwellingPanelDemand` (220.82 / 220.83, #132). The
+ *   family or unset building type) with the dwelling context: E-101's
+ *   `calculateSingleFamilyPanelLoad` (220.83, 220.82 or Part III, #178). The
  *   `isDwellingUnitPanel` name check rejects "Main Panel" etc., so the MDP
  *   is recognised by its circuits; multifamily aggregate MDPs carry feeders,
  *   not these circuits.
@@ -423,12 +424,12 @@ function dwellingLoadSummaryFor(
     opts.buildingType === 'single_family_residential' || opts.buildingType === undefined;
   if (panel.is_main === true && hasDwellingShape && isSingleFamilyContext) {
     if (!opts.singleFamilyDwellingContext) return null;
-    return dwellingSummaryFromOptionalMethod(calculateDwellingPanelDemand({
+    return calculateSingleFamilyPanelLoad({
       circuits: demandCircuits,
       ...opts.singleFamilyDwellingContext,
       voltage: panel.voltage || 240,
       necEdition: opts.necEdition,
-    }));
+    });
   }
   const unitCircuits = circuits.map(c => ({ description: c.description, loadWatts: c.load_watts || 0 }));
   if (!isDwellingUnitPanel(panel.name, unitCircuits)) return null;

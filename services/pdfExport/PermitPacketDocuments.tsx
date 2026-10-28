@@ -15,7 +15,7 @@ import {
   type AggregatedLoad,
   type MultiFamilyContext,
 } from '../calculations/upstreamLoadAggregation';
-import { calculateDwellingPanelDemand } from '../calculations/residentialLoad';
+import { calculateDwellingPanelDemand, calculateSingleFamilyPanelLoad } from '../calculations/residentialLoad';
 import { applyCodeCycleList } from '../../data/ahj/codeCycle';
 import { calculateAllCumulativeVoltageDrops } from '../calculations/cumulativeVoltageDrop';
 import {
@@ -1711,6 +1711,8 @@ interface LoadSummaryProps {
     smallApplianceCircuits: number;
     laundryCircuit: boolean;
     existingDwelling: boolean;
+    /** New dwelling: NEC 220.82 when true, NEC 220 Part III otherwise (#178). */
+    useOptionalMethod?: boolean;
   };
   /** Edition for the per-EVSE load in the 220.82 / 220.83 bucket. Default '2020'. */
   necEdition?: '2020' | '2023';
@@ -1755,33 +1757,48 @@ export const LoadCalculationSummary: React.FC<LoadSummaryProps> = ({
     };
   });
 
-  // Gate: when this is a single-family dwelling MDP, route through the NEC
-  // 220.82/220.83 Optional Method (`calculateDwellingPanelDemand`) instead of
-  // the standard per-load-type cascade. Mirrors the same gate used by the
-  // in-app Panel Summary, so the AHJ-facing PDF matches what the Dwelling
-  // Load Calculator displays.
+  // Gate: when this is a single-family dwelling MDP, route through the
+  // dwelling's own method instead of the generic per-load-type cascade:
+  // NEC 220.83 existing; new → 220.82 when the Dwelling Load Calculator is
+  // set to "10 kVA / 40%", else NEC 220 Part III (#178). Mirrors the same
+  // gate used by the in-app Panel Summary, so the AHJ-facing PDF matches
+  // what the Dwelling Load Calculator displays.
   const useDwellingOptional =
     !!mdp &&
     occupancy === 'dwelling' &&
     !!singleFamilyDwellingContext &&
     !multiFamilyContext;
+  const usePartIIIDwelling = useDwellingOptional
+    && !singleFamilyDwellingContext!.existingDwelling
+    && !singleFamilyDwellingContext!.useOptionalMethod;
+  const dwellingCircuits = mdp
+    ? circuits
+        .filter(c => c.panel_id === mdp.id)
+        .map(c => ({
+          description: c.description,
+          load_watts: c.load_watts,
+          load_type: c.load_type,
+          breaker_amps: c.breaker_amps,
+          is_proposed: c.is_proposed,
+        }))
+    : [];
 
-  const dwellingResult = useDwellingOptional && mdp && singleFamilyDwellingContext
+  const dwellingResult = useDwellingOptional && !usePartIIIDwelling && mdp && singleFamilyDwellingContext
     ? calculateDwellingPanelDemand({
-        circuits: circuits
-          .filter(c => c.panel_id === mdp.id)
-          .map(c => ({
-            description: c.description,
-            load_watts: c.load_watts,
-            load_type: c.load_type,
-            breaker_amps: c.breaker_amps,
-            is_proposed: c.is_proposed,
-          })),
+        circuits: dwellingCircuits,
         squareFootage: singleFamilyDwellingContext.squareFootage,
         smallApplianceCircuits: singleFamilyDwellingContext.smallApplianceCircuits,
         laundryCircuit: singleFamilyDwellingContext.laundryCircuit,
         voltage: mdp.voltage || 240,
         existingDwelling: singleFamilyDwellingContext.existingDwelling,
+        necEdition,
+      })
+    : null;
+  const dwellingPartIII = usePartIIIDwelling && mdp && singleFamilyDwellingContext
+    ? calculateSingleFamilyPanelLoad({
+        circuits: dwellingCircuits,
+        ...singleFamilyDwellingContext,
+        voltage: mdp.voltage || 240,
         necEdition,
       })
     : null;
@@ -1796,7 +1813,9 @@ export const LoadCalculationSummary: React.FC<LoadSummaryProps> = ({
 
   // Synthesize a 220.82/220.83-shaped breakdown when the dwelling gate fired,
   // so the demand table still renders meaningful rows for the AHJ.
-  const dwellingBreakdown = dwellingResult
+  const dwellingBreakdown = dwellingPartIII
+    ? dwellingPartIII.rows
+    : dwellingResult
     ? [
         {
           loadType: dwellingResult.hvacVA === 0 && dwellingResult.necReferences.includes('NEC 220.60')
@@ -1819,12 +1838,16 @@ export const LoadCalculationSummary: React.FC<LoadSummaryProps> = ({
       ]
     : null;
 
-  const totalConnectedVA = dwellingResult
+  const totalConnectedVA = dwellingPartIII
+    ? dwellingPartIII.totalConnectedVA
+    : dwellingResult
     ? dwellingResult.totalConnectedVA
     : aggregate
     ? aggregate.totalConnectedVA
     : circuits.reduce((sum, c) => (isEVEMSMarkerCircuit(c) ? sum : sum + (c.load_watts || 0)), 0);
-  const totalDemandVA = dwellingResult
+  const totalDemandVA = dwellingPartIII
+    ? dwellingPartIII.totalDemandVA
+    : dwellingResult
     ? dwellingResult.totalDemandVA
     : aggregate
     ? aggregate.totalDemandVA
@@ -1968,7 +1991,9 @@ export const LoadCalculationSummary: React.FC<LoadSummaryProps> = ({
         || (aggregate && aggregate.demandBreakdown.length > 0)) && (
         <>
           <Text style={themeStyles.sectionTitle}>
-            {dwellingResult
+            {dwellingPartIII
+              ? 'DEMAND FACTOR BREAKDOWN (NEC 220 PART III STANDARD METHOD)'
+              : dwellingResult
               ? `DEMAND FACTOR BREAKDOWN (${dwellingResult.necArticle} OPTIONAL METHOD)`
               : 'DEMAND FACTOR BREAKDOWN (NEC ARTICLE 220)'}
           </Text>
@@ -2019,7 +2044,22 @@ export const LoadCalculationSummary: React.FC<LoadSummaryProps> = ({
               <Text style={[themeStyles.tdBold, { width: '26%' }]}> </Text>
             </View>
           </View>
-          {dwellingResult ? (
+          {dwellingPartIII ? (
+            <Text
+              style={{
+                fontSize: 8,
+                color: '#555',
+                marginTop: 2,
+                marginBottom: 4,
+                fontStyle: 'italic',
+              }}
+            >
+              Applied: NEC 220 Part III Standard Method for a New Single-Family Dwelling —
+              {' '}general lighting from the floor area (3 VA/sq ft) with the 220.52 small-appliance
+              and laundry circuits under the Table 220.42 tiers; each other load at its own demand
+              factor. References: {dwellingPartIII.necReferences.slice(1).join('; ')}.
+            </Text>
+          ) : dwellingResult ? (
             <Text
               style={{
                 fontSize: 8,
@@ -2084,7 +2124,7 @@ export const LoadCalculationSummary: React.FC<LoadSummaryProps> = ({
         ))}
       </View>
 
-      {!aggregate && !dwellingResult && (
+      {!aggregate && !dwellingResult && !dwellingPartIII && (
         <View style={themeStyles.warningBox}>
           <Text
             style={{

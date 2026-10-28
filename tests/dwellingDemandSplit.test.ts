@@ -70,12 +70,20 @@ describe('calculateDwellingDemandSplit', () => {
     expect(split.necReferences).toEqual(['NEC 220.83(B)', 'NEC 220.60']);
   });
 
-  it('new dwelling → NEC 220.82', () => {
-    const split = calculateDwellingDemandSplit({ circuits, ...dwelling, existingDwelling: false });
+  it('new dwelling with "10 kVA / 40%" selected → NEC 220.82', () => {
+    const split = calculateDwellingDemandSplit({ circuits, ...dwelling, existingDwelling: false, useOptionalMethod: true });
     const e101 = calculateDwellingPanelDemand({ circuits, ...dwelling, existingDwelling: false });
 
     expect(split.necArticle).toBe('NEC 220.82');
     expect(split.totalDemandVA).toBe(e101.totalDemandVA);
+  });
+
+  it('new dwelling by default → NEC 220 Part III, and the narrative cites Part III (#178)', () => {
+    const split = calculateDwellingDemandSplit({ circuits, ...dwelling, existingDwelling: false });
+
+    expect(split.necArticle).toBe('NEC 220 Part III');
+    expect(split.existingDemandVA + split.proposedDemandVA).toBe(split.totalDemandVA);
+    expect(summarizeCalculationRefs(split.necReferences).part).toBe('III');
   });
 
   it('no proposed circuits → proposed demand is 0', () => {
@@ -104,7 +112,10 @@ describe('buildSingleFamilyDwellingContext', () => {
       .toMatchObject({ existingDwelling: true, squareFootage: 2000 });
     expect(buildSingleFamilyDwellingContext(
       project({ occupancyType: 'dwelling', service_modification_type: 'new-service' }), false,
-    )).toMatchObject({ existingDwelling: false });
+    )).toMatchObject({ existingDwelling: false, useOptionalMethod: false });
+    expect(buildSingleFamilyDwellingContext(
+      project({ occupancyType: 'dwelling', service_modification_type: 'new-service', dwelling_calc_mode: 'true-optional' }), false,
+    )).toMatchObject({ existingDwelling: false, useOptionalMethod: true });
   });
 
   it('multi-family context, multi_family dwelling type, or commercial → undefined', () => {
