@@ -66,9 +66,9 @@ import { generateCustomEVPanel, type ChargerTypeOption } from '../data/ev-panel-
 // ── Multi-Family Autogen (NEC 220.82 unit panel sizing) ────────────────────
 import { generateBasicMultiFamilyProject } from '../services/autogeneration/multiFamilyProjectGenerator';
 
-// ── Dwelling Unit Demand Display (NEC 220.82 Optional Method) ──────────────
+// ── Dwelling Unit Panels (NEC 220 Part III, #155) ──────────────────────────
 import {
-  calculateDwellingUnitDemandVA,
+  calculateDwellingUnitPanelLoad,
   isDwellingUnitPanel,
 } from '../services/calculations/residentialLoad';
 
@@ -497,7 +497,7 @@ describe('Residential Load (NEC 220.82 / 220.84)', () => {
       // Lighting connected = 2000 × 3 = 6000 VA
       const lightingEntry = result.breakdown.find(b => b.category === 'General Lighting');
       expect(lightingEntry?.connectedVA).toBe(6000);
-      expect(result.necReferences).toContain('NEC 220.82 - Optional Method for Dwelling Units');
+      expect(result.necReferences).toContain('NEC 220 Part III - Standard Method (Dwelling Unit)');
     });
 
     it('should return a valid result with all standard appliances', () => {
@@ -563,9 +563,9 @@ describe('Residential Load (NEC 220.82 / 220.84)', () => {
       }
     };
 
-    it('per-category mode keeps the legacy Standard-Method-style citations', () => {
+    it('per-category mode is labelled the Part III standard method it runs (#155)', () => {
       const result = calculateSingleFamilyLoad(baseInput);
-      expect(result.necReferences).toContain('NEC 220.82 - Optional Method for Dwelling Units');
+      expect(result.necReferences).toContain('NEC 220 Part III - Standard Method (Dwelling Unit)');
       // Per-category mode: individual rows retain their non-zero demand
       const rangeRow = result.breakdown.find(b => b.category === 'Electric Range');
       expect(rangeRow?.demandVA).toBeGreaterThan(0);
@@ -2833,21 +2833,14 @@ describe('C4 — Per-EVSE branch row VA (nameplate, NEC 625.40)', () => {
       expect(result.panel.bus_rating).toBe(400);
     });
 
-    it('unit panel sizing uses NEC 220.82 Optional Method demand × 1.25', () => {
-      // Audit fixture (user's actual Dwelling Load Calculator config):
+    it('unit panel sizing uses the NEC 220 Part III unit load, no ×1.25 (#155)', () => {
       // 12 units × 900 sqft, 12 kW range, 5.5 kW dryer, 4.5 kW WH,
-      // 5 kW A/C only, 0.5 kW disposal.
-      //
-      // NEC 220.82 Optional Method for one unit:
-      //   General loads: 2.7 + 3.0 + 1.5 + 12 + 5.5 + 4.5 + 0.5 = 29.7 kVA
-      //   General demand: 10 + (29.7 − 10) × 0.4 = 17.88 kVA
-      //   + A/C @ 100%: 5.0 kVA   → total demand 22.88 kVA
-      //   22.88 / 240 = 95.3 A continuous × 1.25 = 119 A
-      //   → next standard from [100, 125, 150, 200] = 125 A panel.
-      //
-      // Pre-fix (Standard Method via misnamed calculateSingleFamilyLoad):
-      //   General + Range@9.6kVA + Dryer@5.5 + WH@4.5 + A/C@5 + Disposal@0.5 = ~30 kVA
-      //   30/240 × 1.25 = 154 A → 200 A panel (oversized by one standard size).
+      // 5 kW A/C only, 0.5 kW disposal. Part III for one unit:
+      //   Lighting 2.7 + SA 3.0 + laundry 1.5 = 7.2 kVA → 3 + 4.2 × 35% = 4.47 kVA
+      //   Range 12 kW → Table 220.55 Col C 8 kVA; dryer 5.5; WH 4.5; A/C 5.0;
+      //   disposal 0.5 (fewer than 4 fastened appliances → 100%);
+      //   + 25% of the largest motor (disposal) 0.125
+      //   = 28.1 kVA → 117 A → next standard size 125 A.
       const result = generateBasicMultiFamilyProject({
         projectId: 'proj-unit-sizing',
         voltage: 240,
@@ -2875,10 +2868,9 @@ describe('C4 — Per-EVSE branch row VA (nameplate, NEC 625.40)', () => {
     });
 
     it('unit panel sizing for smaller appliance config still lands at 100A', () => {
-      // Lighter spec — 1000 sqft + 8 kW range + no dryer + 4.5 WH + 3.5 A/C.
-      // General: 3.0 + 3.0 + 1.5 + 8 + 4.5 = 20.0 kVA
-      // General demand: 10 + 10 × 0.4 = 14.0
-      // + A/C 3.5 = 17.5 kVA → 73 A × 1.25 = 91 A → 100 A panel.
+      // 1000 sqft + 8 kW range + no dryer + 4.5 WH + 3.5 A/C, Part III:
+      // 7.5 kVA general → 4.575; range Col C 8; WH 4.5; A/C 3.5 ≈ 20.6 kVA
+      // → 86 A → 100 A panel.
       const result = generateBasicMultiFamilyProject({
         projectId: 'proj-unit-sizing-small',
         voltage: 240,
@@ -2900,36 +2892,30 @@ describe('C4 — Per-EVSE branch row VA (nameplate, NEC 625.40)', () => {
       }
     });
 
-    it('calculateDwellingUnitDemandVA reports NEC 220.82 demand on Unit 101 audit fixture (~22.9 kVA)', () => {
-      // The user's actual Unit 101 Panel (12 kW range, 5.5 kW dryer, 4.5 kW WH,
-      // 5 kW A/C, 0.5 kW disposal, 900 sqft).
-      // Expected NEC 220.82 demand:
-      //   General (excluding A/C): 1.5×4 (kitchens+laundry+bath) + 1.35×2 (lighting)
-      //                          + 12 (range) + 5.5 (dryer) + 4.5 (WH) + 0.5 (disposal)
-      //                          = 6 + 2.7 + 12 + 5.5 + 4.5 + 0.5 = 31.2 kVA
-      //   General demand: 10 + (31.2 − 10) × 0.4 = 18.48 kVA
-      //   + A/C @ 100%: 5.0 kVA
-      //   = 23.48 kVA → ~97.8 A on 240V ← well within a 125 A panel
+    it('calculateDwellingUnitPanelLoad reports NEC 220 Part III demand on the Unit 101 audit fixture', () => {
+      // Unit 101 (12 kW range, 5.5 kW dryer, 4.5 kW WH, 5 kW A/C, 0.5 kW
+      // disposal, 900 sqft). Part III:
+      //   Lighting 2.7 + SA 3.0 + laundry 1.5 = 7.2 kVA → 4.47 kVA (Table 220.42)
+      //   Range Col C 8 + dryer 5.5 + WH 4.5 + A/C 5.0 + disposal 0.5
+      //   + 25% largest motor (disposal) 0.125 = 28.095 kVA → 117 A ← 125 A panel
+      const L = (description: string, load_watts: number, load_type: string) => ({ description, load_watts, load_type });
       const unit101_circuits = [
-        { description: 'Kitchen Small Appliance #1', loadWatts: 1500 },
-        { description: 'Kitchen Small Appliance #2', loadWatts: 1500 },
-        { description: 'Laundry', loadWatts: 1500 },
-        { description: 'Bathroom(s)', loadWatts: 1500 },
-        { description: 'General Lighting', loadWatts: 1350 },
-        { description: 'General Lighting #2', loadWatts: 1350 },
-        { description: 'Range/Oven', loadWatts: 12000 },
-        { description: 'Clothes Dryer', loadWatts: 5500 },
-        { description: 'A/C Condensing Unit', loadWatts: 5000 },
-        { description: 'Water Heater', loadWatts: 4500 },
-        { description: 'Disposal', loadWatts: 500 },
+        L('Kitchen Small Appliance #1', 1500, 'K'),
+        L('Kitchen Small Appliance #2', 1500, 'K'),
+        L('Laundry', 1500, 'R'),
+        L('Bathroom(s)', 0, 'R'),
+        L('General Lighting', 1350, 'L'),
+        L('General Lighting #2', 1350, 'L'),
+        L('Range/Oven', 12000, 'K'),
+        L('Clothes Dryer', 5500, 'D'),
+        L('A/C Condensing Unit', 5000, 'C'),
+        L('Water Heater', 4500, 'W'),
+        L('Disposal', 500, 'M'),
       ];
-      const result = calculateDwellingUnitDemandVA(unit101_circuits);
-      expect(result.generalConnectedVA).toBe(31_200);
-      expect(result.generalDemandVA).toBe(18_480);
-      expect(result.climateDemandVA).toBe(5_000);
-      expect(result.totalDemandVA).toBe(23_480);
-      // 23,480 / 240 = 97.8 A — comfortably within a 125 A panel
-      expect(result.totalDemandVA / 240).toBeCloseTo(97.8, 1);
+      const result = calculateDwellingUnitPanelLoad({ circuits: unit101_circuits, existingBuilding: false });
+      expect(result.necArticle).toBe('NEC 220 Part III');
+      expect(result.totalDemandVA).toBe(28_095);
+      expect(result.totalDemandVA / 240).toBeLessThan(125);
     });
 
     it('isDwellingUnitPanel matches Unit panels and rejects MDP / EV / House panels', () => {

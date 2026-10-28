@@ -7,7 +7,15 @@
 import React from 'react';
 import { pdf } from '@react-pdf/renderer';
 import type { Panel, Circuit } from '../../lib/database.types';
-import { PanelScheduleDocument, MultiPanelDocument } from './PanelScheduleDocuments';
+import type { NecEdition } from '../../data/nec/evse-load';
+import { PanelScheduleDocument, MultiPanelDocument, type PanelSchedulePDFProps } from './PanelScheduleDocuments';
+
+/** Dwelling inputs for the Load Summary (see PanelSchedulePDFProps). */
+export interface PanelScheduleDwellingOptions {
+  buildingType?: PanelSchedulePDFProps['buildingType'];
+  singleFamilyDwellingContext?: PanelSchedulePDFProps['singleFamilyDwellingContext'];
+  necEdition?: NecEdition;
+}
 
 /**
  * Generate and download a single panel schedule PDF
@@ -17,7 +25,8 @@ export const exportPanelSchedulePDF = async (
   circuits: Circuit[],
   projectName: string,
   projectAddress?: string,
-  showExistingNewMarkers: boolean = false
+  showExistingNewMarkers: boolean = false,
+  dwelling: PanelScheduleDwellingOptions = {},
 ) => {
   try {
     // Validate panel data
@@ -34,6 +43,9 @@ export const exportPanelSchedulePDF = async (
         projectName={projectName}
         projectAddress={projectAddress}
         showExistingNewMarkers={showExistingNewMarkers}
+        buildingType={dwelling.buildingType}
+        singleFamilyDwellingContext={dwelling.singleFamilyDwellingContext}
+        necEdition={dwelling.necEdition}
       />
     ).toBlob();
 
@@ -88,6 +100,7 @@ export const exportAllPanelsPDF = async (
       necReference: string;
     }>;
   }>,
+  dwelling: Omit<PanelScheduleDwellingOptions, 'buildingType'> = {},
 ) => {
   try {
     // Validate panels data
@@ -106,6 +119,8 @@ export const exportAllPanelsPDF = async (
         showExistingNewMarkers={showExistingNewMarkers}
         buildingType={buildingType}
         aggregatedLoadByPanel={aggregatedLoadByPanel}
+        singleFamilyDwellingContext={dwelling.singleFamilyDwellingContext}
+        necEdition={dwelling.necEdition}
       />
     ).toBlob();
 
