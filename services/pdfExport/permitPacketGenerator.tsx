@@ -163,6 +163,8 @@ export interface PermitPacketData {
     laundryCircuit: boolean;
     /** True when service_modification_type !== 'new-service' → routes to NEC 220.83 */
     existingDwelling: boolean;
+    /** New dwelling: NEC 220.82 when true, NEC 220 Part III otherwise (#178). */
+    useOptionalMethod?: boolean;
   };
   /**
    * Sprint 2A C7: NEC edition stamped on cover sheet + compliance summary.

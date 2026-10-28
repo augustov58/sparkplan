@@ -315,7 +315,18 @@ export const ProjectSetup: React.FC<ProjectSetupProps> = ({ project, updateProje
                   // single-family dwellings; multi-family uses 220.84;
                   // commercial uses 220.87 for existing services).
                   if (isResidential) {
-                    if (status === 'new-service') return 'Dwelling loads calculated per NEC 220.82 (Optional, New Dwelling).';
+                    const residential = localProject.settings.residential;
+                    if (residential?.dwellingType === DwellingType.MULTI_FAMILY) {
+                      return residential.totalUnits === 2
+                        ? 'Building load per NEC 220 Part III, or 220.85 when the two units are identical.'
+                        : 'Building load per NEC 220.84 (Optional, Multifamily); unit panels per NEC 220 Part III.';
+                    }
+                    // #178: a new house uses the method chosen on the Dwelling Calculator.
+                    if (status === 'new-service') {
+                      return localProject.settings.dwelling_calc_mode === 'true-optional'
+                        ? 'Dwelling loads calculated per NEC 220.82 (Optional, New Dwelling), as selected on the Dwelling Calculator.'
+                        : 'Dwelling loads calculated per NEC 220 Part III (Standard Method). Select "10 kVA / 40%" on the Dwelling Calculator for NEC 220.82.';
+                    }
                     if (status === 'service-upgrade') return 'Existing service + load addition — NEC 220.87 narrative required for AHJ.';
                     return 'Dwelling loads calculated per NEC 220.83 (Optional, Existing Dwelling Adding Loads).';
                   }

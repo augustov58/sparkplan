@@ -29,7 +29,7 @@ import {
   type MultiFamilyContext,
 } from '../services/calculations/upstreamLoadAggregation';
 import {
-  calculateDwellingPanelDemand,
+  calculateSingleFamilyPanelLoad,
   calculateDwellingUnitPanelLoad,
   type DwellingSummaryRow,
   isDwellingUnitPanel,
@@ -289,7 +289,7 @@ export const PanelSchedule: React.FC<PanelScheduleProps> = ({ project }) => {
   //
   // Two branches:
   //  1. MDP of a single-family dwelling → compute 220.83 / 220.82 directly
-  //     from the panel's actual circuits via calculateDwellingPanelDemand.
+  //     from the panel's actual circuits via calculateSingleFamilyPanelLoad (220.83, 220.82 or Part III, #178).
   //     This is the architectural fix for the "two sources of truth" bug:
   //     the calc no longer reads project.settings.residential.appliances,
   //     so it correctly reflects ALL circuits on the panel — including
@@ -312,8 +312,10 @@ export const PanelSchedule: React.FC<PanelScheduleProps> = ({ project }) => {
       // PR-2 Step 7 (2026-05-27): single shared coercion for null/undefined
       // service_modification_type. Matches the UI default at
       // ProjectSetup.tsx:286 + the packet PDF gate from PR-2 Step 1.
+      // Same method as E-101 (#178): 220.83 existing; new → 220.82 when the
+      // calculator is set to "10 kVA / 40%", else Part III (with its rows).
       const existingDwelling = isExistingConstructionProject(project);
-      const result = calculateDwellingPanelDemand({
+      const summary = calculateSingleFamilyPanelLoad({
         circuits: panelCircuits.map(c => ({
           description: c.description,
           load_watts: c.load_watts,
@@ -326,13 +328,15 @@ export const PanelSchedule: React.FC<PanelScheduleProps> = ({ project }) => {
         laundryCircuit: residential?.laundryCircuit ?? true,
         voltage: selectedPanel.voltage || 240,
         existingDwelling,
+        useOptionalMethod: project.settings?.dwelling_calc_mode === 'true-optional',
         necEdition,
       });
       return {
-        totalConnectedVA: result.totalConnectedVA,
-        totalDemandVA: result.totalDemandVA,
-        necArticle: result.necArticle,
-        necReferences: result.necReferences,
+        totalConnectedVA: summary.totalConnectedVA,
+        totalDemandVA: summary.totalDemandVA,
+        necArticle: summary.necArticle,
+        necReferences: summary.necReferences,
+        ...(summary.necArticle === 'NEC 220 Part III' ? { rows: summary.rows } : {}),
       };
     }
 
@@ -1918,7 +1922,7 @@ export const PanelSchedule: React.FC<PanelScheduleProps> = ({ project }) => {
           !!selectedPanel?.is_main;
         return (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          {isSingleFamilyMDP ? (
+          {isSingleFamilyMDP && !dwellingUnitDemand?.rows ? (
             /* 220.83 / 220.82 explainer card replacing the Standard Method table */
             <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
               <div className="bg-gray-800 text-white px-4 py-2 flex items-center justify-between">
@@ -1963,7 +1967,7 @@ export const PanelSchedule: React.FC<PanelScheduleProps> = ({ project }) => {
                demand (NEC 220 Part III, or 220.83 when load is added; #155). */
             <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
               <div className="bg-gray-800 text-white px-4 py-2 flex items-center justify-between">
-                <span className="font-semibold text-sm">DWELLING UNIT LOAD ({dwellingUnitDemand.necArticle.toUpperCase()})</span>
+                <span className="font-semibold text-sm">{isSingleFamilyMDP ? 'DWELLING' : 'DWELLING UNIT'} LOAD ({dwellingUnitDemand.necArticle.toUpperCase()})</span>
                 <Calculator className="w-4 h-4" />
               </div>
               <table className="w-full text-xs">

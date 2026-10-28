@@ -85,6 +85,17 @@ prefilled in `PermitPacketGenerator.tsx` via `upstreamLoadAggregation.ts::calcul
 and `services/calculations/multiFamilyEV.ts` (measured path) — all three must
 stay in sync. Factor: `EVSE_CONTINUOUS_FACTOR`.
 
+### Single-Family Method (PE ruling 2026-10-27, #178)
+```
+Existing house → 220.83. New house → the Dwelling Load Calculator's choice,
+everywhere (E-101, E-102, Panel Summary, exports, 220.87 narrative):
+220.82 when "10 kVA / 40%" is selected, NEC 220 Part III otherwise (default).
+```
+Implementation: `buildSingleFamilyDwellingContext` (carries `useOptionalMethod`)
+→ `residentialLoad.ts::calculateSingleFamilyPanelLoad` (one function for all three).
+Circuits stored without a load type ('O' — templates write none) take one from
+their description (`dwellingLoadType`); an explicit type always wins.
+
 ### Dwelling Optional Methods — HVAC (PE rulings 2026-10-18)
 ```
 220.83 (existing single-family):
@@ -339,7 +350,7 @@ Real mistakes made in this repo, each paired with the rule that prevents recurre
 | Renames left stale brand/name strings in meta tags and landing pages | Grep all casings/spacings/abbreviations before AND after; require zero hits. Check user-facing strings explicitly. |
 | Cited NEC 220.57 (a 2023-only section) on every Florida EV packet, while Florida enforces NEC 2020; a test asserted the wrong citation | Check every cited section exists in the edition the AHJ adopted. EVSE load goes through `getEvseLoadVA(nameplate, edition)`, never an inline 7,200 VA floor. |
 | Calculated-method narrative cited dwelling Optional Methods (220.82/220.83) as "Part III" by occupancy, though they're Part IV and the narrative's calc never ran them | Cite from the calculation's runtime references (`summarizeCalculationRefs`), never a fixed per-occupancy string. Part IV only when an Optional Method section actually ran. (PE ruling 2026-09-27) |
-| Single-family E-102 ran the Part III cascade while E-101 ran NEC 220.83; the same packet passed the service on one page and failed it on the next (#121) | Pages reporting the same quantity call the same function behind the same gate helper (`buildSingleFamilyDwellingContext`). Existing dwelling → 220.83, new → 220.82, on every page. |
+| Single-family E-102 ran the Part III cascade while E-101 ran NEC 220.83; the same packet passed the service on one page and failed it on the next (#121) | Pages reporting the same quantity call the same function behind the same gate helper (`buildSingleFamilyDwellingContext`). Existing dwelling → 220.83; new → the Dwelling Calculator's choice (220.82 or Part III, #178), on every page. |
 | Single-family calc applied ×1.25 to EVSE and other "continuous" loads inside the 220.82/220.83 load calc, citing "220.18(B)" for it; the #123 edition fix covered only the multifamily path | The 125% is OCPD/conductor sizing, never the Article 220 load. When a rule changes, grep every calc that computes the same quantity (MF, SF Optional Method, Dwelling Calculator, Panel Summary), not just the one in the bug report. |
 | Multifamily 220.84 took electric heat at 65% and cited "220.84(C)(4)" for it — a 220.82(C) single-dwelling factor carried into a section that has none, understating demand (#133) | A factor valid in one Optional Method is not valid in another. Before applying any factor, find it in the text of the section you cite. 220.84(C)(5) = larger of A/C or heat at nameplate. |
 | The Part III aggregator, feeder sizing, the 220.84 total and the 220.87(2) new load read EVSE `load_watts` raw; the NEC 2023 7,200 VA floor reached only the MF-EV calc and the SF Optional Method | Every calc that turns an EVSE into load calls `getEvseLoadVA` (circuits: `withEvseLoadForEdition`) with the project edition. A new edition parameter with a default needs a grep of every production caller — tsc can't see a missing optional argument. |
@@ -350,6 +361,7 @@ Real mistakes made in this repo, each paired with the rule that prevents recurre
 | Saved calculator results (`multiFamilyLoadResult`, `mfEvCalculation`) were printed as saved; a rule change reached a project only after its calculator was reopened, and E-402 printed a full-load EV design for an EVEMS job (#158) | Save a calculator's inputs with its result; readers recompute through the calculator's own function (`lib/storedCalcs.ts`). Compare saved jsonb with sorted keys (jsonb reorders them) or a save effect loops. |
 | One unit's load had four implementations: unit pages printed a 10 kVA bucket labelled 220.83, the generator a 220.82 bucket ×1.25, and the calculator Part III math labelled "220.82 Optional Method" (#155) | List every function that computes a quantity and every reader before fixing it. Make the math match the label printed, then route all of them through one core (`calculateDwellingStandardLoad`). |
 | A two-unit building ran the commercial cascade on the packet (220.44, dishwashers as ranges) and "220.84 @ 100%" in two calculators; adding the case, the context builder classified a unit with its own charger as the EV panel and pulled it out of the dwelling walk (#127) | When a calc gains a case, route every reader through one function and re-check the classifiers upstream of it (which panel is "EV" / "house" / a unit). |
+| A new house's packet printed 220.82 while the calculator defaulted to Part III; switching the packet to Part III read template circuits stored without a load type ('O') as 220.53 appliances — range at 75% instead of Column C, A/C at 75% instead of 100% (#178) | A circuit-based calc that branches on load type infers a type from the description when it is 'O' (`dwellingLoadType`). Test circuit-based calcs with the template's own circuits, not only hand-typed fixtures. |
 | Docs updated with stale "Last Updated" dates; completed features left as "NEXT UP" | Every doc touch updates its date to today; every shipped feature flips its ROADMAP status in the same PR. |
 
 ---

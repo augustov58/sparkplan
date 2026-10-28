@@ -4,6 +4,14 @@ All notable changes to SparkPlan.
 
 ---
 
+## 2026-10-27: A new house prints the method chosen on the Dwelling Calculator (#178)
+
+- **Heads-up: new single-family projects change method on their next packet.** The packet printed NEC 220.82 for every new house, while the Dwelling Load Calculator defaulted to NEC 220 Part III (PE ruling 2026-10-27). Now the method chosen on the calculator prints everywhere (E-101, E-102, Panel Summary, panel-schedule exports, 220.87 narrative): 220.82 when "10 kVA / 40%" is selected, Part III otherwise. A new-house project that never touched that setting moves from 220.82 to Part III, which usually comes out higher. On the QA house, 220.82 is 24.1 kVA and Part III is 30.9 kVA. Select "10 kVA / 40%" to keep 220.82. Existing houses are unchanged (220.83).
+- **Circuits without a load type.** Project templates store circuits with no load type ('O'). Dwelling calculations now read the type from the description for those circuits: receptacles, lighting and the refrigerator fall under the 3 VA/sq ft and 220.52 allowances, the range takes Table 220.55, the dryer 220.54, and the A/C or heat its HVAC row at 100%. Before, a templated house's A/C went into the 220.82 40% bucket. A circuit with a load type keeps it.
+- The Project Setup status hint names the method that will be used, including for multifamily projects.
+
+---
+
 ## 2026-10-27: A unit's own EV charger is in the 220.84 base (#180)
 
 - **PE ruling 2026-10-27.** On a building with 3 or more units, a unit panel with its own EV charger was classified as the building's EV panel. The whole unit (range, dryer, HVAC and charger) left the 220.84 base and was added at the generic cascade's demand. The unit now stays a unit, and its charger's edition load (nameplate under NEC 2020, 7,200 VA minimum under 2023) is in the 220.84 base at the Table 220.84 factor, as the Dwelling Load Calculator already did. The building's shared EV panel still adds after the factor.

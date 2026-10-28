@@ -47,11 +47,13 @@ export function isExistingConstructionProject(project: ProjectLike | Project): b
 }
 
 /**
- * NEC 220.82 / 220.83 single-family-dwelling context, or undefined when the
- * project is not a single-family dwelling (multi-family context present,
- * commercial, industrial, or no residential block). Shared by the E-101
- * Load Calculation Summary and the E-102 existing-service page so both
- * pick the Optional Method under the same conditions.
+ * Single-family-dwelling context, or undefined when the project is not a
+ * single-family dwelling (multi-family context present, commercial,
+ * industrial, or no residential block). Shared by every page that prints the
+ * dwelling's service load (E-101, E-102, Panel Summary, exports) so all pick
+ * the same method: 220.83 existing; new → 220.82 when the Dwelling Load
+ * Calculator is set to "10 kVA / 40%" (`useOptionalMethod`), else NEC 220
+ * Part III (PE ruling 2026-10-27, #178).
  */
 export function buildSingleFamilyDwellingContext(
   project: Project,
@@ -61,6 +63,7 @@ export function buildSingleFamilyDwellingContext(
   smallApplianceCircuits: number;
   laundryCircuit: boolean;
   existingDwelling: boolean;
+  useOptionalMethod: boolean;
 } | undefined {
   const residentialSettings = project.settings?.residential;
   const isSingleFamilyDwelling =
@@ -73,6 +76,7 @@ export function buildSingleFamilyDwellingContext(
     smallApplianceCircuits: residentialSettings?.smallApplianceCircuits ?? 2,
     laundryCircuit: residentialSettings?.laundryCircuit ?? true,
     existingDwelling: project.settings?.service_modification_type !== 'new-service',
+    useOptionalMethod: project.settings?.dwelling_calc_mode === 'true-optional',
   };
 }
 

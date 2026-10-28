@@ -1759,8 +1759,9 @@ export function calculateDwellingPanelDemand(opts: {
 
   for (const c of circuits) {
     const watts = c.load_watts ?? 0;
-    const type = (c.load_type ?? 'O').toUpperCase();
     const desc = (c.description ?? '').toLowerCase();
+    // Untyped ('O') circuits take a type from the description (#178).
+    const type = dwellingLoadType((c.load_type ?? 'O').toUpperCase(), desc);
     if (type === 'L' || type === 'R') continue; // Covered by NEC general lighting/SA/laundry
     // Refrigerator on a dedicated 15/20A branch per NEC 210.52(B)(1) Ex 2
     // is still subsumed in the 3 VA/sq ft general lighting allowance.
@@ -1820,28 +1821,28 @@ export function calculateDwellingPanelDemand(opts: {
 }
 
 export interface DwellingDemandSplitResult {
-  /** Optional Method demand with the proposed circuits excluded */
+  /** The panel's demand with the proposed circuits excluded */
   existingDemandVA: number;
-  /** Demand the proposed circuits add: total − existing (after the 40% remainder factor) */
+  /** Demand the proposed circuits add: total − existing (after the method's factors) */
   proposedDemandVA: number;
-  /** Optional Method demand on all circuits — equals the E-101 Load Calculation Summary total */
+  /** Demand on all circuits — equals the E-101 Load Calculation Summary total */
   totalDemandVA: number;
-  necArticle: 'NEC 220.82' | 'NEC 220.83';
+  /** 'NEC 220.82' | 'NEC 220.83' | 'NEC 220 Part III' */
+  necArticle: string;
   necReferences: string[];
   warnings: string[];
-  breakdown: { existing: PanelDemandResult; total: PanelDemandResult };
+  breakdown: { existing: DwellingPanelLoadSummary; total: DwellingPanelLoadSummary };
 }
 
 /**
- * Existing / proposed split of the single-family Optional Method demand
- * (NEC 220.83 existing dwelling, 220.82 new) for the existing-service
- * capacity page (E-102).
+ * Existing / proposed split of a single-family dwelling's service demand for
+ * the existing-service capacity page (E-102), by the same method as E-101
+ * (`calculateSingleFamilyPanelLoad`: 220.83 existing, 220.82 or Part III new).
  *
- * 220.83 computes the whole dwelling *including* the new load, so there is
- * no native existing/proposed split. Existing = the method run on the
- * existing circuits only; proposed = the increase when the proposed
- * circuits are added. existing + proposed equals the total by construction,
- * so E-102 and E-101 report the same figure.
+ * None of the methods has a native existing/proposed split. Existing = the
+ * method run on the existing circuits only; proposed = the increase when the
+ * proposed circuits are added. existing + proposed equals the total by
+ * construction, so E-102 and E-101 report the same figure.
  */
 export function calculateDwellingDemandSplit(opts: {
   circuits: (PanelDemandCircuit & { is_proposed?: boolean | null })[];
@@ -1850,13 +1851,14 @@ export function calculateDwellingDemandSplit(opts: {
   laundryCircuit: boolean;
   voltage: number;
   existingDwelling: boolean;
+  useOptionalMethod?: boolean;
   necEdition?: NecEdition;
 }): DwellingDemandSplitResult {
   const { circuits, ...rest } = opts;
   // One 220.83(A)/(B) decision for both runs, so existing + proposed = total.
   const hvacProposed = hasProposedHvac(circuits);
-  const total = calculateDwellingPanelDemand({ ...rest, circuits, hvacProposed });
-  const existing = calculateDwellingPanelDemand({
+  const total = calculateSingleFamilyPanelLoad({ ...rest, circuits, hvacProposed });
+  const existing = calculateSingleFamilyPanelLoad({
     ...rest,
     circuits: circuits.filter(c => !c.is_proposed),
     hvacProposed,
@@ -1958,6 +1960,26 @@ const COOKING_PATTERN = /range|oven|cooktop|cooking/;
 const MOTOR_PATTERN = /disposal|disposer|pump/;
 
 /**
+ * A circuit stored without a load type ('O', the database default — project
+ * templates write none) gets one from its description, so receptacle and
+ * lighting circuits fall under their 220.12 / 220.52 allowances and the
+ * range, dryer and HVAC take their own sections instead of 220.53 (#178).
+ * An explicit type always wins; EVSE stays 'O' (matched by description).
+ */
+function dwellingLoadType(type: string, desc: string): string {
+  if (type !== 'O' || isEvseDescription(desc)) return type;
+  if (/receptacle|outlet/.test(desc) || REFRIGERATOR_PATTERN.test(desc)) return 'R';
+  if (/light/.test(desc)) return 'L';
+  if (/air handler|blower/.test(desc)) return 'M';
+  if (/air condition|a\/c|condens|heat pump/.test(desc)) return 'C';
+  if (/heat strip|electric heat|baseboard|furnace|space heat/.test(desc)) return 'H';
+  if (/dryer/.test(desc)) return 'D';
+  if (COOKING_PATTERN.test(desc)) return 'K';
+  if (/water heater/.test(desc)) return 'W';
+  return type;
+}
+
+/**
  * A dwelling unit panel's circuits as Part III inputs. General lighting is
  * the panel's lighting circuits (the generator writes them at 3 VA/ft²);
  * small-appliance and laundry circuits are recognised by description in any
@@ -1975,9 +1997,9 @@ export function dwellingLoadsFromCircuits(circuits: PanelDemandCircuit[]): Omit<
 
   for (const c of circuits) {
     const watts = c.load_watts ?? 0;
-    const type = (c.load_type ?? 'O').toUpperCase();
     const description = c.description ?? '';
     const desc = description.toLowerCase();
+    const type = dwellingLoadType((c.load_type ?? 'O').toUpperCase(), desc);
     if (type === 'L') { lightingVA += watts; continue; }
     if (SMALL_APPLIANCE_PATTERN.test(desc)) { smallApplianceCircuits++; continue; }
     if (LAUNDRY_PATTERN.test(desc) && type !== 'D') { laundryCircuits++; continue; }
@@ -2043,6 +2065,16 @@ export function calculateDwellingUnitPanelLoad(opts: {
   }
 
   const result = calculateDwellingStandardLoad({ ...loads, necEdition });
+  const summary = partIIISummary(
+    result,
+    'NEC 220 Part III — Standard Method, Dwelling Unit',
+    'NEC 220 Part III (Standard Method) — the unit feeder load; each load type takes its own demand factor (220.42, 220.53–220.55, 220.60).',
+  );
+  return { ...summary, warnings: [...loads.warnings, ...summary.warnings] };
+}
+
+/** A Part III walk as a Load Summary: the 220.42 subtotal row plus one row per load. */
+function partIIISummary(result: DwellingStandardResult, title: string, note: string): DwellingPanelLoadSummary {
   const componentRows = new Set(['General Lighting', 'Small Appliance Circuits', 'Laundry Circuit']);
   const rows: DwellingSummaryRow[] = result.breakdown
     .filter(r => !componentRows.has(r.category))
@@ -2057,14 +2089,60 @@ export function calculateDwellingUnitPanelLoad(opts: {
     }));
   return {
     necArticle: 'NEC 220 Part III',
-    title: 'NEC 220 Part III — Standard Method, Dwelling Unit',
-    note: 'NEC 220 Part III (Standard Method) — the unit feeder load; each load type takes its own demand factor (220.42, 220.53–220.55, 220.60).',
+    title,
+    note,
     totalConnectedVA: Math.round(result.totalConnectedVA),
     totalDemandVA: Math.round(result.totalDemandVA),
     rows,
     necReferences: ['NEC 220 Part III - Standard Method (Dwelling Unit)', ...result.necReferences],
-    warnings: [...loads.warnings, ...result.warnings],
+    warnings: result.warnings,
   };
+}
+
+/**
+ * A single-family dwelling's service panel from its circuits, by the method
+ * the Dwelling Load Calculator uses (PE ruling 2026-10-27, #178):
+ * - existing dwelling → NEC 220.83 (`calculateDwellingPanelDemand`)
+ * - new dwelling, "10 kVA / 40%" selected (`useOptionalMethod`) → NEC 220.82
+ * - new dwelling otherwise → NEC 220 Part III, with general lighting from the
+ *   project's square footage and the 220.52 circuits from its settings, as
+ *   the calculator counts them.
+ */
+export function calculateSingleFamilyPanelLoad(opts: {
+  circuits: PanelDemandCircuit[];
+  squareFootage: number;
+  smallApplianceCircuits: number;
+  laundryCircuit: boolean;
+  voltage: number;
+  existingDwelling: boolean;
+  useOptionalMethod?: boolean;
+  necEdition?: NecEdition;
+  /** See `calculateDwellingPanelDemand`; pass it for the existing-only split run. */
+  hvacProposed?: boolean;
+}): DwellingPanelLoadSummary {
+  const { useOptionalMethod = false, ...rest } = opts;
+  if (rest.existingDwelling || useOptionalMethod) {
+    return dwellingSummaryFromOptionalMethod(calculateDwellingPanelDemand(rest));
+  }
+  // Lighting, receptacle, small-appliance and laundry circuits are covered by
+  // the 220.12 / 220.52 allowances below, not counted per circuit.
+  const loads = dwellingLoadsFromCircuits(rest.circuits.filter(c => {
+    const desc = (c.description ?? '').toLowerCase();
+    return !SMALL_APPLIANCE_PATTERN.test(desc) && !(LAUNDRY_PATTERN.test(desc) && (c.load_type ?? '').toUpperCase() !== 'D');
+  }));
+  const result = calculateDwellingStandardLoad({
+    lightingVA: rest.squareFootage * LIGHTING_LOAD_VA_PER_SQFT,
+    lightingDescription: `${rest.squareFootage} sq ft @ 3 VA/sq ft`,
+    smallApplianceCircuits: rest.smallApplianceCircuits,
+    laundryCircuit: rest.laundryCircuit,
+    items: loads.items,
+    necEdition: rest.necEdition,
+  });
+  return partIIISummary(
+    result,
+    'NEC 220 Part III — Standard Method, Single-Family Dwelling',
+    'NEC 220 Part III (Standard Method) — each load type takes its own demand factor (220.42, 220.53–220.55, 220.60). Selected on the Dwelling Load Calculator; "10 kVA / 40%" there switches this to NEC 220.82.',
+  );
 }
 
 // ============================================================================
