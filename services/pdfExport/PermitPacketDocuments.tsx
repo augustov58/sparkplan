@@ -2435,8 +2435,12 @@ const FALLBACK_REFS_BY_OCCUPANCY: Record<NarrativeOccupancy, string[]> = {
   industrial: ['NEC 220.42', 'NEC 220.56'],
 };
 
-/** NEC 220 Part IV Optional Method sections for dwellings. */
-const OPTIONAL_METHOD_SECTIONS = ['220.82', '220.83', '220.84'];
+/**
+ * NEC 220 Part IV Optional Method sections for dwellings, in the order one is
+ * named as the method: 220.85 first, since its result cites the 220.84 it
+ * compared against (#127).
+ */
+const OPTIONAL_METHOD_SECTIONS = ['220.85', '220.82', '220.83', '220.84'];
 
 /**
  * Section token, e.g. `220.84` or `220.84(C)(4)`. The lookahead rejects load
@@ -2478,9 +2482,8 @@ export function summarizeCalculationRefs(necReferences: string[]): CalculationCi
       return t === parent || !tokens.has(parent);
     })
     .sort(compareSections);
-  const optionalSection = sections
-    .map(s => s.replace(/\(.*$/, ''))
-    .find(s => OPTIONAL_METHOD_SECTIONS.includes(s));
+  const bases = sections.map(s => s.replace(/\(.*$/, ''));
+  const optionalSection = OPTIONAL_METHOD_SECTIONS.find(s => bases.includes(s));
   return optionalSection
     ? { part: 'IV', optionalSection, sections }
     : { part: 'III', sections };

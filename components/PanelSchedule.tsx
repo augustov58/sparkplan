@@ -608,6 +608,7 @@ export const PanelSchedule: React.FC<PanelScheduleProps> = ({ project }) => {
           panel.id, panels, circuits, transformers, occupancyForCalc, ctx, necEdition,
         );
         const dominantNec = r.necReferences.find(ref => ref.includes('625.42'))
+          ?? r.necReferences.find(ref => ref.includes('220.85') || ref.includes('Two Dwelling Units'))
           ?? r.necReferences.find(ref => ref.includes('220.84'))
           ?? r.necReferences.find(ref => ref.includes('220.'))
           ?? undefined;
@@ -2082,7 +2083,15 @@ export const PanelSchedule: React.FC<PanelScheduleProps> = ({ project }) => {
                       aggregatedLoad &&
                       aggregatedLoad.totalDemandVA > 0 &&
                       aggregatedLoad.totalDemandVA < demandResult.totalDemandLoad_kVA * 1000 - 1 && (
-                        <span className="ml-1 text-amber-700 normal-case">(NEC 625.42 EVEMS)</span>
+                        // Name the method that lowered the demand, from the
+                        // calculation's own references (#127: a two-unit
+                        // 220.85 MDP has no EVEMS).
+                        <span className="ml-1 text-amber-700 normal-case">
+                          ({aggregatedLoad.necReferences.some(r => r.includes('625.42')) ? 'NEC 625.42 EVEMS'
+                            : aggregatedLoad.necReferences.some(r => r.includes('220.85')) ? 'NEC 220.85'
+                            : aggregatedLoad.necReferences.some(r => r.includes('220.84')) ? 'NEC 220.84'
+                            : 'NEC 220 Part III'})
+                        </span>
                       )}
                   </span>
                   <span className="text-xl font-bold text-[#2d3b2d]">

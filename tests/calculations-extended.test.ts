@@ -897,13 +897,20 @@ describe('Residential Load (NEC 220.82 / 220.84)', () => {
       expect(result.necReferences).toContain('NEC 220.84 - Multi-Family Optional Method');
     });
 
-    it('should warn if fewer than 3 units', () => {
-      const result = calculateMultiFamilyLoad({
+    it('should warn if fewer than 2 units; 2 units run Part III, not 220.84 (#127)', () => {
+      const one = calculateMultiFamilyLoad({
+        unitTemplates: [
+          { id: '1', name: 'A', squareFootage: 800, unitCount: 1, appliances: {} },
+        ],
+      });
+      expect(one.warnings.some(w => w.includes('minimum 3 dwelling units'))).toBe(true);
+      const two = calculateMultiFamilyLoad({
         unitTemplates: [
           { id: '1', name: 'A', squareFootage: 800, unitCount: 2, appliances: {} },
         ],
       });
-      expect(result.warnings.some(w => w.includes('minimum 3 dwelling units'))).toBe(true);
+      expect(two.warnings.some(w => w.includes('minimum 3 dwelling units'))).toBe(false);
+      expect(two.necReferences[0]).toBe('NEC 220 Part III - Standard Method (Two Dwelling Units)');
     });
 
     it('should include house panel load at 100% (after demand factor)', () => {
@@ -1484,13 +1491,18 @@ describe('Upstream Load Aggregation — NEC 220.84 Optional Method (C1)', () => 
       expect(ctx).toBeUndefined();
     });
 
-    it('returns undefined for fewer than 3 units (NEC 220.84 minimum)', () => {
+    it('returns undefined for fewer than 2 units; 2 units get a context for Part III / 220.85 (#127)', () => {
       const { panels, circuits, transformers, mdp } = buildFixture();
-      const ctx = buildMultiFamilyContext(mdp, panels, circuits, transformers, {
+      const one = buildMultiFamilyContext(mdp, panels, circuits, transformers, {
+        occupancyType: 'dwelling',
+        residential: { dwellingType: 'multi_family', totalUnits: 1 },
+      });
+      expect(one).toBeUndefined();
+      const two = buildMultiFamilyContext(mdp, panels, circuits, transformers, {
         occupancyType: 'dwelling',
         residential: { dwellingType: 'multi_family', totalUnits: 2 },
       });
-      expect(ctx).toBeUndefined();
+      expect(two?.dwellingUnits).toBe(2);
     });
 
     it('returns undefined for single-family dwelling type', () => {

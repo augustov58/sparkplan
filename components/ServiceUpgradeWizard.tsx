@@ -948,6 +948,7 @@ export const ServiceUpgradeWizard: React.FC<ServiceUpgradeWizardProps> = ({ proj
                 // — extract the leading article token.
                 const firstRef = dwellingLoadResult.necReferences?.[0] ?? '';
                 const articleLabel = firstRef.includes('220.83') ? 'NEC 220.83'
+                  : firstRef.includes('220.85') ? 'NEC 220.85'
                   : firstRef.includes('220.84') ? 'NEC 220.84'
                   : firstRef.includes('220.82') ? 'NEC 220.82'
                   : 'NEC 220';

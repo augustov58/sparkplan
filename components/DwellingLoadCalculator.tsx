@@ -758,7 +758,9 @@ export const DwellingLoadCalculator: React.FC<DwellingLoadCalculatorProps> = ({
                   : project.settings?.dwelling_calc_mode === 'true-optional'
                     ? 'NEC 220.82 - Optional Method for Single-Family Dwellings (10 kVA / 40% bucket)'
                     : 'NEC 220 Standard Method - Per-Category Demand Factors (220.42 / 220.52 / 220.55 / 220.60)')
-              : 'NEC 220.84 - Optional Method for Multi-Family Dwellings'
+              : unitTemplates.reduce((sum, t) => sum + t.unitCount, 0) === 2
+                ? 'NEC 220 Part III / 220.85 - Two Dwelling Units'
+                : 'NEC 220.84 - Optional Method for Multi-Family Dwellings'
             }
           </p>
           {/* Existing Service Size input — drives the Service Headroom card.

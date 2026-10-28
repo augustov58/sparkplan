@@ -15,6 +15,7 @@
  */
 
 import { getEvseLoadVA, evseLoadCitation, EVSE_CONTINUOUS_FACTOR, type NecEdition } from '../../data/nec/evse-load';
+import { calculateTwoUnitDwellingLoad, twoUnitOptionalRow, type TwoUnitDwellingUnit } from './residentialLoad';
 
 // ============================================================================
 // NEC CONSTANTS AND TABLES
@@ -979,7 +980,8 @@ export function calculateMultiFamilyEV(input: MultiFamilyEVInput): MultiFamilyEV
 
   const warnings: string[] = [];
   const recommendations: string[] = [];
-  const necArticles: string[] = ['NEC 220.84', 'NEC 625.42'];
+  // Two units are outside 220.84 (#127); their path adds its own sections.
+  const necArticles: string[] = dwellingUnits === 2 ? ['NEC 625.42'] : ['NEC 220.84', 'NEC 625.42'];
 
   // =========================================================================
   // STEP 1: Determine Building Load
@@ -1009,6 +1011,33 @@ export function calculateMultiFamilyEV(input: MultiFamilyEVInput): MultiFamilyEV
   const usePreCalculated = existingLoadMethod === 'calculated'
     && input.preCalculatedBuildingLoad !== undefined;
 
+  // Common area loads (calculated paths): itemized with their own demand
+  // factors when provided, otherwise the simple VA input at 100%.
+  const addCommonAreaLoads = (simpleNecReference: string) => {
+    if (commonAreaLoads && commonAreaLoads.length > 0) {
+      const commonAreaResult = calculateCommonAreaLoads(commonAreaLoads);
+      for (const item of commonAreaResult.items) {
+        breakdown.push(item);
+      }
+      return {
+        commonAreaConnectedVA: commonAreaResult.totalConnectedVA,
+        commonAreaDemandVA: commonAreaResult.totalDemandVA,
+      };
+    }
+    if (commonAreaLoadVA > 0) {
+      breakdown.push({
+        category: 'Common Area Loads',
+        description: 'Lighting, elevators, pool, etc. (100%)',
+        connectedVA: commonAreaLoadVA,
+        demandVA: commonAreaLoadVA,
+        demandFactor: 1.0,
+        necReference: simpleNecReference,
+      });
+    }
+    const simpleVA = commonAreaLoadVA > 0 ? commonAreaLoadVA : 0;
+    return { commonAreaConnectedVA: simpleVA, commonAreaDemandVA: simpleVA };
+  };
+
   if (usePreCalculated) {
     // =========================================================================
     // PATH C: PRE-CALCULATED from DwellingLoadCalculator (NEC 220.84)
@@ -1036,8 +1065,13 @@ export function calculateMultiFamilyEV(input: MultiFamilyEVInput): MultiFamilyEV
     buildingDemandVA = preCalc.totalDemandVA;
     buildingDemandFactor = preCalc.demandFactor;
 
+    // A two-unit building comes back as Part III or the 220.85 lesser (#127).
+    const importedMethod = dwellingUnits !== 2
+      ? 'NEC 220.84'
+      : preCalc.breakdown.some(item => item.necReference === 'NEC 220.85') ? 'NEC 220.85' : 'NEC 220 Part III';
+    if (dwellingUnits === 2) necArticles.push(importedMethod);
     recommendations.push(
-      'Building load imported from Dwelling Load Calculator (NEC 220.84 with detailed appliance data).'
+      `Building load imported from Dwelling Load Calculator (${importedMethod} with detailed appliance data).`
     );
 
   } else if (useMeasuredData) {
@@ -1087,6 +1121,41 @@ export function calculateMultiFamilyEV(input: MultiFamilyEVInput): MultiFamilyEV
 
     // Note: Common area loads are INCLUDED in measured demand, don't add separately
 
+  } else if (dwellingUnits === 2) {
+    // =========================================================================
+    // PATH B, two units (PE ruling 2026-10-27, #127): 220.84 needs three or
+    // more units. The building-wide Part III walk on this path's assumed
+    // units (12 kW range, 10 kW heat), or the 220.85 lesser — the assumed
+    // units are identical by construction.
+    // =========================================================================
+    necArticles.push('NEC 220.87(B)');
+    const assumedUnit = (label: string): TwoUnitDwellingUnit => ({
+      label,
+      lightingVA: avgUnitSqFt * LIGHTING_LOAD_VA_PER_SQFT,
+      lightingDescription: `${avgUnitSqFt.toLocaleString()} sq ft @ 3 VA/sq ft`,
+      smallApplianceCircuits: 2,
+      laundryCircuit: true,
+      items: [
+        ...(hasElectricCooking ? [{ category: 'Electric Cooking', description: '12 kW range (assumed)', va: 12000, kind: 'cooking' as const }] : []),
+        ...(hasElectricHeat ? [{ category: 'HVAC', description: '10 kW electric heat (assumed)', va: 10000, kind: 'heating' as const }] : []),
+      ],
+    });
+    const two = calculateTwoUnitDwellingLoad({
+      units: [assumedUnit('Unit 1'), assumedUnit('Unit 2')],
+      identicalUnits: true,
+      necEdition,
+    });
+    warnings.push(...two.warnings);
+    necArticles.push(...two.necReferences);
+    if (two.method === 'NEC 220.85') {
+      breakdown.push(twoUnitOptionalRow(two));
+    } else {
+      breakdown.push(...two.partIII.breakdown);
+    }
+    const { commonAreaConnectedVA, commonAreaDemandVA } = addCommonAreaLoads('NEC 220 Part III (common area loads at 100%)');
+    totalConnectedVA = two.totalConnectedVA + commonAreaConnectedVA;
+    buildingDemandVA = two.totalDemandVA + commonAreaDemandVA;
+    buildingDemandFactor = totalConnectedVA > 0 ? buildingDemandVA / totalConnectedVA : 1;
   } else {
     // =========================================================================
     // PATH B: CALCULATED DATA (NEC 220.87(B) via NEC 220.84)
@@ -1187,33 +1256,7 @@ export function calculateMultiFamilyEV(input: MultiFamilyEVInput): MultiFamilyEV
     });
 
     // 1g. Common area loads
-    // Use itemized loads if provided, otherwise use simple VA input
-    let commonAreaConnectedVA = 0;
-    let commonAreaDemandVA = 0;
-
-    if (commonAreaLoads && commonAreaLoads.length > 0) {
-      // Calculate itemized common area loads with proper NEC demand factors
-      const commonAreaResult = calculateCommonAreaLoads(commonAreaLoads);
-      commonAreaConnectedVA = commonAreaResult.totalConnectedVA;
-      commonAreaDemandVA = commonAreaResult.totalDemandVA;
-
-      // Add each itemized load to the breakdown
-      for (const item of commonAreaResult.items) {
-        breakdown.push(item);
-      }
-    } else if (commonAreaLoadVA > 0) {
-      // Fall back to simple VA input (100% demand factor)
-      commonAreaConnectedVA = commonAreaLoadVA;
-      commonAreaDemandVA = commonAreaLoadVA;
-      breakdown.push({
-        category: 'Common Area Loads',
-        description: 'Lighting, elevators, pool, etc. (100%)',
-        connectedVA: commonAreaLoadVA,
-        demandVA: commonAreaLoadVA,
-        demandFactor: 1.0,
-        necReference: 'NEC 220.84(B)',
-      });
-    }
+    const { commonAreaConnectedVA, commonAreaDemandVA } = addCommonAreaLoads('NEC 220.84(B)');
 
     // Total building load (calculated method)
     totalConnectedVA = unitLoadsSubtotal + commonAreaConnectedVA;
@@ -1548,7 +1591,7 @@ export function calculateMultiFamilyEV(input: MultiFamilyEVInput): MultiFamilyEV
   // =========================================================================
 
   // Add validation warnings
-  if (dwellingUnits < 3) {
+  if (dwellingUnits < 2) {
     warnings.push('NEC 220.84 requires minimum 3 dwelling units for optional calculation method');
     necArticles.push('NEC 220.82 (Optional Method)');
   }

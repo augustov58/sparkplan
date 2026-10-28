@@ -463,6 +463,8 @@ export interface DwellingStandardInput {
   lightingDescription: string;
   smallApplianceCircuits: number;
   laundryCircuit: boolean;
+  /** 220.52(B) laundry circuits when more than one (a two-unit service); overrides `laundryCircuit`. */
+  laundryCircuits?: number;
   items: DwellingLoadItem[];
   necEdition?: NecEdition;
 }
@@ -500,7 +502,8 @@ export function calculateDwellingStandardLoad(input: DwellingStandardInput): Dwe
     warnings.push('Minimum 2 small appliance circuits required per NEC 210.11(C)(1)');
   }
   const smallApplianceVA = effectiveSmallAppliance * SMALL_APPLIANCE_VA_PER_CIRCUIT;
-  const laundryVA = laundryCircuit ? LAUNDRY_CIRCUIT_VA : 0;
+  const laundryCount = input.laundryCircuits ?? (laundryCircuit ? 1 : 0);
+  const laundryVA = laundryCount * LAUNDRY_CIRCUIT_VA;
   const generalVA = lightingVA + smallApplianceVA + laundryVA;
   const generalDemandVA = applyTieredDemand(generalVA, LIGHTING_DEMAND_TABLE);
 
@@ -512,9 +515,9 @@ export function calculateDwellingStandardLoad(input: DwellingStandardInput): Dwe
     category: 'Small Appliance Circuits', description: `${effectiveSmallAppliance} circuits @ 1,500 VA each`,
     connectedVA: smallApplianceVA, demandVA: 0, demandFactor: 0, necReference: 'NEC 220.52(A)',
   });
-  if (laundryCircuit) {
+  if (laundryCount > 0) {
     breakdown.push({
-      category: 'Laundry Circuit', description: '1 circuit @ 1,500 VA',
+      category: 'Laundry Circuit', description: `${laundryCount} circuit${laundryCount > 1 ? 's' : ''} @ 1,500 VA`,
       connectedVA: laundryVA, demandVA: 0, demandFactor: 0, necReference: 'NEC 220.52(B)',
     });
   }
@@ -651,50 +654,8 @@ export function calculateDwellingStandardLoad(input: DwellingStandardInput): Dwe
 // MAIN CALCULATION FUNCTIONS
 // ============================================================================
 
-/**
- * Single-family dwelling load, three methods:
- * - Default: NEC 220 Part III standard method (`calculateDwellingStandardLoad`).
- *   Before #155 this walk was labelled "220.82 Optional Method"; it never
- *   ran the 220.82 bucket.
- * - `useTrueOptionalMethod` (new dwelling): NEC 220.82, 10 kVA / 40% bucket.
- * - `existingDwelling`: NEC 220.83, 8 kVA / 40% bucket, (A)/(B) per #132.
- * The bucket methods re-pool the Part III rows' nameplate values below.
- */
-export function calculateSingleFamilyLoad(input: SingleFamilyInput): ResidentialLoadResult {
-  const {
-    squareFootage,
-    smallApplianceCircuits,
-    laundryCircuit,
-    appliances,
-    serviceVoltage = 240,
-    existingDwelling = false,
-    useTrueOptionalMethod = false,
-    necEdition = '2020'
-  } = input;
-
-  // Resolve which bucket-method post-process (if any) applies.
-  // 220.83 (existing dwelling) always wins because it's the NEC-required
-  // method for that scenario; 220.82 true-optional applies only to new
-  // dwellings when the user has opted in.
-  const bucketMethod: 'none' | 'true-220-82' | '220-83' = existingDwelling
-    ? '220-83'
-    : useTrueOptionalMethod
-      ? 'true-220-82'
-      : 'none';
-
-  const necReferences: string[] = [
-    bucketMethod === '220-83'
-      ? 'NEC 220.83 - Optional Method for Existing Dwelling Units'
-      : bucketMethod === 'true-220-82'
-        ? 'NEC 220.82 - Optional Method for Dwelling Units (10 kVA / 40% bucket)'
-        : 'NEC 220 Part III - Standard Method (Dwelling Unit)'
-  ];
-  const warnings: string[] = [];
-  if (!laundryCircuit) {
-    warnings.push('Laundry circuit required per NEC 210.11(C)(2)');
-  }
-
-  // Appliance toggles → Part III items, in breakdown order.
+/** Appliance toggles → Part III items, in breakdown order. */
+export function dwellingItemsFromAppliances(appliances: ResidentialAppliances): DwellingLoadItem[] {
   const items: DwellingLoadItem[] = [];
   if (appliances.range?.enabled && appliances.range.type === 'electric') {
     items.push({ category: 'Electric Range', description: `${appliances.range.kw} kW`, va: appliances.range.kw * 1000, kind: 'cooking' });
@@ -751,6 +712,53 @@ export function calculateSingleFamilyLoad(input: SingleFamilyInput): Residential
       necReference: isProposedHvac ? 'NEC 220.50, 220.51' : 'NEC 220.14(A)',
     });
   }
+  return items;
+}
+
+/**
+ * Single-family dwelling load, three methods:
+ * - Default: NEC 220 Part III standard method (`calculateDwellingStandardLoad`).
+ *   Before #155 this walk was labelled "220.82 Optional Method"; it never
+ *   ran the 220.82 bucket.
+ * - `useTrueOptionalMethod` (new dwelling): NEC 220.82, 10 kVA / 40% bucket.
+ * - `existingDwelling`: NEC 220.83, 8 kVA / 40% bucket, (A)/(B) per #132.
+ * The bucket methods re-pool the Part III rows' nameplate values below.
+ */
+export function calculateSingleFamilyLoad(input: SingleFamilyInput): ResidentialLoadResult {
+  const {
+    squareFootage,
+    smallApplianceCircuits,
+    laundryCircuit,
+    appliances,
+    serviceVoltage = 240,
+    existingDwelling = false,
+    useTrueOptionalMethod = false,
+    necEdition = '2020'
+  } = input;
+
+  // Resolve which bucket-method post-process (if any) applies.
+  // 220.83 (existing dwelling) always wins because it's the NEC-required
+  // method for that scenario; 220.82 true-optional applies only to new
+  // dwellings when the user has opted in.
+  const bucketMethod: 'none' | 'true-220-82' | '220-83' = existingDwelling
+    ? '220-83'
+    : useTrueOptionalMethod
+      ? 'true-220-82'
+      : 'none';
+
+  const necReferences: string[] = [
+    bucketMethod === '220-83'
+      ? 'NEC 220.83 - Optional Method for Existing Dwelling Units'
+      : bucketMethod === 'true-220-82'
+        ? 'NEC 220.82 - Optional Method for Dwelling Units (10 kVA / 40% bucket)'
+        : 'NEC 220 Part III - Standard Method (Dwelling Unit)'
+  ];
+  const warnings: string[] = [];
+  if (!laundryCircuit) {
+    warnings.push('Laundry circuit required per NEC 210.11(C)(2)');
+  }
+
+  const items = dwellingItemsFromAppliances(appliances);
 
   const partIII = calculateDwellingStandardLoad({
     lightingVA: squareFootage * LIGHTING_LOAD_VA_PER_SQFT,
@@ -973,6 +981,9 @@ export function calculateMultiFamilyLoad(input: MultiFamilyInput): ResidentialLo
 
   const totalUnits = unitTemplates.reduce((sum, t) => sum + t.unitCount, 0);
 
+  if (totalUnits === 2) {
+    return calculateTwoUnitBuildingLoad(input);
+  }
   if (totalUnits < 3) {
     warnings.push('NEC 220.84 requires minimum 3 dwelling units. Use standard method (220.82) for each unit.');
   }
@@ -1206,6 +1217,100 @@ export function calculateMultiFamilyLoad(input: MultiFamilyInput): ResidentialLo
     breakdown,
     necReferences,
     warnings
+  };
+}
+
+/**
+ * A two-unit building from calculator templates: 220.84 needs three or more
+ * units, so the service is the building-wide Part III walk, or the 220.85
+ * lesser when both units are the same template (PE ruling 2026-10-27, #127).
+ */
+function calculateTwoUnitBuildingLoad(input: MultiFamilyInput): ResidentialLoadResult {
+  const { unitTemplates, housePanelLoad = 0, serviceVoltage = 240, necEdition = '2020' } = input;
+
+  // Per-unit panel sizing, as calculateMultiFamilyLoad step 1.
+  for (const template of unitTemplates) {
+    const unitLoad = calculateSingleFamilyLoad({
+      squareFootage: template.squareFootage,
+      smallApplianceCircuits: 2,
+      laundryCircuit: true,
+      appliances: template.appliances,
+      serviceVoltage,
+      necEdition,
+    });
+    template.calculatedLoadVA = unitLoad.totalDemandVA;
+    template.panelSize = recommendServiceSize(unitLoad.serviceAmps);
+  }
+
+  const occupied = unitTemplates.filter(t => t.unitCount > 0);
+  const units: TwoUnitDwellingUnit[] = occupied.flatMap(t => Array.from({ length: t.unitCount }, (_, i) => ({
+    label: t.unitCount > 1 ? `${t.name} #${i + 1}` : t.name,
+    lightingVA: t.squareFootage * LIGHTING_LOAD_VA_PER_SQFT,
+    lightingDescription: `${t.squareFootage} sq ft @ 3 VA/sq ft`,
+    smallApplianceCircuits: 2,
+    laundryCircuit: true,
+    items: dwellingItemsFromAppliances(t.appliances),
+  })));
+  const identicalUnits = occupied.length === 1
+    || (occupied.length === 2
+      && occupied[0]!.squareFootage === occupied[1]!.squareFootage
+      && JSON.stringify(occupied[0]!.appliances) === JSON.stringify(occupied[1]!.appliances));
+
+  const two = calculateTwoUnitDwellingLoad({ units, identicalUnits, necEdition });
+  const breakdown: LoadBreakdown[] = two.method === 'NEC 220.85'
+    ? [twoUnitOptionalRow(two)]
+    : [...two.partIII.breakdown];
+  const necReferences = [...two.necReferences];
+  const warnings = [...two.warnings];
+
+  let totalConnected = two.totalConnectedVA;
+  if (housePanelLoad > 0) {
+    breakdown.push({
+      category: 'House/Common Loads',
+      description: 'Parking, laundry, common areas',
+      connectedVA: housePanelLoad,
+      demandVA: housePanelLoad,
+      demandFactor: 1.0,
+      necReference: 'NEC 220 Part III (house loads at 100%)',
+    });
+    totalConnected += housePanelLoad;
+  }
+  const finalDemand = two.totalDemandVA + housePanelLoad;
+
+  const serviceAmps = finalDemand / serviceVoltage;
+  // Neutral (220.61) from the Part III rows, never above the phase demand.
+  const reducedNeutral = calculateNeutralLoad(
+    [...two.partIII.breakdown, ...breakdown.filter(r => r.category === 'House/Common Loads')],
+    serviceVoltage,
+  );
+  const neutralLoad = reducedNeutral.neutralVA > finalDemand
+    ? { ...reducedNeutral, neutralVA: Math.round(finalDemand), neutralAmps: Math.round(serviceAmps * 10) / 10 }
+    : reducedNeutral;
+  if (neutralLoad.reductionPercent > 0) {
+    necReferences.push('NEC 220.61(B) - Neutral Load Reduction');
+  }
+
+  const serviceConductorSize = recommendServiceConductorSize(serviceAmps, 'Cu');
+  const neutralConductorSize = recommendServiceConductorSize(neutralLoad.neutralAmps, 'Cu');
+  const gecSize = recommendGecSize(serviceConductorSize, 'Cu');
+  necReferences.push('NEC Table 310.12 - Service Conductor Sizing');
+  necReferences.push('NEC 250.66 - Grounding Electrode Conductor');
+
+  return {
+    totalConnectedVA: Math.round(totalConnected),
+    totalDemandVA: Math.round(finalDemand),
+    demandFactor: totalConnected > 0 ? finalDemand / totalConnected : 1,
+    serviceAmps: Math.round(serviceAmps),
+    recommendedServiceSize: recommendServiceSize(serviceAmps),
+    neutralLoadVA: neutralLoad.neutralVA,
+    neutralAmps: neutralLoad.neutralAmps,
+    neutralReduction: neutralLoad.reductionPercent,
+    serviceConductorSize,
+    neutralConductorSize,
+    gecSize,
+    breakdown,
+    necReferences: [...new Set(necReferences)],
+    warnings,
   };
 }
 
@@ -1865,7 +1970,7 @@ export function dwellingLoadsFromCircuits(circuits: PanelDemandCircuit[]): Omit<
 } {
   let lightingVA = 0;
   let smallApplianceCircuits = 0;
-  let laundryCircuit = false;
+  let laundryCircuits = 0;
   const items: DwellingLoadItem[] = [];
 
   for (const c of circuits) {
@@ -1875,7 +1980,7 @@ export function dwellingLoadsFromCircuits(circuits: PanelDemandCircuit[]): Omit<
     const desc = description.toLowerCase();
     if (type === 'L') { lightingVA += watts; continue; }
     if (SMALL_APPLIANCE_PATTERN.test(desc)) { smallApplianceCircuits++; continue; }
-    if (LAUNDRY_PATTERN.test(desc) && type !== 'D') { laundryCircuit = true; continue; }
+    if (LAUNDRY_PATTERN.test(desc) && type !== 'D') { laundryCircuits++; continue; }
     if (type === 'R' || REFRIGERATOR_PATTERN.test(desc)) continue;
     if (watts <= 0) continue;
     const item = (kind: DwellingLoadKind, category = description): DwellingLoadItem =>
@@ -1897,7 +2002,8 @@ export function dwellingLoadsFromCircuits(circuits: PanelDemandCircuit[]): Omit<
     lightingVA,
     lightingDescription: 'Lighting circuits (3 VA/sq ft)',
     smallApplianceCircuits,
-    laundryCircuit,
+    laundryCircuit: laundryCircuits > 0,
+    laundryCircuits,
     items,
     warnings,
   };
@@ -1958,6 +2064,145 @@ export function calculateDwellingUnitPanelLoad(opts: {
     rows,
     necReferences: ['NEC 220 Part III - Standard Method (Dwelling Unit)', ...result.necReferences],
     warnings: [...loads.warnings, ...result.warnings],
+  };
+}
+
+// ============================================================================
+// TWO DWELLING UNITS — NEC 220 PART III, 220.85
+// ============================================================================
+
+/** 220.85 compares the Part III load with 220.84 for this many identical units. */
+const NEC_220_85_COMPARISON_UNITS = 3;
+
+/** One unit's Part III inputs (calculator template or a unit panel's circuits). */
+export interface TwoUnitDwellingUnit extends Omit<DwellingStandardInput, 'necEdition'> {
+  label: string;
+}
+
+export interface TwoUnitDwellingResult {
+  method: 'NEC 220 Part III' | 'NEC 220.85';
+  /** Part III connected (HVAC at the larger of heat/cool). */
+  totalConnectedVA: number;
+  /** The load used: the lesser of Part III and 220.85's 220.84 comparison. */
+  totalDemandVA: number;
+  partIII: DwellingStandardResult;
+  /** 220.84 load of three units identical to these; null when 220.85 can't be applied. */
+  threeUnitOptionalVA: number | null;
+  /** One unit's 220.84 connected load (nameplate), when computed. */
+  unitOptionalConnectedVA: number | null;
+  necReferences: string[];
+  warnings: string[];
+}
+
+/**
+ * One unit's connected load as 220.84(C) counts it: lighting, 220.52 circuits,
+ * every appliance at nameplate (dryer at its 5,000 VA minimum, EVSE at its
+ * edition load), and the larger of A/C or heat per (C)(5) — the same
+ * convention as `calculateMultiFamilyLoad`.
+ */
+function unitConnectedFor22084(unit: TwoUnitDwellingUnit, necEdition: NecEdition): number {
+  const laundryCount = unit.laundryCircuits ?? (unit.laundryCircuit ? 1 : 0);
+  let va = unit.lightingVA
+    + Math.max(2, unit.smallApplianceCircuits) * SMALL_APPLIANCE_VA_PER_CIRCUIT
+    + laundryCount * LAUNDRY_CIRCUIT_VA;
+  let heatingVA = 0;
+  let coolingVA = 0;
+  for (const item of unit.items) {
+    if (item.kind === 'heating') heatingVA += item.va;
+    else if (item.kind === 'cooling') coolingVA += item.va;
+    else if (item.kind === 'dryer') va += Math.max(item.va, DRYER_MIN_VA);
+    else if (item.kind === 'evse') va += getEvseLoadVA(item.va, necEdition).loadVA;
+    else va += item.va;
+  }
+  return va + Math.max(heatingVA, coolingVA);
+}
+
+/**
+ * Two dwelling units on one service or feeder (PE ruling 2026-10-27, #127):
+ * one NEC 220 Part III walk over both units — 220.42 tiers once on the
+ * combined lighting + 220.52 circuits, 220.53 counted across both units,
+ * Table 220.55 Column C by the number of cooking appliances, 220.54 dryers,
+ * the larger of heat or A/C, 25% of the largest motor.
+ *
+ * NEC 220.85: when the Part III load exceeds that of three identical units
+ * under 220.84, the lesser is permitted. Taken only when the two units are
+ * identical (`identicalUnits`) and meet 220.84(A) — electric cooking, and
+ * electric heat or A/C, in each unit.
+ */
+export function calculateTwoUnitDwellingLoad(opts: {
+  units: TwoUnitDwellingUnit[];
+  identicalUnits: boolean;
+  necEdition?: NecEdition;
+}): TwoUnitDwellingResult {
+  const { units, identicalUnits, necEdition = '2020' } = opts;
+  const warnings: string[] = [];
+  const labelled = units.length > 1;
+
+  const partIII = calculateDwellingStandardLoad({
+    lightingVA: units.reduce((sum, u) => sum + u.lightingVA, 0),
+    lightingDescription: units.map(u => `${u.label}: ${u.lightingDescription}`).join('; '),
+    smallApplianceCircuits: units.reduce((sum, u) => sum + u.smallApplianceCircuits, 0),
+    laundryCircuit: units.some(u => u.laundryCircuit),
+    laundryCircuits: units.reduce((sum, u) => sum + (u.laundryCircuits ?? (u.laundryCircuit ? 1 : 0)), 0),
+    // Unit labels go on the description: categories stay the ones
+    // calculateNeutralLoad matches for 240 V-only loads.
+    items: units.flatMap(u => u.items.map(item => (labelled
+      ? { ...item, description: `${u.label}: ${item.description}` }
+      : item))),
+    necEdition,
+  });
+  warnings.push(...partIII.warnings);
+  const partIIIDemandVA = Math.round(partIII.totalDemandVA);
+
+  const unit = units[0];
+  const meets22084A = !!unit
+    && unit.items.some(i => i.kind === 'cooking' && i.va > 0)
+    && unit.items.some(i => (i.kind === 'heating' || i.kind === 'cooling') && i.va > 0);
+  let threeUnitOptionalVA: number | null = null;
+  let unitOptionalConnectedVA: number | null = null;
+  if (!identicalUnits) {
+    warnings.push('ℹ️ NEC 220.85 not applied: the two units are not identical, so there are no "three identical units" to compare under 220.84.');
+  } else if (!meets22084A) {
+    warnings.push('ℹ️ NEC 220.85 not applied: 220.84(A) requires electric cooking and electric heat or A/C in each unit.');
+  } else {
+    unitOptionalConnectedVA = Math.round(unitConnectedFor22084(unit!, necEdition));
+    const factor = getMultiFamilyDemandFactor(NEC_220_85_COMPARISON_UNITS);
+    threeUnitOptionalVA = Math.round(NEC_220_85_COMPARISON_UNITS * unitOptionalConnectedVA * factor);
+  }
+
+  const use22085 = threeUnitOptionalVA !== null && threeUnitOptionalVA < partIIIDemandVA;
+  if (threeUnitOptionalVA !== null) {
+    warnings.push(use22085
+      ? `ℹ️ NEC 220.85: three identical units under 220.84 (${threeUnitOptionalVA.toLocaleString()} VA) is less than the Part III load (${partIIIDemandVA.toLocaleString()} VA), so the lesser is used.`
+      : `ℹ️ NEC 220.85 compared: the Part III load (${partIIIDemandVA.toLocaleString()} VA) does not exceed three identical units under 220.84 (${threeUnitOptionalVA.toLocaleString()} VA), so Part III is used.`);
+  }
+
+  return {
+    method: use22085 ? 'NEC 220.85' : 'NEC 220 Part III',
+    totalConnectedVA: Math.round(partIII.totalConnectedVA),
+    totalDemandVA: use22085 ? threeUnitOptionalVA! : partIIIDemandVA,
+    partIII,
+    threeUnitOptionalVA,
+    unitOptionalConnectedVA,
+    necReferences: use22085
+      ? ['NEC 220.85 - Two Dwelling Units (lesser of Part III and 220.84 for three identical units)', 'NEC Table 220.84']
+      : ['NEC 220 Part III - Standard Method (Two Dwelling Units)', ...partIII.necReferences],
+    warnings,
+  };
+}
+
+/**
+ * The 220.85 three-unit comparison as one breakdown row, in the shape of a
+ * Part III row (connected = the two units' Part III connected load).
+ */
+export function twoUnitOptionalRow(result: TwoUnitDwellingResult): LoadBreakdown {
+  return {
+    category: 'Two Dwelling Units (NEC 220.85)',
+    description: `Lesser of Part III (${Math.round(result.partIII.totalDemandVA).toLocaleString()} VA) and 3 identical units × ${(result.unitOptionalConnectedVA ?? 0).toLocaleString()} VA @ ${(getMultiFamilyDemandFactor(NEC_220_85_COMPARISON_UNITS) * 100).toFixed(0)}% (Table 220.84)`,
+    connectedVA: result.totalConnectedVA,
+    demandVA: result.totalDemandVA,
+    demandFactor: result.totalConnectedVA > 0 ? result.totalDemandVA / result.totalConnectedVA : 0,
+    necReference: 'NEC 220.85',
   };
 }
 
