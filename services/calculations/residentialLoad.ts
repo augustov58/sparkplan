@@ -916,6 +916,34 @@ export function calculateSingleFamilyLoad(input: SingleFamilyInput): Residential
     }
   }
 
+  return dwellingServiceResult({
+    totalConnectedVA: totalConnected,
+    totalDemandVA: totalDemand,
+    neutralLoad: calculateNeutralLoad(breakdown, serviceVoltage),
+    serviceVoltage,
+    breakdown,
+    necReferences,
+    warnings,
+  });
+}
+
+/**
+ * Service size, NEC 220.61 neutral and conductor sizes for a single-family
+ * dwelling's demand — shared by the appliance-toggle and circuit paths.
+ */
+function dwellingServiceResult(opts: {
+  totalConnectedVA: number;
+  totalDemandVA: number;
+  neutralLoad: { neutralVA: number; neutralAmps: number; reductionPercent: number };
+  serviceVoltage: number;
+  breakdown: LoadBreakdown[];
+  necReferences: string[];
+  warnings: string[];
+}): ResidentialLoadResult {
+  const { totalConnectedVA: totalConnected, totalDemandVA: totalDemand, neutralLoad, serviceVoltage, breakdown } = opts;
+  const necReferences = [...opts.necReferences];
+  const warnings = [...opts.warnings];
+
   // =========================================
   // Calculate Service Size
   // =========================================
@@ -925,7 +953,6 @@ export function calculateSingleFamilyLoad(input: SingleFamilyInput): Residential
   // =========================================
   // Calculate Neutral Load (NEC 220.61, 220.82)
   // =========================================
-  const neutralLoad = calculateNeutralLoad(breakdown, serviceVoltage);
   if (neutralLoad.reductionPercent > 0) {
     necReferences.push('NEC 220.61(B) - Neutral Load Reduction');
     warnings.push(
@@ -2143,6 +2170,50 @@ export function calculateSingleFamilyPanelLoad(opts: {
     'NEC 220 Part III — Standard Method, Single-Family Dwelling',
     'NEC 220 Part III (Standard Method) — each load type takes its own demand factor (220.42, 220.53–220.55, 220.60). Selected on the Dwelling Load Calculator; "10 kVA / 40%" there switches this to NEC 220.82.',
   );
+}
+
+/** Loads the Dwelling Load Calculator treats as 240 V-only (no neutral) — see `calculateNeutralLoad`. */
+const NO_NEUTRAL_PATTERN = /pool|hot tub|spa\b|well pump/;
+
+/**
+ * The Dwelling Load Calculator's result from the service panel's circuits —
+ * the same input and the same function (`calculateSingleFamilyPanelLoad`) as
+ * the packet, so the calculator and E-101 print one number (#184). Service
+ * size, neutral and conductors as `calculateSingleFamilyLoad` sizes them; the
+ * neutral leaves out the range, dryer, water heater, EVSE and pool/spa/well
+ * circuits, as the calculator's 240 V-only list does.
+ */
+export function calculateSingleFamilyLoadFromCircuits(
+  opts: Parameters<typeof calculateSingleFamilyPanelLoad>[0],
+): ResidentialLoadResult {
+  const summary = calculateSingleFamilyPanelLoad(opts);
+  const noNeutral = new Set(opts.circuits
+    .filter(c => {
+      const desc = (c.description ?? '').toLowerCase();
+      const type = dwellingLoadType((c.load_type ?? 'O').toUpperCase(), desc);
+      return type === 'D' || type === 'W' || isEvseDescription(desc)
+        || (type === 'K' && COOKING_PATTERN.test(desc)) || NO_NEUTRAL_PATTERN.test(desc);
+    })
+    .map(c => c.description ?? ''));
+  const neutralDemandVA = summary.rows
+    .filter(row => !noNeutral.has(row.loadType))
+    .reduce((sum, row) => sum + row.demandVA, 0);
+  return dwellingServiceResult({
+    totalConnectedVA: summary.totalConnectedVA,
+    totalDemandVA: summary.totalDemandVA,
+    neutralLoad: applyNeutralReduction(neutralDemandVA, opts.voltage),
+    serviceVoltage: opts.voltage,
+    breakdown: summary.rows.map(row => ({
+      category: row.loadType,
+      description: row.necReference,
+      connectedVA: row.connectedVA,
+      demandVA: row.demandVA,
+      demandFactor: row.demandFactor,
+      necReference: row.necReference,
+    })),
+    necReferences: summary.necReferences,
+    warnings: summary.warnings,
+  });
 }
 
 // ============================================================================

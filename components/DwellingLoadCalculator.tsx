@@ -40,6 +40,7 @@ import {
 } from '../types';
 import {
   calculateSingleFamilyLoad,
+  calculateSingleFamilyLoadFromCircuits,
   generateResidentialPanelSchedule,
   dwellingBranchConductorSize,
   ResidentialLoadResult,
@@ -49,11 +50,12 @@ import {
 import { LOAD_TEMPLATES } from '../services/calculations/serviceUpgrade';
 import { getNextStandardBreakerSize } from '../data/nec/standard-breakers';
 import type { LoadTemplate } from '../types';
-import { isExistingConstructionProject } from '../lib/projectSettings';
+import { buildSingleFamilyDwellingContext, isExistingConstructionProject } from '../lib/projectSettings';
 import {
   DEFAULT_APPLIANCES,
   appliancesWithProposed,
   calculateMultiFamilyLoadForProject,
+  circuitsWithPendingProposed,
   toStoredMultiFamilyLoad,
 } from '../lib/storedCalcs';
 import { usePanels } from '../hooks/usePanels';
@@ -195,9 +197,9 @@ export const DwellingLoadCalculator: React.FC<DwellingLoadCalculatorProps> = ({
     [appliances, proposedLoads],
   );
 
-  // Calculate load
+  // Calculate load from the appliance toggles (what "Generate Schedule" writes)
   const necEdition = useProjectNecEdition(project);
-  const loadResult: ResidentialLoadResult | null = useMemo(() => {
+  const appliancesLoadResult: ResidentialLoadResult | null = useMemo(() => {
     try {
       if (isSingleFamily) {
         // Project Status (General Information) drives 220.82 vs 220.83.
@@ -226,6 +228,26 @@ export const DwellingLoadCalculator: React.FC<DwellingLoadCalculatorProps> = ({
       return null;
     }
   }, [isSingleFamily, residentialSettings, appliancesForCalc, unitTemplates, housePanelLoad, project.settings?.service_modification_type, project.settings?.dwelling_calc_mode, necEdition]);
+
+  // Once the service panel has circuits, the result comes from them — the
+  // input the packet prints from, through the same function (#184). Proposed
+  // loads not yet applied count as proposed circuits. The toggles still drive
+  // "Generate Schedule".
+  const dwellingContext = useMemo(
+    () => (isSingleFamily ? buildSingleFamilyDwellingContext(project, false) : undefined),
+    [isSingleFamily, project.settings],
+  );
+  const circuitsLoadResult: ResidentialLoadResult | null = useMemo(() => {
+    const panelCircuits = mainPanel ? circuits.filter(c => c.panel_id === mainPanel.id) : [];
+    if (!dwellingContext || !mainPanel || panelCircuits.length === 0) return null;
+    return calculateSingleFamilyLoadFromCircuits({
+      ...dwellingContext,
+      circuits: circuitsWithPendingProposed(panelCircuits, proposedLoads),
+      voltage: mainPanel.voltage || 240,
+      necEdition,
+    });
+  }, [dwellingContext, mainPanel, circuits, proposedLoads, necEdition]);
+  const loadResult = circuitsLoadResult ?? appliancesLoadResult;
 
   // Persist multi-family load result to project settings so MF EV Calculator can read it
   // Uses value comparison to avoid infinite re-render loop (updateProject changes project → loadResult recomputes → useEffect fires)
@@ -551,7 +573,7 @@ export const DwellingLoadCalculator: React.FC<DwellingLoadCalculatorProps> = ({
       // 113A demand → 150A min for continuous safety) would silently
       // overwrite the user's stated 125A existing service, destroying
       // their input on every Regenerate.
-      if (loadResult) {
+      if (appliancesLoadResult) {
         // PR-2 Step 7 (2026-05-27): use the shared coercion helper so legacy
         // projects with NULL service_modification_type are treated as
         // existing (matches UI default).
@@ -560,14 +582,14 @@ export const DwellingLoadCalculator: React.FC<DwellingLoadCalculatorProps> = ({
           ?? mainPanel?.main_breaker_amps;
         const existingHolds = isExisting
           && typeof existingAmps === 'number'
-          && loadResult.serviceAmps <= existingAmps;
+          && appliancesLoadResult.serviceAmps <= existingAmps;
 
         // Recommended-service stored in settings should reflect the final
         // decision (existing wins when it holds), not the abstract
         // new-install number.
         const finalRecommendation = existingHolds
           ? existingAmps as number
-          : loadResult.recommendedServiceSize;
+          : appliancesLoadResult.recommendedServiceSize;
 
         updateProject({
           ...project,
@@ -575,7 +597,7 @@ export const DwellingLoadCalculator: React.FC<DwellingLoadCalculatorProps> = ({
             ...project.settings,
             residential: {
               ...project.settings.residential,
-              recommendedServiceAmps: loadResult.serviceAmps
+              recommendedServiceAmps: appliancesLoadResult.serviceAmps
             } as any
           }
         });
@@ -1573,6 +1595,13 @@ export const DwellingLoadCalculator: React.FC<DwellingLoadCalculatorProps> = ({
                 <span className="text-base font-semibold text-white">Service Calculation</span>
               </div>
               <div className="p-5 space-y-3">
+                {circuitsLoadResult && mainPanel && (
+                  <p className="text-xs text-[#666] bg-[#f5f5f0] rounded-md px-3 py-2">
+                    From the {mainPanelCircuits.length} circuit{mainPanelCircuits.length !== 1 ? 's' : ''} on {mainPanel.name}
+                    {proposedLoads.length > 0 ? ' and the proposed loads' : ''}, the same input the permit packet uses.
+                    The appliance selections build the schedule on Generate; they change this result after you apply it.
+                  </p>
+                )}
                 <div className="flex justify-between items-center py-1">
                   <span className="text-[#888] text-sm">Connected Load</span>
                   <span className="text-lg font-semibold text-[#2d3b2d]">{(loadResult.totalConnectedVA / 1000).toFixed(1)} kVA</span>

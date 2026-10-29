@@ -13,7 +13,11 @@
  * recompute on read gives the number the calculator would show if reopened.
  */
 import type { DwellingUnitTemplate, ResidentialAppliances } from '../types';
-import { calculateMultiFamilyLoad, type ResidentialLoadResult } from '../services/calculations/residentialLoad';
+import {
+  calculateMultiFamilyLoad,
+  type PanelDemandCircuit,
+  type ResidentialLoadResult,
+} from '../services/calculations/residentialLoad';
 import {
   calculateMultiFamilyEV,
   type CommonAreaLoadItem,
@@ -70,6 +74,29 @@ export function appliancesWithProposed(
     ...appliances,
     otherAppliances: [...(appliances.otherAppliances ?? []), ...proposedAsOther],
   };
+}
+
+/**
+ * The service panel's circuits plus the proposed loads not yet applied to it
+ * (#184). "Generate Schedule" writes each proposed load as an is_proposed
+ * circuit with its description; until then it counts as one here, with the
+ * load type Generate gives it, so the result moves when a load is added and
+ * nothing counts twice after Apply.
+ */
+export function circuitsWithPendingProposed<C extends PanelDemandCircuit>(
+  circuits: C[],
+  proposedLoads: ProposedLoad[] = [],
+): PanelDemandCircuit[] {
+  const applied = new Set(circuits.filter(c => c.is_proposed).map(c => c.description ?? ''));
+  const pending = proposedLoads
+    .filter(p => !applied.has(p.description))
+    .map(p => ({
+      description: p.description,
+      load_watts: p.kw * 1000,
+      load_type: p.category === 'HVAC' ? 'C' : 'O',
+      is_proposed: true,
+    }));
+  return [...circuits, ...pending];
 }
 
 /** `settings.residential.multiFamilyLoadResult`. */

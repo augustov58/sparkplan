@@ -4,6 +4,7 @@ One note per hard problem, written by the model that solved it via the `extract-
 Each entry: `- [title](file.md) — reusable rule`.
 
 <!-- Newest first -->
+- [The calculator and the packet read different inputs](2026-10-28-calculator-reads-circuits.md) — two pages that report one quantity need the same input as well as the same function; when one side works from a model (toggles) and the other from records (circuits), make the records the input once they exist
 - [A method switch exposed untyped template circuits](2026-10-27-sf-new-house-method-choice.md) — before switching a circuit-based calc to a method that branches on load type, run it on the template's own circuits; infer the type from the description only when it is the 'O' default
 - [Two-unit dwelling service: a fourth method, three call sites](2026-10-27-two-unit-dwelling-part-iii.md) — when a calc gains a case, enumerate every function that computes that quantity (packet aggregate, calculator, side calculators) and every classifier upstream of it; a context builder's side decisions (which panel is "EV") can silently undo the new path
 - [One dwelling unit's load had four implementations](2026-10-26-unit-panels-part-iii.md) — list every function that computes a quantity and every reader before fixing it; make the math match the printed label, route all through one core, and prove untouched modes unchanged with the existing suite
