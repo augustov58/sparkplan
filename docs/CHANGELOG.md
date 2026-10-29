@@ -4,6 +4,15 @@ All notable changes to SparkPlan.
 
 ---
 
+## 2026-10-28: The Dwelling Load Calculator reads the panel's circuits (#184)
+
+- **Single-family houses with a panel schedule.** The Dwelling Load Calculator computed from its appliance selections, while the permit packet computed from the service panel's circuits. A project made from a template has circuits but no selections, so the calculator showed only the general loads: 10.2 kVA against 30.9 kVA on the packet for the same house. Once the service panel has circuits, the calculator now computes from them with the packet's own function, under all three methods (Part III, 220.82, 220.83). A note on the result card says where the number comes from.
+- **Proposed loads** added in the calculator count as proposed circuits until "Generate Schedule" applies them, so the result moves as soon as one is added and nothing counts twice afterwards.
+- **Appliance selections** still build the schedule on "Generate". The service size written to the panel on Apply comes from them, since it describes the schedule being applied.
+- **Service Upgrade Wizard:** for a single-family house with circuits, the existing load comes from the existing circuits, the same number as E-102's existing demand.
+
+---
+
 ## 2026-10-27: A new house prints the method chosen on the Dwelling Calculator (#178)
 
 - **Heads-up: new single-family projects change method on their next packet.** The packet printed NEC 220.82 for every new house, while the Dwelling Load Calculator defaulted to NEC 220 Part III (PE ruling 2026-10-27). Now the method chosen on the calculator prints everywhere (E-101, E-102, Panel Summary, panel-schedule exports, 220.87 narrative): 220.82 when "10 kVA / 40%" is selected, Part III otherwise. A new-house project that never touched that setting moves from 220.82 to Part III, which usually comes out higher. On the QA house, 220.82 is 24.1 kVA and Part III is 30.9 kVA. Select "10 kVA / 40%" to keep 220.82. Existing houses are unchanged (220.83).

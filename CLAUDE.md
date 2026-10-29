@@ -95,6 +95,9 @@ Implementation: `buildSingleFamilyDwellingContext` (carries `useOptionalMethod`)
 → `residentialLoad.ts::calculateSingleFamilyPanelLoad` (one function for all three).
 Circuits stored without a load type ('O' — templates write none) take one from
 their description (`dwellingLoadType`); an explicit type always wins.
+Once the service panel has circuits, the Dwelling Load Calculator and the Service
+Upgrade Wizard compute from them too (`calculateSingleFamilyLoadFromCircuits`,
+#184); the appliance toggles only build the schedule on "Generate".
 
 ### Dwelling Optional Methods — HVAC (PE rulings 2026-10-18)
 ```
@@ -362,6 +365,7 @@ Real mistakes made in this repo, each paired with the rule that prevents recurre
 | One unit's load had four implementations: unit pages printed a 10 kVA bucket labelled 220.83, the generator a 220.82 bucket ×1.25, and the calculator Part III math labelled "220.82 Optional Method" (#155) | List every function that computes a quantity and every reader before fixing it. Make the math match the label printed, then route all of them through one core (`calculateDwellingStandardLoad`). |
 | A two-unit building ran the commercial cascade on the packet (220.44, dishwashers as ranges) and "220.84 @ 100%" in two calculators; adding the case, the context builder classified a unit with its own charger as the EV panel and pulled it out of the dwelling walk (#127) | When a calc gains a case, route every reader through one function and re-check the classifiers upstream of it (which panel is "EV" / "house" / a unit). |
 | A new house's packet printed 220.82 while the calculator defaulted to Part III; switching the packet to Part III read template circuits stored without a load type ('O') as 220.53 appliances — range at 75% instead of Column C, A/C at 75% instead of 100% (#178) | A circuit-based calc that branches on load type infers a type from the description when it is 'O' (`dwellingLoadType`). Test circuit-based calcs with the template's own circuits, not only hand-typed fixtures. |
+| The Dwelling Load Calculator computed from appliance toggles and the packet from the panel's circuits; a templated house (circuits, no toggles) showed 10.2 kVA in the calculator and 30.9 kVA on E-101 (#184) | Pages reporting one quantity share the input as well as the function. Once the panel has circuits, every reader computes from them; the toggles only build the schedule. |
 | Docs updated with stale "Last Updated" dates; completed features left as "NEXT UP" | Every doc touch updates its date to today; every shipped feature flips its ROADMAP status in the same PR. |
 
 ---

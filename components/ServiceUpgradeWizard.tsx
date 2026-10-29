@@ -24,9 +24,12 @@ import { useCircuits } from '../hooks/useCircuits';
 import { useProjectNecEdition } from '../hooks/useProjectNecEdition';
 import {
   calculateSingleFamilyLoad,
+  calculateSingleFamilyLoadFromCircuits,
   calculateMultiFamilyLoad,
+  hasProposedHvac,
   ResidentialLoadResult
 } from '../services/calculations/residentialLoad';
+import { buildSingleFamilyDwellingContext } from '../lib/projectSettings';
 import { shouldConsiderCircuitSharing } from '../services/calculations/circuitSharing';
 
 interface ServiceUpgradeWizardProps {
@@ -63,8 +66,25 @@ export const ServiceUpgradeWizard: React.FC<ServiceUpgradeWizardProps> = ({ proj
 
   // Calculate load from Dwelling Calculator data if available
   const necEdition = useProjectNecEdition(project);
+  const { circuits: projectCircuits } = useCircuits(projectId);
   const dwellingLoadResult: ResidentialLoadResult | null = useMemo(() => {
     try {
+      // A single-family service panel with circuits: its existing circuits,
+      // the same input and function as the Dwelling Load Calculator and the
+      // packet's E-102 existing load (#184).
+      const mdp = panels.find(p => p.is_main);
+      const mdpCircuits = mdp ? projectCircuits.filter(c => c.panel_id === mdp.id) : [];
+      const dwellingContext = project ? buildSingleFamilyDwellingContext(project, false) : undefined;
+      if (dwellingContext && mdp && mdpCircuits.length > 0) {
+        return calculateSingleFamilyLoadFromCircuits({
+          ...dwellingContext,
+          circuits: mdpCircuits.filter(c => !c.is_proposed),
+          hvacProposed: hasProposedHvac(mdpCircuits),
+          voltage: mdp.voltage || 240,
+          necEdition,
+        });
+      }
+
       if (!project?.settings?.residential?.appliances) {
         return null;
       }
@@ -101,7 +121,7 @@ export const ServiceUpgradeWizard: React.FC<ServiceUpgradeWizardProps> = ({ proj
       console.error('[ServiceUpgradeWizard] Error calculating dwelling load:', error);
       return null;
     }
-  }, [project, necEdition]);
+  }, [project, necEdition, panels, projectCircuits]);
 
   // Track if using dwelling data
   const [usingDwellingData, setUsingDwellingData] = useState(false);
