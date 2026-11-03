@@ -84,6 +84,9 @@ Implementation: `services/calculations/serviceUpgrade.ts`, mirrored in
 prefilled in `PermitPacketGenerator.tsx` via `upstreamLoadAggregation.ts::calculateProposedNewLoadVA`)
 and `services/calculations/multiFamilyEV.ts` (measured path) — all three must
 stay in sync. Factor: `EVSE_CONTINUOUS_FACTOR`.
+The calculated existing load comes from one function for E-102 and the Service
+Upgrade Wizard: `lib/storedCalcs.ts::projectDemandSplit` (existing circuits
+only, #127; the wizard converts it to amps with √3 on 3-phase, #185).
 
 ### Single-Family Method (PE ruling 2026-10-27, #178)
 ```
@@ -366,6 +369,7 @@ Real mistakes made in this repo, each paired with the rule that prevents recurre
 | A two-unit building ran the commercial cascade on the packet (220.44, dishwashers as ranges) and "220.84 @ 100%" in two calculators; adding the case, the context builder classified a unit with its own charger as the EV panel and pulled it out of the dwelling walk (#127) | When a calc gains a case, route every reader through one function and re-check the classifiers upstream of it (which panel is "EV" / "house" / a unit). |
 | A new house's packet printed 220.82 while the calculator defaulted to Part III; switching the packet to Part III read template circuits stored without a load type ('O') as 220.53 appliances — range at 75% instead of Column C, A/C at 75% instead of 100% (#178) | A circuit-based calc that branches on load type infers a type from the description when it is 'O' (`dwellingLoadType`). Test circuit-based calcs with the template's own circuits, not only hand-typed fixtures. |
 | The Dwelling Load Calculator computed from appliance toggles and the packet from the panel's circuits; a templated house (circuits, no toggles) showed 10.2 kVA in the calculator and 30.9 kVA on E-101 (#184) | Pages reporting one quantity share the input as well as the function. Once the panel has circuits, every reader computes from them; the toggles only build the schedule. |
+| The Service Upgrade Wizard called `useCircuits` with a panel ID (it takes a project ID), so its panel-schedule load never loaded. The raw `load_watts` sum behind it (no demand factors, no √3, main-panel breakers only) would have entered 220.87 as "calculated" once the ID was fixed (#185) | A reader of a packet quantity calls the packet's function (`projectDemandSplit`), never a local copy. Before turning on a dead path, run it and compare its number with the packet's. |
 | Docs updated with stale "Last Updated" dates; completed features left as "NEXT UP" | Every doc touch updates its date to today; every shipped feature flips its ROADMAP status in the same PR. |
 
 ---

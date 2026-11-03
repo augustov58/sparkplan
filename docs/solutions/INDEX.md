@@ -4,6 +4,7 @@ One note per hard problem, written by the model that solved it via the `extract-
 Each entry: `- [title](file.md) — reusable rule`.
 
 <!-- Newest first -->
+- [A dead path in the wizard would have printed a raw sum as "calculated"](2026-11-03-wizard-existing-load-from-schedule.md) — before fixing a path that never ran, run it and compare with the page that prints the same quantity; route the reader through that page's function (moved to a shared module), not a local copy
 - [The calculator and the packet read different inputs](2026-10-28-calculator-reads-circuits.md) — two pages that report one quantity need the same input as well as the same function; when one side works from a model (toggles) and the other from records (circuits), make the records the input once they exist
 - [A method switch exposed untyped template circuits](2026-10-27-sf-new-house-method-choice.md) — before switching a circuit-based calc to a method that branches on load type, run it on the template's own circuits; infer the type from the description only when it is the 'O' default
 - [Two-unit dwelling service: a fourth method, three call sites](2026-10-27-two-unit-dwelling-part-iii.md) — when a calc gains a case, enumerate every function that computes that quantity (packet aggregate, calculator, side calculators) and every classifier upstream of it; a context builder's side decisions (which panel is "EV") can silently undo the new path

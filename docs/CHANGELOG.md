@@ -4,6 +4,14 @@ All notable changes to SparkPlan.
 
 ---
 
+## 2026-11-03: The Service Upgrade Wizard reads the existing load from the panel schedule (#185)
+
+- **Commercial, industrial and multifamily projects.** With "Use project data" on, the wizard said its current load came from the panel schedule, but it queried the circuits with the wrong ID and never got any, so the current load stayed at the manual default (140 A). It now uses the same existing demand as the packet: the NEC 220 calculation run on the existing circuits only, converted to amps for the service (√3 on 3-phase). On the QA café build-out that is 238 A, as on E-102; on the QA 12-unit building, 698 A, the existing calculated demand on E-101. Multifamily projects used to take the Dwelling Load Calculator's unit templates without the house panel; they now read the building's circuits through 220.84.
+- **The 220.87 method.** The panel-schedule number is used under "Calculated from Panel Schedule" only, with no 1.25× multiplier. Under utility billing, load study or manual entry, the wizard uses the amps entered and applies the 1.25×.
+- Single-family houses are unchanged (#184).
+
+---
+
 ## 2026-10-28: The Dwelling Load Calculator reads the panel's circuits (#184)
 
 - **Single-family houses with a panel schedule.** The Dwelling Load Calculator computed from its appliance selections, while the permit packet computed from the service panel's circuits. A project made from a template has circuits but no selections, so the calculator showed only the general loads: 10.2 kVA against 30.9 kVA on the packet for the same house. Once the service panel has circuits, the calculator now computes from them with the packet's own function, under all three methods (Part III, 220.82, 220.83). A note on the result card says where the number comes from.
