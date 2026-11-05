@@ -86,7 +86,10 @@ and `services/calculations/multiFamilyEV.ts` (measured path) — all three must
 stay in sync. Factor: `EVSE_CONTINUOUS_FACTOR`.
 The calculated existing load comes from one function for E-102 and the Service
 Upgrade Wizard: `lib/storedCalcs.ts::projectDemandSplit` (existing circuits
-only, #127; the wizard converts it to amps with √3 on 3-phase, #185).
+only, #127; the wizard converts it to amps with √3 on 3-phase, #185). The wizard's
+new load: `scheduleNewLoadAmps` — calculated → the demand increase
+(`projectDemandSplit.proposedKVA`, PE ruling 2026-11-04), measured/manual →
+`calculateProposedNewLoadVA`, the same as E-102 (#188).
 
 ### Single-Family Method (PE ruling 2026-10-27, #178)
 ```

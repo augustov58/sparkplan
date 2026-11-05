@@ -31,7 +31,7 @@ import {
   ResidentialLoadResult
 } from '../services/calculations/residentialLoad';
 import { buildSingleFamilyDwellingContext } from '../lib/projectSettings';
-import { scheduleExistingLoadAmps } from '../lib/storedCalcs';
+import { scheduleExistingLoadAmps, scheduleNewLoadAmps } from '../lib/storedCalcs';
 import { shouldConsiderCircuitSharing } from '../services/calculations/circuitSharing';
 
 interface ServiceUpgradeWizardProps {
@@ -64,6 +64,8 @@ export const ServiceUpgradeWizard: React.FC<ServiceUpgradeWizardProps> = ({ proj
   const [currentServiceAmps, setCurrentServiceAmps] = useState(200);
   const [currentUsageAmps, setCurrentUsageAmps] = useState(140);
   const [proposedLoadAmps, setProposedLoadAmps] = useState(0);
+  // A new load the user typed or picked is kept over the proposed-circuit pre-fill.
+  const [proposedLoadEdited, setProposedLoadEdited] = useState(false);
   const [selectedTemplate, setSelectedTemplate] = useState('');
 
   // Calculate load from Dwelling Calculator data if available
@@ -192,6 +194,22 @@ export const ServiceUpgradeWizard: React.FC<ServiceUpgradeWizardProps> = ({ proj
     }
   }, [useProjectData, scheduleExistingAmps]);
 
+  // The new load of the project's proposed circuits, as E-102 takes it for
+  // the selected 220.87 method (#188): calculated → the demand increase;
+  // measured / manual → EVSE at 125%, others at nameplate.
+  const scheduleNewAmps = useMemo(
+    () => project
+      ? scheduleNewLoadAmps(project, panels, projectCircuits, transformers, necEdition, existingLoadMethod)
+      : null,
+    [project, panels, projectCircuits, transformers, necEdition, existingLoadMethod],
+  );
+
+  useEffect(() => {
+    if (useProjectData && !proposedLoadEdited && scheduleNewAmps !== null) {
+      setProposedLoadAmps(scheduleNewAmps);
+    }
+  }, [useProjectData, proposedLoadEdited, scheduleNewAmps]);
+
   const isDwellingProject = project?.settings?.occupancyType === 'dwelling';
 
   // Determine which current usage value to use based on method and data source
@@ -247,8 +265,11 @@ export const ServiceUpgradeWizard: React.FC<ServiceUpgradeWizardProps> = ({ proj
     const template = LOAD_TEMPLATES.find(t => t.name === templateName);
     if (!template) return;
 
-    const amps = templateToQuickAmps(template);
+    // Service amps: ÷ V√3 on a 3-phase service, as the rest of the wizard.
+    const voltage = project?.serviceVoltage || 240;
+    const amps = templateToQuickAmps(template, project?.servicePhase === 3 ? voltage * Math.sqrt(3) : voltage);
     setProposedLoadAmps(amps);
+    setProposedLoadEdited(true);
     setSelectedTemplate(''); // Reset dropdown
   };
 
@@ -648,12 +669,29 @@ export const ServiceUpgradeWizard: React.FC<ServiceUpgradeWizardProps> = ({ proj
               <input
                 type="number"
                 value={proposedLoadAmps}
-                onChange={e => setProposedLoadAmps(Number(e.target.value))}
+                onChange={e => { setProposedLoadAmps(Number(e.target.value)); setProposedLoadEdited(true); }}
                 min="0"
                 step="1"
                 className="w-full border-gray-200 rounded text-sm py-2 px-3 focus:border-[#2d3b2d] focus:ring-[#2d3b2d]/20"
                 placeholder="Enter amps"
               />
+              {useProjectData && scheduleNewAmps !== null && (
+                <p className="text-xs text-gray-500 mt-1">
+                  From proposed circuits: {scheduleNewAmps}A
+                  {existingLoadMethod === ExistingLoadDeterminationMethod.CALCULATED
+                    ? ' (the demand increase, the same as E-102).'
+                    : ' (EVSE at 125%, clamped to the EVEMS setpoint where one is set; others at nameplate).'}
+                  {proposedLoadAmps !== scheduleNewAmps && (
+                    <button
+                      type="button"
+                      onClick={() => { setProposedLoadAmps(scheduleNewAmps); setProposedLoadEdited(false); }}
+                      className="ml-1 underline text-[#2d3b2d] hover:text-[#1f2a1f]"
+                    >
+                      Use {scheduleNewAmps}A
+                    </button>
+                  )}
+                </p>
+              )}
             </div>
 
             {proposedLoadAmps > 0 && (
@@ -668,7 +706,7 @@ export const ServiceUpgradeWizard: React.FC<ServiceUpgradeWizardProps> = ({ proj
                     </div>
                   </div>
                   <button
-                    onClick={() => setProposedLoadAmps(0)}
+                    onClick={() => { setProposedLoadAmps(0); setProposedLoadEdited(true); }}
                     className="text-gray-400 hover:text-red-600 transition-colors"
                     title="Clear load"
                   >

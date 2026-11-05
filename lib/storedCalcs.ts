@@ -14,8 +14,9 @@
  */
 import type { Database } from './database.types';
 import type { DwellingUnitTemplate, Project, ResidentialAppliances } from '../types';
+import { ExistingLoadDeterminationMethod } from '../types';
 import { buildSingleFamilyDwellingContext } from './projectSettings';
-import { buildMultiFamilyContext, calculateAggregatedLoad } from '../services/calculations/upstreamLoadAggregation';
+import { buildMultiFamilyContext, calculateAggregatedLoad, calculateProposedNewLoadVA } from '../services/calculations/upstreamLoadAggregation';
 import {
   calculateDwellingDemandSplit,
   calculateMultiFamilyLoad,
@@ -201,8 +202,35 @@ export function scheduleExistingLoadAmps(
 ): number | null {
   if (!panels.some(p => p.is_main) || circuits.length === 0) return null;
   const { existingKVA } = projectDemandSplit(project, panels, circuits, transformers, necEdition);
+  return serviceAmps(project, existingKVA);
+}
+
+/**
+ * The Service Upgrade Wizard's new load from the proposed circuits: E-102's
+ * new load for the 220.87 method, in service amps (#188). Calculated → the
+ * demand increase (`projectDemandSplit.proposedKVA`, PE ruling 2026-11-04);
+ * measured / manual → `calculateProposedNewLoadVA` (EVSE at 125%, EVEMS
+ * setpoint where set). Null without an MDP or proposed circuits.
+ */
+export function scheduleNewLoadAmps(
+  project: Project,
+  panels: PanelRow[],
+  circuits: CircuitRow[],
+  transformers: TransformerRow[],
+  necEdition: NecEdition,
+  existingLoadMethod: ExistingLoadDeterminationMethod,
+): number | null {
+  if (!panels.some(p => p.is_main) || !circuits.some(c => c.is_proposed)) return null;
+  const newLoadKVA = existingLoadMethod === ExistingLoadDeterminationMethod.CALCULATED
+    ? projectDemandSplit(project, panels, circuits, transformers, necEdition).proposedKVA
+    : calculateProposedNewLoadVA(circuits, necEdition) / 1000;
+  return serviceAmps(project, newLoadKVA);
+}
+
+/** kVA → service amps, as E-102 converts it: ÷ V√3 on a 3-phase service, ÷ V on 1-phase. */
+function serviceAmps(project: Project, kVA: number): number {
   const voltage = project.serviceVoltage || 240;
-  return Math.round((existingKVA * 1000) / (project.servicePhase === 3 ? voltage * Math.sqrt(3) : voltage));
+  return Math.round((kVA * 1000) / (project.servicePhase === 3 ? voltage * Math.sqrt(3) : voltage));
 }
 
 /** `settings.residential.multiFamilyLoadResult`. */
