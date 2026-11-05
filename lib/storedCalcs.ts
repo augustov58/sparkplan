@@ -12,8 +12,12 @@
  * The calculators build their own results through the same helpers, so a
  * recompute on read gives the number the calculator would show if reopened.
  */
-import type { DwellingUnitTemplate, ResidentialAppliances } from '../types';
+import type { Database } from './database.types';
+import type { DwellingUnitTemplate, Project, ResidentialAppliances } from '../types';
+import { buildSingleFamilyDwellingContext } from './projectSettings';
+import { buildMultiFamilyContext, calculateAggregatedLoad } from '../services/calculations/upstreamLoadAggregation';
 import {
+  calculateDwellingDemandSplit,
   calculateMultiFamilyLoad,
   type PanelDemandCircuit,
   type ResidentialLoadResult,
@@ -97,6 +101,108 @@ export function circuitsWithPendingProposed<C extends PanelDemandCircuit>(
       is_proposed: true,
     }));
   return [...circuits, ...pending];
+}
+
+type PanelRow = Database['public']['Tables']['panels']['Row'];
+type CircuitRow = Database['public']['Tables']['circuits']['Row'];
+type TransformerRow = Database['public']['Tables']['transformers']['Row'];
+
+/**
+ * The service's existing and proposed demand, as E-102 prints it. The Permit
+ * Packet Generator and the Service Upgrade Wizard both read it, so the
+ * wizard's existing load is the packet's (#185).
+ *
+ * Single-family: the dwelling's own method (#121, #178). Everything else: the
+ * NEC 220 aggregate of the MDP tree, whose existing demand is the same walk
+ * run on the existing circuits only (#127) — commercial, industrial, and
+ * multifamily with its 220.84 / two-unit context.
+ */
+export function projectDemandSplit(
+  project: Project,
+  panels: PanelRow[],
+  circuits: CircuitRow[],
+  transformers: TransformerRow[],
+  necEdition: NecEdition,
+): { existingKVA: number; proposedKVA: number; necReferences: string[] } {
+  const mdp = panels.find(p => p.is_main);
+  if (!mdp) return { existingKVA: 0, proposedKVA: 0, necReferences: [] };
+  const mfCtx = buildMultiFamilyContext(
+    mdp,
+    panels,
+    circuits,
+    transformers,
+    project.settings,
+    necEdition,
+  );
+  // Single-family dwellings: E-101 runs the NEC 220.82 / 220.83 Optional
+  // Method, so E-102 must too — the Part III cascade below gave a different
+  // total and could fail a service E-101 showed as adequate (#121).
+  const sfCtx = buildSingleFamilyDwellingContext(project, !!mfCtx);
+  if (sfCtx) {
+    const split = calculateDwellingDemandSplit({
+      // Same circuit set as E-101 (LoadCalculationSummary): MDP circuits.
+      circuits: circuits
+        .filter(c => c.panel_id === mdp.id)
+        .map(c => ({
+          description: c.description,
+          load_watts: c.load_watts,
+          load_type: c.load_type,
+          breaker_amps: c.breaker_amps,
+          is_proposed: c.is_proposed,
+        })),
+      voltage: mdp.voltage || 240,
+      necEdition,
+      ...sfCtx,
+    });
+    return {
+      existingKVA: split.existingDemandVA / 1000,
+      proposedKVA: split.proposedDemandVA / 1000,
+      necReferences: split.necReferences,
+    };
+  }
+  // Match the orchestrator's occupancyType derivation
+  // (services/pdfExport/permitPacketGenerator.tsx:1116) so the demand
+  // factor cascade picks the same branch.
+  const occupancyType: 'dwelling' | 'commercial' | 'industrial' =
+    project.type === 'Residential'
+      ? 'dwelling'
+      : project.type === 'Industrial'
+        ? 'industrial'
+        : 'commercial';
+  const agg = calculateAggregatedLoad(
+    mdp.id,
+    panels,
+    circuits,
+    transformers,
+    occupancyType,
+    mfCtx,
+    necEdition,
+  );
+  return {
+    existingKVA: agg.existingDemandVA / 1000,
+    proposedKVA: agg.proposedDemandVA / 1000,
+    // Union with the per-row references: the top-level list omits some
+    // applied sections (e.g. 220.14 "Other", 220.51 water heater).
+    necReferences: [...agg.necReferences, ...agg.demandBreakdown.map(r => r.necReference)],
+  };
+}
+
+/**
+ * The Service Upgrade Wizard's existing load from the panel schedule: E-102's
+ * existing demand in service amps (√3 on a 3-phase service, as E-102 converts
+ * it). Null without an MDP or circuits — the wizard then keeps manual entry.
+ */
+export function scheduleExistingLoadAmps(
+  project: Project,
+  panels: PanelRow[],
+  circuits: CircuitRow[],
+  transformers: TransformerRow[],
+  necEdition: NecEdition,
+): number | null {
+  if (!panels.some(p => p.is_main) || circuits.length === 0) return null;
+  const { existingKVA } = projectDemandSplit(project, panels, circuits, transformers, necEdition);
+  const voltage = project.serviceVoltage || 240;
+  return Math.round((existingKVA * 1000) / (project.servicePhase === 3 ? voltage * Math.sqrt(3) : voltage));
 }
 
 /** `settings.residential.multiFamilyLoadResult`. */

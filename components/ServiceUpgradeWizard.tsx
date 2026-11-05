@@ -21,6 +21,7 @@ import { ExistingLoadDeterminationMethod, DwellingType } from '../types';
 import { useProjects } from '../hooks/useProjects';
 import { usePanels } from '../hooks/usePanels';
 import { useCircuits } from '../hooks/useCircuits';
+import { useTransformers } from '../hooks/useTransformers';
 import { useProjectNecEdition } from '../hooks/useProjectNecEdition';
 import {
   calculateSingleFamilyLoad,
@@ -30,6 +31,7 @@ import {
   ResidentialLoadResult
 } from '../services/calculations/residentialLoad';
 import { buildSingleFamilyDwellingContext } from '../lib/projectSettings';
+import { scheduleExistingLoadAmps } from '../lib/storedCalcs';
 import { shouldConsiderCircuitSharing } from '../services/calculations/circuitSharing';
 
 interface ServiceUpgradeWizardProps {
@@ -67,6 +69,7 @@ export const ServiceUpgradeWizard: React.FC<ServiceUpgradeWizardProps> = ({ proj
   // Calculate load from Dwelling Calculator data if available
   const necEdition = useProjectNecEdition(project);
   const { circuits: projectCircuits } = useCircuits(projectId);
+  const { transformers } = useTransformers(projectId);
   const dwellingLoadResult: ResidentialLoadResult | null = useMemo(() => {
     try {
       // A single-family service panel with circuits: its existing circuits,
@@ -168,68 +171,46 @@ export const ServiceUpgradeWizard: React.FC<ServiceUpgradeWizardProps> = ({ proj
     }
   }, [useProjectData, panels]);
 
-  // Get circuits for main panel (or first panel if no main) and calculate load
-  const targetPanel = useMemo(() => {
-    if (!useProjectData || !panels || panels.length === 0) return null;
-    // Try to find main panel first, otherwise use first panel
-    return panels.find(p => p.is_main) || panels[0];
-  }, [useProjectData, panels]);
-  const { circuits } = useCircuits(targetPanel?.id);
+  // Single-family dwellings keep the dwelling result below (#184): with
+  // circuits on the service panel it is E-102's existing load already.
+  // Multifamily, commercial and industrial take the panel-schedule demand.
+  const isSingleFamilyDwelling = !!project && !!buildSingleFamilyDwellingContext(project, false);
+
+  // The existing demand of the project's panel schedule: the number E-102
+  // prints, through the packet's own function (#185). Existing circuits only;
+  // the proposed ones belong in the new-load input.
+  const scheduleExistingAmps = useMemo(
+    () => project && !isSingleFamilyDwelling
+      ? scheduleExistingLoadAmps(project, panels, projectCircuits, transformers, necEdition)
+      : null,
+    [project, isSingleFamilyDwelling, panels, projectCircuits, transformers, necEdition],
+  );
 
   useEffect(() => {
-    if (useProjectData && circuits && circuits.length > 0) {
-      // Calculate total load from circuits
-      let totalLoad_kVA = 0;
-
-      for (const circuit of circuits) {
-        // Sum up connected load (watts converted to kVA)
-        // Note: load_watts is the connected load in watts
-        if (circuit.load_watts) {
-          totalLoad_kVA += circuit.load_watts / 1000;
-        }
-      }
-
-      // Convert kVA to amps
-      const voltage = project?.serviceVoltage || 240;
-      const loadAmps = (totalLoad_kVA * 1000) / voltage;
-
-      setCurrentUsageAmps(Math.round(loadAmps));
+    if (useProjectData && scheduleExistingAmps !== null) {
+      setCurrentUsageAmps(scheduleExistingAmps);
     }
-  }, [useProjectData, circuits, project]);
+  }, [useProjectData, scheduleExistingAmps]);
 
-  // Whether the current project is a residential dwelling. Used to gate the
-  // raw-circuit-sum fallback below — that path bypasses NEC demand factors
-  // (e.g. 220.82 / 220.83 buckets), which underestimated dwelling current
-  // by ~30% (sum of all load_watts vs the actual demand-calculated amps).
   const isDwellingProject = project?.settings?.occupancyType === 'dwelling';
 
   // Determine which current usage value to use based on method and data source
   const effectiveCurrentUsageAmps = useMemo(() => {
-    // Priority 1a: Dwelling projects with appliance data — always use the
-    // NEC 220.82 / 220.83 demand result, even when "Use project data" is on.
-    // The raw load_watts sum below ignores demand factors and is wrong for
-    // dwellings; we keep it only for non-dwelling occupancies where there's
-    // no structured appliance data to feed the demand calc.
-    if (isDwellingProject &&
+    // Priority 1a: Single-family dwellings — the NEC 220.82 / 220.83 / Part
+    // III demand result, even when "Use project data" is on.
+    if (isSingleFamilyDwelling &&
         dwellingLoadResult &&
         dwellingLoadResult.serviceAmps) {
       return Math.round(dwellingLoadResult.serviceAmps);
     }
 
-    // Priority 1b: Non-dwelling occupancy with project panel data — sum the
-    // raw connected load. (Commercial / industrial don't have a residential
-    // demand bucket the way dwellings do; the per-circuit-type demand walk
-    // happens upstream of this widget.)
-    if (useProjectData && circuits && circuits.length > 0) {
-      let totalLoad_kVA = 0;
-      for (const circuit of circuits) {
-        if (circuit.load_watts) {
-          totalLoad_kVA += circuit.load_watts / 1000;
-        }
-      }
-      const voltage = project?.serviceVoltage || 240;
-      const loadAmps = (totalLoad_kVA * 1000) / voltage;
-      return Math.round(loadAmps);
+    // Priority 1b: Project panel data, calculated method — the NEC 220
+    // demand of the existing circuits, as E-102 prints it (#185). A measured
+    // or manual method keeps the value the user enters.
+    if (useProjectData &&
+        existingLoadMethod === ExistingLoadDeterminationMethod.CALCULATED &&
+        scheduleExistingAmps !== null) {
+      return scheduleExistingAmps;
     }
 
     // Priority 2: Method is CALCULATED and dwelling data exists — fall through
@@ -244,7 +225,7 @@ export const ServiceUpgradeWizard: React.FC<ServiceUpgradeWizardProps> = ({ proj
     // Priority 3: For all other cases (UTILITY_BILL, LOAD_STUDY, MANUAL, or no dwelling data),
     // use the manual input value
     return currentUsageAmps;
-  }, [useProjectData, existingLoadMethod, dwellingLoadResult, currentUsageAmps, circuits, project, isDwellingProject]);
+  }, [useProjectData, existingLoadMethod, dwellingLoadResult, currentUsageAmps, scheduleExistingAmps, isSingleFamilyDwelling]);
 
   // Calculate result in real-time
   let result: QuickCheckResult | null = null;
@@ -443,8 +424,8 @@ export const ServiceUpgradeWizard: React.FC<ServiceUpgradeWizardProps> = ({ proj
             <span className="font-semibold text-green-900">Using data from panel "{panelDataSource}"</span>
             <p className="text-xs text-green-700 mt-1">
               Service size and current load auto-populated from your project panel schedule.
-              {circuits && circuits.length > 0 && (
-                <span> Calculated from {circuits.length} circuit{circuits.length > 1 ? 's' : ''}.</span>
+              {scheduleExistingAmps !== null && (
+                <span> Current load: the NEC 220 demand of the existing circuits, the same as E-102.</span>
               )}
             </p>
           </div>

@@ -10,7 +10,7 @@ import { AttachmentUploadCard } from './AttachmentUploadCard';
 import { useProjectAttachments, downloadAttachmentBytes, type ArtifactType, type CoverMode } from '../hooks/useProjectAttachments';
 import { summarizeCalculationRefs, type NEC22087NarrativeData, type NEC22087Method } from '../services/pdfExport/PermitPacketDocuments';
 import { buildSingleFamilyDwellingContext, deriveNarrativeOccupancy } from '../lib/projectSettings';
-import { mfEvCalculationFromSettings } from '../lib/storedCalcs';
+import { mfEvCalculationFromSettings, projectDemandSplit } from '../lib/storedCalcs';
 import {
   BAND_CALCULATIONS,
   DEFAULT_SECTIONS,
@@ -57,11 +57,9 @@ import { ahjEquipmentFlags, serviceScope } from '../data/ahj/checks';
 import { JurisdictionAndAHJPanel } from './JurisdictionAndAHJPanel';
 import {
   buildMultiFamilyContext,
-  calculateAggregatedLoad,
   calculateProposedNewLoadVA,
   isEVEMSManagedPanel,
 } from '../services/calculations/upstreamLoadAggregation';
-import { calculateDwellingDemandSplit } from '../services/calculations/residentialLoad';
 import { screenContractorExemption } from '../services/permitMode/exemptionScreening';
 import {
   projectAddressSchema,
@@ -310,70 +308,12 @@ export const PermitPacketGenerator: React.FC<PermitPacketGeneratorProps> = ({ pr
     () => mfEvCalculationFromSettings(currentProject?.settings?.residential, projectEdition),
     [currentProject?.settings?.residential, projectEdition],
   );
-  const aggregatedDemandSplit = React.useMemo<{ existingKVA: number; proposedKVA: number; necReferences: string[] }>(() => {
-    if (!currentProject) return { existingKVA: 0, proposedKVA: 0, necReferences: [] };
-    const mdp = panels.find(p => p.is_main);
-    if (!mdp) return { existingKVA: 0, proposedKVA: 0, necReferences: [] };
-    const mfCtx = buildMultiFamilyContext(
-      mdp,
-      panels,
-      circuits,
-      transformers,
-      currentProject.settings,
-      projectEdition,
-    );
-    // Single-family dwellings: E-101 runs the NEC 220.82 / 220.83 Optional
-    // Method, so E-102 must too — the Part III cascade below gave a different
-    // total and could fail a service E-101 showed as adequate (#121).
-    const sfCtx = buildSingleFamilyDwellingContext(currentProject, !!mfCtx);
-    if (sfCtx) {
-      const split = calculateDwellingDemandSplit({
-        // Same circuit set as E-101 (LoadCalculationSummary): MDP circuits.
-        circuits: circuits
-          .filter(c => c.panel_id === mdp.id)
-          .map(c => ({
-            description: c.description,
-            load_watts: c.load_watts,
-            load_type: c.load_type,
-            breaker_amps: c.breaker_amps,
-            is_proposed: c.is_proposed,
-          })),
-        voltage: mdp.voltage || 240,
-        necEdition: projectEdition,
-        ...sfCtx,
-      });
-      return {
-        existingKVA: split.existingDemandVA / 1000,
-        proposedKVA: split.proposedDemandVA / 1000,
-        necReferences: split.necReferences,
-      };
-    }
-    // Match the orchestrator's occupancyType derivation
-    // (services/pdfExport/permitPacketGenerator.tsx:1116) so the demand
-    // factor cascade picks the same branch.
-    const occupancyType: 'dwelling' | 'commercial' | 'industrial' =
-      currentProject.type === 'Residential'
-        ? 'dwelling'
-        : currentProject.type === 'Industrial'
-          ? 'industrial'
-          : 'commercial';
-    const agg = calculateAggregatedLoad(
-      mdp.id,
-      panels,
-      circuits,
-      transformers,
-      occupancyType,
-      mfCtx,
-      projectEdition,
-    );
-    return {
-      existingKVA: agg.existingDemandVA / 1000,
-      proposedKVA: agg.proposedDemandVA / 1000,
-      // Union with the per-row references: the top-level list omits some
-      // applied sections (e.g. 220.14 "Other", 220.51 water heater).
-      necReferences: [...agg.necReferences, ...agg.demandBreakdown.map(r => r.necReference)],
-    };
-  }, [currentProject, panels, circuits, transformers, projectEdition]);
+  const aggregatedDemandSplit = React.useMemo<{ existingKVA: number; proposedKVA: number; necReferences: string[] }>(
+    () => currentProject
+      ? projectDemandSplit(currentProject, panels, circuits, transformers, projectEdition)
+      : { existingKVA: 0, proposedKVA: 0, necReferences: [] },
+    [currentProject, panels, circuits, transformers, projectEdition],
+  );
 
   // Auto-fill from profile (only on first load, before user edits)
   useEffect(() => {
