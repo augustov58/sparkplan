@@ -214,8 +214,9 @@ export function projectDemandSplit(
 
 /**
  * The Service Upgrade Wizard's existing load from the panel schedule: E-102's
- * existing demand in service amps (√3 on a 3-phase service, as E-102 converts
- * it). Null without an MDP or circuits — the wizard then keeps manual entry.
+ * existing demand plus 25% of the existing continuous loads (230.42(A)(1),
+ * #192), in service amps (√3 on a 3-phase service, as E-102 converts it).
+ * Null without an MDP or circuits — the wizard then keeps manual entry.
  */
 export function scheduleExistingLoadAmps(
   project: Project,
@@ -225,15 +226,16 @@ export function scheduleExistingLoadAmps(
   necEdition: NecEdition,
 ): number | null {
   if (!panels.some(p => p.is_main) || circuits.length === 0) return null;
-  const { existingKVA } = projectDemandSplit(project, panels, circuits, transformers, necEdition);
-  return serviceAmps(project, existingKVA);
+  const { existingKVA, existingAdderKVA } = projectDemandSplit(project, panels, circuits, transformers, necEdition);
+  return serviceAmps(project, existingKVA + existingAdderKVA);
 }
 
 /**
  * The Service Upgrade Wizard's new load from the proposed circuits: E-102's
  * new load for the 220.87 method, in service amps (#188). Calculated → the
- * demand increase (`projectDemandSplit.proposedKVA`, PE ruling 2026-11-04);
- * measured / manual → `calculateProposedNewLoadVA` (EVSE at 125%, EVEMS
+ * demand increase (`projectDemandSplit.proposedKVA`, PE ruling 2026-11-04)
+ * plus 25% of the new continuous loads (230.42(A)(1), #192); measured /
+ * manual → `calculateProposedNewLoadVA` (continuous loads at 125%, EVEMS
  * setpoint where set). Null without an MDP or proposed circuits.
  */
 export function scheduleNewLoadAmps(
@@ -245,8 +247,11 @@ export function scheduleNewLoadAmps(
   existingLoadMethod: ExistingLoadDeterminationMethod,
 ): number | null {
   if (!panels.some(p => p.is_main) || !circuits.some(c => c.is_proposed)) return null;
-  const newLoadKVA = existingLoadMethod === ExistingLoadDeterminationMethod.CALCULATED
-    ? projectDemandSplit(project, panels, circuits, transformers, necEdition).proposedKVA
+  const split = existingLoadMethod === ExistingLoadDeterminationMethod.CALCULATED
+    ? projectDemandSplit(project, panels, circuits, transformers, necEdition)
+    : null;
+  const newLoadKVA = split
+    ? split.proposedKVA + split.proposedAdderKVA
     : calculateProposedNewLoadVA(circuits, necEdition) / 1000;
   return serviceAmps(project, newLoadKVA);
 }

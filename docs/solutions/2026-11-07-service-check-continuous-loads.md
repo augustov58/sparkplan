@@ -34,6 +34,7 @@
   - measured signs at 125%;
   - dwelling `serviceCheckAmps` (circuits, toggles, 220.84);
   - wizard available capacity, gauge and presets.
+- In the app: wizard and E-102 agree on three QA projects. Single-family: 125 A. Café: 240 A, with its existing sign adding 0.50 kVA. 12-unit EVEMS building: the new load is 204 A under both methods, because the setpoint × 1.25 now applies either way.
 - Five tests that pinned "calculated EV at 100%" in the MF EV calculation were updated to the ruling, not deleted. The EVEMS setpoint on the 400 A sample moved from 230 A to 184 A (230 ÷ 1.25).
 
 ## Failed hypotheses / traps

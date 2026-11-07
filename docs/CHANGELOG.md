@@ -16,6 +16,7 @@ All notable changes to SparkPlan.
   - Common-loads presets: only EV chargers go in at 125%. Water heaters, pool pumps and hot tubs go in at nameplate; their 125% is for the branch circuit.
   - "Available capacity" now subtracts the new load: a 200 A service at 154 A total said "106 A remaining" and now says 46 A.
   - The current-utilization gauge applies the 1.25× to a measured existing load.
+  - The current and new loads it fills in from the panel schedule (Calculated method) include the 25% of continuous loads, so the wizard's total is E-102's. A 48 A charger on a 208 V 3-phase service fills in 40 A, the same as under a utility bill. QA single-family house: 94 + 31 = 125 A; QA café: 240 A (was 238 A, from its sign circuit).
 
 ---
 

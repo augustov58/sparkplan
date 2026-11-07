@@ -38,6 +38,9 @@ interface ServiceUpgradeWizardProps {
   projectId?: string;
 }
 
+/** A dwelling's service check in amps: demand + 25% of continuous loads (230.42(A)(1), #192). */
+const dwellingServiceCheckAmps = (r: ResidentialLoadResult): number => Math.round(r.serviceCheckAmps ?? r.serviceAmps);
+
 export const ServiceUpgradeWizard: React.FC<ServiceUpgradeWizardProps> = ({ projectId: propProjectId }) => {
   const { projectId: urlProjectId } = useParams();
   const projectId = propProjectId || urlProjectId;
@@ -138,7 +141,7 @@ export const ServiceUpgradeWizard: React.FC<ServiceUpgradeWizardProps> = ({ proj
     // 2. Method is CALCULATED (not utility bill or load study)
     // 3. Dwelling data is available
     if (dwellingLoadResult && dwellingLoadResult.serviceAmps && !useProjectData && existingLoadMethod === ExistingLoadDeterminationMethod.CALCULATED) {
-      setCurrentUsageAmps(Math.round(dwellingLoadResult.serviceAmps));
+      setCurrentUsageAmps(dwellingServiceCheckAmps(dwellingLoadResult));
       setUsingDwellingData(true);
     } else {
       // Clear dwelling data flag if we're not using it
@@ -190,7 +193,7 @@ export const ServiceUpgradeWizard: React.FC<ServiceUpgradeWizardProps> = ({ proj
 
   // Single-family: the dwelling result (#184); others: the schedule demand.
   const projectExistingAmps = isSingleFamilyDwelling
-    ? (dwellingLoadResult?.serviceAmps ? Math.round(dwellingLoadResult.serviceAmps) : null)
+    ? (dwellingLoadResult?.serviceAmps ? dwellingServiceCheckAmps(dwellingLoadResult) : null)
     : scheduleExistingAmps;
 
   useEffect(() => {
@@ -226,7 +229,7 @@ export const ServiceUpgradeWizard: React.FC<ServiceUpgradeWizardProps> = ({ proj
         existingLoadMethod === ExistingLoadDeterminationMethod.CALCULATED &&
         dwellingLoadResult &&
         dwellingLoadResult.serviceAmps) {
-      return Math.round(dwellingLoadResult.serviceAmps);
+      return dwellingServiceCheckAmps(dwellingLoadResult);
     }
 
     // Priority 1b: Project panel data, calculated method — the NEC 220
@@ -244,7 +247,7 @@ export const ServiceUpgradeWizard: React.FC<ServiceUpgradeWizardProps> = ({ proj
     if (existingLoadMethod === ExistingLoadDeterminationMethod.CALCULATED &&
         dwellingLoadResult &&
         dwellingLoadResult.serviceAmps) {
-      return Math.round(dwellingLoadResult.serviceAmps);
+      return dwellingServiceCheckAmps(dwellingLoadResult);
     }
 
     // Priority 3: For all other cases (UTILITY_BILL, LOAD_STUDY, MANUAL, or no dwelling data),
@@ -456,7 +459,7 @@ export const ServiceUpgradeWizard: React.FC<ServiceUpgradeWizardProps> = ({ proj
             <p className="text-xs text-green-700 mt-1">
               Service size and current load auto-populated from your project panel schedule.
               {scheduleExistingAmps !== null && (
-                <span> Current load: the NEC 220 demand of the existing circuits, the same as E-102.</span>
+                <span> Current load: the NEC 220 demand of the existing circuits plus 25% of their continuous loads (NEC 230.42(A)(1)), as E-102 checks it.</span>
               )}
             </p>
           </div>
@@ -689,8 +692,8 @@ export const ServiceUpgradeWizard: React.FC<ServiceUpgradeWizardProps> = ({ proj
                 <p className="text-xs text-gray-500 mt-1">
                   From proposed circuits: {scheduleNewAmps}A
                   {existingLoadMethod === ExistingLoadDeterminationMethod.CALCULATED
-                    ? ' (the demand increase, the same as E-102).'
-                    : ' (EVSE at 125%, clamped to the EVEMS setpoint where one is set; others at nameplate).'}
+                    ? ' (the demand increase plus 25% of its continuous loads per NEC 230.42(A)(1), the same as E-102).'
+                    : ' (EVSE, signs and show windows at 125%, EVSE clamped to the EVEMS setpoint where one is set; others at nameplate).'}
                   {proposedLoadAmps !== scheduleNewAmps && (
                     <button
                       type="button"

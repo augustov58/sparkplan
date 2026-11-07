@@ -94,8 +94,8 @@ The calculated existing load comes from one function for E-102 and the Service
 Upgrade Wizard: `lib/storedCalcs.ts::projectDemandSplit` (existing circuits
 only, #127; the wizard converts it to amps with √3 on 3-phase, #185). The wizard's
 new load: `scheduleNewLoadAmps` — calculated → the demand increase
-(`projectDemandSplit.proposedKVA`, PE ruling 2026-11-04), measured/manual →
-`calculateProposedNewLoadVA`, the same as E-102 (#188).
+(`projectDemandSplit.proposedKVA`, PE ruling 2026-11-04) + `proposedAdderKVA`,
+measured/manual → `calculateProposedNewLoadVA`, the same as E-102 (#188, #192).
 The 25% continuous adder: `upstreamLoadAggregation.ts::continuousServiceAdderVA`
 (classifier `data/nec/continuous-load.ts`), returned by `projectDemandSplit`
 as `existingAdderKVA` / `proposedAdderKVA`; dwelling results carry it as

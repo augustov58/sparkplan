@@ -1,8 +1,10 @@
 /**
  * #188: the Service Upgrade Wizard's new load from the proposed circuits is
  * E-102's new load for the 220.87 method, in service amps. Calculated → the
- * demand increase (PE ruling 2026-11-04); measured / manual → the 220.87(2)
- * new load (EVSE at 125%, EVEMS setpoint where set, others at nameplate).
+ * demand increase (PE ruling 2026-11-04) plus 25% of its continuous loads
+ * (230.42(A)(1), PE ruling 2026-11-07, #192); measured / manual → the
+ * 220.87(2) new load (EVSE at 125%, EVEMS setpoint where set, others at
+ * nameplate). Both methods now take the charger at 125%.
  */
 import { describe, it, expect } from 'vitest';
 import type { Project } from '../types';
@@ -31,11 +33,13 @@ const newAmps = (p: Project, circuits: any[], method: ExistingLoadDeterminationM
   scheduleNewLoadAmps(p, [mdp] as any, circuits, [], '2020', method);
 
 describe('wizard new load from the proposed circuits', () => {
-  it('calculated: the demand increase E-102 uses — the charger at 100% (11.52 kVA ÷ 208√3 = 32 A)', () => {
+  it('calculated: the demand increase + 25% of the charger (11.52 + 2.88 kVA ÷ 208√3 = 40 A, #192)', () => {
     const circuits = [...existing, evCharger];
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    expect(projectDemandSplit(project({}), [mdp] as any, circuits as any, [], '2020').proposedKVA).toBe(11.52);
-    expect(newAmps(project({}), circuits, CALCULATED)).toBe(32);
+    const split = projectDemandSplit(project({}), [mdp] as any, circuits as any, [], '2020');
+    expect(split.proposedKVA).toBe(11.52);
+    expect(split.proposedAdderKVA).toBeCloseTo(2.88, 6);
+    expect(newAmps(project({}), circuits, CALCULATED)).toBe(40);
   });
 
   it('measured and manual: the 220.87(2) new load — the charger at 125% (14.4 kVA ÷ 208√3 = 40 A)', () => {
@@ -47,14 +51,15 @@ describe('wizard new load from the proposed circuits', () => {
     }
   });
 
-  it('existing + new = the total demand under the calculated method', () => {
+  it('existing + new = E-102\'s calculated total (demand + continuous adder)', () => {
     const circuits = [...existing, evCharger];
     const p = project({});
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const split = projectDemandSplit(p, [mdp] as any, circuits as any, [], '2020');
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const existingAmps = scheduleExistingLoadAmps(p, [mdp] as any, circuits as any, [], '2020')!;
-    const totalAmps = Math.round(((split.existingKVA + split.proposedKVA) * 1000) / (208 * Math.sqrt(3)));
+    const totalKVA = split.existingKVA + split.proposedKVA + split.existingAdderKVA + split.proposedAdderKVA;
+    const totalAmps = Math.round((totalKVA * 1000) / (208 * Math.sqrt(3)));
     expect(Math.abs(existingAmps + newAmps(p, circuits, CALCULATED)! - totalAmps)).toBeLessThanOrEqual(1);
   });
 
