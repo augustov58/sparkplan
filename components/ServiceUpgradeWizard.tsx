@@ -188,11 +188,16 @@ export const ServiceUpgradeWizard: React.FC<ServiceUpgradeWizardProps> = ({ proj
     [project, isSingleFamilyDwelling, panels, projectCircuits, transformers, necEdition],
   );
 
+  // Single-family: the dwelling result (#184); others: the schedule demand.
+  const projectExistingAmps = isSingleFamilyDwelling
+    ? (dwellingLoadResult?.serviceAmps ? Math.round(dwellingLoadResult.serviceAmps) : null)
+    : scheduleExistingAmps;
+
   useEffect(() => {
-    if (useProjectData && scheduleExistingAmps !== null) {
-      setCurrentUsageAmps(scheduleExistingAmps);
+    if (useProjectData && projectExistingAmps !== null) {
+      setCurrentUsageAmps(projectExistingAmps);
     }
-  }, [useProjectData, scheduleExistingAmps]);
+  }, [useProjectData, projectExistingAmps]);
 
   // The new load of the project's proposed circuits, as E-102 takes it for
   // the selected 220.87 method (#188): calculated → the demand increase;
@@ -214,9 +219,11 @@ export const ServiceUpgradeWizard: React.FC<ServiceUpgradeWizardProps> = ({ proj
 
   // Determine which current usage value to use based on method and data source
   const effectiveCurrentUsageAmps = useMemo(() => {
-    // Priority 1a: Single-family dwellings — the NEC 220.82 / 220.83 / Part
-    // III demand result, even when "Use project data" is on.
+    // Priority 1a: Single-family dwellings, calculated method — the NEC
+    // 220.82 / 220.83 / Part III demand result, even when "Use project data"
+    // is on. A measured or manual method keeps the value the user enters.
     if (isSingleFamilyDwelling &&
+        existingLoadMethod === ExistingLoadDeterminationMethod.CALCULATED &&
         dwellingLoadResult &&
         dwellingLoadResult.serviceAmps) {
       return Math.round(dwellingLoadResult.serviceAmps);
