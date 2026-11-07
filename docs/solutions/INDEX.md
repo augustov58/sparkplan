@@ -4,6 +4,7 @@ One note per hard problem, written by the model that solved it via the `extract-
 Each entry: `- [title](file.md) — reusable rule`.
 
 <!-- Newest first -->
+- [The wizard's new load follows the 220.87 method](2026-11-05-wizard-new-load-prefill.md) — when one quantity has a per-method definition, the shared helper takes the method and the reader recomputes on every method change; keep a user's edit with an explicit flag, not by comparing values
 - [A dead path in the wizard would have printed a raw sum as "calculated"](2026-11-03-wizard-existing-load-from-schedule.md) — before fixing a path that never ran, run it and compare with the page that prints the same quantity; route the reader through that page's function (moved to a shared module), not a local copy
 - [The calculator and the packet read different inputs](2026-10-28-calculator-reads-circuits.md) — two pages that report one quantity need the same input as well as the same function; when one side works from a model (toggles) and the other from records (circuits), make the records the input once they exist
 - [A method switch exposed untyped template circuits](2026-10-27-sf-new-house-method-choice.md) — before switching a circuit-based calc to a method that branches on load type, run it on the template's own circuits; infer the type from the description only when it is the 'O' default

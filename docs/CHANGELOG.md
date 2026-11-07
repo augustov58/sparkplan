@@ -4,6 +4,17 @@ All notable changes to SparkPlan.
 
 ---
 
+## 2026-11-07: The Service Upgrade Wizard pre-fills the new load from the proposed circuits (#188)
+
+- **Projects with proposed circuits.** The wizard took its new load only from the "common loads" dropdown or a typed value, so until one was entered it checked the service against 0 A of new load and could show "Current Service is Adequate" for a job whose E-102 fails. With "Use project data" on, it now pre-fills the new load from the proposed circuits, using the same number E-102 uses for the selected 220.87 method:
+  - **Calculated:** the demand increase (total demand minus the existing demand), per PE ruling 2026-11-04. On the QA 12-unit building that is 165 A, E-101's 39.60 kVA proposed demand ÷ 240 V. The service now shows "Service Upgrade REQUIRED" at 863 A on 800 A, where it used to pass at 698 A.
+  - **Utility billing, load study or manual:** EV chargers at 125% (clamped to the EVEMS setpoint where one is set), other loads at nameplate: 204 A on the same building, the packet's 49.05 kVA suggestion.
+- **A value you type or pick is kept** when the method changes. A note under the field shows the proposed-circuit value, and "Use … A" puts it back.
+- **Common-loads dropdown on 3-phase services.** It divided by 240 V regardless of the service. It now uses the project's service voltage and √3 on 3-phase: a 48 A EV charger on a 208 V 3-phase service enters 40 A, not 60 A.
+- **Single-family houses under a measured method.** Under utility billing, load study or manual entry, the wizard ignored the measured peak you entered and took the calculated dwelling load, then applied the 1.25× to it. It now uses the value entered, × 1.25, as for other projects. The current-usage field also starts at the calculated dwelling load, as it does for other projects.
+
+---
+
 ## 2026-11-03: The Service Upgrade Wizard reads the existing load from the panel schedule (#185)
 
 - **Commercial, industrial and multifamily projects.** With "Use project data" on, the wizard said its current load came from the panel schedule, but it queried the circuits with the wrong ID and never got any, so the current load stayed at the manual default (140 A). It now uses the same existing demand as the packet: the NEC 220 calculation run on the existing circuits only, converted to amps for the service (√3 on 3-phase). On the QA café build-out that is 238 A, as on E-102; on the QA 12-unit building, 698 A, the existing calculated demand on E-101. Multifamily projects used to take the Dwelling Load Calculator's unit templates without the house panel; they now read the building's circuits through 220.84.
