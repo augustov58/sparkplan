@@ -20,7 +20,8 @@
 import type { Database } from '@/lib/database.types';
 import { getLightingDemandFactor } from '@/data/nec/table-220-42';
 import { getMultiFamilyDemandFactor } from './multiFamilyEV';
-import { EVSE_CONTINUOUS_FACTOR, getEvseLoadVA, isEvseDescription, type NecEdition } from '@/data/nec/evse-load';
+import { getEvseLoadVA, isEvseDescription, type NecEdition } from '@/data/nec/evse-load';
+import { CONTINUOUS_LOAD_ADDER, CONTINUOUS_LOAD_FACTOR, isSignOrShowWindowDescription } from '@/data/nec/continuous-load';
 import {
   LARGEST_MOTOR_CATEGORY,
   calculateTwoUnitDwellingLoad,
@@ -130,7 +131,9 @@ export function withEvseLoadForEdition<T extends Pick<Circuit, 'description' | '
  *
  * - EVSE at its edition load (`withEvseLoadForEdition`: NEC 2023 7,200 VA
  *   floor) × 125% — EV charging is continuous per NEC 625.42, sized per
- *   625.41 (PE ruling 2026-10-14); other proposed loads at nameplate.
+ *   625.41 (PE ruling 2026-10-14). Signs and show windows × 125% too
+ *   (230.42(A)(1), PE ruling 2026-11-07, #192); other proposed loads at
+ *   nameplate.
  * - EVEMS marker circuits are metadata, not load (#137).
  * - On a panel with an explicit "EVEMS Aggregate Setpoint" marker, that
  *   panel's proposed EVSE sum is clamped to the setpoint (NEC 625.42), and
@@ -143,25 +146,73 @@ export function calculateProposedNewLoadVA(
   necEdition: NecEdition,
 ): number {
   const circuits = withEvseLoadForEdition(allCircuits, necEdition);
-  const byPanel = new Map<string, { evseVA: number; otherVA: number }>();
+  const byPanel = new Map<string, { evseVA: number; signVA: number; otherVA: number }>();
   for (const c of circuits) {
     if (!c.is_proposed || isEVEMSMarkerCircuit(c)) continue;
     const panelId = c.panel_id ?? '';
-    const entry = byPanel.get(panelId) ?? { evseVA: 0, otherVA: 0 };
+    const entry = byPanel.get(panelId) ?? { evseVA: 0, signVA: 0, otherVA: 0 };
     if (isEvseDescription(c.description ?? '')) entry.evseVA += c.load_watts || 0;
+    else if (isSignOrShowWindowDescription(c.description)) entry.signVA += c.load_watts || 0;
     else entry.otherVA += c.load_watts || 0;
     byPanel.set(panelId, entry);
   }
 
   let totalVA = 0;
-  for (const [panelId, { evseVA, otherVA }] of byPanel) {
+  for (const [panelId, { evseVA, signVA, otherVA }] of byPanel) {
     const setpointVA = circuits.find(
       c => (c.panel_id ?? '') === panelId && isEVEMSExplicitSetpointMarker(c),
     )?.load_watts;
     const evDemandVA = setpointVA && setpointVA > 0 ? Math.min(evseVA, setpointVA) : evseVA;
-    totalVA += evDemandVA * EVSE_CONTINUOUS_FACTOR + otherVA;
+    totalVA += (evDemandVA + signVA) * CONTINUOUS_LOAD_FACTOR + otherVA;
   }
   return totalVA;
+}
+
+/**
+ * NEC 230.42(A)(1) service check: 25% of the continuous loads (EVSE, signs,
+ * show windows) under the MDP, existing and proposed, in VA — added to the
+ * Article 220 load when the method is calculated (PE ruling 2026-11-07,
+ * #192). The Article 220 load stays at 100%.
+ *
+ * - EVSE at its edition load (`withEvseLoadForEdition`), including a unit's
+ *   own charger in the 220.84 base, at its full load (not the factored share).
+ * - An EVEMS-managed panel's chargers count at most the setpoint (625.42).
+ *   The setpoint covers the existing chargers first; the proposed part is
+ *   the rest.
+ */
+export function continuousServiceAdderVA(
+  mdpId: string,
+  panels: Panel[],
+  allCircuits: Circuit[],
+  transformers: Transformer[],
+  necEdition: NecEdition,
+): { existingVA: number; proposedVA: number } {
+  const underMdp = collectDownstreamPanelIds(mdpId, panels, transformers);
+  const circuits = withEvseLoadForEdition(
+    allCircuits.filter(c => !!c.panel_id && underMdp.has(c.panel_id)),
+    necEdition,
+  );
+  let existingVA = 0;
+  let proposedVA = 0;
+  for (const panelId of underMdp) {
+    const panelCircuits = circuits.filter(c => c.panel_id === panelId && !isEVEMSMarkerCircuit(c));
+    const sum = (match: (c: Circuit) => boolean) =>
+      panelCircuits.filter(match).reduce((total, c) => total + (c.load_watts || 0), 0);
+    const isEvse = (c: Circuit) => isEvseDescription(c.description);
+    const isSign = (c: Circuit) => !isEvse(c) && isSignOrShowWindowDescription(c.description);
+    let evExistingVA = sum(c => isEvse(c) && !c.is_proposed);
+    let evProposedVA = sum(c => isEvse(c) && !!c.is_proposed);
+    const panel = panels.find(p => p.id === panelId);
+    const setpointVA = panel && isEVEMSManagedPanel(panelId, circuits) ? evemsSetpointVA(panel, circuits) : null;
+    if (setpointVA !== null) {
+      const evTotalVA = Math.min(evExistingVA + evProposedVA, setpointVA);
+      evExistingVA = Math.min(evExistingVA, setpointVA);
+      evProposedVA = evTotalVA - evExistingVA;
+    }
+    existingVA += evExistingVA + sum(c => isSign(c) && !c.is_proposed);
+    proposedVA += evProposedVA + sum(c => isSign(c) && !!c.is_proposed);
+  }
+  return { existingVA: existingVA * CONTINUOUS_LOAD_ADDER, proposedVA: proposedVA * CONTINUOUS_LOAD_ADDER };
 }
 
 /**

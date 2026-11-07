@@ -26,6 +26,7 @@ import type {
   LoadTemplate,
   ExistingLoadDeterminationMethod
 } from '../../types';
+import { CONTINUOUS_LOAD_FACTOR } from '../../data/nec/continuous-load';
 
 // ============================================================================
 // QUICK CHECK MODE (Amp-Based)
@@ -63,7 +64,9 @@ export function quickServiceCheck(input: QuickCheckInput): QuickCheckResult {
   }
 
   const totalAmps = adjustedExistingLoad + input.proposedLoadAmps;
-  const availableAmps = input.currentServiceAmps - adjustedExistingLoad;
+  // What's left after the new load (#192: it left the new load out, so a
+  // 200 A service at 154 A total read "106 A remaining").
+  const availableAmps = input.currentServiceAmps - totalAmps;
   const utilizationPercent = (totalAmps / input.currentServiceAmps) * 100;
 
   const canHandle = utilizationPercent <= 100;
@@ -90,6 +93,7 @@ export function quickServiceCheck(input: QuickCheckInput): QuickCheckResult {
   );
 
   return {
+    existingAmps: Math.round(adjustedExistingLoad),
     totalAmps: Math.round(totalAmps),
     utilizationPercent: Math.round(utilizationPercent * 10) / 10,
     availableAmps: Math.round(availableAmps),
@@ -791,11 +795,14 @@ export const LOAD_TEMPLATES: LoadTemplate[] = [
 
 /**
  * Convert load template to quick check amps (for Quick Mode)
- * Applies the 125% continuous factor (NEC 625.42 / 625.41, 220.87(2) new
- * load — PE ruling 2026-10-14) and converts to amps
+ * The service check takes continuous loads at 125% per 230.42(A)(1) under
+ * every method (PE ruling 2026-11-07, #192). Among the templates only EV
+ * charging is continuous at the service (625.42): the `continuous` flag is
+ * the branch-circuit one (e.g. a water heater per 422.13), which the Dwelling
+ * Load Calculator uses to size circuits — not the service.
  */
 export function templateToQuickAmps(template: LoadTemplate, voltage: number = 240): number {
-  const effectiveKW = template.continuous ? template.kw * 1.25 : template.kw;
+  const effectiveKW = template.category === 'EV' ? template.kw * CONTINUOUS_LOAD_FACTOR : template.kw;
   const amps = (effectiveKW * 1000) / voltage;
   return Math.round(amps);
 }

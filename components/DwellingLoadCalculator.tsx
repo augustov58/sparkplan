@@ -580,9 +580,10 @@ export const DwellingLoadCalculator: React.FC<DwellingLoadCalculatorProps> = ({
         const isExisting = isExistingConstructionProject(project);
         const existingAmps = project.settings?.residential?.existingServiceAmps
           ?? mainPanel?.main_breaker_amps;
+        // 230.42(A)(1): the check carries continuous loads at 125% (#192).
         const existingHolds = isExisting
           && typeof existingAmps === 'number'
-          && appliancesLoadResult.serviceAmps <= existingAmps;
+          && (appliancesLoadResult.serviceCheckAmps ?? appliancesLoadResult.serviceAmps) <= existingAmps;
 
         // Recommended-service stored in settings should reflect the final
         // decision (existing wins when it holds), not the abstract
@@ -1630,7 +1631,7 @@ export const DwellingLoadCalculator: React.FC<DwellingLoadCalculatorProps> = ({
                       ?? mainPanel?.main_breaker_amps;
                     const existingHolds = isExisting
                       && typeof existing === 'number'
-                      && loadResult.serviceAmps <= existing;
+                      && (loadResult.serviceCheckAmps ?? loadResult.serviceAmps) <= existing;
                     return (
                       <div className="flex justify-between items-center py-1">
                         <span className="text-[#888] text-sm">Recommended Service</span>
@@ -1657,7 +1658,10 @@ export const DwellingLoadCalculator: React.FC<DwellingLoadCalculatorProps> = ({
                     const existing = project.settings?.residential?.existingServiceAmps
                       ?? mainPanel?.main_breaker_amps;
                     if (!existing || !loadResult.serviceAmps) return null;
-                    const demand = loadResult.serviceAmps;
+                    // 230.42(A)(1): Article 220 demand + 25% of continuous
+                    // loads (PE ruling 2026-11-07, #192).
+                    const demand = loadResult.serviceCheckAmps ?? loadResult.serviceAmps;
+                    const continuousAddedAmps = demand - loadResult.serviceAmps;
                     const headroom = existing - demand;
                     const utilization = demand / existing;
                     const holds = headroom >= 0;
@@ -1681,6 +1685,11 @@ export const DwellingLoadCalculator: React.FC<DwellingLoadCalculatorProps> = ({
                         <div className="flex justify-between items-baseline">
                           <span className="text-sm text-[#555]">
                             {demand.toFixed(0)}A demand &middot; {existing}A existing
+                            {continuousAddedAmps > 0 && (
+                              <span className="block text-[10px] text-[#888]">
+                                {loadResult.serviceAmps}A + {continuousAddedAmps}A (25% of continuous loads, NEC 230.42(A)(1))
+                              </span>
+                            )}
                           </span>
                           <span className={`text-xl font-bold ${
                             holds ? (tight ? 'text-amber-700' : 'text-green-700') : 'text-red-700'

@@ -4,6 +4,21 @@ All notable changes to SparkPlan.
 
 ---
 
+## 2026-11-07: The service check takes continuous loads at 125% under every method (#192)
+
+- **The rule (PE ruling 2026-11-07).** Whether a service is sufficient is a question about its conductors and main breaker. Under NEC 230.42(A)(1), service conductors carry the noncontinuous loads plus 125% of the continuous loads. The check is now the Article 220 load plus 25% of the continuous loads, under every 220.87 method:
+  - **Continuous loads:** EV chargers, sign outlets and show-window lighting, existing and new alike.
+  - **The Article 220 load itself is unchanged.** E-101 and the panel totals still print it at 100%.
+- **E-102, Calculated method.** A new line adds "25% of continuous loads (NEC 230.42(A)(1))" to the total before the pass/fail check. One 48 A charger on a 208 V 3-phase service now counts 40 A, not 32 A, the same as under a utility bill. Signs and show windows added on the measured path also go in at 125%.
+- **Multi-Family EV (E-402).** EV load, or the EVEMS setpoint, is taken at 125% under the Calculated method too. The EVEMS setpoint is sized as available × 0.90 ÷ 1.25 under every method, so it is lower than before.
+- **Dwelling Load Calculator.** "Existing holds" and "Service Headroom" compare the demand plus 25% of the EV charger (and of any sign or show-window load) with the existing service. A 220.84 building counts each unit's charger at its full load. The recommended new-service size is unchanged.
+- **Service Upgrade Wizard:**
+  - Common-loads presets: only EV chargers go in at 125%. Water heaters, pool pumps and hot tubs go in at nameplate; their 125% is for the branch circuit.
+  - "Available capacity" now subtracts the new load: a 200 A service at 154 A total said "106 A remaining" and now says 46 A.
+  - The current-utilization gauge applies the 1.25× to a measured existing load.
+
+---
+
 ## 2026-11-03: The Service Upgrade Wizard reads the existing load from the panel schedule (#185)
 
 - **Commercial, industrial and multifamily projects.** With "Use project data" on, the wizard said its current load came from the panel schedule, but it queried the circuits with the wrong ID and never got any, so the current load stayed at the manual default (140 A). It now uses the same existing demand as the packet: the NEC 220 calculation run on the existing circuits only, converted to amps for the service (√3 on 3-phase). On the QA café build-out that is 238 A, as on E-102; on the QA 12-unit building, 698 A, the existing calculated demand on E-101. Multifamily projects used to take the Dwelling Load Calculator's unit templates without the house panel; they now read the building's circuits through 220.84.

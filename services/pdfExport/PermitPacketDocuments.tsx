@@ -2412,6 +2412,14 @@ export interface NEC22087NarrativeData {
   maxDemandKVA: number;
   /** Sum of proposed new loads being added (e.g., new EVSE bank), in kVA. */
   proposedNewLoadKVA: number;
+  /**
+   * `calculated` only: 25% of the continuous loads (EVSE, signs, show
+   * windows), existing and proposed, added to the Article 220 load in the
+   * service check per 230.42(A)(1) (PE ruling 2026-11-07, #192). Measured
+   * and manual methods carry it already: the existing peak is × 1.25 and
+   * the new continuous loads are entered at 125%.
+   */
+  continuousAdderKVA?: number;
   /** Existing service ampacity rating (the number stamped on the meter / main). */
   serviceCapacityAmps: number;
   /** Service voltage in volts (typically 120/240 single-phase or 208/480 3-phase). */
@@ -2594,13 +2602,14 @@ export function getNEC22087NarrativeCopy(
       pageSubtitleSuffix: `${partLabel} \u2014 Calculated Existing Load + Proposed Addition`,
       conditionsHeader: 'CONDITIONS FOR EXISTING SERVICE CAPACITY VERIFICATION',
       condition1Header: `Existing load calculated from the project\u2019s panel schedule using ${basis}`,
-      condition2Header: 'Calculated existing demand plus the proposed new load does not exceed the service ampacity',
+      condition2Header: 'Calculated existing demand plus the proposed new load, with continuous loads at 125% (NEC 230.42(A)(1)), does not exceed the service ampacity',
       condition3Header: 'Feeder OCPD per NEC 240.4 and service overload per NEC 230.90',
       verdictAdequateBanner: `EXISTING SERVICE ADEQUATE (PER NEC 220 PART ${citation.part} CALCULATION)`,
       verdictAdequateBody:
         'The existing service has sufficient capacity for the proposed new load. NEC 220.87 is not invoked here \u2014 ' +
         `existing demand is calculated using ${basis} (sections applied: NEC ${refs}), and ` +
-        'those demand factors already provide the NEC-required diversity allowance.',
+        'those demand factors already provide the NEC-required diversity allowance. Continuous loads (EVSE, signs, ' +
+        'show windows) are taken at 125% per NEC 230.42(A)(1).',
       verdictInadequateBody:
         'The proposed new load combined with the calculated existing demand exceeds the service ampacity. ' +
         'A service upgrade or load management (NEC 750 / NEC 625.42) is required.',
@@ -2666,7 +2675,10 @@ export const NEC22087NarrativePage: React.FC<NEC22087NarrativePageProps> = ({
   const adjustedExisting = data.method === 'calculated'
     ? data.maxDemandKVA
     : data.maxDemandKVA * 1.25;
-  const totalFutureDemand = adjustedExisting + data.proposedNewLoadKVA;
+  // 230.42(A)(1): the service check adds 25% of the continuous loads to the
+  // Article 220 load (PE ruling 2026-11-07, #192).
+  const continuousAdder = data.method === 'calculated' ? (data.continuousAdderKVA ?? 0) : 0;
+  const totalFutureDemand = adjustedExisting + data.proposedNewLoadKVA + continuousAdder;
   // Sprint 2 (2026-05-27 follow-up): method-aware copy. NEC 220.87 only
   // applies to measured demand; `calculated` invokes NEC 220 Part III
   // and gets different headers/labels throughout the page.
@@ -2722,7 +2734,7 @@ export const NEC22087NarrativePage: React.FC<NEC22087NarrativePageProps> = ({
               data.method === 'utility_bill' || data.method === 'load_study'
                 ? 'measured peak x 1.25 per 220.87(2)'
                 : data.method === 'calculated'
-                  ? 'NEC demand-factored (no add. factor)'
+                  ? 'NEC demand-factored (no 220.87 x1.25)'
                   : 'manual entry x 1.25'
             }`}
           </Text>
@@ -2807,10 +2819,10 @@ export const NEC22087NarrativePage: React.FC<NEC22087NarrativePageProps> = ({
             </Text>
             <Text style={{ fontSize: 8.5, color: '#374151', lineHeight: 1.4 }}>
               {data.method === 'utility_bill' || data.method === 'load_study'
-                ? `${data.maxDemandKVA.toFixed(2)} kVA (measured peak) x 1.25 = ${adjustedExisting.toFixed(2)} kVA per NEC 220.87(2) + ${data.proposedNewLoadKVA.toFixed(2)} kVA (new; continuous loads incl. EVSE at 125% per NEC 625.42) = ${totalFutureDemand.toFixed(2)} kVA`
+                ? `${data.maxDemandKVA.toFixed(2)} kVA (measured peak) x 1.25 = ${adjustedExisting.toFixed(2)} kVA per NEC 220.87(2) + ${data.proposedNewLoadKVA.toFixed(2)} kVA (new; continuous loads \u2014 EVSE, signs, show windows \u2014 at 125% per NEC 230.42(A)(1), 625.42) = ${totalFutureDemand.toFixed(2)} kVA`
                 : data.method === 'calculated'
-                  ? `${data.maxDemandKVA.toFixed(2)} kVA (existing demand \u2014 ${copy.calculationBasis} already applied; no additional 125% multiplier) + ${data.proposedNewLoadKVA.toFixed(2)} kVA (new) = ${totalFutureDemand.toFixed(2)} kVA`
-                  : `${data.maxDemandKVA.toFixed(2)} kVA x 1.25 = ${adjustedExisting.toFixed(2)} kVA (adjusted, manual-entry default) + ${data.proposedNewLoadKVA.toFixed(2)} kVA (new; continuous loads incl. EVSE at 125% per NEC 625.42) = ${totalFutureDemand.toFixed(2)} kVA`}
+                  ? `${data.maxDemandKVA.toFixed(2)} kVA (existing demand \u2014 ${copy.calculationBasis} already applied; no 220.87 125% multiplier) + ${data.proposedNewLoadKVA.toFixed(2)} kVA (new)${continuousAdder > 0 ? ` + ${continuousAdder.toFixed(2)} kVA (25% of continuous loads \u2014 EVSE, signs, show windows \u2014 per NEC 230.42(A)(1))` : ''} = ${totalFutureDemand.toFixed(2)} kVA`
+                  : `${data.maxDemandKVA.toFixed(2)} kVA x 1.25 = ${adjustedExisting.toFixed(2)} kVA (adjusted, manual-entry default) + ${data.proposedNewLoadKVA.toFixed(2)} kVA (new; continuous loads \u2014 EVSE, signs, show windows \u2014 at 125% per NEC 230.42(A)(1), 625.42) = ${totalFutureDemand.toFixed(2)} kVA`}
             </Text>
             <Text style={{ fontSize: 8.5, color: '#374151', lineHeight: 1.4, marginTop: 1 }}>
               {`Service ampacity: ${data.serviceCapacityAmps}A x ${data.serviceVoltage}V${data.servicePhase === 3 ? ' x sqrt(3)' : ''} = ${capacityKVA.toFixed(2)} kVA`}

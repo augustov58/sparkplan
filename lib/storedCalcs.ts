@@ -15,7 +15,7 @@
 import type { Database } from './database.types';
 import type { DwellingUnitTemplate, Project, ResidentialAppliances } from '../types';
 import { buildSingleFamilyDwellingContext } from './projectSettings';
-import { buildMultiFamilyContext, calculateAggregatedLoad } from '../services/calculations/upstreamLoadAggregation';
+import { buildMultiFamilyContext, calculateAggregatedLoad, continuousServiceAdderVA } from '../services/calculations/upstreamLoadAggregation';
 import {
   calculateDwellingDemandSplit,
   calculateMultiFamilyLoad,
@@ -116,16 +116,36 @@ type TransformerRow = Database['public']['Tables']['transformers']['Row'];
  * NEC 220 aggregate of the MDP tree, whose existing demand is the same walk
  * run on the existing circuits only (#127) — commercial, industrial, and
  * multifamily with its 220.84 / two-unit context.
+ *
+ * `existingAdderKVA` / `proposedAdderKVA`: 25% of the continuous loads (EVSE,
+ * signs, show windows) that the calculated-method service check adds to the
+ * Article 220 load per 230.42(A)(1) (PE ruling 2026-11-07, #192). Kept apart
+ * so E-101 keeps printing the load at 100%.
  */
+export interface ProjectDemandSplit {
+  existingKVA: number;
+  proposedKVA: number;
+  existingAdderKVA: number;
+  proposedAdderKVA: number;
+  necReferences: string[];
+}
+
+export const EMPTY_DEMAND_SPLIT: ProjectDemandSplit = {
+  existingKVA: 0, proposedKVA: 0, existingAdderKVA: 0, proposedAdderKVA: 0, necReferences: [],
+};
+
 export function projectDemandSplit(
   project: Project,
   panels: PanelRow[],
   circuits: CircuitRow[],
   transformers: TransformerRow[],
   necEdition: NecEdition,
-): { existingKVA: number; proposedKVA: number; necReferences: string[] } {
+): ProjectDemandSplit {
   const mdp = panels.find(p => p.is_main);
-  if (!mdp) return { existingKVA: 0, proposedKVA: 0, necReferences: [] };
+  if (!mdp) return EMPTY_DEMAND_SPLIT;
+  const adder = continuousServiceAdderVA(mdp.id, panels, circuits, transformers, necEdition);
+  const existingAdderKVA = adder.existingVA / 1000;
+  const proposedAdderKVA = adder.proposedVA / 1000;
   const mfCtx = buildMultiFamilyContext(
     mdp,
     panels,
@@ -157,6 +177,8 @@ export function projectDemandSplit(
     return {
       existingKVA: split.existingDemandVA / 1000,
       proposedKVA: split.proposedDemandVA / 1000,
+      existingAdderKVA,
+      proposedAdderKVA,
       necReferences: split.necReferences,
     };
   }
@@ -181,6 +203,8 @@ export function projectDemandSplit(
   return {
     existingKVA: agg.existingDemandVA / 1000,
     proposedKVA: agg.proposedDemandVA / 1000,
+    existingAdderKVA,
+    proposedAdderKVA,
     // Union with the per-row references: the top-level list omits some
     // applied sections (e.g. 220.14 "Other", 220.51 water heater).
     necReferences: [...agg.necReferences, ...agg.demandBreakdown.map(r => r.necReference)],

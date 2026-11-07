@@ -241,6 +241,9 @@ export const ServiceUpgradeWizard: React.FC<ServiceUpgradeWizardProps> = ({ proj
   } catch (err) {
     error = err instanceof Error ? err.message : 'Calculation error';
   }
+  const currentUtilizationPct = result && currentServiceAmps > 0
+    ? (result.existingAmps / currentServiceAmps) * 100
+    : 0;
 
   // Add load from template
   const addLoadFromTemplate = (templateName: string) => {
@@ -696,32 +699,33 @@ export const ServiceUpgradeWizard: React.FC<ServiceUpgradeWizardProps> = ({ proj
 
           {result && (
             <>
-              {/* Current Utilization Gauge */}
+              {/* Current Utilization Gauge — the existing load as the check
+                  takes it (× 1.25 unless calculated, NEC 220.87(2); #192) */}
               <div className="bg-white border border-gray-200 rounded-lg p-4">
                 <div className="flex items-center justify-between mb-2">
                   <span className="text-sm font-semibold text-gray-700">
                     Current Utilization
                   </span>
                   <span className={`text-lg font-bold ${
-                    (effectiveCurrentUsageAmps / currentServiceAmps * 100) > 90 ? 'text-red-700' :
-                    (effectiveCurrentUsageAmps / currentServiceAmps * 100) > 80 ? 'text-orange-700' :
+                    currentUtilizationPct > 90 ? 'text-red-700' :
+                    currentUtilizationPct > 80 ? 'text-orange-700' :
                     'text-green-700'
                   }`}>
-                    {Math.round((effectiveCurrentUsageAmps / currentServiceAmps * 100) * 10) / 10}%
+                    {Math.round(currentUtilizationPct * 10) / 10}%
                   </span>
                 </div>
                 <div className="w-full bg-gray-200 rounded-full h-3">
                   <div
                     className={`h-3 rounded-full transition-all ${
-                      (effectiveCurrentUsageAmps / currentServiceAmps * 100) > 90 ? 'bg-red-600' :
-                      (effectiveCurrentUsageAmps / currentServiceAmps * 100) > 80 ? 'bg-orange-500' :
+                      currentUtilizationPct > 90 ? 'bg-red-600' :
+                      currentUtilizationPct > 80 ? 'bg-orange-500' :
                       'bg-green-500'
                     }`}
-                    style={{ width: `${Math.min((effectiveCurrentUsageAmps / currentServiceAmps * 100), 100)}%` }}
+                    style={{ width: `${Math.min(currentUtilizationPct, 100)}%` }}
                   />
                 </div>
                 <div className="grid grid-cols-2 gap-2 mt-2 text-xs text-gray-600">
-                  <div>Current: {effectiveCurrentUsageAmps}A</div>
+                  <div>Current: {result.existingAmps}A{result.existingAmps !== effectiveCurrentUsageAmps ? ` (${effectiveCurrentUsageAmps}A × 1.25)` : ''}</div>
                   <div>Capacity: {currentServiceAmps}A</div>
                 </div>
               </div>

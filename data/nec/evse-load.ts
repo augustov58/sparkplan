@@ -55,10 +55,10 @@ export function getEvseLoadVA(nameplateVA: number, edition: NecEdition): EvseLoa
 
 /**
  * NEC 625.42: EV charging loads are continuous loads; 625.41 sizes feeder
- * and service OCPD at 125% of them. Applies to the NEW load in the NEC
- * 220.87(2) existing-service comparison ("maximum demand at 125 percent
- * plus the new load" ≤ ampacity/rating) — PE ruling 2026-10-14. NOT applied
- * inside Article 220 load totals (getEvseLoadVA stays at 100%).
+ * OCPD and 230.42(A)(1) service conductors at 125% of them. Applies in the
+ * service check under every 220.87 method (PE rulings 2026-10-14 measured,
+ * 2026-11-07 calculated, #192; see `data/nec/continuous-load.ts`). NOT
+ * applied inside Article 220 load totals (getEvseLoadVA stays at 100%).
  */
 export const EVSE_CONTINUOUS_FACTOR = 1.25;
 

@@ -1307,8 +1307,8 @@ export const MultiFamilyEVCalculator: React.FC<MultiFamilyEVCalculatorProps> = (
                     </div>
                     <div className="text-xs text-gray-500 mt-1">
                       {(result.evLoad.demandVA / 1000).toFixed(1)} kVA ({result.evLoad.demandVA < result.evLoad.totalConnectedVA * result.evLoad.demandFactor
-                        ? (result.evLoad.demandFactor > 1 ? 'EVEMS setpoint × 125% — NEC 220.87(2) / 625.42' : 'EVEMS setpoint — NEC 625.42')
-                        : (result.evLoad.demandFactor > 1 ? 'full connected load × 125% — NEC 220.87(2) / 625.42' : 'full connected load')})
+                        ? (result.evLoad.demandFactor > 1 ? 'EVEMS setpoint × 125% — NEC 230.42(A)(1) / 625.42' : 'EVEMS setpoint — NEC 625.42')
+                        : (result.evLoad.demandFactor > 1 ? 'full connected load × 125% — NEC 230.42(A)(1) / 625.42' : 'full connected load')})
                     </div>
                   </div>
                 </div>
@@ -1325,10 +1325,10 @@ export const MultiFamilyEVCalculator: React.FC<MultiFamilyEVCalculatorProps> = (
                   ? result.serviceAnalysis.existingCapacityVA / result.serviceAnalysis.existingCapacityAmps
                   : voltage;
 
-                // Compute EV amps for the selected scenario. On the measured
-                // (220.87) path, EV load — direct or the EVEMS setpoint — is
-                // taken at 125% (evLoad.demandFactor; PE rulings 2026-10-14
-                // and 2026-10-18 #131).
+                // Compute EV amps for the selected scenario. EV load — direct
+                // or the EVEMS setpoint — is taken at 125% under every method
+                // (evLoad.demandFactor; 230.42(A)(1), PE rulings 2026-10-14,
+                // 2026-10-18 #131 and 2026-11-07 #192).
                 const evAmps = (scenario.powerPerCharger_kW != null && vaPerAmp > 0)
                   ? Math.round((scenario.powerPerCharger_kW * 1000 * chargerCount * result.evLoad.demandFactor) / vaPerAmp)
                   : result.evLoad.loadAmps;

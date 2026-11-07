@@ -597,9 +597,10 @@ export interface QuickCheckInput {
 }
 
 export interface QuickCheckResult {
+  existingAmps: number;            // currentUsage, × 1.25 unless calculated (220.87(2))
   totalAmps: number;               // currentUsage + proposedLoad
   utilizationPercent: number;      // (total / service) × 100
-  availableAmps: number;           // Remaining capacity
+  availableAmps: number;           // Remaining capacity after the proposed load
   canHandle: boolean;              // utilization ≤ 100%
   upgradeRecommended: boolean;     // utilization > 80%
   status: 'OK' | 'HIGH' | 'CRITICAL';
