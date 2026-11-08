@@ -16,7 +16,7 @@ import type { Database } from './database.types';
 import type { DwellingUnitTemplate, Project, ResidentialAppliances } from '../types';
 import { ExistingLoadDeterminationMethod } from '../types';
 import { buildSingleFamilyDwellingContext } from './projectSettings';
-import { buildMultiFamilyContext, calculateAggregatedLoad, calculateProposedNewLoadVA } from '../services/calculations/upstreamLoadAggregation';
+import { buildMultiFamilyContext, calculateAggregatedLoad, calculateProposedNewLoadVA, continuousServiceAdderVA } from '../services/calculations/upstreamLoadAggregation';
 import {
   calculateDwellingDemandSplit,
   calculateMultiFamilyLoad,
@@ -117,16 +117,36 @@ type TransformerRow = Database['public']['Tables']['transformers']['Row'];
  * NEC 220 aggregate of the MDP tree, whose existing demand is the same walk
  * run on the existing circuits only (#127) — commercial, industrial, and
  * multifamily with its 220.84 / two-unit context.
+ *
+ * `existingAdderKVA` / `proposedAdderKVA`: 25% of the continuous loads (EVSE,
+ * signs, show windows) that the calculated-method service check adds to the
+ * Article 220 load per 230.42(A)(1) (PE ruling 2026-11-07, #192). Kept apart
+ * so E-101 keeps printing the load at 100%.
  */
+export interface ProjectDemandSplit {
+  existingKVA: number;
+  proposedKVA: number;
+  existingAdderKVA: number;
+  proposedAdderKVA: number;
+  necReferences: string[];
+}
+
+export const EMPTY_DEMAND_SPLIT: ProjectDemandSplit = {
+  existingKVA: 0, proposedKVA: 0, existingAdderKVA: 0, proposedAdderKVA: 0, necReferences: [],
+};
+
 export function projectDemandSplit(
   project: Project,
   panels: PanelRow[],
   circuits: CircuitRow[],
   transformers: TransformerRow[],
   necEdition: NecEdition,
-): { existingKVA: number; proposedKVA: number; necReferences: string[] } {
+): ProjectDemandSplit {
   const mdp = panels.find(p => p.is_main);
-  if (!mdp) return { existingKVA: 0, proposedKVA: 0, necReferences: [] };
+  if (!mdp) return EMPTY_DEMAND_SPLIT;
+  const adder = continuousServiceAdderVA(mdp.id, panels, circuits, transformers, necEdition);
+  const existingAdderKVA = adder.existingVA / 1000;
+  const proposedAdderKVA = adder.proposedVA / 1000;
   const mfCtx = buildMultiFamilyContext(
     mdp,
     panels,
@@ -158,6 +178,8 @@ export function projectDemandSplit(
     return {
       existingKVA: split.existingDemandVA / 1000,
       proposedKVA: split.proposedDemandVA / 1000,
+      existingAdderKVA,
+      proposedAdderKVA,
       necReferences: split.necReferences,
     };
   }
@@ -182,6 +204,8 @@ export function projectDemandSplit(
   return {
     existingKVA: agg.existingDemandVA / 1000,
     proposedKVA: agg.proposedDemandVA / 1000,
+    existingAdderKVA,
+    proposedAdderKVA,
     // Union with the per-row references: the top-level list omits some
     // applied sections (e.g. 220.14 "Other", 220.51 water heater).
     necReferences: [...agg.necReferences, ...agg.demandBreakdown.map(r => r.necReference)],
@@ -190,8 +214,9 @@ export function projectDemandSplit(
 
 /**
  * The Service Upgrade Wizard's existing load from the panel schedule: E-102's
- * existing demand in service amps (√3 on a 3-phase service, as E-102 converts
- * it). Null without an MDP or circuits — the wizard then keeps manual entry.
+ * existing demand plus 25% of the existing continuous loads (230.42(A)(1),
+ * #192), in service amps (√3 on a 3-phase service, as E-102 converts it).
+ * Null without an MDP or circuits — the wizard then keeps manual entry.
  */
 export function scheduleExistingLoadAmps(
   project: Project,
@@ -201,15 +226,16 @@ export function scheduleExistingLoadAmps(
   necEdition: NecEdition,
 ): number | null {
   if (!panels.some(p => p.is_main) || circuits.length === 0) return null;
-  const { existingKVA } = projectDemandSplit(project, panels, circuits, transformers, necEdition);
-  return serviceAmps(project, existingKVA);
+  const { existingKVA, existingAdderKVA } = projectDemandSplit(project, panels, circuits, transformers, necEdition);
+  return serviceAmps(project, existingKVA + existingAdderKVA);
 }
 
 /**
  * The Service Upgrade Wizard's new load from the proposed circuits: E-102's
  * new load for the 220.87 method, in service amps (#188). Calculated → the
- * demand increase (`projectDemandSplit.proposedKVA`, PE ruling 2026-11-04);
- * measured / manual → `calculateProposedNewLoadVA` (EVSE at 125%, EVEMS
+ * demand increase (`projectDemandSplit.proposedKVA`, PE ruling 2026-11-04)
+ * plus 25% of the new continuous loads (230.42(A)(1), #192); measured /
+ * manual → `calculateProposedNewLoadVA` (continuous loads at 125%, EVEMS
  * setpoint where set). Null without an MDP or proposed circuits.
  */
 export function scheduleNewLoadAmps(
@@ -221,8 +247,11 @@ export function scheduleNewLoadAmps(
   existingLoadMethod: ExistingLoadDeterminationMethod,
 ): number | null {
   if (!panels.some(p => p.is_main) || !circuits.some(c => c.is_proposed)) return null;
-  const newLoadKVA = existingLoadMethod === ExistingLoadDeterminationMethod.CALCULATED
-    ? projectDemandSplit(project, panels, circuits, transformers, necEdition).proposedKVA
+  const split = existingLoadMethod === ExistingLoadDeterminationMethod.CALCULATED
+    ? projectDemandSplit(project, panels, circuits, transformers, necEdition)
+    : null;
+  const newLoadKVA = split
+    ? split.proposedKVA + split.proposedAdderKVA
     : calculateProposedNewLoadVA(circuits, necEdition) / 1000;
   return serviceAmps(project, newLoadKVA);
 }

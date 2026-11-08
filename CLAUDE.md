@@ -72,10 +72,16 @@ CRITICAL: only `calculated` skips the 1.25× multiplier.
   is already in the demand factors; adding 1.25× double-counts
 - Manual (unknown provenance): value × 1.25 as a defensive default
 - NEW load: continuous loads at 125% — EV charging is continuous per NEC 625.42,
-  sized per 625.41 (PE ruling 2026-10-14). This is the 220.87(2) comparison
-  only; inside Article 220 load totals the EVSE stays at 100% (see EVSE below).
+  sized per 625.41 (PE ruling 2026-10-14). Signs and show windows too (#192).
 - EVEMS: the setpoint is the new EV load and ALSO takes the 125% (PE ruling
   2026-10-18, #131). Size it as available × 0.90 ÷ 1.25 so EVEMS designs pass.
+- SERVICE CHECK, every method (PE ruling 2026-11-07, #192): "is the service
+  sufficient" is a conductor/OCPD question → 230.42(A)(1): Article 220 load
+  + 25% of continuous loads (EVSE, signs, show windows; existing AND new;
+  dwellings too; 220.84 unit EVs on their full load; EVEMS = setpoint) ≤
+  service rating. Calculated: the adder is a separate line on E-102. Measured:
+  the existing peak × 1.25 already covers it. The Article 220 LOAD stays at
+  100% (E-101, panel totals) — never fold the adder into it.
 ```
 PE-confirmed 2026-07-09 (PR #118 review), superseding both prior interpretations
 (pre-Sprint-2 multiplied calculated; Sprint 2 wrongly exempted measured).
@@ -88,8 +94,12 @@ The calculated existing load comes from one function for E-102 and the Service
 Upgrade Wizard: `lib/storedCalcs.ts::projectDemandSplit` (existing circuits
 only, #127; the wizard converts it to amps with √3 on 3-phase, #185). The wizard's
 new load: `scheduleNewLoadAmps` — calculated → the demand increase
-(`projectDemandSplit.proposedKVA`, PE ruling 2026-11-04), measured/manual →
-`calculateProposedNewLoadVA`, the same as E-102 (#188).
+(`projectDemandSplit.proposedKVA`, PE ruling 2026-11-04) + `proposedAdderKVA`,
+measured/manual → `calculateProposedNewLoadVA`, the same as E-102 (#188, #192).
+The 25% continuous adder: `upstreamLoadAggregation.ts::continuousServiceAdderVA`
+(classifier `data/nec/continuous-load.ts`), returned by `projectDemandSplit`
+as `existingAdderKVA` / `proposedAdderKVA`; dwelling results carry it as
+`serviceCheckAmps`; `multiFamilyEV.ts` takes EV × 1.25 under every method.
 
 ### Single-Family Method (PE ruling 2026-10-27, #178)
 ```
@@ -161,7 +171,8 @@ Florida enforces NEC 2020 (FBC 8th Ed.) until 2026-12-31, then NEC 2023
 - NEC 2020: per-EVSE load = nameplate per 220.14(A). No 7,200 VA floor.
 - NEC 2023: per-EVSE load = max(7,200 VA, nameplate) per 220.57(A).
 Both at 100% in the Article 220 load calc — the 125% of 625.41 is for
-OCPD/conductor sizing only. Neither is a demand factor.
+OCPD/conductor sizing only, which includes the service check (230.42(A)(1),
+see 220.87 above). Neither is a demand factor.
 ```
 PE-confirmed 2026-09-27; extended 2026-10-14 to the single-family Optional Method
 (220.82/220.83 bucket, 2023 floor included) and to all continuous loads — no ×1.25
@@ -373,6 +384,7 @@ Real mistakes made in this repo, each paired with the rule that prevents recurre
 | A new house's packet printed 220.82 while the calculator defaulted to Part III; switching the packet to Part III read template circuits stored without a load type ('O') as 220.53 appliances — range at 75% instead of Column C, A/C at 75% instead of 100% (#178) | A circuit-based calc that branches on load type infers a type from the description when it is 'O' (`dwellingLoadType`). Test circuit-based calcs with the template's own circuits, not only hand-typed fixtures. |
 | The Dwelling Load Calculator computed from appliance toggles and the packet from the panel's circuits; a templated house (circuits, no toggles) showed 10.2 kVA in the calculator and 30.9 kVA on E-101 (#184) | Pages reporting one quantity share the input as well as the function. Once the panel has circuits, every reader computes from them; the toggles only build the schedule. |
 | The Service Upgrade Wizard called `useCircuits` with a panel ID (it takes a project ID), so its panel-schedule load never loaded. The raw `load_watts` sum behind it (no demand factors, no √3, main-panel breakers only) would have entered 220.87 as "calculated" once the ID was fixed (#185) | A reader of a packet quantity calls the packet's function (`projectDemandSplit`), never a local copy. Before turning on a dead path, run it and compare its number with the packet's. |
+| The service check compared the Article 220 load straight with the service rating under the calculated method, so one charger counted 48 A when calculated and 60 A when measured (#192) | Two numbers: the Article 220 load (100%, E-101) and the service check (+25% of continuous loads per 230.42(A)(1), every method). A ruling about the load is not a ruling about the comparison; ask which one it covers. |
 | Docs updated with stale "Last Updated" dates; completed features left as "NEXT UP" | Every doc touch updates its date to today; every shipped feature flips its ROADMAP status in the same PR. |
 
 ---

@@ -10,6 +10,7 @@
 
 import { ResidentialAppliances, DwellingUnitTemplate } from '../../types';
 import { getEvseLoadVA, isEvseDescription, type NecEdition } from '../../data/nec/evse-load';
+import { CONTINUOUS_LOAD_ADDER, isContinuousServiceLoad } from '../../data/nec/continuous-load';
 import { getNextStandardBreakerSize } from '../../data/nec/standard-breakers';
 import { COOKING_APPLIANCE_TABLE_MIN_VA, getCookingDemandVA } from '../../data/nec/table-220-55';
 import { sizeConductor } from './conductorSizing';
@@ -134,6 +135,13 @@ export interface ResidentialLoadResult {
   // Service sizing
   serviceAmps: number;
   recommendedServiceSize: number;
+  /**
+   * The service check: Article 220 demand + 25% of the continuous loads
+   * (EVSE, signs, show windows) per 230.42(A)(1), in amps (PE ruling
+   * 2026-11-07, #192). Compare this, not `serviceAmps`, with an existing
+   * service. Single-family and 220.84 results; absent elsewhere.
+   */
+  serviceCheckAmps?: number;
 
   // Neutral conductor sizing (NEC 220.61)
   neutralLoadVA: number;
@@ -924,7 +932,23 @@ export function calculateSingleFamilyLoad(input: SingleFamilyInput): Residential
     breakdown,
     necReferences,
     warnings,
+    continuousVA: applianceContinuousVA(appliances, necEdition),
   });
+}
+
+/**
+ * Continuous loads among the appliance toggles and proposed loads, VA: the EV
+ * charger at its edition load, and proposed EV / sign / show-window loads
+ * (230.42(A)(1), PE ruling 2026-11-07, #192).
+ */
+function applianceContinuousVA(appliances: ResidentialAppliances, necEdition: NecEdition): number {
+  let va = appliances.evCharger?.enabled ? getEvseLoadVA(appliances.evCharger.kw * 1000, necEdition).loadVA : 0;
+  for (const other of appliances.otherAppliances ?? []) {
+    const isEv = other.category === 'EV' || isEvseDescription(other.description);
+    if (isEv) va += getEvseLoadVA(other.kw * 1000, necEdition).loadVA;
+    else if (isContinuousServiceLoad(other.description)) va += other.kw * 1000;
+  }
+  return va;
 }
 
 /**
@@ -939,6 +963,8 @@ function dwellingServiceResult(opts: {
   breakdown: LoadBreakdown[];
   necReferences: string[];
   warnings: string[];
+  /** Continuous loads (EVSE at edition load, signs, show windows), VA. */
+  continuousVA: number;
 }): ResidentialLoadResult {
   const { totalConnectedVA: totalConnected, totalDemandVA: totalDemand, neutralLoad, serviceVoltage, breakdown } = opts;
   const necReferences = [...opts.necReferences];
@@ -977,6 +1003,7 @@ function dwellingServiceResult(opts: {
     demandFactor: totalDemand / totalConnected,
     serviceAmps: Math.round(serviceAmps),
     recommendedServiceSize: recommendedSize,
+    serviceCheckAmps: Math.round((totalDemand + opts.continuousVA * CONTINUOUS_LOAD_ADDER) / serviceVoltage),
     neutralLoadVA: neutralLoad.neutralVA,
     neutralAmps: neutralLoad.neutralAmps,
     neutralReduction: neutralLoad.reductionPercent,
@@ -1086,6 +1113,9 @@ export function calculateMultiFamilyLoad(input: MultiFamilyInput): ResidentialLo
   // 240 V-only appliances (no neutral) — same set calculateNeutralLoad
   // excludes for single-family; used for the 220.61 neutral below (#143).
   let totalNonNeutralApplianceVA = 0;
+  // Units' EV chargers at their full edition load, for the 230.42(A)(1)
+  // service check (not the 220.84-factored share; PE ruling 2026-11-07, #192).
+  let unitsEvseVA = 0;
   for (const template of unitTemplates) {
     const app = template.appliances;
     let unitApplianceVA = 0;
@@ -1143,6 +1173,7 @@ export function calculateMultiFamilyLoad(input: MultiFamilyInput): ResidentialLo
     }
 
     totalApplianceVA += unitApplianceVA * template.unitCount;
+    unitsEvseVA += unitEvseVA * template.unitCount;
     const unitNonNeutralVA =
       (app.range?.enabled && app.range.type === 'electric' ? app.range.kw * 1000 : 0) +
       (app.dryer?.enabled && app.dryer.type === 'electric' ? Math.max(app.dryer.kw * 1000, 5000) : 0) +
@@ -1235,6 +1266,7 @@ export function calculateMultiFamilyLoad(input: MultiFamilyInput): ResidentialLo
     demandFactor: totalConnected > 0 ? finalDemand / totalConnected : 1,
     serviceAmps: Math.round(serviceAmps),
     recommendedServiceSize: recommendedSize,
+    serviceCheckAmps: Math.round((finalDemand + unitsEvseVA * CONTINUOUS_LOAD_ADDER) / serviceVoltage),
     neutralLoadVA: neutralLoad.neutralVA,
     neutralAmps: neutralLoad.neutralAmps,
     neutralReduction: neutralLoad.reductionPercent,
@@ -2213,6 +2245,11 @@ export function calculateSingleFamilyLoadFromCircuits(
     })),
     necReferences: summary.necReferences,
     warnings: summary.warnings,
+    continuousVA: opts.circuits
+      .filter(c => isContinuousServiceLoad(c.description))
+      .reduce((sum, c) => sum + (isEvseDescription(c.description)
+        ? getEvseLoadVA(c.load_watts ?? 0, opts.necEdition ?? '2020').loadVA
+        : c.load_watts ?? 0), 0),
   });
 }
 

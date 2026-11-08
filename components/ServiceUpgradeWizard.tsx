@@ -38,6 +38,9 @@ interface ServiceUpgradeWizardProps {
   projectId?: string;
 }
 
+/** A dwelling's service check in amps: demand + 25% of continuous loads (230.42(A)(1), #192). */
+const dwellingServiceCheckAmps = (r: ResidentialLoadResult): number => Math.round(r.serviceCheckAmps ?? r.serviceAmps);
+
 export const ServiceUpgradeWizard: React.FC<ServiceUpgradeWizardProps> = ({ projectId: propProjectId }) => {
   const { projectId: urlProjectId } = useParams();
   const projectId = propProjectId || urlProjectId;
@@ -138,7 +141,7 @@ export const ServiceUpgradeWizard: React.FC<ServiceUpgradeWizardProps> = ({ proj
     // 2. Method is CALCULATED (not utility bill or load study)
     // 3. Dwelling data is available
     if (dwellingLoadResult && dwellingLoadResult.serviceAmps && !useProjectData && existingLoadMethod === ExistingLoadDeterminationMethod.CALCULATED) {
-      setCurrentUsageAmps(Math.round(dwellingLoadResult.serviceAmps));
+      setCurrentUsageAmps(dwellingServiceCheckAmps(dwellingLoadResult));
       setUsingDwellingData(true);
     } else {
       // Clear dwelling data flag if we're not using it
@@ -190,7 +193,7 @@ export const ServiceUpgradeWizard: React.FC<ServiceUpgradeWizardProps> = ({ proj
 
   // Single-family: the dwelling result (#184); others: the schedule demand.
   const projectExistingAmps = isSingleFamilyDwelling
-    ? (dwellingLoadResult?.serviceAmps ? Math.round(dwellingLoadResult.serviceAmps) : null)
+    ? (dwellingLoadResult?.serviceAmps ? dwellingServiceCheckAmps(dwellingLoadResult) : null)
     : scheduleExistingAmps;
 
   useEffect(() => {
@@ -226,7 +229,7 @@ export const ServiceUpgradeWizard: React.FC<ServiceUpgradeWizardProps> = ({ proj
         existingLoadMethod === ExistingLoadDeterminationMethod.CALCULATED &&
         dwellingLoadResult &&
         dwellingLoadResult.serviceAmps) {
-      return Math.round(dwellingLoadResult.serviceAmps);
+      return dwellingServiceCheckAmps(dwellingLoadResult);
     }
 
     // Priority 1b: Project panel data, calculated method — the NEC 220
@@ -244,7 +247,7 @@ export const ServiceUpgradeWizard: React.FC<ServiceUpgradeWizardProps> = ({ proj
     if (existingLoadMethod === ExistingLoadDeterminationMethod.CALCULATED &&
         dwellingLoadResult &&
         dwellingLoadResult.serviceAmps) {
-      return Math.round(dwellingLoadResult.serviceAmps);
+      return dwellingServiceCheckAmps(dwellingLoadResult);
     }
 
     // Priority 3: For all other cases (UTILITY_BILL, LOAD_STUDY, MANUAL, or no dwelling data),
@@ -266,6 +269,9 @@ export const ServiceUpgradeWizard: React.FC<ServiceUpgradeWizardProps> = ({ proj
   } catch (err) {
     error = err instanceof Error ? err.message : 'Calculation error';
   }
+  const currentUtilizationPct = result && currentServiceAmps > 0
+    ? (result.existingAmps / currentServiceAmps) * 100
+    : 0;
 
   // Add load from template
   const addLoadFromTemplate = (templateName: string) => {
@@ -453,7 +459,7 @@ export const ServiceUpgradeWizard: React.FC<ServiceUpgradeWizardProps> = ({ proj
             <p className="text-xs text-green-700 mt-1">
               Service size and current load auto-populated from your project panel schedule.
               {scheduleExistingAmps !== null && (
-                <span> Current load: the NEC 220 demand of the existing circuits, the same as E-102.</span>
+                <span> Current load: the NEC 220 demand of the existing circuits plus 25% of their continuous loads (NEC 230.42(A)(1)), as E-102 checks it.</span>
               )}
             </p>
           </div>
@@ -686,8 +692,8 @@ export const ServiceUpgradeWizard: React.FC<ServiceUpgradeWizardProps> = ({ proj
                 <p className="text-xs text-gray-500 mt-1">
                   From proposed circuits: {scheduleNewAmps}A
                   {existingLoadMethod === ExistingLoadDeterminationMethod.CALCULATED
-                    ? ' (the demand increase, the same as E-102).'
-                    : ' (EVSE at 125%, clamped to the EVEMS setpoint where one is set; others at nameplate).'}
+                    ? ' (the demand increase plus 25% of its continuous loads per NEC 230.42(A)(1), the same as E-102).'
+                    : ' (EVSE, signs and show windows at 125%, EVSE clamped to the EVEMS setpoint where one is set; others at nameplate).'}
                   {proposedLoadAmps !== scheduleNewAmps && (
                     <button
                       type="button"
@@ -741,32 +747,33 @@ export const ServiceUpgradeWizard: React.FC<ServiceUpgradeWizardProps> = ({ proj
 
           {result && (
             <>
-              {/* Current Utilization Gauge */}
+              {/* Current Utilization Gauge — the existing load as the check
+                  takes it (× 1.25 unless calculated, NEC 220.87(2); #192) */}
               <div className="bg-white border border-gray-200 rounded-lg p-4">
                 <div className="flex items-center justify-between mb-2">
                   <span className="text-sm font-semibold text-gray-700">
                     Current Utilization
                   </span>
                   <span className={`text-lg font-bold ${
-                    (effectiveCurrentUsageAmps / currentServiceAmps * 100) > 90 ? 'text-red-700' :
-                    (effectiveCurrentUsageAmps / currentServiceAmps * 100) > 80 ? 'text-orange-700' :
+                    currentUtilizationPct > 90 ? 'text-red-700' :
+                    currentUtilizationPct > 80 ? 'text-orange-700' :
                     'text-green-700'
                   }`}>
-                    {Math.round((effectiveCurrentUsageAmps / currentServiceAmps * 100) * 10) / 10}%
+                    {Math.round(currentUtilizationPct * 10) / 10}%
                   </span>
                 </div>
                 <div className="w-full bg-gray-200 rounded-full h-3">
                   <div
                     className={`h-3 rounded-full transition-all ${
-                      (effectiveCurrentUsageAmps / currentServiceAmps * 100) > 90 ? 'bg-red-600' :
-                      (effectiveCurrentUsageAmps / currentServiceAmps * 100) > 80 ? 'bg-orange-500' :
+                      currentUtilizationPct > 90 ? 'bg-red-600' :
+                      currentUtilizationPct > 80 ? 'bg-orange-500' :
                       'bg-green-500'
                     }`}
-                    style={{ width: `${Math.min((effectiveCurrentUsageAmps / currentServiceAmps * 100), 100)}%` }}
+                    style={{ width: `${Math.min(currentUtilizationPct, 100)}%` }}
                   />
                 </div>
                 <div className="grid grid-cols-2 gap-2 mt-2 text-xs text-gray-600">
-                  <div>Current: {effectiveCurrentUsageAmps}A</div>
+                  <div>Current: {result.existingAmps}A{result.existingAmps !== effectiveCurrentUsageAmps ? ` (${effectiveCurrentUsageAmps}A × 1.25)` : ''}</div>
                   <div>Capacity: {currentServiceAmps}A</div>
                 </div>
               </div>

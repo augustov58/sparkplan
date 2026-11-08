@@ -1108,9 +1108,12 @@ describe('Multi-Family EV (per-EVSE load / 625.42)', () => {
       expect(calculateMultiFamilyEV({ ...input, necEdition: '2020' }).evLoad.totalConnectedVA).toBe(9984 * 5);
     });
 
-    it('should use demand factor of 1.0 for EV loads (no NEC demand factor for EVSE)', () => {
+    it('EV load in the service check at 125% (230.42(A)(1)), never a demand factor below 100%', () => {
+      // PE ruling 2026-11-07 (#192): continuous loads at 125% in the service
+      // check under every method; the NEC has no EVSE demand factor.
       const result = calculateMultiFamilyEV(baseInput);
-      expect(result.evLoad.demandFactor).toBe(1.0);
+      expect(result.evLoad.demandFactor).toBe(1.25);
+      expect(result.compliance.necArticles).toContain('NEC 230.42(A)(1)');
     });
 
     it('NEC 2020 articles cite 220.14(A) + 625.41 and never 220.57', () => {
@@ -1165,7 +1168,7 @@ describe('Multi-Family EV (per-EVSE load / 625.42)', () => {
     // PE ruling 2026-10-14: on the measured (NEC 220.87) path the NEW EV load
     // enters the 220.87(2) comparison at 125% — EV charging is continuous per
     // NEC 625.42, sized per 625.41. The calculated (220.84) path stays at 100%.
-    describe('220.87 new EV load at 125% (measured path only)', () => {
+    describe('new EV load at 125% in the service check (every method)', () => {
       const measured: MultiFamilyEVInput = {
         ...baseInput,
         necEdition: '2020',
@@ -1180,10 +1183,11 @@ describe('Multi-Family EV (per-EVSE load / 625.42)', () => {
         expect(result.evLoad.demandFactor).toBe(1.25);
       });
 
-      it('calculated (220.84): EV demand stays at 100%', () => {
+      it('calculated (220.84): EV demand at 125% too (230.42(A)(1), PE ruling 2026-11-07, #192)', () => {
         const result = calculateMultiFamilyEV({ ...baseInput, necEdition: '2020' });
-        expect(result.evLoad.demandVA).toBe(6656 * 10);
-        expect(result.evLoad.demandFactor).toBe(1);
+        expect(result.evLoad.totalConnectedVA).toBe(6656 * 10);
+        expect(result.evLoad.demandVA).toBe(6656 * 10 * 1.25);
+        expect(result.evLoad.demandFactor).toBe(1.25);
       });
 
       it('measured with EVEMS: setpoint × 1.25 and the setpoint sized to still fit (#131)', () => {
@@ -1195,12 +1199,13 @@ describe('Multi-Family EV (per-EVSE load / 625.42)', () => {
         expect(result.serviceAnalysis.totalDemandVA).toBeLessThanOrEqual(result.serviceAnalysis.existingCapacityVA);
       });
 
-      it('direct-connection charger count uses 125% per-EVSE amps on the measured path', () => {
-        const result = calculateMultiFamilyEV(measured);
+      it('direct-connection charger count uses 125% per-EVSE amps under both methods', () => {
         // 6,656 VA / (208 V × √3) = 18.5 A; × 1.25 = 23.1 A
-        const note = result.scenarios.noEVEMS.notes.find(n => n.startsWith('Service-equivalent'));
-        expect(note).toContain('23.1A per EVSE');
-        expect(note).toContain('×1.25 per 220.87(2)');
+        for (const input of [measured, { ...baseInput, necEdition: '2020' as const }]) {
+          const note = calculateMultiFamilyEV(input).scenarios.noEVEMS.notes.find(n => n.startsWith('Service-equivalent'));
+          expect(note).toContain('23.1A per EVSE');
+          expect(note).toContain('×1.25 per NEC 230.42(A)(1)');
+        }
       });
     });
 

@@ -10,7 +10,7 @@ import { AttachmentUploadCard } from './AttachmentUploadCard';
 import { useProjectAttachments, downloadAttachmentBytes, type ArtifactType, type CoverMode } from '../hooks/useProjectAttachments';
 import { summarizeCalculationRefs, type NEC22087NarrativeData, type NEC22087Method } from '../services/pdfExport/PermitPacketDocuments';
 import { buildSingleFamilyDwellingContext, deriveNarrativeOccupancy } from '../lib/projectSettings';
-import { mfEvCalculationFromSettings, projectDemandSplit } from '../lib/storedCalcs';
+import { EMPTY_DEMAND_SPLIT, mfEvCalculationFromSettings, projectDemandSplit, type ProjectDemandSplit } from '../lib/storedCalcs';
 import {
   BAND_CALCULATIONS,
   DEFAULT_SECTIONS,
@@ -308,10 +308,10 @@ export const PermitPacketGenerator: React.FC<PermitPacketGeneratorProps> = ({ pr
     () => mfEvCalculationFromSettings(currentProject?.settings?.residential, projectEdition),
     [currentProject?.settings?.residential, projectEdition],
   );
-  const aggregatedDemandSplit = React.useMemo<{ existingKVA: number; proposedKVA: number; necReferences: string[] }>(
+  const aggregatedDemandSplit = React.useMemo<ProjectDemandSplit>(
     () => currentProject
       ? projectDemandSplit(currentProject, panels, circuits, transformers, projectEdition)
-      : { existingKVA: 0, proposedKVA: 0, necReferences: [] },
+      : EMPTY_DEMAND_SPLIT,
     [currentProject, panels, circuits, transformers, projectEdition],
   );
 
@@ -1104,6 +1104,10 @@ export const PermitPacketGenerator: React.FC<PermitPacketGeneratorProps> = ({ pr
           dateRangeTo: nec22087DateTo,
           maxDemandKVA: maxDemandFinal,
           proposedNewLoadKVA: proposedFinal,
+          // 230.42(A)(1): 25% of the continuous loads (PE ruling 2026-11-07, #192).
+          continuousAdderKVA: useCalculatedSource
+            ? aggregatedDemandSplit.existingAdderKVA + aggregatedDemandSplit.proposedAdderKVA
+            : undefined,
           serviceCapacityAmps,
           serviceVoltage: currentProject.serviceVoltage,
           servicePhase: currentProject.servicePhase as 1 | 3,
@@ -1944,10 +1948,12 @@ export const PermitPacketGenerator: React.FC<PermitPacketGeneratorProps> = ({ pr
                       {isCalculatedMode ? (
                         <p className="text-xs text-gray-500 mt-1">
                           NEC-demanded proposed load (EVEMS-clamped where applicable per NEC 625.42).
+                          {aggregatedDemandSplit.existingAdderKVA + aggregatedDemandSplit.proposedAdderKVA > 0
+                            && ` The service check adds ${(aggregatedDemandSplit.existingAdderKVA + aggregatedDemandSplit.proposedAdderKVA).toFixed(2)} kVA: 25% of the continuous loads (EVSE, signs, show windows) per NEC 230.42(A)(1).`}
                         </p>
                       ) : (
                         <p className="text-xs text-gray-500 mt-1">
-                          Enter continuous loads at 125% — EV charging is continuous per NEC 625.42 (sized per 625.41).
+                          Enter continuous loads at 125% (NEC 230.42(A)(1)) — EV charging is continuous per NEC 625.42; signs and show windows too.
                           {suggestedProposedKVA > 0 && (
                             <> From proposed circuits: {suggestedProposedKVA.toFixed(2)} kVA (EVSE at 125% — clamped to the EVEMS setpoint where one is set — others at nameplate).</>
                           )}

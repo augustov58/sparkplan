@@ -139,7 +139,8 @@ describe('calculateMultiFamilyLoad (220.84 total)', () => {
 });
 
 describe('EVEMS notes show what a small charger can draw (NEC 2023)', () => {
-  // 400 A service → 230 A setpoint shared by 10 × 16 A chargers (23 A share).
+  // 400 A service → 184 A setpoint (230 A ÷ 1.25: the setpoint takes the
+  // 230.42(A)(1) 125%, #192) shared by 10 × 16 A chargers (18.4 A share).
   const run = (necEdition: '2020' | '2023') => calculateMultiFamilyEV({
     dwellingUnits: 12, avgUnitSqFt: 850, voltage: 240, phase: 1, existingServiceAmps: 400,
     evChargers: { count: 10, level: 'Level2', ampsPerCharger: 16 }, necEdition, useEVEMS: true,
@@ -148,13 +149,13 @@ describe('EVEMS notes show what a small charger can draw (NEC 2023)', () => {
   it('load stays the setpoint; notes cap the share at the 3.84 kW nameplate', () => {
     const r = run('2023');
     const e = r.scenarios.withEVEMS;
-    expect(e.notes).toContain('EVEMS setpoint: 230A (service demand load per NEC 625.42)');
+    expect(e.notes).toContain('EVEMS setpoint: 184A (service demand load per NEC 625.42)');
     expect(e.notes).toContain('10 chargers at full power: 3.8 kW each');
-    expect(e.notes.some(n => n.includes('~23A each'))).toBe(false);
+    expect(e.notes.some(n => n.includes('~18A each'))).toBe(false);
     expect(e.chargingPowerPerCharger_kW).toBeCloseTo(3.84, 6);
-    // Load: the setpoint (~230 A × 240 V ≈ 55.2 kVA), below N × 7,200 —
-    // unchanged by the display cap.
-    expect(r.evLoad.demandVA).toBeCloseTo(e.powerPerCharger_kW! * 10 * 1000, 0);
+    // Load: the setpoint × 1.25 (~184 A × 240 V × 1.25 ≈ 55.2 kVA), below
+    // N × 7,200 — unchanged by the display cap.
+    expect(r.evLoad.demandVA).toBeCloseTo(e.powerPerCharger_kW! * 10 * 1000 * 1.25, 0);
     expect(r.evLoad.demandVA).toBeGreaterThan(55_000);
     expect(r.evLoad.demandVA).toBeLessThan(72_000);
   });

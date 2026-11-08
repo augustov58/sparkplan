@@ -44,9 +44,10 @@ describe('#131 EVEMS setpoint × 1.25 in the 220.87(2) comparison', () => {
     expect(r.scenarios.withEVEMS.notes.some(n => n.includes('EVEMS setpoint: 126A'))).toBe(true);
   });
 
-  it('calculated (220.84) path keeps the setpoint at 100%', () => {
+  it('calculated (220.84) path: the setpoint × 1.25 too (230.42(A)(1), PE ruling 2026-11-07, #192)', () => {
     const r = calculateMultiFamilyEV({ ...stPete, existingLoadMethod: 'calculated', measuredPeakDemandKW: undefined });
-    expect(r.evLoad.demandFactor).toBe(1);
+    expect(r.evLoad.demandFactor).toBe(1.25);
+    expect(r.serviceAnalysis.totalDemandVA).toBeLessThanOrEqual(r.serviceAnalysis.existingCapacityVA);
   });
 });
 
