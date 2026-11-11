@@ -15,6 +15,7 @@
 | `.claude/skills/nec-calc-service/` | Any change to `services/calculations/` or `data/nec/` |
 | `.claude/skills/permit-packet/` | Any change to `services/pdfExport/`, `data/ahj/`, or "the packet PDF looks wrong" |
 | `.claude/skills/packet-verification/` | Before merging any PR that touches PDF output or user-facing flows |
+| `.claude/skills/issue-verification/` | Filing an issue (write its Acceptance (UI) section), starting one, and before its PR — every issue |
 | `.claude/skills/extract-approach/` | AFTER solving any non-trivial problem (see Learning Law below) |
 
 Solved-problem write-ups live in `docs/solutions/` — search there before re-debugging a familiar symptom.
@@ -43,6 +44,7 @@ Before marking any task complete, run these checks in order:
 5. **If you modified a calculation service** — Verify the test file covers your changes. Add tests for new code paths.
 6. **If you added a new route or component** — Verify it's included in the build output (check for the chunk in build log).
 7. **If you touched PDF output or a calc that feeds it** — Run the visual pass in `.claude/skills/packet-verification/`. Unit tests do not catch layout or narrative regressions.
+8. **Every issue: UI acceptance, agent-run** — `.claude/skills/issue-verification/`. Expected values are hand-calculated in the issue *before* the fix; drive the real app in the QA account (never the owner's: the local app writes to prod), get an independent verifier pass, leave `tests/e2e/issues/issue-<N>.spec.ts`, and put the `## UI verification` table in the PR (a hook blocks PR creation without it). Augusto does not review behavior by hand (2026-11-08); he still rules on NEC and approves push/merge.
 
 **Verify incrementally**: Run build/tests after each significant change, not just at the end. Runtime bugs (DB constraint violations, null crashes, type errors) are cheaper to catch in the step that introduced them.
 

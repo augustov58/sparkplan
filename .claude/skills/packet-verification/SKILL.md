@@ -10,8 +10,10 @@ Unit tests validate math; they do not catch layout regressions, wrong narrative 
 ## Setup
 
 1. `npm run dev` → app at `localhost:3000` (HashRouter — routes look like `/#/projects/...`).
-2. Log in as `augustovalbuena@gmail.com` via the Playwright MCP tools. **NEVER store the password to disk** (per Augusto's own security rules). Prefer session-token injection or ask for a per-session password.
-3. Use the named test projects — `new 4-plex` is the standard multifamily fixture. Don't create throwaway projects when a named one covers the scenario.
+2. Drive the app as the **QA account** (`playwright-qa` MCP server / `E2E_QA_EMAIL`), never the owner's: the local app writes to prod Supabase. Account rules, sign-in and the email check: `.claude/skills/issue-verification/`. **NEVER store the password to disk.**
+3. Use the named QA projects in `tests/e2e/fixtures.md`. Don't create throwaway projects when a named one covers the scenario.
+
+This pass is step 4 of the issue-verification loop when the change reaches a packet page.
 
 ## Verification loop
 
