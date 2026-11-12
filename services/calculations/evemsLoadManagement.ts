@@ -10,7 +10,19 @@
  * - System must monitor total load and adjust EV charging accordingly
  * - EVEMS must prevent service overload
  * - Individual EV circuits still sized at 125% per NEC 625.40
+ *
+ * EV load (#194): each charger at getEvseLoadVA (100% — 220.14(A) in NEC 2020,
+ * 220.57(A) in NEC 2023); the NEC has no EVSE demand factor, so the only
+ * reduction is an EVEMS setpoint (625.42). The service check adds 25% of the
+ * EV load (230.42(A)(1), PE ruling 2026-11-07); with EVEMS the setpoint takes
+ * it too, so the setpoint is sized as available × 0.90 ÷ 1.25 (#131).
  */
+
+import { getEvseLoadVA, EVSE_CONTINUOUS_FACTOR, type NecEdition } from '../../data/nec/evse-load';
+import { CONTINUOUS_LOAD_ADDER, CONTINUOUS_LOAD_REFERENCE } from '../../data/nec/continuous-load';
+
+/** Share of the available capacity an EVEMS setpoint may use (safety margin). */
+const EVEMS_UTILIZATION_FACTOR = 0.90;
 
 /**
  * Input parameters for EVEMS load management calculation
@@ -45,6 +57,9 @@ export interface EVEMSInput {
   
   /** EVEMS priority mode (if applicable) */
   evemsMode?: 'first_come_first_served' | 'priority_based' | 'round_robin';
+
+  /** Project NEC edition — sets the per-EVSE load (getEvseLoadVA) */
+  necEdition: NecEdition;
 }
 
 /**
@@ -63,10 +78,13 @@ export interface EVEMSResult {
   /** Total EV connected load (kVA) */
   totalEVLoad_kVA: number;
   
-  /** EV demand load with/without EVEMS (kVA) */
+  /** EV load in the Article 220 calc: 100%, or the EVEMS setpoint (kVA) */
   evDemandLoad_kVA: number;
   
-  /** Total system demand (existing + EV) */
+  /** 25% of the EV load, added in the service check per 230.42(A)(1) (kVA) */
+  continuousAdder_kVA: number;
+  
+  /** Service check: existing + EV load + continuous adder (kVA) */
   totalSystemDemand_kVA: number;
   
   /** Service utilization percentage */
@@ -99,6 +117,9 @@ export interface EVEMSResult {
     utilizationPercent: number;
   }[];
   
+  /** NEC sections applied */
+  necReferences: string[];
+  
   /** NEC compliance */
   compliance: {
     necArticle: string;
@@ -123,52 +144,48 @@ export function calculateEVEMSLoadManagement(input: EVEMSInput): EVEMSResult {
     ? (input.serviceVoltage * Math.sqrt(3) * input.serviceAmps) / 1000
     : (input.serviceVoltage * input.serviceAmps) / 1000;
   
-  // Calculate total EV connected load
-  let totalEVLoad_kVA = 0;
-  input.evChargers.forEach(charger => {
-    const singleChargerVA = charger.phase === 1
-      ? charger.voltage * charger.chargerAmps
-      : Math.sqrt(3) * charger.voltage * charger.chargerAmps;
-    const singleChargerKVA = singleChargerVA / 1000;
-    totalEVLoad_kVA += singleChargerKVA * charger.quantity;
-  });
-  
-  // Calculate EV demand load
-  // Without EVEMS: All chargers at full capacity (with diversity)
-  // With EVEMS: Can reduce to available capacity
-  let evDemandLoad_kVA: number;
-  
-  if (input.useEVEMS) {
-    // EVEMS allows charging up to available capacity
-    // System intelligently schedules charging based on available capacity
-    const availableCapacity = serviceCapacity_kVA - input.existingDemand_kVA;
-    
-    // EVEMS can utilize up to 100% of available capacity (with some safety margin)
-    const evemsUtilizationFactor = 0.90; // 90% to leave safety margin
-    evDemandLoad_kVA = Math.min(totalEVLoad_kVA, availableCapacity * evemsUtilizationFactor);
-    
-    notes.push(
-      `EVEMS allows ${evDemandLoad_kVA.toFixed(2)} kVA of EV charging ` +
-      `(limited by available capacity of ${availableCapacity.toFixed(2)} kVA)`
-    );
-  } else {
-    // Without EVEMS: Apply standard demand factors per NEC 625.44
-    const totalChargers = input.evChargers.reduce((sum, c) => sum + c.quantity, 0);
-    const simultaneousUse = 100; // Assume 100% without EVEMS (conservative)
-    const demandFactor = calculateEVDemandFactor(totalChargers, simultaneousUse);
-    evDemandLoad_kVA = totalEVLoad_kVA * demandFactor;
-    
-    notes.push(
-      `Without EVEMS: Demand factor of ${(demandFactor * 100).toFixed(0)}% applied ` +
-      `for ${totalChargers} chargers per NEC 625.44`
-    );
-  }
-  
   // Calculate available capacity
   const availableCapacity_kVA = serviceCapacity_kVA - input.existingDemand_kVA;
   
-  // Total system demand
-  const totalSystemDemand_kVA = input.existingDemand_kVA + evDemandLoad_kVA;
+  // Total EV load: every charger at getEvseLoadVA (100%, by edition)
+  const necReferences = new Set<string>();
+  let totalEVLoad_kVA = 0;
+  input.evChargers.forEach(charger => {
+    const evse = chargerLoad(charger, input.necEdition);
+    necReferences.add(evse.necReference);
+    totalEVLoad_kVA += (evse.loadVA / 1000) * charger.quantity;
+  });
+  necReferences.add('NEC 625.42');
+  necReferences.add(CONTINUOUS_LOAD_REFERENCE);
+  
+  // The largest EVEMS setpoint whose 125% fits 90% of the available capacity
+  const fittingSetpoint_kVA = Math.max(0, (availableCapacity_kVA * EVEMS_UTILIZATION_FACTOR) / EVSE_CONTINUOUS_FACTOR);
+  
+  // EV load: 100% without EVEMS (no NEC demand factor for EVSE); the setpoint with it
+  let evDemandLoad_kVA: number;
+  
+  if (input.useEVEMS) {
+    evDemandLoad_kVA = Math.min(totalEVLoad_kVA, fittingSetpoint_kVA);
+    
+    notes.push(
+      `EVEMS setpoint ${evDemandLoad_kVA.toFixed(2)} kVA: at 125% it fits 90% of the ` +
+      `available capacity of ${availableCapacity_kVA.toFixed(2)} kVA (NEC 625.42)`
+    );
+  } else {
+    evDemandLoad_kVA = totalEVLoad_kVA;
+    const totalChargers = input.evChargers.reduce((sum, c) => sum + c.quantity, 0);
+    notes.push(
+      `Without EVEMS: ${totalChargers} charger${totalChargers === 1 ? '' : 's'} at 100% = ${totalEVLoad_kVA.toFixed(2)} kVA ` +
+      `(${[...necReferences][0]}; the NEC has no demand factor for EVSE)`
+    );
+  }
+  
+  // Service check: 25% of the EV load on top (230.42(A)(1))
+  const continuousAdder_kVA = evDemandLoad_kVA * CONTINUOUS_LOAD_ADDER;
+  notes.push(`Service check adds 25% of the EV load: ${continuousAdder_kVA.toFixed(2)} kVA (${CONTINUOUS_LOAD_REFERENCE})`);
+  
+  // Total system demand (service check)
+  const totalSystemDemand_kVA = input.existingDemand_kVA + evDemandLoad_kVA + continuousAdder_kVA;
   
   // Service utilization
   const serviceUtilizationPercent = (totalSystemDemand_kVA / serviceCapacity_kVA) * 100;
@@ -180,17 +197,19 @@ export function calculateEVEMSLoadManagement(input: EVEMSInput): EVEMSResult {
   const maxChargersWithoutEVEMS = calculateMaxChargers(
     input.evChargers,
     availableCapacity_kVA,
-    false
+    false,
+    input.necEdition
   );
   
   const maxChargersWithEVEMS = calculateMaxChargers(
     input.evChargers,
     availableCapacity_kVA,
-    true
+    true,
+    input.necEdition
   );
   
-  // EVEMS recommendations
-  const evemsBenefit_kVA = (totalEVLoad_kVA * 0.9) - evDemandLoad_kVA; // Approximate benefit
+  // EVEMS recommendations: service-check load saved by a setpoint that fits
+  const evemsBenefit_kVA = Math.max(0, totalEVLoad_kVA - fittingSetpoint_kVA) * EVSE_CONTINUOUS_FACTOR;
   const evemsRequired = totalSystemDemand_kVA > serviceCapacity_kVA && !input.useEVEMS;
   
   let schedulingStrategy = '';
@@ -262,6 +281,7 @@ export function calculateEVEMSLoadManagement(input: EVEMSInput): EVEMSResult {
     availableCapacity_kVA: Math.round(availableCapacity_kVA * 100) / 100,
     totalEVLoad_kVA: Math.round(totalEVLoad_kVA * 100) / 100,
     evDemandLoad_kVA: Math.round(evDemandLoad_kVA * 100) / 100,
+    continuousAdder_kVA: Math.round(continuousAdder_kVA * 100) / 100,
     totalSystemDemand_kVA: Math.round(totalSystemDemand_kVA * 100) / 100,
     serviceUtilizationPercent: Math.round(serviceUtilizationPercent * 10) / 10,
     serviceUpgradeNeeded,
@@ -275,8 +295,9 @@ export function calculateEVEMSLoadManagement(input: EVEMSInput): EVEMSResult {
       notes,
     },
     loadSchedule,
+    necReferences: [...necReferences],
     compliance: {
-      necArticle: 'NEC 625.42',
+      necArticle: [...necReferences].join(', '),
       compliant,
       message,
       warnings,
@@ -285,23 +306,16 @@ export function calculateEVEMSLoadManagement(input: EVEMSInput): EVEMSResult {
 }
 
 /**
- * Calculate demand factor for multiple EV chargers
- * Per NEC 625.44
+ * Per-charger EV load: nameplate VA through getEvseLoadVA (edition-aware, 100%)
  */
-function calculateEVDemandFactor(numChargers: number, simultaneousUse: number): number {
-  const baseFactor = simultaneousUse / 100;
-  
-  if (numChargers <= 1) {
-    return 1.0;
-  } else if (numChargers <= 3) {
-    return Math.min(1.0, baseFactor * 1.1);
-  } else if (numChargers <= 10) {
-    return Math.min(1.0, baseFactor * 0.95);
-  } else if (numChargers <= 25) {
-    return Math.min(1.0, baseFactor * 0.85);
-  } else {
-    return Math.min(1.0, baseFactor * 0.75);
-  }
+function chargerLoad(
+  charger: { voltage: number; phase: 1 | 3; chargerAmps: number },
+  edition: NecEdition
+) {
+  const nameplateVA = charger.phase === 1
+    ? charger.voltage * charger.chargerAmps
+    : Math.sqrt(3) * charger.voltage * charger.chargerAmps;
+  return getEvseLoadVA(nameplateVA, edition);
 }
 
 /**
@@ -310,25 +324,22 @@ function calculateEVDemandFactor(numChargers: number, simultaneousUse: number): 
 function calculateMaxChargers(
   chargerSpecs: Array<{ voltage: number; phase: 1 | 3; chargerAmps: number; quantity: number }>,
   availableCapacity_kVA: number,
-  withEVEMS: boolean
+  withEVEMS: boolean,
+  edition: NecEdition
 ): number {
   if (chargerSpecs.length === 0) return 0;
 
   // Use the first charger spec as reference (simplified)
   const refCharger = chargerSpecs[0];
   if (!refCharger) return 0;
-  const singleChargerVA = refCharger.phase === 1
-    ? refCharger.voltage * refCharger.chargerAmps
-    : Math.sqrt(3) * refCharger.voltage * refCharger.chargerAmps;
-  const singleChargerKVA = singleChargerVA / 1000;
+  const singleChargerKVA = chargerLoad(refCharger, edition).loadVA / 1000;
   
   if (withEVEMS) {
-    // With EVEMS: Can use up to 90% of available capacity
-    return Math.floor((availableCapacity_kVA * 0.90) / singleChargerKVA);
+    // With EVEMS: the setpoint at 125% fits 90% of available capacity
+    return Math.floor((availableCapacity_kVA * EVEMS_UTILIZATION_FACTOR) / EVSE_CONTINUOUS_FACTOR / singleChargerKVA);
   } else {
-    // Without EVEMS: Apply demand factor (assume 85% for multiple chargers)
-    const demandFactor = 0.85;
-    return Math.floor((availableCapacity_kVA / singleChargerKVA) / demandFactor);
+    // Without EVEMS: every charger at 100%, plus 25% in the service check
+    return Math.floor(availableCapacity_kVA / (singleChargerKVA * EVSE_CONTINUOUS_FACTOR));
   }
 }
 

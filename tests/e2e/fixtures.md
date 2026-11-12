@@ -7,8 +7,8 @@ delete these freely; never point a spec at the owner's account.
 Add a row when a scenario needs a project none of these covers. No row IDs or
 stored settings values here (public repo).
 
-Last updated: 2026-11-08
+Last updated: 2026-11-11
 
 | Project name | Scenario | Key setup |
 |---|---|---|
-| _(seeded when the QA account exists)_ | | |
+| QA EVEMS tool (NEC 2023) | EVEMS Load Management tool (#194) | Blank residential project, NEC Edition = 2023 Edition; the tool keeps its own defaults (200 A / 240 V / 24 kVA demand) |

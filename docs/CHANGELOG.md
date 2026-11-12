@@ -4,6 +4,21 @@ All notable changes to SparkPlan.
 
 ---
 
+## 2026-11-11: The EVEMS Load Management tool takes EV load at 100% (#194)
+
+- **No demand factor for EV chargers.** Without EVEMS, the tool took 4 to 10 chargers at 95%, 11 to 25 at 85% and more than 25 at 75%, citing NEC 625.44. The NEC has no demand factor for EV chargers, and 625.44 covers equipment connection. Each charger now counts at 100%:
+  - NEC 2020: nameplate, per 220.14(A).
+  - NEC 2023: the 7,200 VA minimum of 220.57(A), using the project's edition.
+  - **Example:** four 32 A chargers on 240 V count 30.72 kVA, not 29.2 kVA.
+- **The service check adds 25% of the EV load** (230.42(A)(1), PE ruling 2026-11-07), shown on its own "Continuous +25%" line.
+  - The same four chargers on a 200 A / 240 V service with a 24 kVA existing load total 62.4 kVA. That's 130% of the service, so the tool recommends a 400 A service. It used to show 53.2 kVA (110.8%) and recommend 300 A.
+- **With EVEMS,** the setpoint is sized so that 125% of it fits 90% of the available capacity, as on E-402. On the same service that is 17.28 kVA. The total is unchanged at 45.6 kVA (95%).
+- **Maximum chargers without EVEMS** used to divide by 0.85, which raised the count. It now counts each charger at 125%: 2 chargers on that service instead of 3.
+- **"EVEMS can reduce required capacity by up to …"** was negative for 4 to 10 chargers (−1.5 kVA). It now shows the service-check load an EVEMS sized to fit would save: 16.8 kVA in the example.
+- A Level 1 charger under NEC 2023 now counts 7.2 kVA, not 1.4 kVA.
+
+---
+
 ## 2026-11-07: The service check takes continuous loads at 125% under every method (#192)
 
 - **The rule (PE ruling 2026-11-07).** Whether a service is sufficient is a question about its conductors and main breaker. Under NEC 230.42(A)(1), service conductors carry the noncontinuous loads plus 125% of the continuous loads. The check is now the Article 220 load plus 25% of the continuous loads, under every 220.87 method:

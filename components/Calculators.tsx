@@ -297,7 +297,7 @@ export const Calculators: React.FC<CalculatorsProps> = ({ projectId }) => {
           )}
           {activeTab === 'evems' && (
             <FeatureGate feature="evems-calculator">
-              <EVEMSLoadManagement />
+              <EVEMSLoadManagement project={project} />
             </FeatureGate>
           )}
           {activeTab === 'service-upgrade' && (

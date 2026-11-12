@@ -5,11 +5,18 @@
 
 import React, { useState } from 'react';
 import { Zap, Plus, Trash2, AlertTriangle, CheckCircle, Info, TrendingUp } from 'lucide-react';
+import type { Project } from '../types';
+import { useProjectNecEdition } from '../hooks/useProjectNecEdition';
 import { calculateEVEMSLoadManagement, type EVEMSInput, type EVEMSResult } from '../services/calculations/evemsLoadManagement';
 import { EV_CHARGER_SPECS, type EVChargerLevel } from '../services/calculations/evCharging';
 import { EVEMSDiagram } from './EVEMSDiagram';
 
-export const EVEMSLoadManagement: React.FC = () => {
+interface EVEMSLoadManagementProps {
+  project?: Project;
+}
+
+export const EVEMSLoadManagement: React.FC<EVEMSLoadManagementProps> = ({ project }) => {
+  const necEdition = useProjectNecEdition(project);
   const [serviceAmps, setServiceAmps] = useState(200);
   const [serviceVoltage, setServiceVoltage] = useState(240);
   const [servicePhase, setServicePhase] = useState<1 | 3>(1);
@@ -49,6 +56,7 @@ export const EVEMSLoadManagement: React.FC = () => {
       })),
       useEVEMS,
       evemsMode,
+      necEdition,
     });
   } catch (err) {
     error = err instanceof Error ? err.message : 'Calculation error';
@@ -381,9 +389,10 @@ export const EVEMSLoadManagement: React.FC = () => {
                     style={{ width: `${Math.min(result.serviceUtilizationPercent, 100)}%` }}
                   />
                 </div>
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 mt-3 text-xs text-gray-600">
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mt-3 text-xs text-gray-600">
                   <div>Existing: {result.existingDemand_kVA.toFixed(1)} kVA</div>
-                  <div>EV Load: {result.evDemandLoad_kVA.toFixed(1)} kVA</div>
+                  <div>EV Load{useEVEMS ? ' (setpoint)' : ''}: {result.evDemandLoad_kVA.toFixed(1)} kVA</div>
+                  <div>Continuous +25%: {result.continuousAdder_kVA.toFixed(1)} kVA</div>
                   <div>Total: {result.totalSystemDemand_kVA.toFixed(1)} kVA</div>
                 </div>
               </div>
