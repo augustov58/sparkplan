@@ -11,4 +11,4 @@ Last updated: 2026-11-13
 
 | Project name | Scenario | Key setup |
 |---|---|---|
-| QA EVEMS tool (NEC 2023) | EVEMS Load Management tool (#194); EV Charging calculator (#198) | Blank residential project, NEC Edition = 2023 Edition; the tool keeps its own defaults (200 A / 240 V / 24 kVA demand) |
+| QA EVEMS tool (NEC 2023) | EVEMS Load Management tool (#194); EV Charging calculator (#198); EVEMS load schedule (#199) | Blank residential project, NEC Edition = 2023 Edition; the tool keeps its own defaults (200 A / 240 V / 24 kVA demand) |

@@ -113,6 +113,8 @@ export interface EVEMSResult {
     timeSlot: string;
     availableCapacity_kVA: number;
     evCharging_kVA: number;
+    /** 25% of the slot's EV charging (230.42(A)(1)) */
+    continuousAdder_kVA: number;
     otherLoads_kVA: number;
     utilizationPercent: number;
   }[];
@@ -232,8 +234,8 @@ export function calculateEVEMSLoadManagement(input: EVEMSInput): EVEMSResult {
   // Generate load schedule (simplified - shows peak and off-peak scenarios)
   const loadSchedule = input.useEVEMS ? generateLoadSchedule(
     input.existingDemand_kVA,
-    availableCapacity_kVA,
     totalEVLoad_kVA,
+    evDemandLoad_kVA,
     serviceCapacity_kVA
   ) : undefined;
   
@@ -344,44 +346,40 @@ function calculateMaxChargers(
 }
 
 /**
- * Generate simplified load schedule
+ * Illustrative load schedule by time of day (#199, owner ruling 2026-11-13).
+ * The time-of-day shares are an illustration, not NEC math, but every slot
+ * obeys the result above it:
+ * - other loads never exceed the existing demand entered (peak 100%, off-peak 60%);
+ * - EV charging = min(share of the full EV load, the EVEMS setpoint);
+ * - the 25% service-check adder (230.42(A)(1)) is in each slot's total;
+ * - available = service − total, so the slot's numbers agree with each other.
  */
+const LOAD_SCHEDULE_SLOTS = [
+  { timeSlot: 'Peak Hours (6PM-10PM)', otherShare: 1.0, evShare: 0.5 },
+  { timeSlot: 'Off-Peak Hours (10PM-6AM)', otherShare: 0.6, evShare: 0.9 },
+  { timeSlot: 'Daytime Hours (6AM-6PM)', otherShare: 1.0, evShare: 0.7 },
+];
+
 function generateLoadSchedule(
   existingDemand_kVA: number,
-  availableCapacity_kVA: number,
   totalEVLoad_kVA: number,
+  setpoint_kVA: number,
   serviceCapacity_kVA: number
-): Array<{
-  timeSlot: string;
-  availableCapacity_kVA: number;
-  evCharging_kVA: number;
-  otherLoads_kVA: number;
-  utilizationPercent: number;
-}> {
-  // Simplified schedule showing peak and off-peak scenarios
-  return [
-    {
-      timeSlot: 'Peak Hours (6PM-10PM)',
-      availableCapacity_kVA: availableCapacity_kVA * 0.7, // Less available during peak
-      evCharging_kVA: Math.min(totalEVLoad_kVA * 0.5, availableCapacity_kVA * 0.7 * 0.9),
-      otherLoads_kVA: existingDemand_kVA * 1.2, // Higher during peak
-      utilizationPercent: ((existingDemand_kVA * 1.2 + Math.min(totalEVLoad_kVA * 0.5, availableCapacity_kVA * 0.7 * 0.9)) / serviceCapacity_kVA) * 100,
-    },
-    {
-      timeSlot: 'Off-Peak Hours (10PM-6AM)',
-      availableCapacity_kVA: availableCapacity_kVA * 1.1, // More available off-peak
-      evCharging_kVA: Math.min(totalEVLoad_kVA * 0.9, availableCapacity_kVA * 1.1 * 0.9),
-      otherLoads_kVA: existingDemand_kVA * 0.6, // Lower during off-peak
-      utilizationPercent: ((existingDemand_kVA * 0.6 + Math.min(totalEVLoad_kVA * 0.9, availableCapacity_kVA * 1.1 * 0.9)) / serviceCapacity_kVA) * 100,
-    },
-    {
-      timeSlot: 'Daytime Hours (6AM-6PM)',
-      availableCapacity_kVA: availableCapacity_kVA,
-      evCharging_kVA: Math.min(totalEVLoad_kVA * 0.7, availableCapacity_kVA * 0.9),
-      otherLoads_kVA: existingDemand_kVA,
-      utilizationPercent: ((existingDemand_kVA + Math.min(totalEVLoad_kVA * 0.7, availableCapacity_kVA * 0.9)) / serviceCapacity_kVA) * 100,
-    },
-  ];
+): NonNullable<EVEMSResult['loadSchedule']> {
+  return LOAD_SCHEDULE_SLOTS.map(({ timeSlot, otherShare, evShare }) => {
+    const otherLoads_kVA = existingDemand_kVA * otherShare;
+    const evCharging_kVA = Math.min(totalEVLoad_kVA * evShare, setpoint_kVA);
+    const continuousAdder_kVA = evCharging_kVA * CONTINUOUS_LOAD_ADDER;
+    const total_kVA = otherLoads_kVA + evCharging_kVA + continuousAdder_kVA;
+    return {
+      timeSlot,
+      availableCapacity_kVA: serviceCapacity_kVA - total_kVA,
+      evCharging_kVA,
+      continuousAdder_kVA,
+      otherLoads_kVA,
+      utilizationPercent: (total_kVA / serviceCapacity_kVA) * 100,
+    };
+  });
 }
 
 /**

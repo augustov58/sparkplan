@@ -479,8 +479,9 @@ export const EVEMSLoadManagement: React.FC<EVEMSLoadManagementProps> = ({ projec
                             {schedule.utilizationPercent.toFixed(1)}% utilized
                           </span>
                         </div>
-                        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 text-xs text-gray-600">
+                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs text-gray-600">
                           <div>EV: {schedule.evCharging_kVA.toFixed(1)} kVA</div>
+                          <div>+25%: {schedule.continuousAdder_kVA.toFixed(1)} kVA</div>
                           <div>Other: {schedule.otherLoads_kVA.toFixed(1)} kVA</div>
                           <div>Available: {schedule.availableCapacity_kVA.toFixed(1)} kVA</div>
                         </div>

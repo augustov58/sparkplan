@@ -4,6 +4,7 @@ One note per hard problem, written by the model that solved it via the `extract-
 Each entry: `- [title](file.md) — reusable rule`.
 
 <!-- Newest first -->
+- [An illustrative schedule contradicted the result above it](2026-11-13-evems-load-schedule.md) — an illustration may use made-up shares, but it must obey the calculation it illustrates (caps, adders, inputs as maxima); check the invariant with a sweep, and ask about adjacent multipliers that would still break it after the ruled fix
 - [The EV Charging calculator's user % became a demand factor](2026-11-13-ev-charging-simultaneous-use.md) — a user-entered planning % is fine as long as it is printed as an assumption on its own line and never feeds the NEC load; fix wrong citations on the card you touch
 - [The EVEMS tool took 4+ chargers at 75–95%; first issue through the UI loop](2026-11-11-evems-tool-ev-demand-factor.md) — write the expected values by hand and reproduce every step on main before fixing (it surfaced a second, negative-value bug); make an edition input required so tsc lists every caller; grep for copies of an invented factor
 - [One charger, 48 A or 60 A: the load and the service check were one number](2026-11-07-service-check-continuous-loads.md) — when a ruling says "X at 100%", ask whether it covers the load or the comparison with a rating; keep the two as separate numbers with the adder on its own printed line, and check every reader of a flag before flipping it
