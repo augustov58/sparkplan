@@ -4,6 +4,16 @@ All notable changes to SparkPlan.
 
 ---
 
+## 2026-11-13: The EV Charging calculator takes EV load at 100% (#198)
+
+- **No demand factor for EV chargers.** The calculator multiplied "simultaneous use %" by 1.1 for 2–3 chargers, 0.95 for 4–10, 0.85 for 11–25 and 0.75 above that, and reported the result as the "Demand Load" under NEC 625.44. The NEC has no EVSE demand factor. The new "NEC Load" line counts every charger at 100%, in the project's edition (220.14(A) under NEC 2020, the 7,200 VA minimum of 220.57(A) under NEC 2023).
+  - **Example:** twelve 32 A chargers at 60% now show a 92.16 kVA NEC load, not 47 kVA.
+- **"Simultaneous use %" stays, as a labelled design assumption** (PE ruling 2026-11-13). Its "Expected peak" line sits in its own box marked "not an NEC load", at exactly the % entered (55.3 kVA in the example, with no extra multipliers).
+- **Citations:** the 125% overcurrent protection now cites 625.41 and continuous duty 625.42; they cited 625.40 and 625.42 for the wrong things.
+- A Level 1 charger under NEC 2023 now counts 7.2 kVA, not 1.92 kVA.
+
+---
+
 ## 2026-11-11: The EVEMS Load Management tool takes EV load at 100% (#194)
 
 - **No demand factor for EV chargers.** Without EVEMS, the tool took 4 to 10 chargers at 95%, 11 to 25 at 85% and more than 25 at 75%, citing NEC 625.44. The NEC has no demand factor for EV chargers, and 625.44 covers equipment connection. Each charger now counts at 100%:

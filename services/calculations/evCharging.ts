@@ -5,6 +5,7 @@
  */
 
 import { getNextStandardBreakerSize } from '../../data/nec/standard-breakers';
+import { getEvseLoadVA, type NecEdition } from '../../data/nec/evse-load';
 
 /**
  * EV Charger levels and typical characteristics
@@ -51,9 +52,11 @@ export interface EVChargingInput {
   voltage: number;
   phase: 1 | 3;
   numChargers: number;
-  simultaneousUse: number; // Percentage (0-100) of chargers expected in use
+  /** Design assumption (0-100), never applied to the NEC load (PE ruling 2026-11-13, #198) */
+  simultaneousUse: number;
   circuitLength_ft: number;
   conductorMaterial: 'Cu' | 'Al';
+  necEdition: NecEdition;
 }
 
 export interface EVChargingResult {
@@ -64,8 +67,12 @@ export interface EVChargingResult {
   
   // Total system load
   totalConnectedLoad_kVA: number;
-  demandLoad_kVA: number;
-  demandFactor: number;
+  /** Article 220 load: chargers × getEvseLoadVA at 100% (no EVSE demand factor exists) */
+  necLoad_kVA: number;
+  /** 220.14(A) (NEC 2020) or 220.57(A) (NEC 2023) */
+  necLoadReference: string;
+  /** Design assumption: connected load × simultaneous use %. Not an NEC load. */
+  expectedPeak_kVA: number;
   
   // Voltage drop
   voltageDropPercent: number;
@@ -81,9 +88,10 @@ export interface EVChargingResult {
  * Calculate EV Charging circuit requirements per NEC Article 625
  * 
  * Key NEC requirements:
- * - NEC 625.40: Branch circuit sizing at 125% of maximum load
- * - NEC 625.42: Overcurrent protection
- * - NEC 625.44: Feeder load calculation with demand factors
+ * - NEC 625.41: Overcurrent protection at 125% of the maximum load (continuous duty)
+ * - NEC 625.42: EV charging is a continuous load
+ * - NEC 220.14(A) / 220.57(A): per-EVSE load at 100%, by edition. The NEC has
+ *   no EVSE demand factor; only an EVEMS setpoint (625.42) lowers it (#198).
  * 
  * @param input - EV charging calculation parameters
  * @returns Complete EV charging calculation result
@@ -93,15 +101,13 @@ export function calculateEVCharging(input: EVChargingInput): EVChargingResult {
   const warnings: string[] = [];
   const notes: string[] = [];
 
-  // NEC 625.40: Branch circuit conductors must be sized at 125% of max load
-  // This is because EV charging is considered a continuous load
+  // NEC 625.42: EV charging is a continuous load; 625.41 sizes the OCPD
+  // (and the circuit it protects) at 125% of the maximum load
   const continuousLoadFactor = 1.25;
   const requiredAmps = input.chargerAmps * continuousLoadFactor;
-  necReferences.push('NEC 625.40 - Branch Circuit Conductors (125% continuous load)');
-
-  // NEC 625.42: Overcurrent protection
   const circuitBreakerAmps = getNextStandardBreakerSize(requiredAmps);
-  necReferences.push('NEC 625.42 - Overcurrent Protection');
+  necReferences.push('NEC 625.41 - Overcurrent Protection (125%, continuous duty)');
+  necReferences.push('NEC 625.42 - EV charging is a continuous load');
 
   // Conductor sizing based on breaker size
   const conductorSize = getConductorSizeForAmps(circuitBreakerAmps, input.conductorMaterial);
@@ -116,18 +122,17 @@ export function calculateEVCharging(input: EVChargingInput): EVChargingResult {
   // Total connected load
   const totalConnectedLoad_kVA = singleChargerKVA * input.numChargers;
 
-  // NEC 625.44: Feeder load calculation
-  // Demand factor for multiple EV chargers
-  const demandFactor = calculateEVDemandFactor(input.numChargers, input.simultaneousUse);
-  const demandLoad_kVA = totalConnectedLoad_kVA * demandFactor;
-  necReferences.push('NEC 625.44 - Feeder Load');
+  // Article 220 load: every charger at 100% (220.57(A) floor under NEC 2023)
+  const evse = getEvseLoadVA(singleChargerVA, input.necEdition);
+  const necLoad_kVA = (evse.loadVA / 1000) * input.numChargers;
+  necReferences.push(`${evse.necReference} - EVSE load at 100% (the NEC has no EVSE demand factor)`);
 
-  if (input.numChargers > 1) {
-    notes.push(
-      `Demand factor of ${(demandFactor * 100).toFixed(0)}% applied per NEC 625.44 ` +
-      `for ${input.numChargers} chargers with ${input.simultaneousUse}% expected simultaneous use.`
-    );
-  }
+  // Design assumption only (PE ruling 2026-11-13, #198): never the NEC load
+  const expectedPeak_kVA = totalConnectedLoad_kVA * (input.simultaneousUse / 100);
+  notes.push(
+    `Expected peak at ${input.simultaneousUse}% simultaneous use is a design assumption, ` +
+    `not an NEC load. Only an EVEMS (NEC 625.42) lowers the load used for sizing.`
+  );
 
   // Voltage drop calculation
   const voltageDropPercent = calculateSimpleVoltageDrop(
@@ -171,37 +176,15 @@ export function calculateEVCharging(input: EVChargingInput): EVChargingResult {
     conductorSize,
     egcSize,
     totalConnectedLoad_kVA: Math.round(totalConnectedLoad_kVA * 100) / 100,
-    demandLoad_kVA: Math.round(demandLoad_kVA * 100) / 100,
-    demandFactor: Math.round(demandFactor * 1000) / 1000,
+    necLoad_kVA: Math.round(necLoad_kVA * 100) / 100,
+    necLoadReference: evse.necReference,
+    expectedPeak_kVA: Math.round(expectedPeak_kVA * 100) / 100,
     voltageDropPercent: Math.round(voltageDropPercent * 100) / 100,
     meetsVoltageDrop,
     necReferences,
     warnings,
     notes
   };
-}
-
-/**
- * Calculate demand factor for multiple EV chargers
- * Based on NEC 625.44 and typical load management practices
- */
-function calculateEVDemandFactor(numChargers: number, simultaneousUse: number): number {
-  // Base demand factor from expected simultaneous use
-  const baseFactor = simultaneousUse / 100;
-  
-  // Additional diversity for large numbers of chargers
-  // Based on statistical averaging effect
-  if (numChargers <= 1) {
-    return 1.0; // Single charger at 100%
-  } else if (numChargers <= 3) {
-    return Math.min(1.0, baseFactor * 1.1); // Small adjustment for 2-3 chargers
-  } else if (numChargers <= 10) {
-    return Math.min(1.0, baseFactor * 0.95); // Slight reduction 4-10 chargers
-  } else if (numChargers <= 25) {
-    return Math.min(1.0, baseFactor * 0.85); // More reduction 11-25 chargers
-  } else {
-    return Math.min(1.0, baseFactor * 0.75); // Maximum diversity for 26+ chargers
-  }
 }
 
 /**

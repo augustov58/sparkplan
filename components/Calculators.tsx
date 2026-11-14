@@ -7,7 +7,8 @@ import { useSubscription } from '../hooks/useSubscription';
 import { FeatureGate } from './FeatureGate';
 import { calculateVoltageDropAC, compareVoltageDropMethods, VoltageDropResult } from '../services/calculations';
 import { ConductorSizingTool } from './ConductorSizingTool';
-import { ProjectSettings } from '../types';
+import { ProjectSettings, type Project } from '../types';
+import { useProjectNecEdition } from '../hooks/useProjectNecEdition';
 import {
   analyzeSystemFaultCurrents,
   calculateServiceFaultCurrent,
@@ -292,7 +293,7 @@ export const Calculators: React.FC<CalculatorsProps> = ({ projectId }) => {
           {/* Pro-tier */}
           {activeTab === 'ev-charging' && (
             <FeatureGate feature="ev-charging-calc">
-              <EVChargingCalculator />
+              <EVChargingCalculator project={project} />
             </FeatureGate>
           )}
           {activeTab === 'evems' && (
@@ -1448,7 +1449,8 @@ const ShortCircuitCalculator: React.FC<ShortCircuitCalculatorProps> = ({ project
 // ============================================
 // EV CHARGING CALCULATOR - NEC Article 625
 // ============================================
-const EVChargingCalculator: React.FC = () => {
+const EVChargingCalculator: React.FC<{ project?: Project }> = ({ project }) => {
+  const necEdition = useProjectNecEdition(project);
   const [chargerLevel, setChargerLevel] = useState<EVChargerLevel>('Level2');
   const [chargerAmps, setChargerAmps] = useState(32);
   const [voltage, setVoltage] = useState(240);
@@ -1475,7 +1477,8 @@ const EVChargingCalculator: React.FC = () => {
       numChargers,
       simultaneousUse,
       circuitLength_ft: circuitLength,
-      conductorMaterial: material
+      conductorMaterial: material,
+      necEdition
     });
   } catch (error) {
     result = null;
@@ -1572,7 +1575,7 @@ const EVChargingCalculator: React.FC = () => {
             </div>
             
             <div>
-              <label className="block text-xs font-semibold text-[#888] uppercase mb-1">Simultaneous Use %</label>
+              <label className="block text-xs font-semibold text-[#888] uppercase mb-1">Simultaneous Use % (design assumption)</label>
               <NumberInput
                 min={10}
                 max={100}
@@ -1664,14 +1667,24 @@ const EVChargingCalculator: React.FC = () => {
 
               {/* System Load */}
               <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                <h4 className="font-medium text-blue-800 mb-2">System Load (per NEC 625.44)</h4>
+                <h4 className="font-medium text-blue-800 mb-2">System Load (NEC Article 220)</h4>
                 <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
                   <span className="text-[#666]">Total Connected Load:</span>
                   <span className="font-bold">{result.totalConnectedLoad_kVA} kVA</span>
-                  <span className="text-[#666]">Demand Factor:</span>
-                  <span className="font-bold">{(result.demandFactor * 100).toFixed(0)}%</span>
-                  <span className="text-[#666]">Demand Load:</span>
-                  <span className="font-bold">{result.demandLoad_kVA} kVA</span>
+                  <span className="text-[#666]">NEC Load (100%, {result.necLoadReference}):</span>
+                  <span className="font-bold">{result.necLoad_kVA} kVA</span>
+                </div>
+                <p className="text-xs text-[#666] mt-2">
+                  The NEC has no demand factor for EV chargers. Only an EVEMS (NEC 625.42) lowers the load used for sizing; see EVEMS Load Mgmt.
+                </p>
+              </div>
+
+              {/* Design assumption: never the NEC load (PE ruling 2026-11-13, #198) */}
+              <div className="bg-gray-50 border border-dashed border-[#c8c6c3] rounded-lg p-4">
+                <h4 className="font-medium text-gray-800 mb-2">Design Assumption (not an NEC load)</h4>
+                <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
+                  <span className="text-[#666]">Expected peak at {simultaneousUse}% simultaneous use:</span>
+                  <span className="font-bold">{result.expectedPeak_kVA} kVA</span>
                 </div>
               </div>
 

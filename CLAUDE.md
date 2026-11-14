@@ -180,7 +180,9 @@ PE-confirmed 2026-09-27; extended 2026-10-14 to the single-family Optional Metho
 (220.82/220.83 bucket, 2023 floor included) and to all continuous loads — no ×1.25
 in any Article 220 load calc; extended 2026-10-21 to the Part III aggregate (panels,
 feeders, MDP), the 220.84 total and the 220.87(2) new load. EVEMS under 2023: the
-setpoint, capped at N × 7,200 VA. Single source: `data/nec/evse-load.ts::getEvseLoadVA`;
+setpoint, capped at N × 7,200 VA. No EVSE demand factor anywhere: a user-entered
+"simultaneous use %" is a design assumption printed on its own line, never the NEC
+load (PE ruling 2026-11-13, #194/#198). Single source: `data/nec/evse-load.ts::getEvseLoadVA`;
 circuit-based calcs go through `upstreamLoadAggregation.ts::withEvseLoadForEdition`.
 Edition = project-page pick (`settings.nec_edition_override`) → Automatic: Florida's
 code cycle by date (a non-FL jurisdiction's own row edition), via
