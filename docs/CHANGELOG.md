@@ -4,6 +4,15 @@ All notable changes to SparkPlan.
 
 ---
 
+## 2026-11-13: The EVEMS load schedule stays under the setpoint (#199)
+
+- **EV charging in each time slot is capped at the EVEMS setpoint.** With four 32 A chargers on a 200 A / 240 V service, off-peak showed 23.8 kVA of charging against a 17.28 kVA setpoint. It now shows 17.3 kVA.
+- **Each slot adds 25% of its EV charging** (230.42(A)(1)), shown on a new "+25%" line and included in its utilization.
+- **The peak slot no longer puts other loads at 120% of the existing demand entered.** It used 28.8 kVA when 24 kVA was entered; it now uses 24 kVA. Off-peak stays at 60%.
+- **"Available" is now the service minus everything in that slot**, so each slot's numbers add up: 4.8 kVA at peak in the example, not 16.8 kVA. No slot can show more load than the result above the schedule.
+
+---
+
 ## 2026-11-13: The EV Charging calculator takes EV load at 100% (#198)
 
 - **No demand factor for EV chargers.** The calculator multiplied "simultaneous use %" by 1.1 for 2–3 chargers, 0.95 for 4–10, 0.85 for 11–25 and 0.75 above that, and reported the result as the "Demand Load" under NEC 625.44. The NEC has no EVSE demand factor. The new "NEC Load" line counts every charger at 100%, in the project's edition (220.14(A) under NEC 2020, the 7,200 VA minimum of 220.57(A) under NEC 2023).

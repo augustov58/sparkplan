@@ -88,3 +88,43 @@ describe('EVEMS tool — with EVEMS (#194)', () => {
     expect(r.serviceUpgradeNeeded).toBe(true);
   });
 });
+
+describe('EVEMS tool — load schedule (#199, ruling 2026-11-13)', () => {
+  const row = (s: NonNullable<ReturnType<typeof calculateEVEMSLoadManagement>['loadSchedule']>[number]) => ({
+    other: +s.otherLoads_kVA.toFixed(2),
+    ev: +s.evCharging_kVA.toFixed(3),
+    adder: +s.continuousAdder_kVA.toFixed(3),
+    util: +s.utilizationPercent.toFixed(1),
+    avail: +s.availableCapacity_kVA.toFixed(2),
+  });
+
+  it('caps each slot at the setpoint and includes the 25% adder (4 chargers)', () => {
+    const r = calculateEVEMSLoadManagement(base({ qty: 4, useEVEMS: true }));
+    expect(r.loadSchedule!.map(row)).toEqual([
+      { other: 24, ev: 15.36, adder: 3.84, util: 90, avail: 4.8 },
+      { other: 14.4, ev: 17.28, adder: 4.32, util: 75, avail: 12 },
+      { other: 24, ev: 17.28, adder: 4.32, util: 95, avail: 2.4 },
+    ]);
+  });
+
+  it('uses the time-of-day share when it is below the setpoint (2 chargers)', () => {
+    const r = calculateEVEMSLoadManagement(base({ qty: 2, useEVEMS: true }));
+    expect(r.loadSchedule!.map(row)).toEqual([
+      { other: 24, ev: 7.68, adder: 1.92, util: 70, avail: 14.4 },
+      { other: 14.4, ev: 13.824, adder: 3.456, util: 66, avail: 16.32 },
+      { other: 24, ev: 10.752, adder: 2.688, util: 78, avail: 10.56 },
+    ]);
+  });
+
+  it('never shows a slot above the result card', () => {
+    for (const qty of [1, 2, 4, 12]) {
+      for (const existingDemand_kVA of [10, 24, 30, 40]) {
+        const r = calculateEVEMSLoadManagement(base({ qty, useEVEMS: true, existingDemand_kVA }));
+        for (const s of r.loadSchedule!) {
+          expect(s.evCharging_kVA).toBeLessThanOrEqual(r.evDemandLoad_kVA + 1e-9);
+          expect(s.utilizationPercent).toBeLessThanOrEqual(r.serviceUtilizationPercent + 0.05);
+        }
+      }
+    }
+  });
+});
