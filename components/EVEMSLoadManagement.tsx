@@ -431,6 +431,9 @@ export const EVEMSLoadManagement: React.FC<EVEMSLoadManagementProps> = ({ projec
                     <div className="text-xl font-bold text-green-700">
                       {result.maxChargersWithEVEMS}
                     </div>
+                    <div className="text-xs text-gray-500 mt-1">
+                      at {result.evemsMinChargingAmps} A minimum each
+                    </div>
                   </div>
                 </div>
                 {result.maxChargersWithEVEMS > result.maxChargersWithoutEVEMS && (

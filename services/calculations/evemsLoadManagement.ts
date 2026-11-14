@@ -25,6 +25,13 @@ import { CONTINUOUS_LOAD_ADDER, CONTINUOUS_LOAD_REFERENCE } from '../../data/nec
 const EVEMS_UTILIZATION_FACTOR = 0.90;
 
 /**
+ * Minimum useful charging current per charger under an EVEMS (owner decision
+ * 2026-11-14, #202): about 8–10 miles per hour. A design judgment, not an NEC
+ * value; the same 12 A as `multiFamilyEV.ts` (minViableAmpsPerCharger).
+ */
+const EVEMS_MIN_CHARGING_AMPS = 12;
+
+/**
  * Input parameters for EVEMS load management calculation
  */
 export interface EVEMSInput {
@@ -98,7 +105,10 @@ export interface EVEMSResult {
   
   /** Number of chargers that can be installed */
   maxChargersWithoutEVEMS: number;
+  /** Chargers that each get at least evemsMinChargingAmps under the largest setpoint (#202) */
   maxChargersWithEVEMS: number;
+  /** Minimum charging current per charger behind maxChargersWithEVEMS (A) */
+  evemsMinChargingAmps: number;
   
   /** EVEMS recommendations */
   evemsRecommendations: {
@@ -199,16 +209,33 @@ export function calculateEVEMSLoadManagement(input: EVEMSInput): EVEMSResult {
   const maxChargersWithoutEVEMS = calculateMaxChargers(
     input.evChargers,
     availableCapacity_kVA,
-    false,
     input.necEdition
   );
   
-  const maxChargersWithEVEMS = calculateMaxChargers(
-    input.evChargers,
-    availableCapacity_kVA,
-    true,
-    input.necEdition
-  );
+  // With EVEMS (#202): chargers that each get the minimum current under the
+  // largest setpoint (reference charger = the first row, as above)
+  const refCharger = input.evChargers[0];
+  const minChargingAmps = refCharger ? Math.min(EVEMS_MIN_CHARGING_AMPS, refCharger.chargerAmps) : EVEMS_MIN_CHARGING_AMPS;
+  const maxChargersWithEVEMS = refCharger && minChargingAmps > 0
+    ? Math.floor(setpointAmps(fittingSetpoint_kVA, refCharger) / minChargingAmps)
+    : 0;
+  
+  // With EVEMS on: the current each charger gets at the entered quantity
+  const totalChargers = input.evChargers.reduce((sum, c) => sum + c.quantity, 0);
+  if (input.useEVEMS && refCharger && totalChargers > 0) {
+    const sharedAmps = setpointAmps(evDemandLoad_kVA, refCharger);
+    const ampsEach = Math.min(refCharger.chargerAmps, sharedAmps / totalChargers);
+    notes.push(
+      `EVEMS setpoint ${sharedAmps.toFixed(1)} A shared by ${totalChargers} charger${totalChargers === 1 ? '' : 's'}: ` +
+      `${ampsEach.toFixed(1)} A each`
+    );
+    if (ampsEach < minChargingAmps) {
+      warnings.push(
+        `${totalChargers} chargers share ${ampsEach.toFixed(1)} A each, below the ${minChargingAmps} A minimum useful charging current. ` +
+        `The EVEMS setpoint supports up to ${maxChargersWithEVEMS} chargers at ${minChargingAmps} A.`
+      );
+    }
+  }
   
   // EVEMS recommendations: service-check load saved by a setpoint that fits
   const evemsBenefit_kVA = Math.max(0, totalEVLoad_kVA - fittingSetpoint_kVA) * EVSE_CONTINUOUS_FACTOR;
@@ -258,7 +285,7 @@ export function calculateEVEMSLoadManagement(input: EVEMSInput): EVEMSResult {
   } else if (serviceUtilizationPercent > 80) {
     compliant = true;
     message = `Service utilization at ${serviceUtilizationPercent.toFixed(1)}% - acceptable but approaching limits.`;
-    notes.push('Consider EVEMS for future expansion or to reduce peak demand.');
+    if (!input.useEVEMS) notes.push('Consider EVEMS for future expansion or to reduce peak demand.');
   } else {
     compliant = true;
     message = `Service utilization at ${serviceUtilizationPercent.toFixed(1)}% - within acceptable limits.`;
@@ -290,6 +317,7 @@ export function calculateEVEMSLoadManagement(input: EVEMSInput): EVEMSResult {
     recommendedServiceAmps,
     maxChargersWithoutEVEMS,
     maxChargersWithEVEMS,
+    evemsMinChargingAmps: minChargingAmps,
     evemsRecommendations: {
       evemsRequired: evemsRequired,
       evemsBenefit_kVA: Math.round(evemsBenefit_kVA * 100) / 100,
@@ -320,29 +348,25 @@ function chargerLoad(
   return getEvseLoadVA(nameplateVA, edition);
 }
 
+/** A setpoint in kVA as current at the charger's voltage (√3 for 3-phase) */
+function setpointAmps(setpoint_kVA: number, charger: { voltage: number; phase: 1 | 3 }): number {
+  const volts = charger.phase === 3 ? Math.sqrt(3) * charger.voltage : charger.voltage;
+  return (setpoint_kVA * 1000) / volts;
+}
+
 /**
- * Calculate maximum number of chargers that can be installed
+ * Maximum chargers without EVEMS: every charger at 100%, plus 25% in the service check
  */
 function calculateMaxChargers(
   chargerSpecs: Array<{ voltage: number; phase: 1 | 3; chargerAmps: number; quantity: number }>,
   availableCapacity_kVA: number,
-  withEVEMS: boolean,
   edition: NecEdition
 ): number {
-  if (chargerSpecs.length === 0) return 0;
-
   // Use the first charger spec as reference (simplified)
   const refCharger = chargerSpecs[0];
   if (!refCharger) return 0;
   const singleChargerKVA = chargerLoad(refCharger, edition).loadVA / 1000;
-  
-  if (withEVEMS) {
-    // With EVEMS: the setpoint at 125% fits 90% of available capacity
-    return Math.floor((availableCapacity_kVA * EVEMS_UTILIZATION_FACTOR) / EVSE_CONTINUOUS_FACTOR / singleChargerKVA);
-  } else {
-    // Without EVEMS: every charger at 100%, plus 25% in the service check
-    return Math.floor(availableCapacity_kVA / (singleChargerKVA * EVSE_CONTINUOUS_FACTOR));
-  }
+  return Math.floor(availableCapacity_kVA / (singleChargerKVA * EVSE_CONTINUOUS_FACTOR));
 }
 
 /**
