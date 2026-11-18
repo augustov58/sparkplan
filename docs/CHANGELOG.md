@@ -4,6 +4,12 @@ All notable changes to SparkPlan.
 
 ---
 
+## 2026-11-18: The EV Panel Builder's number fields take typed numbers (#243)
+
+- **"Number of Chargers" and "Max Simultaneous Chargers" clamped every keystroke**, so clearing the field snapped it to 1, and typing 12 gave 11, then 112, then 20. The fields now keep what you type. The preview follows each valid value as you type, an out-of-range value is clamped when you leave the field, and an empty field gets back its last valid value.
+
+---
+
 ## 2026-11-18: The EV Panel Builder previews the panel it creates (#230)
 
 - **The preview card showed a breaker sum as "Total Load"**: 280 A for 4 × 48 A chargers, where the created panel's demand is 199.5 A. "Total Power" left out the lighting, and "Panel Utilization" was breakers ÷ rating. The card now reads the panel that Create makes:

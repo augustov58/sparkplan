@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { Zap, Check, AlertCircle, Info, Activity, Sparkles, Calculator } from 'lucide-react';
 import {
   generateCustomEVPanel,
@@ -23,6 +23,41 @@ type CircuitRow = Database['public']['Tables']['circuits']['Row'];
 interface EVPanelTemplatesProps {
   project: Project;
 }
+
+/**
+ * A whole-number input that keeps what the user types (#243: clamping every
+ * keystroke turned "12" into 20). A valid in-range value is reported as it's
+ * typed; the field is clamped when it loses focus.
+ */
+const WholeNumberInput: React.FC<{
+  value: number; min: number; max: number; onChange: (n: number) => void; className: string;
+}> = ({ value, min, max, onChange, className }) => {
+  const [text, setText] = useState(String(value));
+  useEffect(() => {
+    // The value changed from outside (a reset, or a clamp by another field)
+    if (parseInt(text, 10) !== value) setText(String(value));
+  }, [value]); // eslint-disable-line react-hooks/exhaustive-deps -- re-sync on value only
+  return (
+    <input
+      type="number"
+      min={min}
+      max={max}
+      value={text}
+      onChange={(e) => {
+        setText(e.target.value);
+        const n = parseInt(e.target.value, 10);
+        if (Number.isInteger(n) && n >= min && n <= max) onChange(n);
+      }}
+      onBlur={() => {
+        const n = parseInt(text, 10);
+        const clamped = Number.isInteger(n) ? Math.max(min, Math.min(max, n)) : value;
+        setText(String(clamped));
+        onChange(clamped);
+      }}
+      className={className}
+    />
+  );
+};
 
 export const EVPanelTemplates: React.FC<EVPanelTemplatesProps> = ({ project }) => {
   const { panels, loading: panelsLoading, createPanel } = usePanels(project.id);
@@ -244,12 +279,11 @@ export const EVPanelTemplates: React.FC<EVPanelTemplatesProps> = ({ project }) =
             <label className="block text-sm font-semibold text-gray-900 mb-3">
               Number of Chargers
             </label>
-            <input
-              type="number"
-              min="1"
-              max="20"
+            <WholeNumberInput
+              min={1}
+              max={20}
               value={numberOfChargers}
-              onChange={(e) => setNumberOfChargers(Math.max(1, Math.min(20, parseInt(e.target.value) || 1)))}
+              onChange={setNumberOfChargers}
               className="w-full px-4 py-3 border border-gray-300 rounded-lg text-lg font-medium focus:ring-2 focus:ring-[#2d3b2d]/20 focus:border-[#2d3b2d]"
             />
             <p className="text-xs text-gray-500 mt-2">
@@ -283,12 +317,11 @@ export const EVPanelTemplates: React.FC<EVPanelTemplatesProps> = ({ project }) =
                   <label className="block text-xs font-medium text-gray-700 mb-2">
                     Max Simultaneous Chargers
                   </label>
-                  <input
-                    type="number"
-                    min="1"
+                  <WholeNumberInput
+                    min={1}
                     max={numberOfChargers}
                     value={simultaneousChargers}
-                    onChange={(e) => setSimultaneousChargers(Math.max(1, Math.min(numberOfChargers, parseInt(e.target.value) || 1)))}
+                    onChange={setSimultaneousChargers}
                     className="w-full px-3 py-2 border border-gray-300 rounded focus:ring-2 focus:ring-[#2d3b2d]/20 focus:border-[#2d3b2d]"
                   />
                   <p className="text-xs text-gray-500 mt-1">

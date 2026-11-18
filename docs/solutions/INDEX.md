@@ -4,6 +4,7 @@ One note per hard problem, written by the model that solved it via the `extract-
 Each entry: `- [title](file.md) — reusable rule`.
 
 <!-- Newest first -->
+- [The EV Panel Builder number fields clamped every keystroke](2026-11-18-ev-builder-number-inputs.md) — keep the text, report valid values, clamp on blur; test with keystrokes, not fill()
 - [The EV Panel Builder previewed a different panel than it created](2026-11-18-ev-builder-preview.md) — a preview calls the builder function; write columns from the source object, not the DB default; metadata rows go last
 - [Packet panel schedules: blank second poles, invented feeder breakers](2026-11-18-packet-feeder-rows-poles.md) — port the app rule (breaker-fed vs lug-fed); slot 0 keeps load in totals but out of the grid; an empty PDF-text test after a harmless change is the extractor
 - [Non-dwelling lighting cited a Table 220.42 row that does not exist](2026-11-18-table-220-42-all-others.md) — name lookup keys after the book row; re-point "right by accident" mappings before the data is fixed; pin only verified rows
