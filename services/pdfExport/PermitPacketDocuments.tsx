@@ -1073,9 +1073,25 @@ const buildRiserTree = (
         line3: `${stack.num_meter_positions} meters`,
         children: [],
       };
+      // #220: the MDP under the stack, and its panels under the MDP — the
+      // hierarchy the data, the feeders and E-301 carry (MDP is the
+      // structural root, the meter stack sits ahead of it; ADR-005). The
+      // riser drew each metered panel straight off the stack, with no MDP
+      // node and so no MDP → panel feeder edges to label.
+      const mdpNode = buildPanelSubtree(mdp, panels, transformers, feeders, undefined, cumulativeVd);
+      // Each metered panel keeps its meter position, on its own node
+      const meterOf = new Map(stackMeters.map(m => [m.panel_id, `Meter ${m.position_number ?? '?'}`]));
+      const tagMeters = (n: RiserNode) => {
+        const meter = n.kind === 'panel' ? meterOf.get(n.id) : undefined;
+        if (meter) n.line4 = [n.line4, meter].filter(Boolean).join(' \u2022 ');
+        n.children.forEach(tagMeters);
+      };
+      tagMeters(mdpNode);
+      stackNode.children.push(mdpNode);
+      // A panel fed from the stack itself (not through the MDP) keeps its meter edge
       for (const meter of stackMeters) {
         const panel = panels.find(p => p.id === meter.panel_id);
-        if (panel) {
+        if (panel && !panel.is_main && panel.fed_from_type === 'meter_stack') {
           const meterLabel = `Meter ${meter.position_number ?? '?'}: ${
             meter.breaker_amps ? `${meter.breaker_amps}A` : 'MLO'
           }`;
@@ -1431,7 +1447,10 @@ const buildRiserDraw = (node: RiserNode, draw: RiserDraw): void => {
       draw.labels.push({
         key: `feeder-${child.id}`,
         x: childMid + 4,
-        y: mid - 8,
+        // Just below the bus, beside the child's drop (#220): above it, the
+        // 7 pt floor outgrew the gap on a scaled-down (deeper) riser and the
+        // label sat on the bus line, and the parent's trunk crossed it
+        y: mid + 3,
         width: Math.max(NODE_W - 8, 80),
         content: child.feederLabel,
         fontSize: 7,
@@ -1585,7 +1604,7 @@ const RiserPageBody: React.FC<RiserPageBodyProps> = ({
         {`MLO = Main Lug Only (no main breaker) \u2022 AIC = Available Interrupting Current`}
       </Text>
       <Text style={{ fontSize: 8 }}>
-        Feeder labels show conductor size + design load in kVA. Per-node AIC ratings shown for compliance with NEC 110.9 / 110.10.
+        Feeder labels show conductor size, length and voltage drop (the design load in kVA when no voltage drop is computed). Per-node AIC ratings shown for compliance with NEC 110.9 / 110.10.
       </Text>
 
       <BrandFooter
