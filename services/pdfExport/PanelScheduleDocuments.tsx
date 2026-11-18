@@ -22,6 +22,7 @@ import {
 import {
   isEVEMSMarkerCircuit,
   findEVEMSSetpointMarker,
+  circuitsUnderPanel,
 } from '../calculations/upstreamLoadAggregation';
 import { lineToNeutralVoltage } from '../../lib/electricalDisplay';
 import { isEvseDescription, type NecEdition } from '../../data/nec/evse-load';
@@ -374,6 +375,11 @@ export interface PanelSchedulePDFProps {
     useOptionalMethod?: boolean;
   };
   necEdition?: '2020' | '2023';
+  /**
+   * Every circuit under this panel (`circuitsUnderPanel`). On the single-family
+   * service panel the dwelling's load reads these, its subpanels included (#216).
+   */
+  serviceCircuits?: Circuit[];
 }
 
 type SingleFamilyDwellingContext = NonNullable<PanelSchedulePDFProps['singleFamilyDwellingContext']>;
@@ -400,8 +406,11 @@ function dwellingLoadSummaryFor(
     existingBuilding: boolean;
     singleFamilyDwellingContext?: SingleFamilyDwellingContext;
     necEdition?: NecEdition;
+    /** Single-family MDP: every circuit under it (#216). */
+    serviceCircuits?: Circuit[];
   },
 ): DwellingPanelLoadSummary | null {
+  const sfCircuits = panel.is_main && opts.serviceCircuits ? opts.serviceCircuits : circuits;
   const demandCircuits = circuits.map(c => ({
     description: c.description,
     load_watts: c.load_watts,
@@ -409,7 +418,7 @@ function dwellingLoadSummaryFor(
     breaker_amps: c.breaker_amps,
     is_proposed: c.is_proposed,
   }));
-  const hasDwellingShape = circuits.some(c => {
+  const hasDwellingShape = sfCircuits.some(c => {
     const d = (c.description ?? '').toLowerCase();
     return (
       d.includes('kitchen') ||
@@ -425,7 +434,14 @@ function dwellingLoadSummaryFor(
   if (panel.is_main === true && hasDwellingShape && isSingleFamilyContext) {
     if (!opts.singleFamilyDwellingContext) return null;
     return calculateSingleFamilyPanelLoad({
-      circuits: demandCircuits,
+      // Every circuit under the service panel, subpanels included (#216)
+      circuits: sfCircuits.map(c => ({
+        description: c.description,
+        load_watts: c.load_watts,
+        load_type: c.load_type,
+        breaker_amps: c.breaker_amps,
+        is_proposed: c.is_proposed,
+      })),
       ...opts.singleFamilyDwellingContext,
       voltage: panel.voltage || 240,
       necEdition: opts.necEdition,
@@ -504,6 +520,7 @@ export const PanelSchedulePages: React.FC<PanelSchedulePDFProps> = ({
   aggregatedLoad,
   singleFamilyDwellingContext,
   necEdition,
+  serviceCircuits,
 }) => {
   // Helper: append " *" to a description when (a) markers are enabled AND
   // (b) the circuit is flagged as a proposed new addition. Returns the raw
@@ -543,6 +560,7 @@ export const PanelSchedulePages: React.FC<PanelSchedulePDFProps> = ({
     existingBuilding: showExistingNewMarkers,
     singleFamilyDwellingContext,
     necEdition,
+    serviceCircuits,
   });
 
   const phaseBalancing = calculatePhaseBalancing(sortedCircuits, panel.phase);
@@ -1198,6 +1216,10 @@ export const MultiPanelDocument: React.FC<MultiPanelDocumentProps> = ({
               existingBuilding: showExistingNewMarkers,
               singleFamilyDwellingContext,
               necEdition,
+              // Single-family MDP: its subpanels' circuits too (#216)
+              serviceCircuits: panel.is_main
+                ? circuitsUnderPanel(panel.id, panels, [...circuitsByPanel.values()].flat(), [])
+                : undefined,
             });
 
             const aggLoad = aggregatedLoadByPanel?.get(panel.id);

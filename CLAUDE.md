@@ -116,6 +116,8 @@ as `existingAdderKVA` / `proposedAdderKVA`; dwelling results carry it as
 Existing house → 220.83. New house → the Dwelling Load Calculator's choice,
 everywhere (E-101, E-102, Panel Summary, exports, 220.87 narrative):
 220.82 when "10 kVA / 40%" is selected, NEC 220 Part III otherwise (default).
+Every reader passes the circuits UNDER the MDP (circuitsUnderPanel), never
+the MDP's own: a subpanel's loads are the dwelling's (#216).
 ```
 Implementation: `buildSingleFamilyDwellingContext` (carries `useOptionalMethod`)
 → `residentialLoad.ts::calculateSingleFamilyPanelLoad` (one function for all three).

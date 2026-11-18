@@ -12,6 +12,7 @@ import { PanelScheduleDocument } from './PanelScheduleDocuments';
 import {
   calculateAggregatedLoad,
   isEVEMSMarkerCircuit,
+  circuitsUnderPanel,
   type AggregatedLoad,
   type MultiFamilyContext,
 } from '../calculations/upstreamLoadAggregation';
@@ -1771,9 +1772,9 @@ export const LoadCalculationSummary: React.FC<LoadSummaryProps> = ({
   const usePartIIIDwelling = useDwellingOptional
     && !singleFamilyDwellingContext!.existingDwelling
     && !singleFamilyDwellingContext!.useOptionalMethod;
+  // Every circuit under the MDP: a subpanel's loads are the dwelling's (#216)
   const dwellingCircuits = mdp
-    ? circuits
-        .filter(c => c.panel_id === mdp.id)
+    ? circuitsUnderPanel(mdp.id, panels, circuits, transformers)
         .map(c => ({
           description: c.description,
           load_watts: c.load_watts,

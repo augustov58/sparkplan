@@ -4,6 +4,16 @@ All notable changes to SparkPlan.
 
 ---
 
+## 2026-11-18: A single-family service load includes the house's subpanels (#216)
+
+- **The single-family service calculation now reads every circuit under the MDP.** It read only the MDP's own circuits, so a range, dryer, A/C or EV charger on a subpanel never reached the service load. That's the unsafe direction: the service could pass when it shouldn't. In a 2,400 ft² house with a garage subpanel (EV charger + air compressor), E-101 goes from 29.57 kVA (123 A) to 37.38 kVA (156 A). The four fastened appliances then take NEC 220.53's 75%.
+  - Applies to E-101, E-102, the Service Upgrade Wizard, the Dwelling Load Calculator, the Main Panel's Panel Summary and its panel-schedule page (in the packet and the exports).
+  - The panel-schedule page used to count the subpanel's feeder row as an appliance, so one packet printed two service loads. It now uses the real circuits.
+- **On a single-family Main Panel, "Demand with feeders" is the dwelling's service load.** It printed a per-type total that counted the refrigerator, dishwasher and disposal as ranges (54.8 kVA in the example), next to the dwelling method's number. That separate per-type card is gone; the dwelling table covers it, and the summary cards read "Dwelling Load / Dwelling Demand (all panels)".
+- A subpanel's own page and its feeder are unchanged until #217 is ruled.
+
+---
+
 ## 2026-11-18: Inspector Mode, the Copilot and the EV tools use the real service check (#193)
 
 - **Every place that says whether the service is big enough now uses the check E-102 and the Service Upgrade Wizard make:** the NEC 220 load plus 25% of the continuous loads (EV charging, signs, show windows; NEC 230.42(A)(1)), against the service rating. Several tools used rough rules of their own.

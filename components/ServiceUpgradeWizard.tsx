@@ -23,6 +23,7 @@ import { usePanels } from '../hooks/usePanels';
 import { useCircuits } from '../hooks/useCircuits';
 import { useTransformers } from '../hooks/useTransformers';
 import { useProjectNecEdition } from '../hooks/useProjectNecEdition';
+import { circuitsUnderPanel } from '../services/calculations/upstreamLoadAggregation';
 import {
   calculateSingleFamilyLoad,
   calculateSingleFamilyLoadFromCircuits,
@@ -81,7 +82,8 @@ export const ServiceUpgradeWizard: React.FC<ServiceUpgradeWizardProps> = ({ proj
       // the same input and function as the Dwelling Load Calculator and the
       // packet's E-102 existing load (#184).
       const mdp = panels.find(p => p.is_main);
-      const mdpCircuits = mdp ? projectCircuits.filter(c => c.panel_id === mdp.id) : [];
+      // Every circuit under the MDP: a subpanel's loads are the dwelling's (#216)
+      const mdpCircuits = mdp ? circuitsUnderPanel(mdp.id, panels, projectCircuits, transformers ?? []) : [];
       const dwellingContext = project ? buildSingleFamilyDwellingContext(project, false) : undefined;
       if (dwellingContext && mdp && mdpCircuits.length > 0) {
         return calculateSingleFamilyLoadFromCircuits({
@@ -129,7 +131,7 @@ export const ServiceUpgradeWizard: React.FC<ServiceUpgradeWizardProps> = ({ proj
       console.error('[ServiceUpgradeWizard] Error calculating dwelling load:', error);
       return null;
     }
-  }, [project, necEdition, panels, projectCircuits]);
+  }, [project, necEdition, panels, projectCircuits, transformers]);
 
   // Track if using dwelling data
   const [usingDwellingData, setUsingDwellingData] = useState(false);
