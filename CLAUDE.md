@@ -84,6 +84,11 @@ CRITICAL: only `calculated` skips the 1.25× multiplier.
   service rating. Calculated: the adder is a separate line on E-102. Measured:
   the existing peak × 1.25 already covers it. The Article 220 LOAD stays at
   100% (E-101, panel totals) — never fold the adder into it.
+- FEEDERS (PE ruling 2026-11-17, #190): design load = Article 220 demand +
+  25% of the continuous loads on that feeder (215.2(A)(1), 215.3, 625.41),
+  the service check's list (lighting not counted, EVEMS at the setpoint). No
+  blanket 80/20 split. Existing feeders whose stored design load is >1% off
+  are flagged "Outdated" (the riser and equipment schedule print stored sizes).
 ```
 PE-confirmed 2026-07-09 (PR #118 review), superseding both prior interpretations
 (pre-Sprint-2 multiplied calculated; Sprint 2 wrongly exempted measured).
@@ -98,7 +103,7 @@ only, #127; the wizard converts it to amps with √3 on 3-phase, #185). The wiza
 new load: `scheduleNewLoadAmps` — calculated → the demand increase
 (`projectDemandSplit.proposedKVA`, PE ruling 2026-11-04) + `proposedAdderKVA`,
 measured/manual → `calculateProposedNewLoadVA`, the same as E-102 (#188, #192).
-The 25% continuous adder: `upstreamLoadAggregation.ts::continuousServiceAdderVA`
+The 25% continuous adder: `upstreamLoadAggregation.ts::continuousServiceAdderVA` (over `continuousLoadVA`, which feeders share via `feederLoadSync.ts::feederDesignLoadSplit`, #190)
 (classifier `data/nec/continuous-load.ts`), returned by `projectDemandSplit`
 as `existingAdderKVA` / `proposedAdderKVA`; dwelling results carry it as
 `serviceCheckAmps`; `multiFamilyEV.ts` takes EV × 1.25 under every method.

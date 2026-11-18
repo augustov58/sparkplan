@@ -4,6 +4,17 @@ All notable changes to SparkPlan.
 
 ---
 
+## 2026-11-17: Feeders are sized from their real continuous loads (#190)
+
+- **Feeder design load is now the Article 220 demand plus 25% of the continuous loads on that feeder** (NEC 215.2(A)(1), 215.3, 625.41). Continuous loads are EV charging, signs and show windows, the same list as the service check (#192). An EVEMS panel's chargers count at the setpoint. Every feeder used to be sized at 1.20 × demand, whatever was on it.
+  - **All-EV feeders** were undersized: three 48 A chargers plus 1.8 kVA of receptacles now design at 45.0 kVA (187.5 A), not 43.6 kVA (181.8 A). In that example the conductor goes from 4/0 to 250 kcmil.
+  - **Feeders with no EV, signs or show windows** were 20% oversized: an office panel at 13.5 kVA of demand, plus one 1.5 kVA sign, now designs at 13.9 kVA (57.8 A), not 16.2 kVA (67.5 A).
+- **Existing feeders are flagged "Outdated"** when their saved sizing differs from what the rule now gives, so the riser, the one-line and the equipment schedule (which print the saved sizes) can be brought up to date with the existing Recalc button. Adding an EVEMS setpoint now flags its feeder too.
+- **The voltage-drop page and the Copilot size each feeder with its own conditions** (ambient temperature, number of current-carrying conductors, parallel sets). They assumed 3 conductors, so the same packet could print 3/0 on the voltage-drop page and 4/0 on the equipment schedule for one feeder.
+- **The Feeder Manager's "Continuous Load Percentage" slider is gone.** Nothing used it; its info box claimed 100% of the load was continuous while the calculation used 80%. The info box now names the loads taken at 125%.
+
+---
+
 ## 2026-11-17: The Commercial Load Calculator keeps continuous loads at 100% in the load total (#195)
 
 - **Continuous HVAC and special loads no longer carry 125% inside "Demand".** A continuous 42 A / 208 V rooftop unit showed Demand 18.9 kVA at a 125% factor. It now shows 15.1 kVA at 100%, with 18.9 kVA only in the "Service" column, the same way signs and show windows already worked.

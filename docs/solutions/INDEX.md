@@ -4,6 +4,7 @@ One note per hard problem, written by the model that solved it via the `extract-
 Each entry: `- [title](file.md) — reusable rule`.
 
 <!-- Newest first -->
+- [Feeders were sized at a blanket 1.20 × demand](2026-11-17-feeder-real-continuous-loads.md) — reuse the service check's classifier; when a rule changes a stored value, make existing rows flag themselves; pick the stale threshold from the unsafe case (4.2%, not 5%); "same function" includes the same inputs (installation conditions)
 - [The Commercial Load Calculator put 125% inside the load total](2026-11-17-commercial-calc-continuous-in-load.md) — a load row carries two numbers (Article 220 load at 100%, sizing load with the 125%); derive "continuous" from the input flag, never from a factor above 100%; guardrail = the sizing amps must not move
 - [The Panel Schedule's demand table was a second, wrong demand calculation](2026-11-17-panel-schedule-second-demand-calc.md) — never choose between two calculations by which is lower; replace a parallel calc with the packet's function and delete it; a list filtered for display (EVEMS marker dropped) is the wrong input for a calculation; build a fixture for the path that has none
 - ["Max chargers with EVEMS" always equalled "without"](2026-11-14-evems-max-chargers.md) — reduce a with/without pair to a common form (a constant ratio never changes the answer); under load management, "how many fit" needs a named per-unit minimum current, and the quantity check becomes advice at that minimum

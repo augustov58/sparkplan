@@ -169,10 +169,10 @@ export function calculateProposedNewLoadVA(
 }
 
 /**
- * NEC 230.42(A)(1) service check: 25% of the continuous loads (EVSE, signs,
- * show windows) under the MDP, existing and proposed, in VA — added to the
- * Article 220 load when the method is calculated (PE ruling 2026-11-07,
- * #192). The Article 220 load stays at 100%.
+ * The continuous loads under a panel (that panel and everything it feeds), in
+ * VA at 100%: EVSE (625.42), signs and show windows (`data/nec/continuous-load.ts`).
+ * General lighting is not counted. One classifier for the service check
+ * (#192) and feeder sizing (#190), so the two agree.
  *
  * - EVSE at its edition load (`withEvseLoadForEdition`), including a unit's
  *   own charger in the 220.84 base, at its full load (not the factored share).
@@ -180,21 +180,21 @@ export function calculateProposedNewLoadVA(
  *   The setpoint covers the existing chargers first; the proposed part is
  *   the rest.
  */
-export function continuousServiceAdderVA(
-  mdpId: string,
+export function continuousLoadVA(
+  rootPanelId: string,
   panels: Panel[],
   allCircuits: Circuit[],
   transformers: Transformer[],
   necEdition: NecEdition,
 ): { existingVA: number; proposedVA: number } {
-  const underMdp = collectDownstreamPanelIds(mdpId, panels, transformers);
+  const underRoot = collectDownstreamPanelIds(rootPanelId, panels, transformers);
   const circuits = withEvseLoadForEdition(
-    allCircuits.filter(c => !!c.panel_id && underMdp.has(c.panel_id)),
+    allCircuits.filter(c => !!c.panel_id && underRoot.has(c.panel_id)),
     necEdition,
   );
   let existingVA = 0;
   let proposedVA = 0;
-  for (const panelId of underMdp) {
+  for (const panelId of underRoot) {
     const panelCircuits = circuits.filter(c => c.panel_id === panelId && !isEVEMSMarkerCircuit(c));
     const sum = (match: (c: Circuit) => boolean) =>
       panelCircuits.filter(match).reduce((total, c) => total + (c.load_watts || 0), 0);
@@ -212,6 +212,23 @@ export function continuousServiceAdderVA(
     existingVA += evExistingVA + sum(c => isSign(c) && !c.is_proposed);
     proposedVA += evProposedVA + sum(c => isSign(c) && !!c.is_proposed);
   }
+  return { existingVA, proposedVA };
+}
+
+/**
+ * NEC 230.42(A)(1) service check: 25% of the continuous loads under the MDP
+ * (`continuousLoadVA`), existing and proposed, in VA — added to the Article
+ * 220 load when the method is calculated (PE ruling 2026-11-07, #192). The
+ * Article 220 load stays at 100%.
+ */
+export function continuousServiceAdderVA(
+  mdpId: string,
+  panels: Panel[],
+  allCircuits: Circuit[],
+  transformers: Transformer[],
+  necEdition: NecEdition,
+): { existingVA: number; proposedVA: number } {
+  const { existingVA, proposedVA } = continuousLoadVA(mdpId, panels, allCircuits, transformers, necEdition);
   return { existingVA: existingVA * CONTINUOUS_LOAD_ADDER, proposedVA: proposedVA * CONTINUOUS_LOAD_ADDER };
 }
 
