@@ -18,7 +18,7 @@ const shot = (page: Page, name: string) =>
 
 async function openProject(page: Page, projectName: string): Promise<string> {
   await page.goto('/');
-  await page.waitForLoadState('networkidle');
+  await page.waitForLoadState('domcontentloaded'); // not networkidle: realtime keeps the dashboard busy; the next step waits for what it needs
   const card = page.getByText(projectName, { exact: true }).first();
   await expect(card, `QA project "${projectName}" (tests/e2e/fixtures.md) is missing`).toBeVisible({ timeout: 15_000 });
   await card.click();

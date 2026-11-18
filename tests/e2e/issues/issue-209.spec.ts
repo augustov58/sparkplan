@@ -46,10 +46,10 @@ test('#209 the EVEMS setpoint can be edited and removed', async ({ page }) => {
   // The welcome modal opens while the project list is still loading
   await page.addInitScript(() => localStorage.setItem('welcomeModalDismissed', 'true'));
   await page.goto('/');
-  await page.waitForLoadState('networkidle');
+  await page.waitForLoadState('domcontentloaded'); // not networkidle: realtime keeps the dashboard busy; the next step waits for what it needs
   await resetMarker(page);
   await page.reload();
-  await page.waitForLoadState('networkidle');
+  await page.waitForLoadState('domcontentloaded'); // not networkidle: realtime keeps the dashboard busy; the next step waits for what it needs
   const card = page.getByText(PROJECT_NAME, { exact: true }).first();
   await expect(card, `QA project "${PROJECT_NAME}" (tests/e2e/fixtures.md) is missing`).toBeVisible({ timeout: 15_000 });
   await card.click();
