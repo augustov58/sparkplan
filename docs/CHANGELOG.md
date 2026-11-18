@@ -4,6 +4,12 @@ All notable changes to SparkPlan.
 
 ---
 
+## 2026-11-18: The Commercial Load Calculator's lighting demand no longer understates warehouses (#260)
+
+- **Warehouse, hospital and hotel lighting is taken at 100%.** The calculator applied its own demand factors (first 20 kVA at 50%, the rest at 40%) to these occupancies, which put warehouses below the code table: 30 kVA of warehouse lighting gave 14.0 kVA. It now uses the same lighting table as the panel schedule and the permit packet, where every non-dwelling occupancy is at 100% until the reduced rows are added from the code book. Other occupancies are unchanged.
+
+---
+
 ## 2026-11-18: The EV Panel Builder sizes a 150 kW DC fast charger at 125% of its load (#249)
 
 - **A 150 kW DC fast charger circuit gets a 250 A breaker on 250 kcmil copper.** It was 225 A on 3/0, and 3/0 is rated 200 A. The charger is 150,000 VA in every calculation: 180.4 A at 480 V three-phase, and 125% of that is 225.5 A, which needs the next standard breaker size (NEC 625.41, 240.6(A)). The "2× DC Fast Chargers" template matches, and so does the panel rating the builder proposes (4 chargers: 1200 A, was 1000 A).
