@@ -4,6 +4,13 @@ All notable changes to SparkPlan.
 
 ---
 
+## 2026-11-18: The multifamily riser shows the MDP (#220)
+
+- **On a multifamily project with a meter stack, the riser (E-201) skipped the MDP.** It drew every unit and house panel straight off the meter stack, so it disagreed with the panel schedules and feeders, and the MDP's feeders had no edges to label. It now draws utility → meter stack → MDP → panels, as the rest of the packet and the app do. The MDP's feeders are labelled on their edges, each panel shows its meter (e.g. "Meter 2"), and the legend now matches what the labels show.
+- **Feeder labels on every riser now sit just below the bus line, beside the panel's drop.** Above it, on a scaled-down riser the text sat on the bus line, and the parent's vertical line could cross a label.
+
+---
+
 ## 2026-11-18: Add an EVEMS setpoint from the Panel Schedule (#222)
 
 - **A panel with EV chargers and no EVEMS setpoint now has an "Add EVEMS setpoint (NEC 625.42)" control.** Before, the only way to add one was "Add Circuit" with the exact marker description. It takes the controller's setpoint in VA and warns when the value is at or above the chargers' load, where it would limit nothing. The setpoint then shows in the same card as an existing one, with Edit and Remove (#209), and limits the panel's feeder and the service (#210).
