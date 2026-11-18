@@ -79,7 +79,7 @@ export interface HVACLoad {
   nameplateFLA: number; // MCA (Minimum Circuit Ampacity) per NEC 440.22
   voltage: number;
   phase: 1 | 3;
-  isContinuous: boolean; // 125% factor if continuous (>3 hours)
+  isContinuous: boolean; // 125% in service sizing if continuous (>3 hours)
 }
 
 export interface MotorLoad {
@@ -110,7 +110,7 @@ export interface CommercialLoadResult {
   receptacleDemandLoad_VA: number; // After demand factors (NEC 220.44)
 
   hvacLoad_VA: number;
-  hvacDemandLoad_VA: number; // With 125% continuous factor
+  hvacDemandLoad_VA: number; // 100% (the continuous 125% is in service sizing only, #195)
 
   motorLoad_VA: number;
   motorDemandLoad_VA: number; // With 25% on largest motor
@@ -145,6 +145,8 @@ export interface LoadBreakdownItem {
   demandFactor: number; // Demand factor as percentage (e.g., 100, 85, 50)
   isContinuous: boolean; // True if continuous load (gets ×1.25 for service sizing)
   serviceSizingLoad_VA: number; // Demand × 1.25 if continuous, otherwise same as demand
+  /** In a row that mixes continuous and non-continuous loads: the non-continuous part of serviceSizingLoad_VA */
+  nonContinuousSizing_VA?: number;
   necReference: string;
 }
 
@@ -340,8 +342,12 @@ export function calculateCommercialLoad(input: CommercialLoadInput): CommercialL
   }
 
   // ===== 3. HVAC LOAD (NEC 220.14(C)) =====
+  // The Article 220 load takes HVAC at 100%; a continuous unit's 125% belongs
+  // to service sizing only (230.42(A)(1)), as for signs and show windows (#195).
   let hvacLoad_VA = 0;
-  let hvacDemandLoad_VA = 0;
+  let hvacServiceSizing_VA = 0;
+  let hvacNonContinuous_VA = 0;
+  let hvacIsContinuous = false;
 
   for (const hvac of input.hvacLoads) {
     let loadVA = 0;
@@ -354,28 +360,26 @@ export function calculateCommercialLoad(input: CommercialLoadInput): CommercialL
       loadVA = hvac.voltage * hvac.nameplateFLA;
     }
 
-    // Apply 125% for continuous loads (>3 hours)
-    const demandVA = hvac.isContinuous ? loadVA * 1.25 : loadVA;
-
     hvacLoad_VA += loadVA;
-    hvacDemandLoad_VA += demandVA;
+    hvacServiceSizing_VA += hvac.isContinuous ? loadVA * 1.25 : loadVA;
+    if (hvac.isContinuous) hvacIsContinuous = true;
+    else hvacNonContinuous_VA += loadVA;
   }
 
   if (hvacLoad_VA > 0) {
-    const hvacDemandFactor = (hvacDemandLoad_VA / hvacLoad_VA) * 100;
-    const hvacIsContinuous = hvacDemandFactor > 100; // Continuous if demand > connected
     loadBreakdown.push({
       category: 'HVAC Equipment',
       connectedLoad_VA: hvacLoad_VA,
-      demandLoad_VA: hvacDemandLoad_VA,
-      demandFactor: hvacDemandFactor,
+      demandLoad_VA: hvacLoad_VA,
+      demandFactor: 100,
       isContinuous: hvacIsContinuous,
-      serviceSizingLoad_VA: hvacDemandLoad_VA, // Already includes 125% if continuous
+      serviceSizingLoad_VA: hvacServiceSizing_VA,
+      nonContinuousSizing_VA: hvacIsContinuous ? hvacNonContinuous_VA : undefined,
       necReference: 'NEC 220.14(C), 440.6',
     });
 
     if (hvacIsContinuous) {
-      notes.push(`HVAC loads include 125% factor for continuous operation per NEC 220.14(C)`);
+      notes.push(`Continuous HVAC loads are taken at 125% for service sizing only (NEC 230.42(A)(1)); the load total takes them at 100%`);
     }
   }
 
@@ -453,32 +457,35 @@ export function calculateCommercialLoad(input: CommercialLoadInput): CommercialL
   }
 
   // ===== 6. SPECIAL LOADS =====
+  // 100% in the load total; a continuous load's 125% in service sizing only (#195)
   let specialLoad_VA: number | undefined;
-  let specialDemandLoad_VA: number | undefined;
 
   if (input.specialLoads && input.specialLoads.length > 0) {
     specialLoad_VA = 0;
-    specialDemandLoad_VA = 0;
+    let specialServiceSizing_VA = 0;
+    let specialNonContinuous_VA = 0;
 
     for (const load of input.specialLoads) {
       specialLoad_VA += load.load_VA;
-      // Apply 125% for continuous loads
-      const demandVA = load.isContinuous ? load.load_VA * 1.25 : load.load_VA;
-      specialDemandLoad_VA += demandVA;
+      specialServiceSizing_VA += load.isContinuous ? load.load_VA * 1.25 : load.load_VA;
+      if (!load.isContinuous) specialNonContinuous_VA += load.load_VA;
     }
-
-    const specialDemandFactor = (specialDemandLoad_VA / specialLoad_VA) * 100;
-    const specialIsContinuous = specialDemandFactor > 100; // Continuous if demand > connected
+    const specialIsContinuous = input.specialLoads.some(load => load.isContinuous);
 
     loadBreakdown.push({
       category: 'Special Loads',
       connectedLoad_VA: specialLoad_VA,
-      demandLoad_VA: specialDemandLoad_VA,
-      demandFactor: specialDemandFactor,
+      demandLoad_VA: specialLoad_VA,
+      demandFactor: 100,
       isContinuous: specialIsContinuous,
-      serviceSizingLoad_VA: specialDemandLoad_VA, // Already includes 125% if continuous
+      serviceSizingLoad_VA: specialServiceSizing_VA,
+      nonContinuousSizing_VA: specialIsContinuous ? specialNonContinuous_VA : undefined,
       necReference: 'NEC 220.14',
     });
+
+    if (specialIsContinuous) {
+      notes.push(`Continuous special loads are taken at 125% for service sizing only (NEC 230.42(A)(1)); the load total takes them at 100%`);
+    }
   }
 
   // ===== 7. CALCULATE TOTALS =====
@@ -492,8 +499,8 @@ export function calculateCommercialLoad(input: CommercialLoadInput): CommercialL
     (kitchenLoad_VA || 0) +
     (specialLoad_VA || 0);
 
-  // Total demand load — sum of all demand values from breakdown
-  // (each item's demandLoad_VA already includes 125% where applicable, e.g. HVAC continuous)
+  // Total demand load — the Article 220 load: sum of all demand values from the
+  // breakdown, continuous loads at 100% (their 125% is in serviceSizingLoad_VA)
   const totalDemandLoad_VA = loadBreakdown.reduce(
     (total, item) => total + item.demandLoad_VA,
     0
@@ -516,13 +523,15 @@ export function calculateCommercialLoad(input: CommercialLoadInput): CommercialL
   );
 
   // Calculate breakdown for notes
+  // A continuous row may hold non-continuous loads too (mixed HVAC or special loads)
+  const mixedNonContinuous_VA = loadBreakdown.reduce((sum, item) => sum + (item.nonContinuousSizing_VA ?? 0), 0);
   const nonContinuousItems = loadBreakdown.filter(item => !item.isContinuous);
-  const totalNonContinuous_VA = nonContinuousItems.reduce((sum, item) => sum + item.serviceSizingLoad_VA, 0);
+  const totalNonContinuous_VA = nonContinuousItems.reduce((sum, item) => sum + item.serviceSizingLoad_VA, 0) + mixedNonContinuous_VA;
 
   // Separate continuous loads: Table 220.42(A) lighting vs other continuous
   const lightingItem = loadBreakdown.find(item => item.necReference.includes('220.42(A)'));
   const otherContinuousItems = loadBreakdown.filter(item => item.isContinuous && !item.necReference.includes('220.42(A)'));
-  const otherContinuousService_VA = otherContinuousItems.reduce((sum, item) => sum + item.serviceSizingLoad_VA, 0);
+  const otherContinuousService_VA = otherContinuousItems.reduce((sum, item) => sum + item.serviceSizingLoad_VA, 0) - mixedNonContinuous_VA;
 
   let sizingNote = `Service sizing per NEC 215.3/230.90: Non-continuous (${Math.round(totalNonContinuous_VA)} VA)`;
   if (otherContinuousService_VA > 0) {
@@ -594,13 +603,13 @@ export function calculateCommercialLoad(input: CommercialLoadInput): CommercialL
     receptacleLoad_VA,
     receptacleDemandLoad_VA,
     hvacLoad_VA,
-    hvacDemandLoad_VA,
+    hvacDemandLoad_VA: hvacLoad_VA,
     motorLoad_VA,
     motorDemandLoad_VA,
     kitchenLoad_VA,
     kitchenDemandLoad_VA,
     specialLoad_VA,
-    specialDemandLoad_VA,
+    specialDemandLoad_VA: specialLoad_VA,
     totalConnectedLoad_VA,
     totalDemandLoad_VA,
     calculatedAmps,

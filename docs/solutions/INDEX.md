@@ -4,6 +4,7 @@ One note per hard problem, written by the model that solved it via the `extract-
 Each entry: `- [title](file.md) — reusable rule`.
 
 <!-- Newest first -->
+- [The Commercial Load Calculator put 125% inside the load total](2026-11-17-commercial-calc-continuous-in-load.md) — a load row carries two numbers (Article 220 load at 100%, sizing load with the 125%); derive "continuous" from the input flag, never from a factor above 100%; guardrail = the sizing amps must not move
 - [The Panel Schedule's demand table was a second, wrong demand calculation](2026-11-17-panel-schedule-second-demand-calc.md) — never choose between two calculations by which is lower; replace a parallel calc with the packet's function and delete it; a list filtered for display (EVEMS marker dropped) is the wrong input for a calculation; build a fixture for the path that has none
 - ["Max chargers with EVEMS" always equalled "without"](2026-11-14-evems-max-chargers.md) — reduce a with/without pair to a common form (a constant ratio never changes the answer); under load management, "how many fit" needs a named per-unit minimum current, and the quantity check becomes advice at that minimum
 - [An illustrative schedule contradicted the result above it](2026-11-13-evems-load-schedule.md) — an illustration may use made-up shares, but it must obey the calculation it illustrates (caps, adders, inputs as maxima); check the invariant with a sweep, and ask about adjacent multipliers that would still break it after the ruled fix
