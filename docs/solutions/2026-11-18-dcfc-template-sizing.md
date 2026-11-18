@@ -9,6 +9,8 @@
 3. **A test that holds across charger types:** for every type, breaker ≥ 1.25 × the charger current, and the conductor is the one rated for the breaker. Level 2 stays 60 A / 6 AWG and 100 A / 3 AWG.
 4. **Look for the same quantity in other tools.** The EV Charging calculator's DC presets list input currents *below* their output (150 kW at 160 A = 133 kVA). Filed as #264, since picking preset currents is the same open question.
 
+5. **Follow-up #264, same rule in the EV Charging presets.** The calculator turns a preset's amps straight into load (√3 × V × A), so presets listing less current than their own output understated everything downstream. Each preset is now ≥ kW ÷ (480 × √3), to 0.1 A as here, so both tools give 180.4 A / 250 A for 150 kW. The calculator's inline conductor list, which matches neither 310.16 column, is filed as #269: it needs a terminal-temperature ruling.
+
 ## Verification
 
 - `tests/dcfcTemplateSizing249.test.ts`: 3 of 4 fail on `main`; the Level 2 test passes on both by design.
