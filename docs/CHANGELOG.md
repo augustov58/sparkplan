@@ -4,6 +4,15 @@ All notable changes to SparkPlan.
 
 ---
 
+## 2026-11-18: The MDP counts a downstream EV panel at its EVEMS setpoint (#210)
+
+- **An EVEMS setpoint now limits the load at every panel above the EV panel, the MDP included** (NEC 625.42: the setpoint is the maximum load on the feeder and the service). The setpoint used to apply only on the EV panel's own page. In a project with three 48 A chargers under a 28.8 kVA setpoint, the MDP's demand drops from 49.9 kVA to 44.1 kVA, now the same as the sum of its feeders.
+  - Affects the MDP's Panel Summary, E-101, the MDP's panel schedule page and the Service Upgrade Wizard's new load (239 A → 215 A in that example). The service check's 25% adder already used the setpoint, so it no longer mixes a clamped adder with an unclamped load.
+- **The demand table shows a row for it**, "EVEMS feeder reduction (EV Panel)", with the demand before and after the setpoint, as the EV panel's own page does.
+- The connected load is unchanged: chargers stay at nameplate there, and in branch-circuit sizing.
+
+---
+
 ## 2026-11-17: Feeders are sized from their real continuous loads (#190)
 
 - **Feeder design load is now the Article 220 demand plus 25% of the continuous loads on that feeder** (NEC 215.2(A)(1), 215.3, 625.41). Continuous loads are EV charging, signs and show windows, the same list as the service check (#192). An EVEMS panel's chargers count at the setpoint. Every feeder used to be sized at 1.20 × demand, whatever was on it.

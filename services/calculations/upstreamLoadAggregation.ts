@@ -1169,31 +1169,43 @@ export function calculateAggregatedLoad(
   const { demandBreakdown } = phase2;
   const necReferences = [...phase2.necReferences];
 
-  // NEC 625.42 — EVEMS-managed EV bank panel: clamp feeder demand to setpoint.
-  // Branch conductors stay at full nameplate (NEC 625.40 + 210.19); only
-  // the FEEDER serving the EV panel benefits from the EVEMS reduction.
-  if (isEVEMSManagedPanel(panelId, circuits)) {
-    const setpointVA = evemsSetpointVA(panel, circuits);
-    // The EVEMS limits the chargers only; the panel's other loads (lighting,
-    // receptacles) add on top of the setpoint (#144 — the clamp used to
-    // replace the whole panel demand and dropped them).
+  // NEC 625.42 — every EVEMS-managed EV panel at or under this one counts its
+  // chargers at most at the setpoint: the EVEMS limits the feeder AND the
+  // service (#210 — the clamp used to apply only when this panel itself was
+  // managed, so the MDP took a downstream EV panel's chargers at full load).
+  // The panel's other loads add on top of the setpoint (#144). Branch
+  // conductors stay at full nameplate (NEC 625.40 + 210.19).
+  let evemsReductionVA = 0;
+  let setpointSumVA = 0;
+  const clampedPanelNames: string[] = [];
+  for (const id of collectDownstreamPanelIds(panelId, panels, transformers)) {
+    const managed = panels.find(p => p.id === id);
+    if (!managed || !isEVEMSManagedPanel(id, circuits)) continue;
+    const setpointVA = evemsSetpointVA(managed, circuits);
     const evseVA = circuits
-      .filter(c => c.panel_id === panelId && !isEVEMSMarkerCircuit(c) && isEvseDescription(c.description))
+      .filter(c => c.panel_id === id && !isEVEMSMarkerCircuit(c) && isEvseDescription(c.description))
       .reduce((sum, c) => sum + (c.load_watts || 0), 0);
-    const nonEvseDemandVA = Math.max(0, totalDemandVA - evseVA);
-    const clampedVA = setpointVA !== null ? setpointVA + nonEvseDemandVA : null;
-    if (clampedVA !== null && evseVA > setpointVA! && totalDemandVA > clampedVA) {
-      const preClampVA = totalDemandVA;
-      totalDemandVA = clampedVA;
-      necReferences.push('NEC 625.42 (EVEMS — feeder demand clamped to setpoint)');
-      demandBreakdown.push({
-        loadType: 'EVEMS feeder reduction',
-        connectedVA: preClampVA,
-        demandVA: clampedVA,
-        demandFactor: preClampVA > 0 ? clampedVA / preClampVA : 1.0,
-        necReference: 'NEC 625.42 (EVEMS — branch conductors at nameplate; feeder at setpoint)',
-      });
+    if (setpointVA !== null && evseVA > setpointVA) {
+      evemsReductionVA += evseVA - setpointVA;
+      setpointSumVA += setpointVA;
+      clampedPanelNames.push(managed.name);
     }
+  }
+  // Never below the setpoints themselves (a cascade that already reduced the
+  // chargers, e.g. typed as receptacles, keeps at least the setpoint)
+  const clampedVA = Math.max(setpointSumVA, totalDemandVA - evemsReductionVA);
+  if (evemsReductionVA > 0 && clampedVA < totalDemandVA) {
+    const preClampVA = totalDemandVA;
+    totalDemandVA = clampedVA;
+    necReferences.push('NEC 625.42 (EVEMS — feeder demand clamped to setpoint)');
+    const onlyThisPanel = clampedPanelNames.length === 1 && clampedPanelNames[0] === panel.name;
+    demandBreakdown.push({
+      loadType: onlyThisPanel ? 'EVEMS feeder reduction' : `EVEMS feeder reduction (${clampedPanelNames.join(', ')})`,
+      connectedVA: preClampVA,
+      demandVA: clampedVA,
+      demandFactor: preClampVA > 0 ? clampedVA / preClampVA : 1.0,
+      necReference: 'NEC 625.42 (EVEMS — branch conductors at nameplate; feeder at setpoint)',
+    });
   }
 
   // PR-2 Step 3 (2026-05-26): existing/proposed split — standard NEC 220 path.
