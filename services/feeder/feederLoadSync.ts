@@ -13,7 +13,12 @@
 
 import type { Feeder } from '@/types';
 import type { Database } from '@/lib/database.types';
-import { calculateAggregatedLoad, continuousLoadVA, isEVEMSMarkerCircuit } from '@/services/calculations/upstreamLoadAggregation';
+import {
+  calculateAggregatedLoad,
+  continuousLoadVA,
+  isEVEMSMarkerCircuit,
+  type DwellingAggregateOptions,
+} from '@/services/calculations/upstreamLoadAggregation';
 import { CONTINUOUS_LOAD_FACTOR } from '@/data/nec/continuous-load';
 import type { NecEdition } from '@/data/nec/evse-load';
 
@@ -47,6 +52,8 @@ export interface FeederDesignContext {
   transformers: Transformer[];
   occupancy: Occupancy;
   necEdition: NecEdition;
+  /** Dwelling projects: unit / house panel rules (#179); `dwellingAggregateOptions(project)`. */
+  dwelling?: DwellingAggregateOptions;
 }
 
 /**
@@ -239,6 +246,9 @@ export function computeFeederLoadVA(
   transformers: Transformer[],
   /** EVSE load rule (NEC 2023 220.57 floor); the project's `resolveNecEdition`. */
   necEdition: NecEdition = '2020',
+  /** The project's occupancy, as the Feeder Manager sizes it (#179). */
+  occupancy: Occupancy = 'commercial',
+  dwelling?: DwellingAggregateOptions,
 ): number {
   if (!feeder.destination_panel_id) {
     return feeder.total_load_va || 0;
@@ -252,9 +262,10 @@ export function computeFeederLoadVA(
     panels,
     circuits,
     transformers,
-    'commercial',
+    occupancy,
     undefined,
     necEdition,
+    dwelling,
   );
   return aggregate.totalDemandVA;
 }
@@ -304,7 +315,7 @@ export function feederDesignLoadVA(
   design: FeederDesignContext,
 ): number {
   const demandVA = calculateAggregatedLoad(
-    destinationPanelId, panels, circuits, design.transformers, design.occupancy, undefined, design.necEdition,
+    destinationPanelId, panels, circuits, design.transformers, design.occupancy, undefined, design.necEdition, design.dwelling,
   ).totalDemandVA;
   const { continuousVA, noncontinuousVA } = feederDesignLoadSplit(
     [destinationPanelId], demandVA, panels, circuits, design.transformers, design.necEdition,

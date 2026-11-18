@@ -45,7 +45,7 @@ import {
   describeEvDesignDrift,
 } from '../calculations/upstreamLoadAggregation';
 import { EquipmentSpecsPages } from './EquipmentSpecsDocuments';
-import { VoltageDropPages } from './VoltageDropDocuments';
+import { VoltageDropPages, type FeederLoadRules } from './VoltageDropDocuments';
 import { JurisdictionRequirementsPages } from './JurisdictionDocuments';
 import { ShortCircuitTablePages } from './ShortCircuitDocuments';
 import { ArcFlashPages } from './ArcFlashDocuments';
@@ -89,6 +89,24 @@ import type {
 import { manifestTextForEdition, resolveNecEdition } from '../../data/ahj/codeCycle';
 import { ahjEquipmentFlags, serviceScope } from '../../data/ahj/checks';
 import { isEvseDescription, type NecEdition } from '../../data/nec/evse-load';
+
+/**
+ * The occupancy and dwelling panel rules every feeder and panel aggregate in
+ * the packet uses, the same as the Feeder Manager and the Panel Schedule
+ * (#179): a unit panel takes its page's method, a multifamily house panel the
+ * non-dwelling Part III rules.
+ */
+function packetFeederLoadRules(data: PermitPacketData): FeederLoadRules {
+  return {
+    occupancy: data.projectType === 'Residential'
+      ? 'dwelling'
+      : data.projectType === 'Industrial' ? 'industrial' : 'commercial',
+    dwelling: {
+      multiFamily: !!data.multiFamilyContext,
+      existingBuilding: (data.serviceModificationType ?? 'existing') !== 'new-service',
+    },
+  };
+}
 
 export interface PermitPacketData {
   projectId: string;
@@ -747,6 +765,7 @@ export const generatePermitPacket = async (data: PermitPacketData): Promise<void
           transformers={data.transformers}
           circuits={data.circuits}
           necEdition={resolvedNecEdition}
+          feederLoad={packetFeederLoadRules(data)}
           includeNECReferences={true}
           {...contractor}
           sheetId={sheetIds[0]}
@@ -1242,6 +1261,7 @@ export const generatePermitPacket = async (data: PermitPacketData): Promise<void
         occupancyType,
         undefined,
         resolvedNecEdition,
+        packetFeederLoadRules(data).dwelling,
       );
       const breakerAmps = dp.feeder_breaker_amps || dp.main_breaker_amps || 100;
       const pole = (dp.phase === 3 ? 3 : 2) as 1 | 2 | 3;
@@ -1296,6 +1316,7 @@ export const generatePermitPacket = async (data: PermitPacketData): Promise<void
         occupancyType,
         isMDP ? data.multiFamilyContext : undefined,
         resolvedNecEdition,
+        packetFeederLoadRules(data).dwelling,
       );
       const dominantNec = aggResult.necReferences.find(r => r.includes('625.42'))
         ?? aggResult.necReferences.find(r => r.includes('220.84'))

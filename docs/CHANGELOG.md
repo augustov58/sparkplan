@@ -4,6 +4,21 @@ All notable changes to SparkPlan.
 
 ---
 
+## 2026-11-18: Dwelling unit feeders print the unit's own load; house panels use the non-dwelling rules (#179)
+
+- **The feeder to a dwelling unit panel now carries the unit's NEC 220 Part III load**, the number the unit's own page prints (#155). Before, one feeder printed three different loads. In a generated 3-unit building, Unit 101's page said 29.7 kVA:
+  - the Feeder Manager and the voltage-drop page sized its feeder at 36.6 kVA (the commercial rules);
+  - the MDP's feed-thru row said 37.1 kVA. The per-type rules there counted both small-appliance circuits and the dishwasher as ranges ("4 ranges → 17 kW").
+  - All three now say 29.7 kVA: 123.8 A, 2/0 instead of 3/0. The "exceeds the panel's 125 A rating" warning goes away.
+- **Multifamily house (common-area) panels use the non-dwelling Part III rules** (PE ruling 2026-11-17, NEC 220.84(B)): lighting at 100% (not the dwelling 35% tiers), receptacles per 220.44, the largest motor at 125%.
+  - This applies on the house panel's page and its feeder, and as the house row in the MDP's 220.84 total, which used to add the house panel's connected load.
+  - Generated house panels (no load types) don't change. A typed house panel with an elevator now prints 19.3 kVA everywhere, not 16.6 on its page and 18.3 at the MDP.
+- **The Feeder Manager now reads the project's occupancy.** It was never given one and sized every feeder with the commercial rules. The voltage-drop page and the Copilot's feeder check follow it too.
+- Existing feeders to unit panels show "Outdated" until recalculated.
+- Not changed: EV panels on dwelling projects; single-family subpanels (a ruling is pending, #217).
+
+---
+
 ## 2026-11-18: The MDP counts a downstream EV panel at its EVEMS setpoint (#210)
 
 - **An EVEMS setpoint now limits the load at every panel above the EV panel, the MDP included** (NEC 625.42: the setpoint is the maximum load on the feeder and the service). The setpoint used to apply only on the EV panel's own page. In a project with three 48 A chargers under a 28.8 kVA setpoint, the MDP's demand drops from 49.9 kVA to 44.1 kVA, now the same as the sum of its feeders.

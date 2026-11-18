@@ -151,6 +151,12 @@ cooking, dryers, heat, A/C, EVSE); +25% of the largest MOTOR CIRCUIT
 Implementation: `residentialLoad.ts::calculateDwellingStandardLoad` (the only
 Part III walk) ← `calculateSingleFamilyLoad` (toggles), `calculateDwellingUnitPanelLoad`
 (circuits; unit pages, in-app summary, exports, MF generator).
+The unit's feeder and the MDP's feed-thru row are the same number (PE ruling
+2026-11-17, #179): `calculateAggregatedLoad` sends a unit panel to
+`calculateDwellingUnitPanelLoad` and a multifamily house panel to the
+non-dwelling Part III rules (also its 220.84(B) row at the MDP). Pass
+`dwellingAggregateOptions(project)` with every aggregate of a project's panels.
+Single-family subpanels keep the per-type cascade until #217 is ruled.
 
 ### Two Dwelling Units — Part III / 220.85 (PE ruling 2026-10-27, #127)
 ```
@@ -398,6 +404,7 @@ Real mistakes made in this repo, each paired with the rule that prevents recurre
 | The service check compared the Article 220 load straight with the service rating under the calculated method, so one charger counted 48 A when calculated and 60 A when measured (#192) | Two numbers: the Article 220 load (100%, E-101) and the service check (+25% of continuous loads per 230.42(A)(1), every method). A ruling about the load is not a ruling about the comparison; ask which one it covers. |
 | The in-app Panel Schedule ran its own demand walk (lighting and water heaters ×1.25, heat ×0.75 for 4+ circuits, dwelling lighting tiers on every panel), and the card showed the shared aggregate only when it was lower (#191). The first fix fed the aggregate a display list that drops the EVEMS marker, so the table ignored the setpoint | An in-app view of a packet quantity reads the packet's function. Never choose between two calculations by which is lower. Don't pass a list filtered for display to a calc; check what the function needs (EVEMS marker circuits). |
 | The Part III aggregate clamped EVSE to the EVEMS setpoint only when it ran on the EV panel itself; the MDP took the chargers at full load, so one page printed its feed-thru rows at 44.1 kVA and its demand at 49.9 kVA (#210) | A limit on the feeder and the service applies at every level above the device: walk the subtree (`collectDownstreamPanelIds`), as `continuousLoadVA` does. Two numbers on one page that must agree (feed-thru rows vs the aggregate) are a free test. |
+| One unit feeder printed 29.7 kVA on the unit page, 36.6 in the Feeder Manager and voltage-drop page, 37.1 on the MDP row: `FeederManager`'s `occupancyType` prop defaulted to `'commercial'` and no render site passed it, `computeFeederLoadVA` hard-coded `'commercial'`, and the MDP row ran the cascade that counts every 'K' circuit as a range (#179) | A defaulted prop or argument hides a missing caller: check every render site / call passes it, or derive it inside. Route every reader of a quantity through the function its own page prints. List optional-argument callers with a script; tsc can't. |
 | Docs updated with stale "Last Updated" dates; completed features left as "NEXT UP" | Every doc touch updates its date to today; every shipped feature flips its ROADMAP status in the same PR. |
 
 ---

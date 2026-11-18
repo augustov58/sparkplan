@@ -24,6 +24,7 @@ import { getEvseLoadVA, isEvseDescription, type NecEdition } from '@/data/nec/ev
 import { CONTINUOUS_LOAD_ADDER, CONTINUOUS_LOAD_FACTOR, isSignOrShowWindowDescription } from '@/data/nec/continuous-load';
 import {
   LARGEST_MOTOR_CATEGORY,
+  calculateDwellingUnitPanelLoad,
   calculateTwoUnitDwellingLoad,
   dwellingLoadsFromCircuits,
   isDwellingUnitPanel,
@@ -40,6 +41,24 @@ type Circuit = Database['public']['Tables']['circuits']['Row'];
 type OccupancyType = 'dwelling' | 'commercial' | 'industrial';
 
 /**
+ * What a dwelling-occupancy aggregate needs from the project to pick a
+ * panel's rules (#179, PE ruling 2026-11-17). Built by
+ * `lib/projectSettings.ts::dwellingAggregateOptions`; pass it wherever a
+ * dwelling project's panels are aggregated.
+ */
+export interface DwellingAggregateOptions {
+  /** Multifamily building: a "house" panel is common-area load, on the non-dwelling Part III rules (220.84(B)). */
+  multiFamily: boolean;
+  /** Existing building: a unit panel with proposed circuits takes NEC 220.83, as its page does (#155). */
+  existingBuilding: boolean;
+}
+
+/** A house (common-area) panel, by name — the same rule `buildMultiFamilyContext` uses. */
+function isHousePanelName(name: string): boolean {
+  return name.toLowerCase().includes('house');
+}
+
+/**
  * Context for a multifamily dwelling service: NEC 220.84 Optional Calculation
  * for 3+ units; for 2 units, the building-wide Part III walk or the 220.85
  * lesser (PE ruling 2026-10-27, #127).
@@ -48,8 +67,14 @@ export interface MultiFamilyContext {
   dwellingUnits: number;
   /** EV panel raw connected VA — subtracted from dwelling base before applying 220.84 demand factor */
   evLoadVA?: number;
-  /** House/common area panel load (VA) — excluded from 220.84 base, added at connected value */
+  /** House/common area panel connected load (VA) — excluded from the 220.84 base */
   housePanelLoadVA?: number;
+  /**
+   * House panels' NEC 220 Part III demand, non-dwelling rules (220.84(B): house
+   * loads "calculated in accordance with Part III"; PE ruling 2026-11-17, #179).
+   * Added to the MDP total. Falls back to `housePanelLoadVA` when undefined.
+   */
+  housePanelDemandVA?: number;
   /**
    * EV panel post-NEC-625.42 demand VA — added back to MDP demand at 100%
    * (EVEMS-clamped on EVEMS-managed panels, raw connected otherwise).
@@ -911,6 +936,8 @@ export function calculateAggregatedLoad(
   occupancyType: OccupancyType = 'commercial',
   multiFamilyContext?: MultiFamilyContext,
   necEdition: NecEdition = '2020',
+  /** Dwelling projects: which rules a unit / house panel takes (#179). */
+  dwelling?: DwellingAggregateOptions,
 ): AggregatedLoad {
   // Every sum below reads EVSE circuits at their edition load (220.57 floor).
   circuits = withEvseLoadForEdition(circuits, necEdition);
@@ -968,7 +995,9 @@ export function calculateAggregatedLoad(
     const climateReductionVA = Math.max(0, climateNameplateVA - climateDemandVA);
     const dwellingDemandBaseVA = Math.max(0, dwellingConnectedVA - climateReductionVA);
     const dwellingDemandVA = Math.round(dwellingDemandBaseVA * demandFactor);
-    const totalDemandVA = dwellingDemandVA + housePanelLoadVA + evDemandVA;
+    // 220.84(B): house loads per Part III, non-dwelling rules (#179)
+    const houseDemandVA = multiFamilyContext.housePanelDemandVA ?? housePanelLoadVA;
+    const totalDemandVA = dwellingDemandVA + houseDemandVA + evDemandVA;
 
     const demandBreakdown: DemandCalculation[] = [{
       loadType: `Multi-Family Dwelling (${multiFamilyContext.dwellingUnits} units)`,
@@ -999,9 +1028,9 @@ export function calculateAggregatedLoad(
       demandBreakdown.push({
         loadType: 'House Panel / Common Areas',
         connectedVA: housePanelLoadVA,
-        demandVA: housePanelLoadVA,
-        demandFactor: 1.0,
-        necReference: 'NEC 220.84 (Common area loads — excluded from dwelling demand)',
+        demandVA: houseDemandVA,
+        demandFactor: houseDemandVA / housePanelLoadVA,
+        necReference: 'NEC 220.84(B) (house loads per NEC 220 Part III)',
       });
     }
 
@@ -1033,7 +1062,7 @@ export function calculateAggregatedLoad(
     const mfSplit = hasSubsetProvenance
       ? computeMFProposedSplit(
           panelId, panels, circuits, transformers,
-          multiFamilyContext, dwellingDemandVA, housePanelLoadVA, evDemandVA,
+          multiFamilyContext, dwellingDemandVA, houseDemandVA, evDemandVA,
         )
       : computeProposedSplit(
           panelId, panels, circuits, transformers, totalConnectedVA, totalDemandVA,
@@ -1062,6 +1091,7 @@ export function calculateAggregatedLoad(
     const evLoadVA = multiFamilyContext.evLoadVA || 0;
     const evDemandVA = multiFamilyContext.evDemandVA ?? evLoadVA;
     const housePanelLoadVA = multiFamilyContext.housePanelLoadVA || 0;
+    const houseDemandVA = multiFamilyContext.housePanelDemandVA ?? housePanelLoadVA;
     const dwelling = twoUnitDwellingDemand(panelId, panels, circuits, transformers, multiFamilyContext, necEdition);
     const { two } = dwelling;
 
@@ -1116,9 +1146,9 @@ export function calculateAggregatedLoad(
       demandBreakdown.push({
         loadType: 'House Panel / Common Areas',
         connectedVA: housePanelLoadVA,
-        demandVA: housePanelLoadVA,
-        demandFactor: 1.0,
-        necReference: 'NEC 220 Part III (house loads at 100%)',
+        demandVA: houseDemandVA,
+        demandFactor: houseDemandVA / housePanelLoadVA,
+        necReference: 'NEC 220 Part III (house loads, non-dwelling rules)',
       });
     }
     const necRefs = [...two.necReferences];
@@ -1136,11 +1166,11 @@ export function calculateAggregatedLoad(
       if (evClamped) necRefs.push('NEC 625.42 (EVEMS Load)');
     }
     const dwellingDemandVA = two.totalDemandVA;
-    const totalDemandVA = dwellingDemandVA + housePanelLoadVA + evDemandVA;
+    const totalDemandVA = dwellingDemandVA + houseDemandVA + evDemandVA;
     const hasProposedDwelling = dwelling.dwellingCircuits.some(c => c.is_proposed);
     const split = computeMFProposedSplit(
       panelId, panels, circuits, transformers,
-      multiFamilyContext, dwellingDemandVA, housePanelLoadVA, evDemandVA,
+      multiFamilyContext, dwellingDemandVA, houseDemandVA, evDemandVA,
       // #127: existing dwelling demand = the same walk on the existing circuits.
       hasProposedDwelling
         ? twoUnitDwellingDemand(panelId, panels, circuits.filter(c => !c.is_proposed), transformers, multiFamilyContext, necEdition).two.totalDemandVA
@@ -1163,8 +1193,19 @@ export function calculateAggregatedLoad(
     };
   }
 
-  // PHASE 2: Apply standard NEC 220 demand factors to system-wide totals
-  const phase2 = applyDemandFactors(loads, occupancyType);
+  // PHASE 2: Apply standard NEC 220 demand factors to system-wide totals.
+  // #179 (PE ruling 2026-11-17), dwelling projects: a unit panel takes the
+  // unit page's own calculation (Part III, or 220.83 when the permit adds load
+  // to the unit, #155), so the unit page, its feeder and the MDP's feed-thru
+  // row print one number. A multifamily house panel takes the non-dwelling
+  // Part III rules (220.84(B)). EV panels and single-family subpanels (#217)
+  // keep the per-type cascade.
+  const role = occupancyType === 'dwelling' && !panel.is_main
+    ? dwellingPanelRole(panel, circuits, dwelling)
+    : null;
+  const phase2 = role === 'unit'
+    ? dwellingUnitDemand(panelId, panels, circuits, transformers, dwelling?.existingBuilding ?? false, necEdition)
+    : applyDemandFactors(loads, role === 'house' ? 'commercial' : occupancyType);
   let { totalDemandVA } = phase2;
   const { demandBreakdown } = phase2;
   const necReferences = [...phase2.necReferences];
@@ -1217,7 +1258,7 @@ export function calculateAggregatedLoad(
   );
   if (stdSplit.proposedConnectedVA > 0) {
     const existingOnly = calculateAggregatedLoad(
-      panelId, panels, circuits.filter(c => !c.is_proposed), transformers, occupancyType, undefined, necEdition,
+      panelId, panels, circuits.filter(c => !c.is_proposed), transformers, occupancyType, undefined, necEdition, dwelling,
     );
     stdSplit.existingDemandVA = Math.round(existingOnly.totalDemandVA);
     stdSplit.proposedDemandVA = Math.round(totalDemandVA) - stdSplit.existingDemandVA;
@@ -1363,6 +1404,68 @@ function computeProposedSplit(
  * watts) — what the multifamily generator writes. Otherwise all circuits
  * enter as one group and 220.85 is not taken.
  */
+/**
+ * A non-MDP panel's rules on a dwelling project (#179): 'unit' for a dwelling
+ * unit panel (the unit page's test, `isDwellingUnitPanel`), 'house' for a
+ * multifamily house panel, null for everything else (EV panels, single-family
+ * subpanels: the per-type cascade).
+ */
+function dwellingPanelRole(
+  panel: Panel,
+  circuits: Circuit[],
+  dwelling: DwellingAggregateOptions | undefined,
+): 'unit' | 'house' | null {
+  const own = circuits
+    .filter(c => c.panel_id === panel.id)
+    .map(c => ({ description: c.description, loadWatts: c.load_watts || 0 }));
+  if (isDwellingUnitPanel(panel.name, own)) return 'unit';
+  if (dwelling?.multiFamily && isHousePanelName(panel.name)) return 'house';
+  return null;
+}
+
+/**
+ * A dwelling unit panel's demand (#179): `calculateDwellingUnitPanelLoad`, the
+ * function the unit page and the panel-schedule PDF print (#155), over the
+ * circuits under the panel. Rows sum to the circuits' connected load (#160):
+ * a 0% row carries what Part III counts inside the 220.12 / 220.52 allowances
+ * or omits under 220.60.
+ */
+function dwellingUnitDemand(
+  panelId: string,
+  panels: Panel[],
+  circuits: Circuit[],
+  transformers: Transformer[],
+  existingBuilding: boolean,
+  necEdition: NecEdition,
+): { demandBreakdown: DemandCalculation[]; totalDemandVA: number; necReferences: string[] } {
+  const ids = collectDownstreamPanelIds(panelId, panels, transformers);
+  const unitCircuits = circuits.filter(c => !!c.panel_id && ids.has(c.panel_id) && !isEVEMSMarkerCircuit(c));
+  const summary = calculateDwellingUnitPanelLoad({ circuits: unitCircuits, existingBuilding, necEdition });
+  const demandBreakdown: DemandCalculation[] = summary.rows.map(r => ({
+    loadType: r.loadType,
+    connectedVA: r.connectedVA,
+    demandVA: r.demandVA,
+    demandFactor: r.demandFactor,
+    necReference: r.necReference,
+  }));
+  const circuitConnectedVA = unitCircuits.reduce((sum, c) => sum + (c.load_watts || 0), 0);
+  const insideOtherRowsVA = circuitConnectedVA - summary.totalConnectedVA;
+  if (insideOtherRowsVA > 0) {
+    demandBreakdown.push({
+      loadType: 'Circuits counted in other rows (allowances, smaller of heat/cool)',
+      connectedVA: insideOtherRowsVA,
+      demandVA: 0,
+      demandFactor: 0,
+      necReference: 'NEC 220.12, 220.52, 220.60',
+    });
+  }
+  return {
+    demandBreakdown,
+    totalDemandVA: Math.round(summary.totalDemandVA),
+    necReferences: [...summary.necReferences],
+  };
+}
+
 function twoUnitDwellingDemand(
   mdpId: string,
   panels: Panel[],
@@ -1650,19 +1753,26 @@ export function buildMultiFamilyContext(
     evDemandVA += result.totalDemandVA;
   }
 
-  const housePanels = downstreamFromMDP.filter(p => p.name.toLowerCase().includes('house'));
-  const housePanelLoadVA = housePanels.reduce(
-    (sum, p) =>
-      sum +
-      calculateAggregatedLoad(p.id, panels, circuits, transformers, 'dwelling', undefined, necEdition).totalConnectedVA,
-    0,
-  );
+  // House panels: connected load out of the dwelling base; demand per Part III
+  // on the non-dwelling rules (220.84(B), PE ruling 2026-11-17, #179)
+  const housePanels = downstreamFromMDP.filter(p => isHousePanelName(p.name));
+  let housePanelLoadVA = 0;
+  let housePanelDemandVA = 0;
+  for (const p of housePanels) {
+    const result = calculateAggregatedLoad(
+      p.id, panels, circuits, transformers, 'dwelling', undefined, necEdition,
+      { multiFamily: true, existingBuilding: false },
+    );
+    housePanelLoadVA += result.totalConnectedVA;
+    housePanelDemandVA += result.totalDemandVA;
+  }
 
   return {
     dwellingUnits: totalUnits,
     evLoadVA: evLoadVA > 0 ? evLoadVA : undefined,
     evDemandVA: evLoadVA > 0 && evDemandVA !== evLoadVA ? evDemandVA : undefined,
     housePanelLoadVA: housePanelLoadVA > 0 ? housePanelLoadVA : undefined,
+    housePanelDemandVA: housePanelLoadVA > 0 ? housePanelDemandVA : undefined,
     // Sprint 3 (2026-05-27): expose the panel IDs so the existing/proposed
     // demand split can partition the EV / house / dwelling subsets without
     // re-doing the "name includes ev" / "name includes house" classification.

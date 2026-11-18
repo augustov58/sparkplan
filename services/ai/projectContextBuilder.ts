@@ -8,7 +8,7 @@
  */
 
 import type { Database } from '@/lib/database.types';
-import { isEVEMSMarkerCircuit } from '@/services/calculations/upstreamLoadAggregation';
+import { isEVEMSMarkerCircuit, type DwellingAggregateOptions } from '@/services/calculations/upstreamLoadAggregation';
 import type { NecEdition } from '../../data/nec/evse-load';
 import { multiFamilyLoadFromSettings } from '../../lib/storedCalcs';
 import {
@@ -30,6 +30,8 @@ export interface ProjectContext {
   projectType: 'Residential' | 'Commercial' | 'Industrial';
   /** The project's NEC edition (`resolveNecEdition`); tools that compute load use it. */
   necEdition?: NecEdition;
+  /** Dwelling unit / house panel rules for feeder loads, as the Feeder Manager uses them (#179). */
+  dwelling?: DwellingAggregateOptions;
   serviceVoltage: number;
   servicePhase: 1 | 3;
   summary: string;
@@ -188,6 +190,8 @@ export function buildProjectContext(
   shortCircuitCalculations?: ShortCircuitCalculation[],
   /** The project's NEC edition (`resolveNecEdition`), so answers cite the right code. */
   necEdition?: NecEdition,
+  /** `isExistingConstructionProject(project)`: a unit panel with proposed circuits takes 220.83 (#155, #179). */
+  existingBuilding?: boolean,
 ): ProjectContext {
   // Build panel summaries with hierarchy information
   const panelSummaries: PanelSummary[] = panels.map(panel => {
@@ -505,6 +509,10 @@ ${transformers.length > 0 ? `Transformers: ${transformers.length}` : ''}${permit
     estimating: estimatingSummary,
     shortCircuits,
     necEdition,
+    dwelling: {
+      multiFamily: residentialSettings?.dwellingType === 'multi_family',
+      existingBuilding: existingBuilding ?? false,
+    },
   };
 }
 
