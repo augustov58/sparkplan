@@ -20,6 +20,7 @@ const REPLACEMENTS: Readonly<Record<string, string>> = {
   '≈': '~',
   '√': 'sqrt',
   'Ω': 'ohm',
+  'θ': 'theta', // #219: printed as '¸' (U+03B8's low byte in WinAnsi)
   'Σ': 'Sum',
   'Φ': 'Ø',
   'φ': 'Ø',

@@ -65,3 +65,9 @@ describe('Text', () => {
     expect(blob.size).toBeGreaterThan(0);
   });
 });
+
+describe('θ (#219)', () => {
+  it('spells out theta: WinAnsi has no θ, it printed as a cedilla', () => {
+    expect(toPdfText('XL × sin θ')).toBe('XL × sin theta');
+  });
+});
