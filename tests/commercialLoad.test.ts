@@ -77,6 +77,8 @@ describe('Commercial Load Calculator — continuous loads (#195)', () => {
     expect(special.serviceSizingLoad_VA).toBe(17500); // 12,500 + 5,000
     expect(r.totalDemandLoad_VA).toBeCloseTo(52131.2, 1);
     expect(r.calculatedAmps).toBeCloseTo(162.1, 1);
+    // The sizing note splits the mixed row: 9,000 + 5,000 non-continuous; 18,914 + 12,500 at 125%
+    expect(r.notes.join(' | ')).toContain('Non-continuous (14000 VA) + Continuous loads at 125% (31414 VA)');
   });
 
   it('keeps signs and show windows as they were: 100% in the load, 125% in service sizing', () => {

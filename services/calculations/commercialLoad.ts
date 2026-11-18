@@ -145,6 +145,8 @@ export interface LoadBreakdownItem {
   demandFactor: number; // Demand factor as percentage (e.g., 100, 85, 50)
   isContinuous: boolean; // True if continuous load (gets ×1.25 for service sizing)
   serviceSizingLoad_VA: number; // Demand × 1.25 if continuous, otherwise same as demand
+  /** In a row that mixes continuous and non-continuous loads: the non-continuous part of serviceSizingLoad_VA */
+  nonContinuousSizing_VA?: number;
   necReference: string;
 }
 
@@ -344,6 +346,7 @@ export function calculateCommercialLoad(input: CommercialLoadInput): CommercialL
   // to service sizing only (230.42(A)(1)), as for signs and show windows (#195).
   let hvacLoad_VA = 0;
   let hvacServiceSizing_VA = 0;
+  let hvacNonContinuous_VA = 0;
   let hvacIsContinuous = false;
 
   for (const hvac of input.hvacLoads) {
@@ -360,6 +363,7 @@ export function calculateCommercialLoad(input: CommercialLoadInput): CommercialL
     hvacLoad_VA += loadVA;
     hvacServiceSizing_VA += hvac.isContinuous ? loadVA * 1.25 : loadVA;
     if (hvac.isContinuous) hvacIsContinuous = true;
+    else hvacNonContinuous_VA += loadVA;
   }
 
   if (hvacLoad_VA > 0) {
@@ -370,6 +374,7 @@ export function calculateCommercialLoad(input: CommercialLoadInput): CommercialL
       demandFactor: 100,
       isContinuous: hvacIsContinuous,
       serviceSizingLoad_VA: hvacServiceSizing_VA,
+      nonContinuousSizing_VA: hvacIsContinuous ? hvacNonContinuous_VA : undefined,
       necReference: 'NEC 220.14(C), 440.6',
     });
 
@@ -458,21 +463,29 @@ export function calculateCommercialLoad(input: CommercialLoadInput): CommercialL
   if (input.specialLoads && input.specialLoads.length > 0) {
     specialLoad_VA = 0;
     let specialServiceSizing_VA = 0;
+    let specialNonContinuous_VA = 0;
 
     for (const load of input.specialLoads) {
       specialLoad_VA += load.load_VA;
       specialServiceSizing_VA += load.isContinuous ? load.load_VA * 1.25 : load.load_VA;
+      if (!load.isContinuous) specialNonContinuous_VA += load.load_VA;
     }
+    const specialIsContinuous = input.specialLoads.some(load => load.isContinuous);
 
     loadBreakdown.push({
       category: 'Special Loads',
       connectedLoad_VA: specialLoad_VA,
       demandLoad_VA: specialLoad_VA,
       demandFactor: 100,
-      isContinuous: input.specialLoads.some(load => load.isContinuous),
+      isContinuous: specialIsContinuous,
       serviceSizingLoad_VA: specialServiceSizing_VA,
+      nonContinuousSizing_VA: specialIsContinuous ? specialNonContinuous_VA : undefined,
       necReference: 'NEC 220.14',
     });
+
+    if (specialIsContinuous) {
+      notes.push(`Continuous special loads are taken at 125% for service sizing only (NEC 230.42(A)(1)); the load total takes them at 100%`);
+    }
   }
 
   // ===== 7. CALCULATE TOTALS =====
@@ -510,13 +523,15 @@ export function calculateCommercialLoad(input: CommercialLoadInput): CommercialL
   );
 
   // Calculate breakdown for notes
+  // A continuous row may hold non-continuous loads too (mixed HVAC or special loads)
+  const mixedNonContinuous_VA = loadBreakdown.reduce((sum, item) => sum + (item.nonContinuousSizing_VA ?? 0), 0);
   const nonContinuousItems = loadBreakdown.filter(item => !item.isContinuous);
-  const totalNonContinuous_VA = nonContinuousItems.reduce((sum, item) => sum + item.serviceSizingLoad_VA, 0);
+  const totalNonContinuous_VA = nonContinuousItems.reduce((sum, item) => sum + item.serviceSizingLoad_VA, 0) + mixedNonContinuous_VA;
 
   // Separate continuous loads: Table 220.42(A) lighting vs other continuous
   const lightingItem = loadBreakdown.find(item => item.necReference.includes('220.42(A)'));
   const otherContinuousItems = loadBreakdown.filter(item => item.isContinuous && !item.necReference.includes('220.42(A)'));
-  const otherContinuousService_VA = otherContinuousItems.reduce((sum, item) => sum + item.serviceSizingLoad_VA, 0);
+  const otherContinuousService_VA = otherContinuousItems.reduce((sum, item) => sum + item.serviceSizingLoad_VA, 0) - mixedNonContinuous_VA;
 
   let sizingNote = `Service sizing per NEC 215.3/230.90: Non-continuous (${Math.round(totalNonContinuous_VA)} VA)`;
   if (otherContinuousService_VA > 0) {

@@ -73,5 +73,9 @@ test('#195 Commercial Load Calculator: continuous loads at 100% in the load tota
   await addSpecial.click();
   await expect(row('Special Loads')).toContainText(cells('15.0', '15.0', '100', '17.5'));
   await expectSummary('162.1', '52.1');
+  // The sizing note splits the mixed row: 9,000 + 5,000 non-continuous; 18,914 + 12,500 at 125%
+  await expect(page.getByText('Service sizing per NEC')).toContainText(
+    'Non-continuous (14000 VA) + Continuous loads at 125% (31414 VA)',
+  );
   await shot(page, '4-special-mixed');
 });

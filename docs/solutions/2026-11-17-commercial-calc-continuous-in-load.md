@@ -9,6 +9,8 @@
 3. **Apply the 125% per load, then sum.** A row can mix continuous and non-continuous loads (10,000 VA continuous + 5,000 VA not = 17,500 VA sizing). The sum is kept per load rather than applied to the row.
 4. **Pick the guardrail that proves nothing else moved.** The calculated amps come from `serviceSizingLoad_VA`, which had the 125% exactly once before and after. So the Acceptance pins the amps in every step (113.6 / 103.1 / 148.3 / 162.1 A) and they are the same on `main`.
 
+5. **The verifier found a second defect on the same card.** The "Service sizing" note filed a whole mixed row under "Continuous loads at 125%" (9,000 / 36,414 VA where the split is 14,000 / 31,414). It predates the fix. Each mixed row now carries its non-continuous part (`nonContinuousSizing_VA`), and the verifier re-checked only that line, with a mixed case of its own.
+
 ## Verification
 
 - `tests/commercialLoad.test.ts` (6 tests, the file is new): the four hand steps, signs and show windows unchanged, and an invariant that no non-motor row's demand exceeds its connected load.
