@@ -14,6 +14,7 @@
 
 import type { NecEdition } from '@/data/nec/evse-load';
 import { article220Citations } from '@/data/nec/article220-citations';
+import { getLightingDemandFactor } from '@/data/nec/table-220-42';
 
 // ==================== TYPES ====================
 
@@ -274,11 +275,11 @@ export function calculateCommercialLoad(input: CommercialLoadInput): CommercialL
   const lightingUnitLoad = LIGHTING_UNIT_LOAD[input.occupancyType];
   const lightingLoad_VA = input.totalFloorArea * lightingUnitLoad;
 
-  // Apply lighting demand factors (NEC 220.42)
-  const lightingDemandLoad_VA = applyLightingDemandFactor(
-    lightingLoad_VA,
-    input.occupancyType
-  );
+  // Lighting demand factors: the shared table (#260). Its "All others" row
+  // (100%) covers every non-dwelling occupancy; the inline hospital / hotel /
+  // warehouse factors were not the table's (warehouses came out below it) and
+  // are left out until their rows come from the code book (#236).
+  const lightingDemandLoad_VA = getLightingDemandFactor('all_others', lightingLoad_VA, input.necEdition).demandVA;
 
   const lightingDemandFactor = (lightingDemandLoad_VA / lightingLoad_VA) * 100;
 
@@ -631,36 +632,6 @@ export function calculateCommercialLoad(input: CommercialLoadInput): CommercialL
 }
 
 // ==================== HELPER FUNCTIONS ====================
-
-/**
- * Apply lighting demand factors per NEC 220.42
- *
- * NEC 220.42(A): Hospitals, hotels, motels, and storage warehouses
- * - First 20,000 VA @ 50%
- * - Remainder @ 40%
- *
- * All other occupancies: 100% (no reduction)
- */
-function applyLightingDemandFactor(
-  lightingLoad_VA: number,
-  occupancyType: OccupancyType
-): number {
-  const hospitalHotelTypes: OccupancyType[] = [
-    'hospitals',
-    'hotels_motels',
-    'warehouse',
-  ];
-
-  if (hospitalHotelTypes.includes(occupancyType) && lightingLoad_VA > 20000) {
-    // First 20,000 VA @ 50%, remainder @ 40%
-    const first20k = 20000 * 0.50;
-    const remainder = (lightingLoad_VA - 20000) * 0.40;
-    return first20k + remainder;
-  }
-
-  // All other occupancies: 100% (no demand reduction)
-  return lightingLoad_VA;
-}
 
 /**
  * Apply receptacle demand factors per NEC 220.44
