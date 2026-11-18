@@ -17,7 +17,7 @@ import {
   type AggregatedLoad,
   type MultiFamilyContext,
 } from '../calculations/upstreamLoadAggregation';
-import { calculateDwellingPanelDemand, calculateSingleFamilyPanelLoad } from '../calculations/residentialLoad';
+import { calculateDwellingPanelDemand, calculateSingleFamilyPanelLoad, calculateSingleFamilyLoadFromCircuits } from '../calculations/residentialLoad';
 import { applyCodeCycleList } from '../../data/ahj/codeCycle';
 import { calculateAllCumulativeVoltageDrops } from '../calculations/cumulativeVoltageDrop';
 import {
@@ -1805,6 +1805,21 @@ export const LoadCalculationSummary: React.FC<LoadSummaryProps> = ({
       })
     : null;
 
+  // A new single-family service: the 230.42(A)(1) service check (Article 220
+  // load + 25% of the continuous loads, PE ruling #192 — every method,
+  // dwellings too), from the Dwelling Load Calculator's own function (#227).
+  // Existing services print it on E-102.
+  const newHouseServiceCheck = mdp && singleFamilyDwellingContext && !singleFamilyDwellingContext.existingDwelling
+    && (dwellingPartIII || dwellingResult)
+    ? calculateSingleFamilyLoadFromCircuits({
+        circuits: dwellingCircuits,
+        ...singleFamilyDwellingContext,
+        voltage: mdp.voltage || 240,
+        necEdition,
+      })
+    : null;
+  const newHouseServiceRating = mdp ? (mdp.main_breaker_amps || mdp.bus_rating || 0) : 0;
+
   // Real NEC 220 aggregation on the MDP (entire system). Only computed when
   // the dwelling-optional gate did NOT fire (commercial, multi-family, or
   // missing dwelling context) — single-family dwellings shouldn't use the
@@ -1938,6 +1953,14 @@ export const LoadCalculationSummary: React.FC<LoadSummaryProps> = ({
           </Text>
         </View>
       </View>
+
+      {newHouseServiceCheck?.serviceCheckAmps != null && newHouseServiceRating > 0 && (
+        <Text style={{ fontSize: 8, color: '#333', marginTop: 4, marginBottom: 4 }}>
+          {`Service check (NEC 230.42(A)(1)): ${newHouseServiceCheck.serviceCheckAmps} A on the ${newHouseServiceRating} A service `
+            + `(the NEC 220 load + 25% of the continuous loads) — `
+            + (newHouseServiceCheck.serviceCheckAmps <= newHouseServiceRating ? 'sufficient.' : 'NOT sufficient.')}
+        </Text>
+      )}
 
       {/* PR-2 Step 3 (2026-05-26): Existing vs Proposed split.
           Renders only when downstream circuits include at least one

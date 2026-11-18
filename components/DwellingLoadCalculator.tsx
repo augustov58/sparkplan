@@ -1630,6 +1630,17 @@ export const DwellingLoadCalculator: React.FC<DwellingLoadCalculatorProps> = ({
                     <span className="text-[#888] text-sm">Service Current</span>
                     <span className="text-xl font-bold text-[#c9a227]">{loadResult.serviceAmps}A</span>
                   </div>
+                  {/* #227: a new house's service check (230.42(A)(1), PE ruling
+                      #192); existing services have the Service Headroom card */}
+                  {isSingleFamily && !isExistingConstructionProject(project) && loadResult.serviceCheckAmps != null && (
+                    <div className="flex justify-between items-center py-1">
+                      <span className="text-[#888] text-sm">
+                        Service Check (NEC 230.42(A)(1))
+                        <span className="block text-[10px]">load + 25% of the continuous loads</span>
+                      </span>
+                      <span className="text-lg font-semibold text-[#2d3b2d]">{loadResult.serviceCheckAmps}A</span>
+                    </div>
+                  )}
                   {(() => {
                     // On existing-construction with a user-stated existing
                     // service that holds, the "recommendation" IS the
