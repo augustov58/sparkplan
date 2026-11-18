@@ -26,7 +26,7 @@ import { calculateAggregatedLoad } from '../services/calculations/upstreamLoadAg
 import { useCumulativeVoltageDrop } from '../hooks/useCumulativeVoltageDrop';
 import { calculateCumulativeForFeeder } from '../services/calculations/cumulativeVoltageDrop';
 import { exportVoltageDropReport, hasVoltageDropData } from '../services/pdfExport/voltageDropPDF';
-import { computeFeederLoadVA, splitFeederDesignLoad } from '../services/feeder/feederLoadSync';
+import { computeFeederLoadVA, feederDesignLoadSplit } from '../services/feeder/feederLoadSync';
 import type { Feeder, FeederCalculationResult } from '../types';
 
 interface FeederManagerProps {
@@ -79,14 +79,18 @@ export const FeederManager: React.FC<FeederManagerProps> = ({
 
   // Advanced calculation options
   const [showAdvancedOptions, setShowAdvancedOptions] = useState(false);
-  const [continuousLoadPercent, setContinuousLoadPercent] = useState(100); // % of load that is continuous (default 100% for capacity-based)
   const [temperatureRating, setTemperatureRating] = useState<60 | 75 | 90>(75); // Conductor insulation temperature rating
 
-  // Detect stale feeders when circuit loads change
+  // Detect stale feeders when circuit loads change, or when the stored design
+  // load is not what the sizing rule now gives (#190)
   // Note: Only applies to feeders sized based on calculated load (not max capacity)
+  const designContext = useMemo(
+    () => ({ transformers: transformers ?? [], occupancy: occupancyType, necEdition }),
+    [transformers, occupancyType, necEdition],
+  );
   const staleFeeders = useMemo(() => {
-    return getStaleFeedersList(feeders, circuits, panels, 5); // 5% threshold
-  }, [feeders, circuits, panels]);
+    return getStaleFeedersList(feeders, circuits, panels, 5, designContext); // 5% connected-load threshold
+  }, [feeders, circuits, panels, designContext]);
 
   // Get valid destination panels based on selected source (panel or transformer)
   const validDestinations = useMemo(() => {
@@ -189,11 +193,12 @@ export const FeederManager: React.FC<FeederManagerProps> = ({
     const aggregated = calculateAggregatedLoad(panelId, panels, circuits, transformers, occupancyType, undefined, necEdition);
     
     // #144: size from the destination's demand — EVEMS marker excluded and the
-    // 625.42 setpoint clamp kept — split exactly like the packet's E-103.
-    // The old direct-circuit classification counted the marker as load and
-    // lost the clamp (downstream term max(0, demand − direct) = 0), sizing an
-    // EVEMS feeder at 686 A where the packet showed 189 A.
-    const { continuousVA, noncontinuousVA } = splitFeederDesignLoad(aggregated.totalDemandVA);
+    // 625.42 setpoint clamp kept. #190: its continuous part is the real
+    // continuous loads (EV, signs, show windows), split exactly like the
+    // packet's E-103, so the design load is demand + 25% of them.
+    const { continuousVA, noncontinuousVA } = feederDesignLoadSplit(
+      [panelId], aggregated.totalDemandVA, panels, circuits, transformers, necEdition,
+    );
 
     return {
       totalVA: aggregated.totalConnectedVA,
@@ -736,15 +741,19 @@ export const FeederManager: React.FC<FeederManagerProps> = ({
                   {staleFeeders.length} Feeder{staleFeeders.length > 1 ? 's' : ''} Need Recalculation
                 </h4>
                 <p className="text-sm text-[#2d3b2d] mt-1">
-                  Panel loads have changed since these feeders were calculated. Click the refresh button to update.
+                  Their stored sizing no longer matches the current load or sizing rule. Click the refresh button to update.
                 </p>
                 <ul className="mt-2 space-y-1">
                   {staleFeeders.map(sf => (
                     <li key={sf.feederId} className="text-sm text-[#2d3b2d] flex items-center gap-2">
                       <span className="font-medium">{sf.feederName}:</span>
                       <span>
-                        {sf.cachedConnectedVA.toLocaleString()} VA → {sf.currentConnectedVA.toLocaleString()} VA
-                        ({sf.loadDifferencePercent > 0 ? '+' : ''}{sf.loadDifferencePercent}%)
+                        {sf.designChanged
+                          ? `Design load ${(sf.cachedDesignVA / 1000).toFixed(1)} → ${(sf.currentDesignVA / 1000).toFixed(1)} kVA`
+                          : <>
+                              {sf.cachedConnectedVA.toLocaleString()} VA → {sf.currentConnectedVA.toLocaleString()} VA
+                              ({sf.loadDifferencePercent > 0 ? '+' : ''}{sf.loadDifferencePercent}%)
+                            </>}
                       </span>
                       <button
                         onClick={() => {
@@ -1227,30 +1236,6 @@ export const FeederManager: React.FC<FeederManagerProps> = ({
                   </p>
                 </div>
 
-                {/* Continuous Load Percentage (only for load-based sizing) */}
-                {sizingBasis === 'load' && (
-                  <div>
-                    <label className="block text-xs font-semibold text-gray-500 mb-1 uppercase tracking-wider">
-                      Continuous Load Percentage
-                    </label>
-                    <div className="flex items-center gap-2">
-                      <input
-                        type="range"
-                        min="0"
-                        max="100"
-                        step="10"
-                        value={continuousLoadPercent}
-                        onChange={e => setContinuousLoadPercent(Number(e.target.value))}
-                        className="flex-1"
-                      />
-                      <span className="text-sm font-medium w-12 text-right">{continuousLoadPercent}%</span>
-                    </div>
-                    <p className="text-xs text-gray-500 mt-1">
-                      % of calculated load that operates continuously (&gt;3 hrs). Continuous loads get 125% multiplier (NEC 215.2(A)(1))
-                    </p>
-                  </div>
-                )}
-
                 {/* Capacity-based sizing explanation */}
                 {sizingBasis === 'capacity' && (
                   <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
@@ -1280,7 +1265,7 @@ export const FeederManager: React.FC<FeederManagerProps> = ({
                       <ul className="list-disc ml-4 space-y-1">
                         {sizingBasis === 'load' && (
                           <li>
-                            <strong>Continuous load (125%):</strong> {continuousLoadPercent}% of load treated as continuous (NEC 215.2(A)(1))
+                            <strong>Continuous load (125%):</strong> EV charging, signs and show windows on this feeder (an EVEMS panel at its setpoint); every other load at 100% (NEC 215.2(A)(1), 625.41)
                           </li>
                         )}
                         <li>
@@ -1347,7 +1332,7 @@ export const FeederManager: React.FC<FeederManagerProps> = ({
       ) : (
         <div className="space-y-4">
           {feeders.map(feeder => {
-            const staleStatus = checkFeederLoadStatus(feeder, circuits, panels, 5);
+            const staleStatus = checkFeederLoadStatus(feeder, circuits, panels, 5, designContext);
             // Per-feeder cumulative — handles both panel-destination and
             // transformer-primary destination feeders correctly.
             const cum = calculateCumulativeForFeeder(feeder, cumulativeVdMap);
@@ -1387,6 +1372,9 @@ interface FeederCardProps {
     currentConnectedVA: number;
     cachedConnectedVA: number;
     loadDifferencePercent: number;
+    designChanged: boolean;
+    cachedDesignVA: number;
+    currentDesignVA: number;
     message: string;
   };
   cumulativeVdPercent: number | null;          // chain total at destination panel
@@ -1436,8 +1424,12 @@ const FeederCard: React.FC<FeederCardProps> = ({
           <div className="flex items-center gap-1.5">
             <AlertTriangle className="w-3.5 h-3.5 text-[#3d6b3d]" />
             <span className="text-amber-800">
-              Load: {staleStatus.cachedConnectedVA.toLocaleString()} → {staleStatus.currentConnectedVA.toLocaleString()} VA
-              ({staleStatus.loadDifferencePercent > 0 ? '+' : ''}{staleStatus.loadDifferencePercent}%)
+              {staleStatus.designChanged
+                ? `Design load: ${(staleStatus.cachedDesignVA / 1000).toFixed(1)} → ${(staleStatus.currentDesignVA / 1000).toFixed(1)} kVA`
+                : <>
+                    Load: {staleStatus.cachedConnectedVA.toLocaleString()} → {staleStatus.currentConnectedVA.toLocaleString()} VA
+                    ({staleStatus.loadDifferencePercent > 0 ? '+' : ''}{staleStatus.loadDifferencePercent}%)
+                  </>}
             </span>
           </div>
           <button

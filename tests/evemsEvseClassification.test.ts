@@ -7,7 +7,7 @@ import {
   calculateAggregatedLoad,
   buildMultiFamilyContext,
 } from '../services/calculations/upstreamLoadAggregation';
-import { splitFeederDesignLoad } from '../services/feeder/feederLoadSync';
+import { feederDesignLoadSplit } from '../services/feeder/feederLoadSync';
 import type { Database } from '../lib/database.types';
 
 type Panel = Database['public']['Tables']['panels']['Row'];
@@ -59,8 +59,16 @@ describe('#144 EVEMS clamp limits the chargers, not the whole panel', () => {
     expect(r.totalDemandVA).toBe(30_240 + 1_800);
   });
 
-  it('feeder split is shared: 80% continuous / 20% non-continuous', () => {
-    expect(splitFeederDesignLoad(32_040)).toEqual({ continuousVA: 32_040 * 0.8, noncontinuousVA: 32_040 * 0.2 });
+  it('feeder split: the chargers at the setpoint are the continuous part (#190)', () => {
+    const ev = panel({ id: 'ev', name: 'EV Sub-Panel', bus_rating: 300 });
+    const circuits = [
+      ...Array.from({ length: 8 }, (_, i) => circuit('ev', 11_520, `EV Charger #${i + 1} - Level 2 (48A) (EVEMS managed)`, 60)),
+      circuit('ev', 1_800, 'Lighting Circuit'),
+      circuit('ev', 30_240, 'EVEMS Aggregate Setpoint (NEC 625.42)'),
+    ];
+    // demand 32,040 = setpoint 30,240 + lighting 1,800; continuous = min(92,160, 30,240)
+    expect(feederDesignLoadSplit(['ev'], 32_040, [ev], circuits, [], '2020'))
+      .toEqual({ continuousVA: 30_240, noncontinuousVA: 1_800 });
   });
 });
 

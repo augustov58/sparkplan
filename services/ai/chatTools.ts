@@ -14,7 +14,7 @@ import { analyzeChangeImpact, draftRFI, predictInspection } from '../api/pythonB
 import { supabase } from '@/lib/supabase';
 import { isExistingConstructionProject } from '@/lib/projectSettings';
 import { notifyDataRefresh } from '@/lib/dataRefreshEvents';
-import { computeFeederLoadVA, splitFeederDesignLoad } from '@/services/feeder/feederLoadSync';
+import { computeFeederLoadVA, feederDesignLoadSplit } from '@/services/feeder/feederLoadSync';
 import { calculateFeederSizing } from '@/services/calculations/feederSizing';
 import {
   calculateAllCumulativeVoltageDrops,
@@ -583,18 +583,28 @@ Returns the feeder's voltage drop percentage if already calculated in the projec
           context.projectContext.necEdition,
         );
 
+        // #190: the same design load and feeder conditions as E-103
+        const split = feederDesignLoadSplit(
+          [rawFeeder!.destination_panel_id],
+          liveLoadVA,
+          context.rawPanels!,
+          context.rawCircuits!,
+          context.rawTransformers!,
+          context.projectContext.necEdition ?? '2020', // computeFeederLoadVA's default
+        );
         const input: FeederCalculationInput = {
           source_voltage: voltage,
           source_phase: phase,
           destination_voltage: voltage,
           destination_phase: phase,
           total_load_va: liveLoadVA,
-          continuous_load_va: splitFeederDesignLoad(liveLoadVA).continuousVA,
-          noncontinuous_load_va: splitFeederDesignLoad(liveLoadVA).noncontinuousVA,
+          continuous_load_va: split.continuousVA,
+          noncontinuous_load_va: split.noncontinuousVA,
           distance_ft: rawFeeder!.distance_ft || 0,
           conductor_material: (rawFeeder!.conductor_material as 'Cu' | 'Al') || 'Cu',
-          ambient_temperature_c: 30,
-          num_current_carrying: 3,
+          ambient_temperature_c: rawFeeder!.ambient_temperature_c || 30,
+          num_current_carrying: rawFeeder!.num_current_carrying || 4,
+          sets_in_parallel: rawFeeder!.sets_in_parallel ?? 1,
           max_voltage_drop_percent: 3.0,
         };
 

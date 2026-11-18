@@ -13,12 +13,17 @@
 
 import type { Feeder } from '@/types';
 import type { Database } from '@/lib/database.types';
-import { calculateAggregatedLoad, isEVEMSMarkerCircuit } from '@/services/calculations/upstreamLoadAggregation';
+import { calculateAggregatedLoad, continuousLoadVA, isEVEMSMarkerCircuit } from '@/services/calculations/upstreamLoadAggregation';
+import { CONTINUOUS_LOAD_FACTOR } from '@/data/nec/continuous-load';
 import type { NecEdition } from '@/data/nec/evse-load';
 
 type Circuit = Database['public']['Tables']['circuits']['Row'];
 type Panel = Database['public']['Tables']['panels']['Row'];
 type Transformer = Database['public']['Tables']['transformers']['Row'];
+type Occupancy = 'dwelling' | 'commercial' | 'industrial';
+
+/** A stored design load this far from the current rule's flags the feeder (#190). */
+const DESIGN_LOAD_STALE_FRACTION = 0.01;
 
 export interface FeederLoadStatus {
   feederId: string;
@@ -30,7 +35,18 @@ export interface FeederLoadStatus {
   cachedConnectedVA: number;
   loadDifferenceVA: number;
   loadDifferencePercent: number;
+  /** True when the stored design load differs from what the sizing rule now gives (#190) */
+  designChanged: boolean;
+  cachedDesignVA: number;
+  currentDesignVA: number;
   message: string;
+}
+
+/** What the stale check needs to recompute a feeder's design load the way the Feeder Manager does */
+export interface FeederDesignContext {
+  transformers: Transformer[];
+  occupancy: Occupancy;
+  necEdition: NecEdition;
 }
 
 /**
@@ -66,7 +82,9 @@ export function checkFeederLoadStatus(
   feeder: Feeder,
   circuits: Circuit[],
   panels?: Panel[],
-  thresholdPercent: number = 5
+  thresholdPercent: number = 5,
+  /** When given, also flag a stored design load that the sizing rule no longer gives (#190) */
+  design?: FeederDesignContext,
 ): FeederLoadStatus {
   // Only check feeders that go to panels (not transformers)
   if (!feeder.destination_panel_id) {
@@ -79,6 +97,9 @@ export function checkFeederLoadStatus(
       cachedConnectedVA: 0,
       loadDifferenceVA: 0,
       loadDifferencePercent: 0,
+      designChanged: false,
+      cachedDesignVA: 0,
+      currentDesignVA: 0,
       message: 'Feeder to transformer - load sync N/A',
     };
   }
@@ -107,6 +128,9 @@ export function checkFeederLoadStatus(
           cachedConnectedVA: cachedLoad,
           loadDifferenceVA: 0,
           loadDifferencePercent: 0,
+          designChanged: false,
+          cachedDesignVA: 0,
+          currentDesignVA: 0,
           message: 'Feeder sized for panel max capacity - not affected by load changes',
         };
       }
@@ -121,10 +145,23 @@ export function checkFeederLoadStatus(
     ? (difference / cachedConnected) * 100 
     : (currentConnected > 0 ? 100 : 0);
 
-  const isStale = percentDiff > thresholdPercent;
+  // #190: the stored design load against the one the current rule gives. A
+  // rule change (or an EVEMS marker, which adds no connected load) moves it
+  // without moving the connected load. 1%, not 5%: an all-EV feeder going
+  // from 1.20 to 1.25 × demand moves 4.2%.
+  const cachedDesignVA = feeder.design_load_va || 0;
+  const currentDesignVA = design && panels && cachedDesignVA > 0
+    ? feederDesignLoadVA(feeder.destination_panel_id, panels, circuits, design)
+    : cachedDesignVA;
+  const designChanged = cachedDesignVA > 0 &&
+    Math.abs(currentDesignVA - cachedDesignVA) / cachedDesignVA > DESIGN_LOAD_STALE_FRACTION;
+
+  const isStale = percentDiff > thresholdPercent || designChanged;
 
   let message = '';
-  if (isStale) {
+  if (designChanged && percentDiff <= thresholdPercent) {
+    message = `Design load ${(cachedDesignVA / 1000).toFixed(1)} → ${(currentDesignVA / 1000).toFixed(1)} kVA - recalculation recommended`;
+  } else if (isStale) {
     if (currentConnected > cachedConnected) {
       message = `Load increased by ${difference.toLocaleString()} VA (${percentDiff.toFixed(1)}%) - recalculation recommended`;
     } else {
@@ -143,6 +180,9 @@ export function checkFeederLoadStatus(
     cachedConnectedVA: cachedConnected,
     loadDifferenceVA: difference,
     loadDifferencePercent: Math.round(percentDiff * 10) / 10,
+    designChanged,
+    cachedDesignVA,
+    currentDesignVA: Math.round(currentDesignVA),
     message,
   };
 }
@@ -155,10 +195,11 @@ export function getStaleFeedersList(
   feeders: Feeder[],
   circuits: Circuit[],
   panels?: Panel[],
-  thresholdPercent: number = 5
+  thresholdPercent: number = 5,
+  design?: FeederDesignContext,
 ): FeederLoadStatus[] {
   return feeders
-    .map(feeder => checkFeederLoadStatus(feeder, circuits, panels, thresholdPercent))
+    .map(feeder => checkFeederLoadStatus(feeder, circuits, panels, thresholdPercent, design))
     .filter(status => status.isStale);
 }
 
@@ -219,11 +260,54 @@ export function computeFeederLoadVA(
 }
 
 /**
- * Continuous / non-continuous split for feeder sizing from a demand load:
- * 80% continuous (×1.25 in calculateFeederSizing) / 20% non-continuous. One
- * definition for the packet's E-103, the Copilot, and the Feeder Manager so
- * the app and the packet size the same feeder the same way (#144).
+ * Feeder design load split — NEC 215.2(A)(1), 215.3 and 625.41 (PE ruling
+ * 2026-11-17, #190): the feeder's Article 220 demand at 100%, with its
+ * continuous loads (`continuousLoadVA`: EV charging, signs, show windows; an
+ * EVEMS panel's chargers at the setpoint) as the continuous part.
+ * `calculateFeederSizing` takes that part at 125%, so the design load is the
+ * demand plus 25% of the continuous loads. Replaces a blanket 80% / 20% split
+ * (design = 1.20 × demand) that undersized all-EV feeders and oversized the
+ * rest. One definition for the Feeder Manager, the packet's E-103 and the
+ * Copilot, the same classifier as the service check (#192).
+ *
+ * @param rootPanelIds - the destination panel, or the panels a destination
+ *   transformer feeds; each counts with everything downstream of it
+ * @param demandVA - the feeder's Article 220 demand; the continuous part is
+ *   capped at it
  */
-export function splitFeederDesignLoad(loadVA: number): { continuousVA: number; noncontinuousVA: number } {
-  return { continuousVA: loadVA * 0.8, noncontinuousVA: loadVA * 0.2 };
+export function feederDesignLoadSplit(
+  rootPanelIds: string[],
+  demandVA: number,
+  panels: Panel[],
+  circuits: Circuit[],
+  transformers: Transformer[],
+  necEdition: NecEdition,
+): { continuousVA: number; noncontinuousVA: number } {
+  const demand = Math.max(0, demandVA);
+  const continuousTotalVA = rootPanelIds.reduce((total, panelId) => {
+    const { existingVA, proposedVA } = continuousLoadVA(panelId, panels, circuits, transformers, necEdition);
+    return total + existingVA + proposedVA;
+  }, 0);
+  const continuousVA = Math.min(continuousTotalVA, demand);
+  return { continuousVA, noncontinuousVA: demand - continuousVA };
+}
+
+/**
+ * The design load the current rule gives a feeder to `destinationPanelId`,
+ * computed as the Feeder Manager does: the destination's aggregate demand for
+ * the project's occupancy, plus 25% of its continuous loads.
+ */
+export function feederDesignLoadVA(
+  destinationPanelId: string,
+  panels: Panel[],
+  circuits: Circuit[],
+  design: FeederDesignContext,
+): number {
+  const demandVA = calculateAggregatedLoad(
+    destinationPanelId, panels, circuits, design.transformers, design.occupancy, undefined, design.necEdition,
+  ).totalDemandVA;
+  const { continuousVA, noncontinuousVA } = feederDesignLoadSplit(
+    [destinationPanelId], demandVA, panels, circuits, design.transformers, design.necEdition,
+  );
+  return continuousVA * CONTINUOUS_LOAD_FACTOR + noncontinuousVA;
 }

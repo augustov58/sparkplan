@@ -18,7 +18,7 @@ import { Text } from './PdfText';
 import type { Database } from '../../lib/database.types';
 import { calculateFeederSizing } from '../calculations/feederSizing';
 import { calculateAllCumulativeVoltageDrops, calculateCumulativeForFeeder } from '../calculations/cumulativeVoltageDrop';
-import { computeFeederLoadVA, splitFeederDesignLoad } from '../feeder/feederLoadSync';
+import { computeFeederLoadVA, feederDesignLoadSplit } from '../feeder/feederLoadSync';
 import type { NecEdition } from '../../data/nec/evse-load';
 import type { FeederCalculationInput, FeederCalculationResult } from '../../types';
 import {
@@ -343,18 +343,31 @@ function buildBaseFeederRow(
         ? computeFeederLoadVA(feeder as never, panels, circuits, transformers, necEdition)
         : (feeder.total_load_va || 0);
 
+      // #190: the continuous part is the real continuous loads under the
+      // feeder (EV, signs, show windows), not a blanket 80%. A transformer
+      // feeder counts the panels the transformer feeds.
+      const rootPanelIds = feeder.destination_panel_id
+        ? [feeder.destination_panel_id]
+        : panels.filter(p => p.fed_from_transformer_id === feeder.destination_transformer_id).map(p => p.id);
+      const split = circuits
+        ? feederDesignLoadSplit(rootPanelIds, liveLoadVA, panels, circuits, transformers, necEdition ?? '2020')
+        : { continuousVA: 0, noncontinuousVA: liveLoadVA };
+
       const input: FeederCalculationInput = {
         source_voltage: voltage,
         source_phase: phase,
         destination_voltage: voltage,
         destination_phase: phase,
         total_load_va: liveLoadVA,
-        continuous_load_va: splitFeederDesignLoad(liveLoadVA).continuousVA,
-        noncontinuous_load_va: splitFeederDesignLoad(liveLoadVA).noncontinuousVA,
+        continuous_load_va: split.continuousVA,
+        noncontinuous_load_va: split.noncontinuousVA,
         distance_ft: feeder.distance_ft || 0,
         conductor_material: (feeder.conductor_material as 'Cu' | 'Al') || 'Cu',
-        ambient_temperature_c: 30,
-        num_current_carrying: 3,
+        // The feeder's own conditions, defaulted as the Feeder Manager does,
+        // so this page and the equipment schedule print one conductor (#190)
+        ambient_temperature_c: feeder.ambient_temperature_c || 30,
+        num_current_carrying: feeder.num_current_carrying || 4,
+        sets_in_parallel: feeder.sets_in_parallel ?? 1,
         max_voltage_drop_percent: 3.0,
       };
 
