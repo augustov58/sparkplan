@@ -6,9 +6,8 @@
 
 export interface OccupancyLightingDemand {
   occupancyType: string;
-  firstVA: number; // First tier VA
-  firstDemand: number; // Demand factor 0.0-1.0
-  remainderDemand: number; // Demand factor for remainder
+  /** Tiers in order: the VA up to `upTo` (cumulative) at `factor` (#236). */
+  tiers: { upTo: number; factor: number }[];
   necReference: string;
 }
 
