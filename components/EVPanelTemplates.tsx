@@ -2,6 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { Zap, Check, AlertCircle, Info, Activity, Sparkles, Calculator } from 'lucide-react';
 import {
   generateCustomEVPanel,
+  templateCircuitRow,
   type ChargerTypeOption,
   type CustomEVPanelConfig
 } from '../data/ev-panel-templates';
@@ -21,7 +22,7 @@ interface EVPanelTemplatesProps {
 }
 
 export const EVPanelTemplates: React.FC<EVPanelTemplatesProps> = ({ project }) => {
-  const { panels, createPanel } = usePanels(project.id);
+  const { panels, loading: panelsLoading, createPanel } = usePanels(project.id);
   const { circuits, createCircuit } = useCircuits(project.id);
   const { transformers } = useTransformers(project.id);
   const necEdition = useProjectNecEdition(project);
@@ -82,6 +83,31 @@ export const EVPanelTemplates: React.FC<EVPanelTemplatesProps> = ({ project }) =
     };
   }, [chargerType, numberOfChargers, useEVEMS, simultaneousChargers, includeSpare, includeLighting]);
 
+  // One template for the service-check preview and for Create (#224). With
+  // EVEMS, an explicit NEC 625.42 setpoint marker: the simultaneous chargers
+  // at full power (the legacy marker clamped to the panel's main breaker).
+  const builderTemplate = useMemo(() => {
+    const config: CustomEVPanelConfig = {
+      chargerType,
+      numberOfChargers,
+      useEVEMS,
+      simultaneousChargers: useEVEMS ? simultaneousChargers : undefined,
+      includeSpare,
+      includeLighting,
+      panelName: customPanelName || undefined,
+    };
+    const first = generateCustomEVPanel({ projectId: project.id, config });
+    if (!useEVEMS) return first;
+    const perChargerVA = first.circuits.find(c => c.isEvCharger)?.loadVA ?? 0;
+    return generateCustomEVPanel({
+      projectId: project.id,
+      config: { ...config, evemsSetpointVA: simultaneousChargers * perChargerVA },
+    });
+  }, [project.id, chargerType, numberOfChargers, useEVEMS, simultaneousChargers, includeSpare, includeLighting, customPanelName]);
+
+  const toCircuitRow = (c: (typeof builderTemplate.circuits)[number], panelId: string) =>
+    templateCircuitRow(c, panelId, project.id);
+
   // #193: the service check once this panel is on the service (under the
   // MDP): the project's Article 220 load + 25% of its continuous loads, the
   // template's chargers included — the check E-102 and the Service Upgrade
@@ -90,62 +116,31 @@ export const EVPanelTemplates: React.FC<EVPanelTemplatesProps> = ({ project }) =
   const serviceWithPanel = useMemo(() => {
     const mdp = panels.find(p => p.is_main);
     if (!mdp) return null;
-    const preview = generateCustomEVPanel({
-      projectId: project.id,
-      config: {
-        chargerType,
-        numberOfChargers,
-        useEVEMS,
-        simultaneousChargers: useEVEMS ? simultaneousChargers : undefined,
-        includeSpare,
-        includeLighting,
-      },
-    });
     const previewPanel = {
-      ...preview.panel,
+      ...builderTemplate.panel,
       id: 'ev-panel-preview',
       is_main: false,
       fed_from_type: 'panel',
       fed_from: mdp.id,
       fed_from_transformer_id: null,
     } as unknown as PanelRow;
-    const previewCircuits = preview.circuits.map((c, i) => ({
+    const previewCircuits = builderTemplate.circuits.map((c, i) => ({
+      ...toCircuitRow(c, previewPanel.id),
       id: `ev-panel-preview-${i}`,
-      panel_id: previewPanel.id,
-      project_id: project.id,
-      circuit_number: c.circuitNumber,
-      description: c.description,
-      load_watts: c.loadVA,
       load_type: 'O',
-      breaker_amps: c.breakerAmps,
-      pole: c.poles,
-      is_proposed: true,
     }) as unknown as CircuitRow);
     return scheduleServiceCheck(
       project, [...panels, previewPanel], [...circuits, ...previewCircuits], transformers, necEdition,
     );
-  }, [project, panels, circuits, transformers, necEdition, chargerType, numberOfChargers, useEVEMS, simultaneousChargers, includeSpare, includeLighting]);
+  }, [project, panels, circuits, transformers, necEdition, builderTemplate]); // toCircuitRow reads only project.id
 
   const handleApplyConfiguration = async () => {
     setApplyStatus('applying');
     setErrorMessage('');
 
     try {
-      const config: CustomEVPanelConfig = {
-        chargerType,
-        numberOfChargers,
-        useEVEMS,
-        simultaneousChargers: useEVEMS ? simultaneousChargers : undefined,
-        includeSpare,
-        includeLighting,
-        panelName: customPanelName || undefined
-      };
-
-      // Generate panel and circuits
-      const { panel, circuits } = generateCustomEVPanel({
-        projectId: project.id,
-        config
-      });
+      const { panel, circuits: templateCircuits } = builderTemplate;
+      const mdp = panels.find(p => p.is_main);
 
       // Create panel in database. The template generator returns a Partial<Panel>
       // (Supabase fills the remaining nullable columns at insert time); cast to
@@ -154,8 +149,10 @@ export const EVPanelTemplates: React.FC<EVPanelTemplatesProps> = ({ project }) =
       // by construction — flag with is_proposed:true so the riser PDF + One-Line
       // diagram render the dashed outline + "NEW" badge on existing projects.
       // Matches the per-circuit flag below at the createCircuit call.
+      // #224: fed from the MDP when there is one (the template says 'service').
       const newPanel = await createPanel({
         ...panel,
+        ...(mdp ? { fed_from_type: 'panel', fed_from: mdp.id } : {}),
         is_proposed: true,
       } as Parameters<typeof createPanel>[0]);
 
@@ -163,21 +160,19 @@ export const EVPanelTemplates: React.FC<EVPanelTemplatesProps> = ({ project }) =
         throw new Error('Failed to create panel');
       }
 
-      // Create all circuits. EV-template circuits are post-existing-service
-      // additions by construction — flag them so the permit-packet panel
-      // schedule renders them with the "* = Proposed new circuit" marker
-      // when the project is existing-construction. (The flag is harmless on
-      // new-construction projects because the marker is gated upstream.)
-      for (const circuit of circuits) {
-        // TemplateCircuit uses a camelCase intermediate shape; this call site
-        // preserves the legacy spread behavior. Cast satisfies the stricter
-        // snake_case CircuitInsert signature.
-        await createCircuit({
-          ...circuit,
-          panel_id: newPanel.id,
-          project_id: project.id,
-          is_proposed: true,
-        } as unknown as Parameters<typeof createCircuit>[0]);
+      // Create all circuits as circuit rows (#224: the camelCase template shape
+      // was inserted as is, so every insert failed and left an empty panel).
+      // EV-template circuits are post-existing-service additions by
+      // construction — flagged proposed for the "* = Proposed" marker.
+      let failed = 0;
+      for (const circuit of templateCircuits) {
+        const created = await createCircuit(
+          toCircuitRow(circuit, newPanel.id) as Parameters<typeof createCircuit>[0],
+        );
+        if (!created) failed++;
+      }
+      if (failed > 0) {
+        throw new Error(`${failed} of ${templateCircuits.length} circuits could not be saved to "${newPanel.name}"`);
       }
 
       setApplyStatus('success');
@@ -487,7 +482,8 @@ export const EVPanelTemplates: React.FC<EVPanelTemplatesProps> = ({ project }) =
           {/* Apply Button */}
           <button
             onClick={handleApplyConfiguration}
-            disabled={applyStatus === 'applying'}
+            // Wait for the panels: the new panel attaches to the MDP (#224)
+            disabled={applyStatus === 'applying' || panelsLoading}
             className={`w-full py-4 rounded-lg font-medium transition-colors flex items-center justify-center gap-2 ${
               applyStatus === 'applying'
                 ? 'bg-gray-400 text-white cursor-not-allowed'

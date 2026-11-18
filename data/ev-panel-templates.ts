@@ -20,7 +20,7 @@ import { findConductorByAmpacity } from './nec/table-310-16';
 // DB Circuit row type. These templates are display fixtures; the
 // applyEVPanelTemplate / generateCustomEVPanel paths convert to DB shape
 // before insert.
-interface TemplateCircuit {
+export interface TemplateCircuit {
   circuitNumber: number;
   breakerAmps: number;
   poles: number;
@@ -31,6 +31,26 @@ interface TemplateCircuit {
   loadVA: number;
   isEvCharger: boolean;
   evChargerAmps?: number;
+}
+
+/**
+ * A template circuit as a `circuits` row. The generator's shape is camelCase
+ * (`circuitNumber`, `breakerAmps`, `loadVA`, …); inserting it as is fails
+ * every insert (#224). Load type stays the column default ('O'): EVSE are
+ * recognised by description.
+ */
+export function templateCircuitRow(c: TemplateCircuit, panelId: string, projectId: string) {
+  return {
+    panel_id: panelId,
+    project_id: projectId,
+    circuit_number: c.circuitNumber,
+    description: c.description,
+    breaker_amps: c.breakerAmps,
+    pole: c.poles,
+    load_watts: c.loadVA,
+    conductor_size: c.conductorSize,
+    is_proposed: true,
+  };
 }
 
 export interface EVPanelTemplate {

@@ -4,6 +4,14 @@ All notable changes to SparkPlan.
 
 ---
 
+## 2026-11-18: The EV Panel Builder's "Create EV Panel" works (#224)
+
+- **"Create EV Panel" now saves the panel with its circuits, under the MDP.** Every circuit insert used to fail (the template's fields were sent with the wrong column names), leaving an empty panel fed straight from the service and no error on screen. Four 48 A chargers now arrive as 4 × 11,520 VA plus the spare and lighting circuits; the panel shows 47.9 kVA, and the MDP's demand includes it.
+- **With EVEMS, the panel gets an explicit setpoint:** the "Max Simultaneous Chargers" at full power (2 × 11,520 = 23.0 kVA). It used to get the older marker, which limited the feeder to the panel's main breaker. The setpoint shows on the panel's EVEMS card, where it can be edited (#209).
+- The button waits until the project's panels have loaded, and a failed save is reported.
+
+---
+
 ## 2026-11-18: A single-family service load includes the house's subpanels (#216)
 
 - **The single-family service calculation now reads every circuit under the MDP.** It read only the MDP's own circuits, so a range, dryer, A/C or EV charger on a subpanel never reached the service load. That's the unsafe direction: the service could pass when it shouldn't. In a 2,400 ft² house with a garage subpanel (EV charger + air compressor), E-101 goes from 29.57 kVA (123 A) to 37.38 kVA (156 A). The four fastened appliances then take NEC 220.53's 75%.
