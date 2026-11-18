@@ -4,6 +4,13 @@ All notable changes to SparkPlan.
 
 ---
 
+## 2026-11-18: Add an EVEMS setpoint from the Panel Schedule (#222)
+
+- **A panel with EV chargers and no EVEMS setpoint now has an "Add EVEMS setpoint (NEC 625.42)" control.** Before, the only way to add one was "Add Circuit" with the exact marker description. It takes the controller's setpoint in VA and warns when the value is at or above the chargers' load, where it would limit nothing. The setpoint then shows in the same card as an existing one, with Edit and Remove (#209), and limits the panel's feeder and the service (#210).
+- Clicking Add right after Remove no longer gets its editor closed by the finishing delete.
+
+---
+
 ## 2026-11-18: A new house shows its service check (#227)
 
 - **New single-family projects now print the NEC 230.42(A)(1) service check**: the Article 220 load plus 25% of the continuous loads (EV charging, signs). It appears in the Dwelling Load Calculator under "Service Current" and on E-101 under the summary cards, e.g. "Service check: 164 A on the 200 A service — sufficient". Existing houses already had it on E-102 and the Service Headroom card. The recommended service size doesn't change; with its 80% margin it always passes this check.
