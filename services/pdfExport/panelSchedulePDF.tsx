@@ -17,6 +17,8 @@ export interface PanelScheduleDwellingOptions {
   necEdition?: NecEdition;
   /** Every circuit under the panel: the single-family MDP's dwelling load reads them (#216). */
   serviceCircuits?: Circuit[];
+  /** The panel's NEC 220 aggregate: its demand breakdown, as on All Panels (#238). */
+  aggregatedLoad?: PanelSchedulePDFProps['aggregatedLoad'];
 }
 
 /**
@@ -49,6 +51,7 @@ export const exportPanelSchedulePDF = async (
         singleFamilyDwellingContext={dwelling.singleFamilyDwellingContext}
         necEdition={dwelling.necEdition}
         serviceCircuits={dwelling.serviceCircuits}
+        aggregatedLoad={dwelling.aggregatedLoad}
       />
     ).toBlob();
 

@@ -4,6 +4,14 @@ All notable changes to SparkPlan.
 
 ---
 
+## 2026-11-18: The Panel Schedule exports print what the packet prints (#238)
+
+- **"Export PDF" now carries the demand breakdown** (Lighting / Receptacles / Other with their NEC rows) that "All Panels" prints for the same panel. It used to show only the load summary.
+- **Both exports list a panel's downstream feeds the way the app and the permit packet do (#228).** Before, "Export PDF" left them out, and "All Panels" drew them as invented breakers in slots 1 and 2, and only for a panel with no circuits of its own. Now a sub-panel on feed-thru lugs (and a transformer) is listed under FEED-THRU LUGS, a breaker-fed one sits at its slot, and Total Circuits reads e.g. "18 (+1 feeder)".
+- A single-family Main Panel's Load Summary is the same in both exports and the packet (48.6 kVA / 37.4 kVA / 155.7 A on the QA project). The feed isn't counted on top of the sub-panel's own circuits.
+
+---
+
 ## 2026-11-18: One toast for a batch of circuits (#242)
 
 - **Creating an EV panel** used to fire a toast per circuit plus "Panel added to diagram" and the summary, about 8 in all, stacked over the panel tabs and blocking clicks while hovered. It now shows one: 'EV panel "…" created under the MDP with 6 circuits'.

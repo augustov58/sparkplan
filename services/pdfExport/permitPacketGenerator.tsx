@@ -37,7 +37,8 @@ import {
   type EVEMSNarrativePanelEntry,
   type EVSELabelingPanelEntry,
 } from './PermitPacketDocuments';
-import { PanelSchedulePages, SYNTH_FEEDER_PREFIX, SYNTH_LUG_PREFIX } from './PanelScheduleDocuments';
+import { PanelSchedulePages } from './PanelScheduleDocuments';
+import { feederRowsFor } from './feederRows';
 import {
   calculateAggregatedLoad,
   circuitsUnderPanel,
@@ -1188,71 +1189,17 @@ export const generatePermitPacket = async (data: PermitPacketData): Promise<void
       : data.projectType === 'Industrial'
         ? 'industrial'
         : 'commercial';
-  const synthesizeFeederCircuits = (panel: Panel, existing: Circuit[]): Circuit[] => {
-    const downstreamPanels = data.panels.filter(
-      p => p.fed_from_type === 'panel' && p.fed_from === panel.id,
-    );
-    if (downstreamPanels.length === 0) return [];
-
-    // A panel fed from a breaker (`fed_from_circuit_number`) is drawn at that
-    // slot, as the in-app schedule does. Any other panel is on feed-thru lugs:
-    // slot 0 keeps it out of the breaker grid while its load still counts in
-    // the phase totals, and the schedule lists it under FEED-THRU LUGS (#228;
-    // it used to get an invented breaker in the next free slot).
-    // Dedup: if the downstream panel already has an explicit feeder circuit
-    // on this parent (matching fed_from_circuit_number to an existing
-    // circuit_number on the parent), skip synthesis. Otherwise the panel
-    // schedule shows the same feeder twice — once as the user-created circuit
-    // ("Feed to H1") and once as the auto-synthesized row ("→ PANEL H1").
-    // 2026-05-17 user feedback.
-    const parentCircuitNumbers = new Set<number>(
-      existing.map(c => c.circuit_number),
-    );
-
-    return downstreamPanels.flatMap(dp => {
-      // Skip synthesis if the user has already created a circuit at the slot
-      // the downstream panel is fed from.
-      const fedFromSlot = dp.fed_from_circuit_number;
-      if (
-        typeof fedFromSlot === 'number'
-        && parentCircuitNumbers.has(fedFromSlot)
-      ) {
-        return [];
-      }
-      const dpLoad = calculateAggregatedLoad(
-        dp.id,
-        data.panels,
-        data.circuits,
-        data.transformers,
-        occupancyType,
-        undefined,
-        resolvedNecEdition,
-        packetFeederLoadRules(data).dwelling,
-      );
-      const breakerAmps = dp.feeder_breaker_amps || dp.main_breaker_amps || 100;
-      const pole = (dp.phase === 3 ? 3 : 2) as 1 | 2 | 3;
-      const lugFed = typeof fedFromSlot !== 'number';
-      return [{
-        id: `${lugFed ? SYNTH_LUG_PREFIX : SYNTH_FEEDER_PREFIX}${panel.id}-${dp.id}`,
-        project_id: panel.project_id,
-        panel_id: panel.id,
-        circuit_number: lugFed ? 0 : fedFromSlot,
-        description: `→ PANEL ${dp.name}`,
-        breaker_amps: breakerAmps,
-        pole,
-        load_watts: dpLoad.totalDemandVA,
-        load_type: 'O',
-        conductor_size: null,
-        conductor_type: null,
-        conductor_material: null,
-        feeder_id: null,
-        is_continuous_load: null,
-        notes: 'Synthesized feeder row — represents downstream panel demand (NEC 408)',
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      } as unknown as Circuit];
+  // Downstream feeds as schedule rows: the rule the app and the exports
+  // share (#228, #238). Panels only — transformer feeds aren't listed here.
+  const synthesizeFeederCircuits = (panel: Panel, existing: Circuit[]): Circuit[] =>
+    feederRowsFor(panel, existing, {
+      panels: data.panels,
+      circuits: data.circuits,
+      transformers: data.transformers,
+      occupancy: occupancyType,
+      necEdition: resolvedNecEdition,
+      dwelling: packetFeederLoadRules(data).dwelling,
     });
-  };
 
   // ---- Panel schedules (band 300) — one builder per panel ----
   if (sections.panelSchedules) {
