@@ -500,7 +500,7 @@ const VoltageDropCalculator: React.FC = () => {
              {/* Calculation Details */}
              <div className="text-xs text-[#666] space-y-0.5 bg-white p-3 rounded border border-[#e8e6e3]">
                <div className="font-semibold text-gray-700 mb-1 text-sm">AC Impedance Method (NEC Ch. 9 Table 9)</div>
-               <div>Effective Z: <span className="tabular-nums">{result.effectiveZ} Ω/1000ft</span> @ 0.85 PF</div>
+               <div>Effective Z: <span className="tabular-nums">{result.effectiveZ.toFixed(4)} Ω/1000ft</span> @ 0.85 PF</div>
                <div>Distance: <span className="tabular-nums">{result.distance} ft</span> (one-way)</div>
                <div>Current: <span className="tabular-nums">{result.current} A</span></div>
                <div className="text-[#888] mt-1.5 pt-1.5 border-t border-[#e8e6e3] text-xs">

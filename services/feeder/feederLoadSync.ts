@@ -20,6 +20,7 @@ import {
   type DwellingAggregateOptions,
 } from '@/services/calculations/upstreamLoadAggregation';
 import { CONTINUOUS_LOAD_FACTOR } from '@/data/nec/continuous-load';
+import { calculateVoltageDropAC } from '@/services/calculations/voltageDrop';
 import type { NecEdition } from '@/data/nec/evse-load';
 
 type Circuit = Database['public']['Tables']['circuits']['Row'];
@@ -29,6 +30,8 @@ type Occupancy = 'dwelling' | 'commercial' | 'industrial';
 
 /** A stored design load this far from the current rule's flags the feeder (#190). */
 const DESIGN_LOAD_STALE_FRACTION = 0.01;
+/** A stored voltage drop this far (percentage points) from the formula's is outdated (#219) */
+const VD_STALE_PERCENT_POINTS = 0.02;
 
 export interface FeederLoadStatus {
   feederId: string;
@@ -44,6 +47,10 @@ export interface FeederLoadStatus {
   designChanged: boolean;
   cachedDesignVA: number;
   currentDesignVA: number;
+  /** True when the stored voltage drop differs from what the formula now gives (#219) */
+  vdChanged?: boolean;
+  cachedVdPercent?: number;
+  currentVdPercent?: number;
   message: string;
 }
 
@@ -163,10 +170,32 @@ export function checkFeederLoadStatus(
   const designChanged = cachedDesignVA > 0 &&
     Math.abs(currentDesignVA - cachedDesignVA) / cachedDesignVA > DESIGN_LOAD_STALE_FRACTION;
 
-  const isStale = percentDiff > thresholdPercent || designChanged;
+  // #219: the stored voltage drop against the formula now (Table 9 Note 2
+  // effective Z; √3 on three-phase), for the stored conductor and design
+  // load, as calculateFeederSizing computes it. Panel-fed feeders only.
+  const sourcePanel = panels?.find(p => p.id === feeder.source_panel_id);
+  const cachedVdPercent = feeder.voltage_drop_percent;
+  let currentVdPercent: number | undefined;
+  if (sourcePanel && !feeder.source_transformer_id && feeder.phase_conductor_size && feeder.distance_ft
+    && cachedDesignVA > 0 && typeof cachedVdPercent === 'number') {
+    const phase: 1 | 3 = sourcePanel.phase === 1 ? 1 : 3;
+    const voltage = sourcePanel.voltage || 240;
+    const amps = cachedDesignVA / (voltage * (phase === 3 ? Math.sqrt(3) : 1)) / Math.max(1, feeder.sets_in_parallel || 1);
+    const vd = calculateVoltageDropAC(
+      feeder.phase_conductor_size, feeder.conductor_material === 'Al' ? 'Al' : 'Cu', 'PVC',
+      feeder.distance_ft, amps, voltage, phase,
+    );
+    if (vd.effectiveZ > 0) currentVdPercent = vd.voltageDropPercent;
+  }
+  const vdChanged = currentVdPercent !== undefined && typeof cachedVdPercent === 'number'
+    && Math.abs(currentVdPercent - cachedVdPercent) > VD_STALE_PERCENT_POINTS;
+
+  const isStale = percentDiff > thresholdPercent || designChanged || vdChanged;
 
   let message = '';
-  if (designChanged && percentDiff <= thresholdPercent) {
+  if (vdChanged && !designChanged && percentDiff <= thresholdPercent) {
+    message = `Voltage drop ${cachedVdPercent!.toFixed(2)}% → ${currentVdPercent!.toFixed(2)}% - recalculation recommended`;
+  } else if (designChanged && percentDiff <= thresholdPercent) {
     message = `Design load ${(cachedDesignVA / 1000).toFixed(1)} → ${(currentDesignVA / 1000).toFixed(1)} kVA - recalculation recommended`;
   } else if (isStale) {
     if (currentConnected > cachedConnected) {
@@ -190,6 +219,9 @@ export function checkFeederLoadStatus(
     designChanged,
     cachedDesignVA,
     currentDesignVA: Math.round(currentDesignVA),
+    vdChanged,
+    cachedVdPercent: typeof cachedVdPercent === 'number' ? cachedVdPercent : undefined,
+    currentVdPercent,
     message,
   };
 }

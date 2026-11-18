@@ -51,6 +51,22 @@ export interface VoltageDropResult {
  * const result = calculateVoltageDropAC('250 kcmil', 'Cu', 'PVC', 150, 200, 208, 3);
  * // Uses actual AC impedance from NEC Chapter 9 Table 9
  */
+/**
+ * Effective Z per NEC Chapter 9 Table 9, Note 2: Ze = R × PF + XL × sin(arccos PF),
+ * from the row's own R and XL (#219). The stored `effectiveZ` column ran
+ * 10–20% below this for the same R and XL, and it ignored the power factor.
+ */
+export function effectiveImpedance(resistanceOhmsPerKFt: number, reactanceOhmsPerKFt: number, powerFactor: number): number {
+  const pf = Math.min(1, Math.max(0, powerFactor));
+  return resistanceOhmsPerKFt * pf + reactanceOhmsPerKFt * Math.sin(Math.acos(pf));
+}
+
+/**
+ * Line-to-line multiplier on the line-to-neutral drop I × Ze (Table 9, Note 2):
+ * 2 for single-phase, √3 for three-phase (#219: three-phase used 1).
+ */
+export const voltageDropMultiplier = (phase: 1 | 3): number => (phase === 1 ? 2 : Math.sqrt(3));
+
 export function calculateVoltageDropAC(
   conductorSize: string,
   material: 'Cu' | 'Al',
@@ -90,13 +106,11 @@ export function calculateVoltageDropAC(
     };
   }
 
-  // Use effective Z at 0.85 PF from table (most accurate)
-  const effectiveZ = impedanceData.effectiveZ;
+  // Effective Z from the row's R and XL at this power factor (Table 9, Note 2)
+  const effectiveZ = effectiveImpedance(impedanceData.resistanceOhmsPerKFt, impedanceData.reactanceXLOhmsPerKFt, powerFactor);
 
-  // Calculate voltage drop
-  // VD = Z × L × I (for 3-phase)
-  // VD = 2 × Z × L × I (for single-phase)
-  const multiplier = phase === 1 ? 2 : 1;
+  // VD (line-to-line) = I × Ze × L × multiplier: 2 single-phase, √3 three-phase
+  const multiplier = voltageDropMultiplier(phase);
   const voltageDropVolts = (effectiveZ * lengthFeet * loadAmps * multiplier) / 1000;
   const voltageDropPercent = (voltageDropVolts / voltage) * 100;
 
@@ -119,7 +133,7 @@ export function calculateVoltageDropAC(
 
   // Add informational notes
   notes.push(
-    `Effective Z = ${effectiveZ} Ω/1000ft at ${powerFactor} PF (from NEC Table 9)`
+    `Effective Z = ${effectiveZ.toFixed(4)} Ω/1000ft at ${powerFactor} PF (NEC Chapter 9 Table 9, Note 2: R × PF + XL × sin θ)`
   );
   notes.push(
     `AC impedance method accounts for skin effect and inductive reactance in AC circuits.`
@@ -271,12 +285,12 @@ export function calculateMaxCircuitLength(
     };
   }
 
-  const effectiveZ = impedanceData.effectiveZ;
+  const effectiveZ = effectiveImpedance(impedanceData.resistanceOhmsPerKFt, impedanceData.reactanceXLOhmsPerKFt, 0.85);
   const maxVoltageDropVolts = voltage * (maxVoltageDropPercent / 100);
 
   // VD = Z × L × I × multiplier / 1000
   // L = (VD × 1000) / (Z × I × multiplier)
-  const multiplier = phase === 1 ? 2 : 1;
+  const multiplier = voltageDropMultiplier(phase);
   const maxLengthFeet = (maxVoltageDropVolts * 1000) / (effectiveZ * loadAmps * multiplier);
 
   return {

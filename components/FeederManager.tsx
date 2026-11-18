@@ -758,6 +758,8 @@ export const FeederManager: React.FC<FeederManagerProps> = ({
                       <span>
                         {sf.designChanged
                           ? `Design load ${(sf.cachedDesignVA / 1000).toFixed(1)} → ${(sf.currentDesignVA / 1000).toFixed(1)} kVA`
+                          : sf.vdChanged && sf.cachedVdPercent !== undefined && sf.currentVdPercent !== undefined
+                          ? `Voltage drop ${sf.cachedVdPercent.toFixed(2)}% → ${sf.currentVdPercent.toFixed(2)}%`
                           : <>
                               {sf.cachedConnectedVA.toLocaleString()} VA → {sf.currentConnectedVA.toLocaleString()} VA
                               ({sf.loadDifferencePercent > 0 ? '+' : ''}{sf.loadDifferencePercent}%)
@@ -1383,6 +1385,9 @@ interface FeederCardProps {
     designChanged: boolean;
     cachedDesignVA: number;
     currentDesignVA: number;
+    vdChanged?: boolean;
+    cachedVdPercent?: number;
+    currentVdPercent?: number;
     message: string;
   };
   cumulativeVdPercent: number | null;          // chain total at destination panel
@@ -1434,6 +1439,8 @@ const FeederCard: React.FC<FeederCardProps> = ({
             <span className="text-amber-800">
               {staleStatus.designChanged
                 ? `Design load: ${(staleStatus.cachedDesignVA / 1000).toFixed(1)} → ${(staleStatus.currentDesignVA / 1000).toFixed(1)} kVA`
+                : staleStatus.vdChanged && staleStatus.cachedVdPercent !== undefined && staleStatus.currentVdPercent !== undefined
+                ? `Voltage drop: ${staleStatus.cachedVdPercent.toFixed(2)}% → ${staleStatus.currentVdPercent.toFixed(2)}%`
                 : <>
                     Load: {staleStatus.cachedConnectedVA.toLocaleString()} → {staleStatus.currentConnectedVA.toLocaleString()} VA
                     ({staleStatus.loadDifferencePercent > 0 ? '+' : ''}{staleStatus.loadDifferencePercent}%)

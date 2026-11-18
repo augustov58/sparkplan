@@ -4,6 +4,13 @@ All notable changes to SparkPlan.
 
 ---
 
+## 2026-11-18: Voltage drop follows Table 9's effective-impedance formula (#219)
+
+- **Voltage drop was understated.** It read a stored effective-impedance value that ran 10–20% below NEC Chapter 9 Table 9's own formula for the same conductor, and three-phase runs left out the √3. Effective Z now comes from each conductor's resistance and reactance at the power factor (Table 9, Note 2), and three-phase drops take √3. On the QA multifamily project the unit feeder goes from 0.47% to 0.56%. A 208 V three-phase run of 2/0 copper at 100 A over 100 ft goes from 1.08 V to 1.86 V.
+- **Feeders saved before this change are flagged "Outdated"** with their old and new voltage drop ("Voltage drop: 0.47% → 0.57%"). "Recalc" updates them, and the riser then prints the new value.
+
+---
+
 ## 2026-11-18: Table 220.42 data keeps only the rows the app reads (#236)
 
 - **The dwelling row now has the table's third tier** (over 120,000 VA at 25%), the same tiers as the dwelling Part III walk. The hotel, warehouse and store rows, which nothing read and which didn't match the table, are removed. No number changes on a project below 120 kVA of dwelling lighting.
