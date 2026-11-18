@@ -183,7 +183,7 @@ export const EVPanelTemplates: React.FC<EVPanelTemplatesProps> = ({ project }) =
         ...panel,
         ...(mdp ? { fed_from_type: 'panel', fed_from: mdp.id } : {}),
         is_proposed: true,
-      } as Parameters<typeof createPanel>[0]);
+      } as Parameters<typeof createPanel>[0], { silent: true }); // one summary toast below (#242)
 
       if (!newPanel || !newPanel.id) {
         throw new Error('Failed to create panel');
@@ -197,6 +197,7 @@ export const EVPanelTemplates: React.FC<EVPanelTemplatesProps> = ({ project }) =
       for (const circuit of templateCircuits) {
         const created = await createCircuit(
           toCircuitRow(circuit, newPanel.id) as Parameters<typeof createCircuit>[0],
+          { silent: true },
         );
         if (!created) failed++;
       }

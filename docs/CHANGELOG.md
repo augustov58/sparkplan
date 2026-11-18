@@ -4,6 +4,14 @@ All notable changes to SparkPlan.
 
 ---
 
+## 2026-11-18: One toast for a batch of circuits (#242)
+
+- **Creating an EV panel** used to fire a toast per circuit plus "Panel added to diagram" and the summary, about 8 in all, stacked over the panel tabs and blocking clicks while hovered. It now shows one: 'EV panel "…" created under the MDP with 6 circuits'.
+- **Applying a generated dwelling schedule** fired 18 "Circuit added" toasts and then a blocking "Successfully created" alert. It now shows one "18 circuits added" toast (which counts only the circuits actually saved), and no alert.
+- Not changed: the One-Line Diagram's bulk circuit creator still toasts per circuit (it's a stable module; to do separately).
+
+---
+
 ## 2026-11-18: The EV Panel Builder's number fields take typed numbers (#243)
 
 - **"Number of Chargers" and "Max Simultaneous Chargers" clamped every keystroke**, so clearing the field snapped it to 1, and typing 12 gave 11, then 112, then 20. The fields now keep what you type. The preview follows each valid value as you type, an out-of-range value is clamped when you leave the field, and an empty field gets back its last valid value.

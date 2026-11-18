@@ -63,6 +63,7 @@ import { useProjects } from '../hooks/useProjects';
 import { useCircuits } from '../hooks/useCircuits';
 import { useTransformers } from '../hooks/useTransformers';
 import { useProjectNecEdition } from '../hooks/useProjectNecEdition';
+import { showToast, toastMessages } from '../lib/toast';
 import { circuitsUnderPanel } from '../services/calculations/upstreamLoadAggregation';
 import {
   generateBasicMultiFamilyProject,
@@ -539,14 +540,15 @@ export const DwellingLoadCalculator: React.FC<DwellingLoadCalculatorProps> = ({
         if (placed === -1) skipped.push(i);
       }
 
-      // Create circuits at their allocated slots
+      // Create circuits at their allocated slots: one toast for the batch (#242)
+      let createdCount = 0;
       for (let i = 0; i < generatedCircuits.length; i++) {
         const circuit = generatedCircuits[i];
         if (!circuit) continue;
         const slot = assignedSlots[i];
         if (slot === undefined || slot === -1) continue; // Skipped — panel out of space; warn after loop
 
-        await createCircuit({
+        const created = await createCircuit({
           project_id: project.id,
           panel_id: mainPanel.id,
           circuit_number: slot,
@@ -557,8 +559,10 @@ export const DwellingLoadCalculator: React.FC<DwellingLoadCalculatorProps> = ({
           conductor_size: dwellingBranchConductorSize(circuit.breakerAmps),
           load_type: circuit.loadType,
           is_proposed: !!circuit.isProposed,
-        });
+        }, { silent: true });
+        if (created) createdCount++;
       }
+      if (createdCount > 0) showToast.success(toastMessages.circuit.bulkCreated(createdCount));
 
       if (skipped.length > 0) {
         alert(
@@ -616,7 +620,8 @@ export const DwellingLoadCalculator: React.FC<DwellingLoadCalculatorProps> = ({
       }
 
       setShowGenerated(false);
-      alert(`Successfully created ${generatedCircuits.length} circuits in the panel schedule!`);
+      // The "N circuits added" toast above reports it (#242: was a blocking
+      // alert on top of one toast per circuit, counting skipped circuits too)
     } catch (error) {
       console.error('Error creating circuits:', error);
       alert('Error creating circuits. Check console for details.');
