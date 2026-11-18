@@ -14,16 +14,16 @@ describe('#236 Table 220.42 rows', () => {
   });
 
   it('dwelling units: three tiers, as the Part III walk', () => {
-    expect(getLightingDemandFactor('dwelling', 2_000).demandVA).toBe(2_000);
-    expect(getLightingDemandFactor('dwelling', 10_000).demandVA).toBe(3_000 + 7_000 * 0.35); // 5,450
-    expect(getLightingDemandFactor('dwelling', 120_000).demandVA).toBeCloseTo(3_000 + 117_000 * 0.35, 6); // 43,950
+    expect(getLightingDemandFactor('dwelling', 2_000, '2020').demandVA).toBe(2_000);
+    expect(getLightingDemandFactor('dwelling', 10_000, '2020').demandVA).toBe(3_000 + 7_000 * 0.35); // 5,450
+    expect(getLightingDemandFactor('dwelling', 120_000, '2020').demandVA).toBeCloseTo(3_000 + 117_000 * 0.35, 6); // 43,950
     // was 3,000 + 147,000 × 0.35 = 54,450 (no 25% tier)
-    expect(getLightingDemandFactor('dwelling', 150_000).demandVA).toBeCloseTo(3_000 + 117_000 * 0.35 + 30_000 * 0.25, 6); // 51,450
-    expect(getLightingDemandFactor('dwelling', 150_000).necReference).toBe('Table 220.42 (Dwelling Units)');
+    expect(getLightingDemandFactor('dwelling', 150_000, '2020').demandVA).toBeCloseTo(3_000 + 117_000 * 0.35 + 30_000 * 0.25, 6); // 51,450
+    expect(getLightingDemandFactor('dwelling', 150_000, '2020').necReference).toBe('Table 220.42 (Dwelling Units)');
   });
 
   it('all others: 100%; an unknown occupancy falls back to 100%', () => {
-    expect(getLightingDemandFactor('all_others', 50_000)).toMatchObject({ demandVA: 50_000, demandFactor: 1 });
-    expect(getLightingDemandFactor('hotel', 50_000)).toMatchObject({ demandVA: 50_000, demandFactor: 1, necReference: 'Table 220.42 (Default - No Demand Factor)' });
+    expect(getLightingDemandFactor('all_others', 50_000, '2020')).toMatchObject({ demandVA: 50_000, demandFactor: 1 });
+    expect(getLightingDemandFactor('hotel', 50_000, '2020')).toMatchObject({ demandVA: 50_000, demandFactor: 1, necReference: 'Table 220.42 (Default - No Demand Factor)' });
   });
 });

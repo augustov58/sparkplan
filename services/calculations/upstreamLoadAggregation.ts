@@ -19,6 +19,7 @@
 
 import type { Database } from '@/lib/database.types';
 import { getLightingDemandFactor } from '@/data/nec/table-220-42';
+import { article220Citations } from '@/data/nec/article220-citations';
 import { getMultiFamilyDemandFactor } from './multiFamilyEV';
 import { getEvseLoadVA, isEvseDescription, type NecEdition } from '@/data/nec/evse-load';
 import { CONTINUOUS_LOAD_ADDER, CONTINUOUS_LOAD_FACTOR, isSignOrShowWindowDescription } from '@/data/nec/continuous-load';
@@ -830,7 +831,8 @@ function calculateHvacDemand(heatingVA: number, coolingVA: number): DemandCalcul
  */
 function applyDemandFactors(
   loads: CollectedLoads,
-  occupancyType: OccupancyType
+  occupancyType: OccupancyType,
+  necEdition: NecEdition
 ): { demandBreakdown: DemandCalculation[]; totalDemandVA: number; necReferences: string[] } {
   
   const demandBreakdown: DemandCalculation[] = [];
@@ -842,7 +844,7 @@ function applyDemandFactors(
     // Map project occupancy to table occupancy
     let tableOccupancy = occupancyType === 'dwelling' ? 'dwelling' : 'all_others'; // #218
     
-    const lightingDemand = getLightingDemandFactor(tableOccupancy, loads.lighting);
+    const lightingDemand = getLightingDemandFactor(tableOccupancy, loads.lighting, necEdition);
     demandBreakdown.push({
       loadType: 'Lighting',
       connectedVA: loads.lighting,
@@ -1145,11 +1147,11 @@ export function calculateAggregatedLoad(
     const allowanceResidualVA = dwelling.circuitConnectedVA - two.totalConnectedVA - dwelling.hvacOmittedVA;
     if (allowanceResidualVA > 0) {
       demandBreakdown.push({
-        loadType: 'Circuits within the 220.52 / 220.12 allowances',
+        loadType: `Circuits within the 220.52 / ${article220Citations(necEdition).dwellingUnitLoad} allowances`,
         connectedVA: allowanceResidualVA,
         demandVA: 0,
         demandFactor: 0,
-        necReference: 'NEC 220.52, 220.12 (counted in the general loads row)',
+        necReference: `NEC 220.52, ${article220Citations(necEdition).dwellingUnitLoad} (counted in the general loads row)`,
       });
     }
     if (housePanelLoadVA > 0) {
@@ -1215,7 +1217,7 @@ export function calculateAggregatedLoad(
     : null;
   const phase2 = role === 'unit'
     ? dwellingUnitDemand(panelId, panels, circuits, transformers, dwelling?.existingBuilding ?? false, necEdition)
-    : applyDemandFactors(loads, role === 'house' ? 'commercial' : occupancyType);
+    : applyDemandFactors(loads, role === 'house' ? 'commercial' : occupancyType, necEdition);
   let { totalDemandVA } = phase2;
   const { demandBreakdown } = phase2;
   const necReferences = [...phase2.necReferences];
@@ -1484,7 +1486,7 @@ function dwellingUnitDemand(
       connectedVA: insideOtherRowsVA,
       demandVA: 0,
       demandFactor: 0,
-      necReference: 'NEC 220.12, 220.52, 220.60',
+      necReference: `NEC ${article220Citations(necEdition).dwellingUnitLoad}, 220.52, 220.60`,
     });
   }
   return {
@@ -1516,7 +1518,7 @@ function twoUnitDwellingDemand(
     !!c.panel_id && downstream.has(c.panel_id) && !excluded.has(c.panel_id) && !isEVEMSMarkerCircuit(c));
 
   const toUnit = (label: string, group: Circuit[]): TwoUnitDwellingUnit => {
-    const { warnings: _warnings, ...loads } = dwellingLoadsFromCircuits(group);
+    const { warnings: _warnings, ...loads } = dwellingLoadsFromCircuits(group, necEdition);
     return { label, ...loads };
   };
   const unitPanels = panels.filter(p =>

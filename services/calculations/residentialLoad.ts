@@ -10,6 +10,7 @@
 
 import { ResidentialAppliances, DwellingUnitTemplate } from '../../types';
 import { getEvseLoadVA, isEvseDescription, type NecEdition } from '../../data/nec/evse-load';
+import { article220Citations } from '../../data/nec/article220-citations';
 import { CONTINUOUS_LOAD_ADDER, isContinuousServiceLoad } from '../../data/nec/continuous-load';
 import { getNextStandardBreakerSize } from '../../data/nec/standard-breakers';
 import { COOKING_APPLIANCE_TABLE_MIN_VA, getCookingDemandVA } from '../../data/nec/table-220-55';
@@ -517,7 +518,7 @@ export function calculateDwellingStandardLoad(input: DwellingStandardInput): Dwe
 
   breakdown.push({
     category: 'General Lighting', description: lightingDescription,
-    connectedVA: lightingVA, demandVA: 0, demandFactor: 0, necReference: 'NEC Table 220.12',
+    connectedVA: lightingVA, demandVA: 0, demandFactor: 0, necReference: `NEC ${article220Citations(necEdition).dwellingUnitLoad}`,
   });
   breakdown.push({
     category: 'Small Appliance Circuits', description: `${effectiveSmallAppliance} circuits @ 1,500 VA each`,
@@ -532,9 +533,9 @@ export function calculateDwellingStandardLoad(input: DwellingStandardInput): Dwe
   breakdown.push({
     category: 'General Loads Subtotal', description: 'Lighting + Small Appliance + Laundry',
     connectedVA: generalVA, demandVA: generalDemandVA,
-    demandFactor: generalVA > 0 ? generalDemandVA / generalVA : 0, necReference: 'NEC Table 220.42',
+    demandFactor: generalVA > 0 ? generalDemandVA / generalVA : 0, necReference: `NEC ${article220Citations(necEdition).lightingDemandTable}`,
   });
-  necReferences.push('NEC Table 220.42');
+  necReferences.push(`NEC ${article220Citations(necEdition).lightingDemandTable}`);
 
   // Cooking appliances at or under 1¾ kW are not in Table 220.55; they are
   // fastened-in-place appliances under 220.53.
@@ -1079,7 +1080,7 @@ export function calculateMultiFamilyLoad(input: MultiFamilyInput): ResidentialLo
     connectedVA: totalLightingVA,
     demandVA: totalLightingVA,
     demandFactor: 1.0,
-    necReference: 'NEC Table 220.12'
+    necReference: `NEC ${article220Citations(necEdition).dwellingUnitLoad}`
   });
 
   // 2b. Small appliance circuits (2 per unit @ 1,500 VA each)
@@ -2046,7 +2047,7 @@ function dwellingLoadType(type: string, desc: string): string {
  * 'K', single-family panels as 'R') and enter as their 220.52 1,500 VA.
  * Other receptacles and the refrigerator are inside the general lighting load.
  */
-export function dwellingLoadsFromCircuits(circuits: PanelDemandCircuit[]): Omit<DwellingStandardInput, 'necEdition'> & {
+export function dwellingLoadsFromCircuits(circuits: PanelDemandCircuit[], necEdition: NecEdition): Omit<DwellingStandardInput, 'necEdition'> & {
   warnings: string[];
 } {
   let lightingVA = 0;
@@ -2077,7 +2078,7 @@ export function dwellingLoadsFromCircuits(circuits: PanelDemandCircuit[]): Omit<
 
   const warnings: string[] = [];
   if (lightingVA <= 0) {
-    warnings.push('WARNING: No general lighting circuits on this panel — the 3 VA/ft² general lighting load (NEC 220.12) is not included.');
+    warnings.push(`WARNING: No general lighting circuits on this panel — the 3 VA/ft² general lighting load (NEC ${article220Citations(necEdition).dwellingUnitLoad}) is not included.`);
   }
   return {
     lightingVA,
@@ -2102,7 +2103,7 @@ export function calculateDwellingUnitPanelLoad(opts: {
   necEdition?: NecEdition;
 }): DwellingPanelLoadSummary {
   const { circuits, existingBuilding, necEdition = '2020' } = opts;
-  const loads = dwellingLoadsFromCircuits(circuits);
+  const loads = dwellingLoadsFromCircuits(circuits, necEdition);
 
   if (existingBuilding && circuits.some(c => c.is_proposed)) {
     const result = calculateDwellingPanelDemand({
@@ -2127,7 +2128,7 @@ export function calculateDwellingUnitPanelLoad(opts: {
   const summary = partIIISummary(
     result,
     'NEC 220 Part III — Standard Method, Dwelling Unit',
-    'NEC 220 Part III (Standard Method) — the unit feeder load; each load type takes its own demand factor (220.42, 220.53–220.55, 220.60).',
+    `NEC 220 Part III (Standard Method) — the unit feeder load; each load type takes its own demand factor (${article220Citations(necEdition).lightingDemandTable.replace('Table ', '')}, 220.53–220.55, 220.60).`,
   );
   return { ...summary, warnings: [...loads.warnings, ...summary.warnings] };
 }
@@ -2188,7 +2189,7 @@ export function calculateSingleFamilyPanelLoad(opts: {
   const loads = dwellingLoadsFromCircuits(rest.circuits.filter(c => {
     const desc = (c.description ?? '').toLowerCase();
     return !SMALL_APPLIANCE_PATTERN.test(desc) && !(LAUNDRY_PATTERN.test(desc) && (c.load_type ?? '').toUpperCase() !== 'D');
-  }));
+  }), rest.necEdition ?? '2020');
   const result = calculateDwellingStandardLoad({
     lightingVA: rest.squareFootage * LIGHTING_LOAD_VA_PER_SQFT,
     lightingDescription: `${rest.squareFootage} sq ft @ 3 VA/sq ft`,
@@ -2200,7 +2201,7 @@ export function calculateSingleFamilyPanelLoad(opts: {
   return partIIISummary(
     result,
     'NEC 220 Part III — Standard Method, Single-Family Dwelling',
-    'NEC 220 Part III (Standard Method) — each load type takes its own demand factor (220.42, 220.53–220.55, 220.60). Selected on the Dwelling Load Calculator; "10 kVA / 40%" there switches this to NEC 220.82.',
+    `NEC 220 Part III (Standard Method) — each load type takes its own demand factor (${article220Citations(rest.necEdition ?? '2020').lightingDemandTable.replace('Table ', '')}, 220.53–220.55, 220.60). Selected on the Dwelling Load Calculator; "10 kVA / 40%" there switches this to NEC 220.82.`,
   );
 }
 

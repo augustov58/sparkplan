@@ -1156,7 +1156,7 @@ describe('Multi-Family EV (per-EVSE load / 625.42)', () => {
 
   describe('calculateCommonAreaLoads', () => {
     it('should return zero for empty input', () => {
-      const result = calculateCommonAreaLoads([]);
+      const result = calculateCommonAreaLoads([], '2020');
       expect(result.totalConnectedVA).toBe(0);
       expect(result.totalDemandVA).toBe(0);
     });
@@ -1165,7 +1165,7 @@ describe('Multi-Family EV (per-EVSE load / 625.42)', () => {
       const result = calculateCommonAreaLoads([
         { category: 'elevators', description: 'Elevator 1', inputType: 'va', value: 30000 },
         { category: 'elevators', description: 'Elevator 2', inputType: 'va', value: 20000 },
-      ]);
+      ], '2020');
       // Largest (30000) at 100% + second (20000) at 50% = 30000 + 10000 = 40000
       const elevEntry = result.items.find(i => i.category.includes('Elevator'));
       expect(elevEntry?.demandVA).toBe(40000);

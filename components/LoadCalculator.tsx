@@ -10,6 +10,7 @@ import { exportLoadCalculationPDF } from '../services/pdfExport';
 import { loadItemSchema, type LoadItemFormData } from '../lib/validation';
 import { useLoads } from '../hooks/useLoads';
 import { useProjectNecEdition } from '../hooks/useProjectNecEdition';
+import { article220Citations } from '../data/nec/article220-citations';
 
 interface LoadCalculatorProps {
   project: Project;
@@ -383,7 +384,7 @@ export const LoadCalculator: React.FC<LoadCalculatorProps> = ({ project, updateP
         <div className="mt-8">
           {(() => {
             try {
-              const result = calculateLoad(loads as never, project.settings);
+              const result = calculateLoad(loads as never, project.settings, necEdition);
 
               return (
                 <CalculationBreakdown
@@ -416,7 +417,7 @@ export const LoadCalculator: React.FC<LoadCalculatorProps> = ({ project, updateP
                   ]}
                   breakdown={[
                     {
-                      category: 'Lighting Loads (NEC Table 220.42)',
+                      category: `Lighting Loads (NEC ${article220Citations(necEdition).lightingDemandTable})`,
                       items: [
                         {
                           label: 'Connected Load',

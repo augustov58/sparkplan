@@ -5,6 +5,7 @@
  */
 
 import { LoadItem, ProjectSettings } from '../../types';
+import type { NecEdition } from '../../data/nec/evse-load';
 import {
   getLightingDemandFactor,
   getRangeDemand,
@@ -75,15 +76,15 @@ export interface LoadCalculationResult {
  * @param settings - Project electrical settings
  * @returns Detailed load calculation result
  */
-export function calculateLoad(loads: LoadItem[], settings: ProjectSettings): LoadCalculationResult {
+export function calculateLoad(loads: LoadItem[], settings: ProjectSettings, necEdition: NecEdition): LoadCalculationResult {
   if (settings.occupancyType === 'dwelling') {
     // 'existing' is the default — only 'new-service' routes to 220.82.
     if (settings.service_modification_type === 'new-service') {
-      return calculateDwellingLoad(loads, settings);
+      return calculateDwellingLoad(loads, settings, necEdition);
     }
     return calculateExistingDwellingLoad(loads, settings);
   }
-  return calculateCommercialIndustrialLoad(loads, settings);
+  return calculateCommercialIndustrialLoad(loads, settings, necEdition);
 }
 
 /**
@@ -94,7 +95,7 @@ export function calculateLoad(loads: LoadItem[], settings: ProjectSettings): Loa
  * @param settings - Project electrical settings
  * @returns Load calculation result
  */
-function calculateDwellingLoad(loads: LoadItem[], settings: ProjectSettings): LoadCalculationResult {
+function calculateDwellingLoad(loads: LoadItem[], settings: ProjectSettings, necEdition: NecEdition): LoadCalculationResult {
   const necReferences: string[] = ['NEC 220.82 Optional Calculation for Dwelling Units'];
   const notes: string[] = [];
 
@@ -113,7 +114,7 @@ function calculateDwellingLoad(loads: LoadItem[], settings: ProjectSettings): Lo
   const continuousLightingVA = lightingLoads.filter(l => l.continuous).reduce((sum, load) => sum + load.watts, 0);
   const nonContinuousLightingVA = lightingLoads.filter(l => !l.continuous).reduce((sum, load) => sum + load.watts, 0);
 
-  const lightingDemand = getLightingDemandFactor('dwelling', nonContinuousLightingVA);
+  const lightingDemand = getLightingDemandFactor('dwelling', nonContinuousLightingVA, necEdition);
   const lightingDemandVA = lightingDemand.demandVA + (continuousLightingVA * 1.25); // Continuous at 125%, non-continuous with demand factor
 
   if (lightingLoads.length > 0) {
@@ -382,7 +383,7 @@ function calculateExistingDwellingLoad(loads: LoadItem[], settings: ProjectSetti
  * @param settings - Project electrical settings
  * @returns Load calculation result
  */
-function calculateCommercialIndustrialLoad(loads: LoadItem[], settings: ProjectSettings): LoadCalculationResult {
+function calculateCommercialIndustrialLoad(loads: LoadItem[], settings: ProjectSettings, necEdition: NecEdition): LoadCalculationResult {
   const necReferences: string[] = ['NEC 220.40 Standard Calculation'];
   const notes: string[] = [];
 
@@ -400,7 +401,8 @@ function calculateCommercialIndustrialLoad(loads: LoadItem[], settings: ProjectS
   };
   const lightingDemand = getLightingDemandFactor(
     occupancyMapping[settings.occupancyType],
-    totalLightingVA
+    totalLightingVA,
+    necEdition
   );
   necReferences.push(lightingDemand.necReference);
 

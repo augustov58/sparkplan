@@ -25,6 +25,7 @@ import {
 } from '../services/pdfExport/commercialLoadExport';
 import { useProfile } from '../hooks/useProfile';
 import { useProjectNecEdition } from '../hooks/useProjectNecEdition';
+import { article220Citations } from '../data/nec/article220-citations';
 
 interface CommercialLoadCalculatorProps {
   projectId?: string;
@@ -148,6 +149,7 @@ export const CommercialLoadCalculator: React.FC<CommercialLoadCalculatorProps> =
         specialLoads: specialLoads.length > 0 ? specialLoads : undefined,
         serviceVoltage,
         servicePhase,
+        necEdition,
       });
 
       setResult(calculatedResult);
@@ -171,6 +173,7 @@ export const CommercialLoadCalculator: React.FC<CommercialLoadCalculatorProps> =
     servicePhase,
     showKitchenSection,
     onResultCalculated,
+    necEdition,
   ]);
 
   // ===== HVAC CRUD =====
@@ -465,7 +468,7 @@ export const CommercialLoadCalculator: React.FC<CommercialLoadCalculatorProps> =
                     ))}
                   </select>
                   <p className="text-xs text-gray-500 mt-1">
-                    <span className="nec-reference">NEC Table 220.42(A)</span>
+                    <span className="nec-reference">NEC {article220Citations(necEdition).unitLoadTable}</span>
                   </p>
                 </div>
 

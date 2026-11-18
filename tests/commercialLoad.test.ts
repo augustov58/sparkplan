@@ -16,6 +16,7 @@ const base = (over: Partial<CommercialLoadInput> = {}): CommercialLoadInput => (
   motorLoads: [],
   serviceVoltage: 208,
   servicePhase: 3,
+  necEdition: '2020',
   ...over,
 });
 

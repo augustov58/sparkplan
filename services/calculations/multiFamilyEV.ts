@@ -15,6 +15,7 @@
  */
 
 import { getEvseLoadVA, evseLoadCitation, EVSE_CONTINUOUS_FACTOR, type NecEdition } from '../../data/nec/evse-load';
+import { article220Citations } from '../../data/nec/article220-citations';
 import { calculateTwoUnitDwellingLoad, twoUnitOptionalRow, type TwoUnitDwellingUnit } from './residentialLoad';
 
 // ============================================================================
@@ -679,7 +680,7 @@ function checkTransformerCapacity(
  * @param items - Array of common area load items
  * @returns Calculated loads with demand factors applied
  */
-export function calculateCommonAreaLoads(items: CommonAreaLoadItem[]): CommonAreaLoadResult {
+export function calculateCommonAreaLoads(items: CommonAreaLoadItem[], necEdition: NecEdition): CommonAreaLoadResult {
   if (!items || items.length === 0) {
     return {
       items: [],
@@ -747,7 +748,7 @@ export function calculateCommonAreaLoads(items: CommonAreaLoadItem[]): CommonAre
         connectedVA: Math.round(data.connectedVA),
         demandVA: Math.round(demandVA),
         demandFactor: 1.0,
-        necReference: 'NEC 220.42',
+        necReference: `NEC ${article220Citations(necEdition).lightingDemandTable.replace('Table ', '')}`,
       });
       totalConnectedVA += data.connectedVA;
       totalDemandVA += demandVA;
@@ -1015,7 +1016,7 @@ export function calculateMultiFamilyEV(input: MultiFamilyEVInput): MultiFamilyEV
   // factors when provided, otherwise the simple VA input at 100%.
   const addCommonAreaLoads = (simpleNecReference: string) => {
     if (commonAreaLoads && commonAreaLoads.length > 0) {
-      const commonAreaResult = calculateCommonAreaLoads(commonAreaLoads);
+      const commonAreaResult = calculateCommonAreaLoads(commonAreaLoads, necEdition);
       for (const item of commonAreaResult.items) {
         breakdown.push(item);
       }
@@ -1174,7 +1175,7 @@ export function calculateMultiFamilyEV(input: MultiFamilyEVInput): MultiFamilyEV
       connectedVA: lightingLoadVA,
       demandVA: lightingLoadVA, // Will be factored later
       demandFactor: 1.0,
-      necReference: 'NEC Table 220.12',
+      necReference: `NEC ${article220Citations(necEdition).dwellingUnitLoad}`,
     });
 
     // 1b. Small appliance circuits (2 per unit @ 1,500 VA each)

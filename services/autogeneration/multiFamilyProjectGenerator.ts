@@ -507,7 +507,9 @@ function generateHousePanel(
 
   // ---- Itemized path: real circuits from calculateCommonAreaLoads ----
   if (commonAreaItems && commonAreaItems.length > 0) {
-    const caResult = calculateCommonAreaLoads(commonAreaItems);
+    // Only each item's VA is read here; the edition sets the row's citation,
+    // which the generated circuits don't carry.
+    const caResult = calculateCommonAreaLoads(commonAreaItems, '2020');
 
     for (const item of caResult.items) {
       const mapping = CATEGORY_CIRCUIT_MAP[item.category] || CATEGORY_CIRCUIT_MAP['other']!;

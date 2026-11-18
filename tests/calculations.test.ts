@@ -61,7 +61,7 @@ describe('NEC Load Calculations', () => {
         }
       ];
 
-      const result = calculateLoad(loads, dwellingSettings);
+      const result = calculateLoad(loads, dwellingSettings, '2020');
 
       expect(result.method).toBe('NEC 220.82 Optional (Dwelling)');
       expect(result.totalConnectedVA).toBe(15000);
@@ -82,7 +82,7 @@ describe('NEC Load Calculations', () => {
         }
       ];
 
-      const result = calculateLoad(loads, dwellingSettings);
+      const result = calculateLoad(loads, dwellingSettings, '2020');
 
       // With 125% factor, 8000VA continuous should result in higher demand
       expect(result.totalDemandVA).toBeGreaterThan(8000);
@@ -108,7 +108,7 @@ describe('NEC Load Calculations', () => {
         }
       ];
 
-      const result = calculateLoad(loads, dwellingSettings);
+      const result = calculateLoad(loads, dwellingSettings, '2020');
 
       expect(result.breakdown.motors.largestMotorVA).toBe(2000);
       // Demand should be 125% of largest + 100% of others = (2000 * 1.25) + 1000 = 3500
@@ -128,7 +128,7 @@ describe('NEC Load Calculations', () => {
         { id: '2', description: 'Range', watts: 8000, type: 'range', continuous: false, phase: 'A' }
       ];
 
-      const result = calculateLoad(loads, existingDwellingSettings);
+      const result = calculateLoad(loads, existingDwellingSettings, '2020');
       expect(result.method).toBe('NEC 220.83 Optional (Existing Dwelling)');
       expect(result.necReferences[0]).toBe('NEC 220.83 Optional Calculation for Existing Dwelling Unit');
     });
@@ -139,7 +139,7 @@ describe('NEC Load Calculations', () => {
         { id: '1', description: 'General Loads', watts: 18000, type: 'lighting', continuous: false, phase: 'A' }
       ];
 
-      const result = calculateLoad(loads, existingDwellingSettings);
+      const result = calculateLoad(loads, existingDwellingSettings, '2020');
       expect(result.totalConnectedVA).toBe(18000);
       expect(result.totalDemandVA).toBe(12000);
     });
@@ -151,7 +151,7 @@ describe('NEC Load Calculations', () => {
         { id: '2', description: 'AC', watts: 5000, type: 'hvac', continuous: true, phase: 'A' }
       ];
 
-      const result = calculateLoad(loads, existingDwellingSettings);
+      const result = calculateLoad(loads, existingDwellingSettings, '2020');
       expect(result.totalConnectedVA).toBe(13000);
       expect(result.totalDemandVA).toBe(13000);
     });
@@ -166,7 +166,7 @@ describe('NEC Load Calculations', () => {
         service_modification_type: undefined
       };
 
-      const result = calculateLoad(loads, settingsWithoutStatus);
+      const result = calculateLoad(loads, settingsWithoutStatus, '2020');
       expect(result.method).toBe('NEC 220.83 Optional (Existing Dwelling)');
     });
   });
@@ -198,7 +198,7 @@ describe('NEC Load Calculations', () => {
         serviceVoltage: 208
       };
 
-      const result = calculateLoad(loads, threePhaseSettings);
+      const result = calculateLoad(loads, threePhaseSettings, '2020');
 
       expect(result.phaseBalance.imbalancePercent).toBeGreaterThan(10);
       expect(result.phaseBalance.warnings.length).toBeGreaterThan(0);
