@@ -4,6 +4,12 @@ All notable changes to SparkPlan.
 
 ---
 
+## 2026-11-18: Table 220.42 data keeps only the rows the app reads (#236)
+
+- **The dwelling row now has the table's third tier** (over 120,000 VA at 25%), the same tiers as the dwelling Part III walk. The hotel, warehouse and store rows, which nothing read and which didn't match the table, are removed. No number changes on a project below 120 kVA of dwelling lighting.
+
+---
+
 ## 2026-11-18: The multifamily riser shows the MDP (#220)
 
 - **On a multifamily project with a meter stack, the riser (E-201) skipped the MDP.** It drew every unit and house panel straight off the meter stack, so it disagreed with the panel schedules and feeders, and the MDP's feeders had no edges to label. It now draws utility → meter stack → MDP → panels, as the rest of the packet and the app do. The MDP's feeders are labelled on their edges, each panel shows its meter (e.g. "Meter 2"), and the legend now matches what the labels show.

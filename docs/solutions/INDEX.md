@@ -4,6 +4,7 @@ One note per hard problem, written by the model that solved it via the `extract-
 Each entry: `- [title](file.md) — reusable rule`.
 
 <!-- Newest first -->
+- [Table 220.42 data had unread rows and a missing dwelling tier](2026-11-18-table-220-42-rows.md) — align data to the PE-ruled implementation; delete unread safety-table rows rather than guess them
 - [The multifamily riser skipped the MDP](2026-11-18-mf-riser-mdp.md) — route special-case topologies through the same subtree builder; check the ADRs before calling it a decision; keep the info the old drawing carried (meter tags)
 - [No control to add an EVEMS setpoint](2026-11-18-add-evems-setpoint.md) — reuse the card save path (update or create); reset UI state before an awaited optimistic write, not after; metadata rows take the highest free slot
 - [A new house never printed its 230.42(A)(1) service check](2026-11-18-new-house-service-check.md) — check recorded rulings before calling it a decision; prove the existing recommendation always passes the new check
