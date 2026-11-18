@@ -460,6 +460,14 @@ export const MultiFamilyEVCalculator: React.FC<MultiFamilyEVCalculatorProps> = (
     );
   }, [dwellingUnits, avgUnitSqFt, existingServiceAmps, evChargerCount, evAmpsPerCharger, voltage, phase]);
 
+  // The banner's verdict: the full calculation when it ran; the rough
+  // estimate (quickMultiFamilyEVCheck) only when it failed (#193)
+  const bannerVerdict: 'direct' | 'evems' | 'short' = result
+    ? result.scenarios.noEVEMS.maxChargers >= evChargerCount
+      ? 'direct'
+      : result.scenarios.withEVEMS.maxChargers >= evChargerCount ? 'evems' : 'short'
+    : quickCheck?.canSupport ? 'direct' : 'short';
+
   // Handle PDF export
   const handleExportPDF = async () => {
     if (!result) return;
@@ -504,9 +512,13 @@ export const MultiFamilyEVCalculator: React.FC<MultiFamilyEVCalculatorProps> = (
       {/* Quick Summary Banner */}
       {quickCheck && (
         <div className={`border-2 rounded-lg p-4 ${
-          quickCheck.canSupport
+          // #193: the color follows the verdict printed below (the full
+          // calculation), not the rough estimate
+          bannerVerdict === 'direct'
             ? 'bg-green-50 border-green-300'
-            : 'bg-[#fff8e6] border-[#c9a227]/50'
+            : bannerVerdict === 'evems'
+              ? 'bg-blue-50 border-blue-300'
+              : 'bg-[#fff8e6] border-[#c9a227]/50'
         }`}>
           <div className="flex items-center justify-between flex-wrap gap-4">
             <div className="flex items-center gap-3">
@@ -533,8 +545,8 @@ export const MultiFamilyEVCalculator: React.FC<MultiFamilyEVCalculatorProps> = (
                         ? `✓ Can support all ${evChargerCount} chargers with EVEMS`
                         : `Max ${result.scenarios.noEVEMS.maxChargers} direct, ${result.scenarios.withEVEMS.maxChargers} with EVEMS`
                   ) : quickCheck.canSupport
-                    ? `Can support all ${evChargerCount} chargers`
-                    : `Max ${quickCheck.maxChargersWithoutUpgrade} chargers without upgrade`}
+                    ? `Estimate: can support all ${evChargerCount} chargers`
+                    : `Estimate: max ${quickCheck.maxChargersWithoutUpgrade} chargers without upgrade`}
                 </div>
                 <div className="text-xs text-gray-600">
                   {result ? (
@@ -551,7 +563,7 @@ export const MultiFamilyEVCalculator: React.FC<MultiFamilyEVCalculatorProps> = (
               <div className="text-2xl font-bold text-gray-900">
                 {result ? result.serviceAnalysis.utilizationPercent : quickCheck.utilizationPercent}%
               </div>
-              <div className="text-xs text-gray-500">Service Utilization (w/EV)</div>
+              <div className="text-xs text-gray-500">{result ? 'Service Utilization (w/EV)' : 'Estimated utilization (w/EV)'}</div>
             </div>
           </div>
         </div>
@@ -1444,7 +1456,10 @@ export const MultiFamilyEVCalculator: React.FC<MultiFamilyEVCalculatorProps> = (
                       <div>
                         <div className="font-medium text-gray-900 text-sm">{result.scenarios.withUpgrade.name}</div>
                         <div className="text-xs text-gray-500">
-                          Upgrade to {result.scenarios.withUpgrade.recommendedServiceAmps}A service
+                          {/* No upgrade needed → no size; say why (found on #193) */}
+                          {result.scenarios.withUpgrade.recommendedServiceAmps
+                            ? `Upgrade to ${result.scenarios.withUpgrade.recommendedServiceAmps}A service`
+                            : result.scenarios.withUpgrade.notes[0]}
                         </div>
                       </div>
                       <div className="text-right">

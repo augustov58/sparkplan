@@ -89,6 +89,9 @@ CRITICAL: only `calculated` skips the 1.25× multiplier.
   the service check's list (lighting not counted, EVEMS at the setpoint). No
   blanket 80/20 split. Existing feeders whose stored design load is >1% off
   are flagged "Outdated" (the riser and equipment schedule print stored sizes).
+- OTHER TOOLS (#193): Inspector Mode, the Copilot and the EV Panel Builder
+  read lib/storedCalcs.ts::scheduleServiceCheck (the same check, in service
+  amps vs the rating). Never a connected × 0.8 or breaker-sum rule.
 ```
 PE-confirmed 2026-07-09 (PR #118 review), superseding both prior interpretations
 (pre-Sprint-2 multiplied calculated; Sprint 2 wrongly exempted measured).

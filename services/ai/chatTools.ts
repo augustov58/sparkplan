@@ -15,6 +15,7 @@ import { supabase } from '@/lib/supabase';
 import { isExistingConstructionProject } from '@/lib/projectSettings';
 import { notifyDataRefresh } from '@/lib/dataRefreshEvents';
 import { computeFeederLoadVA, feederDesignLoadSplit } from '@/services/feeder/feederLoadSync';
+import { CONTINUOUS_LOAD_FACTOR, isContinuousServiceLoad } from '@/data/nec/continuous-load';
 import { calculateFeederSizing } from '@/services/calculations/feederSizing';
 import {
   calculateAllCumulativeVoltageDrops,
@@ -906,7 +907,51 @@ Returns the feeder's voltage drop percentage if already calculated in the projec
       const serviceVoltage = pc.serviceVoltage;
       const servicePhase = pc.servicePhase;
 
-      // Estimate current service amps from main panel
+      // #193: the check E-102 and the Service Upgrade Wizard make — NEC 220
+      // load + 25% of the continuous loads (230.42(A)(1)) against the rating.
+      // A proposed load named as continuous (EV charging, signs, show
+      // windows) takes 125%; sufficiency is the rating itself, not 80%.
+      const sc = pc.serviceCheck;
+      if (sc && sc.serviceAmps > 0) {
+        const proposedVA = (params.proposed_load_watts as number) || 0;
+        const proposedDescription = (params.proposed_load_description as string) || '';
+        const proposedContinuous = isContinuousServiceLoad(proposedDescription);
+        const divisor = servicePhase === 3 ? serviceVoltage * Math.sqrt(3) : serviceVoltage;
+        const proposedCheckAmps = (proposedVA * (proposedContinuous ? CONTINUOUS_LOAD_FACTOR : 1)) / divisor;
+        const totalCheckAmps = sc.checkAmps + proposedCheckAmps;
+        const needsUpgrade = totalCheckAmps > sc.serviceAmps;
+        const recommendedSize = needsUpgrade ? getNextServiceSize(totalCheckAmps) : sc.serviceAmps;
+        const current = Math.round(sc.checkAmps);
+        const projected = Math.round(totalCheckAmps);
+        return {
+          success: true,
+          data: {
+            basis: 'NEC 220 load + 25% of continuous loads (NEC 230.42(A)(1)), the check E-102 and the Service Upgrade Wizard make',
+            currentServiceAmps: sc.serviceAmps,
+            serviceVoltage,
+            servicePhase,
+            currentArticle220LoadVA: Math.round(sc.loadKVA * 1000),
+            continuousAdderVA: Math.round(sc.adderKVA * 1000),
+            currentCheckAmps: current,
+            currentUtilization: Math.round(sc.utilizationPct),
+            proposedAdditionalVA: proposedVA,
+            proposedTakenAsContinuous: proposedContinuous,
+            proposedCheckAmps: Math.round(proposedCheckAmps),
+            projectedCheckAmps: projected,
+            projectedUtilization: Math.round((totalCheckAmps / sc.serviceAmps) * 100),
+            needsUpgrade,
+            recommendedServiceAmps: recommendedSize,
+            necReference: 'NEC 220 (load), NEC 230.42(A)(1) (+25% of continuous loads), NEC 220.87 (existing service)',
+            recommendation: needsUpgrade
+              ? `Service upgrade needed: the service check is ${projected} A on the ${sc.serviceAmps} A service. Recommend ${recommendedSize} A, or load management (EVEMS, NEC 625.42).`
+              : proposedVA > 0
+                ? `The ${sc.serviceAmps} A service can take the additional ${proposedVA} W${proposedContinuous ? ' (continuous, at 125%)' : ''}: service check ${projected} A.`
+                : `The service check is ${current} A of ${sc.serviceAmps} A (${Math.round(sc.utilizationPct)}%).`,
+          },
+        };
+      }
+
+      // Without project data: a rough estimate, labelled as one
       const mainPanel = pc.panels.find(p => p.isMain);
       const currentServiceAmps = mainPanel?.busRating || 200;
 
@@ -935,6 +980,7 @@ Returns the feeder's voltage drop percentage if already calculated in the projec
           projectedUtilization: Math.round(projectedUtilization),
           needsUpgrade,
           recommendedServiceAmps: recommendedSize,
+          basis: 'ROUGH ESTIMATE (connected load × 0.8, 80% threshold), not the NEC 220 calculation — open the project for the service check E-102 makes',
           necReference: 'NEC 220.87 - Determining Existing Loads',
           recommendation: needsUpgrade
             ? `Service upgrade recommended. Current ${currentServiceAmps}A service will be at ${Math.round(projectedUtilization)}% utilization. Recommend ${recommendedSize}A service.`

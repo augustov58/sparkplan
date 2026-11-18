@@ -4,6 +4,18 @@ All notable changes to SparkPlan.
 
 ---
 
+## 2026-11-18: Inspector Mode, the Copilot and the EV tools use the real service check (#193)
+
+- **Every place that says whether the service is big enough now uses the check E-102 and the Service Upgrade Wizard make:** the NEC 220 load plus 25% of the continuous loads (EV charging, signs, show windows; NEC 230.42(A)(1)), against the service rating. Several tools used rough rules of their own.
+  - **Inspector Mode** estimated the load as connected × 80%. A project whose check is 245 A on a 200 A service showed only "Service Nearing Capacity (83%)". It now shows "Service Undersized for Load", with the numbers.
+  - **The EV Panel Builder** compared the template's breaker sizes with the service and ignored the loads already on it. Its warning is now the service check with the new panel added: 493 A on the 200 A service in the same example, not "280 A".
+  - **The Copilot** reads the same check in its project context and its "check service upgrade" tool. A proposed EV charger or sign counts at 125%; the service is sufficient up to its rating, not 80% of it.
+  - **The Multi-Family EV Calculator's banner** took its color from a quick estimate while its text came from the full calculation: it could say "Can support all 20 chargers with EVEMS" on an amber banner. The color now follows the text.
+- The Multi-Family EV Calculator's "With Service Upgrade" card printed "Upgrade to A service" when no upgrade was needed. It now says why, e.g. "Service upgrade not required if EVEMS is used".
+- The Python agents' service tools can't run the app's calculation. Their results now say they are connected-load estimates, not the service check.
+
+---
+
 ## 2026-11-18: The EVEMS setpoint can be edited and removed (#209)
 
 - **The EVEMS setpoint card on the Panel Schedule now has Edit and Remove.** The setpoint is stored as a hidden marker circuit, so once one existed, no screen could change or delete it. It kept limiting the panel's demand (NEC 625.42) and its feeder's design load.

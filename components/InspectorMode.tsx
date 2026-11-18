@@ -40,6 +40,9 @@ import { useFeeders } from '../hooks/useFeeders';
 import { useTransformers } from '../hooks/useTransformers';
 import { useGrounding } from '../hooks/useGrounding';
 import { useInspectorReports } from '../hooks/useInspectorReports';
+import { useProjects } from '../hooks/useProjects';
+import { useProjectNecEdition } from '../hooks/useProjectNecEdition';
+import { scheduleServiceCheck } from '../lib/storedCalcs';
 import { getAllActions } from '../services/ai/agentOrchestrator';
 import type { AgentAction } from '../types';
 import {
@@ -269,6 +272,14 @@ export const InspectorMode: React.FC<InspectorModeProps> = ({
   const { circuits, loading: circuitsLoading } = useCircuits(projectId);
   const { feeders, loading: feedersLoading } = useFeeders(projectId);
   const { transformers, loading: transformersLoading } = useTransformers(projectId);
+  // #193: the service check E-102 and the Service Upgrade Wizard use
+  const { getProjectById } = useProjects();
+  const project = getProjectById(projectId);
+  const necEdition = useProjectNecEdition(project);
+  const serviceCheck = useMemo(
+    () => (project ? scheduleServiceCheck(project, panels, circuits, transformers, necEdition) : null),
+    [project, panels, circuits, transformers, necEdition],
+  );
   const { grounding, loading: groundingLoading } = useGrounding(projectId);
   const { latestReport, loading: reportsLoading, saveReport } = useInspectorReports(projectId);
 
@@ -318,6 +329,7 @@ export const InspectorMode: React.FC<InspectorModeProps> = ({
         gecSize: grounding.gec_size || '',
         bonding: grounding.bonding || [],
       } : undefined,
+      serviceCheck,
     };
 
     // useFeeders returns the camelCase `Feeder` from types.ts; runInspection
