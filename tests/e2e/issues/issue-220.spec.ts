@@ -40,8 +40,9 @@ test('#220 the multifamily riser has the MDP between the meter stack and the pan
   expect(at('QA MF feeders MDP (MDP)')).toBeGreaterThan(at('CT Cabinet'));
   expect(at('Unit 101 Panel')).toBeGreaterThan(at('QA MF feeders MDP (MDP)'));
   // 2 — the MDP → panel feeders are labelled
-  expect(riser).toContain('2/0 AWG Cu • 50 ft • VD 0.47%');
-  expect(riser).toContain('1 AWG Cu • 50 ft • VD 0.47%');
+  // VD from Table 9 Note 2 effective Z since #219 (the feeders were recalculated)
+  expect(riser).toContain('2/0 AWG Cu • 50 ft • VD 0.56%');
+  expect(riser).toContain('1 AWG Cu • 50 ft • VD 0.51%');
   expect(riser).not.toContain('Meter 1: MLO'); // the old stack → panel edges
   // 3 — each panel keeps its meter
   for (const n of [1, 2, 3, 4]) expect(riser).toContain(`Meter ${n}`);
