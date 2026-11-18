@@ -300,9 +300,11 @@ export const PanelSchedule: React.FC<PanelScheduleProps> = ({ project }) => {
       totalWithFeeders_kVA: (directTotalVA + feederTotalVA) / 1000,
       connectedWithFeeders_kVA: (directConnectedVA + feederTotalVA) / 1000,
     } : {
-      // Minimal result when only feeders exist (no direct circuits)
-      totalConnectedLoad_kVA: feederTotalVA / 1000,
-      totalDemandLoad_kVA: feederTotalVA / 1000,
+      // Minimal result when only feeders exist (no direct circuits): the
+      // direct load is zero; the feeders' total is the feeder card and
+      // "Demand with feeders" (#213: it showed as "Direct circuits load" too)
+      totalConnectedLoad_kVA: 0,
+      totalDemandLoad_kVA: 0,
       demandAmps: feederTotalVA / (selectedPanel.voltage * (selectedPanel.phase === 3 ? Math.sqrt(3) : 1)),
       percentImbalance: 0,
       // phaseLoads must be an array with objects matching the expected structure
@@ -2062,6 +2064,13 @@ export const PanelSchedule: React.FC<PanelScheduleProps> = ({ project }) => {
                   </tr>
                 </tfoot>
               </table>
+            </div>
+          ) : panelCircuits.length === 0 ? (
+            /* No branch circuits: the feeders carry this panel's load (#213) */
+            <div className="bg-white border border-gray-200 rounded-lg p-4 text-sm text-gray-600">
+              <span className="font-semibold text-gray-800 block mb-1">DEMAND FACTOR CALCULATION (NEC ARTICLE 220)</span>
+              No branch circuits on this panel. Its load is the panels it feeds: see Feeder Circuits and
+              Demand with Feeders in the Panel Summary{aggregatedLoad && aggregatedLoad.downstreamPanelCount > 0 ? ', and the Aggregated Load below' : ''}.
             </div>
           ) : (
           /* Per-circuit-type Standard Method walk — for commercial /
