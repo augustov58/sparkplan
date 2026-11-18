@@ -15,6 +15,8 @@ export interface PanelScheduleDwellingOptions {
   buildingType?: PanelSchedulePDFProps['buildingType'];
   singleFamilyDwellingContext?: PanelSchedulePDFProps['singleFamilyDwellingContext'];
   necEdition?: NecEdition;
+  /** Every circuit under the panel: the single-family MDP's dwelling load reads them (#216). */
+  serviceCircuits?: Circuit[];
 }
 
 /**
@@ -46,6 +48,7 @@ export const exportPanelSchedulePDF = async (
         buildingType={dwelling.buildingType}
         singleFamilyDwellingContext={dwelling.singleFamilyDwellingContext}
         necEdition={dwelling.necEdition}
+        serviceCircuits={dwelling.serviceCircuits}
       />
     ).toBlob();
 

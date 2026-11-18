@@ -26,6 +26,7 @@ import {
   buildMultiFamilyContext,
   isEVEMSMarkerCircuit,
   findEVEMSSetpointMarker,
+  circuitsUnderPanel,
   type MultiFamilyContext,
 } from '../services/calculations/upstreamLoadAggregation';
 import {
@@ -352,7 +353,8 @@ export const PanelSchedule: React.FC<PanelScheduleProps> = ({ project }) => {
       // calculator is set to "10 kVA / 40%", else Part III (with its rows).
       const existingDwelling = isExistingConstructionProject(project);
       const summary = calculateSingleFamilyPanelLoad({
-        circuits: panelCircuits.map(c => ({
+        // Every circuit under the MDP: a subpanel's loads are the dwelling's (#216)
+        circuits: circuitsUnderPanel(selectedPanel.id, panels, circuits, transformers).map(c => ({
           description: c.description,
           load_watts: c.load_watts,
           load_type: c.load_type,
@@ -402,7 +404,7 @@ export const PanelSchedule: React.FC<PanelScheduleProps> = ({ project }) => {
       necReferences: summary.necReferences,
       rows: summary.rows,
     };
-  }, [selectedPanel, panelCircuits, project.settings, necEdition]);
+  }, [selectedPanel, panelCircuits, panels, circuits, transformers, project.settings, necEdition]);
 
   // Calculate aggregated load including downstream panels
   // Uses occupancyType from project settings for correct demand factor selection
@@ -530,6 +532,10 @@ export const PanelSchedule: React.FC<PanelScheduleProps> = ({ project }) => {
     buildingType,
     singleFamilyDwellingContext: buildSingleFamilyDwellingContext(project, !!multiFamilyCtx),
     necEdition,
+    // The single-family MDP's dwelling load covers its subpanels (#216)
+    serviceCircuits: selectedPanel?.is_main
+      ? circuitsUnderPanel(selectedPanel.id, panels, circuits, transformers)
+      : undefined,
   };
 
   const handleExportPDF = async () => {
@@ -2112,7 +2118,8 @@ export const PanelSchedule: React.FC<PanelScheduleProps> = ({ project }) => {
                 {/* Direct Circuits */}
                 <div className="bg-gray-50 rounded p-3">
                   <span className="text-[10px] uppercase text-gray-500 block">
-                    Direct Circuits Load
+                    {/* Single-family MDP: the dwelling's load, its subpanels included (#216) */}
+                    {isSingleFamilyMDP && dwellingUnitDemand ? 'Dwelling Load (all panels)' : 'Direct Circuits Load'}
                     {dwellingUnitDemand && (dwellingUnitDemand as any).totalConnectedVA != null && (
                       <span className="ml-1 text-amber-700 normal-case">
                         ({(dwellingUnitDemand as any).necArticle ?? 'NEC 220.82'})
@@ -2128,7 +2135,7 @@ export const PanelSchedule: React.FC<PanelScheduleProps> = ({ project }) => {
                 </div>
                 <div className="bg-[#f0f5f0] rounded p-3">
                   <span className="text-[10px] uppercase text-gray-500 block">
-                    Direct Demand Load
+                    {isSingleFamilyMDP && dwellingUnitDemand ? 'Dwelling Demand (all panels)' : 'Direct Demand Load'}
                     {dwellingUnitDemand && (
                       <span className="ml-1 text-amber-700 normal-case">
                         ({(dwellingUnitDemand as any).necArticle ?? 'NEC 220.82'})
@@ -2178,7 +2185,10 @@ export const PanelSchedule: React.FC<PanelScheduleProps> = ({ project }) => {
                         {aggregatedLoad && aggregatedLoad.downstreamPanelCount > 0 ? 'DEMAND WITH FEEDERS' : 'TOTAL WITH FEEDERS'}
                       </span>
                       <span className="text-xl font-bold text-purple-900">
-                        {aggregatedLoad && aggregatedLoad.downstreamPanelCount > 0
+                        {isSingleFamilyMDP && dwellingUnitDemand
+                          // The dwelling's service load already covers its subpanels (#216)
+                          ? (dwellingUnitDemand.totalDemandVA / 1000).toFixed(1)
+                          : aggregatedLoad && aggregatedLoad.downstreamPanelCount > 0
                           ? (aggregatedLoad.totalDemandVA / 1000).toFixed(1)
                           : ((demandResult as any).totalWithFeeders_kVA || demandResult.totalDemandLoad_kVA).toFixed(1)
                         } KVA
@@ -2311,7 +2321,8 @@ export const PanelSchedule: React.FC<PanelScheduleProps> = ({ project }) => {
             )}
 
             {/* Upstream Load Aggregation (when panel has downstream loads) */}
-            {aggregatedLoad && aggregatedLoad.downstreamPanelCount > 0 && (
+            {/* Not on a single-family MDP: its dwelling method (above) replaces the per-type cascade (#216) */}
+            {aggregatedLoad && aggregatedLoad.downstreamPanelCount > 0 && !(isSingleFamilyMDP && dwellingUnitDemand) && (
               <div className="bg-[#f0f5f0] border border-[#3d6b3d]/30 rounded-lg p-4">
                 <h4 className="font-semibold text-sm text-amber-800 mb-3 flex items-center gap-2">
                   <ArrowDown className="w-4 h-4" /> AGGREGATED LOAD (NEC 220.40)

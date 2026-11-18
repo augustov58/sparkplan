@@ -40,6 +40,7 @@ import {
 import { PanelSchedulePages } from './PanelScheduleDocuments';
 import {
   calculateAggregatedLoad,
+  circuitsUnderPanel,
   isEVEMSManagedPanel,
   findEVEMSSetpointMarker,
   describeEvDesignDrift,
@@ -1359,6 +1360,10 @@ export const generatePermitPacket = async (data: PermitPacketData): Promise<void
             aggregatedLoad={aggregatedLoad}
             singleFamilyDwellingContext={data.singleFamilyDwellingContext}
             necEdition={resolvedNecEdition}
+            // The single-family MDP's dwelling load covers its subpanels (#216)
+            serviceCircuits={panel.is_main
+              ? circuitsUnderPanel(panel.id, data.panels, data.circuits, data.transformers)
+              : undefined}
           />
         ),
       });

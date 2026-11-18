@@ -16,7 +16,7 @@ import type { Database } from './database.types';
 import type { DwellingUnitTemplate, Project, ResidentialAppliances } from '../types';
 import { ExistingLoadDeterminationMethod } from '../types';
 import { buildSingleFamilyDwellingContext } from './projectSettings';
-import { buildMultiFamilyContext, calculateAggregatedLoad, calculateProposedNewLoadVA, continuousServiceAdderVA } from '../services/calculations/upstreamLoadAggregation';
+import { buildMultiFamilyContext, calculateAggregatedLoad, calculateProposedNewLoadVA, circuitsUnderPanel, continuousServiceAdderVA } from '../services/calculations/upstreamLoadAggregation';
 import {
   calculateDwellingDemandSplit,
   calculateMultiFamilyLoad,
@@ -161,9 +161,9 @@ export function projectDemandSplit(
   const sfCtx = buildSingleFamilyDwellingContext(project, !!mfCtx);
   if (sfCtx) {
     const split = calculateDwellingDemandSplit({
-      // Same circuit set as E-101 (LoadCalculationSummary): MDP circuits.
-      circuits: circuits
-        .filter(c => c.panel_id === mdp.id)
+      // Same circuit set as E-101 (LoadCalculationSummary): every circuit
+      // under the MDP — a subpanel's loads are the dwelling's (#216).
+      circuits: circuitsUnderPanel(mdp.id, panels, circuits, transformers)
         .map(c => ({
           description: c.description,
           load_watts: c.load_watts,

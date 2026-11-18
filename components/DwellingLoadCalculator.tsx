@@ -61,7 +61,9 @@ import {
 import { usePanels } from '../hooks/usePanels';
 import { useProjects } from '../hooks/useProjects';
 import { useCircuits } from '../hooks/useCircuits';
+import { useTransformers } from '../hooks/useTransformers';
 import { useProjectNecEdition } from '../hooks/useProjectNecEdition';
+import { circuitsUnderPanel } from '../services/calculations/upstreamLoadAggregation';
 import {
   generateBasicMultiFamilyProject,
   type BasicGenerationOptions,
@@ -103,6 +105,10 @@ export const DwellingLoadCalculator: React.FC<DwellingLoadCalculatorProps> = ({
 
   // Get existing circuits for the main panel
   const mainPanelCircuits = mainPanel ? circuits.filter(c => c.panel_id === mainPanel.id) : [];
+  // The service result reads every circuit under the MDP: a subpanel's loads
+  // are the dwelling's (#216). The schedule generator keeps the MDP's own.
+  const { transformers } = useTransformers(project.id);
+  const serviceCircuits = mainPanel ? circuitsUnderPanel(mainPanel.id, panels, circuits, transformers) : [];
 
   // Local state
   const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set(['appliances', 'results']));
@@ -238,15 +244,14 @@ export const DwellingLoadCalculator: React.FC<DwellingLoadCalculatorProps> = ({
     [isSingleFamily, project.settings],
   );
   const circuitsLoadResult: ResidentialLoadResult | null = useMemo(() => {
-    const panelCircuits = mainPanel ? circuits.filter(c => c.panel_id === mainPanel.id) : [];
-    if (!dwellingContext || !mainPanel || panelCircuits.length === 0) return null;
+    if (!dwellingContext || !mainPanel || serviceCircuits.length === 0) return null;
     return calculateSingleFamilyLoadFromCircuits({
       ...dwellingContext,
-      circuits: circuitsWithPendingProposed(panelCircuits, proposedLoads),
+      circuits: circuitsWithPendingProposed(serviceCircuits, proposedLoads),
       voltage: mainPanel.voltage || 240,
       necEdition,
     });
-  }, [dwellingContext, mainPanel, circuits, proposedLoads, necEdition]);
+  }, [dwellingContext, mainPanel, serviceCircuits, proposedLoads, necEdition]);
   const loadResult = circuitsLoadResult ?? appliancesLoadResult;
 
   // Persist multi-family load result to project settings so MF EV Calculator can read it
@@ -1598,7 +1603,7 @@ export const DwellingLoadCalculator: React.FC<DwellingLoadCalculatorProps> = ({
               <div className="p-5 space-y-3">
                 {circuitsLoadResult && mainPanel && (
                   <p className="text-xs text-[#666] bg-[#f5f5f0] rounded-md px-3 py-2">
-                    From the {mainPanelCircuits.length} circuit{mainPanelCircuits.length !== 1 ? 's' : ''} on {mainPanel.name}
+                    From the {serviceCircuits.length} circuit{serviceCircuits.length !== 1 ? 's' : ''} {serviceCircuits.length > mainPanelCircuits.length ? `under ${mainPanel.name} (its subpanels included)` : `on ${mainPanel.name}`}
                     {proposedLoads.length > 0 ? ' and the proposed loads' : ''}, the same input the permit packet uses.
                     The appliance selections build the schedule on Generate; they change this result after you apply it.
                   </p>

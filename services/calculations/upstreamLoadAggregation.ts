@@ -1313,6 +1313,22 @@ function createEmptyAggregatedLoad(panelId: string, panelName: string, occupancy
  *
  * Pure / no side effects. The visited set is local to a single call.
  */
+/**
+ * The circuits on a panel and every panel it feeds (through feeds and
+ * transformers), EVEMS marker circuits left out (metadata). A single-family
+ * dwelling's service calculation reads these from the MDP: a subpanel's loads
+ * are the dwelling's loads (#216).
+ */
+export function circuitsUnderPanel<C extends Pick<Circuit, 'panel_id' | 'description'>>(
+  rootPanelId: string,
+  panels: Panel[],
+  circuits: C[],
+  transformers: Transformer[],
+): C[] {
+  const ids = collectDownstreamPanelIds(rootPanelId, panels, transformers);
+  return circuits.filter(c => !!c.panel_id && ids.has(c.panel_id) && !isEVEMSMarkerCircuit(c));
+}
+
 function collectDownstreamPanelIds(
   rootPanelId: string,
   panels: Panel[],
