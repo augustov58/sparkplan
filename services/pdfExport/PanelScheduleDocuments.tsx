@@ -23,6 +23,7 @@ import {
   isEVEMSMarkerCircuit,
   findEVEMSSetpointMarker,
   circuitsUnderPanel,
+  isEvemsReductionRow,
 } from '../calculations/upstreamLoadAggregation';
 import { lineToNeutralVoltage } from '../../lib/electricalDisplay';
 import { isEvseDescription, type NecEdition } from '../../data/nec/evse-load';
@@ -680,7 +681,7 @@ export const PanelSchedulePages: React.FC<PanelSchedulePDFProps> = ({
   // multiple categories. Skip for single-category panels where the
   // breakdown would just restate the Load Summary numbers.
   const breakdownRows = (aggregatedLoad?.demandBreakdown ?? [])
-    .filter(b => b.connectedVA > 0 || b.demandVA > 0);
+    .filter(b => b.connectedVA !== 0 || b.demandVA !== 0); // keeps the EVEMS reduction (#212)
   const showBreakdown = hasAggregatedDemand && breakdownRows.length >= 1;
 
   return (
@@ -935,7 +936,7 @@ export const PanelSchedulePages: React.FC<PanelSchedulePDFProps> = ({
                         {(b.demandVA / 1000).toFixed(1)} kVA
                       </Text>
                       <Text style={styles.breakdownColFactor}>
-                        {(b.demandFactor * 100).toFixed(0)}%
+                        {isEvemsReductionRow(b) ? '—' : `${(b.demandFactor * 100).toFixed(0)}%`}
                       </Text>
                       <Text style={styles.breakdownColNec}>
                         {b.necReference.replace(/^NEC\s+/, '').replace(/\s*\(.*$/, '')}
@@ -1292,7 +1293,7 @@ export const MultiPanelDocument: React.FC<MultiPanelDocumentProps> = ({
               ? aggLoad!.totalDemandVA / voltageDivisor
               : 0;
             const breakdownRows2 = (aggLoad?.demandBreakdown ?? [])
-              .filter(b => b.connectedVA > 0 || b.demandVA > 0);
+              .filter(b => b.connectedVA !== 0 || b.demandVA !== 0); // keeps the EVEMS reduction (#212)
             const showBreakdown2 = hasAggregatedDemand && breakdownRows2.length >= 1;
 
             return (
@@ -1361,7 +1362,7 @@ export const MultiPanelDocument: React.FC<MultiPanelDocumentProps> = ({
                               {(b.demandVA / 1000).toFixed(1)} kVA
                             </Text>
                             <Text style={styles.breakdownColFactor}>
-                              {(b.demandFactor * 100).toFixed(0)}%
+                              {isEvemsReductionRow(b) ? '—' : `${(b.demandFactor * 100).toFixed(0)}%`}
                             </Text>
                             <Text style={styles.breakdownColNec}>
                               {b.necReference.replace(/^NEC\s+/, '').replace(/\s*\(.*$/, '')}

@@ -60,7 +60,9 @@ describe('Panel Schedule direct demand — EVEMS-managed panel (#191)', () => {
     expect(r.totalConnectedVA).toBe(46080);
     expect(r.totalDemandVA).toBe(20000); // 625.42: the setpoint
     expect(r.necReferences.some(ref => ref.includes('625.42'))).toBe(true);
-    expect(r.demandBreakdown.find(b => b.loadType.includes('EVEMS'))!.demandVA).toBe(20000);
+    // #212: the EVEMS row is the reduction; the rows sum to the setpoint
+    expect(r.demandBreakdown.find(b => b.loadType.includes('EVEMS'))!.demandVA).toBe(20000 - 46080);
+    expect(r.demandBreakdown.reduce((s, b) => s + b.demandVA, 0)).toBe(20000);
   });
 
   it('does not clamp without the marker (why the component passes every circuit)', () => {

@@ -13,6 +13,7 @@ import {
   calculateAggregatedLoad,
   isEVEMSMarkerCircuit,
   circuitsUnderPanel,
+  isEvemsReductionRow,
   type AggregatedLoad,
   type MultiFamilyContext,
 } from '../calculations/upstreamLoadAggregation';
@@ -2024,7 +2025,7 @@ export const LoadCalculationSummary: React.FC<LoadSummaryProps> = ({
                   {(d.connectedVA / 1000).toFixed(2)}
                 </Text>
                 <Text style={tdNumCol('12%')}>
-                  {(d.demandFactor * 100).toFixed(0)}%
+                  {isEvemsReductionRow(d) ? '—' : `${(d.demandFactor * 100).toFixed(0)}%`}
                 </Text>
                 <Text style={tdNumCol('17%')}>
                   {(d.demandVA / 1000).toFixed(2)}

@@ -41,7 +41,7 @@ test('#210 the MDP takes a downstream EV panel at its EVEMS setpoint', async ({ 
   // The text is title case; CSS shows it in capitals
   await expect(aggregated).toContainText(/TOTAL CONNECTED\s*49\.9 kVA/i); // chargers at nameplate
   await expect(aggregated).toContainText(/TOTAL DEMAND\s*44\.1 kVA/i);
-  await expect(aggregated).toContainText('EVEMS feeder reduction (EV Panel)');
+  await expect(aggregated).toContainText('EV chargers above the EVEMS setpoint (EV Panel)'); // #212: the reduction row
   await shot(page, '1-mdp');
 
   // 2 — Service Upgrade Wizard: (44,100 + 25% × 30,300) ÷ 240 = 215 A (was 239 A)
