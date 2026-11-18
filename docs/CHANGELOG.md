@@ -4,6 +4,14 @@ All notable changes to SparkPlan.
 
 ---
 
+## 2026-11-18: Voltage drop uses the NEC's Table 9 values for every conductor and conduit (#258)
+
+- **Voltage drop was understated in steel conduit, for small conductors, and for large conductors in PVC.** The conductor reactance values were below the code table's: 12 AWG in PVC was 0.042 ohm/1000 ft against 0.054, and steel conduit used the PVC values. All values now come from the NEC (Chapter 9, Table 9). Large conductors in steel conduit show 12–17% more voltage drop than before, and in PVC 6–7% more. 8 AWG–4/0 in PVC is unchanged.
+- **Aluminum conduit works in the Voltage Drop tool.** It returned 0 V with "Cannot find impedance data".
+- **Short-circuit results** at the end of a feeder drop by up to about 6%, because the conductors' impedance is now the code value.
+
+---
+
 ## 2026-11-18: The EV Panel Builder flags a panel that doesn't match the service (#265)
 
 - **A panel whose voltage or phase differs from the service now shows a warning before Create.** The panel can't be fed from the main panel directly:
