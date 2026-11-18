@@ -4,6 +4,14 @@ All notable changes to SparkPlan.
 
 ---
 
+## 2026-11-18: Article 220 citations follow the project's NEC edition (#237)
+
+- **NEC 2023 projects cite the 2023 table numbers:** lighting demand factors are Table 220.45 (was 220.42), and the dwelling 3 VA/ft² load is 220.41.
+- **NEC 2020 projects cite the 2020 numbers:** the Commercial Load Calculator's unit loads are Table 220.12 (it printed the 2023 "Table 220.42(A)"), and the dwelling 3 VA/ft² load is 220.14(J) (it printed "Table 220.12", which no longer lists dwellings).
+- **No load or service number changes.** This covers the Commercial, Dwelling and legacy Load Calculators, the Panel Schedule demand table, E-101 and the panel pages, the multifamily common-area rows, and the 220.87 narrative.
+
+---
+
 ## 2026-11-18: Voltage drop follows Table 9's effective-impedance formula (#219)
 
 - **Voltage drop was understated.** It read a stored effective-impedance value that ran 10–20% below NEC Chapter 9 Table 9's own formula for the same conductor, and three-phase runs left out the √3. Effective Z now comes from each conductor's resistance and reactance at the power factor (Table 9, Note 2), and three-phase drops take √3. On the QA multifamily project the unit feeder goes from 0.47% to 0.56%. A 208 V three-phase run of 2/0 copper at 100 A over 100 ft goes from 1.08 V to 1.86 V.
