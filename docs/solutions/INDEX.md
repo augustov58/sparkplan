@@ -4,6 +4,7 @@ One note per hard problem, written by the model that solved it via the `extract-
 Each entry: `- [title](file.md) — reusable rule`.
 
 <!-- Newest first -->
+- [Opening the Permit Packet page saved the project twice](2026-11-18-packet-page-writes.md) — every "skip if unchanged" against jsonb compares with sorted keys (stableJson); swap in the old code before blaming the newest change
 - [The EVEMS row made demand tables sum to twice their total](2026-11-18-evems-reduction-row.md) — show the adjustment, not a before→after summary; grep for > 0 filters when a row can be negative; update pinned tests to assert the rule
 - [The EV Panel Builder cited sections by titles they do not have](2026-11-18-ev-builder-references.md) — cite by what the app does with a section (from recorded rulings) when a title is uncertain; previews should work without the missing parent
 - [A refetch started before a delete brought the deleted row back](2026-11-18-hooks-refetch-race.md) — results older than the latest local write lose (FetchGuard); to test a slow response delay the response, not the request; log the timeline when a repro passes on buggy code

@@ -459,7 +459,7 @@ export interface MfEvSavedInputs {
 }
 
 /** JSON with sorted keys: Postgres jsonb does not keep key order. */
-function stableJson(v: unknown): string {
+export function stableJson(v: unknown): string {
   if (Array.isArray(v)) return `[${v.map(stableJson).join(',')}]`;
   if (v && typeof v === 'object') {
     return `{${Object.keys(v).filter(k => (v as Record<string, unknown>)[k] !== undefined).sort()
