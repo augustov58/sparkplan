@@ -15,6 +15,7 @@ import { useCircuits } from '../hooks/useCircuits';
 import { useTransformers } from '../hooks/useTransformers';
 import { useProjectNecEdition } from '../hooks/useProjectNecEdition';
 import { exportPanelSchedulePDF, exportAllPanelsPDF } from '../services/pdfExport/panelSchedulePDF';
+import { feederRowsFor } from '../services/pdfExport/feederRows';
 import { 
   calculatePanelPhaseLoads, 
   getCircuitPhase, 
@@ -540,16 +541,70 @@ export const PanelSchedule: React.FC<PanelScheduleProps> = ({ project }) => {
       : undefined,
   };
 
+  // What both PDF exports print for each panel (#238): its circuits plus its
+  // downstream feeds as rows (the packet's rule, feederRows.ts), and its NEC
+  // 220 aggregate, which carries the demand breakdown. "Export PDF" used to
+  // get neither, so it printed no breakdown and no feeds.
+  const exportInputs = () => {
+    const occupancyForCalc = project.settings?.occupancyType || 'commercial';
+    const circuitsByPanel = new Map<string, typeof panelCircuits>();
+    panels.forEach(panel => {
+      const direct = circuits.filter(c => c.panel_id === panel.id);
+      circuitsByPanel.set(panel.id, [...direct, ...feederRowsFor(panel, direct, {
+        panels, circuits, transformers, occupancy: occupancyForCalc, necEdition,
+        dwelling: dwellingOptions, includeTransformers: true,
+      })]);
+    });
+
+    // Per-panel aggregated demand so the Load Summary surfaces NEC 220.84 /
+    // 625.42 numbers (matching the in-app Panel Summary). multiFamilyCtx
+    // only for the MDP — it applies the blanket dwelling demand factor at
+    // the aggregate.
+    const aggregatedLoadByPanel = new Map<string, {
+      totalDemandVA: number;
+      totalConnectedVA: number;
+      downstreamPanelCount: number;
+      necReference?: string;
+      demandBreakdown?: Array<{
+        loadType: string;
+        connectedVA: number;
+        demandVA: number;
+        demandFactor: number;
+        necReference: string;
+      }>;
+    }>();
+    panels.forEach(panel => {
+      const ctx = panel.is_main ? multiFamilyCtx : undefined;
+      const r = calculateAggregatedLoad(
+        panel.id, panels, circuits, transformers, occupancyForCalc, ctx, necEdition, dwellingOptions,
+      );
+      const dominantNec = r.necReferences.find(ref => ref.includes('625.42'))
+        ?? r.necReferences.find(ref => ref.includes('220.85') || ref.includes('Two Dwelling Units'))
+        ?? r.necReferences.find(ref => ref.includes('220.84'))
+        ?? r.necReferences.find(ref => ref.includes('220.'))
+        ?? undefined;
+      aggregatedLoadByPanel.set(panel.id, {
+        totalDemandVA: r.totalDemandVA,
+        totalConnectedVA: r.totalConnectedVA,
+        downstreamPanelCount: r.downstreamPanelCount,
+        necReference: dominantNec,
+        demandBreakdown: r.demandBreakdown,
+      });
+    });
+    return { circuitsByPanel, aggregatedLoadByPanel };
+  };
+
   const handleExportPDF = async () => {
     if (!selectedPanel) return;
     try {
+      const { circuitsByPanel, aggregatedLoadByPanel } = exportInputs();
       await exportPanelSchedulePDF(
         selectedPanel,
-        panelCircuits,
+        circuitsByPanel.get(selectedPanel.id) ?? panelCircuits,
         project.name,
         project.address,
         !!isExistingConstruction,
-        exportDwelling,
+        { ...exportDwelling, aggregatedLoad: aggregatedLoadByPanel.get(selectedPanel.id) },
       );
     } catch (error) {
       alert(`Failed to export PDF: ${error instanceof Error ? error.message : 'Unknown error'}`);
@@ -559,134 +614,7 @@ export const PanelSchedule: React.FC<PanelScheduleProps> = ({ project }) => {
   const handleExportAllPanels = async () => {
     if (panels.length === 0) return;
     try {
-      const occ = project.settings?.occupancyType;
-      const occupancyForCalc = occ || 'commercial';
-
-      // Synthesize "virtual feeder circuits" for any panel that has
-      // downstream panels or transformers fed from it. Mirrors the in-app
-      // feederCircuits useMemo above (~L131) — without this the standalone
-      // "All Panels" PDF renders multi-family aggregate MDPs as 0 circuits
-      // because the MDP has no direct circuit rows in the DB (its outgoing
-      // connections live in the feeders / fed_from_* relationships).
-      // Slot assignment follows the UI's left/right alternation so the PDF
-      // layout matches what the user sees on-screen.
-      const synthesizeFeedersForPanel = (panel: typeof panels[0]): typeof panelCircuits => {
-        const children = panels.filter(
-          p => p.fed_from_type === 'panel' && p.fed_from === panel.id
-        );
-        const childXfmrs = transformers.filter(t => t.fed_from_panel_id === panel.id);
-        const synthesized: typeof panelCircuits = [];
-
-        const assignSlot = (i: number): number => {
-          // i=0→1, i=1→2, i=2→5, i=3→6, i=4→9, i=5→10... — pair-aligned
-          // alternation with 4-slot stride between rows. Matches the in-app
-          // visual where left-column feeders sit at 1,5,9,... and right at
-          // 2,6,10,...
-          const pairIdx = Math.floor(i / 2);
-          const isLeft = i % 2 === 0;
-          return pairIdx * 4 + (isLeft ? 1 : 2);
-        };
-
-        children.forEach((child, idx) => {
-          const childLoad = calculateAggregatedLoad(
-            child.id, panels, circuits, transformers, occupancyForCalc, undefined, necEdition, dwellingOptions,
-          );
-          synthesized.push({
-            id: `synth-feeder-panel-${child.id}`,
-            panel_id: panel.id,
-            project_id: project.id,
-            circuit_number: assignSlot(idx),
-            description: `→ PANEL ${child.name}`,
-            pole: child.phase === 3 ? 3 : 2,
-            breaker_amps: child.feeder_breaker_amps || child.main_breaker_amps || 100,
-            load_watts: childLoad.totalDemandVA,
-            conductor_size: '',
-            egc_size: null,
-            load_type: 'O',
-            is_proposed: false,
-            created_at: null,
-          } as unknown as typeof panelCircuits[number]);
-        });
-
-        const offset = children.length;
-        childXfmrs.forEach((xfmr, idx) => {
-          const xfmrPanels = panels.filter(p => p.fed_from_transformer_id === xfmr.id);
-          let totalLoad = 0;
-          xfmrPanels.forEach(p => {
-            totalLoad += calculateAggregatedLoad(
-              p.id, panels, circuits, transformers, occupancyForCalc, undefined, necEdition, dwellingOptions,
-            ).totalDemandVA;
-          });
-          if (xfmrPanels.length === 0 && xfmr.kva_rating) {
-            totalLoad = xfmr.kva_rating * 1000;
-          }
-          const denom = (panel.voltage || 480) * (panel.phase === 3 ? Math.sqrt(3) : 1);
-          synthesized.push({
-            id: `synth-feeder-xfmr-${xfmr.id}`,
-            panel_id: panel.id,
-            project_id: project.id,
-            circuit_number: assignSlot(offset + idx),
-            description: `→ XFMR ${xfmr.name || (xfmr.kva_rating + 'kVA')}`,
-            pole: panel.phase === 3 ? 3 : 2,
-            breaker_amps: Math.ceil(totalLoad / denom) || 100,
-            load_watts: totalLoad,
-            conductor_size: '',
-            egc_size: null,
-            load_type: 'M',
-            is_proposed: false,
-            created_at: null,
-          } as unknown as typeof panelCircuits[number]);
-        });
-
-        return synthesized;
-      };
-
-      const circuitsByPanel = new Map<string, typeof panelCircuits>();
-      panels.forEach(panel => {
-        const direct = circuits.filter(c => c.panel_id === panel.id);
-        // Synthesize feeders only when the panel has zero direct circuits —
-        // otherwise the panel's real branch circuits already represent its
-        // load, and synthesizing on top would double-count visually.
-        const synthesized = direct.length === 0 ? synthesizeFeedersForPanel(panel) : [];
-        circuitsByPanel.set(panel.id, [...direct, ...synthesized]);
-      });
-
-      // Build per-panel aggregated demand map so the Load Summary in the PDF
-      // surfaces NEC 220.84 / 625.42 numbers (matching the in-app Panel
-      // Summary). Pass multiFamilyCtx only for the MDP — it applies the
-      // blanket dwelling demand factor at the aggregate; sub-panel demand
-      // uses the standard NEC 220 cascade with auto-EVEMS clamping.
-      const aggregatedLoadByPanel = new Map<string, {
-        totalDemandVA: number;
-        totalConnectedVA: number;
-        downstreamPanelCount: number;
-        necReference?: string;
-        demandBreakdown?: Array<{
-          loadType: string;
-          connectedVA: number;
-          demandVA: number;
-          demandFactor: number;
-          necReference: string;
-        }>;
-      }>();
-      panels.forEach(panel => {
-        const ctx = panel.is_main ? multiFamilyCtx : undefined;
-        const r = calculateAggregatedLoad(
-          panel.id, panels, circuits, transformers, occupancyForCalc, ctx, necEdition, dwellingOptions,
-        );
-        const dominantNec = r.necReferences.find(ref => ref.includes('625.42'))
-          ?? r.necReferences.find(ref => ref.includes('220.85') || ref.includes('Two Dwelling Units'))
-          ?? r.necReferences.find(ref => ref.includes('220.84'))
-          ?? r.necReferences.find(ref => ref.includes('220.'))
-          ?? undefined;
-        aggregatedLoadByPanel.set(panel.id, {
-          totalDemandVA: r.totalDemandVA,
-          totalConnectedVA: r.totalConnectedVA,
-          downstreamPanelCount: r.downstreamPanelCount,
-          necReference: dominantNec,
-          demandBreakdown: r.demandBreakdown,
-        });
-      });
+      const { circuitsByPanel, aggregatedLoadByPanel } = exportInputs();
 
       await exportAllPanelsPDF(
         panels,

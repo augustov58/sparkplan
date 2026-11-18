@@ -246,6 +246,31 @@ export const circuitCountLabel = (circuits: Circuit[]): string => {
 };
 
 /**
+ * Feed-thru lugs (#228): downstream panels and transformers not fed from a
+ * breaker, as the in-app schedule lists them. Their load is in the totals.
+ */
+const FeedThruLugs: React.FC<{ circuits: Circuit[] }> = ({ circuits }) => {
+  const lugs = circuits.filter(isFeedThruLug);
+  if (lugs.length === 0) return null;
+  return (
+    <View style={styles.tableContainer} wrap={false}>
+      <View style={styles.tableRowAlt}>
+        <Text style={{ width: '100%', fontFamily: 'Helvetica-Bold', fontSize: 8 }}>
+          FEED-THRU LUGS (not breaker-fed)
+        </Text>
+      </View>
+      {lugs.map(c => (
+        <View key={c.id} style={styles.tableRow}>
+          <Text style={{ width: '60%', fontSize: 8 }}>{c.description}</Text>
+          <Text style={{ width: '15%', fontSize: 8, textAlign: 'center' }}>{`LUG ${c.pole}P`}</Text>
+          <Text style={{ width: '25%', fontSize: 8, textAlign: 'right' }}>{`${(c.load_watts || 0).toLocaleString()} VA`}</Text>
+        </View>
+      ))}
+    </View>
+  );
+};
+
+/**
  * The circuit in a slot: one that starts there, or the multi-pole circuit
  * whose later pole it is (a 2-pole at N also holds N+2; a 3-pole N+2 and
  * N+4). The schedule left later poles blank (#228).
@@ -812,24 +837,7 @@ export const PanelSchedulePages: React.FC<PanelSchedulePDFProps> = ({
           )}
         </View>
 
-        {/* Feed-thru lugs (#228): downstream panels not fed from a breaker,
-            as the in-app schedule lists them. Their load is in the totals. */}
-        {sortedCircuits.some(isFeedThruLug) && (
-          <View style={styles.tableContainer} wrap={false}>
-            <View style={styles.tableRowAlt}>
-              <Text style={{ width: '100%', fontFamily: 'Helvetica-Bold', fontSize: 8 }}>
-                FEED-THRU LUGS (not breaker-fed)
-              </Text>
-            </View>
-            {sortedCircuits.filter(isFeedThruLug).map(c => (
-              <View key={c.id} style={styles.tableRow}>
-                <Text style={{ width: '60%', fontSize: 8 }}>{c.description}</Text>
-                <Text style={{ width: '15%', fontSize: 8, textAlign: 'center' }}>{`LUG ${c.pole}P`}</Text>
-                <Text style={{ width: '25%', fontSize: 8, textAlign: 'right' }}>{`${(c.load_watts || 0).toLocaleString()} VA`}</Text>
-              </View>
-            ))}
-          </View>
-        )}
+        <FeedThruLugs circuits={sortedCircuits} />
 
         {/* Phase Balancing Summary — wrap={false} keeps the entire card on
             one page; with the contractor block + sheet ID footer reducing
@@ -1243,6 +1251,8 @@ export const MultiPanelDocument: React.FC<MultiPanelDocumentProps> = ({
             )}
           </View>
 
+          <FeedThruLugs circuits={circuits} />
+
           {/* Phase Balancing Summary — see sibling implementation in
               PanelSchedulePages above for full branch rationale (dwelling vs
               aggregator/EVEMS vs default). Mirror logic kept here to keep
@@ -1267,7 +1277,9 @@ export const MultiPanelDocument: React.FC<MultiPanelDocumentProps> = ({
               necEdition,
               // Single-family MDP: its subpanels' circuits too (#216)
               serviceCircuits: panel.is_main
-                ? circuitsUnderPanel(panel.id, panels, [...circuitsByPanel.values()].flat(), [])
+                // Real circuits only: a feeder row here would count the
+                // subpanel twice, as itself and as its circuits (#238)
+                ? circuitsUnderPanel(panel.id, panels, [...circuitsByPanel.values()].flat().filter(c => !isSynthesizedFeeder(c)), [])
                 : undefined,
             });
 
@@ -1296,7 +1308,7 @@ export const MultiPanelDocument: React.FC<MultiPanelDocumentProps> = ({
                 {dwellingDemand ? (
                   <DwellingLoadSummaryBody
                     summary={dwellingDemand}
-                    circuitCount={circuits.length}
+                    circuitCount={circuitCountLabel(circuits)}
                     voltageDivisor={voltageDivisor}
                   />
                 ) : hasAggregatedDemand ? (
@@ -1304,7 +1316,7 @@ export const MultiPanelDocument: React.FC<MultiPanelDocumentProps> = ({
                     <View style={styles.summaryGrid}>
                       <View style={styles.summaryItem}>
                         <Text style={styles.summaryLabel}>Total Circuits</Text>
-                        <Text style={styles.summaryValue}>{circuits.length}</Text>
+                        <Text style={styles.summaryValue}>{circuitCountLabel(circuits)}</Text>
                       </View>
                       <View style={styles.summaryItem}>
                         <Text style={styles.summaryLabel}>Connected Load (sum)</Text>
@@ -1363,7 +1375,7 @@ export const MultiPanelDocument: React.FC<MultiPanelDocumentProps> = ({
                   <View style={styles.summaryGrid}>
                     <View style={styles.summaryItem}>
                       <Text style={styles.summaryLabel}>Total Circuits</Text>
-                      <Text style={styles.summaryValue}>{circuits.length}</Text>
+                      <Text style={styles.summaryValue}>{circuitCountLabel(circuits)}</Text>
                     </View>
 
                     <View style={styles.summaryItem}>
