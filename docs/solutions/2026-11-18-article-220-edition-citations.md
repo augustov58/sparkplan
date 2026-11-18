@@ -8,7 +8,8 @@
 2. **The edition is a required argument** to `getLightingDemandFactor`, `calculateLoad`, `calculateCommonAreaLoads`, `dwellingLoadsFromCircuits` and `CommercialLoadInput`. The Mistake Ledger's 220.57 row says a defaulted edition hides a caller that never passes one. Making it required turned every production caller (3 for the demand table, 2 for the legacy calc) into a tsc error to fix. The one caller that only reads VA (the multifamily generator) passes `'2020'` with a comment saying why.
 3. **Don't find rows by their citation.** `calculateCommercialLoad` found its lighting row with `necReference.includes('220.42(A)')`. Once the citation followed the edition, a NEC 2020 project would have lost that row from the service-sizing note. It now compares the row object itself. Grep for `includes('` on reference strings before making a citation dynamic.
 4. **Sweep the whole candidate set first.** There were 81 hits of 220.12 / 220.14(J) / 220.41 / 220.42 / 220.45 across 18 files. 35 were user-visible strings. Each one was either changed, or listed in the PR with the reason it stayed (stored template descriptions; a "220.12–220.18" help-text range whose 2023 equivalent I don't know).
-5. **A test needs a project of each edition.** "QA Commercial 2023" is a copy of "QA Commercial panel" with `settings.nec_edition_override = '2023'`. Copied rows keep their `user_id`, since RLS rejects inserts without it.
+5. **Follow-up #261:** a further search settled the receptacle section (220.44 → 220.47 in 2023). It became a fourth field, `receptacleDemand`, on the same table, so every site picked it up through the same helper. The two #237 assertions that pinned "220.44" under 2023 were updated.
+6. **A test needs a project of each edition.** "QA Commercial 2023" is a copy of "QA Commercial panel" with `settings.nec_edition_override = '2023'`. Copied rows keep their `user_id`, since RLS rejects inserts without it.
 
 ## Verification
 
