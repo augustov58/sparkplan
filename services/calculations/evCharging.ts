@@ -38,11 +38,14 @@ export const EV_CHARGER_SPECS: Record<EVChargerLevel, EVChargerSpec[]> = {
     { level: 'Level2', voltage: 240, phase: 1, maxAmps: 80, power_kw: 19.2, description: '80A EVSE (19.2 kW)' },
   ],
   Level3_DCFC: [
+    // #264: a DC charger's input is at least its output: kW ÷ (480 V × √3),
+    // to 0.1 A as the EV Panel Builder's 150 kW charger (#249). 100–350 kW
+    // listed currents below their own output (150 kW at 160 A = 133 kVA).
     { level: 'Level3_DCFC', voltage: 480, phase: 3, maxAmps: 63, power_kw: 50, description: '50 kW DC Fast Charger' },
-    { level: 'Level3_DCFC', voltage: 480, phase: 3, maxAmps: 100, power_kw: 100, description: '100 kW DC Fast Charger' },
-    { level: 'Level3_DCFC', voltage: 480, phase: 3, maxAmps: 160, power_kw: 150, description: '150 kW DC Fast Charger' },
-    { level: 'Level3_DCFC', voltage: 480, phase: 3, maxAmps: 250, power_kw: 250, description: '250 kW DC Fast Charger' },
-    { level: 'Level3_DCFC', voltage: 480, phase: 3, maxAmps: 400, power_kw: 350, description: '350 kW DC Fast Charger' },
+    { level: 'Level3_DCFC', voltage: 480, phase: 3, maxAmps: 120.3, power_kw: 100, description: '100 kW DC Fast Charger' },
+    { level: 'Level3_DCFC', voltage: 480, phase: 3, maxAmps: 180.4, power_kw: 150, description: '150 kW DC Fast Charger' },
+    { level: 'Level3_DCFC', voltage: 480, phase: 3, maxAmps: 300.7, power_kw: 250, description: '250 kW DC Fast Charger' },
+    { level: 'Level3_DCFC', voltage: 480, phase: 3, maxAmps: 421.0, power_kw: 350, description: '350 kW DC Fast Charger' },
   ],
 };
 
