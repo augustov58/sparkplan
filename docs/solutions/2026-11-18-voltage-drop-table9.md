@@ -23,4 +23,5 @@
 
 - **When a table has a derived column, recompute it from its inputs and compare.** A derived column that disagrees with its own row is the error.
 - **A formula change makes stored results stale.** Give the stored numbers an "Outdated" check, not a silent mismatch.
+- **New packet text needs a look at the rendered page, not only the extracted text.** The new method line's "θ" printed as "¸" (not in WinAnsi, the #153 pattern). `pdftotext` hid it as a near-miss, and the verifier caught it on a pdftoppm render. θ now goes through `PdfText`'s map.
 - **Multipliers depend on the quantity:** fault current and voltage drop handle three-phase differently. Name which one a rule covers.
