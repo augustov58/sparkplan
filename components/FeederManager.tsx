@@ -758,6 +758,8 @@ export const FeederManager: React.FC<FeederManagerProps> = ({
                       <span>
                         {sf.designChanged
                           ? `Design load ${(sf.cachedDesignVA / 1000).toFixed(1)} → ${(sf.currentDesignVA / 1000).toFixed(1)} kVA`
+                          : sf.vdChanged && sf.cachedVdPercent !== undefined && sf.currentVdPercent !== undefined
+                          ? `Voltage drop ${sf.cachedVdPercent.toFixed(2)}% → ${sf.currentVdPercent.toFixed(2)}%`
                           : <>
                               {sf.cachedConnectedVA.toLocaleString()} VA → {sf.currentConnectedVA.toLocaleString()} VA
                               ({sf.loadDifferencePercent > 0 ? '+' : ''}{sf.loadDifferencePercent}%)

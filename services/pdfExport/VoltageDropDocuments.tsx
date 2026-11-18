@@ -626,7 +626,7 @@ const NECReferencesSection: React.FC = () => (
         • Total voltage drop (feeder + branch circuit) should not exceed 5% per NEC recommendations
       </Text>
       <Text style={styles.necReference}>
-        • Voltage drop calculated using AC impedance method (Z = √(R² + X²)) for accuracy
+        • Voltage drop from NEC Chapter 9 Table 9 effective impedance (Note 2: Ze = R × PF + XL × sin θ, at 0.85 PF): 2 × I × Ze × L single-phase, √3 × I × Ze × L three-phase
       </Text>
       <Text style={styles.necReference}>
         • Power factor assumed at 0.85 for general loads (typical for commercial/industrial)
