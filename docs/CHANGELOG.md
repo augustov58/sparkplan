@@ -4,6 +4,12 @@ All notable changes to SparkPlan.
 
 ---
 
+## 2026-11-18: DC fast charger presets carry at least their output current (#264)
+
+- **The EV Charging calculator's and the EVEMS tool's DC fast charger presets now carry at least their rated output.** 100, 150, 250 and 350 kW at 480 V three-phase are 120.3, 180.4, 300.7 and 421.0 A. They listed less current than their own output: the 150 kW preset was 160 A, which is 133 kVA. Loads, breakers, conductors and EVEMS counts from these presets were understated. A 150 kW charger now gives 150 kVA and a 250 A breaker, the same as the EV Panel Builder.
+
+---
+
 ## 2026-11-18: Receptacle demand cites NEC 220.47 on NEC 2023 projects (#261)
 
 - **The non-dwelling receptacle demand (first 10 kVA at 100%, the rest at 50%) is cited as 220.47 under NEC 2023 and 220.44 under NEC 2020.** It printed 220.44 on every project. This covers the panel demand table, E-101 and the panel pages, the Commercial Load Calculator and its PDF/CSV exports, multifamily common-area receptacles and the 220.87 narrative. No number changes.
