@@ -28,6 +28,7 @@ import {
   isEVEMSMarkerCircuit,
   findEVEMSSetpointMarker,
   circuitsUnderPanel,
+  isEvemsReductionRow,
   type MultiFamilyContext,
 } from '../services/calculations/upstreamLoadAggregation';
 import {
@@ -283,7 +284,7 @@ export const PanelSchedule: React.FC<PanelScheduleProps> = ({ project }) => {
           ...calculatePanelPhaseLoads(circuitLoads, panelPhase),
           totalDemandLoad_kVA: directAggregate.totalDemandVA / 1000,
           demandAmps: directAggregate.totalDemandVA / voltageDivisor,
-          demandBreakdown: directAggregate.demandBreakdown.filter(b => b.connectedVA > 0 || b.demandVA > 0),
+          demandBreakdown: directAggregate.demandBreakdown.filter(b => b.connectedVA !== 0 || b.demandVA !== 0), // keeps the EVEMS reduction (#212)
           necReferences: directAggregate.necReferences,
         }
       : null;
@@ -2025,7 +2026,7 @@ export const PanelSchedule: React.FC<PanelScheduleProps> = ({ project }) => {
                   <tr key={row.loadType} className="border-t border-gray-100">
                     <td className="p-2">{row.loadType}</td>
                     <td className="p-2 text-center font-mono">{(row.connectedVA / 1000).toFixed(2)}</td>
-                    <td className="p-2 text-center font-mono">{row.demandFactor.toFixed(2)}</td>
+                    <td className="p-2 text-center font-mono">{isEvemsReductionRow(row) ? '—' : row.demandFactor.toFixed(2)}</td>
                     <td className="p-2 text-center font-mono font-semibold">{(row.demandVA / 1000).toFixed(2)}</td>
                     <td className="p-2 text-gray-500">{row.necReference.replace(/^NEC /, '')}</td>
                   </tr>
@@ -2292,9 +2293,15 @@ export const PanelSchedule: React.FC<PanelScheduleProps> = ({ project }) => {
                         <div key={i} className="flex justify-between items-center text-xs">
                           <span className="text-amber-800 font-medium">{item.loadType}</span>
                           <div className="flex items-center gap-2">
-                            <span className="text-gray-500">{(item.connectedVA / 1000).toFixed(1)} kVA →</span>
-                            <span className="font-bold text-amber-900">{(item.demandVA / 1000).toFixed(1)} kVA</span>
-                            <span className="text-green-600 text-[10px]">({(item.demandFactor * 100).toFixed(0)}%)</span>
+                            {isEvemsReductionRow(item) ? (
+                              <span className="font-bold text-amber-900">{(item.demandVA / 1000).toFixed(1)} kVA (NEC 625.42)</span>
+                            ) : (
+                              <>
+                                <span className="text-gray-500">{(item.connectedVA / 1000).toFixed(1)} kVA →</span>
+                                <span className="font-bold text-amber-900">{(item.demandVA / 1000).toFixed(1)} kVA</span>
+                                <span className="text-green-600 text-[10px]">({(item.demandFactor * 100).toFixed(0)}%)</span>
+                              </>
+                            )}
                           </div>
                         </div>
                       ))}

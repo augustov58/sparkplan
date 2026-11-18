@@ -4,6 +4,12 @@ All notable changes to SparkPlan.
 
 ---
 
+## 2026-11-18: The EVEMS row of a demand table adds up (#212)
+
+- **On an EVEMS panel, and on any panel above one, the demand table's "EVEMS feeder reduction" row showed the panel's demand before and after the setpoint**, so its rows summed to almost twice the TOTAL row. The row is now the reduction itself, "EV chargers above the EVEMS setpoint": 0 connected, the reduction as a negative demand (−5.76 kVA on the QA project), and a "—" factor. The rows add up to the totals like every other table in the packet. The totals don't change. This applies to the in-app tables and the Aggregated Load card, the panel schedule PDFs and E-101.
+
+---
+
 ## 2026-11-18: The EV Panel Builder's NEC references say what each section does (#241)
 
 - **The builder cited "625.41 - Electric Vehicle Coupler" and "625.44 - … Demand Factors".** There is no EVSE demand factor. The list now says what each cited section does in the builder: the EVSE load at nameplate (NEC 2020, 220.14(A)) or the larger of 7,200 VA and nameplate (NEC 2023, 220.57), by the project's edition; 625.41 for the 125% overcurrent protection and conductors; 625.42 for the EVEMS setpoint on the feeder and service; 215.2(A)(1) / 230.42(A)(1) for the 25% of continuous loads; and 408.30 for the panel's rating.

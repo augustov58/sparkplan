@@ -120,6 +120,16 @@ export function isEVEMSManagedPanel(panelId: string, circuits: Circuit[]): boole
  * be drawn as physical branch circuits (e.g. a 47 kVA aggregate-setpoint
  * marker on a "20A 2P" placeholder breaker is misleading to AHJ reviewers).
  */
+/**
+ * The EVEMS row of a demand breakdown (#212): the chargers' load above the
+ * setpoint, as a reduction (connected 0, demand negative), so the rows add up
+ * to the TOTAL row like every other table (#160). Its factor prints as "—".
+ */
+export const EVEMS_REDUCTION_LABEL = 'EV chargers above the EVEMS setpoint';
+export function isEvemsReductionRow(row: { connectedVA: number; demandVA: number }): boolean {
+  return row.connectedVA === 0 && row.demandVA < 0;
+}
+
 export function isEVEMSMarkerCircuit(circuit: Pick<Circuit, 'description'>): boolean {
   const desc = circuit.description?.toLowerCase() ?? '';
   return (
@@ -1240,11 +1250,13 @@ export function calculateAggregatedLoad(
     totalDemandVA = clampedVA;
     necReferences.push('NEC 625.42 (EVEMS — feeder demand clamped to setpoint)');
     const onlyThisPanel = clampedPanelNames.length === 1 && clampedPanelNames[0] === panel.name;
+    // The reduction itself, so the rows sum to the TOTAL row (#212; it was a
+    // before → after row, and the columns summed to twice the total)
     demandBreakdown.push({
-      loadType: onlyThisPanel ? 'EVEMS feeder reduction' : `EVEMS feeder reduction (${clampedPanelNames.join(', ')})`,
-      connectedVA: preClampVA,
-      demandVA: clampedVA,
-      demandFactor: preClampVA > 0 ? clampedVA / preClampVA : 1.0,
+      loadType: onlyThisPanel ? EVEMS_REDUCTION_LABEL : `${EVEMS_REDUCTION_LABEL} (${clampedPanelNames.join(', ')})`,
+      connectedVA: 0,
+      demandVA: clampedVA - preClampVA,
+      demandFactor: 0,
       necReference: 'NEC 625.42 (EVEMS — branch conductors at nameplate; feeder at setpoint)',
     });
   }

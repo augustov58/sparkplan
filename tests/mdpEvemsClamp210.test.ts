@@ -49,8 +49,11 @@ describe('the MDP counts a downstream EV panel at its EVEMS setpoint (#210)', ()
     expect(r.totalDemandVA).toBe(agg('ev').totalDemandVA + agg('office').totalDemandVA);
     expect(r.totalConnectedVA).toBe(49_860); // chargers stay at nameplate in the connected load
     expect(r.necReferences).toContain('NEC 625.42 (EVEMS — feeder demand clamped to setpoint)');
-    const row = r.demandBreakdown.find(b => b.loadType.startsWith('EVEMS feeder reduction'));
-    expect(row).toMatchObject({ loadType: 'EVEMS feeder reduction (EV Panel)', connectedVA: 49_860, demandVA: 44_100 });
+    // #212: the row is the reduction itself, so the rows sum to the totals
+    const row = r.demandBreakdown.find(b => b.loadType.startsWith('EV chargers above the EVEMS setpoint'));
+    expect(row).toMatchObject({ loadType: 'EV chargers above the EVEMS setpoint (EV Panel)', connectedVA: 0, demandVA: -5_760 });
+    expect(r.demandBreakdown.reduce((s, b) => s + b.connectedVA, 0)).toBe(r.totalConnectedVA);
+    expect(Math.round(r.demandBreakdown.reduce((s, b) => s + b.demandVA, 0))).toBe(r.totalDemandVA);
   });
 
   it('the proposed demand (E-101 split, the wizard\'s new load) takes the clamp', () => {
@@ -66,7 +69,8 @@ describe('the MDP counts a downstream EV panel at its EVEMS setpoint (#210)', ()
 
   it('guardrails: the EV panel itself and the office panel are unchanged', () => {
     expect(agg('ev').totalDemandVA).toBe(30_600);
-    expect(agg('ev').demandBreakdown.at(-1)?.loadType).toBe('EVEMS feeder reduction');
+    expect(agg('ev').demandBreakdown.at(-1)).toMatchObject({ loadType: 'EV chargers above the EVEMS setpoint', connectedVA: 0, demandVA: -5_760 });
+    expect(Math.round(agg('ev').demandBreakdown.reduce((s, b) => s + b.demandVA, 0))).toBe(30_600); // 1,800 + 34,560 − 5,760
     expect(agg('office').totalDemandVA).toBe(13_500);
   });
 
@@ -101,13 +105,13 @@ describe('the MDP counts a downstream EV panel at its EVEMS setpoint (#210)', ()
     const r = agg('mdp', cs, [...panels, ev2]);
     // 44,100 + 23,040 − (23,040 − 11,520)
     expect(r.totalDemandVA).toBe(55_620);
-    expect(r.demandBreakdown.at(-1)?.loadType).toBe('EVEMS feeder reduction (EV Panel, EV Panel 2)');
+    expect(r.demandBreakdown.at(-1)).toMatchObject({ loadType: 'EV chargers above the EVEMS setpoint (EV Panel, EV Panel 2)', demandVA: -(5_760 + 11_520) });
   });
 
   it('a setpoint on the MDP itself keeps its row (#191)', () => {
     const chargers = [1, 2, 3, 4].map(i => circuit('mdp', `EV Charger #${i}`, 'O', 11_520));
     const r = agg('mdp', [...chargers, circuit('mdp', MARKER, 'O', 20_000)], [mdp]);
     expect(r.totalDemandVA).toBe(20_000);
-    expect(r.demandBreakdown.at(-1)).toMatchObject({ loadType: 'EVEMS feeder reduction', connectedVA: 46_080, demandVA: 20_000 });
+    expect(r.demandBreakdown.at(-1)).toMatchObject({ loadType: 'EV chargers above the EVEMS setpoint', connectedVA: 0, demandVA: 20_000 - 46_080 });
   });
 });

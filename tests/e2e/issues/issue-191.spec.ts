@@ -75,7 +75,8 @@ test('#191 an EVEMS-managed panel: the table total and the card both show the se
   const totals = table.locator('tfoot td');
   await expect(totals.nth(1)).toHaveText('46.08');
   await expect(totals.nth(3)).toHaveText('20.00');
-  await expect(table.locator('tbody tr', { hasText: 'EVEMS' }).locator('td').nth(3)).toHaveText('20.00');
+  // #212: the EVEMS row is the reduction (20,000 − 46,080); the TOTALS row carries the setpoint
+  await expect(table.locator('tbody tr', { hasText: 'EVEMS' }).locator('td').nth(3)).toHaveText('-26.08');
   await expect(summary).toContainText(/Direct Circuits Load\s*46\.1 KVA/i);
   await expect(summary).toContainText(/Direct Demand Load\s*\(NEC 625\.42 EVEMS\)\s*20\.0\s*KVA/i);
   await expect(summary).toContainText(/Demand Amps\s*55\.5 A/i);
