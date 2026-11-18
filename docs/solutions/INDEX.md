@@ -4,6 +4,7 @@ One note per hard problem, written by the model that solved it via the `extract-
 Each entry: `- [title](file.md) — reusable rule`.
 
 <!-- Newest first -->
+- [A second copy of Table 220.42 understated warehouse lighting](2026-11-18-commercial-lighting-demand.md) — when removing unsourced table data, grep for other copies by their values; route every reader through the one function
 - [DC fast charger template sized below 125% of its own load](2026-11-18-dcfc-template-sizing.md) — an "assumption" question may already be answered by the data (`loadVA`); size every preset with the helpers the computed path uses
 - [Article 220 cited one edition's numbers](2026-11-18-article-220-edition-citations.md) — citations are edition data in `data/nec/`; make the edition a required argument so tsc lists every caller; never find a row by its citation string
 - [Voltage drop was low: stored Ze column and no √3 on three-phase](2026-11-18-voltage-drop-table9.md) — recompute derived table columns from their inputs; a formula change needs a stale flag for stored results; three-phase multipliers depend on the quantity
