@@ -357,27 +357,27 @@ export const EV_PANEL_TEMPLATE_2X_DC_FAST: EVPanelTemplate = {
   circuits: [
     {
       circuitNumber: 1,
-      breakerAmps: 225,
+      breakerAmps: 250, // 125% of 180.4 A = 225.5 A → 250 A (#249)
       poles: 3,
       voltage: 480,
-      description: 'DC Fast Charger #1 - 150kW (180A continuous)',
-      conductorSize: '3/0 AWG Cu',
+      description: 'DC Fast Charger #1 - 150kW (180.4A continuous)',
+      conductorSize: '250 kcmil Cu',
       conductorType: 'THHN',
       loadVA: 150000,
       isEvCharger: true,
-      evChargerAmps: 180
+      evChargerAmps: 180.4
     },
     {
       circuitNumber: 7,
-      breakerAmps: 225,
+      breakerAmps: 250, // 125% of 180.4 A = 225.5 A → 250 A (#249)
       poles: 3,
       voltage: 480,
-      description: 'DC Fast Charger #2 - 150kW (180A continuous)',
-      conductorSize: '3/0 AWG Cu',
+      description: 'DC Fast Charger #2 - 150kW (180.4A continuous)',
+      conductorSize: '250 kcmil Cu',
       conductorType: 'THHN',
       loadVA: 150000,
       isEvCharger: true,
-      evChargerAmps: 180
+      evChargerAmps: 180.4
     },
     {
       circuitNumber: 13,
@@ -551,15 +551,21 @@ export function generateCustomEVPanel(input: CustomEVPanelInput): ApplyTemplateO
       conductorSize = '3 AWG Cu';
       loadVA = 19200;  // 80A × 240V
       break;
-    case 'DC Fast Charge (150kW)':
-      chargerAmps = 180;  // 150kW / (480V × √3)
+    case 'DC Fast Charge (150kW)': {
       chargerKW = 150;
       voltage = 480;
       phase = 3;
-      breakerSize = 225;  // 125% of 180A = 225A
-      conductorSize = '3/0 AWG Cu';
-      loadVA = 150000;  // 150kW
+      loadVA = 150000;  // 150kW: the load every calc takes for this charger
+      // #249: sized from that load the way the Level 2 override is (625.41,
+      // 125%): 150,000 / (480 × √3) = 180.4 A → 225.5 A → 250 A, and a
+      // conductor rated for the breaker (250 kcmil Cu, 255 A at 75 °C). The
+      // fixed 225 A / 3/0 (200 A) sat below 125% of the charger's current.
+      chargerAmps = Math.round((loadVA / (voltage * Math.sqrt(3))) * 10) / 10;
+      breakerSize = getNextStandardBreakerSize(chargerAmps * 1.25);
+      const conductor = findConductorByAmpacity(breakerSize, 'Cu', 75);
+      conductorSize = conductor ? `${conductor.size} Cu` : '250 kcmil Cu';
       break;
+    }
   }
 
   let chargerLabel: string = chargerType;
