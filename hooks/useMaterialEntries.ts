@@ -23,6 +23,7 @@ import {
   computeMaterialCostAmount,
 } from '@/services/billing/billingMath';
 
+import { useFetchGuard } from '@/lib/fetchGuard';
 type MaterialEntry = Database['public']['Tables']['material_entries']['Row'];
 type MaterialEntryInsert = Database['public']['Tables']['material_entries']['Insert'];
 type MaterialEntryUpdate = Database['public']['Tables']['material_entries']['Update'];
@@ -53,10 +54,13 @@ export interface UseMaterialEntriesReturn {
 
 export function useMaterialEntries(projectId: string | undefined): UseMaterialEntriesReturn {
   const [materialEntries, setMaterialEntries] = useState<MaterialEntry[]>([]);
+  // A refetch that overlaps a local write must not undo it (#234)
+  const guard = useFetchGuard();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   const fetchEntries = useCallback(async () => {
+    const token = guard.token();
     if (!projectId) {
       setMaterialEntries([]);
       setLoading(false);
@@ -70,6 +74,7 @@ export function useMaterialEntries(projectId: string | undefined): UseMaterialEn
         .order('installed_date', { ascending: false })
         .order('created_at', { ascending: false });
       if (err) throw err;
+      if (guard.stale(token)) return; // a local write is newer; the guard refetches after it
       setMaterialEntries(data || []);
       setError(null);
     } catch (err) {
@@ -220,12 +225,15 @@ export function useMaterialEntries(projectId: string | undefined): UseMaterialEn
     }
   };
 
+  guard.refetch = fetchEntries;
+
+
   return {
     materialEntries,
     loading,
     error,
-    createMaterialEntry,
-    updateMaterialEntry,
-    deleteMaterialEntry,
+    createMaterialEntry: guard.wrap(createMaterialEntry),
+    updateMaterialEntry: guard.wrap(updateMaterialEntry),
+    deleteMaterialEntry: guard.wrap(deleteMaterialEntry),
   };
 }

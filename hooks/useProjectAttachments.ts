@@ -42,6 +42,7 @@ import type { Database } from '@/lib/database.types';
 import { showToast, toastMessages } from '@/lib/toast';
 import { dataRefreshEvents } from '@/lib/dataRefreshEvents';
 
+import { useFetchGuard } from '@/lib/fetchGuard';
 type ProjectAttachment = Database['public']['Tables']['project_attachments']['Row'];
 
 /**
@@ -292,10 +293,13 @@ export function useProjectAttachments(
   projectId: string | undefined,
 ): UseProjectAttachmentsReturn {
   const [attachments, setAttachments] = useState<ProjectAttachment[]>([]);
+  // A refetch that overlaps a local write must not undo it (#234)
+  const guard = useFetchGuard();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   const fetchAttachments = useCallback(async () => {
+    const token = guard.token();
     if (!projectId) return;
 
     try {
@@ -306,6 +310,7 @@ export function useProjectAttachments(
         .order('uploaded_at', { ascending: false });
 
       if (fetchError) throw fetchError;
+      if (guard.stale(token)) return; // a local write is newer; the guard refetches after it
       setAttachments(data || []);
       setError(null);
     } catch (err) {
@@ -628,15 +633,18 @@ export function useProjectAttachments(
     }
   };
 
+  guard.refetch = fetchAttachments;
+
+
   return {
     attachments,
     loading,
     error,
-    upload,
-    remove,
-    updateCoverMode,
-    updateCustomSheetId,
-    updateDisciplineOverride,
+    upload: guard.wrap(upload),
+    remove: guard.wrap(remove),
+    updateCoverMode: guard.wrap(updateCoverMode),
+    updateCustomSheetId: guard.wrap(updateCustomSheetId),
+    updateDisciplineOverride: guard.wrap(updateDisciplineOverride),
   };
 }
 

@@ -8,6 +8,7 @@ import { supabase } from '@/lib/supabase';
 import type { Database } from '@/lib/database.types';
 import { showToast, toastMessages } from '@/lib/toast';
 import { dataRefreshEvents } from '@/lib/dataRefreshEvents';
+import { useFetchGuard } from '@/lib/fetchGuard';
 
 type Circuit = Database['public']['Tables']['circuits']['Row'];
 type CircuitInsert = Database['public']['Tables']['circuits']['Insert'];
@@ -29,10 +30,13 @@ export interface UseCircuitsReturn {
 
 export function useCircuits(projectId: string | undefined): UseCircuitsReturn {
   const [circuits, setCircuits] = useState<Circuit[]>([]);
+  // A refetch that overlaps a local write must not undo it (#234)
+  const guard = useFetchGuard();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   const fetchCircuits = useCallback(async () => {
+    const token = guard.token();
     if (!projectId) return;
 
     try {
@@ -43,6 +47,7 @@ export function useCircuits(projectId: string | undefined): UseCircuitsReturn {
         .order('circuit_number', { ascending: true });
 
       if (error) throw error;
+      if (guard.stale(token)) return; // a local write is newer; the guard refetches after it
       setCircuits(data || []);
       setError(null);
     } catch (err) {
@@ -50,7 +55,8 @@ export function useCircuits(projectId: string | undefined): UseCircuitsReturn {
     } finally {
       setLoading(false);
     }
-  }, [projectId]);
+  }, [projectId]); // eslint-disable-line react-hooks/exhaustive-deps -- guard is stable
+  guard.refetch = fetchCircuits;
 
   useEffect(() => {
     if (!projectId) {
@@ -201,10 +207,10 @@ export function useCircuits(projectId: string | undefined): UseCircuitsReturn {
     circuits,
     loading,
     error,
-    createCircuit,
-    updateCircuit,
-    deleteCircuit,
-    deleteCircuitsByPanel,
+    createCircuit: guard.wrap(createCircuit),
+    updateCircuit: guard.wrap(updateCircuit),
+    deleteCircuit: guard.wrap(deleteCircuit),
+    deleteCircuitsByPanel: guard.wrap(deleteCircuitsByPanel),
     refetch: fetchCircuits,
   };
 }

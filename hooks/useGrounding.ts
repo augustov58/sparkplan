@@ -21,6 +21,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
 import type { Database } from '@/lib/database.types';
 
+import { useFetchGuard } from '@/lib/fetchGuard';
 type GroundingDetail = Database['public']['Tables']['grounding_details']['Row'];
 type GroundingInsert = Database['public']['Tables']['grounding_details']['Insert'];
 type GroundingUpdate = Database['public']['Tables']['grounding_details']['Update'];
@@ -93,11 +94,14 @@ export interface UseGroundingReturn {
  */
 export function useGrounding(projectId: string): UseGroundingReturn {
   const [grounding, setGrounding] = useState<GroundingDetail | null>(null);
+  // A refetch that overlaps a local write must not undo it (#234)
+  const guard = useFetchGuard();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   // Fetch grounding details
   const fetchGrounding = useCallback(async () => {
+    const token = guard.token();
     if (!projectId) {
       setLoading(false);
       return;
@@ -113,6 +117,8 @@ export function useGrounding(projectId: string): UseGroundingReturn {
       if (fetchError) {
         throw fetchError;
       }
+
+      if (guard.stale(token)) return; // a local write is newer; the guard refetches after it
 
       setGrounding(data ?? null);
       setError(null);
@@ -270,16 +276,19 @@ export function useGrounding(projectId: string): UseGroundingReturn {
     }
   };
 
+  guard.refetch = fetchGrounding;
+
+
   return {
     grounding,
     loading,
     error,
-    saveGrounding,
-    toggleElectrode,
-    toggleBonding,
-    setGecSize,
-    setNotes,
-    deleteGrounding,
+    saveGrounding: guard.wrap(saveGrounding),
+    toggleElectrode: guard.wrap(toggleElectrode),
+    toggleBonding: guard.wrap(toggleBonding),
+    setGecSize: guard.wrap(setGecSize),
+    setNotes: guard.wrap(setNotes),
+    deleteGrounding: guard.wrap(deleteGrounding),
   };
 }
 

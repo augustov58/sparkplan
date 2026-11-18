@@ -76,6 +76,7 @@ import { supabase } from '@/lib/supabase';
 import type { Database } from '@/lib/database.types';
 import { showToast, toastMessages } from '@/lib/toast';
 import { dataRefreshEvents } from '@/lib/dataRefreshEvents';
+import { useFetchGuard } from '@/lib/fetchGuard';
 
 type Panel = Database['public']['Tables']['panels']['Row'];
 type PanelInsert = Database['public']['Tables']['panels']['Insert'];
@@ -185,11 +186,14 @@ export interface UsePanelsReturn {
  */
 export function usePanels(projectId: string | undefined): UsePanelsReturn {
   const [panels, setPanels] = useState<Panel[]>([]);
+  // A refetch that overlaps a local write must not undo it (#234)
+  const guard = useFetchGuard();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   const fetchPanels = useCallback(async () => {
     if (!projectId) return;
+    const token = guard.token();
 
     try {
       const { data, error } = await supabase
@@ -199,6 +203,7 @@ export function usePanels(projectId: string | undefined): UsePanelsReturn {
         .order('created_at', { ascending: true });
 
       if (error) throw error;
+      if (guard.stale(token)) return; // a local write is newer; the guard refetches after it
       setPanels(data || []);
       setError(null);
     } catch (err) {
@@ -206,7 +211,8 @@ export function usePanels(projectId: string | undefined): UsePanelsReturn {
     } finally {
       setLoading(false);
     }
-  }, [projectId]);
+  }, [projectId]); // eslint-disable-line react-hooks/exhaustive-deps -- guard is stable
+  guard.refetch = fetchPanels;
 
   useEffect(() => {
     if (!projectId) {
@@ -330,9 +336,9 @@ export function usePanels(projectId: string | undefined): UsePanelsReturn {
     panels,
     loading,
     error,
-    createPanel,
-    updatePanel,
-    deletePanel,
+    createPanel: guard.wrap(createPanel),
+    updatePanel: guard.wrap(updatePanel),
+    deletePanel: guard.wrap(deletePanel),
     getMainPanel,
   };
 }

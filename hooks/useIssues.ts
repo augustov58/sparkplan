@@ -11,6 +11,7 @@ import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 import type { Issue, IssueInsert, IssueUpdate } from '@/lib/database.types';
 
+import { useFetchGuard } from '@/lib/fetchGuard';
 /**
  * Return type for useIssues hook
  */
@@ -86,6 +87,8 @@ export interface UseIssuesReturn {
  */
 export function useIssues(projectId: string | undefined): UseIssuesReturn {
   const [issues, setIssues] = useState<Issue[]>([]);
+  // A refetch that overlaps a local write must not undo it (#234)
+  const guard = useFetchGuard();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -121,6 +124,7 @@ export function useIssues(projectId: string | undefined): UseIssuesReturn {
   }, [projectId]);
 
   const fetchIssues = async () => {
+    const token = guard.token();
     if (!projectId) return;
 
     try {
@@ -131,6 +135,7 @@ export function useIssues(projectId: string | undefined): UseIssuesReturn {
         .order('created_at', { ascending: false });
 
       if (error) throw error;
+      if (guard.stale(token)) return; // a local write is newer; the guard refetches after it
       setIssues(data || []);
       setError(null);
     } catch (err) {
@@ -234,13 +239,16 @@ export function useIssues(projectId: string | undefined): UseIssuesReturn {
     await updateIssue(id, { status: newStatus });
   };
 
+  guard.refetch = fetchIssues;
+
+
   return {
     issues,
     loading,
     error,
-    createIssue,
-    updateIssue,
-    deleteIssue,
-    toggleIssueStatus,
+    createIssue: guard.wrap(createIssue),
+    updateIssue: guard.wrap(updateIssue),
+    deleteIssue: guard.wrap(deleteIssue),
+    toggleIssueStatus: guard.wrap(toggleIssueStatus),
   };
 }

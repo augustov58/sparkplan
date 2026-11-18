@@ -11,6 +11,7 @@ import { useAuthContext } from '@/components/Auth/AuthProvider';
 import { dbProjectToFrontend, frontendProjectToDbInsert, frontendProjectToDbUpdate } from '@/lib/typeAdapters';
 import { showToast, toastMessages } from '@/lib/toast';
 
+import { useFetchGuard } from '@/lib/fetchGuard';
 type DbProject = Database['public']['Tables']['projects']['Row'];
 
 export interface UseProjectsReturn {
@@ -52,6 +53,8 @@ export function useProjects(): UseProjectsReturn {
 function useProjectsState(): UseProjectsReturn {
   const { user } = useAuthContext();
   const [projects, setProjects] = useState<Project[]>([]);
+  // A refetch that overlaps a local write must not undo it (#234)
+  const guard = useFetchGuard();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   // Latest list, updated synchronously by patchProject so back-to-back
@@ -91,6 +94,7 @@ function useProjectsState(): UseProjectsReturn {
   }, [user]);
 
   const fetchProjects = async () => {
+    const token = guard.token();
     if (!user) return;
 
     try {
@@ -104,6 +108,7 @@ function useProjectsState(): UseProjectsReturn {
 
       // Convert database projects to frontend format
       const frontendProjects = (data || []).map(dbProjectToFrontend);
+      if (guard.stale(token)) return; // a local write is newer; the guard refetches after it
       setProjects(frontendProjects);
       setError(null);
     } catch (err) {
@@ -208,14 +213,17 @@ function useProjectsState(): UseProjectsReturn {
     return projects.find((p: Project) => p.id === id);
   };
 
+  guard.refetch = fetchProjects;
+
+
   return {
     projects,
     loading,
     error,
-    createProject,
-    updateProject,
-    patchProject,
-    deleteProject,
+    createProject: guard.wrap(createProject),
+    updateProject: guard.wrap(updateProject),
+    patchProject: guard.wrap(patchProject),
+    deleteProject: guard.wrap(deleteProject),
     getProjectById,
   };
 }

@@ -11,6 +11,7 @@ import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 import type { InspectionItem, InspectionItemInsert, InspectionItemUpdate } from '@/lib/database.types';
 
+import { useFetchGuard } from '@/lib/fetchGuard';
 /**
  * Return type for useInspectionItems hook
  */
@@ -92,6 +93,8 @@ export interface UseInspectionItemsReturn {
  */
 export function useInspectionItems(projectId: string | undefined): UseInspectionItemsReturn {
   const [items, setItems] = useState<InspectionItem[]>([]);
+  // A refetch that overlaps a local write must not undo it (#234)
+  const guard = useFetchGuard();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -127,6 +130,7 @@ export function useInspectionItems(projectId: string | undefined): UseInspection
   }, [projectId]);
 
   const fetchItems = async () => {
+    const token = guard.token();
     if (!projectId) return;
 
     try {
@@ -137,6 +141,7 @@ export function useInspectionItems(projectId: string | undefined): UseInspection
         .order('created_at', { ascending: true });
 
       if (error) throw error;
+      if (guard.stale(token)) return; // a local write is newer; the guard refetches after it
       setItems(data || []);
       setError(null);
     } catch (err) {
@@ -250,14 +255,17 @@ export function useInspectionItems(projectId: string | undefined): UseInspection
     await updateItem(id, { status });
   };
 
+  guard.refetch = fetchItems;
+
+
   return {
     items,
     loading,
     error,
-    createItem,
-    createItems,
-    updateItem,
-    deleteItem,
-    updateItemStatus,
+    createItem: guard.wrap(createItem),
+    createItems: guard.wrap(createItems),
+    updateItem: guard.wrap(updateItem),
+    deleteItem: guard.wrap(deleteItem),
+    updateItemStatus: guard.wrap(updateItemStatus),
   };
 }

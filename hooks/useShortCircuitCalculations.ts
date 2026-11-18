@@ -12,6 +12,7 @@ import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 import type { ShortCircuitCalculation, ShortCircuitCalculationInsert, ShortCircuitCalculationUpdate } from '@/lib/database.types';
 
+import { useFetchGuard } from '@/lib/fetchGuard';
 /**
  * Return type for useShortCircuitCalculations hook
  */
@@ -103,6 +104,8 @@ export interface UseShortCircuitCalculationsReturn {
  */
 export function useShortCircuitCalculations(projectId: string | undefined): UseShortCircuitCalculationsReturn {
   const [calculations, setCalculations] = useState<ShortCircuitCalculation[]>([]);
+  // A refetch that overlaps a local write must not undo it (#234)
+  const guard = useFetchGuard();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -138,6 +141,7 @@ export function useShortCircuitCalculations(projectId: string | undefined): UseS
   }, [projectId]);
 
   const fetchCalculations = async () => {
+    const token = guard.token();
     if (!projectId) return;
 
     try {
@@ -148,6 +152,7 @@ export function useShortCircuitCalculations(projectId: string | undefined): UseS
         .order('created_at', { ascending: false });
 
       if (error) throw error;
+      if (guard.stale(token)) return; // a local write is newer; the guard refetches after it
       setCalculations(data || []);
       setError(null);
     } catch (err) {
@@ -243,13 +248,16 @@ export function useShortCircuitCalculations(projectId: string | undefined): UseS
     return calculations.find(c => c.calculation_type === 'service' && c.panel_id === null) || null;
   };
 
+  guard.refetch = fetchCalculations;
+
+
   return {
     calculations,
     loading,
     error,
-    createCalculation,
-    updateCalculation,
-    deleteCalculation,
+    createCalculation: guard.wrap(createCalculation),
+    updateCalculation: guard.wrap(updateCalculation),
+    deleteCalculation: guard.wrap(deleteCalculation),
     getCalculationsByPanel,
     getServiceCalculation,
   };

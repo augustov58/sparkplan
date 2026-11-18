@@ -19,6 +19,7 @@ import type { Database } from '@/lib/database.types';
 import { showToast, toastMessages } from '@/lib/toast';
 import { dataRefreshEvents } from '@/lib/dataRefreshEvents';
 
+import { useFetchGuard } from '@/lib/fetchGuard';
 export type Permit = Database['public']['Tables']['permits']['Row'];
 export type PermitInsert = Database['public']['Tables']['permits']['Insert'];
 export type PermitUpdate = Database['public']['Tables']['permits']['Update'];
@@ -37,10 +38,13 @@ export interface UsePermitsReturn {
 
 export function usePermits(projectId: string | undefined): UsePermitsReturn {
   const [permits, setPermits] = useState<Permit[]>([]);
+  // A refetch that overlaps a local write must not undo it (#234)
+  const guard = useFetchGuard();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   const fetchPermits = useCallback(async () => {
+    const token = guard.token();
     if (!projectId) return;
     try {
       const { data, error } = await supabase
@@ -50,6 +54,7 @@ export function usePermits(projectId: string | undefined): UsePermitsReturn {
         .order('created_at', { ascending: false });
 
       if (error) throw error;
+      if (guard.stale(token)) return; // a local write is newer; the guard refetches after it
       setPermits(data || []);
       setError(null);
     } catch (err) {
@@ -186,13 +191,16 @@ export function usePermits(projectId: string | undefined): UsePermitsReturn {
     }
   };
 
+  guard.refetch = fetchPermits;
+
+
   return {
     permits,
     loading,
     error,
-    createPermit,
-    updatePermit,
-    deletePermit,
+    createPermit: guard.wrap(createPermit),
+    updatePermit: guard.wrap(updatePermit),
+    deletePermit: guard.wrap(deletePermit),
     refresh: fetchPermits,
   };
 }

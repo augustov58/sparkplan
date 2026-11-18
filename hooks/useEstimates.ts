@@ -16,6 +16,7 @@ import { showToast, toastMessages } from '@/lib/toast';
 import { dataRefreshEvents } from '@/lib/dataRefreshEvents';
 import { useAuthContext } from '@/components/Auth/AuthProvider';
 
+import { useFetchGuard } from '@/lib/fetchGuard';
 type Estimate = Database['public']['Tables']['estimates']['Row'];
 type EstimateInsert = Database['public']['Tables']['estimates']['Insert'];
 type EstimateUpdate = Database['public']['Tables']['estimates']['Update'];
@@ -53,10 +54,13 @@ export interface UseEstimatesReturn {
 export function useEstimates(projectId: string | undefined): UseEstimatesReturn {
   const { user } = useAuthContext();
   const [estimates, setEstimates] = useState<Estimate[]>([]);
+  // A refetch that overlaps a local write must not undo it (#234)
+  const guard = useFetchGuard();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   const fetchEstimates = useCallback(async () => {
+    const token = guard.token();
     if (!projectId) return;
 
     try {
@@ -67,6 +71,7 @@ export function useEstimates(projectId: string | undefined): UseEstimatesReturn 
         .order('created_at', { ascending: false });
 
       if (error) throw error;
+      if (guard.stale(token)) return; // a local write is newer; the guard refetches after it
       setEstimates((data as Estimate[]) || []);
       setError(null);
     } catch (err) {
@@ -211,13 +216,16 @@ export function useEstimates(projectId: string | undefined): UseEstimatesReturn 
     return created;
   };
 
+  guard.refetch = fetchEstimates;
+
+
   return {
     estimates,
     loading,
     error,
-    createEstimate,
-    updateEstimate,
-    deleteEstimate,
-    cloneAsRevision,
+    createEstimate: guard.wrap(createEstimate),
+    updateEstimate: guard.wrap(updateEstimate),
+    deleteEstimate: guard.wrap(deleteEstimate),
+    cloneAsRevision: guard.wrap(cloneAsRevision),
   };
 }
