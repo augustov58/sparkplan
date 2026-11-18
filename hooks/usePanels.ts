@@ -112,7 +112,8 @@ export interface UsePanelsReturn {
    *   fed_from: 'mdp-id'
    * });
    */
-  createPanel: (panel: Omit<PanelInsert, 'id'>) => Promise<Panel | null>;
+  /** `silent`: no success toast, for a caller that toasts its own summary (#242). Errors still toast. */
+  createPanel: (panel: Omit<PanelInsert, 'id'>, options?: { silent?: boolean }) => Promise<Panel | null>;
 
   /**
    * Updates an existing panel
@@ -244,7 +245,7 @@ export function usePanels(projectId: string | undefined): UsePanelsReturn {
     };
   }, [projectId, fetchPanels]);
 
-  const createPanel = async (panel: Omit<PanelInsert, 'id'>): Promise<Panel | null> => {
+  const createPanel = async (panel: Omit<PanelInsert, 'id'>, options: { silent?: boolean } = {}): Promise<Panel | null> => {
     try {
       const { data, error } = await supabase.from('panels').insert(panel).select().single();
 
@@ -255,7 +256,7 @@ export function usePanels(projectId: string | undefined): UsePanelsReturn {
         setPanels(prev => [...prev, data]);
       }
 
-      showToast.success(toastMessages.panel.created);
+      if (!options.silent) showToast.success(toastMessages.panel.created);
       // Notify peer usePanels instances (e.g. FeederManager dropdown) to refetch.
       // Supabase realtime can miss the second subscriber when two components share
       // a channel name; this event bus guarantees every instance on the page refreshes.

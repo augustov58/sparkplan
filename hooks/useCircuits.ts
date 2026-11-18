@@ -17,7 +17,8 @@ export interface UseCircuitsReturn {
   circuits: Circuit[];
   loading: boolean;
   error: string | null;
-  createCircuit: (circuit: Omit<CircuitInsert, 'id'>) => Promise<Circuit | null>;
+  /** `silent`: no success toast, for callers that create many and toast once (#242). Errors still toast. */
+  createCircuit: (circuit: Omit<CircuitInsert, 'id'>, options?: { silent?: boolean }) => Promise<Circuit | null>;
   updateCircuit: (id: string, updates: CircuitUpdate) => Promise<void>;
   deleteCircuit: (id: string) => Promise<void>;
   /** Delete all circuits for a specific panel - useful for regenerating panel schedules */
@@ -88,7 +89,7 @@ export function useCircuits(projectId: string | undefined): UseCircuitsReturn {
     };
   }, [projectId, fetchCircuits]);
 
-  const createCircuit = async (circuit: Omit<CircuitInsert, 'id'>): Promise<Circuit | null> => {
+  const createCircuit = async (circuit: Omit<CircuitInsert, 'id'>, options: { silent?: boolean } = {}): Promise<Circuit | null> => {
     try {
       // OPTIMISTIC UPDATE: Add circuit to local state immediately
       const tempId = `temp-${Date.now()}-${Math.random()}`;
@@ -113,7 +114,7 @@ export function useCircuits(projectId: string | undefined): UseCircuitsReturn {
       // REPLACE: Replace temp circuit with real one from database
       setCircuits(prev => prev.map(c => c.id === tempId ? data : c));
 
-      showToast.success(toastMessages.circuit.created);
+      if (!options.silent) showToast.success(toastMessages.circuit.created);
       return data;
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to create circuit');
