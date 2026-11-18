@@ -231,6 +231,36 @@ export const styles = StyleSheet.create({
 const branchConductorCitation = (circuits: Circuit[]): string =>
   circuits.some((c) => isEvseDescription(c.description)) ? 'NEC 625.40 + 210.19' : 'NEC 210.19';
 
+/** Ids of the packet's synthesized rows for downstream panels (#228). */
+export const SYNTH_FEEDER_PREFIX = 'synth-feeder-'; // breaker-fed: drawn at its slot
+export const SYNTH_LUG_PREFIX = 'synth-lug-';       // feed-thru lugs: slot 0, listed below the grid
+const isSynthesizedFeeder = (c: Circuit) =>
+  !!c.id?.startsWith(SYNTH_FEEDER_PREFIX) || isFeedThruLug(c);
+const isFeedThruLug = (c: Circuit) => !!c.id?.startsWith(SYNTH_LUG_PREFIX); // fixtures may lack ids
+
+/** "18" or "18 (+1 feeder)": branch circuits as the app counts them, feeders apart (#228). */
+export const circuitCountLabel = (circuits: Circuit[]): string => {
+  const feeders = circuits.filter(isSynthesizedFeeder).length;
+  const branch = circuits.length - feeders;
+  return feeders > 0 ? `${branch} (+${feeders} feeder${feeders === 1 ? '' : 's'})` : `${branch}`;
+};
+
+/**
+ * The circuit in a slot: one that starts there, or the multi-pole circuit
+ * whose later pole it is (a 2-pole at N also holds N+2; a 3-pole N+2 and
+ * N+4). The schedule left later poles blank (#228).
+ */
+export const slotCircuit = (circuits: Circuit[], slot: number): { circuit?: Circuit; continuationOf?: Circuit } => {
+  const circuit = circuits.find(c => c.circuit_number === slot);
+  if (circuit) return { circuit };
+  const continuationOf = circuits.find(c => {
+    const poles = c.pole || 1;
+    const k = (slot - c.circuit_number) / 2;
+    return c.circuit_number > 0 && Number.isInteger(k) && k > 0 && k < poles;
+  });
+  return { continuationOf };
+};
+
 export const calculatePhaseBalancing = (
   circuits: Circuit[],
   panelPhase: number
@@ -459,7 +489,7 @@ function dwellingLoadSummaryFor(
 /** Summary grid, method note and breakdown table of a dwelling Load Summary. */
 const DwellingLoadSummaryBody: React.FC<{
   summary: DwellingPanelLoadSummary;
-  circuitCount: number;
+  circuitCount: number | string;
   voltageDivisor: number;
 }> = ({ summary, circuitCount, voltageDivisor }) => (
   <>
@@ -734,8 +764,8 @@ export const PanelSchedulePages: React.FC<PanelSchedulePDFProps> = ({
               const leftNum = row * 2 - 1;  // Odd numbers: 1, 3, 5, 7...
               const rightNum = row * 2;      // Even numbers: 2, 4, 6, 8...
 
-              const leftCkt = sortedCircuits.find(c => c.circuit_number === leftNum);
-              const rightCkt = sortedCircuits.find(c => c.circuit_number === rightNum);
+              const { circuit: leftCkt, continuationOf: leftCont } = slotCircuit(sortedCircuits, leftNum);
+              const { circuit: rightCkt, continuationOf: rightCont } = slotCircuit(sortedCircuits, rightNum);
 
               // Phase for this row (left & right slots share the same bus stab,
               // so one letter labels the row). Split-phase panels alternate A/B
@@ -748,7 +778,7 @@ export const PanelSchedulePages: React.FC<PanelSchedulePDFProps> = ({
                 <View key={row} style={isAlt ? styles.tableRowAlt : styles.tableRow}>
                   {/* Left Circuit */}
                   <Text style={styles.colLeftCkt}>{leftNum}</Text>
-                  <Text style={styles.colLeftDescription}>{decorateDescription(leftCkt)}</Text>
+                  <Text style={styles.colLeftDescription}>{leftCont ? `(cont. ckt ${leftCont.circuit_number})` : decorateDescription(leftCkt)}</Text>
                   <Text style={styles.colLeftLoad}>
                     {leftCkt ? (leftCkt.load_watts || 0).toLocaleString() : ''}
                   </Text>
@@ -764,7 +794,7 @@ export const PanelSchedulePages: React.FC<PanelSchedulePDFProps> = ({
                   <Text style={styles.colRightLoad}>
                     {rightCkt ? (rightCkt.load_watts || 0).toLocaleString() : ''}
                   </Text>
-                  <Text style={styles.colRightDescription}>{decorateDescription(rightCkt)}</Text>
+                  <Text style={styles.colRightDescription}>{rightCont ? `(cont. ckt ${rightCont.circuit_number})` : decorateDescription(rightCkt)}</Text>
                   <Text style={styles.colRightCkt}>{rightNum}</Text>
                 </View>
               );
@@ -781,6 +811,25 @@ export const PanelSchedulePages: React.FC<PanelSchedulePDFProps> = ({
             </View>
           )}
         </View>
+
+        {/* Feed-thru lugs (#228): downstream panels not fed from a breaker,
+            as the in-app schedule lists them. Their load is in the totals. */}
+        {sortedCircuits.some(isFeedThruLug) && (
+          <View style={styles.tableContainer} wrap={false}>
+            <View style={styles.tableRowAlt}>
+              <Text style={{ width: '100%', fontFamily: 'Helvetica-Bold', fontSize: 8 }}>
+                FEED-THRU LUGS (not breaker-fed)
+              </Text>
+            </View>
+            {sortedCircuits.filter(isFeedThruLug).map(c => (
+              <View key={c.id} style={styles.tableRow}>
+                <Text style={{ width: '60%', fontSize: 8 }}>{c.description}</Text>
+                <Text style={{ width: '15%', fontSize: 8, textAlign: 'center' }}>{`LUG ${c.pole}P`}</Text>
+                <Text style={{ width: '25%', fontSize: 8, textAlign: 'right' }}>{`${(c.load_watts || 0).toLocaleString()} VA`}</Text>
+              </View>
+            ))}
+          </View>
+        )}
 
         {/* Phase Balancing Summary — wrap={false} keeps the entire card on
             one page; with the contractor block + sheet ID footer reducing
@@ -822,7 +871,7 @@ export const PanelSchedulePages: React.FC<PanelSchedulePDFProps> = ({
           {dwellingUnitDemand ? (
             <DwellingLoadSummaryBody
               summary={dwellingUnitDemand}
-              circuitCount={sortedCircuits.length}
+              circuitCount={circuitCountLabel(sortedCircuits)}
               voltageDivisor={voltageDivisor}
             />
           ) : hasAggregatedDemand ? (
@@ -830,7 +879,7 @@ export const PanelSchedulePages: React.FC<PanelSchedulePDFProps> = ({
               <View style={styles.summaryGrid}>
                 <View style={styles.summaryItem}>
                   <Text style={styles.summaryLabel}>Total Circuits</Text>
-                  <Text style={styles.summaryValue}>{sortedCircuits.length}</Text>
+                  <Text style={styles.summaryValue}>{circuitCountLabel(sortedCircuits)}</Text>
                 </View>
 
                 <View style={styles.summaryItem}>
@@ -893,7 +942,7 @@ export const PanelSchedulePages: React.FC<PanelSchedulePDFProps> = ({
               <View style={styles.summaryGrid}>
                 <View style={styles.summaryItem}>
                   <Text style={styles.summaryLabel}>Total Circuits</Text>
-                  <Text style={styles.summaryValue}>{sortedCircuits.length}</Text>
+                  <Text style={styles.summaryValue}>{circuitCountLabel(sortedCircuits)}</Text>
                 </View>
 
                 <View style={styles.summaryItem}>
@@ -1154,8 +1203,8 @@ export const MultiPanelDocument: React.FC<MultiPanelDocumentProps> = ({
                 const leftNum = row * 2 - 1;
                 const rightNum = row * 2;
 
-                const leftCkt = sortedCircuits.find(c => c.circuit_number === leftNum);
-                const rightCkt = sortedCircuits.find(c => c.circuit_number === rightNum);
+                const { circuit: leftCkt, continuationOf: leftCont } = slotCircuit(sortedCircuits, leftNum);
+                const { circuit: rightCkt, continuationOf: rightCont } = slotCircuit(sortedCircuits, rightNum);
 
                 const phase = getCircuitPhase(leftNum, panel.phase === 3 ? 3 : 1);
                 const isAlt = row % 2 === 0;
@@ -1163,7 +1212,7 @@ export const MultiPanelDocument: React.FC<MultiPanelDocumentProps> = ({
                 rows.push(
                   <View key={row} style={isAlt ? styles.tableRowAlt : styles.tableRow}>
                     <Text style={styles.colLeftCkt}>{leftNum}</Text>
-                    <Text style={styles.colLeftDescription}>{decorate(leftCkt)}</Text>
+                    <Text style={styles.colLeftDescription}>{leftCont ? `(cont. ckt ${leftCont.circuit_number})` : decorate(leftCkt)}</Text>
                     <Text style={styles.colLeftLoad}>
                       {leftCkt ? (leftCkt.load_watts || 0).toLocaleString() : ''}
                     </Text>
@@ -1177,7 +1226,7 @@ export const MultiPanelDocument: React.FC<MultiPanelDocumentProps> = ({
                     <Text style={styles.colRightLoad}>
                       {rightCkt ? (rightCkt.load_watts || 0).toLocaleString() : ''}
                     </Text>
-                    <Text style={styles.colRightDescription}>{decorate(rightCkt)}</Text>
+                    <Text style={styles.colRightDescription}>{rightCont ? `(cont. ckt ${rightCont.circuit_number})` : decorate(rightCkt)}</Text>
                     <Text style={styles.colRightCkt}>{rightNum}</Text>
                   </View>
                 );

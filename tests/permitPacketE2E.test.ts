@@ -791,7 +791,10 @@ describe('Permit packet: NEC 220.83 existing dwelling — proposed loads on PDF'
       const streamBytes = Buffer.from(m[1]!, 'binary');
       let inflated: Buffer;
       try {
-        inflated = zlib.inflateSync(streamBytes);
+        // Z_SYNC_FLUSH: the stream regex can swallow a trailing CR/LF byte
+        // of the compressed data; a strict inflate then drops the whole page
+        // (its text came back empty once a schedule gained "(cont. ckt N)", #228).
+        inflated = zlib.inflateSync(streamBytes, { finishFlush: zlib.constants.Z_SYNC_FLUSH });
       } catch {
         // Non-FlateDecode stream (e.g., raw image data, embedded font) — skip.
         continue;

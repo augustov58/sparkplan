@@ -3417,7 +3417,8 @@ export const EVSELabelingPage: React.FC<EVSELabelingPageProps> = ({
             </Text>
             <Text style={[themeStyles.td, { width: '15%' }]}>{p.chargerCircuitCount}</Text>
             <Text style={[themeStyles.td, { width: '60%', fontSize: 7 }]}>
-              {`"EV CHARGING — ${p.panelName.toUpperCase()}${p.location ? `, ${p.location.toUpperCase()}` : ''} — DO NOT OPERATE WHILE LOADED" — applied to panel deadfront and to each EVSE disconnect cover.`}
+              {/* #228: the location in parentheses (it ran into the panel name), the standard "under load" */}
+              {`"EV CHARGING — ${p.panelName.toUpperCase()}${p.location ? ` (${p.location.toUpperCase()})` : ''} — DO NOT OPERATE UNDER LOAD" — applied to panel deadfront and to each EVSE disconnect cover.`}
             </Text>
           </View>
         ))}
