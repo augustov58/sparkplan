@@ -5,6 +5,7 @@
  */
 
 import { getNextStandardBreakerSize } from '../../data/nec/standard-breakers';
+import { findConductorByAmpacity } from '../../data/nec/table-310-16';
 import { getEvseLoadVA, type NecEdition } from '../../data/nec/evse-load';
 
 /**
@@ -112,8 +113,15 @@ export function calculateEVCharging(input: EVChargingInput): EVChargingResult {
   necReferences.push('NEC 625.41 - Overcurrent Protection (125%, continuous duty)');
   necReferences.push('NEC 625.42 - EV charging is a continuous load');
 
-  // Conductor sizing based on breaker size
-  const conductorSize = getConductorSizeForAmps(circuitBreakerAmps, input.conductorMaterial);
+  // Conductor sizing based on breaker size (#269: Table 310.16, see sizeEvConductor)
+  const conductor = sizeEvConductor(circuitBreakerAmps, input.conductorMaterial);
+  const conductorSize = conductor.sets > 1 ? `${conductor.sets} × ${conductor.size} (parallel)` : conductor.size;
+  if (conductor.sets > 1) {
+    necReferences.push('NEC 310.10(G) - Conductors in parallel (1/0 AWG and larger)');
+  }
+  if (!conductor.size) {
+    warnings.push(`CRITICAL: No conductor arrangement in Table 310.16 found for ${circuitBreakerAmps} A; size this circuit by engineering design.`);
+  }
   const egcSize = getEGCSizeForBreaker(circuitBreakerAmps, input.conductorMaterial);
 
   // Calculate single charger load
@@ -139,10 +147,10 @@ export function calculateEVCharging(input: EVChargingInput): EVChargingResult {
 
   // Voltage drop calculation
   const voltageDropPercent = calculateSimpleVoltageDrop(
-    conductorSize,
+    conductor.size,
     input.conductorMaterial,
     input.circuitLength_ft,
-    input.chargerAmps,
+    input.chargerAmps / conductor.sets, // each parallel set carries its share
     input.voltage,
     input.phase
   );
@@ -191,38 +199,6 @@ export function calculateEVCharging(input: EVChargingInput): EVChargingResult {
 }
 
 /**
- * Get conductor size based on ampacity
- * Simplified lookup for EV circuits
- */
-function getConductorSizeForAmps(amps: number, material: 'Cu' | 'Al'): string {
-  const copperSizes: [number, string][] = [
-    [15, '14 AWG'], [20, '12 AWG'], [30, '10 AWG'],
-    [40, '8 AWG'], [55, '6 AWG'], [70, '4 AWG'],
-    [85, '3 AWG'], [95, '2 AWG'], [110, '1 AWG'],
-    [130, '1/0 AWG'], [150, '2/0 AWG'], [175, '3/0 AWG'],
-    [200, '4/0 AWG'], [230, '250 kcmil'], [255, '300 kcmil'],
-    [285, '350 kcmil'], [310, '400 kcmil'], [380, '500 kcmil'],
-  ];
-
-  const aluminumSizes: [number, string][] = [
-    [15, '12 AWG'], [20, '10 AWG'], [30, '8 AWG'],
-    [40, '6 AWG'], [55, '4 AWG'], [65, '3 AWG'],
-    [75, '2 AWG'], [85, '1 AWG'], [100, '1/0 AWG'],
-    [115, '2/0 AWG'], [130, '3/0 AWG'], [150, '4/0 AWG'],
-    [170, '250 kcmil'], [190, '300 kcmil'], [210, '350 kcmil'],
-    [230, '400 kcmil'], [260, '500 kcmil'],
-  ];
-
-  const sizes = material === 'Cu' ? copperSizes : aluminumSizes;
-  
-  for (const [capacity, size] of sizes) {
-    if (capacity >= amps) return size;
-  }
-  
-  return material === 'Cu' ? '500 kcmil' : '500 kcmil';
-}
-
-/**
  * Get EGC size based on breaker rating
  * Per NEC Table 250.122
  */
@@ -251,6 +227,26 @@ function getEGCSizeForBreaker(breakerAmps: number, material: 'Cu' | 'Al'): strin
 }
 
 /**
+ * Conductor for an EV branch circuit, rated for its breaker (#269), from Table
+ * 310.16 in data/nec (book-checked, pinned) at the NEC 110.14(C) column the
+ * conductor sizing service uses (conductorSizing.ts): 60 °C for a circuit of
+ * 100 A or less (conductors 14–1 AWG), 75 °C above. When no single conductor
+ * carries it (past 1000 kcmil), parallel sets of 1/0 AWG or larger at 75 °C
+ * (310.10(G)). It replaced an inline list that matched neither column from
+ * 1/0 up and stopped at 500 kcmil (a 600 A breaker got 380 A of copper).
+ */
+export function sizeEvConductor(amps: number, material: 'Cu' | 'Al'): { size: string; sets: number } {
+  const single = findConductorByAmpacity(amps, material, amps <= 100 ? 60 : 75);
+  if (single) return { size: single.size, sets: 1 };
+  for (let sets = 2; sets <= 10; sets++) {
+    // Each set ≥ amps / sets; past 545 A (Cu) that is ≥ 300 kcmil, above 1/0
+    const perSet = findConductorByAmpacity(amps / sets, material, 75);
+    if (perSet) return { size: perSet.size, sets };
+  }
+  return { size: '', sets: 1 };
+}
+
+/**
  * Simple voltage drop calculation
  */
 function calculateSimpleVoltageDrop(
@@ -274,7 +270,9 @@ function calculateSimpleVoltageDrop(
     '350 kcmil': 350000, '400 kcmil': 400000, '500 kcmil': 500000,
   };
   
-  const cm = circularMils[conductorSize] || 100000;
+  // kcmil sizes past the list (600–1000 kcmil, #269) read their own size
+  const kcmil = /^(\d+) kcmil$/.exec(conductorSize);
+  const cm = circularMils[conductorSize] ?? (kcmil ? Number(kcmil[1]) * 1000 : 100000);
   const multiplier = phase === 1 ? 2 : Math.sqrt(3);
   
   const vdVolts = (K * length_ft * amps * multiplier) / cm;

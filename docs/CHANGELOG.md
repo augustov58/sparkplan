@@ -4,6 +4,12 @@ All notable changes to SparkPlan.
 
 ---
 
+## 2026-11-18: The EV Charging calculator sizes conductors from the NEC ampacity table (#269)
+
+- **Large EV circuits are no longer undersized.** The calculator used its own conductor list, which stopped at 500 kcmil: a 350 kW DC fast charger on a 600 A breaker got 500 kcmil copper, rated 380 A. It now uses the app's Table 310.16 data, at 60 °C for circuits up to 100 A and 75 °C above (NEC 110.14(C)). Past a single conductor it gives parallel sets: 600 A → 2 × 350 kcmil. Results up to 100 A are unchanged for copper. Above 100 A some sizes drop to the 75 °C value (150 kW: 250 kcmil, was 300 kcmil), and the EV Panel Builder now gives the same size.
+
+---
+
 ## 2026-11-18: DC fast charger presets carry at least their output current (#264)
 
 - **The EV Charging calculator's and the EVEMS tool's DC fast charger presets now carry at least their rated output.** 100, 150, 250 and 350 kW at 480 V three-phase are 120.3, 180.4, 300.7 and 421.0 A. They listed less current than their own output: the 150 kW preset was 160 A, which is 133 kVA. Loads, breakers, conductors and EVEMS counts from these presets were understated. A 150 kW charger now gives 150 kVA and a 250 A breaker, the same as the EV Panel Builder.
