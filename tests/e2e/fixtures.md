@@ -7,8 +7,9 @@ delete these freely; never point a spec at the owner's account.
 Add a row when a scenario needs a project none of these covers. No row IDs or
 stored settings values here (public repo).
 
-Last updated: 2026-11-14
+Last updated: 2026-11-17
 
 | Project name | Scenario | Key setup |
 |---|---|---|
 | QA EVEMS tool (NEC 2023) | EVEMS Load Management tool (#194); EV Charging calculator (#198); EVEMS load schedule (#199); EVEMS max chargers (#202) | Blank residential project, NEC Edition = 2023 Edition; the tool keeps its own defaults (200 A / 240 V / 24 kVA demand) |
+| QA Commercial calc | Commercial Load Calculator (#195) | Blank commercial project (Start from Scratch); the calculator keeps its own defaults in the tab (Office, 10,000 sq ft, 50 receptacles, one 42 A / 208 V / 3-phase continuous HVAC row) |

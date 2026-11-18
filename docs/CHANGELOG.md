@@ -4,6 +4,16 @@ All notable changes to SparkPlan.
 
 ---
 
+## 2026-11-17: The Commercial Load Calculator keeps continuous loads at 100% in the load total (#195)
+
+- **Continuous HVAC and special loads no longer carry 125% inside "Demand".** A continuous 42 A / 208 V rooftop unit showed Demand 18.9 kVA at a 125% factor. It now shows 15.1 kVA at 100%, with 18.9 kVA only in the "Service" column, the same way signs and show windows already worked.
+- **"Total Demand" is now the Article 220 load.** In that example it drops from 40.9 kVA to 37.1 kVA.
+- **The recommended service size does not change.** Calculated Load stays 113.6 A, because the 125% was already counted once in service sizing.
+- **Mixed special loads:** the 125% applies to each continuous load on its own. A 10,000 VA continuous load plus a 5,000 VA non-continuous load show Demand 15.0 kVA, Service 17.5 kVA.
+- The PDF and CSV exports print the same corrected numbers.
+
+---
+
 ## 2026-11-14: EVEMS "Maximum Chargers" counts chargers at a 12 A minimum (#202)
 
 - **"With EVEMS" is now the number of chargers that each get at least 12 A** under the largest setpoint the service allows. It used to divide the setpoint by each charger's full load, so it always equalled "Without EVEMS". With 32 A / 240 V chargers on a 200 A / 240 V service with 24 kVA existing demand, the card now reads 2 without EVEMS, 6 with (72 A ÷ 12 A), "EVEMS allows 4 additional chargers".
