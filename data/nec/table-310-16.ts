@@ -5,6 +5,12 @@ import { AmpacityEntry } from '../../types/nec-types';
  * Based on 30°C (86°F) ambient temperature
  * NEC 2020 and 2023 (numbered Table 310.15(B)(16) in NEC 2017 and earlier)
  *
+ * Sizes: the ones Chapter 9 Table 9 lists (14 AWG – 1000 kcmil; no 700, 800,
+ * 900 or > 1000 kcmil). Table 310.16 goes further, but every conductor the
+ * sizing tools pick must have Table 9 impedance for its voltage drop (#272).
+ * Keep the two size sets equal (tests/table-310-16.test.ts). Every row here
+ * matches the NEC 2023 book, p. 70-187 (checked for #272).
+ *
  * This table shows the maximum current-carrying capacity (ampacity) of
  * insulated conductors based on conductor size, material, and insulation
  * temperature rating. Values must be corrected for ambient temperature

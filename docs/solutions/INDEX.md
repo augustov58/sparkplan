@@ -4,6 +4,7 @@ One note per hard problem, written by the model that solved it via the `extract-
 Each entry: `- [title](file.md) — reusable rule`.
 
 <!-- Newest first -->
+- [Table 310.16 "missing" rows mirror Chapter 9 Table 9](2026-11-18-table-310-16-size-set.md) — check what keys off a table before completing it; the NEC 2023 book is in the Obsidian vault for data/nec cross-checks
 - [EV calculator conductor list stopped at 500 kcmil](2026-11-18-ev-conductor-table.md) — check what the app already decided before asking for a ruling; "return the largest row" is a silent undersize; re-check tables when a fix makes larger inputs reachable
 - [A second copy of Table 220.42 understated warehouse lighting](2026-11-18-commercial-lighting-demand.md) — when removing unsourced table data, grep for other copies by their values; route every reader through the one function
 - [DC fast charger template sized below 125% of its own load](2026-11-18-dcfc-template-sizing.md) — an "assumption" question may already be answered by the data (`loadVA`); size every preset with the helpers the computed path uses
