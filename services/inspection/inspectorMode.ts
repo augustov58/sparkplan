@@ -99,6 +99,12 @@ export interface ProjectInspectionData {
    * scheduleServiceCheck`, #193): Article 220 load + 25% of continuous loads
    * vs the service rating. No check is reported without it.
    */
+  /**
+   * Each panel's design load in amps, for the 408.30 bus check (#225): the
+   * Feeder Manager's `feederDesignLoadVA` in the panel's own phase; the MDP's
+   * is the service check. Missing → the panel's own connected load.
+   */
+  panelDesignAmps?: Record<string, number>;
   serviceCheck?: {
     loadKVA: number;
     adderKVA: number;
@@ -261,29 +267,39 @@ function checkPanelMaxPoles(panel: Panel, circuits: Circuit[]): InspectionIssue 
   return null;
 }
 
+/** " (58 A of 200 A)" for a passed bus check, so the pass states its numbers (#225). */
+function busLoadingDetail(panel: Panel, circuits: Circuit[], designAmps: number | undefined): string {
+  if (!panel.bus_rating || panel.bus_rating <= 0) return '';
+  const divisor = panel.voltage * (panel.phase === 3 ? Math.sqrt(3) : 1);
+  const amps = designAmps ?? calculatePanelLoad(panel.id, circuits) / divisor;
+  return ` (${Math.round(amps)} A of ${panel.bus_rating} A)`;
+}
+
 /**
- * Panel Bus Rating vs Load Check
- * Panel should not be loaded beyond its bus rating
+ * Panel Bus Rating vs Load Check — NEC 408.30: the panelboard rating is not
+ * less than the minimum feeder capacity required for the Article 220 load
+ * (#225). That capacity is the panel's design load: demand + 25% of its
+ * continuous loads (215.2(A)(1), the Feeder Manager's `feederDesignLoadVA`,
+ * #190); for the MDP, the service check (#193). The caller passes it per
+ * panel in amps (`ProjectInspectionData.panelDesignAmps`). Without it the
+ * check falls back to the panel's own connected load, in its own phase.
  */
 function checkPanelBusLoading(
-  panel: Panel, 
+  panel: Panel,
   circuits: Circuit[],
-  servicePhase: 1 | 3
+  designAmps: number | undefined,
 ): InspectionIssue | null {
-  const totalLoadVA = calculatePanelLoad(panel.id, circuits);
   const busAmps = panel.bus_rating;
-  const voltage = panel.voltage;
-  
-  // Calculate maximum VA capacity
-  let maxCapacityVA: number;
-  if (servicePhase === 1) {
-    maxCapacityVA = busAmps * voltage;
-  } else {
-    maxCapacityVA = busAmps * voltage * Math.sqrt(3);
-  }
-  
-  const utilizationPercent = (totalLoadVA / maxCapacityVA) * 100;
-  
+  if (!busAmps || busAmps <= 0) return null;
+  const divisor = panel.voltage * (panel.phase === 3 ? Math.sqrt(3) : 1);
+  const loadAmps = designAmps ?? calculatePanelLoad(panel.id, circuits) / divisor;
+  const utilizationPercent = (loadAmps / busAmps) * 100;
+  const basis = designAmps !== undefined
+    ? (panel.is_main
+      ? 'the service check (NEC 220 load + 25% of continuous loads)'
+      : 'its design load (NEC 220 demand + 25% of continuous loads, 215.2(A)(1))')
+    : 'its connected load';
+
   // Critical if > 100%
   if (utilizationPercent > 100) {
     return {
@@ -292,15 +308,15 @@ function checkPanelBusLoading(
       severity: 'critical',
       necArticle: 'NEC 408.30',
       title: 'Panel Overloaded Beyond Bus Rating',
-      description: `Panel ${panel.name} load of ${Math.round(totalLoadVA / 1000)} kVA exceeds ${busAmps}A bus capacity of ${Math.round(maxCapacityVA / 1000)} kVA (${Math.round(utilizationPercent)}% utilization).`,
+      description: `Panel ${panel.name}: ${Math.round(loadAmps)} A (${basis}) exceeds its ${busAmps} A bus rating (${Math.round(utilizationPercent)}%).`,
       location: panel.name,
-      currentValue: `${Math.round(totalLoadVA / 1000)} kVA`,
-      requiredValue: `≤ ${Math.round(maxCapacityVA / 1000)} kVA`,
+      currentValue: `${Math.round(loadAmps)} A`,
+      requiredValue: `≤ ${busAmps} A`,
       recommendation: `Upgrade panel bus rating or redistribute loads to additional panels.`,
       autoFixable: false,
     };
   }
-  
+
   // Warning if > 80%
   if (utilizationPercent > 80) {
     return {
@@ -309,15 +325,15 @@ function checkPanelBusLoading(
       severity: 'warning',
       necArticle: 'NEC 408.30',
       title: 'Panel High Utilization',
-      description: `Panel ${panel.name} is at ${Math.round(utilizationPercent)}% of bus capacity. Best practice is to keep utilization below 80%.`,
+      description: `Panel ${panel.name} is at ${Math.round(utilizationPercent)}% of its ${busAmps} A bus (${Math.round(loadAmps)} A, ${basis}). Best practice is to keep utilization below 80%.`,
       location: panel.name,
       currentValue: `${Math.round(utilizationPercent)}%`,
-      requiredValue: '≤ 80%',
+      requiredValue: '≤ 80% (design margin, advisory)',
       recommendation: `Consider load balancing or future panel upgrade for expansion capacity.`,
       autoFixable: false,
     };
   }
-  
+
   return null;
 }
 
@@ -655,7 +671,8 @@ function checkServiceCapacity(
 
   const amps = Math.round(check.checkAmps);
   const utilization = Math.round(check.utilizationPct);
-  const basis = `the NEC 220 load of ${check.loadKVA.toFixed(1)} kVA plus 25% of the continuous loads (${check.adderKVA.toFixed(1)} kVA)`;
+  // The 9.0 kVA is the adder, not the continuous loads themselves
+  const basis = `the NEC 220 load of ${check.loadKVA.toFixed(1)} kVA plus ${check.adderKVA.toFixed(1)} kVA, 25% of the continuous loads`;
 
   if (check.checkAmps > check.serviceAmps) {
     return {
@@ -786,7 +803,7 @@ export function runInspection(data: ProjectInspectionData): InspectionResult {
     }
     
     // Bus loading check
-    const busLoadingIssue = checkPanelBusLoading(panel, data.circuits, data.servicePhase);
+    const busLoadingIssue = checkPanelBusLoading(panel, data.circuits, data.panelDesignAmps?.[panel.id]);
     if (busLoadingIssue) {
       issues.push(busLoadingIssue);
       necArticlesReferenced.add('NEC 408.30');
@@ -795,7 +812,7 @@ export function runInspection(data: ProjectInspectionData): InspectionResult {
         id: generateId(),
         category: 'panel',
         necArticle: 'NEC 408.30',
-        description: `Panel ${panel.name}: Bus loading acceptable`,
+        description: `Panel ${panel.name}: Bus loading acceptable${busLoadingDetail(panel, data.circuits, data.panelDesignAmps?.[panel.id])}`,
         passed: true,
       });
     }

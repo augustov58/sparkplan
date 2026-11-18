@@ -42,7 +42,7 @@ import { useGrounding } from '../hooks/useGrounding';
 import { useInspectorReports } from '../hooks/useInspectorReports';
 import { useProjects } from '../hooks/useProjects';
 import { useProjectNecEdition } from '../hooks/useProjectNecEdition';
-import { scheduleServiceCheck } from '../lib/storedCalcs';
+import { panelDesignAmps, scheduleServiceCheck } from '../lib/storedCalcs';
 import { getAllActions } from '../services/ai/agentOrchestrator';
 import type { AgentAction } from '../types';
 import {
@@ -280,6 +280,11 @@ export const InspectorMode: React.FC<InspectorModeProps> = ({
     () => (project ? scheduleServiceCheck(project, panels, circuits, transformers, necEdition) : null),
     [project, panels, circuits, transformers, necEdition],
   );
+  // #225: each panel's design load for the 408.30 bus check (the MDP's = the service check)
+  const designAmps = useMemo(
+    () => (project ? panelDesignAmps(project, panels, circuits, transformers, necEdition) : undefined),
+    [project, panels, circuits, transformers, necEdition],
+  );
   const { grounding, loading: groundingLoading } = useGrounding(projectId);
   const { latestReport, loading: reportsLoading, saveReport } = useInspectorReports(projectId);
 
@@ -330,6 +335,7 @@ export const InspectorMode: React.FC<InspectorModeProps> = ({
         bonding: grounding.bonding || [],
       } : undefined,
       serviceCheck,
+      panelDesignAmps: designAmps,
     };
 
     // useFeeders returns the camelCase `Feeder` from types.ts; runInspection

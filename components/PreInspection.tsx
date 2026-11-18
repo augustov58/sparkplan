@@ -12,7 +12,7 @@ import { useShortCircuitCalculations } from '../hooks/useShortCircuitCalculation
 import { buildProjectContext, formatContextForAI } from '../services/ai/projectContextBuilder';
 import { useProjectNecEdition } from '../hooks/useProjectNecEdition';
 import { isExistingConstructionProject } from '../lib/projectSettings';
-import { scheduleServiceCheck } from '../lib/storedCalcs';
+import { panelDesignAmps, scheduleServiceCheck } from '../lib/storedCalcs';
 
 interface InspectionProps {
   project: Project;
@@ -75,6 +75,8 @@ export const PreInspection: React.FC<InspectionProps> = ({ project }) => {
         isExistingConstructionProject(project),
         // #193: the service check E-102 uses
         scheduleServiceCheck(project, panels, circuits, transformers, necEdition),
+        // #225: each panel's design load for the bus check
+        panelDesignAmps(project, panels, circuits, transformers, necEdition),
       );
       projectContext = formatContextForAI(context);
       console.log('Built project context with:', panels.length, 'panels,', circuits.length, 'circuits');

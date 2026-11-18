@@ -1017,8 +1017,13 @@ Returns the feeder's voltage drop percentage if already calculated in the projec
       // Check panel utilization
       if (category === 'all' || category === 'panels' || category === 'capacity') {
         for (const panel of pc.panels) {
-          const capacityVA = panel.busRating * panel.voltage * (panel.phase === 3 ? 1.732 : 1) * 0.8;
-          const utilization = (panel.totalLoadVA / capacityVA) * 100;
+          // #225: NEC 408.30 — the bus against the panel's design load (demand
+          // + 25% of continuous loads; the MDP's = the service check), as
+          // Inspector Mode. Without project data: connected VA vs 80% of the
+          // bus, a rough estimate.
+          const utilization = panel.designAmps !== undefined && panel.busRating > 0
+            ? (panel.designAmps / panel.busRating) * 100
+            : (panel.totalLoadVA / (panel.busRating * panel.voltage * (panel.phase === 3 ? 1.732 : 1) * 0.8)) * 100;
 
           if (utilization > 100) {
             issues.push({
