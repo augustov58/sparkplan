@@ -80,7 +80,8 @@ describe('calculateDwellingUnitPanelLoad', () => {
       circuits: unit101.filter(x => x.load_type !== 'L'),
       existingBuilding: false,
     });
-    expect(r.warnings.some(w => w.includes('220.12'))).toBe(true);
+    // NEC 2020 (the default): the 3 VA/ft² dwelling load is 220.14(J), not Table 220.12 (#237)
+    expect(r.warnings.some(w => w.includes('3 VA/ft²') && w.includes('NEC 220.14(J)'))).toBe(true);
   });
 });
 

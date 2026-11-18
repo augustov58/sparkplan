@@ -19,10 +19,10 @@ const ALL_OTHERS = 'Table 220.42 (All others)';
 
 describe('#218 Table 220.42 "All others" row', () => {
   it('is 100% of the total and cites "All others"; no row is called office', () => {
-    expect(getLightingDemandFactor('all_others', 250_000)).toEqual({
+    expect(getLightingDemandFactor('all_others', 250_000, '2020')).toEqual({
       demandVA: 250_000, demandFactor: 1, necReference: ALL_OTHERS,
     });
-    expect(TABLE_220_42.map(r => r.necReference).join(' ')).not.toMatch(/office/i);
+    expect(TABLE_220_42.map(r => r.row).join(' ')).not.toMatch(/office/i);
   });
 
   it('the Part III aggregate cites it for a commercial panel (QA Commercial panel: 3,000 VA lighting)', () => {
@@ -39,7 +39,7 @@ describe('#218 Table 220.42 "All others" row', () => {
     const loads: LoadItem[] = [{ id: 'l', description: 'Lighting', watts: 20_000, type: 'lighting', continuous: false, phase: 'A' }];
     for (const occupancyType of ['commercial', 'industrial'] as const) {
       const settings = { serviceVoltage: 208, servicePhase: 3, occupancyType, conductorMaterial: 'Cu', temperatureRating: 75 } as ProjectSettings;
-      const refs = calculateLoad(loads, settings).necReferences.join(' | ');
+      const refs = calculateLoad(loads, settings, '2020').necReferences.join(' | ');
       expect(refs).toContain(ALL_OTHERS);
       expect(refs).not.toMatch(/Warehouse|Office/);
     }

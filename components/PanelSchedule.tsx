@@ -14,6 +14,7 @@ import { usePanels } from '../hooks/usePanels';
 import { useCircuits } from '../hooks/useCircuits';
 import { useTransformers } from '../hooks/useTransformers';
 import { useProjectNecEdition } from '../hooks/useProjectNecEdition';
+import { article220Citations } from '../data/nec/article220-citations';
 import { exportPanelSchedulePDF, exportAllPanelsPDF } from '../services/pdfExport/panelSchedulePDF';
 import { feederRowsFor } from '../services/pdfExport/feederRows';
 import { 
@@ -1963,7 +1964,7 @@ export const PanelSchedule: React.FC<PanelScheduleProps> = ({ project }) => {
               </div>
               <div className="p-4 text-xs text-gray-700 space-y-2">
                 <p>
-                  Single-family dwelling MDPs are sized per the {dwellingUnitDemand?.necArticle ?? 'NEC 220.83'} Optional Method, not the per-circuit-type Standard Method walk (NEC 220.42 / 220.55 / 220.56).
+                  Single-family dwelling MDPs are sized per the {dwellingUnitDemand?.necArticle ?? 'NEC 220.83'} Optional Method, not the per-circuit-type Standard Method walk (NEC {article220Citations(necEdition).lightingDemandTable.replace('Table ', '')} / 220.55 / 220.56).
                 </p>
                 <p className="text-gray-500 italic">
                   Edit appliance toggles or proposed loads on the Dwelling Load Calculator to change the demand calc.

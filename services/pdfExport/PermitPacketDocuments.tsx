@@ -20,6 +20,8 @@ import {
 import { calculateDwellingPanelDemand, calculateSingleFamilyPanelLoad, calculateSingleFamilyLoadFromCircuits } from '../calculations/residentialLoad';
 import { applyCodeCycleList } from '../../data/ahj/codeCycle';
 import { calculateAllCumulativeVoltageDrops } from '../calculations/cumulativeVoltageDrop';
+import type { NecEdition } from '../../data/nec/evse-load';
+import { article220Citations } from '../../data/nec/article220-citations';
 import {
   BrandBar,
   Footer as BrandFooter,
@@ -2410,7 +2412,7 @@ export type NEC22087Method = 'utility_bill' | 'load_study' | 'calculated' | 'man
  * produced the existing-demand figure. Since the 2026-09-27 PE ruling those
  * come from `calculationNecReferences` (the calculation's own runtime list);
  * occupancy is only the fallback when that list is absent — see
- * FALLBACK_REFS_BY_OCCUPANCY.
+ * fallbackRefsByOccupancy.
  *
  * Pre-Sprint 3 the citation string was hard-coded to dwelling subsections
  * (`220.42 / 220.82 / 220.84`) for all occupancies, so commercial / industrial
@@ -2431,6 +2433,8 @@ export type NarrativeOccupancy =
 export interface NEC22087NarrativeData {
   /** How the existing maximum demand was determined (drives Condition 1 wording). */
   method: NEC22087Method;
+  /** The project's edition: the fallback citations' table numbers follow it (#237). */
+  necEdition?: NecEdition;
   /**
    * Sprint 3: occupancy axis for `method === 'calculated'`. Drives which NEC
    * 220 Part III subsections are cited in the narrative. Optional —
@@ -2520,13 +2524,18 @@ const METHOD_NEC_REF: Record<Exclude<NEC22087Method, 'calculated'>, string> = {
  * calculated source (`calculateAggregatedLoad`) runs 220.84 for multifamily
  * but never 220.82 / 220.83, so single-family falls back to Part III.
  */
-const FALLBACK_REFS_BY_OCCUPANCY: Record<NarrativeOccupancy, string[]> = {
-  dwelling_single_family_existing: ['NEC 220.40', 'NEC 220.42'],
-  dwelling_single_family_new: ['NEC 220.40', 'NEC 220.42'],
-  dwelling_multi_family: ['NEC 220.84'],
-  commercial: ['NEC 220.42', 'NEC 220.44', 'NEC 220.56'],
-  industrial: ['NEC 220.42', 'NEC 220.56'],
-};
+function fallbackRefsByOccupancy(occupancy: NarrativeOccupancy, necEdition: NecEdition): string[] {
+  // Lighting demand factors: 220.42 (NEC 2020) / 220.45 (NEC 2023), #237
+  const lighting = `NEC ${article220Citations(necEdition).lightingDemandTable.replace('Table ', '')}`;
+  const refs: Record<NarrativeOccupancy, string[]> = {
+    dwelling_single_family_existing: ['NEC 220.40', lighting],
+    dwelling_single_family_new: ['NEC 220.40', lighting],
+    dwelling_multi_family: ['NEC 220.84'],
+    commercial: [lighting, 'NEC 220.44', 'NEC 220.56'],
+    industrial: [lighting, 'NEC 220.56'],
+  };
+  return refs[occupancy];
+}
 
 /**
  * NEC 220 Part IV Optional Method sections for dwellings, in the order one is
@@ -2628,12 +2637,13 @@ export function getNEC22087NarrativeCopy(
   method: NEC22087Method,
   occupancy: NarrativeOccupancy = 'dwelling_multi_family',
   calculationNecReferences?: string[],
+  necEdition: NecEdition = '2020',
 ): NEC22087NarrativeCopy {
   if (method === 'calculated') {
     const citation = summarizeCalculationRefs(
       calculationNecReferences && calculationNecReferences.length > 0
         ? calculationNecReferences
-        : FALLBACK_REFS_BY_OCCUPANCY[occupancy],
+        : fallbackRefsByOccupancy(occupancy, necEdition),
     );
     const refs = citation.sections.join(' / ');
     const partLabel = citation.part === 'IV'
@@ -2731,7 +2741,7 @@ export const NEC22087NarrativePage: React.FC<NEC22087NarrativePageProps> = ({
   // citations so commercial / industrial packets don't cite dwelling
   // subsections (220.82 / 220.84). `data.occupancy` is optional —
   // defaults to `dwelling_multi_family` inside the helper for back-compat.
-  const copy = getNEC22087NarrativeCopy(data.method, data.occupancy, data.calculationNecReferences);
+  const copy = getNEC22087NarrativeCopy(data.method, data.occupancy, data.calculationNecReferences, data.necEdition);
   const utilizationPct = capacityKVA > 0 ? (totalFutureDemand / capacityKVA) * 100 : 0;
   const isCompliant = totalFutureDemand <= capacityKVA;
 

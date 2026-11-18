@@ -63,6 +63,7 @@ import { useProjects } from '../hooks/useProjects';
 import { useCircuits } from '../hooks/useCircuits';
 import { useTransformers } from '../hooks/useTransformers';
 import { useProjectNecEdition } from '../hooks/useProjectNecEdition';
+import { article220Citations } from '../data/nec/article220-citations';
 import { showToast, toastMessages } from '../lib/toast';
 import { circuitsUnderPanel } from '../services/calculations/upstreamLoadAggregation';
 import {
@@ -790,7 +791,7 @@ export const DwellingLoadCalculator: React.FC<DwellingLoadCalculatorProps> = ({
                   ? 'NEC 220.83 - Optional Method for Existing Single-Family Dwellings'
                   : project.settings?.dwelling_calc_mode === 'true-optional'
                     ? 'NEC 220.82 - Optional Method for Single-Family Dwellings (10 kVA / 40% bucket)'
-                    : 'NEC 220 Standard Method - Per-Category Demand Factors (220.42 / 220.52 / 220.55 / 220.60)')
+                    : `NEC 220 Standard Method - Per-Category Demand Factors (${article220Citations(necEdition).lightingDemandTable.replace('Table ', '')} / 220.52 / 220.55 / 220.60)`)
               : unitTemplates.reduce((sum, t) => sum + t.unitCount, 0) === 2
                 ? 'NEC 220 Part III / 220.85 - Two Dwelling Units'
                 : 'NEC 220.84 - Optional Method for Multi-Family Dwellings'
@@ -1030,7 +1031,7 @@ export const DwellingLoadCalculator: React.FC<DwellingLoadCalculatorProps> = ({
                     General Lighting Load: {((residentialSettings?.squareFootage || 2000) * 3).toLocaleString()} VA
                   </p>
                   <p className="text-xs text-[#3d6b3d]">
-                    {residentialSettings?.squareFootage?.toLocaleString() || '2,000'} sq ft × 3 VA/sq ft (NEC Table 220.12)
+                    {residentialSettings?.squareFootage?.toLocaleString() || '2,000'} sq ft × 3 VA/sq ft (NEC {article220Citations(necEdition).dwellingUnitLoad})
                   </p>
                 </div>
                 <p className="text-xs text-[#2d3b2d]">

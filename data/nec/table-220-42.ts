@@ -1,8 +1,10 @@
 import { OccupancyLightingDemand } from '../../types/nec-types';
+import type { NecEdition } from './evse-load';
+import { article220Citations } from './article220-citations';
 
 /**
- * NEC Table 220.42 - Lighting Load Demand Factors (NEC 2020 numbering;
- * the edition question is #237)
+ * General lighting demand factors: NEC 2020 Table 220.42, NEC 2023 Table
+ * 220.45 (#237). The citation comes from the edition; the rows are the same.
  *
  * Only the rows the app reads (#236): dwelling units (the same tiers as the
  * Part III walk in residentialLoad.ts, PE ruling #155) and "All others"
@@ -18,14 +20,14 @@ export const TABLE_220_42: OccupancyLightingDemand[] = [
       { upTo: 120000, factor: 0.35 },  // 3,001 to 120,000 VA at 35%
       { upTo: Infinity, factor: 0.25 }, // over 120,000 VA at 25%
     ],
-    necReference: 'Table 220.42 (Dwelling Units)'
+    row: 'Dwelling Units'
   },
   {
     // The table's catch-all row: every occupancy it doesn't list (offices,
     // stores, industrial, common areas). There is no "office" row (#218).
     occupancyType: 'all_others',
     tiers: [{ upTo: Infinity, factor: 1.0 }], // total volt-amperes at 100%
-    necReference: 'Table 220.42 (All others)'
+    row: 'All others'
   },
 ];
 
@@ -36,15 +38,16 @@ export const TABLE_220_42: OccupancyLightingDemand[] = [
  * @param totalVA - Total connected lighting load in VA
  * @returns Object with demand VA, demand factor, and NEC reference
  */
-export function getLightingDemandFactor(occupancyType: string, totalVA: number): {
+export function getLightingDemandFactor(occupancyType: string, totalVA: number, edition: NecEdition): {
   demandVA: number;
   demandFactor: number;
   necReference: string;
 } {
+  const table = article220Citations(edition).lightingDemandTable;
   const entry = TABLE_220_42.find(e => e.occupancyType === occupancyType);
   if (!entry) {
     // Default to 100% demand if not found
-    return { demandVA: totalVA, demandFactor: 1.0, necReference: 'Table 220.42 (Default - No Demand Factor)' };
+    return { demandVA: totalVA, demandFactor: 1.0, necReference: `${table} (Default - No Demand Factor)` };
   }
   let demandVA = 0;
   let from = 0;
@@ -56,6 +59,6 @@ export function getLightingDemandFactor(occupancyType: string, totalVA: number):
   return {
     demandVA,
     demandFactor: totalVA > 0 ? demandVA / totalVA : entry.tiers[0]!.factor,
-    necReference: entry.necReference,
+    necReference: `${table} (${entry.row})`,
   };
 }

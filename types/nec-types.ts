@@ -8,7 +8,8 @@ export interface OccupancyLightingDemand {
   occupancyType: string;
   /** Tiers in order: the VA up to `upTo` (cumulative) at `factor` (#236). */
   tiers: { upTo: number; factor: number }[];
-  necReference: string;
+  /** The table's row name; the table number comes from the edition (#237). */
+  row: string;
 }
 
 export interface RangeDemand {

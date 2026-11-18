@@ -8,6 +8,7 @@ import { pdf } from '@react-pdf/renderer';
 import { Project } from '../types';
 import { calculateLoad } from './calculations';
 import type { NecEdition } from '../data/nec/evse-load';
+import { article220Citations } from '../data/nec/article220-citations';
 
 /**
  * Generate and download PDF load calculation report
@@ -24,7 +25,7 @@ export async function exportLoadCalculationPDF(project: Project, necEdition: Nec
       throw new Error('Project must have occupancyType configured for PDF export');
     }
 
-    const result = calculateLoad(project.loads, project.settings);
+    const result = calculateLoad(project.loads, project.settings, necEdition);
 
     // Generate report content
     const reportContent = generateReportText(project, result, necEdition);
@@ -91,7 +92,7 @@ Total Connected Load: ${result.totalConnectedVA.toLocaleString()} VA
 CALCULATION METHOD: ${result.method}
 ───────────────────────────────────────────────────────────────────────
 
-LIGHTING LOADS (NEC Table 220.42)
+LIGHTING LOADS (NEC ${article220Citations(necEdition).lightingDemandTable})
   Connected Load:    ${result.breakdown.lighting.connectedVA.toLocaleString()} VA
   Demand Factor:     ${(result.breakdown.lighting.demandFactor * 100).toFixed(1)}%
   Demand Load:       ${result.breakdown.lighting.demandVA.toLocaleString()} VA
