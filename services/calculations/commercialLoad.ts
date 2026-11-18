@@ -313,7 +313,7 @@ export function calculateCommercialLoad(input: CommercialLoadInput): CommercialL
     demandFactor: receptacleDemandFactor,
     isContinuous: false,
     serviceSizingLoad_VA: receptacleDemandLoad_VA, // No multiplier for non-continuous
-    necReference: 'NEC 220.14, 220.44',
+    necReference: `NEC 220.14, ${article220Citations(input.necEdition).receptacleDemand}`,
   });
 
   // ===== 3. SHOW WINDOW LIGHTING (NEC 220.14(G)) - CONTINUOUS =====

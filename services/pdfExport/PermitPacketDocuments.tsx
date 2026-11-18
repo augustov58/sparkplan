@@ -2531,7 +2531,7 @@ function fallbackRefsByOccupancy(occupancy: NarrativeOccupancy, necEdition: NecE
     dwelling_single_family_existing: ['NEC 220.40', lighting],
     dwelling_single_family_new: ['NEC 220.40', lighting],
     dwelling_multi_family: ['NEC 220.84'],
-    commercial: [lighting, 'NEC 220.44', 'NEC 220.56'],
+    commercial: [lighting, `NEC ${article220Citations(necEdition).receptacleDemand}`, 'NEC 220.56'],
     industrial: [lighting, 'NEC 220.56'],
   };
   return refs[occupancy];
