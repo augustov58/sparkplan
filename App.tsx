@@ -63,7 +63,7 @@ import { Toaster } from 'react-hot-toast';
 import { TemplateType, createProjectFromTemplate } from './services/sampleTemplates';
 import { useProjectNecEdition } from './hooks/useProjectNecEdition';
 import { isExistingConstructionProject } from './lib/projectSettings';
-import { scheduleServiceCheck } from './lib/storedCalcs';
+import { panelDesignAmps, scheduleServiceCheck } from './lib/storedCalcs';
 
 const SupportWidget = lazy(() =>
   import('./components/SupportWidget').then((m) => ({ default: m.SupportWidget }))
@@ -407,6 +407,8 @@ const NecAssistant = () => {
             isExistingConstructionProject(currentProject),
             // #193: the service check E-102 uses, for the context and check_service_upgrade
             scheduleServiceCheck(currentProject, panels, circuits, transformers, necEdition),
+            // #225: each panel's design load for the bus check
+            panelDesignAmps(currentProject, panels, circuits, transformers, necEdition),
           )
         : null;
 

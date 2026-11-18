@@ -83,6 +83,8 @@ interface PanelSummary {
   mainBreaker?: number;
   circuitCount: number;
   totalLoadVA: number;
+  /** Design load in amps for the NEC 408.30 bus check (`panelDesignAmps`, #225). */
+  designAmps?: number;
   location?: string;
   fedFrom?: string; // Name of panel/transformer/service that feeds this panel
   fedFromType?: 'service' | 'panel' | 'transformer' | 'meter_stack';
@@ -200,6 +202,8 @@ export function buildProjectContext(
   existingBuilding?: boolean,
   /** `scheduleServiceCheck(project, …)`: the service check E-102 uses (#193). */
   serviceCheck?: ScheduleServiceCheck | null,
+  /** `panelDesignAmps(project, …)`: each panel's design load for the bus check (#225). */
+  panelDesignAmps?: Record<string, number>,
 ): ProjectContext {
   // Build panel summaries with hierarchy information
   const panelSummaries: PanelSummary[] = panels.map(panel => {
@@ -240,6 +244,7 @@ export function buildProjectContext(
       mainBreaker: panel.main_breaker_amps || undefined,
       circuitCount: panelCircuits.length,
       totalLoadVA,
+      designAmps: panelDesignAmps?.[panel.id],
       location: panel.location || undefined,
       fedFrom,
       fedFromType: (panel.fed_from_type as 'service' | 'panel' | 'transformer' | 'meter_stack' | null) || undefined,

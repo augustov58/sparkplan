@@ -4,6 +4,17 @@ All notable changes to SparkPlan.
 
 ---
 
+## 2026-11-18: Inspector Mode's bus check sees the whole load on each panel (#225)
+
+- **The panel bus check (NEC 408.30) compares each panel's design load with its bus rating.** It used to add up only the panel's own circuits, so an MDP that feeds everything through sub-panels always passed with 0 kVA.
+  - The design load is the panel's NEC 220 demand plus 25% of its continuous loads, the same number the Feeder Manager sizes its feeder from.
+  - The MDP's is the service check.
+  - In a project with a 200 A MDP bus and three 48 A chargers on a 200 A EV panel, the MDP now shows "Panel Overloaded Beyond Bus Rating" (245 A) and the EV panel "Panel High Utilization" (94%). Both passed before.
+- A passed bus check states its numbers ("58 A of 200 A"). The service check's wording says which number is the 25% adder ("plus 9.0 kVA, 25% of the continuous loads").
+- The check uses each panel's own phase (it used the service's), and the Copilot's quick inspection uses the same numbers (it compared connected load with 80% of the bus).
+
+---
+
 ## 2026-11-18: The EV Panel Builder's "Create EV Panel" works (#224)
 
 - **"Create EV Panel" now saves the panel with its circuits, under the MDP.** Every circuit insert used to fail (the template's fields were sent with the wrong column names), leaving an empty panel fed straight from the service and no error on screen. Four 48 A chargers now arrive as 4 × 11,520 VA plus the spare and lighting circuits; the panel shows 47.9 kVA, and the MDP's demand includes it.

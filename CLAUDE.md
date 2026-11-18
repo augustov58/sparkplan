@@ -92,6 +92,9 @@ CRITICAL: only `calculated` skips the 1.25× multiplier.
 - OTHER TOOLS (#193): Inspector Mode, the Copilot and the EV Panel Builder
   read lib/storedCalcs.ts::scheduleServiceCheck (the same check, in service
   amps vs the rating). Never a connected × 0.8 or breaker-sum rule.
+- PANEL BUS (#225, 408.30): each panel's design load (feederDesignLoadVA;
+  the MDP's = the service check) vs its bus, in its own phase —
+  lib/storedCalcs.ts::panelDesignAmps (Inspector Mode, the Copilot).
 ```
 PE-confirmed 2026-07-09 (PR #118 review), superseding both prior interpretations
 (pre-Sprint-2 multiplied calculated; Sprint 2 wrongly exempted measured).

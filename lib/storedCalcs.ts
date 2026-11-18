@@ -15,7 +15,8 @@
 import type { Database } from './database.types';
 import type { DwellingUnitTemplate, Project, ResidentialAppliances } from '../types';
 import { ExistingLoadDeterminationMethod } from '../types';
-import { buildSingleFamilyDwellingContext } from './projectSettings';
+import { buildSingleFamilyDwellingContext, dwellingAggregateOptions } from './projectSettings';
+import { feederDesignLoadVA } from '../services/feeder/feederLoadSync';
 import { buildMultiFamilyContext, calculateAggregatedLoad, calculateProposedNewLoadVA, circuitsUnderPanel, continuousServiceAdderVA } from '../services/calculations/upstreamLoadAggregation';
 import {
   calculateDwellingDemandSplit,
@@ -308,6 +309,39 @@ export function scheduleServiceCheck(
     utilizationPct: rating > 0 ? (checkAmps / rating) * 100 : 0,
     sufficient: rating > 0 && checkAmps <= rating,
   };
+}
+
+/**
+ * Each panel's design load in amps, for the NEC 408.30 bus check (#225): a
+ * panelboard is rated not less than the minimum feeder capacity for its
+ * Article 220 load — the Feeder Manager's design load (demand + 25% of the
+ * continuous loads, `feederDesignLoadVA`, #190) in the panel's own phase.
+ * The MDP's is the service check (#193). Inspector Mode and the Copilot read it.
+ */
+export function panelDesignAmps(
+  project: Project,
+  panels: PanelRow[],
+  circuits: CircuitRow[],
+  transformers: TransformerRow[],
+  necEdition: NecEdition,
+): Record<string, number> {
+  const design = {
+    transformers,
+    occupancy: project.settings?.occupancyType ?? 'commercial',
+    necEdition,
+    dwelling: dwellingAggregateOptions(project),
+  };
+  const service = scheduleServiceCheck(project, panels, circuits, transformers, necEdition);
+  const amps: Record<string, number> = {};
+  for (const panel of panels) {
+    if (panel.is_main) {
+      if (service) amps[panel.id] = service.checkAmps;
+      continue;
+    }
+    const divisor = (panel.voltage || 240) * (panel.phase === 3 ? Math.sqrt(3) : 1);
+    amps[panel.id] = feederDesignLoadVA(panel.id, panels, circuits, design) / divisor;
+  }
+  return amps;
 }
 
 /** `settings.residential.multiFamilyLoadResult`. */

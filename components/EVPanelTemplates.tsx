@@ -470,8 +470,8 @@ export const EVPanelTemplates: React.FC<EVPanelTemplatesProps> = ({ project }) =
                   <p className="text-sm text-orange-800">
                     With this panel, the service check is <strong>{Math.round(serviceWithPanel.checkAmps)}A</strong>
                     {' '}on the <strong>{serviceWithPanel.serviceAmps}A</strong> service: the NEC 220 load of
-                    {' '}{serviceWithPanel.loadKVA.toFixed(1)} kVA plus 25% of the continuous loads
-                    {' '}({serviceWithPanel.adderKVA.toFixed(1)} kVA, NEC 230.42(A)(1)), the loads already on the
+                    {' '}{serviceWithPanel.loadKVA.toFixed(1)} kVA plus {serviceWithPanel.adderKVA.toFixed(1)} kVA
+                    {' '}(25% of the continuous loads, NEC 230.42(A)(1)), the loads already on the
                     {' '}service included. Use the <strong>Service Upgrade Wizard</strong> to check the upgrade per NEC 220.87.
                   </p>
                 </div>
