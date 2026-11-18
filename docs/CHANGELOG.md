@@ -6,7 +6,11 @@ All notable changes to SparkPlan.
 
 ## 2026-11-18: The EV Panel Builder flags a panel that doesn't match the service (#265)
 
-- **A panel whose voltage or phase differs from the service now shows a warning before Create:** "Needs a transformer or a separate service". Examples are a 480 V three-phase DC fast panel on a 240 V single-phase service, or a 240 V single-phase Level 2 panel on a 208 V three-phase one. The panel can't be fed from the main panel directly. It is a heads-up only, and Create still works.
+- **A panel whose voltage or phase differs from the service now shows a warning before Create.** The panel can't be fed from the main panel directly:
+  - A three-phase panel (such as a 480 V DC fast charger) on a single-phase service needs a new three-phase service, because a transformer can't make three-phase from single-phase.
+  - Other mismatches, such as a 240 V single-phase Level 2 panel on a 208 V three-phase service, need a transformer or a separate service.
+
+  It is a heads-up only, and Create still works.
 
 ---
 

@@ -28,10 +28,15 @@ test('#265 a 480 V 3Φ DC fast panel on a 240 V 1Φ service is flagged; Level 2 
   await expect(mismatch).toHaveCount(0); // Level 2 (48A): 240 V 1Φ on a 240 V 1Φ MDP
   await page.getByText('DC Fast Charge (150kW)', { exact: true }).first().click();
   await expect(mismatch).toContainText('This panel is 480V 3-phase; the service (MDP) is 240V 1-phase.');
+  // 1Φ → 3Φ: a transformer can't make 3-phase; a new 3-phase service is the only path
+  await expect(mismatch).toContainText('Needs a separate 3-phase service');
+  await expect(mismatch).toContainText('it needs a new 480V 3-phase service from the utility');
+  await expect(mismatch).not.toContainText('plan a transformer');
   await expect(page.getByRole('button', { name: /Create EV Panel/ })).toBeEnabled(); // advisory, not a gate
 });
 
 test('#265 a 240 V 1Φ Level 2 panel on a 208 V 3Φ service is flagged', async ({ page }) => {
   const mismatch = await openBuilder(page, 'QA Commercial panel');
   await expect(mismatch).toContainText('This panel is 240V 1-phase; the service (MDP) is 208V 3-phase.');
+  await expect(mismatch).toContainText('plan a transformer between them, or a separate 240V 1-phase service.');
 });
