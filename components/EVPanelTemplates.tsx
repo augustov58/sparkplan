@@ -264,7 +264,7 @@ export const EVPanelTemplates: React.FC<EVPanelTemplatesProps> = ({ project }) =
                       <div className="text-xs text-gray-500 mt-1">
                         {type === 'Level 2 (48A)' && '11.5 kW | 60A breaker | 240V'}
                         {type === 'Level 2 (80A)' && '19.2 kW | 100A breaker | 240V'}
-                        {type === 'DC Fast Charge (150kW)' && '150 kW | 225A breaker | 480V 3φ'}
+                        {type === 'DC Fast Charge (150kW)' && '150 kW | 250A breaker | 480V 3φ'}
                       </div>
                     </div>
                     {chargerType === type && (
