@@ -4,6 +4,12 @@ All notable changes to SparkPlan.
 
 ---
 
+## 2026-11-18: A new house shows its service check (#227)
+
+- **New single-family projects now print the NEC 230.42(A)(1) service check**: the Article 220 load plus 25% of the continuous loads (EV charging, signs). It appears in the Dwelling Load Calculator under "Service Current" and on E-101 under the summary cards, e.g. "Service check: 164 A on the 200 A service — sufficient". Existing houses already had it on E-102 and the Service Headroom card. The recommended service size doesn't change; with its 80% margin it always passes this check.
+
+---
+
 ## 2026-11-18: Opening the Permit Packet page no longer saves the project (#252)
 
 - **Every visit to the Permit Packet page saved the project twice and showed "Project updated"**, with nothing changed. The page compared its form with the stored copy, and the database returns the stored copy's fields in a different order, so the two never matched. They're now compared with sorted keys. A visit makes no write, not even the first one on a project that has never saved these fields (it used to store the defaults). An edit still saves once, about 750 ms after you stop typing.
