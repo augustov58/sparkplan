@@ -47,6 +47,20 @@ export function isExistingConstructionProject(project: ProjectLike | Project): b
 }
 
 /**
+ * What `calculateAggregatedLoad` needs to pick a dwelling project's panel
+ * rules (#179): unit panels the unit page's method, multifamily house panels
+ * the non-dwelling Part III rules. Pass it with every aggregate of a project's
+ * panels; it is ignored on non-dwelling projects.
+ */
+export function dwellingAggregateOptions(project: Project): { multiFamily: boolean; existingBuilding: boolean } {
+  const residential = project.settings?.residential as { dwellingType?: string } | undefined;
+  return {
+    multiFamily: residential?.dwellingType === 'multi_family',
+    existingBuilding: isExistingConstructionProject(project),
+  };
+}
+
+/**
  * Single-family-dwelling context, or undefined when the project is not a
  * single-family dwelling (multi-family context present, commercial,
  * industrial, or no residential block). Shared by every page that prints the

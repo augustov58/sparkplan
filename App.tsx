@@ -62,6 +62,7 @@ import type { ProjectTemplate } from './data/project-templates';
 import { Toaster } from 'react-hot-toast';
 import { TemplateType, createProjectFromTemplate } from './services/sampleTemplates';
 import { useProjectNecEdition } from './hooks/useProjectNecEdition';
+import { isExistingConstructionProject } from './lib/projectSettings';
 
 const SupportWidget = lazy(() =>
   import('./components/SupportWidget').then((m) => ({ default: m.SupportWidget }))
@@ -401,7 +402,8 @@ const NecAssistant = () => {
             undefined, // permits
             undefined, // inspections
             shortCircuitCalculations,
-            necEdition
+            necEdition,
+            isExistingConstructionProject(currentProject),
           )
         : null;
 

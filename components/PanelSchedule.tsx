@@ -6,7 +6,7 @@
 
 import React, { useState, useMemo, useCallback } from 'react';
 import { Project } from '../types';
-import { buildSingleFamilyDwellingContext, isExistingConstructionProject } from '../lib/projectSettings';
+import { buildSingleFamilyDwellingContext, dwellingAggregateOptions, isExistingConstructionProject } from '../lib/projectSettings';
 import { LayoutGrid, Download, Edit2, Save, X, Trash2, Settings, Calculator, Info, ArrowDown, Plus, Camera } from 'lucide-react';
 import { PanelPhotoImporter } from './PanelPhotoImporter';
 import type { ExtractedCircuit } from '@/services/panelOcrService';
@@ -60,6 +60,8 @@ export const PanelSchedule: React.FC<PanelScheduleProps> = ({ project }) => {
   const { transformers } = useTransformers(project.id);
 
   const [selectedPanelId, setSelectedPanelId] = useState<string | null>(null);
+  // Which rules a dwelling project's unit / house panels take in every aggregate (#179)
+  const dwellingOptions = useMemo(() => dwellingAggregateOptions(project), [project]);
   const [editingCircuit, setEditingCircuit] = useState<string | null>(null);
   const [editForm, setEditForm] = useState<{
     description?: string;
@@ -154,7 +156,7 @@ export const PanelSchedule: React.FC<PanelScheduleProps> = ({ project }) => {
     // the MDP aggregate, not for individual feeder sizing. Each feeder uses standard
     // NEC 220 demand factors for its own panel load.
     downstreamPanels.forEach(panel => {
-      const panelLoad = calculateAggregatedLoad(panel.id, panels, circuits, transformers, occupancy, undefined, necEdition);
+      const panelLoad = calculateAggregatedLoad(panel.id, panels, circuits, transformers, occupancy, undefined, necEdition, dwellingOptions);
 
       feeders.push({
         id: `feeder-panel-${panel.id}`,
@@ -175,7 +177,7 @@ export const PanelSchedule: React.FC<PanelScheduleProps> = ({ project }) => {
       const xfmrPanels = panels.filter(p => p.fed_from_transformer_id === xfmr.id);
       let totalLoad = 0;
       xfmrPanels.forEach(p => {
-        const pLoad = calculateAggregatedLoad(p.id, panels, circuits, transformers, occupancy, undefined, necEdition);
+        const pLoad = calculateAggregatedLoad(p.id, panels, circuits, transformers, occupancy, undefined, necEdition, dwellingOptions);
         totalLoad += pLoad.totalDemandVA;
       });
       // If no panels, use transformer kVA rating
@@ -197,7 +199,7 @@ export const PanelSchedule: React.FC<PanelScheduleProps> = ({ project }) => {
     });
 
     return feeders;
-  }, [downstreamPanels, downstreamTransformers, panels, circuits, transformers, selectedPanel, project.settings?.occupancyType, necEdition]);
+  }, [downstreamPanels, downstreamTransformers, panels, circuits, transformers, selectedPanel, project.settings?.occupancyType, necEdition, dwellingOptions]);
 
   // Split feeder circuits into breaker-fed (assigned to specific slot) and lug-fed (feed-thru lug)
   const { breakerFedPanels, lugFedPanels } = useMemo(() => {
@@ -260,6 +262,7 @@ export const PanelSchedule: React.FC<PanelScheduleProps> = ({ project }) => {
           project.settings?.occupancyType || 'commercial',
           undefined,
           necEdition,
+          dwellingOptions,
         )
       : null;
     const directDemand = directAggregate
@@ -302,7 +305,7 @@ export const PanelSchedule: React.FC<PanelScheduleProps> = ({ project }) => {
       totalWithFeeders_kVA: feederTotalVA / 1000,
       connectedWithFeeders_kVA: feederTotalVA / 1000,
     };
-  }, [selectedPanel, panelCircuits, circuits, feederCircuits, project.settings?.occupancyType, necEdition]);
+  }, [selectedPanel, panelCircuits, circuits, feederCircuits, project.settings?.occupancyType, necEdition, dwellingOptions]);
 
   // NEC 220.82 / 220.83 Optional Method demand for dwelling-unit panels —
   // used by the panel summary cards in lieu of the panel-local NEC 220.14
@@ -395,8 +398,8 @@ export const PanelSchedule: React.FC<PanelScheduleProps> = ({ project }) => {
   const aggregatedLoad = useMemo(() => {
     if (!selectedPanel) return null;
     const occupancy = project.settings?.occupancyType || 'commercial';
-    return calculateAggregatedLoad(selectedPanel.id, panels, circuits, transformers, occupancy, multiFamilyCtx, necEdition);
-  }, [selectedPanel, panels, circuits, transformers, project.settings?.occupancyType, multiFamilyCtx, necEdition]);
+    return calculateAggregatedLoad(selectedPanel.id, panels, circuits, transformers, occupancy, multiFamilyCtx, necEdition, dwellingOptions);
+  }, [selectedPanel, panels, circuits, transformers, project.settings?.occupancyType, multiFamilyCtx, necEdition, dwellingOptions]);
 
   // Panel slot count is stored per-panel in panels.num_spaces.
   // Fallback mirrors the legacy inference for any row that predates the column.
@@ -548,7 +551,7 @@ export const PanelSchedule: React.FC<PanelScheduleProps> = ({ project }) => {
 
         children.forEach((child, idx) => {
           const childLoad = calculateAggregatedLoad(
-            child.id, panels, circuits, transformers, occupancyForCalc, undefined, necEdition
+            child.id, panels, circuits, transformers, occupancyForCalc, undefined, necEdition, dwellingOptions,
           );
           synthesized.push({
             id: `synth-feeder-panel-${child.id}`,
@@ -573,7 +576,7 @@ export const PanelSchedule: React.FC<PanelScheduleProps> = ({ project }) => {
           let totalLoad = 0;
           xfmrPanels.forEach(p => {
             totalLoad += calculateAggregatedLoad(
-              p.id, panels, circuits, transformers, occupancyForCalc, undefined, necEdition
+              p.id, panels, circuits, transformers, occupancyForCalc, undefined, necEdition, dwellingOptions,
             ).totalDemandVA;
           });
           if (xfmrPanels.length === 0 && xfmr.kva_rating) {
@@ -631,7 +634,7 @@ export const PanelSchedule: React.FC<PanelScheduleProps> = ({ project }) => {
       panels.forEach(panel => {
         const ctx = panel.is_main ? multiFamilyCtx : undefined;
         const r = calculateAggregatedLoad(
-          panel.id, panels, circuits, transformers, occupancyForCalc, ctx, necEdition,
+          panel.id, panels, circuits, transformers, occupancyForCalc, ctx, necEdition, dwellingOptions,
         );
         const dominantNec = r.necReferences.find(ref => ref.includes('625.42'))
           ?? r.necReferences.find(ref => ref.includes('220.85') || ref.includes('Two Dwelling Units'))

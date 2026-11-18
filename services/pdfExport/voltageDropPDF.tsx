@@ -8,7 +8,7 @@
  */
 
 import { pdf } from '@react-pdf/renderer';
-import { VoltageDropDocument } from './VoltageDropDocuments';
+import { VoltageDropDocument, type FeederLoadRules } from './VoltageDropDocuments';
 import { computeFeederLoadVA } from '../feeder/feederLoadSync';
 import type { NecEdition } from '../../data/nec/evse-load';
 import type { Database } from '../../lib/database.types';
@@ -77,6 +77,7 @@ export async function exportVoltageDropReport(
   includeNECReferences: boolean = true,
   circuits?: Circuit[],
   necEdition?: NecEdition,
+  feederLoad?: FeederLoadRules,
 ): Promise<void> {
   // Validation
   if (!projectName || projectName.trim() === '') {
@@ -98,6 +99,7 @@ export async function exportVoltageDropReport(
         transformers={transformers}
         circuits={circuits}
         necEdition={necEdition}
+        feederLoad={feederLoad}
         includeNECReferences={includeNECReferences}
       />
     ).toBlob();

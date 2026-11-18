@@ -581,6 +581,11 @@ Returns the feeder's voltage drop percentage if already calculated in the projec
           context.rawCircuits!,
           context.rawTransformers!,
           context.projectContext.necEdition,
+          // #179: the Feeder Manager's occupancy and dwelling panel rules
+          context.projectContext.projectType === 'Residential'
+            ? 'dwelling'
+            : context.projectContext.projectType === 'Industrial' ? 'industrial' : 'commercial',
+          context.projectContext.dwelling,
         );
 
         // #190: the same design load and feeder conditions as E-103

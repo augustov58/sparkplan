@@ -18,6 +18,7 @@ import { useTransformers } from '../hooks/useTransformers';
 import { useCircuits } from '../hooks/useCircuits';
 import { useProjects } from '../hooks/useProjects';
 import { useProjectNecEdition } from '../hooks/useProjectNecEdition';
+import { dwellingAggregateOptions } from '../lib/projectSettings';
 import { calculateFeederSizing } from '../services/calculations';
 import { validateFeederForm, showValidationErrors } from '../lib/validation-utils';
 import { validateFeederConnectivityEnhanced, getValidFeederDestinations, getValidPanelDestinationsFromTransformer } from '../services/validation/panelConnectivityValidation';
@@ -40,7 +41,7 @@ export const FeederManager: React.FC<FeederManagerProps> = ({
   projectId,
   projectVoltage,
   projectPhase,
-  occupancyType = 'commercial'
+  occupancyType: occupancyTypeProp,
 }) => {
   const { feeders, loading, error, createFeeder, updateFeeder, deleteFeeder } = useFeeders(projectId);
   const { panels } = usePanels(projectId);
@@ -48,7 +49,13 @@ export const FeederManager: React.FC<FeederManagerProps> = ({
   const { circuits } = useCircuits(projectId);
   // EVSE loads in feeder demand follow the project's NEC edition (220.57 floor).
   const { getProjectById } = useProjects();
-  const necEdition = useProjectNecEdition(getProjectById(projectId));
+  const project = getProjectById(projectId);
+  const necEdition = useProjectNecEdition(project);
+  // #179: the project's occupancy (neither render site passes one, so every
+  // feeder was sized with the commercial cascade), and the rules its dwelling
+  // unit / house panels take — the same as the Panel Schedule.
+  const occupancyType = occupancyTypeProp ?? project?.settings?.occupancyType ?? 'commercial';
+  const dwellingOptions = useMemo(() => (project ? dwellingAggregateOptions(project) : undefined), [project]);
 
   // Cumulative VD per panel — used to annotate each feeder card with the
   // chain-total at the destination panel (the one this run lands on).
@@ -85,8 +92,8 @@ export const FeederManager: React.FC<FeederManagerProps> = ({
   // load is not what the sizing rule now gives (#190)
   // Note: Only applies to feeders sized based on calculated load (not max capacity)
   const designContext = useMemo(
-    () => ({ transformers: transformers ?? [], occupancy: occupancyType, necEdition }),
-    [transformers, occupancyType, necEdition],
+    () => ({ transformers: transformers ?? [], occupancy: occupancyType, necEdition, dwelling: dwellingOptions }),
+    [transformers, occupancyType, necEdition, dwellingOptions],
   );
   const staleFeeders = useMemo(() => {
     return getStaleFeedersList(feeders, circuits, panels, 5, designContext); // 5% connected-load threshold
@@ -190,7 +197,7 @@ export const FeederManager: React.FC<FeederManagerProps> = ({
   const calculatePanelLoads = (panelId: string) => {
     // Use aggregated load calculation to include downstream panels
     // Pass occupancyType for correct demand factor selection
-    const aggregated = calculateAggregatedLoad(panelId, panels, circuits, transformers, occupancyType, undefined, necEdition);
+    const aggregated = calculateAggregatedLoad(panelId, panels, circuits, transformers, occupancyType, undefined, necEdition, dwellingOptions);
     
     // #144: size from the destination's demand — EVEMS marker excluded and the
     // 625.42 setpoint clamp kept. #190: its continuous part is the real
@@ -708,6 +715,7 @@ export const FeederManager: React.FC<FeederManagerProps> = ({
         true, // Include NEC references
         circuits, // C2: live-derive feeder load from destination panel demand
         necEdition,
+        { occupancy: occupancyType, dwelling: dwellingOptions },
       );
     } catch (error) {
       console.error('Failed to export voltage drop report:', error);
