@@ -257,6 +257,11 @@ export const ServiceUpgradeWizard: React.FC<ServiceUpgradeWizardProps> = ({ proj
     return currentUsageAmps;
   }, [useProjectData, existingLoadMethod, dwellingLoadResult, currentUsageAmps, scheduleExistingAmps, isSingleFamilyDwelling]);
 
+  // The calculated method computes the current load (priorities 1a–2 above);
+  // the input then shows that value read-only instead of a number it ignores (#214)
+  const currentUsageComputed = existingLoadMethod === ExistingLoadDeterminationMethod.CALCULATED &&
+    ((useProjectData && scheduleExistingAmps !== null) || !!dwellingLoadResult?.serviceAmps);
+
   // Calculate result in real-time
   let result: QuickCheckResult | null = null;
   let error: string | null = null;
@@ -459,8 +464,10 @@ export const ServiceUpgradeWizard: React.FC<ServiceUpgradeWizardProps> = ({ proj
           <div className="text-sm">
             <span className="font-semibold text-green-900">Using data from panel "{panelDataSource}"</span>
             <p className="text-xs text-green-700 mt-1">
-              Service size and current load auto-populated from your project panel schedule.
-              {scheduleExistingAmps !== null && (
+              {existingLoadMethod === ExistingLoadDeterminationMethod.CALCULATED
+                ? 'Service size and current load auto-populated from your project panel schedule.'
+                : 'Service size auto-populated from your project panel schedule. Enter the measured (or known) existing peak as Current Usage.'}
+              {scheduleExistingAmps !== null && existingLoadMethod === ExistingLoadDeterminationMethod.CALCULATED && (
                 <span> Current load: the NEC 220 demand of the existing circuits plus 25% of their continuous loads (NEC 230.42(A)(1)), as E-102 checks it.</span>
               )}
             </p>
@@ -546,13 +553,19 @@ export const ServiceUpgradeWizard: React.FC<ServiceUpgradeWizardProps> = ({ proj
                 </label>
                 <input
                   type="number"
-                  value={currentUsageAmps}
+                  value={currentUsageComputed ? effectiveCurrentUsageAmps : currentUsageAmps}
                   onChange={e => setCurrentUsageAmps(Number(e.target.value))}
+                  readOnly={currentUsageComputed}
                   min="0"
                   max={currentServiceAmps}
                   step="1"
                   className="w-full border-gray-200 rounded text-sm py-2 px-3 focus:border-[#2d3b2d] focus:ring-[#2d3b2d]/20"
+                  // inline: the global input rule in index.css is unlayered and beats Tailwind's bg-* utilities
+                  style={currentUsageComputed ? { backgroundColor: 'var(--color-gray-100)', color: 'var(--color-muted)', cursor: 'not-allowed' } : undefined}
                 />
+                {currentUsageComputed && (
+                  <p className="text-xs text-gray-500 mt-1">Calculated from the panel schedule. Pick a measured method to enter a peak.</p>
+                )}
               </div>
             </div>
 
@@ -717,7 +730,13 @@ export const ServiceUpgradeWizard: React.FC<ServiceUpgradeWizardProps> = ({ proj
                       Proposed Load
                     </div>
                     <div className="text-xs text-gray-500">
-                      {proposedLoadAmps}A continuous load
+                      {/* #214: the new load, not all of it continuous */}
+                      {proposedLoadAmps}A new load
+                      {!(useProjectData && scheduleNewAmps !== null && proposedLoadAmps === scheduleNewAmps)
+                        ? ' (as entered)'
+                        : existingLoadMethod === ExistingLoadDeterminationMethod.CALCULATED
+                          ? ' (NEC 220 demand increase + 25% of its continuous loads, NEC 230.42(A)(1))'
+                          : ' (continuous loads at 125%)'}
                     </div>
                   </div>
                   <button
@@ -806,7 +825,7 @@ export const ServiceUpgradeWizard: React.FC<ServiceUpgradeWizardProps> = ({ proj
                     />
                   </div>
                   <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 mt-3 text-xs text-gray-600">
-                    <div>Current: {effectiveCurrentUsageAmps}A</div>
+                    <div>Current: {result.existingAmps}A</div>
                     <div>Added: +{proposedLoadAmps}A</div>
                     <div>Total: {result.totalAmps}A</div>
                   </div>
@@ -935,9 +954,14 @@ export const ServiceUpgradeWizard: React.FC<ServiceUpgradeWizardProps> = ({ proj
               <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
                 <h4 className="font-semibold text-gray-900 mb-2 text-sm">NEC References</h4>
                 <div className="text-xs text-gray-700 space-y-1">
-                  <div>• NEC 230.42 - Service Conductor Sizing</div>
-                  <div>• NEC 210.19 - Continuous Load (80% rule)</div>
-                  <div>• NEC 625.42 / 625.41 - EV charging is a continuous load: new load at 125% in the 220.87 check</div>
+                  {/* #214: the service check's sections (210.19 is branch circuits) */}
+                  <div>• NEC 230.42(A)(1) - Service conductors: the NEC 220 load + 25% of the continuous loads</div>
+                  <div>• {existingLoadMethod === ExistingLoadDeterminationMethod.CALCULATED
+                    ? 'NEC 220.87 - Existing load calculated from the panel schedule (NEC 220 demand, no additional multiplier)'
+                    : existingLoadMethod === ExistingLoadDeterminationMethod.MANUAL
+                      ? 'NEC 220.87 - Existing load: a manual entry × 125% (defensive default; source unknown)'
+                      : 'NEC 220.87(2) - Existing load: the measured peak × 125%'}</div>
+                  <div>• NEC 625.41 / 625.42 - EV charging in the new load is a continuous load; an EVEMS limits it to its setpoint</div>
                 </div>
               </div>
 
@@ -946,7 +970,7 @@ export const ServiceUpgradeWizard: React.FC<ServiceUpgradeWizardProps> = ({ proj
                 <h4 className="font-semibold text-blue-900 mb-2 text-sm">Calculation Details</h4>
                 <div className="text-xs text-blue-800 space-y-1">
                   <div>Service Capacity: {currentServiceAmps}A</div>
-                  <div>Current Usage: {effectiveCurrentUsageAmps}A ({Math.round((effectiveCurrentUsageAmps / currentServiceAmps * 100) * 10) / 10}%)</div>
+                  <div>Current Usage: {result.existingAmps}A{result.existingAmps !== effectiveCurrentUsageAmps ? ` (${effectiveCurrentUsageAmps}A × 1.25)` : ''} ({Math.round((result.existingAmps / currentServiceAmps * 100) * 10) / 10}%)</div>
                   {proposedLoadAmps > 0 && (
                     <>
                       <div>Proposed Additional Load: {proposedLoadAmps}A</div>

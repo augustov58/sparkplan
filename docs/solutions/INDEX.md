@@ -4,6 +4,7 @@ One note per hard problem, written by the model that solved it via the `extract-
 Each entry: `- [title](file.md) — reusable rule`.
 
 <!-- Newest first -->
+- [The Service Upgrade Wizard called the whole new load "continuous" and cited 210.19](2026-11-18-wizard-new-load-wording.md) — when a calc changes, its labels and citations are part of the change; cite the section for the quantity shown
 - [A panel with only feeders showed their total as its "direct" load](2026-11-18-feeder-only-panel-summary.md) — a fallback object feeds every card that reads it: set each field to what it means; `networkidle` is the wrong readiness signal on a realtime app
 - [Inspector's bus check read only a panel's own circuits](2026-11-18-inspector-bus-check.md) — a per-panel capacity check reads the design load of everything under the panel (408.30 → the feeder capacity, `feederDesignLoadVA`; MDP = the service check), in the panel's own phase
 - [EV Panel Builder's "Create" left an empty, service-fed panel](2026-11-18-ev-builder-create.md) — a cast at an insert boundary hides a schema mismatch: map to the real Insert type in a tested pure function; check hooks that return null on error; a fast spec finds the load race a manual pass misses

@@ -4,6 +4,16 @@ All notable changes to SparkPlan.
 
 ---
 
+## 2026-11-18: The Service Upgrade Wizard names the new load and the service check's sections (#214)
+
+- **The "Proposed Load" card read "245A continuous load"**, though only the EV, sign and show-window part of a new load is continuous. It now reads "245A new load" and gives the basis for the method: under the calculated method, "NEC 220 demand increase + 25% of its continuous loads, NEC 230.42(A)(1)"; under the measured methods, "continuous loads at 125%".
+- **NEC References** cited "210.19 - Continuous Load (80% rule)". 210.19 covers branch-circuit conductors, not the service. The box now cites the sections the check runs: 230.42(A)(1) (the load plus 25% of continuous loads), 220.87 for the chosen method (calculated: no additional multiplier; measured: peak × 125%) and 625.41/625.42 (EV charging is continuous; an EVEMS limits it to its setpoint). The numbers are unchanged.
+- **Manual Entry** now reads "a manual entry × 125% (defensive default)", not "the measured peak". A load picked by hand reads "(as entered)" instead of the circuits' basis.
+- **The Future Utilization card** showed the raw current next to a total built from current × 1.25 (100 A + 245 A = "370 A"). It now shows "Current: 125A", as does Calculation Details ("125A (100A × 1.25)").
+- **Under the calculated method,** the Current Usage box shows the computed value, read-only. It used to accept a number the result ignored. The "NEC 220 demand of the existing circuits" banner sentence shows only under that method; under the measured methods the banner asks for the measured peak.
+
+---
+
 ## 2026-11-18: A panel with only feeders shows no "direct" load (#213)
 
 - **On a panel with no branch circuits** (an MDP that feeds everything through sub-panels), the Panel Summary showed the feeders' total as "Direct circuits load" and "Direct demand load", and again as "Feeder circuits". The direct cards now read 0.0 kVA. The feeders' total stays on "Feeder circuits" and "Demand with feeders", and Demand Amps is unchanged.
