@@ -15,6 +15,17 @@ All notable changes to SparkPlan.
 
 ---
 
+## 2026-11-17: The Panel Schedule's demand table uses the same calculation as the packet (#191)
+
+- **The in-app demand table had its own factors, and three were wrong.** Lighting and water heaters were taken at 125%. Electric heat dropped to 75% on a panel with four or more heating circuits. Commercial lighting above 3,000 VA got the dwelling 35% tier. The table and the Panel Summary cards now read the same Article 220 calculation as the permit packet and the panel schedule PDF.
+  - **Example:** a commercial panel with 3 kVA of lighting, 1.8 kVA of receptacles, a 4.5 kVA water heater and four 3 kVA heaters showed a demand of 20.2 kVA and 56.0 A. It now shows 21.3 kVA and 59.1 A.
+- **The card no longer shows whichever of two calculations is lower.** There is one calculation.
+- **On an EVEMS-managed panel the table total now shows the setpoint too**, with a row for the reduction. Before, the card showed the setpoint and the table showed the full charger load.
+- The table lists the NEC section applied to each row, as the PDF does.
+- Nothing printed changes: the packet and the PDF export already used the correct calculation. Phase loads and phase imbalance are unchanged.
+
+---
+
 ## 2026-11-14: EVEMS "Maximum Chargers" counts chargers at a 12 A minimum (#202)
 
 - **"With EVEMS" is now the number of chargers that each get at least 12 A** under the largest setpoint the service allows. It used to divide the setpoint by each charger's full load, so it always equalled "Without EVEMS". With 32 A / 240 V chargers on a 200 A / 240 V service with 24 kVA existing demand, the card now reads 2 without EVEMS, 6 with (72 A ÷ 12 A), "EVEMS allows 4 additional chargers".

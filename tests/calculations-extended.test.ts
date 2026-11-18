@@ -47,7 +47,7 @@ import {
 
 // ── Demand Factor ──────────────────────────────────────────────────────────
 import {
-  calculatePanelDemand,
+  calculatePanelPhaseLoads,
   getCircuitPhase,
   type CircuitLoad,
 } from '../services/calculations/demandFactor';
@@ -933,93 +933,31 @@ describe('Residential Load (NEC 220.82 / 220.84)', () => {
 // ============================================================================
 
 describe('Demand Factor (NEC Article 220)', () => {
-  describe('calculatePanelDemand', () => {
-    it('should apply lighting demand factor per NEC 220.42', () => {
-      // 5000 VA lighting: first 3000 at 100%, next 2000 at 35%
-      // Demand = 3000 + 700 = 3700 VA. Factor = 3700/5000 = 0.74
-      const circuits: CircuitLoad[] = [
-        { id: '1', description: 'Lighting 1', loadWatts: 2500, loadType: 'L', pole: 1, circuitNumber: 1 },
-        { id: '2', description: 'Lighting 2', loadWatts: 2500, loadType: 'L', pole: 1, circuitNumber: 3 },
-      ];
-      const result = calculatePanelDemand(circuits, 240, 1);
-
-      const lightingLoad = result.loadsByType.find(l => l.type === 'L');
-      expect(lightingLoad).toBeDefined();
-      expect(lightingLoad!.demandFactor).toBeCloseTo(0.74, 2);
-      expect(result.necReferences).toContain('NEC 220.42 - Lighting Demand Factors');
-    });
-
-    it('should apply receptacle demand factor per NEC 220.44', () => {
-      // 15000 VA receptacles: first 10000 at 100%, next 5000 at 50%
-      // Demand = 10000 + 2500 = 12500. Factor = 12500/15000 = 0.833
-      const circuits: CircuitLoad[] = Array.from({ length: 10 }, (_, i) => ({
-        id: String(i),
-        description: `Receptacle ${i}`,
-        loadWatts: 1500,
-        loadType: 'R' as const,
-        pole: 1 as const,
-        circuitNumber: i * 2 + 1,
-      }));
-      const result = calculatePanelDemand(circuits, 240, 1);
-
-      const recepLoad = result.loadsByType.find(l => l.type === 'R');
-      expect(recepLoad).toBeDefined();
-      expect(recepLoad!.demandFactor).toBeCloseTo(0.833, 2);
-      expect(result.necReferences).toContain('NEC 220.44 - Receptacle Demand Factors');
-    });
-
-    it('should apply 125% to largest motor per NEC 430.24', () => {
-      const circuits: CircuitLoad[] = [
-        { id: '1', description: 'Motor 1', loadWatts: 2000, loadType: 'M', pole: 1, circuitNumber: 1 },
-        { id: '2', description: 'Motor 2 (largest)', loadWatts: 5000, loadType: 'M', pole: 2, circuitNumber: 3 },
-        { id: '3', description: 'Motor 3', loadWatts: 1000, loadType: 'M', pole: 1, circuitNumber: 5 },
-      ];
-      const result = calculatePanelDemand(circuits, 208, 3);
-
-      const motorLoad = result.loadsByType.find(l => l.type === 'M');
-      expect(motorLoad).toBeDefined();
-      // Largest motor = 5000, at 125% = 6250. Others = 2000 + 1000 = 3000.
-      // adjustmentFactor = 9250 / 8000 = 1.15625
-      expect(motorLoad!.adjustmentFactor).toBeCloseTo(1.156, 2);
-      expect(result.necReferences).toContain('NEC 430.24 - Largest Motor at 125%');
-    });
-
-    it('should handle non-coincident heating/cooling per NEC 220.60', () => {
-      const circuits: CircuitLoad[] = [
-        { id: '1', description: 'A/C', loadWatts: 5000, loadType: 'C', pole: 2, circuitNumber: 1 },
-        { id: '2', description: 'Heat', loadWatts: 3000, loadType: 'H', pole: 2, circuitNumber: 3 },
-      ];
-      const result = calculatePanelDemand(circuits, 240, 1);
-      // Both appear in loadsByType — it's the engineer's job to omit the smaller
-      // But both should have NEC references
-      expect(result.necReferences).toContain('NEC 220.60 - Noncoincident Loads (Heating/Cooling)');
-    });
-
-    it('should calculate demand amps for single-phase', () => {
-      const circuits: CircuitLoad[] = [
-        { id: '1', description: 'Load', loadWatts: 24000, loadType: 'O', pole: 2, circuitNumber: 1 },
-      ];
-      const result = calculatePanelDemand(circuits, 240, 1);
-      // 24 kVA / 240V = 100A
-      expect(result.demandAmps).toBeCloseTo(100, 0);
-    });
-
-    it('should calculate demand amps for three-phase', () => {
-      const circuits: CircuitLoad[] = [
-        { id: '1', description: 'Load', loadWatts: 36000, loadType: 'O', pole: 3, circuitNumber: 1 },
-      ];
-      const result = calculatePanelDemand(circuits, 208, 3);
-      // 36 kVA / (208 × √3) = 36000 / 360.22 ≈ 99.9A
-      expect(result.demandAmps).toBeCloseTo(100, 0);
-    });
-
-    it('should include phase imbalance calculation', () => {
+  // The per-type demand walk that lived in this file was removed (#191):
+  // a panel's demand comes from calculateAggregatedLoad
+  // (tests/panelScheduleDemand191.test.ts).
+  describe('calculatePanelPhaseLoads', () => {
+    it('sums the connected load and reports phase imbalance', () => {
       const circuits: CircuitLoad[] = [
         { id: '1', description: 'A', loadWatts: 10000, loadType: 'O', pole: 1, circuitNumber: 1, phase: 'A' },
         { id: '2', description: 'B', loadWatts: 2000, loadType: 'O', pole: 1, circuitNumber: 3, phase: 'B' },
       ];
-      const result = calculatePanelDemand(circuits, 240, 1);
-      expect(result.percentImbalance).toBeGreaterThan(0);
+      const result = calculatePanelPhaseLoads(circuits, 1);
+      expect(result.totalConnectedLoad_kVA).toBe(12);
+      expect(result.phaseLoads).toEqual([
+        { phase: 'A', connectedLoad_kVA: 10 },
+        { phase: 'B', connectedLoad_kVA: 2 },
+      ]);
+      // (10 − 2) ÷ 6 = 133.3%
+      expect(result.percentImbalance).toBeCloseTo(133.3, 1);
+    });
+
+    it('carries no demand figures', () => {
+      const result = calculatePanelPhaseLoads(
+        [{ id: '1', description: 'Lighting', loadWatts: 5000, loadType: 'L', pole: 1, circuitNumber: 1 }],
+        1,
+      );
+      expect(Object.keys(result).sort()).toEqual(['percentImbalance', 'phaseLoads', 'totalConnectedLoad_kVA']);
     });
   });
 
@@ -2948,7 +2886,7 @@ describe('C4 — Per-EVSE branch row VA (nameplate, NEC 625.40)', () => {
       expect(isDwellingUnitPanel('Multifamily Test MDP', unitCircuits)).toBe(false);
     });
 
-    it('calculatePanelDemand splits 2-pole 240V loads 50/50 across A/B on 1Φ split-phase panel (regression for in-app twin of C6)', () => {
+    it('calculatePanelPhaseLoads splits 2-pole 240V loads 50/50 across A/B on 1Φ split-phase panel (regression for in-app twin of C6)', () => {
       // Reproduces the audit-fixture Unit 110 panel where the in-app PanelSchedule
       // showed Phase A=5.7, Phase B=17.0, Phase Imbalance 99.6% — broken because
       // 2-pole loads on slots that land on Phase B were rotating B→C (3Φ rule)
@@ -2971,7 +2909,7 @@ describe('C4 — Per-EVSE branch row VA (nameplate, NEC 625.40)', () => {
         { id: 'dp', description: 'Disposal',   loadWatts: 500,  loadType: 'O', pole: 1, circuitNumber: 15 },
       ];
 
-      const result = calculatePanelDemand(audit_unit110_loads, 240, 1);
+      const result = calculatePanelPhaseLoads(audit_unit110_loads, 1);
 
       // Phase A 1-pole: K1 + K2 + GL1 + GL2 = 5,700 VA
       // Phase B 1-pole: Laundry + Bath + Disposal = 3,500 VA

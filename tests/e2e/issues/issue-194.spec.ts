@@ -56,7 +56,8 @@ test('#194 EVEMS tool: EV load at 100% + 25% service-check adder', async ({ page
   await expect(results).not.toContainText('625.44');
   await expect(results).not.toContainText(/Demand factor of/i);
   const maxChargers = page.locator('h4', { hasText: 'Maximum Chargers' }).locator('..');
-  await expect(maxChargers).toContainText(/Without EVEMS\s*2\s*With EVEMS\s*2/);
+  // "With EVEMS" is 6 since #202 (72 A setpoint ÷ 12 A minimum); it was 2
+  await expect(maxChargers).toContainText(/Without EVEMS\s*2\s*With EVEMS\s*6(?!\d)/);
   await shot(page, '1-qty4');
 
   // 2 — twelve chargers
@@ -97,6 +98,7 @@ test('#194 EVEMS tool: EV load at 100% + 25% service-check adder', async ({ page
     'Total: 33.0 kVA',
     '68.8%',
   ]);
-  await expect(maxChargers).toContainText(/Without EVEMS\s*2\s*With EVEMS\s*2/);
+  // #202: 17,280 VA ÷ 120 V = 144 A ÷ 12 A = 12 chargers with EVEMS; it was 2
+  await expect(maxChargers).toContainText(/Without EVEMS\s*2\s*With EVEMS\s*12(?!\d)/);
   await shot(page, '4-level1');
 });
