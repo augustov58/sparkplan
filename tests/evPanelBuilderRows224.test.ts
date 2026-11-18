@@ -21,7 +21,7 @@ describe('EV Panel Builder rows (#224)', () => {
     expect(rows).toHaveLength(6);
     expect(rows[0]).toEqual({
       panel_id: 'panel-1', project_id: 'p', circuit_number: 1, description: 'EV Charger #1 - Level 2 (48A)',
-      breaker_amps: 60, pole: 2, load_watts: 11_520, conductor_size: expect.any(String), is_proposed: true,
+      breaker_amps: 60, pole: 2, load_watts: 11_520, load_type: 'O', conductor_size: expect.any(String), is_proposed: true,
     });
     for (const row of rows) {
       expect(Object.keys(row).some(k => /[A-Z]/.test(k))).toBe(false); // no camelCase column

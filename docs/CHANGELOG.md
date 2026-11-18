@@ -4,6 +4,20 @@ All notable changes to SparkPlan.
 
 ---
 
+## 2026-11-18: The EV Panel Builder previews the panel it creates (#230)
+
+- **The preview card showed a breaker sum as "Total Load"**: 280 A for 4 × 48 A chargers, where the created panel's demand is 199.5 A. "Total Power" left out the lighting, and "Panel Utilization" was breakers ÷ rating. The card now reads the panel that Create makes:
+  - **Demand Load:** NEC 220, with the EVEMS setpoint when one is set. 199.5 A (47.9 kVA).
+  - **Bus Design Load (NEC 408.30):** demand + 25% of the continuous loads, as Inspector Mode checks the bus. 247.5 A.
+  - **Utilization:** design load ÷ rating, 83%.
+  - **Total Circuits:** the setpoint marker isn't counted, so it reads 6, as the created panel's tab does.
+- **The lighting circuit** is created as a 1-pole lighting load (it was a 2-pole circuit coded "Other"). The hidden EVEMS setpoint marker now sits after the real circuits, so no empty-looking slot appears between them.
+- **With EVEMS, the simultaneous-charger count is capped at the number of chargers.** It kept its old value (3) when the count dropped to 1, so the builder sized a 225 A bus and stored a 34,560 VA setpoint for one 11,520 VA charger. That case now gets a 100 A bus and an 11,520 VA setpoint.
+- Clicking a checkbox's label text toggles it, Create shows a toast naming the new panel and its circuit count, and "1 EV Circuit" is singular.
+- The builder's NEC reference titles (625.41 "Coupler", 625.44 "Demand Factors") wait for the PE's wording (#241).
+
+---
+
 ## 2026-11-18: Packet panel schedules draw every pole and list feed-thru lugs (#228)
 
 - **Multi-pole circuits now show every pole** on the panel schedule pages (packet and the All Panels export). A 2-pole range at 13 used to leave slot 15 blank, which read as a spare space. Slot 15 now reads "(cont. ckt 13)".

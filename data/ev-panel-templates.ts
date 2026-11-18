@@ -31,13 +31,15 @@ export interface TemplateCircuit {
   loadVA: number;
   isEvCharger: boolean;
   evChargerAmps?: number;
+  /** `circuits.load_type`; omitted → 'O' (EVSE are recognised by description). */
+  loadType?: string;
 }
 
 /**
  * A template circuit as a `circuits` row. The generator's shape is camelCase
  * (`circuitNumber`, `breakerAmps`, `loadVA`, …); inserting it as is fails
- * every insert (#224). Load type stays the column default ('O'): EVSE are
- * recognised by description.
+ * every insert (#224). Load type: the circuit's own (lighting 'L', #230),
+ * else 'O' — EVSE are recognised by description.
  */
 export function templateCircuitRow(c: TemplateCircuit, panelId: string, projectId: string) {
   return {
@@ -48,6 +50,7 @@ export function templateCircuitRow(c: TemplateCircuit, panelId: string, projectI
     breaker_amps: c.breakerAmps,
     pole: c.poles,
     load_watts: c.loadVA,
+    load_type: c.loadType ?? 'O', // lighting 'L' (#230); was the column default for every row
     conductor_size: c.conductorSize,
     is_proposed: true,
   };
@@ -666,6 +669,41 @@ export function generateCustomEVPanel(input: CustomEVPanelInput): ApplyTemplateO
   // Set circuitNumber to the next available slot for auxiliary circuits
   circuitNumber = Math.max(leftSlot, rightSlot);
 
+  // Add spare circuit if requested
+  if (includeSpare) {
+    circuits.push({
+      circuitNumber: circuitNumber,
+      breakerAmps: 20,
+      poles: 2,
+      voltage: voltage === 480 ? 277 : 120,
+      description: 'Spare Circuit',
+      conductorSize: '12 AWG Cu',
+      conductorType: 'THHN',
+      loadVA: 0,
+      isEvCharger: false
+    });
+    circuitNumber += 4;  // 2-pole occupies 2 slots
+  }
+
+  // Add lighting circuit if requested
+  if (includeLighting) {
+    circuits.push({
+      circuitNumber: circuitNumber,
+      breakerAmps: 20,
+      poles: 1,
+      voltage: voltage === 480 ? 277 : 120,
+      description: 'Lighting Circuit',
+      conductorSize: '12 AWG Cu',
+      conductorType: 'THHN',
+      loadVA: 1800,
+      isEvCharger: false,
+      loadType: 'L', // #230: a 120/277 V lighting circuit, coded as lighting
+    });
+    circuitNumber += 2;  // 1-pole
+  }
+
+  // #230: the setpoint marker goes after the real circuits, so the slots it
+  // holds (hidden metadata) aren't in the middle of the schedule.
   // EVEMS marker circuit. Per NEC 625.42, an EVEMS allows the FEEDER /
   // SERVICE to be sized to the managed setpoint (not the sum of branch
   // nameplates). When the caller provides the explicit setpoint, we emit a
@@ -694,36 +732,6 @@ export function generateCustomEVPanel(input: CustomEVPanelInput): ApplyTemplateO
     circuitNumber += 4;  // 2-pole occupies 2 slots
   }
 
-  // Add spare circuit if requested
-  if (includeSpare) {
-    circuits.push({
-      circuitNumber: circuitNumber,
-      breakerAmps: 20,
-      poles: 2,
-      voltage: voltage === 480 ? 277 : 120,
-      description: 'Spare Circuit',
-      conductorSize: '12 AWG Cu',
-      conductorType: 'THHN',
-      loadVA: 0,
-      isEvCharger: false
-    });
-    circuitNumber += 4;  // 2-pole occupies 2 slots
-  }
-
-  // Add lighting circuit if requested
-  if (includeLighting) {
-    circuits.push({
-      circuitNumber: circuitNumber,
-      breakerAmps: 20,
-      poles: 2,
-      voltage: voltage === 480 ? 277 : 120,
-      description: 'Lighting Circuit',
-      conductorSize: '12 AWG Cu',
-      conductorType: 'THHN',
-      loadVA: 1800,
-      isEvCharger: false
-    });
-  }
 
   return { panel, circuits };
 }
