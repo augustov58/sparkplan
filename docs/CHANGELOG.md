@@ -4,6 +4,17 @@ All notable changes to SparkPlan.
 
 ---
 
+## 2026-11-18: The EVEMS setpoint can be edited and removed (#209)
+
+- **The EVEMS setpoint card on the Panel Schedule now has Edit and Remove.** The setpoint is stored as a hidden marker circuit, so once one existed, no screen could change or delete it. It kept limiting the panel's demand (NEC 625.42) and its feeder's design load.
+  - **Edit** takes the setpoint in VA.
+  - **Remove** asks for confirmation; the chargers then count at full load again.
+  - Feeders sized under the old setpoint show "Outdated" until recalculated.
+- **A panel set up with the older EVEMS marker** (no setpoint value: the feeder is limited to the panel's main breaker) now shows the card too. Edit sets an explicit setpoint.
+- **Circuit counts leave the marker out:** the Panel Schedule tabs ("EV Panel(4)", not 5), and TOTAL CIRCUITS on E-101 and the NEC compliance summary, which now agree with the per-panel table.
+
+---
+
 ## 2026-11-18: Dwelling unit feeders print the unit's own load; house panels use the non-dwelling rules (#179)
 
 - **The feeder to a dwelling unit panel now carries the unit's NEC 220 Part III load**, the number the unit's own page prints (#155). Before, one feeder printed three different loads. In a generated 3-unit building, Unit 101's page said 29.7 kVA:

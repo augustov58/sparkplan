@@ -1893,7 +1893,8 @@ export const LoadCalculationSummary: React.FC<LoadSummaryProps> = ({
         </View>
         <View style={themeStyles.projectCell}>
           <Text style={themeStyles.projectLabel}>Total Circuits</Text>
-          <Text style={themeStyles.projectValue}>{circuits.length}</Text>
+          {/* EVEMS marker circuits are metadata, not circuits (#209): the same count as the per-panel table */}
+          <Text style={themeStyles.projectValue}>{circuits.filter(c => !isEVEMSMarkerCircuit(c)).length}</Text>
         </View>
       </View>
 
@@ -2183,7 +2184,7 @@ export const ComplianceSummary: React.FC<ComplianceSummaryProps> = ({
   sheetId,
 }) => {
   const mainPanel = panels.find(p => p.is_main);
-  const totalCircuits = circuits.length;
+  const totalCircuits = circuits.filter(c => !isEVEMSMarkerCircuit(c)).length; // EVEMS markers are metadata (#209)
   const totalFeeders = feeders.length;
 
   // Status values are ASCII-only; Helvetica StandardEncoding can't render
