@@ -4,6 +4,12 @@ All notable changes to SparkPlan.
 
 ---
 
+## 2026-11-18: Opening the Permit Packet page no longer saves the project (#252)
+
+- **Every visit to the Permit Packet page saved the project twice and showed "Project updated"**, with nothing changed. The page compared its form with the stored copy, and the database returns the stored copy's fields in a different order, so the two never matched. They're now compared with sorted keys. A visit makes no write, not even the first one on a project that has never saved these fields (it used to store the defaults). An edit still saves once, about 750 ms after you stop typing.
+
+---
+
 ## 2026-11-18: The EVEMS row of a demand table adds up (#212)
 
 - **On an EVEMS panel, and on any panel above one, the demand table's "EVEMS feeder reduction" row showed the panel's demand before and after the setpoint**, so its rows summed to almost twice the TOTAL row. The row is now the reduction itself, "EV chargers above the EVEMS setpoint": 0 connected, the reduction as a negative demand (−5.76 kVA on the QA project), and a "—" factor. The rows add up to the totals like every other table in the packet. The totals don't change. This applies to the in-app tables and the Aggregated Load card, the panel schedule PDFs and E-101.

@@ -10,7 +10,7 @@ import { AttachmentUploadCard } from './AttachmentUploadCard';
 import { useProjectAttachments, downloadAttachmentBytes, type ArtifactType, type CoverMode } from '../hooks/useProjectAttachments';
 import { summarizeCalculationRefs, type NEC22087NarrativeData, type NEC22087Method } from '../services/pdfExport/PermitPacketDocuments';
 import { buildSingleFamilyDwellingContext, deriveNarrativeOccupancy } from '../lib/projectSettings';
-import { EMPTY_DEMAND_SPLIT, mfEvCalculationFromSettings, projectDemandSplit, type ProjectDemandSplit } from '../lib/storedCalcs';
+import { EMPTY_DEMAND_SPLIT, mfEvCalculationFromSettings, projectDemandSplit, stableJson, type ProjectDemandSplit } from '../lib/storedCalcs';
 import {
   BAND_CALCULATIONS,
   DEFAULT_SECTIONS,
@@ -345,7 +345,12 @@ export const PermitPacketGenerator: React.FC<PermitPacketGeneratorProps> = ({ pr
   // explicitly saved an override — stored values take precedence because
   // they fire later and set `!preparedBy` to false.
   const packetDefaultsHydratedRef = React.useRef(false);
+  // A real edit on this page (a DOM change event; auto-fill and hydration set
+  // state without one). Until then, a project with nothing stored isn't
+  // written: opening the page seeded both blocks with defaults (#252).
+  const userEditedRef = React.useRef(false);
   useEffect(() => {
+    userEditedRef.current = false;
     const stored = currentProject?.settings?.permitPacketDefaults;
     if (!stored) {
       packetDefaultsHydratedRef.current = true;
@@ -375,7 +380,9 @@ export const PermitPacketGenerator: React.FC<PermitPacketGeneratorProps> = ({ pr
       serviceConductorRouting,
     };
     const stored = currentProject.settings?.permitPacketDefaults;
-    if (JSON.stringify(next) === JSON.stringify(stored ?? {})) return;
+    if (!stored && !userEditedRef.current) return; // nothing stored, nothing typed (#252)
+    // Sorted keys: jsonb returns them in its own order (#252: every visit saved)
+    if (stableJson(next) === stableJson(stored ?? {})) return;
     // patchProject reads the latest project when the timer fires, so a save
     // made elsewhere during the debounce (e.g. the jurisdiction) survives (#134).
     const timer = setTimeout(() => {
@@ -445,7 +452,9 @@ export const PermitPacketGenerator: React.FC<PermitPacketGeneratorProps> = ({ pr
       proposedNewLoadKVA: nec22087ProposedKVA,
     };
     const stored = currentProject.settings?.nec22087Narrative;
-    if (JSON.stringify(next) === JSON.stringify(stored ?? {})) return;
+    if (!stored && !userEditedRef.current) return; // nothing stored, nothing typed (#252)
+    // Sorted keys: jsonb returns them in its own order (#252: every visit saved)
+    if (stableJson(next) === stableJson(stored ?? {})) return;
     // patchProject reads the latest project when the timer fires, so a save
     // made elsewhere during the debounce (e.g. the jurisdiction) survives (#134).
     const timer = setTimeout(() => {
@@ -1191,7 +1200,7 @@ export const PermitPacketGenerator: React.FC<PermitPacketGeneratorProps> = ({ pr
   }
 
   return (
-    <div className="space-y-6 animate-in fade-in duration-500">
+    <div className="space-y-6 animate-in fade-in duration-500" onChangeCapture={() => { userEditedRef.current = true; }}>
       {/* Header */}
       <div>
         <h2 className="text-2xl font-light text-gray-900 flex items-center gap-2">
