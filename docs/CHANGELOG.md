@@ -4,6 +4,15 @@ All notable changes to SparkPlan.
 
 ---
 
+## 2026-11-18: Packet panel schedules draw every pole and list feed-thru lugs (#228)
+
+- **Multi-pole circuits now show every pole** on the panel schedule pages (packet and the All Panels export). A 2-pole range at 13 used to leave slot 15 blank, which read as a spare space. Slot 15 now reads "(cont. ckt 13)".
+- **A sub-panel on feed-thru lugs is no longer drawn as an invented breaker.** The packet gave every downstream panel a "100A 2P" breaker in the next free slot. That breaker sat on one phase only, and the app showed the same panel as a lug feed. Lug-fed panels are now listed under "FEED-THRU LUGS (not breaker-fed)" below the grid. A panel fed from a breaker is drawn at its own slot, as in the app. Its load still counts in the phase totals and the Load Summary, which don't change.
+- **Total Circuits counts branch circuits as the app does**, with the feeders apart: "18 (+1 feeder)", where it read 19.
+- **E-601's EV disconnect label** separates the panel from its location: "EV CHARGING — GARAGE SUBPANEL (GARAGE) — DO NOT OPERATE UNDER LOAD".
+
+---
+
 ## 2026-11-18: Non-dwelling lighting cites Table 220.42 "All others" (#218)
 
 - **Every commercial lighting row cited "Table 220.42 (Office Buildings)"**, and so did a multifamily building's common-area panel. Table 220.42 has no office row. Occupancies it doesn't list fall under **All others** (100%), and that is what the in-app demand table and the packet's E-101 now print (the panel schedule pages print the section alone, as they do every citation). The 100% factor was already right, so no number changes.

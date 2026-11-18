@@ -4,6 +4,7 @@ One note per hard problem, written by the model that solved it via the `extract-
 Each entry: `- [title](file.md) — reusable rule`.
 
 <!-- Newest first -->
+- [Packet panel schedules: blank second poles, invented feeder breakers](2026-11-18-packet-feeder-rows-poles.md) — port the app rule (breaker-fed vs lug-fed); slot 0 keeps load in totals but out of the grid; an empty PDF-text test after a harmless change is the extractor
 - [Non-dwelling lighting cited a Table 220.42 row that does not exist](2026-11-18-table-220-42-all-others.md) — name lookup keys after the book row; re-point "right by accident" mappings before the data is fixed; pin only verified rows
 - [The Service Upgrade Wizard called the whole new load "continuous" and cited 210.19](2026-11-18-wizard-new-load-wording.md) — when a calc changes, its labels and citations are part of the change; cite the section for the quantity shown
 - [A panel with only feeders showed their total as its "direct" load](2026-11-18-feeder-only-panel-summary.md) — a fallback object feeds every card that reads it: set each field to what it means; `networkidle` is the wrong readiness signal on a realtime app

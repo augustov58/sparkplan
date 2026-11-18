@@ -37,7 +37,7 @@ import {
   type EVEMSNarrativePanelEntry,
   type EVSELabelingPanelEntry,
 } from './PermitPacketDocuments';
-import { PanelSchedulePages } from './PanelScheduleDocuments';
+import { PanelSchedulePages, SYNTH_FEEDER_PREFIX, SYNTH_LUG_PREFIX } from './PanelScheduleDocuments';
 import {
   calculateAggregatedLoad,
   circuitsUnderPanel,
@@ -1194,46 +1194,11 @@ export const generatePermitPacket = async (data: PermitPacketData): Promise<void
     );
     if (downstreamPanels.length === 0) return [];
 
-    // Slot allocator — alternate left (odd) / right (even), avoiding any slots
-    // already taken by real circuits or by the slots a multi-pole circuit
-    // occupies (a 2-pole at slot N occupies N and N+2; 3-pole occupies
-    // N, N+2, N+4).
-    const occupied = new Set<number>();
-    for (const c of existing) {
-      const span = c.pole === 3 ? 3 : c.pole === 2 ? 2 : 1;
-      for (let i = 0; i < span; i++) {
-        occupied.add(c.circuit_number + i * 2);
-      }
-    }
-
-    let leftSlot = 1;
-    let rightSlot = 2;
-    let useLeft = true;
-    const advanceLeft = (poles: number) => {
-      leftSlot += poles === 3 ? 6 : poles === 2 ? 4 : 2;
-    };
-    const advanceRight = (poles: number) => {
-      rightSlot += poles === 3 ? 6 : poles === 2 ? 4 : 2;
-    };
-    const findFreeSlot = (poles: number): number => {
-      const span = poles === 3 ? 3 : poles === 2 ? 2 : 1;
-      while (true) {
-        const candidate = useLeft ? leftSlot : rightSlot;
-        const slots: number[] = [];
-        for (let i = 0; i < span; i++) slots.push(candidate + i * 2);
-        const free = slots.every(s => !occupied.has(s));
-        if (free) {
-          slots.forEach(s => occupied.add(s));
-          if (useLeft) advanceLeft(poles);
-          else advanceRight(poles);
-          useLeft = !useLeft;
-          return candidate;
-        }
-        if (useLeft) advanceLeft(poles);
-        else advanceRight(poles);
-      }
-    };
-
+    // A panel fed from a breaker (`fed_from_circuit_number`) is drawn at that
+    // slot, as the in-app schedule does. Any other panel is on feed-thru lugs:
+    // slot 0 keeps it out of the breaker grid while its load still counts in
+    // the phase totals, and the schedule lists it under FEED-THRU LUGS (#228;
+    // it used to get an invented breaker in the next free slot).
     // Dedup: if the downstream panel already has an explicit feeder circuit
     // on this parent (matching fed_from_circuit_number to an existing
     // circuit_number on the parent), skip synthesis. Otherwise the panel
@@ -1266,12 +1231,12 @@ export const generatePermitPacket = async (data: PermitPacketData): Promise<void
       );
       const breakerAmps = dp.feeder_breaker_amps || dp.main_breaker_amps || 100;
       const pole = (dp.phase === 3 ? 3 : 2) as 1 | 2 | 3;
-      const slot = findFreeSlot(pole);
+      const lugFed = typeof fedFromSlot !== 'number';
       return [{
-        id: `synth-feeder-${panel.id}-${dp.id}`,
+        id: `${lugFed ? SYNTH_LUG_PREFIX : SYNTH_FEEDER_PREFIX}${panel.id}-${dp.id}`,
         project_id: panel.project_id,
         panel_id: panel.id,
-        circuit_number: slot,
+        circuit_number: lugFed ? 0 : fedFromSlot,
         description: `→ PANEL ${dp.name}`,
         breaker_amps: breakerAmps,
         pole,
