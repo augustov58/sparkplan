@@ -4,6 +4,12 @@ All notable changes to SparkPlan.
 
 ---
 
+## 2026-11-18: A deleted row no longer comes back after a refetch (#234)
+
+- **Removing something right after another change could make it reappear.** Every data list (circuits, panels, projects, attachments, permits and the rest) reloads in full whenever the database reports a change, and shows your own edits before the save finishes. A reload that started *before* a delete could finish *after* it and put the deleted row back. The row then stayed until the next reload, which never came if the live connection had dropped. Lists now ignore a reload that overlaps one of your own changes, and reload once after your changes finish.
+
+---
+
 ## 2026-11-18: The Panel Schedule exports print what the packet prints (#238)
 
 - **"Export PDF" now carries the demand breakdown** (Lighting / Receptacles / Other with their NEC rows) that "All Panels" prints for the same panel. It used to show only the load summary.

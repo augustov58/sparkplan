@@ -21,6 +21,7 @@ import {
   computeTimeEntryCost,
 } from '@/services/billing/billingMath';
 
+import { useFetchGuard } from '@/lib/fetchGuard';
 type TimeEntry = Database['public']['Tables']['time_entries']['Row'];
 type TimeEntryInsert = Database['public']['Tables']['time_entries']['Insert'];
 type TimeEntryUpdate = Database['public']['Tables']['time_entries']['Update'];
@@ -42,10 +43,13 @@ export interface UseTimeEntriesReturn {
 
 export function useTimeEntries(projectId: string | undefined): UseTimeEntriesReturn {
   const [timeEntries, setTimeEntries] = useState<TimeEntry[]>([]);
+  // A refetch that overlaps a local write must not undo it (#234)
+  const guard = useFetchGuard();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   const fetchEntries = useCallback(async () => {
+    const token = guard.token();
     if (!projectId) {
       setTimeEntries([]);
       setLoading(false);
@@ -59,6 +63,7 @@ export function useTimeEntries(projectId: string | undefined): UseTimeEntriesRet
         .order('work_date', { ascending: false })
         .order('created_at', { ascending: false });
       if (err) throw err;
+      if (guard.stale(token)) return; // a local write is newer; the guard refetches after it
       setTimeEntries(data || []);
       setError(null);
     } catch (err) {
@@ -193,12 +198,15 @@ export function useTimeEntries(projectId: string | undefined): UseTimeEntriesRet
     }
   };
 
+  guard.refetch = fetchEntries;
+
+
   return {
     timeEntries,
     loading,
     error,
-    createTimeEntry,
-    updateTimeEntry,
-    deleteTimeEntry,
+    createTimeEntry: guard.wrap(createTimeEntry),
+    updateTimeEntry: guard.wrap(updateTimeEntry),
+    deleteTimeEntry: guard.wrap(deleteTimeEntry),
   };
 }

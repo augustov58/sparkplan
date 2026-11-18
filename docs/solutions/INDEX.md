@@ -4,6 +4,7 @@ One note per hard problem, written by the model that solved it via the `extract-
 Each entry: `- [title](file.md) — reusable rule`.
 
 <!-- Newest first -->
+- [A refetch started before a delete brought the deleted row back](2026-11-18-hooks-refetch-race.md) — results older than the latest local write lose (FetchGuard); to test a slow response delay the response, not the request; log the timeline when a repro passes on buggy code
 - [The Panel Schedule exports disagreed with each other and the packet](2026-11-18-panel-exports-feeds.md) — build both buttons' inputs in one function; one feeder-row rule for packet and exports; synthesized rows must stay out of "real circuits" inputs; assert totals across renderers
 - [Creating many circuits fired one toast per circuit](2026-11-18-batch-toasts.md) — hooks that toast need a silent option; toast the batch once with the count that succeeded; record toasts with a MutationObserver
 - [The EV Panel Builder number fields clamped every keystroke](2026-11-18-ev-builder-number-inputs.md) — keep the text, report valid values, clamp on blur; test with keystrokes, not fill()

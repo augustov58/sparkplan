@@ -17,6 +17,7 @@ import type { Database } from '@/lib/database.types';
 import { showToast, toastMessages } from '@/lib/toast';
 import { dataRefreshEvents } from '@/lib/dataRefreshEvents';
 
+import { useFetchGuard } from '@/lib/fetchGuard';
 export type PermitInspection =
   Database['public']['Tables']['permit_inspections']['Row'];
 export type PermitInspectionInsert =
@@ -44,10 +45,13 @@ export function usePermitInspections(
   permitId?: string | undefined,
 ): UsePermitInspectionsReturn {
   const [inspections, setInspections] = useState<PermitInspection[]>([]);
+  // A refetch that overlaps a local write must not undo it (#234)
+  const guard = useFetchGuard();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   const fetchInspections = useCallback(async () => {
+    const token = guard.token();
     if (!projectId) return;
     try {
       let query = supabase
@@ -63,6 +67,7 @@ export function usePermitInspections(
 
       const { data, error } = await query;
       if (error) throw error;
+      if (guard.stale(token)) return; // a local write is newer; the guard refetches after it
       setInspections(data || []);
       setError(null);
     } catch (err) {
@@ -203,13 +208,16 @@ export function usePermitInspections(
     }
   };
 
+  guard.refetch = fetchInspections;
+
+
   return {
     inspections,
     loading,
     error,
-    createInspection,
-    updateInspection,
-    deleteInspection,
+    createInspection: guard.wrap(createInspection),
+    updateInspection: guard.wrap(updateInspection),
+    deleteInspection: guard.wrap(deleteInspection),
     refresh: fetchInspections,
   };
 }

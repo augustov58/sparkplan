@@ -221,6 +221,7 @@ EV panel (MDP included) takes its chargers at the setpoint (#210).
 
 ### Hooks Pattern
 All data hooks (`usePanels`, `useCircuits`, `useFeeders`, etc.) follow optimistic update + realtime subscription pattern via Supabase. New hooks should copy this pattern exactly.
+A realtime event refetches the whole list, so a fetch that started before a local write can land after it and undo it (a deleted row comes back, #234). Every such hook uses `lib/fetchGuard.ts`: `const guard = useFetchGuard()`; the fetch takes `guard.token()` and drops its result when `guard.stale(token)`; the hook returns its mutations as `guard.wrap(fn)` and sets `guard.refetch = fetchX` (one refetch after the writes settle). A caller creating many rows passes `{ silent: true }` and toasts once (#242).
 
 ### Database Types
 Use `Database['public']['Tables'][table]['Row']` pattern for types. The `types.ts` file has separate interfaces that may not match DB exactly.
@@ -338,7 +339,7 @@ When renaming across the codebase, grep for ALL variations: exact match, partial
 3. Update `lib/database.types.ts`
 
 ### Adding New Entity Hooks
-- Follow optimistic update + realtime subscription pattern (copy existing hooks)
+- Follow optimistic update + realtime subscription pattern (copy existing hooks), with `useFetchGuard` (see Hooks Pattern, #234)
 - Add event type to `dataRefreshEvents.ts`
 - Add toast messages for CRUD operations in `toast.ts`
 - Update `fed_from_type` enum in `validation-schemas.ts` if adding new feed types
@@ -414,6 +415,7 @@ Real mistakes made in this repo, each paired with the rule that prevents recurre
 | The Part III aggregate clamped EVSE to the EVEMS setpoint only when it ran on the EV panel itself; the MDP took the chargers at full load, so one page printed its feed-thru rows at 44.1 kVA and its demand at 49.9 kVA (#210) | A limit on the feeder and the service applies at every level above the device: walk the subtree (`collectDownstreamPanelIds`), as `continuousLoadVA` does. Two numbers on one page that must agree (feed-thru rows vs the aggregate) are a free test. |
 | One unit feeder printed 29.7 kVA on the unit page, 36.6 in the Feeder Manager and voltage-drop page, 37.1 on the MDP row: `FeederManager`'s `occupancyType` prop defaulted to `'commercial'` and no render site passed it, `computeFeederLoadVA` hard-coded `'commercial'`, and the MDP row ran the cascade that counts every 'K' circuit as a range (#179) | A defaulted prop or argument hides a missing caller: check every render site / call passes it, or derive it inside. Route every reader of a quantity through the function its own page prints. List optional-argument callers with a script; tsc can't. |
 | The EVEMS setpoint marker circuit was hidden as metadata on every screen, so once written it could never be edited or removed, and it kept clamping the panel and its feeder (#209) | Data filtered out of every list needs one visible owner that can edit and delete it (here the setpoint card). Counts that skip it elsewhere must skip it everywhere (tabs, E-101 TOTAL CIRCUITS). |
+| Every data hook refetched its whole list on any realtime event and wrote optimistically; a fetch started before a delete landed after it and put the row back on screen (#234). The first repro passed on `main` because `route.continue()` after a sleep delays the *request*, so the server answered after the delete | A list hook drops fetch results that overlap a local write (`lib/fetchGuard.ts`). To test a slow response, hold the response back (`route.fetch()` → wait → `route.fulfill`), not the request. |
 | Docs updated with stale "Last Updated" dates; completed features left as "NEXT UP" | Every doc touch updates its date to today; every shipped feature flips its ROADMAP status in the same PR. |
 
 ---
