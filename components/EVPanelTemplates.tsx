@@ -10,7 +10,10 @@ import { usePanels } from '../hooks/usePanels';
 import { useCircuits } from '../hooks/useCircuits';
 import { useTransformers } from '../hooks/useTransformers';
 import { useProjectNecEdition } from '../hooks/useProjectNecEdition';
-import { scheduleServiceCheck } from '../lib/storedCalcs';
+import { scheduleServiceCheck, panelDesignAmps } from '../lib/storedCalcs';
+import { dwellingAggregateOptions } from '../lib/projectSettings';
+import { calculateAggregatedLoad, isEVEMSMarkerCircuit } from '../services/calculations/upstreamLoadAggregation';
+import { showToast, toastMessages } from '../lib/toast';
 import type { Database } from '../lib/database.types';
 import type { Project } from '../types';
 
@@ -31,7 +34,10 @@ export const EVPanelTemplates: React.FC<EVPanelTemplatesProps> = ({ project }) =
   const [chargerType, setChargerType] = useState<ChargerTypeOption>('Level 2 (48A)');
   const [numberOfChargers, setNumberOfChargers] = useState<number>(4);
   const [useEVEMS, setUseEVEMS] = useState<boolean>(false);
-  const [simultaneousChargers, setSimultaneousChargers] = useState<number>(3);
+  const [simultaneousChargerInput, setSimultaneousChargers] = useState<number>(3);
+  // #230: never more simultaneous chargers than chargers. The input kept 3
+  // when the count dropped to 1, and the setpoint marker stored 3 × 11,520 VA.
+  const simultaneousChargers = Math.min(simultaneousChargerInput, numberOfChargers);
   const [includeSpare, setIncludeSpare] = useState<boolean>(true);
   const [includeLighting, setIncludeLighting] = useState<boolean>(true);
   const [customPanelName, setCustomPanelName] = useState('');
@@ -40,48 +46,6 @@ export const EVPanelTemplates: React.FC<EVPanelTemplatesProps> = ({ project }) =
   const [applyStatus, setApplyStatus] = useState<'idle' | 'applying' | 'success' | 'error'>('idle');
   const [errorMessage, setErrorMessage] = useState('');
 
-  // Calculate panel specifications in real-time
-  const panelSpecs = useMemo(() => {
-    // Charger specs
-    const chargerSpecs = {
-      'Level 2 (48A)': { breakerSize: 60, voltage: 240, phase: 1 as 1 | 3, kW: 11.5 },
-      'Level 2 (80A)': { breakerSize: 100, voltage: 240, phase: 1 as 1 | 3, kW: 19.2 },
-      'DC Fast Charge (150kW)': { breakerSize: 225, voltage: 480, phase: 3 as 1 | 3, kW: 150 }
-    };
-
-    const specs = chargerSpecs[chargerType];
-    const totalChargerLoad = numberOfChargers * specs.breakerSize;
-
-    // Apply EVEMS if enabled
-    const effectiveLoad = useEVEMS
-      ? simultaneousChargers * specs.breakerSize
-      : totalChargerLoad;
-
-    // Add extras
-    const spareLoad = includeSpare ? 20 : 0;
-    const lightingLoad = includeLighting ? 20 : 0;
-    const totalLoad = effectiveLoad + spareLoad + lightingLoad;
-
-    // Determine panel rating
-    const standardSizes = [100, 125, 150, 200, 225, 300, 400, 500, 600, 800, 1000, 1200, 1600, 2000];
-    const panelRating = standardSizes.find(size => size >= totalLoad) || 2000;
-
-    // Calculate total circuits
-    const totalCircuits = numberOfChargers
-      + (useEVEMS ? 1 : 0)
-      + (includeSpare ? 1 : 0)
-      + (includeLighting ? 1 : 0);
-
-    return {
-      voltage: specs.voltage,
-      phase: specs.phase,
-      panelRating,
-      totalLoad,
-      effectiveLoad,
-      totalCircuits,
-      totalPowerKW: numberOfChargers * specs.kW
-    };
-  }, [chargerType, numberOfChargers, useEVEMS, simultaneousChargers, includeSpare, includeLighting]);
 
   // One template for the service-check preview and for Create (#224). With
   // EVEMS, an explicit NEC 625.42 setpoint marker: the simultaneous chargers
@@ -113,10 +77,12 @@ export const EVPanelTemplates: React.FC<EVPanelTemplatesProps> = ({ project }) =
   // template's chargers included — the check E-102 and the Service Upgrade
   // Wizard make. Was: the template's breaker sizes against the service
   // rating, ignoring the loads already on it.
-  const serviceWithPanel = useMemo(() => {
+  // The panel Create would add, under the MDP, as rows (#230: the preview
+  // reads this, not a separate breaker sum).
+  const preview = useMemo(() => {
     const mdp = panels.find(p => p.is_main);
     if (!mdp) return null;
-    const previewPanel = {
+    const panel = {
       ...builderTemplate.panel,
       id: 'ev-panel-preview',
       is_main: false,
@@ -124,15 +90,43 @@ export const EVPanelTemplates: React.FC<EVPanelTemplatesProps> = ({ project }) =
       fed_from: mdp.id,
       fed_from_transformer_id: null,
     } as unknown as PanelRow;
-    const previewCircuits = builderTemplate.circuits.map((c, i) => ({
-      ...toCircuitRow(c, previewPanel.id),
+    const rows = builderTemplate.circuits.map((c, i) => ({
+      ...toCircuitRow(c, panel.id),
       id: `ev-panel-preview-${i}`,
-      load_type: 'O',
     }) as unknown as CircuitRow);
-    return scheduleServiceCheck(
-      project, [...panels, previewPanel], [...circuits, ...previewCircuits], transformers, necEdition,
-    );
-  }, [project, panels, circuits, transformers, necEdition, builderTemplate]); // toCircuitRow reads only project.id
+    return { panel, panels: [...panels, panel], circuits: [...circuits, ...rows], rows };
+  }, [panels, circuits, builderTemplate]); // toCircuitRow reads only project.id
+
+  const serviceWithPanel = useMemo(
+    () => preview && scheduleServiceCheck(project, preview.panels, preview.circuits, transformers, necEdition),
+    [project, preview, transformers, necEdition],
+  );
+
+  // The preview card (#230), from the same functions as the created panel's
+  // schedule: its NEC 220 demand (EVEMS at the setpoint), its 408.30 design
+  // load (demand + 25% of continuous loads, as Inspector Mode checks the bus,
+  // #225), and its circuits without the setpoint marker (metadata, #209).
+  const panelSpecs = useMemo(() => {
+    const p = builderTemplate.panel as unknown as PanelRow;
+    const divisor = (p.voltage || 240) * (p.phase === 3 ? Math.sqrt(3) : 1);
+    const circuitCount = builderTemplate.circuits.filter(c => !isEVEMSMarkerCircuit(c)).length;
+    if (!preview) {
+      return { panelRating: p.bus_rating, voltage: p.voltage, phase: p.phase, circuitCount, demandKVA: null, demandAmps: null, designAmps: null };
+    }
+    const occupancy = project.settings?.occupancyType ?? 'commercial';
+    const demandVA = calculateAggregatedLoad(
+      preview.panel.id, preview.panels, preview.circuits, transformers, occupancy, undefined, necEdition,
+      dwellingAggregateOptions(project),
+    ).totalDemandVA;
+    const designAmps = panelDesignAmps(project, preview.panels, preview.circuits, transformers, necEdition)[preview.panel.id] ?? null;
+    return {
+      panelRating: p.bus_rating, voltage: p.voltage, phase: p.phase, circuitCount,
+      demandKVA: demandVA / 1000, demandAmps: demandVA / divisor, designAmps,
+    };
+  }, [builderTemplate, preview, project, transformers, necEdition]);
+  const utilizationPct = panelSpecs.designAmps !== null && panelSpecs.panelRating
+    ? (panelSpecs.designAmps / panelSpecs.panelRating) * 100
+    : null;
 
   const handleApplyConfiguration = async () => {
     setApplyStatus('applying');
@@ -175,6 +169,7 @@ export const EVPanelTemplates: React.FC<EVPanelTemplatesProps> = ({ project }) =
         throw new Error(`${failed} of ${templateCircuits.length} circuits could not be saved to "${newPanel.name}"`);
       }
 
+      showToast.success(toastMessages.evPanel.created(newPanel.name, templateCircuits.filter(c => !isEVEMSMarkerCircuit(c)).length));
       setApplyStatus('success');
       setTimeout(() => {
         setApplyStatus('idle');
@@ -267,13 +262,14 @@ export const EVPanelTemplates: React.FC<EVPanelTemplatesProps> = ({ project }) =
             <div className="bg-white border border-gray-200 rounded-lg p-6">
               <div className="flex items-start gap-3 mb-4">
                 <input
+                  id="ev-builder-evems"
                   type="checkbox"
                   checked={useEVEMS}
                   onChange={(e) => setUseEVEMS(e.target.checked)}
                   className="mt-1 w-5 h-5 text-[#2d3b2d] border-gray-300 rounded focus:ring-[#2d3b2d]/20"
                 />
                 <div className="flex-1">
-                  <label className="block text-sm font-semibold text-gray-900">
+                  <label htmlFor="ev-builder-evems" className="block text-sm font-semibold text-gray-900 cursor-pointer">
                     Use EVEMS Load Management
                   </label>
                   <p className="text-xs text-gray-600 mt-1">
@@ -296,7 +292,7 @@ export const EVPanelTemplates: React.FC<EVPanelTemplatesProps> = ({ project }) =
                     className="w-full px-3 py-2 border border-gray-300 rounded focus:ring-2 focus:ring-[#2d3b2d]/20 focus:border-[#2d3b2d]"
                   />
                   <p className="text-xs text-gray-500 mt-1">
-                    Typical: 75% of total chargers ({Math.floor(numberOfChargers * 0.75)} for {numberOfChargers} chargers)
+                    Typical: 75% of total chargers ({Math.max(1, Math.floor(numberOfChargers * 0.75))} for {numberOfChargers} charger{numberOfChargers === 1 ? '' : 's'})
                   </p>
                 </div>
               )}
@@ -312,24 +308,26 @@ export const EVPanelTemplates: React.FC<EVPanelTemplatesProps> = ({ project }) =
             <div className="space-y-3">
               <div className="flex items-center gap-3">
                 <input
+                  id="ev-builder-spare"
                   type="checkbox"
                   checked={includeSpare}
                   onChange={(e) => setIncludeSpare(e.target.checked)}
                   className="w-4 h-4 text-[#2d3b2d] border-gray-300 rounded focus:ring-[#2d3b2d]/20"
                 />
-                <label className="text-sm text-gray-700">
+                <label htmlFor="ev-builder-spare" className="text-sm text-gray-700 cursor-pointer">
                   Include Spare Circuit (20A)
                 </label>
               </div>
 
               <div className="flex items-center gap-3">
                 <input
+                  id="ev-builder-lighting"
                   type="checkbox"
                   checked={includeLighting}
                   onChange={(e) => setIncludeLighting(e.target.checked)}
                   className="w-4 h-4 text-[#2d3b2d] border-gray-300 rounded focus:ring-[#2d3b2d]/20"
                 />
-                <label className="text-sm text-gray-700">
+                <label htmlFor="ev-builder-lighting" className="text-sm text-gray-700 cursor-pointer">
                   Include Lighting Circuit (20A)
                 </label>
               </div>
@@ -376,42 +374,44 @@ export const EVPanelTemplates: React.FC<EVPanelTemplatesProps> = ({ project }) =
               </div>
 
               <div className="flex items-center justify-between p-3 bg-gray-50 rounded">
-                <span className="text-sm text-gray-600">Total Load:</span>
+                <span className="text-sm text-gray-600">Demand Load (NEC 220{useEVEMS ? ', EVEMS setpoint' : ''}):</span>
                 <span className="font-medium text-gray-900">
-                  {panelSpecs.totalLoad}A {useEVEMS && `(${panelSpecs.effectiveLoad}A with EVEMS)`}
+                  {panelSpecs.demandAmps !== null && panelSpecs.demandKVA !== null
+                    ? `${panelSpecs.demandAmps.toFixed(1)} A (${panelSpecs.demandKVA.toFixed(1)} kVA)`
+                    : '—'}
                 </span>
               </div>
 
               <div className="flex items-center justify-between p-3 bg-gray-50 rounded">
-                <span className="text-sm text-gray-600">Total Power:</span>
+                <span className="text-sm text-gray-600">Bus Design Load (NEC 408.30):</span>
                 <span className="font-medium text-gray-900">
-                  {panelSpecs.totalPowerKW.toFixed(1)} kW
+                  {panelSpecs.designAmps !== null ? `${panelSpecs.designAmps.toFixed(1)} A` : '—'}
                 </span>
               </div>
 
               <div className="flex items-center justify-between p-3 bg-gray-50 rounded">
                 <span className="text-sm text-gray-600">Total Circuits:</span>
                 <span className="font-medium text-gray-900">
-                  {panelSpecs.totalCircuits}
+                  {panelSpecs.circuitCount}
                 </span>
               </div>
 
               {/* Utilization Bar */}
               <div className="mt-4">
                 <div className="flex items-center justify-between text-xs text-gray-600 mb-1">
-                  <span>Panel Utilization</span>
-                  <span>{((panelSpecs.totalLoad / panelSpecs.panelRating) * 100).toFixed(0)}%</span>
+                  <span>Panel Utilization (bus design load ÷ rating)</span>
+                  <span>{utilizationPct !== null ? `${utilizationPct.toFixed(0)}%` : '—'}</span>
                 </div>
                 <div className="h-3 bg-gray-200 rounded-full overflow-hidden">
                   <div
                     className={`h-full transition-all ${
-                      (panelSpecs.totalLoad / panelSpecs.panelRating) > 0.8
+                      (utilizationPct ?? 0) > 100
                         ? 'bg-red-500'
-                        : (panelSpecs.totalLoad / panelSpecs.panelRating) > 0.6
+                        : (utilizationPct ?? 0) > 80
                         ? 'bg-[#fff8e6]0'
                         : 'bg-green-500'
                     }`}
-                    style={{ width: `${Math.min(100, (panelSpecs.totalLoad / panelSpecs.panelRating) * 100)}%` }}
+                    style={{ width: `${Math.min(100, utilizationPct ?? 0)}%` }}
                   />
                 </div>
               </div>
@@ -434,14 +434,14 @@ export const EVPanelTemplates: React.FC<EVPanelTemplatesProps> = ({ project }) =
               <li className="flex items-start gap-2">
                 <Check className="w-4 h-4 text-green-600 flex-shrink-0 mt-0.5" />
                 <span>
-                  <strong>{numberOfChargers} EV Circuits:</strong> {chargerType} chargers
+                  <strong>{numberOfChargers} EV Circuit{numberOfChargers === 1 ? '' : 's'}:</strong> {chargerType} charger{numberOfChargers === 1 ? '' : 's'}
                 </span>
               </li>
               {useEVEMS && (
                 <li className="flex items-start gap-2">
                   <Info className="w-4 h-4 text-blue-600 flex-shrink-0 mt-0.5" />
                   <span>
-                    <strong>1 EVEMS Controller:</strong> Manages {simultaneousChargers} simultaneous chargers
+                    <strong>1 EVEMS Controller:</strong> Manages {simultaneousChargers} simultaneous charger{simultaneousChargers === 1 ? '' : 's'}
                   </span>
                 </li>
               )}

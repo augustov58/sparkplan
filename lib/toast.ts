@@ -48,6 +48,12 @@ export const toastMessages = {
     deleteError: 'Failed to delete panel',
   },
 
+  // EV Panel Builder (#230)
+  evPanel: {
+    created: (name: string, circuits: number) =>
+      `EV panel "${name}" created under the MDP with ${circuits} circuit${circuits === 1 ? '' : 's'}`,
+  },
+
   // Circuits
   circuit: {
     created: 'Circuit added',
