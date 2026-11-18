@@ -4,6 +4,14 @@ All notable changes to SparkPlan.
 
 ---
 
+## 2026-11-18: A panel with only feeders shows no "direct" load (#213)
+
+- **On a panel with no branch circuits** (an MDP that feeds everything through sub-panels), the Panel Summary showed the feeders' total as "Direct circuits load" and "Direct demand load", and again as "Feeder circuits". The direct cards now read 0.0 kVA. The feeders' total stays on "Feeder circuits" and "Demand with feeders", and Demand Amps is unchanged.
+- The demand-factor table on such a panel had only a TOTALS row, with the feeders' demand under "connected". It now says the panel has no branch circuits and points to its feeders.
+- The issue specs no longer wait for the dashboard's network to go idle (realtime keeps it busy); each waits for the element it needs. The folder runs in about 1 minute instead of 2, without the timeouts.
+
+---
+
 ## 2026-11-18: Inspector Mode's bus check sees the whole load on each panel (#225)
 
 - **The panel bus check (NEC 408.30) compares each panel's design load with its bus rating.** It used to add up only the panel's own circuits, so an MDP that feeds everything through sub-panels always passed with 0 kVA.
