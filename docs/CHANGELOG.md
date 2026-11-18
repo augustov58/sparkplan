@@ -4,6 +4,15 @@ All notable changes to SparkPlan.
 
 ---
 
+## 2026-11-14: EVEMS "Maximum Chargers" counts chargers at a 12 A minimum (#202)
+
+- **"With EVEMS" is now the number of chargers that each get at least 12 A** under the largest setpoint the service allows. It used to divide the setpoint by each charger's full load, so it always equalled "Without EVEMS". With 32 A / 240 V chargers on a 200 A / 240 V service with 24 kVA existing demand, the card now reads 2 without EVEMS, 6 with (72 A ÷ 12 A), "EVEMS allows 4 additional chargers".
+- **With EVEMS on, the notes show the current each charger gets** at the quantity entered: 4 chargers share the 72 A setpoint at 18.0 A each.
+- **A warning when chargers would get less than 12 A.** Before, any number of chargers passed with EVEMS on. Seven chargers now warn: 10.3 A each, and the setpoint supports up to 6 at 12 A. The warning is advice only; the result stays compliant.
+- "Consider EVEMS for future expansion" no longer shows when EVEMS is already on.
+
+---
+
 ## 2026-11-13: The EVEMS load schedule stays under the setpoint (#199)
 
 - **EV charging in each time slot is capped at the EVEMS setpoint.** With four 32 A chargers on a 200 A / 240 V service, off-peak showed 23.8 kVA of charging against a 17.28 kVA setpoint. It now shows 17.3 kVA.
