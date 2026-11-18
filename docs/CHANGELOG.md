@@ -4,6 +4,12 @@ All notable changes to SparkPlan.
 
 ---
 
+## 2026-11-18: Receptacle demand cites NEC 220.47 on NEC 2023 projects (#261)
+
+- **The non-dwelling receptacle demand (first 10 kVA at 100%, the rest at 50%) is cited as 220.47 under NEC 2023 and 220.44 under NEC 2020.** It printed 220.44 on every project. This covers the panel demand table, E-101 and the panel pages, the Commercial Load Calculator and its PDF/CSV exports, multifamily common-area receptacles and the 220.87 narrative. No number changes.
+
+---
+
 ## 2026-11-18: The Commercial Load Calculator's lighting demand no longer understates warehouses (#260)
 
 - **Warehouse, hospital and hotel lighting is taken at 100%.** The calculator applied its own demand factors (first 20 kVA at 50%, the rest at 40%) to these occupancies, which put warehouses below the code table: 30 kVA of warehouse lighting gave 14.0 kVA. It now uses the same lighting table as the panel schedule and the permit packet, where every non-dwelling occupancy is at 100% until the reduced rows are added from the code book. Other occupancies are unchanged.

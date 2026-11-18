@@ -30,8 +30,8 @@ const commercial = (necEdition: NecEdition): CommercialLoadInput => ({
 
 describe('#237 Article 220 citations by edition', () => {
   it('the table of renumbered sections', () => {
-    expect(article220Citations('2020')).toEqual({ dwellingUnitLoad: '220.14(J)', unitLoadTable: 'Table 220.12', lightingDemandTable: 'Table 220.42' });
-    expect(article220Citations('2023')).toEqual({ dwellingUnitLoad: '220.41', unitLoadTable: 'Table 220.42(A)', lightingDemandTable: 'Table 220.45' });
+    expect(article220Citations('2020')).toEqual({ dwellingUnitLoad: '220.14(J)', unitLoadTable: 'Table 220.12', lightingDemandTable: 'Table 220.42', receptacleDemand: '220.44' });
+    expect(article220Citations('2023')).toEqual({ dwellingUnitLoad: '220.41', unitLoadTable: 'Table 220.42(A)', lightingDemandTable: 'Table 220.45', receptacleDemand: '220.47' }); // receptacles: #261
   });
 
   it('demand factors: Table 220.42 (2020) / 220.45 (2023), same values', () => {
@@ -81,7 +81,7 @@ describe('#237 Article 220 citations by edition', () => {
   it('the 220.87 narrative fallback cites the edition demand table', () => {
     expect(getNEC22087NarrativeCopy('calculated', 'commercial', [], '2020').methodNecRef).toContain('220.42 / 220.44 / 220.56');
     const y23 = getNEC22087NarrativeCopy('calculated', 'commercial', [], '2023').methodNecRef;
-    expect(y23).toContain('220.44 / 220.45 / 220.56');
+    expect(y23).toContain('220.45 / 220.47 / 220.56'); // receptacles 220.47 under 2023 (#261)
     expect(y23).not.toContain('220.42');
   });
 });

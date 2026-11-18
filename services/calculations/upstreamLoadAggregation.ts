@@ -648,14 +648,15 @@ function collectAllDownstreamLoads(
  * First 10kVA at 100%, remainder at 50%
  * Applies to commercial/industrial and dwelling units
  */
-function calculateReceptacleDemand(totalVA: number): DemandCalculation {
+function calculateReceptacleDemand(totalVA: number, necEdition: NecEdition): DemandCalculation {
+  const section = article220Citations(necEdition).receptacleDemand;
   if (totalVA <= 10000) {
     return {
       loadType: 'Receptacles',
       connectedVA: totalVA,
       demandVA: totalVA,
       demandFactor: 1.0,
-      necReference: 'NEC 220.44',
+      necReference: `NEC ${section}`,
     };
   }
   
@@ -665,7 +666,7 @@ function calculateReceptacleDemand(totalVA: number): DemandCalculation {
     connectedVA: totalVA,
     demandVA: Math.round(demandVA),
     demandFactor: demandVA / totalVA,
-    necReference: 'NEC 220.44 (First 10kVA @100%, remainder @50%)',
+    necReference: `NEC ${section} (First 10kVA @100%, remainder @50%)`,
   };
 }
 
@@ -858,7 +859,7 @@ function applyDemandFactors(
   
   // 2. Receptacles - NEC 220.44 (applies to all occupancies)
   if (loads.receptacles > 0) {
-    const receptacleDemand = calculateReceptacleDemand(loads.receptacles);
+    const receptacleDemand = calculateReceptacleDemand(loads.receptacles, necEdition);
     demandBreakdown.push(receptacleDemand);
     totalDemandVA += receptacleDemand.demandVA;
     necReferences.push(receptacleDemand.necReference);

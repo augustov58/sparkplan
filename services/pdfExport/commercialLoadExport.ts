@@ -18,6 +18,7 @@ import { pdf } from '@react-pdf/renderer';
 import React from 'react';
 import { CommercialLoadDocument, type CommercialLoadDocumentProps } from './CommercialLoadDocument';
 import { OCCUPANCY_LABELS, LIGHTING_UNIT_LOAD } from '../calculations/commercialLoad';
+import { article220Citations } from '../../data/nec/article220-citations';
 
 export type CommercialLoadExportInput = CommercialLoadDocumentProps;
 
@@ -177,7 +178,7 @@ export function buildCommercialLoadCSV(input: CommercialLoadExportInput): string
   // --- Receptacles / auxiliary lighting inputs ---
   lines.push('# GENERAL RECEPTACLES & SPECIAL OUTLETS (INPUTS)');
   lines.push(csvRow(['Item', 'Quantity', 'NEC Reference']));
-  lines.push(csvRow(['General Receptacles (180 VA each)', generalReceptacleCount, '220.14(I), 220.44']));
+  lines.push(csvRow(['General Receptacles (180 VA each)', generalReceptacleCount, `220.14(I), ${article220Citations(project.necEdition ?? '2023').receptacleDemand}`]));
   lines.push(csvRow([
     'Show Window Lighting (linear ft, 200 VA/ft)',
     showWindowLighting_linearFeet,

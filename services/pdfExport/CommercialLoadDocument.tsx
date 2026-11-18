@@ -25,6 +25,7 @@ import type {
   OccupancyType,
 } from '../calculations/commercialLoad';
 import { OCCUPANCY_LABELS, LIGHTING_UNIT_LOAD } from '../calculations/commercialLoad';
+import { article220Citations } from '../../data/nec/article220-citations';
 
 // Helvetica + Helvetica-Bold are built-in standard PDF fonts; do not register.
 
@@ -616,7 +617,7 @@ export const CommercialLoadDocument: React.FC<CommercialLoadDocumentProps> = (pr
           <View style={styles.tableRow}>
             <Text style={[styles.td, { width: '55%' }]}>General Receptacles (180 VA each)</Text>
             <Text style={[styles.tdNum, { width: '25%' }]}>{generalReceptacleCount}</Text>
-            <Text style={[styles.td, { width: '20%', fontSize: 7 }]}>220.14(I), 220.44</Text>
+            <Text style={[styles.td, { width: '20%', fontSize: 7 }]}>220.14(I), {article220Citations(project.necEdition ?? '2023').receptacleDemand}</Text>
           </View>
           <View style={styles.tableRowAlt}>
             <Text style={[styles.td, { width: '55%' }]}>Show Window Lighting (200 VA/linear ft)</Text>

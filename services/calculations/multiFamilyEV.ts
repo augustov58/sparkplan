@@ -773,7 +773,7 @@ export function calculateCommonAreaLoads(items: CommonAreaLoadItem[], necEdition
       connectedVA: Math.round(receptacleData.connectedVA),
       demandVA: Math.round(demandVA),
       demandFactor: Math.round(demandFactor * 100) / 100,
-      necReference: 'NEC 220.44',
+      necReference: `NEC ${article220Citations(necEdition).receptacleDemand}`,
     });
     totalConnectedVA += receptacleData.connectedVA;
     totalDemandVA += demandVA;
