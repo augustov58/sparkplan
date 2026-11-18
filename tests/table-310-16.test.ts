@@ -60,3 +60,17 @@ describe('NEC Table 310.16 ampacities', () => {
     expect(findConductorByAmpacity(15, 'Cu', 60)?.size).toBe('14 AWG');
   });
 });
+
+describe('#272 sizes match Chapter 9 Table 9', () => {
+  // A size the sizing tools can pick must have Table 9 impedance, or its
+  // voltage drop comes back 0 V with a CRITICAL warning. Table 9 has no 700,
+  // 800, 900 or > 1000 kcmil (NEC 2023 book), so 310.16 stops where it stops.
+  it('Table 310.16 and Table 9 list the same sizes, per material', async () => {
+    const { CHAPTER_9_TABLE_9 } = await import('../data/nec/table-chapter9-table9');
+    for (const material of ['Cu', 'Al'] as const) {
+      const ampacity = new Set(TABLE_310_16.filter(r => r.material === material).map(r => r.size));
+      const impedance = new Set(CHAPTER_9_TABLE_9.filter(r => r.material === material).map(r => r.size));
+      expect([...ampacity].sort()).toEqual([...impedance].sort());
+    }
+  });
+});
