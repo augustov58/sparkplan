@@ -4,6 +4,16 @@ All notable changes to SparkPlan.
 
 ---
 
+## 2026-11-18: The EV Panel Builder flags a panel that doesn't match the service (#265)
+
+- **A panel whose voltage or phase differs from the service now shows a warning before Create.** The panel can't be fed from the main panel directly:
+  - A three-phase panel (such as a 480 V DC fast charger) on a single-phase service needs a new three-phase service, because a transformer can't make three-phase from single-phase.
+  - Other mismatches, such as a 240 V single-phase Level 2 panel on a 208 V three-phase service, need a transformer or a separate service.
+
+  It is a heads-up only, and Create still works.
+
+---
+
 ## 2026-11-18: The EV Charging calculator sizes conductors from the NEC ampacity table (#269)
 
 - **Large EV circuits are no longer undersized.** The calculator used its own conductor list, which stopped at 500 kcmil: a 350 kW DC fast charger on a 600 A breaker got 500 kcmil copper, rated 380 A. It now uses the app's Table 310.16 data, at 60 °C for circuits up to 100 A and 75 °C above (NEC 110.14(C)). Past a single conductor it gives parallel sets: 600 A → 2 × 350 kcmil. Results up to 100 A are unchanged for copper. Above 100 A some sizes drop to the 75 °C value (150 kW: 250 kcmil, was 300 kcmil), and the EV Panel Builder now gives the same size.

@@ -11,6 +11,8 @@
 
 5. **Follow-up #264, same rule in the EV Charging presets.** The calculator turns a preset's amps straight into load (√3 × V × A), so presets listing less current than their own output understated everything downstream. Each preset is now ≥ kW ÷ (480 × √3), to 0.1 A as here, so both tools give 180.4 A / 250 A for 150 kW. The calculator's inline conductor list, which matches neither 310.16 column, is filed as #269: it needs a terminal-temperature ruling.
 
+6. **Follow-up #265, the panel's supply.** The builder fed a 480 V 3Φ DC fast panel straight from a 240 V 1Φ MDP with no word about it. The recorded rule "validation is advisory" settles the minimum: an amber card before Create whenever the panel's voltage or phase differs from the MDP's. Create still works, and an automatic transformer is a feature for later. Compare the new object with what it plugs into, not only with its own rules.
+
 ## Verification
 
 - `tests/dcfcTemplateSizing249.test.ts`: 3 of 4 fail on `main`; the Level 2 test passes on both by design.

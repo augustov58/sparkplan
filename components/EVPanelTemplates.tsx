@@ -160,6 +160,14 @@ export const EVPanelTemplates: React.FC<EVPanelTemplatesProps> = ({ project }) =
       demandKVA: demandVA / 1000, demandAmps: demandVA / divisor, designAmps,
     };
   }, [builderTemplate, preview, project, transformers, necEdition]);
+  // #265: the panel Create adds is fed from the MDP. When its voltage or
+  // phase differs from the MDP's (a 480 V 3Φ DC fast panel on a 240 V 1Φ
+  // service), it can't be fed directly: say so before Create. Advisory —
+  // Create still works (validation is advisory, never blocking).
+  const serviceMdp = panels.find(p => p.is_main);
+  const supplyMismatch = serviceMdp && (serviceMdp.voltage !== panelSpecs.voltage || serviceMdp.phase !== panelSpecs.phase)
+    ? { name: serviceMdp.name, voltage: serviceMdp.voltage, phase: serviceMdp.phase }
+    : null;
   const utilizationPct = panelSpecs.designAmps !== null && panelSpecs.panelRating
     ? (panelSpecs.designAmps / panelSpecs.panelRating) * 100
     : null;
@@ -494,6 +502,29 @@ export const EVPanelTemplates: React.FC<EVPanelTemplatesProps> = ({ project }) =
               )}
             </ul>
           </div>
+
+          {/* #265: panel voltage/phase differs from the service */}
+          {supplyMismatch && (
+            <div className="bg-amber-50 border border-amber-200 rounded-lg p-4" data-testid="ev-builder-supply-mismatch">
+              <div className="flex items-start gap-2">
+                <AlertCircle className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
+                <div>
+                  <h4 className="font-medium text-amber-900 mb-1">
+                    {supplyMismatch.phase === 1 && panelSpecs.phase === 3 ? 'Needs a separate 3-phase service' : 'Needs a transformer or a separate service'}
+                  </h4>
+                  <p className="text-sm text-amber-800">
+                    This panel is {panelSpecs.voltage}V {panelSpecs.phase}-phase; the service ({supplyMismatch.name}) is{' '}
+                    {supplyMismatch.voltage}V {supplyMismatch.phase}-phase. It can't be fed from {supplyMismatch.name} directly:{' '}
+                    {supplyMismatch.phase === 1 && panelSpecs.phase === 3
+                      // A transformer can't make 3-phase from a 1-phase service (verifier, #265)
+                      ? `it needs a new ${panelSpecs.voltage}V 3-phase service from the utility (a transformer can't derive 3-phase from a single-phase service).`
+                      : `plan a transformer between them, or a separate ${panelSpecs.voltage}V ${panelSpecs.phase}-phase service.`}{' '}
+                    Create still adds the panel under {supplyMismatch.name}; set its feed in Circuit Design.
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* Service Upgrade Warning */}
           {serviceWithPanel && !serviceWithPanel.sufficient && (
