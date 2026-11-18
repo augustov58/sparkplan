@@ -16,7 +16,7 @@ import { useTransformers } from '../hooks/useTransformers';
 import { useProjectNecEdition } from '../hooks/useProjectNecEdition';
 import { exportPanelSchedulePDF, exportAllPanelsPDF } from '../services/pdfExport/panelSchedulePDF';
 import { 
-  calculatePanelDemand, 
+  calculatePanelPhaseLoads, 
   getCircuitPhase, 
   getLoadTypeColor,
   type CircuitLoad 
@@ -245,9 +245,31 @@ export const PanelSchedule: React.FC<PanelScheduleProps> = ({ project }) => {
       phase: getCircuitPhase(c.circuit_number, panelPhase),
     }));
 
-    // Calculate direct circuit demand
-    const directDemand = panelCircuits.length > 0
-      ? calculatePanelDemand(circuitLoads, selectedPanel.voltage, panelPhase)
+    // Direct circuits: phase loads from the schedule, demand from the shared
+    // aggregate run on this panel alone — the function the packet and the
+    // panel schedule PDF use (#191). No local demand factors.
+    const voltageDivisor = selectedPanel.voltage * (panelPhase === 3 ? Math.sqrt(3) : 1);
+    const directAggregate = panelCircuits.length > 0
+      ? calculateAggregatedLoad(
+          selectedPanel.id,
+          [selectedPanel],
+          // All circuits, not `panelCircuits`: that list drops the EVEMS
+          // setpoint marker, and the aggregate needs it to clamp (625.42)
+          circuits,
+          [],
+          project.settings?.occupancyType || 'commercial',
+          undefined,
+          necEdition,
+        )
+      : null;
+    const directDemand = directAggregate
+      ? {
+          ...calculatePanelPhaseLoads(circuitLoads, panelPhase),
+          totalDemandLoad_kVA: directAggregate.totalDemandVA / 1000,
+          demandAmps: directAggregate.totalDemandVA / voltageDivisor,
+          demandBreakdown: directAggregate.demandBreakdown.filter(b => b.connectedVA > 0 || b.demandVA > 0),
+          necReferences: directAggregate.necReferences,
+        }
       : null;
 
     // Calculate total including feeders
@@ -270,17 +292,17 @@ export const PanelSchedule: React.FC<PanelScheduleProps> = ({ project }) => {
       percentImbalance: 0,
       // phaseLoads must be an array with objects matching the expected structure
       phaseLoads: [
-        { phase: 'A' as const, connectedLoad_kVA: feederTotalVA / 1000 / (selectedPanel.phase === 3 ? 3 : 2), demandLoad_kVA: feederTotalVA / 1000 / (selectedPanel.phase === 3 ? 3 : 2) },
-        { phase: 'B' as const, connectedLoad_kVA: feederTotalVA / 1000 / (selectedPanel.phase === 3 ? 3 : 2), demandLoad_kVA: feederTotalVA / 1000 / (selectedPanel.phase === 3 ? 3 : 2) },
-        { phase: 'C' as const, connectedLoad_kVA: selectedPanel.phase === 3 ? feederTotalVA / 1000 / 3 : 0, demandLoad_kVA: selectedPanel.phase === 3 ? feederTotalVA / 1000 / 3 : 0 },
+        { phase: 'A' as const, connectedLoad_kVA: feederTotalVA / 1000 / (selectedPanel.phase === 3 ? 3 : 2) },
+        { phase: 'B' as const, connectedLoad_kVA: feederTotalVA / 1000 / (selectedPanel.phase === 3 ? 3 : 2) },
+        { phase: 'C' as const, connectedLoad_kVA: selectedPanel.phase === 3 ? feederTotalVA / 1000 / 3 : 0 },
       ],
-      necReferences: [],
-      loadsByType: [], // Empty since no direct circuits
+      necReferences: [] as string[],
+      demandBreakdown: [] as NonNullable<typeof directAggregate>['demandBreakdown'], // no direct circuits
       feederTotalVA,
       totalWithFeeders_kVA: feederTotalVA / 1000,
       connectedWithFeeders_kVA: feederTotalVA / 1000,
     };
-  }, [selectedPanel, panelCircuits, feederCircuits]);
+  }, [selectedPanel, panelCircuits, circuits, feederCircuits, project.settings?.occupancyType, necEdition]);
 
   // NEC 220.82 / 220.83 Optional Method demand for dwelling-unit panels —
   // used by the panel summary cards in lieu of the panel-local NEC 220.14
@@ -2016,24 +2038,20 @@ export const PanelSchedule: React.FC<PanelScheduleProps> = ({ project }) => {
                 <tr>
                   <th className="p-2 text-left">LOAD TYPE</th>
                   <th className="p-2 text-center">CONN. LOAD (KVA)</th>
-                  <th className="p-2 text-center">ADJUST. FACTOR</th>
                   <th className="p-2 text-center">DEMAND FACTOR</th>
                   <th className="p-2 text-center">DEMAND LOAD (KVA)</th>
+                  <th className="p-2 text-left">NEC</th>
                 </tr>
               </thead>
               <tbody>
-                {(demandResult.loadsByType || []).map(lt => (
-                  <tr key={lt.type} className="border-t border-gray-100">
-                    <td className="p-2">
-                      <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold ${getLoadTypeColor(lt.type)} border mr-2`}>
-                        {lt.type}
-                      </span>
-                      {lt.label}
-                    </td>
-                    <td className="p-2 text-center font-mono">{lt.connectedLoad_kVA.toFixed(2)}</td>
-                    <td className="p-2 text-center font-mono">{lt.adjustmentFactor.toFixed(2)}</td>
-                    <td className="p-2 text-center font-mono">{lt.demandFactor.toFixed(2)}</td>
-                    <td className="p-2 text-center font-mono font-semibold">{lt.demandLoad_kVA.toFixed(2)}</td>
+                {/* Rows from the shared aggregate, as on the panel schedule PDF (#191) */}
+                {demandResult.demandBreakdown.map(row => (
+                  <tr key={row.loadType} className="border-t border-gray-100">
+                    <td className="p-2">{row.loadType}</td>
+                    <td className="p-2 text-center font-mono">{(row.connectedVA / 1000).toFixed(2)}</td>
+                    <td className="p-2 text-center font-mono">{row.demandFactor.toFixed(2)}</td>
+                    <td className="p-2 text-center font-mono font-semibold">{(row.demandVA / 1000).toFixed(2)}</td>
+                    <td className="p-2 text-gray-500">{row.necReference.replace(/^NEC /, '')}</td>
                   </tr>
                 ))}
               </tbody>
@@ -2042,8 +2060,8 @@ export const PanelSchedule: React.FC<PanelScheduleProps> = ({ project }) => {
                   <td className="p-2">TOTALS</td>
                   <td className="p-2 text-center font-mono">{demandResult.totalConnectedLoad_kVA.toFixed(2)}</td>
                   <td className="p-2 text-center">—</td>
-                  <td className="p-2 text-center">—</td>
                   <td className="p-2 text-center font-mono text-[#2d3b2d]">{demandResult.totalDemandLoad_kVA.toFixed(2)}</td>
+                  <td className="p-2" />
                 </tr>
               </tfoot>
             </table>
@@ -2086,7 +2104,9 @@ export const PanelSchedule: React.FC<PanelScheduleProps> = ({ project }) => {
                     {!dwellingUnitDemand &&
                       aggregatedLoad &&
                       aggregatedLoad.totalDemandVA > 0 &&
-                      aggregatedLoad.totalDemandVA < demandResult.totalDemandLoad_kVA * 1000 - 1 && (
+                      (aggregatedLoad.totalDemandVA < demandResult.totalDemandLoad_kVA * 1000 - 1 ||
+                        // The direct demand already carries an EVEMS clamp (#191)
+                        demandResult.necReferences.some(r => r.includes('625.42'))) && (
                         // Name the method that lowered the demand, from the
                         // calculation's own references (#127: a two-unit
                         // 220.85 MDP has no EVEMS).

@@ -36,7 +36,7 @@ What stays with the owner: NEC interpretations (Escalation Rule 1), Stable Modul
    NOTES=<anything that looked wrong, even outside the steps>
    ```
    Compare its values with yours line by line. A disagreement blocks the PR until explained.
-6. **Regression spec.** Turn the steps into `tests/e2e/issues/issue-<N>.spec.ts`: QA project by name, assert the expected values from step 1 (as text in the UI), screenshot on failure. It must pass on the branch. Copy the shape of an existing spec in `tests/e2e/issues/`.
+6. **Regression spec.** Turn the steps into `tests/e2e/issues/issue-<N>.spec.ts`: QA project by name, assert the expected values from step 1 (as text in the UI), screenshot on failure. It must pass on the branch. Copy the shape of an existing spec in `tests/e2e/issues/`. Then run the whole folder (`npx playwright test tests/e2e/issues/`), not only the new spec: CI does not run these, and a fix that changes a value on purpose leaves an older spec asserting the old one (#202 broke #194's spec this way).
 7. **Evidence in the PR.** The body gets:
    ```
    ## UI verification
