@@ -4,6 +4,13 @@ All notable changes to SparkPlan.
 
 ---
 
+## 2026-11-18: The EV Panel Builder's NEC references say what each section does (#241)
+
+- **The builder cited "625.41 - Electric Vehicle Coupler" and "625.44 - … Demand Factors".** There is no EVSE demand factor. The list now says what each cited section does in the builder: the EVSE load at nameplate (NEC 2020, 220.14(A)) or the larger of 7,200 VA and nameplate (NEC 2023, 220.57), by the project's edition; 625.41 for the 125% overcurrent protection and conductors; 625.42 for the EVEMS setpoint on the feeder and service; 215.2(A)(1) / 230.42(A)(1) for the 25% of continuous loads; and 408.30 for the panel's rating.
+- On a project with no panels yet, the preview shows the new panel's demand and design load instead of "—".
+
+---
+
 ## 2026-11-18: A deleted row no longer comes back after a refetch (#234)
 
 - **Removing something right after another change could make it reappear.** Every data list (circuits, panels, projects, attachments, permits and the rest) reloads in full whenever the database reports a change, and shows your own edits before the save finishes. A reload that started *before* a delete could finish *after* it and put the deleted row back. The row then stayed until the next reload, which never came if the live connection had dropped. Lists now ignore a reload that overlaps one of your own changes, and reload once after your changes finish.

@@ -116,13 +116,14 @@ export const EVPanelTemplates: React.FC<EVPanelTemplatesProps> = ({ project }) =
   // reads this, not a separate breaker sum).
   const preview = useMemo(() => {
     const mdp = panels.find(p => p.is_main);
-    if (!mdp) return null;
+    // No MDP yet: the panel on its own (its demand doesn't depend on one; the
+    // service check below needs the MDP and stays hidden) — was "—" (#241)
     const panel = {
       ...builderTemplate.panel,
       id: 'ev-panel-preview',
       is_main: false,
-      fed_from_type: 'panel',
-      fed_from: mdp.id,
+      fed_from_type: mdp ? 'panel' : 'service',
+      fed_from: mdp ? mdp.id : null,
       fed_from_transformer_id: null,
     } as unknown as PanelRow;
     const rows = builderTemplate.circuits.map((c, i) => ({
@@ -563,9 +564,15 @@ export const EVPanelTemplates: React.FC<EVPanelTemplatesProps> = ({ project }) =
       <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 text-xs text-gray-600">
         <p className="font-medium mb-2">NEC References:</p>
         <ul className="space-y-1">
-          <li>• NEC 625.41 - Electric Vehicle Coupler</li>
-          <li>• NEC 625.42 - Electric Vehicle Supply Equipment Load Management (EVEMS)</li>
-          <li>• NEC 625.44 - Electric Vehicle Supply Equipment Demand Factors</li>
+          {/* #241: what each section does in this builder (CLAUDE.md, PE rulings
+              #192/#194/#198/#225); there is no EVSE demand factor */}
+          <li>• {necEdition === '2023'
+            ? 'NEC 220.57 - EVSE load: the larger of 7,200 VA or the nameplate rating, at 100%'
+            : 'NEC 220.14(A) - EVSE load at the nameplate rating, at 100%'}</li>
+          <li>• NEC 625.41 - EV branch circuit overcurrent protection and conductors at 125% of the charger's rating</li>
+          <li>• NEC 625.42 - EVEMS: the setpoint limits the load on the feeder and the service</li>
+          <li>• NEC 215.2(A)(1) / 230.42(A)(1) - Feeder and service: the load + 25% of the continuous loads (EV charging)</li>
+          <li>• NEC 408.30 - Panelboard rating: at least the feeder design load</li>
           <li>• NEC 210.19 - Conductors - Minimum Ampacity and Size</li>
           <li>• NEC 310.16 - Allowable Ampacities of Insulated Conductors</li>
         </ul>
