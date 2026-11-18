@@ -4,6 +4,7 @@ One note per hard problem, written by the model that solved it via the `extract-
 Each entry: `- [title](file.md) — reusable rule`.
 
 <!-- Newest first -->
+- [EV Panel Builder's "Create" left an empty, service-fed panel](2026-11-18-ev-builder-create.md) — a cast at an insert boundary hides a schema mismatch: map to the real Insert type in a tested pure function; check hooks that return null on error; a fast spec finds the load race a manual pass misses
 - [A single-family service read only the MDP's own circuits](2026-11-18-sf-service-subpanels.md) — a service-level calc reads the whole tree (`circuitsUnderPanel`); a `panel_id === mdp.id` filter is a red flag; synthesized display rows (feeder rows) must never enter a calc
 - [Five tools each answered "is the service big enough?" their own way](2026-11-18-service-check-everywhere.md) — one function named for the question, read by every tool; model the future state in memory for what-if checks; label what cannot be made right; e2e on a page showing the last saved report waits for the new save
 - [An EVEMS setpoint could not be edited or removed](2026-11-18-evems-setpoint-edit.md) — data hidden from every list needs one visible owner that can edit it; a fixture-mutating spec resets in `finally`; import browser-only paths through a variable in page.evaluate
