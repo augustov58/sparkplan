@@ -37,6 +37,7 @@ import {
   type DwellingSummaryRow,
   isDwellingUnitPanel,
 } from '../services/calculations/residentialLoad';
+import { isEvseDescription } from '../data/nec/evse-load';
 import type { LoadTypeCode } from '../types';
 import { formatPanelVoltageDisplay } from '../lib/electricalDisplay';
 
@@ -125,6 +126,10 @@ export const PanelSchedule: React.FC<PanelScheduleProps> = ({ project }) => {
   const [editingSetpointPanelId, setEditingSetpointPanelId] = useState<string | null>(null);
   const editingSetpoint = !!selectedPanelId && editingSetpointPanelId === selectedPanelId;
   const [setpointDraftVA, setSetpointDraftVA] = useState(0);
+  // #222: the chargers on the panel (nameplate), for "Add EVEMS setpoint"
+  const panelEvseVA = panelCircuits
+    .filter(c => isEvseDescription(c.description))
+    .reduce((sum, c) => sum + (c.load_watts || 0), 0);
 
   // Find downstream panels fed from this panel
   const downstreamPanels = useMemo(() => {
@@ -496,18 +501,51 @@ export const PanelSchedule: React.FC<PanelScheduleProps> = ({ project }) => {
   // marker on the panel, so its chargers count at full load again.
   const saveSetpoint = useCallback(async () => {
     const marker = evemsSetpointMarker ?? evemsMarkers[0];
-    if (!marker || !(setpointDraftVA > 0)) return;
+    if (!(setpointDraftVA > 0) || !selectedPanel) return;
+    if (!marker) {
+      // #222: add one — a hidden metadata row in the panel's highest free
+      // slot, after the real circuits (and any breaker-fed feeder)
+      const taken = new Set<number>();
+      for (const c of circuits.filter(x => x.panel_id === selectedPanel.id)) {
+        for (let k = 0; k < (c.pole || 1); k++) taken.add(c.circuit_number + 2 * k);
+      }
+      for (const p of panels) {
+        if (p.fed_from === selectedPanel.id && typeof p.fed_from_circuit_number === 'number') {
+          for (let k = 0; k < (p.phase === 3 ? 3 : 2); k++) taken.add(p.fed_from_circuit_number + 2 * k);
+        }
+      }
+      const spaces = selectedPanel.num_spaces || 42;
+      let slot = spaces;
+      while (slot > 1 && taken.has(slot)) slot--;
+      if (taken.has(slot)) slot = spaces + 1;
+      await createCircuit({
+        project_id: project.id,
+        panel_id: selectedPanel.id,
+        circuit_number: slot,
+        description: EVEMS_SETPOINT_DESCRIPTION,
+        load_type: 'O',
+        load_watts: Math.round(setpointDraftVA),
+        breaker_amps: 20,
+        pole: 1,
+        conductor_size: '12 AWG',
+        is_proposed: true,
+      });
+      setEditingSetpointPanelId(null);
+      return;
+    }
     await updateCircuit(marker.id, {
       description: EVEMS_SETPOINT_DESCRIPTION,
       load_watts: Math.round(setpointDraftVA),
     });
     setEditingSetpointPanelId(null);
-  }, [evemsSetpointMarker, evemsMarkers, setpointDraftVA, updateCircuit]);
+  }, [evemsSetpointMarker, evemsMarkers, setpointDraftVA, updateCircuit, createCircuit, selectedPanel, circuits, panels, project.id]);
 
   const removeSetpoint = useCallback(async () => {
     if (!confirm('Remove the EVEMS setpoint from this panel? Its chargers will count at full load on the feeder and the service.')) return;
-    for (const marker of evemsMarkers) await deleteCircuit(marker.id);
+    // Close the editor first: the card goes at once (optimistic), and a quick
+    // "Add EVEMS setpoint" must not be closed when the delete returns (#222)
     setEditingSetpointPanelId(null);
+    for (const marker of evemsMarkers) await deleteCircuit(marker.id);
   }, [evemsMarkers, deleteCircuit]);
 
   // Building type and single-family dwelling context for the Load Summary
@@ -2169,6 +2207,65 @@ export const PanelSchedule: React.FC<PanelScheduleProps> = ({ project }) => {
                 </div>
               </div>
             </div>
+
+            {/* #222: a panel with chargers and no setpoint — add one */}
+            {evemsMarkers.length === 0 && selectedPanel && panelEvseVA > 0 && (
+              <div className="border border-amber-300 border-dashed rounded-lg p-4">
+                <div className="flex items-center justify-between gap-2">
+                  <h4 className="font-semibold text-sm text-amber-900 flex items-center gap-2">
+                    <Settings className="w-4 h-4" /> EVEMS SETPOINT (NEC 625.42)
+                  </h4>
+                  {!editingSetpoint && (
+                    <button
+                      onClick={() => { setSetpointDraftVA(0); setEditingSetpointPanelId(selectedPanel.id); }}
+                      className="flex items-center gap-1 px-2 py-1 text-xs text-amber-900 border border-amber-300 rounded hover:bg-amber-100"
+                    >
+                      <Plus className="w-3 h-3" /> Add EVEMS setpoint
+                    </button>
+                  )}
+                </div>
+                <p className="text-xs text-gray-600 mt-1">
+                  No EVEMS on this panel: its chargers count at full load ({(panelEvseVA / 1000).toFixed(1)} kVA).
+                  Add the controller's setpoint if an energy management system limits them.
+                </p>
+                {editingSetpoint && (
+                  <div className="mt-3">
+                    <div className="flex items-end gap-2">
+                      <label className="flex-1">
+                        <span className="text-[10px] uppercase text-amber-800 block">Setpoint (VA)</span>
+                        <input
+                          type="number"
+                          min={1}
+                          step="any"
+                          aria-label="EVEMS setpoint (VA)"
+                          value={setpointDraftVA || ''}
+                          onChange={e => setSetpointDraftVA(parseFloat(e.target.value) || 0)}
+                          className="w-full text-sm border border-amber-300 rounded px-2 py-1 bg-white"
+                        />
+                      </label>
+                      <button
+                        onClick={saveSetpoint}
+                        disabled={!(setpointDraftVA > 0)}
+                        className="flex items-center gap-1 px-3 py-1.5 text-xs text-white bg-[#2d3b2d] rounded disabled:opacity-50"
+                      >
+                        <Save className="w-3 h-3" /> Save
+                      </button>
+                      <button
+                        onClick={() => setEditingSetpointPanelId(null)}
+                        className="flex items-center gap-1 px-3 py-1.5 text-xs text-gray-700 border border-gray-300 rounded bg-white"
+                      >
+                        <X className="w-3 h-3" /> Cancel
+                      </button>
+                    </div>
+                    {setpointDraftVA >= panelEvseVA && (
+                      <p className="text-xs text-amber-800 mt-2">
+                        At or above the chargers' load ({(panelEvseVA / 1000).toFixed(1)} kVA): this setpoint limits nothing.
+                      </p>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
 
             {/* NEC 625.42 EVEMS Setpoint Info (when an explicit setpoint marker is present) */}
             {evemsMarkers.length > 0 && selectedPanel && (
