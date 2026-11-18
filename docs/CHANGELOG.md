@@ -4,6 +4,14 @@ All notable changes to SparkPlan.
 
 ---
 
+## 2026-11-18: Non-dwelling lighting cites Table 220.42 "All others" (#218)
+
+- **Every commercial lighting row cited "Table 220.42 (Office Buildings)"**, and so did a multifamily building's common-area panel. Table 220.42 has no office row. Occupancies it doesn't list fall under **All others** (100%), and that is what the in-app demand table and the packet's E-101 now print (the panel schedule pages print the section alone, as they do every citation). The 100% factor was already right, so no number changes.
+- The legacy Load Calculator mapped industrial projects to the "Warehouses (storage)" row. They now use All others too, so a later correction to the warehouse row can't quietly give a factory a storage discount.
+- Filed for the code book: the hotel, warehouse and store rows of the same table (#236), and Article 220's NEC 2020 vs 2023 numbering (#237).
+
+---
+
 ## 2026-11-18: The Service Upgrade Wizard names the new load and the service check's sections (#214)
 
 - **The "Proposed Load" card read "245A continuous load"**, though only the EV, sign and show-window part of a new load is continuous. It now reads "245A new load" and gives the basis for the method: under the calculated method, "NEC 220 demand increase + 25% of its continuous loads, NEC 230.42(A)(1)"; under the measured methods, "continuous loads at 125%".

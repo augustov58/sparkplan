@@ -395,8 +395,8 @@ function calculateCommercialIndustrialLoad(loads: LoadItem[], settings: ProjectS
   const totalLightingVA = lightingLoads.reduce((sum, load) => sum + load.watts, 0);
   const occupancyMapping: Record<typeof settings.occupancyType, string> = {
     dwelling: 'dwelling',
-    commercial: 'office',
-    industrial: 'warehouse'
+    commercial: 'all_others',
+    industrial: 'all_others' // not 'warehouse': a storage warehouse is its own row (#218, #236)
   };
   const lightingDemand = getLightingDemandFactor(
     occupancyMapping[settings.occupancyType],

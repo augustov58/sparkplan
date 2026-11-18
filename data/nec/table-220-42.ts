@@ -1,8 +1,12 @@
 import { OccupancyLightingDemand } from '../../types/nec-types';
 
 /**
- * NEC Table 220.42 - Lighting Load Demand Factors
- * 2023 NEC Edition
+ * NEC Table 220.42 - Lighting Load Demand Factors (NEC 2020 numbering;
+ * the edition question is #237)
+ *
+ * Read today: 'dwelling' and 'all_others'. The hotel / warehouse / store
+ * rows don't match the book and nothing reads them (#236) — check them
+ * against the code book before wiring any occupancy to them.
  *
  * This table provides demand factors for general lighting loads
  * based on occupancy type. Demand factors reduce the total connected
@@ -31,11 +35,13 @@ export const TABLE_220_42: OccupancyLightingDemand[] = [
     necReference: 'Table 220.42 (Warehouses - Storage)'
   },
   {
-    occupancyType: 'office',
+    // The table's catch-all row: every occupancy it doesn't list (offices,
+    // stores, industrial, common areas). There is no "office" row (#218).
+    occupancyType: 'all_others',
     firstVA: Infinity,
-    firstDemand: 1.0, // 100% - no demand factor
+    firstDemand: 1.0, // 100% - total volt-amperes
     remainderDemand: 1.0,
-    necReference: 'Table 220.42 (Office Buildings)'
+    necReference: 'Table 220.42 (All others)'
   },
   {
     occupancyType: 'store',
@@ -49,7 +55,7 @@ export const TABLE_220_42: OccupancyLightingDemand[] = [
 /**
  * Get lighting demand factor for a given occupancy type and total VA
  *
- * @param occupancyType - Type of occupancy (dwelling, hotel, warehouse, office, store)
+ * @param occupancyType - Type of occupancy (dwelling, all_others, hotel, warehouse, store)
  * @param totalVA - Total connected lighting load in VA
  * @returns Object with demand VA, demand factor, and NEC reference
  */

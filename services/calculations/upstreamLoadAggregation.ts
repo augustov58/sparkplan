@@ -830,7 +830,7 @@ function applyDemandFactors(
   // 1. Lighting - Use Table 220.42 based on occupancy
   if (loads.lighting > 0) {
     // Map project occupancy to table occupancy
-    let tableOccupancy = occupancyType === 'dwelling' ? 'dwelling' : 'office';
+    let tableOccupancy = occupancyType === 'dwelling' ? 'dwelling' : 'all_others'; // #218
     
     const lightingDemand = getLightingDemandFactor(tableOccupancy, loads.lighting);
     demandBreakdown.push({
