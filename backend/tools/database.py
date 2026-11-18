@@ -156,6 +156,18 @@ async def calculate_total_panel_load(supabase: Client, panel_id: str) -> float:
         return 0.0
 
 
+# #193: a connected-load estimate, NOT the service check. The app's check
+# (Article 220 demand + 25% of continuous loads, NEC 230.42(A)(1); E-102 and
+# the Service Upgrade Wizard) lives in the TypeScript calc services and isn't
+# reproduced here. Every result says so in "basis", so an agent never
+# presents it as the NEC calculation.
+SERVICE_ESTIMATE_BASIS = (
+    "ESTIMATE: connected load (sum of circuit load_watts, no NEC 220 demand "
+    "factors, no NEC 230.42(A)(1) 25% continuous-load adder). Not the service "
+    "check: use the app's Service Upgrade Wizard or the permit packet's "
+    "E-101/E-102 for the NEC calculation."
+)
+
 async def get_service_utilization(supabase: Client, project_id: str) -> Dict[str, Any]:
     """
     Calculate current service utilization
@@ -201,7 +213,8 @@ async def get_service_utilization(supabase: Client, project_id: str) -> Dict[str
             "phases": phases,
             "service_capacity_va": service_capacity_va,
             "total_load_va": total_load_va,
-            "utilization_percent": utilization_percent
+            "utilization_percent": utilization_percent,
+            "basis": SERVICE_ESTIMATE_BASIS,
         }
 
     except Exception as e:
@@ -332,11 +345,12 @@ async def check_service_capacity(
         remaining_after_change = service_size - new_total_amps
 
         # Determine if change can proceed
-        can_proceed = new_utilization <= 80  # NEC recommends 80% max continuous
+        can_proceed = new_utilization <= 80  # design margin on the estimate, not an NEC limit (#193)
         requires_upgrade = new_utilization > 100
         warning = 80 < new_utilization <= 100
 
         return {
+            "basis": SERVICE_ESTIMATE_BASIS,
             "can_proceed": can_proceed,
             "requires_service_upgrade": requires_upgrade,
             "warning": warning,

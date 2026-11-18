@@ -7,15 +7,24 @@ import {
 } from '../data/ev-panel-templates';
 import { usePanels } from '../hooks/usePanels';
 import { useCircuits } from '../hooks/useCircuits';
+import { useTransformers } from '../hooks/useTransformers';
+import { useProjectNecEdition } from '../hooks/useProjectNecEdition';
+import { scheduleServiceCheck } from '../lib/storedCalcs';
+import type { Database } from '../lib/database.types';
 import type { Project } from '../types';
+
+type PanelRow = Database['public']['Tables']['panels']['Row'];
+type CircuitRow = Database['public']['Tables']['circuits']['Row'];
 
 interface EVPanelTemplatesProps {
   project: Project;
 }
 
 export const EVPanelTemplates: React.FC<EVPanelTemplatesProps> = ({ project }) => {
-  const { createPanel } = usePanels(project.id);
-  const { createCircuit } = useCircuits(project.id);
+  const { panels, createPanel } = usePanels(project.id);
+  const { circuits, createCircuit } = useCircuits(project.id);
+  const { transformers } = useTransformers(project.id);
+  const necEdition = useProjectNecEdition(project);
 
   // Configuration state
   const [chargerType, setChargerType] = useState<ChargerTypeOption>('Level 2 (48A)');
@@ -72,6 +81,50 @@ export const EVPanelTemplates: React.FC<EVPanelTemplatesProps> = ({ project }) =
       totalPowerKW: numberOfChargers * specs.kW
     };
   }, [chargerType, numberOfChargers, useEVEMS, simultaneousChargers, includeSpare, includeLighting]);
+
+  // #193: the service check once this panel is on the service (under the
+  // MDP): the project's Article 220 load + 25% of its continuous loads, the
+  // template's chargers included — the check E-102 and the Service Upgrade
+  // Wizard make. Was: the template's breaker sizes against the service
+  // rating, ignoring the loads already on it.
+  const serviceWithPanel = useMemo(() => {
+    const mdp = panels.find(p => p.is_main);
+    if (!mdp) return null;
+    const preview = generateCustomEVPanel({
+      projectId: project.id,
+      config: {
+        chargerType,
+        numberOfChargers,
+        useEVEMS,
+        simultaneousChargers: useEVEMS ? simultaneousChargers : undefined,
+        includeSpare,
+        includeLighting,
+      },
+    });
+    const previewPanel = {
+      ...preview.panel,
+      id: 'ev-panel-preview',
+      is_main: false,
+      fed_from_type: 'panel',
+      fed_from: mdp.id,
+      fed_from_transformer_id: null,
+    } as unknown as PanelRow;
+    const previewCircuits = preview.circuits.map((c, i) => ({
+      id: `ev-panel-preview-${i}`,
+      panel_id: previewPanel.id,
+      project_id: project.id,
+      circuit_number: c.circuitNumber,
+      description: c.description,
+      load_watts: c.loadVA,
+      load_type: 'O',
+      breaker_amps: c.breakerAmps,
+      pole: c.poles,
+      is_proposed: true,
+    }) as unknown as CircuitRow);
+    return scheduleServiceCheck(
+      project, [...panels, previewPanel], [...circuits, ...previewCircuits], transformers, necEdition,
+    );
+  }, [project, panels, circuits, transformers, necEdition, chargerType, numberOfChargers, useEVEMS, simultaneousChargers, includeSpare, includeLighting]);
 
   const handleApplyConfiguration = async () => {
     setApplyStatus('applying');
@@ -413,16 +466,18 @@ export const EVPanelTemplates: React.FC<EVPanelTemplatesProps> = ({ project }) =
           </div>
 
           {/* Service Upgrade Warning */}
-          {panelSpecs.totalLoad > (project.serviceAmps || 200) && (
+          {serviceWithPanel && !serviceWithPanel.sufficient && (
             <div className="bg-orange-50 border border-orange-200 rounded-lg p-4">
               <div className="flex items-start gap-2">
                 <AlertCircle className="w-5 h-5 text-orange-600 flex-shrink-0 mt-0.5" />
                 <div>
                   <h4 className="font-medium text-orange-900 mb-1">Service Upgrade May Be Required</h4>
                   <p className="text-sm text-orange-800">
-                    This configuration requires <strong>{panelSpecs.totalLoad}A</strong> of capacity,
-                    but your current service is only <strong>{project.serviceAmps || 200}A</strong>.
-                    Use the <strong>Service Upgrade Wizard</strong> to determine if an upgrade is needed per NEC 220.87.
+                    With this panel, the service check is <strong>{Math.round(serviceWithPanel.checkAmps)}A</strong>
+                    {' '}on the <strong>{serviceWithPanel.serviceAmps}A</strong> service: the NEC 220 load of
+                    {' '}{serviceWithPanel.loadKVA.toFixed(1)} kVA plus 25% of the continuous loads
+                    {' '}({serviceWithPanel.adderKVA.toFixed(1)} kVA, NEC 230.42(A)(1)), the loads already on the
+                    {' '}service included. Use the <strong>Service Upgrade Wizard</strong> to check the upgrade per NEC 220.87.
                   </p>
                 </div>
               </div>

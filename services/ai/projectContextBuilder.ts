@@ -10,7 +10,7 @@
 import type { Database } from '@/lib/database.types';
 import { isEVEMSMarkerCircuit, type DwellingAggregateOptions } from '@/services/calculations/upstreamLoadAggregation';
 import type { NecEdition } from '../../data/nec/evse-load';
-import { multiFamilyLoadFromSettings } from '../../lib/storedCalcs';
+import { multiFamilyLoadFromSettings, type ScheduleServiceCheck } from '../../lib/storedCalcs';
 import {
   calculateAllCumulativeVoltageDrops,
   calculateCumulativeForFeeder,
@@ -32,6 +32,12 @@ export interface ProjectContext {
   necEdition?: NecEdition;
   /** Dwelling unit / house panel rules for feeder loads, as the Feeder Manager uses them (#179). */
   dwelling?: DwellingAggregateOptions;
+  /**
+   * The service check E-102 and the Service Upgrade Wizard use
+   * (`scheduleServiceCheck`, #193). Absent → `totalLoad.demandVA` is a rough
+   * estimate and the context says so.
+   */
+  serviceCheck?: ScheduleServiceCheck | null;
   serviceVoltage: number;
   servicePhase: 1 | 3;
   summary: string;
@@ -192,6 +198,8 @@ export function buildProjectContext(
   necEdition?: NecEdition,
   /** `isExistingConstructionProject(project)`: a unit panel with proposed circuits takes 220.83 (#155, #179). */
   existingBuilding?: boolean,
+  /** `scheduleServiceCheck(project, …)`: the service check E-102 uses (#193). */
+  serviceCheck?: ScheduleServiceCheck | null,
 ): ProjectContext {
   // Build panel summaries with hierarchy information
   const panelSummaries: PanelSummary[] = panels.map(panel => {
@@ -314,8 +322,9 @@ export function buildProjectContext(
 
   // Calculate total load
   const totalConnectedVA = circuits.reduce((sum, c) => (isEVEMSMarkerCircuit(c) ? sum : sum + (c.load_watts || 0)), 0);
-  // Estimate demand load (simplified - actual calculation is more complex)
-  const totalDemandVA = totalConnectedVA * 0.8; // Rough 80% demand factor estimate
+  // The NEC 220 load from the shared service check (#193); without it, a
+  // rough connected × 0.8 estimate, labelled as such in the summary
+  const totalDemandVA = serviceCheck ? serviceCheck.loadKVA * 1000 : totalConnectedVA * 0.8;
 
   // Helper to get panel load
   const getPanelLoad = (panelId: string) => {
@@ -431,7 +440,9 @@ ${mainPanel ? `Main Panel: ${mainPanel.name} (${mainPanel.bus_rating}A bus, ${ma
 Total Panels: ${panels.length}
 Total Circuits: ${circuits.length}
 Total Connected Load: ${Math.round(totalConnectedVA / 1000)} kVA
-Estimated Demand Load: ${Math.round(totalDemandVA / 1000)} kVA
+${serviceCheck
+  ? `NEC 220 Demand Load: ${(serviceCheck.loadKVA).toFixed(1)} kVA\nService check (NEC 220 load + 25% of continuous loads, NEC 230.42(A)(1); the check E-102 makes): ${Math.round(serviceCheck.checkAmps)} A of ${serviceCheck.serviceAmps} A (${Math.round(serviceCheck.utilizationPct)}%, ${serviceCheck.sufficient ? 'sufficient' : 'INSUFFICIENT'})`
+  : `Estimated Demand Load (rough: connected × 0.8, not the NEC 220 calculation): ${Math.round(totalDemandVA / 1000)} kVA`}
 ${feeders.length > 0 ? `Feeders: ${feeders.length}` : ''}
 ${transformers.length > 0 ? `Transformers: ${transformers.length}` : ''}${permitsText}${multiFamilyText}${hierarchyText}
   `.trim();
@@ -509,6 +520,7 @@ ${transformers.length > 0 ? `Transformers: ${transformers.length}` : ''}${permit
     estimating: estimatingSummary,
     shortCircuits,
     necEdition,
+    serviceCheck: serviceCheck ?? null,
     dwelling: {
       multiFamily: residentialSettings?.dwellingType === 'multi_family',
       existingBuilding: existingBuilding ?? false,

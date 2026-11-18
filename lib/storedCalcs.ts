@@ -262,6 +262,54 @@ function serviceAmps(project: Project, kVA: number): number {
   return Math.round((kVA * 1000) / (project.servicePhase === 3 ? voltage * Math.sqrt(3) : voltage));
 }
 
+/**
+ * "Is the service sufficient?" from the panel schedule (#193): the Article
+ * 220 load (`projectDemandSplit`, E-101) plus 25% of the continuous loads
+ * (230.42(A)(1), PE ruling 2026-11-07, #192), in service amps, against the
+ * service rating — the check E-102 makes on the calculated method and the
+ * Service Upgrade Wizard prints. Inspector Mode, the Copilot and the EV Panel
+ * Builder read it rather than a rule of their own.
+ */
+export interface ScheduleServiceCheck {
+  /** Article 220 load, kVA (existing + proposed). */
+  loadKVA: number;
+  /** 25% of the continuous loads, kVA. */
+  adderKVA: number;
+  /** (load + adder) in service amps, unrounded (÷ V√3 on a 3-phase service). */
+  checkAmps: number;
+  /** The rating compared against: `project.serviceAmps`, else the MDP main breaker (as the packet). */
+  serviceAmps: number;
+  utilizationPct: number;
+  sufficient: boolean;
+}
+
+/** Null without an MDP or circuits. */
+export function scheduleServiceCheck(
+  project: Project,
+  panels: PanelRow[],
+  circuits: CircuitRow[],
+  transformers: TransformerRow[],
+  necEdition: NecEdition,
+): ScheduleServiceCheck | null {
+  const mdp = panels.find(p => p.is_main);
+  if (!mdp || circuits.length === 0) return null;
+  const split = projectDemandSplit(project, panels, circuits, transformers, necEdition);
+  const loadKVA = split.existingKVA + split.proposedKVA;
+  const adderKVA = split.existingAdderKVA + split.proposedAdderKVA;
+  const voltage = project.serviceVoltage || mdp.voltage || 240;
+  const threePhase = (project.servicePhase ?? mdp.phase) === 3;
+  const checkAmps = ((loadKVA + adderKVA) * 1000) / (threePhase ? voltage * Math.sqrt(3) : voltage);
+  const rating = project.serviceAmps || mdp.main_breaker_amps || mdp.bus_rating || 0;
+  return {
+    loadKVA,
+    adderKVA,
+    checkAmps,
+    serviceAmps: rating,
+    utilizationPct: rating > 0 ? (checkAmps / rating) * 100 : 0,
+    sufficient: rating > 0 && checkAmps <= rating,
+  };
+}
+
 /** `settings.residential.multiFamilyLoadResult`. */
 export interface StoredMultiFamilyLoad {
   totalDemandVA: number;

@@ -94,6 +94,18 @@ export interface ProjectInspectionData {
     gecSize: string;
     bonding: string[];
   };
+  /**
+   * The service check from the panel schedule (`lib/storedCalcs.ts::
+   * scheduleServiceCheck`, #193): Article 220 load + 25% of continuous loads
+   * vs the service rating. No check is reported without it.
+   */
+  serviceCheck?: {
+    loadKVA: number;
+    adderKVA: number;
+    checkAmps: number;
+    serviceAmps: number;
+    utilizationPct: number;
+  } | null;
 }
 
 // ============================================================================
@@ -635,62 +647,48 @@ function checkMainPanelGrounding(
 function checkServiceCapacity(
   data: ProjectInspectionData
 ): InspectionIssue | null {
+  // #193: the shared service check (the one E-102 and the Service Upgrade
+  // Wizard use), not a connected-load × 0.8 estimate of its own
   const mainPanel = data.panels.find(p => p.is_main);
-  if (!mainPanel) return null;
-  
-  // Calculate total demand load from all panels
-  let totalDemandVA = 0;
-  data.panels.forEach(panel => {
-    const panelLoad = calculatePanelLoad(panel.id, data.circuits);
-    // Apply general demand factor estimate (this is simplified)
-    totalDemandVA += panelLoad * 0.8; // 80% demand factor estimate
-  });
-  
-  const serviceAmps = mainPanel.main_breaker_amps || mainPanel.bus_rating;
-  const voltage = mainPanel.voltage;
-  const phase = mainPanel.phase;
-  
-  let serviceCapacityVA: number;
-  if (phase === 1) {
-    serviceCapacityVA = serviceAmps * voltage;
-  } else {
-    serviceCapacityVA = serviceAmps * voltage * Math.sqrt(3);
-  }
-  
-  const utilization = (totalDemandVA / serviceCapacityVA) * 100;
-  
-  if (utilization > 100) {
+  const check = data.serviceCheck;
+  if (!mainPanel || !check || check.serviceAmps <= 0) return null;
+
+  const amps = Math.round(check.checkAmps);
+  const utilization = Math.round(check.utilizationPct);
+  const basis = `the NEC 220 load of ${check.loadKVA.toFixed(1)} kVA plus 25% of the continuous loads (${check.adderKVA.toFixed(1)} kVA)`;
+
+  if (check.checkAmps > check.serviceAmps) {
     return {
       id: generateId(),
       category: 'service',
       severity: 'critical',
-      necArticle: 'NEC 230.42',
+      necArticle: 'NEC 230.42(A)(1)',
       title: 'Service Undersized for Load',
-      description: `Calculated demand load of ${Math.round(totalDemandVA / 1000)} kVA exceeds ${serviceAmps}A service capacity of ${Math.round(serviceCapacityVA / 1000)} kVA.`,
+      description: `Service check of ${amps} A (${basis}) exceeds the ${check.serviceAmps} A service.`,
       location: mainPanel.name,
-      currentValue: `${Math.round(totalDemandVA / 1000)} kVA`,
-      requiredValue: `≤ ${Math.round(serviceCapacityVA / 1000)} kVA`,
-      recommendation: `Upgrade service to accommodate load or reduce connected loads.`,
+      currentValue: `${amps} A`,
+      requiredValue: `≤ ${check.serviceAmps} A`,
+      recommendation: `Upgrade the service, add load management (EVEMS, NEC 625.42) or reduce the new loads. The Service Upgrade Wizard and E-102 show the same check.`,
       autoFixable: false,
     };
   }
-  
+
   if (utilization > 80) {
     return {
       id: generateId(),
       category: 'service',
       severity: 'warning',
-      necArticle: 'NEC 230.42',
+      necArticle: 'NEC 230.42(A)(1)',
       title: 'Service Nearing Capacity',
-      description: `Service is at ${Math.round(utilization)}% of capacity. Consider future expansion needs.`,
+      description: `Service check of ${amps} A (${basis}) is ${utilization}% of the ${check.serviceAmps} A service. Consider future expansion needs.`,
       location: mainPanel.name,
-      currentValue: `${Math.round(utilization)}%`,
-      requiredValue: '≤ 80%',
+      currentValue: `${utilization}%`,
+      requiredValue: '≤ 80% (design margin, advisory)',
       recommendation: `Plan for service upgrade if additional loads are anticipated.`,
       autoFixable: false,
     };
   }
-  
+
   return null;
 }
 

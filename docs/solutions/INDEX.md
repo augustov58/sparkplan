@@ -4,6 +4,7 @@ One note per hard problem, written by the model that solved it via the `extract-
 Each entry: `- [title](file.md) — reusable rule`.
 
 <!-- Newest first -->
+- [Five tools each answered "is the service big enough?" their own way](2026-11-18-service-check-everywhere.md) — one function named for the question, read by every tool; model the future state in memory for what-if checks; label what cannot be made right; e2e on a page showing the last saved report waits for the new save
 - [An EVEMS setpoint could not be edited or removed](2026-11-18-evems-setpoint-edit.md) — data hidden from every list needs one visible owner that can edit it; a fixture-mutating spec resets in `finally`; import browser-only paths through a variable in page.evaluate
 - [One dwelling unit feeder printed three different loads](2026-11-18-dwelling-unit-feeders.md) — route every reader of a quantity through the function its own page prints, keyed by panel role in the shared aggregate; a defaulted prop hides a missing caller; enumerate optional-argument callers with a script (tsc cannot)
 - [The MDP ignored a downstream EVEMS setpoint](2026-11-18-mdp-downstream-evems-clamp.md) — a limit on the feeder AND the service holds at every level above the device; walk the subtree as the shared helper does, and use two numbers that must agree on one page as the oracle
