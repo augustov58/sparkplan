@@ -7,7 +7,7 @@ delete these freely; never point a spec at the owner's account.
 Add a row when a scenario needs a project none of these covers. No row IDs or
 stored settings values here (public repo).
 
-Last updated: 2026-11-17
+Last updated: 2026-11-18
 
 | Project name | Scenario | Key setup |
 |---|---|---|
@@ -16,3 +16,4 @@ Last updated: 2026-11-17
 | QA Commercial panel | Panel Schedule demand table and cards (#191) | Commercial project (Start from Scratch), main panel "MDP" 208 V 3-phase, seven 1-pole circuits on odd slots: Lighting (L) 3,000 VA; Receptacles (R) 1,800 VA; Water heater (W) 4,500 VA; Unit heater 1 to 4 (H) 3,000 VA each |
 | QA EVEMS panel | Panel Schedule on an EVEMS-managed panel (#191) | Commercial project, main panel "MDP" 208 V 3-phase, "EV Charger #1" to "#4" (O) 11,520 VA each, plus the marker circuit "EVEMS Aggregate Setpoint (NEC 625.42)" 20,000 VA. The chargers are 1-pole for a short setup; the demand values don't depend on poles |
 | QA Feeder sizing | Feeder design load (#190) | Commercial project set to 120/240 V single-phase. MDP 400 A; "EV Panel" and "Office Panel" (200 A, fed from MDP). EV Panel: "EV Charger #1"–"#3" (O) 11,520 VA, 2-pole; "Receptacles" (R) 1,800 VA. Office Panel: "Lighting" (L) 6,000; "Receptacles" (R) 6,000; "Exterior sign" (O) 1,500. Feeders "F-EV" and "F-Office" from MDP, load-based, 50 ft, Cu, 4 current-carrying conductors |
+| QA EVEMS downstream | MDP demand with a downstream EVEMS panel (#210) | A copy of "QA Feeder sizing" (no feeders) plus the marker circuit "EVEMS Aggregate Setpoint (NEC 625.42)" (O) 28,800 VA on EV Panel |

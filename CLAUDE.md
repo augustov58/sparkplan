@@ -198,6 +198,8 @@ the 2020 cycle goes through `applyCodeCycle` / `manifestTextForEdition`.
 
 ### EVEMS Sizing (NEC 625.42)
 Size to setpoint, not full connected load. EVEMS allows service capacity reduction.
+The setpoint limits the feeder AND the service: every aggregate at or above the
+EV panel (MDP included) takes its chargers at the setpoint (#210).
 
 ---
 
@@ -395,6 +397,7 @@ Real mistakes made in this repo, each paired with the rule that prevents recurre
 | The Service Upgrade Wizard called `useCircuits` with a panel ID (it takes a project ID), so its panel-schedule load never loaded. The raw `load_watts` sum behind it (no demand factors, no √3, main-panel breakers only) would have entered 220.87 as "calculated" once the ID was fixed (#185) | A reader of a packet quantity calls the packet's function (`projectDemandSplit`), never a local copy. Before turning on a dead path, run it and compare its number with the packet's. |
 | The service check compared the Article 220 load straight with the service rating under the calculated method, so one charger counted 48 A when calculated and 60 A when measured (#192) | Two numbers: the Article 220 load (100%, E-101) and the service check (+25% of continuous loads per 230.42(A)(1), every method). A ruling about the load is not a ruling about the comparison; ask which one it covers. |
 | The in-app Panel Schedule ran its own demand walk (lighting and water heaters ×1.25, heat ×0.75 for 4+ circuits, dwelling lighting tiers on every panel), and the card showed the shared aggregate only when it was lower (#191). The first fix fed the aggregate a display list that drops the EVEMS marker, so the table ignored the setpoint | An in-app view of a packet quantity reads the packet's function. Never choose between two calculations by which is lower. Don't pass a list filtered for display to a calc; check what the function needs (EVEMS marker circuits). |
+| The Part III aggregate clamped EVSE to the EVEMS setpoint only when it ran on the EV panel itself; the MDP took the chargers at full load, so one page printed its feed-thru rows at 44.1 kVA and its demand at 49.9 kVA (#210) | A limit on the feeder and the service applies at every level above the device: walk the subtree (`collectDownstreamPanelIds`), as `continuousLoadVA` does. Two numbers on one page that must agree (feed-thru rows vs the aggregate) are a free test. |
 | Docs updated with stale "Last Updated" dates; completed features left as "NEXT UP" | Every doc touch updates its date to today; every shipped feature flips its ROADMAP status in the same PR. |
 
 ---
