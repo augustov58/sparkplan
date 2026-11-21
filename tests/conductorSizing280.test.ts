@@ -55,17 +55,17 @@ const ctx = (circuits: unknown[]): ToolContext => ({
 describe('#280 Copilot tools', () => {
   it('check_conductor_sizing: 8 AWG on a 60 A breaker, 48 A EV load → not compliant, minimum 4 AWG', async () => {
     const r = await executeTool('check_conductor_sizing', { conductor_size: '8 AWG', breaker_amps: 60, load_amps: 48, continuous: true }, ctx([]));
-    expect(r.data.compliant).toBe(false); // main: "properly sized" (50 A at 75 °C ≥ 48)
-    expect(r.data.minimumRequiredSize).toBe('4 AWG');
+    expect(r.data!.compliant).toBe(false); // main: "properly sized" (50 A at 75 °C ≥ 48)
+    expect(r.data!.minimumRequiredSize).toBe('4 AWG');
   });
   it('check_conductor_sizing: 6 AWG on 60 A, 44 A → compliant (240.4(B))', async () => {
     const r = await executeTool('check_conductor_sizing', { conductor_size: '6 AWG', breaker_amps: 60, load_amps: 44 }, ctx([]));
-    expect(r.data.compliant).toBe(true);
+    expect(r.data!.compliant).toBe(true);
   });
   const inspect = async (conductorSize: string, breakerAmps: number) => {
     const r = await executeTool('run_quick_inspection', { category: 'circuits' },
       ctx([{ circuitNumber: 1, description: 'Feeder test', panelName: 'P', breakerAmps, conductorSize, loadWatts: 2400 }]));
-    return (r.data.issues as { severity: string; description: string }[]).filter(i => /conductor/.test(i.description));
+    return (r.data!.issues as { severity: string; description: string }[]).filter(i => /conductor/.test(i.description));
   };
   it('run_quick_inspection: 8 AWG on 50 A is flagged (legal only with 75 °C terminations); 8 AWG on 60 A critical; 1 AWG on 150 A fine', async () => {
     // 8 AWG: 40 A at 60 °C; 50 A at 75 °C — legal only if both terminations are listed for 75 °C
@@ -91,7 +91,7 @@ describe('#280 Circuit Sharing and the multifamily generator', () => {
       projectId: 'x', voltage: 240, phase: 1, dwellingUnits: 2, avgUnitSqFt: 1000, serviceAmps: 400,
       commonAreaLoadVA: 5000, hasElectricCooking: true, hasElectricHeat: true, applianceConfig: { heatingKW: kw },
     } as never);
-    const unit = Array.from((g.unitCircuits as Map<string, { description: string; breaker_amps: number; conductor_size: string }[]>).values())[0]!;
+    const unit = Array.from((g.unitCircuits as unknown as Map<number, { description: string; breaker_amps: number; conductor_size: string }[]>).values())[0]!;
     return Object.fromEntries(unit.map(c => [c.description, `${c.breaker_amps} ${c.conductor_size}`]));
   };
   it('generator: 100 A → 1 AWG Cu; 150 A → 1/0 AWG Cu; 15–90 A unchanged', () => {
