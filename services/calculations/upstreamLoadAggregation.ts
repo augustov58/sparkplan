@@ -26,6 +26,8 @@ import { CONTINUOUS_LOAD_ADDER, CONTINUOUS_LOAD_FACTOR, isSignOrShowWindowDescri
 import {
   LARGEST_MOTOR_CATEGORY,
   calculateDwellingUnitPanelLoad,
+  calculateSingleFamilySubpanelLoad,
+  type DwellingPanelLoadSummary,
   calculateTwoUnitDwellingLoad,
   dwellingLoadsFromCircuits,
   isDwellingUnitPanel,
@@ -1211,14 +1213,23 @@ export function calculateAggregatedLoad(
   // unit page's own calculation (Part III, or 220.83 when the permit adds load
   // to the unit, #155), so the unit page, its feeder and the MDP's feed-thru
   // row print one number. A multifamily house panel takes the non-dwelling
-  // Part III rules (220.84(B)). EV panels and single-family subpanels (#217)
-  // keep the per-type cascade.
+  // Part III rules (220.84(B)). A single-family subpanel takes Part III over
+  // its own circuits: no 2-circuit small-appliance minimum, receptacles at
+  // their VA in the 220.42 tiers (PE ruling 2026-11-20, #217). Multifamily EV
+  // panels keep the per-type cascade.
   const role = occupancyType === 'dwelling' && !panel.is_main
     ? dwellingPanelRole(panel, circuits, dwelling)
     : null;
+  const existingBuilding = dwelling?.existingBuilding ?? false;
   const phase2 = role === 'unit'
-    ? dwellingUnitDemand(panelId, panels, circuits, transformers, dwelling?.existingBuilding ?? false, necEdition)
-    : applyDemandFactors(loads, role === 'house' ? 'commercial' : occupancyType, necEdition);
+    ? dwellingPanelDemand(panelId, panels, circuits, transformers, unitCircuits =>
+        calculateDwellingUnitPanelLoad({ circuits: unitCircuits, existingBuilding, necEdition }),
+        `NEC ${article220Citations(necEdition).dwellingUnitLoad}, 220.52, 220.60`)
+    : role === 'subpanel'
+      // A subpanel carries no 3 VA/ft² or 220.52 allowance: only 220.60 leaves load out
+      ? dwellingPanelDemand(panelId, panels, circuits, transformers, subCircuits =>
+          calculateSingleFamilySubpanelLoad({ circuits: subCircuits, necEdition }), 'NEC 220.60')
+      : applyDemandFactors(loads, role === 'house' ? 'commercial' : occupancyType, necEdition);
   let { totalDemandVA } = phase2;
   const { demandBreakdown } = phase2;
   const necReferences = [...phase2.necReferences];
@@ -1438,40 +1449,43 @@ function computeProposedSplit(
 /**
  * A non-MDP panel's rules on a dwelling project (#179): 'unit' for a dwelling
  * unit panel (the unit page's test, `isDwellingUnitPanel`), 'house' for a
- * multifamily house panel, null for everything else (EV panels, single-family
- * subpanels: the per-type cascade).
+ * multifamily house panel, 'subpanel' for any other panel of a single-family
+ * dwelling (#217), null for the rest (multifamily EV panels, or no dwelling
+ * options: the per-type cascade).
  */
 function dwellingPanelRole(
   panel: Panel,
   circuits: Circuit[],
   dwelling: DwellingAggregateOptions | undefined,
-): 'unit' | 'house' | null {
+): 'unit' | 'house' | 'subpanel' | null {
   const own = circuits
     .filter(c => c.panel_id === panel.id)
     .map(c => ({ description: c.description, loadWatts: c.load_watts || 0 }));
   if (isDwellingUnitPanel(panel.name, own)) return 'unit';
   if (dwelling?.multiFamily && isHousePanelName(panel.name)) return 'house';
+  if (dwelling && !dwelling.multiFamily) return 'subpanel';
   return null;
 }
 
 /**
- * A dwelling unit panel's demand (#179): `calculateDwellingUnitPanelLoad`, the
- * function the unit page and the panel-schedule PDF print (#155), over the
- * circuits under the panel. Rows sum to the circuits' connected load (#160):
- * a 0% row carries what Part III counts inside the 220.12 / 220.52 allowances
- * or omits under 220.60.
+ * A dwelling panel's demand from its dwelling summary, over the circuits under
+ * the panel: a unit panel's `calculateDwellingUnitPanelLoad` (#179, the
+ * function the unit page and the panel-schedule PDF print, #155) or a
+ * single-family subpanel's `calculateSingleFamilySubpanelLoad` (#217). Rows
+ * sum to the circuits' connected load (#160): a 0% row carries what Part III
+ * counts inside the 220.12 / 220.52 allowances or omits under 220.60.
  */
-function dwellingUnitDemand(
+function dwellingPanelDemand(
   panelId: string,
   panels: Panel[],
   circuits: Circuit[],
   transformers: Transformer[],
-  existingBuilding: boolean,
-  necEdition: NecEdition,
+  summarize: (panelCircuits: Circuit[]) => DwellingPanelLoadSummary,
+  insideOtherRowsReference: string,
 ): { demandBreakdown: DemandCalculation[]; totalDemandVA: number; necReferences: string[] } {
   const ids = collectDownstreamPanelIds(panelId, panels, transformers);
   const unitCircuits = circuits.filter(c => !!c.panel_id && ids.has(c.panel_id) && !isEVEMSMarkerCircuit(c));
-  const summary = calculateDwellingUnitPanelLoad({ circuits: unitCircuits, existingBuilding, necEdition });
+  const summary = summarize(unitCircuits);
   const demandBreakdown: DemandCalculation[] = summary.rows.map(r => ({
     loadType: r.loadType,
     connectedVA: r.connectedVA,
@@ -1487,7 +1501,7 @@ function dwellingUnitDemand(
       connectedVA: insideOtherRowsVA,
       demandVA: 0,
       demandFactor: 0,
-      necReference: `NEC ${article220Citations(necEdition).dwellingUnitLoad}, 220.52, 220.60`,
+      necReference: insideOtherRowsReference,
     });
   }
   return {

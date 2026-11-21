@@ -4,6 +4,19 @@ All notable changes to SparkPlan.
 
 ---
 
+## 2026-11-20: A single-family subpanel's feeder uses the dwelling calculation, over its own circuits (#217)
+
+- **The feeder load of a subpanel in a single-family house now follows NEC 220 Part III (the dwelling calculation),** as the house's service already does. It counts the subpanel's own circuits:
+  - Lighting and general-use receptacles at their VA, through the dwelling demand factors.
+  - Only the small-appliance and laundry circuits that are actually on the subpanel; the two-circuit minimum stays with the house.
+  - Then the dwelling rules for appliances, cooking, dryers, heating/cooling and the largest motor.
+
+  It used the general per-load-type method and cited a non-dwelling receptacle rule. Example: a pool subpanel with 1,500 VA of lighting, 1,800 VA of receptacles and a 1,800 VA pump is 5,355 VA, was 5,550 VA.
+- The subpanel's Panel Summary, the main panel's row for it and its feeder all show the same number. The house's service calculation is unchanged.
+- Until the engineer rules on them (#282), a refrigerator circuit on a subpanel counts at its VA instead of being left out, and so does a small-appliance or laundry circuit above 1,500 VA (instead of a flat 1,500).
+
+---
+
 ## 2026-11-20: EV circuits up to 100 A size their conductors at 60 °C in both EV tools (#271)
 
 - **The EV Panel Builder now gives the same conductor as the EV Charging calculator.** For EV circuits of 100 A or less, both use the 60 °C column of the NEC ampacity table (NEC 110.14(C)(1)(a)): a 48 A charger on a 60 A breaker gets 4 AWG copper (the builder gave 6 AWG), an 80 A charger on a 100 A breaker gets 1 AWG (was 3 AWG). Larger circuits, such as DC fast chargers, are unchanged (75 °C).

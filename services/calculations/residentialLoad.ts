@@ -471,6 +471,12 @@ export interface DwellingStandardInput {
   lightingVA: number;
   lightingDescription: string;
   smallApplianceCircuits: number;
+  /**
+   * The 210.11(C)(1) floor on small-appliance circuits: 2 for a whole dwelling
+   * (default); 0 for a subpanel serving part of one, which counts only the
+   * circuits on it (PE ruling 2026-11-20, #217).
+   */
+  minimumSmallApplianceCircuits?: number;
   laundryCircuit: boolean;
   /** 220.52(B) laundry circuits when more than one (a two-unit service); overrides `laundryCircuit`. */
   laundryCircuits?: number;
@@ -506,8 +512,9 @@ export function calculateDwellingStandardLoad(input: DwellingStandardInput): Dwe
   const necReferences: string[] = [];
   const warnings: string[] = [];
 
-  const effectiveSmallAppliance = Math.max(2, smallApplianceCircuits);
-  if (smallApplianceCircuits < 2) {
+  const minimumSmallAppliance = input.minimumSmallApplianceCircuits ?? 2;
+  const effectiveSmallAppliance = Math.max(minimumSmallAppliance, smallApplianceCircuits);
+  if (smallApplianceCircuits < minimumSmallAppliance) {
     warnings.push('Minimum 2 small appliance circuits required per NEC 210.11(C)(1)');
   }
   const smallApplianceVA = effectiveSmallAppliance * SMALL_APPLIANCE_VA_PER_CIRCUIT;
@@ -2049,8 +2056,21 @@ function dwellingLoadType(type: string, desc: string): string {
  */
 export function dwellingLoadsFromCircuits(circuits: PanelDemandCircuit[], necEdition: NecEdition): Omit<DwellingStandardInput, 'necEdition'> & {
   warnings: string[];
+  /** General-use receptacle ('R') circuits. A whole dwelling counts them inside 3 VA/ft²; a subpanel at their VA (#217). */
+  receptacleVA: number;
+  /** Refrigerator circuits, which a whole dwelling leaves out under the 220.52(A) Exception (#217: a subpanel counts them). */
+  refrigeratorVA: number;
+  /**
+   * Small-appliance and laundry circuits' VA above the 1,500 VA each counts in
+   * the walk, summed circuit by circuit (220.52(A)/(B): "not less than 1500
+   * volt-amperes for each"). A subpanel counts it (#282, pending).
+   */
+  aboveMinimumVA: number;
 } {
   let lightingVA = 0;
+  let receptacleVA = 0;
+  let refrigeratorVA = 0;
+  let aboveMinimumVA = 0;
   let smallApplianceCircuits = 0;
   let laundryCircuits = 0;
   const items: DwellingLoadItem[] = [];
@@ -2061,9 +2081,18 @@ export function dwellingLoadsFromCircuits(circuits: PanelDemandCircuit[], necEdi
     const desc = description.toLowerCase();
     const type = dwellingLoadType((c.load_type ?? 'O').toUpperCase(), desc);
     if (type === 'L') { lightingVA += watts; continue; }
-    if (SMALL_APPLIANCE_PATTERN.test(desc)) { smallApplianceCircuits++; continue; }
-    if (LAUNDRY_PATTERN.test(desc) && type !== 'D') { laundryCircuits++; continue; }
-    if (type === 'R' || REFRIGERATOR_PATTERN.test(desc)) continue;
+    if (SMALL_APPLIANCE_PATTERN.test(desc)) {
+      smallApplianceCircuits++;
+      aboveMinimumVA += Math.max(0, watts - SMALL_APPLIANCE_VA_PER_CIRCUIT);
+      continue;
+    }
+    if (LAUNDRY_PATTERN.test(desc) && type !== 'D') {
+      laundryCircuits++;
+      aboveMinimumVA += Math.max(0, watts - LAUNDRY_CIRCUIT_VA);
+      continue;
+    }
+    if (REFRIGERATOR_PATTERN.test(desc)) { refrigeratorVA += watts; continue; }
+    if (type === 'R') { receptacleVA += watts; continue; }
     if (watts <= 0) continue;
     const item = (kind: DwellingLoadKind, category = description): DwellingLoadItem =>
       ({ category, description, va: watts, kind });
@@ -2082,6 +2111,9 @@ export function dwellingLoadsFromCircuits(circuits: PanelDemandCircuit[], necEdi
   }
   return {
     lightingVA,
+    receptacleVA,
+    refrigeratorVA,
+    aboveMinimumVA,
     lightingDescription: 'Lighting circuits (3 VA/sq ft)',
     smallApplianceCircuits,
     laundryCircuit: laundryCircuits > 0,
@@ -2133,14 +2165,53 @@ export function calculateDwellingUnitPanelLoad(opts: {
   return { ...summary, warnings: [...loads.warnings, ...summary.warnings] };
 }
 
+/**
+ * The feeder to a subpanel serving part of a single-family dwelling (PE ruling
+ * 2026-11-20, #217): NEC 220 Part III over the circuits under it, (a) counting
+ * only the small-appliance circuits actually there (no 2-circuit minimum) and
+ * (b) its general-use receptacles at their VA inside the Table 220.42 tiers,
+ * with its lighting. The 3 VA/ft² allowance and the 2-circuit minimum stay on
+ * the service calculation.
+ */
+export function calculateSingleFamilySubpanelLoad(opts: {
+  circuits: PanelDemandCircuit[];
+  necEdition?: NecEdition;
+}): DwellingPanelLoadSummary {
+  const { circuits, necEdition = '2020' } = opts;
+  // Its "no general lighting → 3 VA/ft² missing" warning is for a whole dwelling; not carried here
+  const { receptacleVA, refrigeratorVA, aboveMinimumVA, ...loads } = dwellingLoadsFromCircuits(circuits, necEdition);
+  // Not ruled (#282, pending): rather than leave load out, a refrigerator
+  // circuit counts at its VA (the 220.52(A) Exception is a whole-dwelling
+  // small-appliance rule), and a small-appliance or laundry circuit above
+  // 1,500 VA at its own VA (220.52(A)/(B): "not less than 1500 ... for each").
+  const result = calculateDwellingStandardLoad({
+    ...loads,
+    lightingVA: loads.lightingVA + receptacleVA + refrigeratorVA + aboveMinimumVA,
+    lightingDescription: 'Lighting and general-use receptacle circuits on this panel',
+    minimumSmallApplianceCircuits: 0,
+    necEdition,
+  });
+  return partIIISummary(
+    result,
+    'NEC 220 Part III — Standard Method, Single-Family Subpanel',
+    `NEC 220 Part III (Standard Method) — the subpanel feeder load, from its own circuits: lighting and receptacles at their VA with any small-appliance and laundry circuits on it (${article220Citations(necEdition).lightingDemandTable.replace('Table ', '')}), then 220.53–220.55 and 220.60. The 3 VA/ft² allowance and the two small-appliance circuits stay on the service calculation.`,
+    { generalLabel: 'Lighting + general-use receptacles + small appliance + laundry', scope: 'Single-Family Subpanel' },
+  );
+}
+
 /** A Part III walk as a Load Summary: the 220.42 subtotal row plus one row per load. */
-function partIIISummary(result: DwellingStandardResult, title: string, note: string): DwellingPanelLoadSummary {
+function partIIISummary(
+  result: DwellingStandardResult,
+  title: string,
+  note: string,
+  { generalLabel = 'General lighting + small appliance + laundry', scope = 'Dwelling Unit' } = {},
+): DwellingPanelLoadSummary {
   const componentRows = new Set(['General Lighting', 'Small Appliance Circuits', 'Laundry Circuit']);
   const rows: DwellingSummaryRow[] = result.breakdown
     .filter(r => !componentRows.has(r.category))
     .map(r => ({
       loadType: r.category === 'General Loads Subtotal'
-        ? 'General lighting + small appliance + laundry'
+        ? generalLabel
         : r.category === 'HVAC' ? `HVAC — ${r.description}` : r.category,
       connectedVA: r.connectedVA,
       demandVA: r.demandVA,
@@ -2154,7 +2225,7 @@ function partIIISummary(result: DwellingStandardResult, title: string, note: str
     totalConnectedVA: Math.round(result.totalConnectedVA),
     totalDemandVA: Math.round(result.totalDemandVA),
     rows,
-    necReferences: ['NEC 220 Part III - Standard Method (Dwelling Unit)', ...result.necReferences],
+    necReferences: [`NEC 220 Part III - Standard Method (${scope})`, ...result.necReferences],
     warnings: result.warnings,
   };
 }
