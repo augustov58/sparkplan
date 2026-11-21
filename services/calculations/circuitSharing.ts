@@ -437,8 +437,10 @@ function generateWarnings(
     warnings.push('HVAC sharing may cause frequent charging pauses during extreme weather');
   }
 
-  if (input.proposedEVChargerAmps > 40 && input.existingCircuitAmps < 50) {
-    warnings.push('Consider upgrading circuit to 50A to maximize EV charging speed');
+  // #280: the charger's circuit is 125 % of its rating (NEC 625.41/625.42)
+  const evCircuitAmps = getNextStandardBreakerSize(input.proposedEVChargerAmps * EVSE_CONTINUOUS_FACTOR);
+  if (input.existingCircuitAmps < evCircuitAmps) {
+    warnings.push(`A ${input.proposedEVChargerAmps} A charger needs a ${evCircuitAmps} A circuit (125 %, NEC 625.41); the existing ${input.existingCircuitAmps} A circuit would have to be upgraded`);
   }
 
   if (input.evChargingSchedule !== 'overnight') {
