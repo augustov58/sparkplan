@@ -4,6 +4,7 @@ One note per hard problem, written by the model that solved it via the `extract-
 Each entry: `- [title](file.md) — reusable rule`.
 
 <!-- Newest first -->
+- [Short circuit counted steel conduit twice](2026-11-20-short-circuit-steel-double-count.md) — before applying a factor, check the table doesn't already have a column for that condition; verify a comment's claim about the data
 - [Table 9 reactances low; aluminum conduit missing](2026-11-18-table-9-book-values.md) — cross-check OCR book values two ways (metric × 0.3048); quantify every consumer of shared NEC data (short circuit) before merging
 - [Table 310.16 "missing" rows mirror Chapter 9 Table 9](2026-11-18-table-310-16-size-set.md) — check what keys off a table before completing it; the NEC 2023 book is in the Obsidian vault for data/nec cross-checks
 - [EV calculator conductor list stopped at 500 kcmil](2026-11-18-ev-conductor-table.md) — check what the app already decided before asking for a ruling; "return the largest row" is a silent undersize; re-check tables when a fix makes larger inputs reachable

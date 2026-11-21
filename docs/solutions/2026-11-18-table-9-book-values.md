@@ -12,7 +12,7 @@ Since #219 computes Ze from R and XL, low XL meant low voltage drop.
 
 1. **Source: the book, in the vault.** `Obsidian Notes/Electrical Engineering/NEC 2023/Transcript/Chapter 9 - Tables.md` (p. 70-726). The OCR garbles some cells. Each size has a metric row (Ω/km) and an imperial row (Ω/1000 ft), so every imperial value was accepted only when it matched metric × 0.3048. The #272 verifier made the same comparison independently and found the same 82 differences before the fix.
 2. **Regenerate, don't patch.** All 123 rows (Cu 21 sizes, Al 20, × PVC / aluminum / steel) were written from one transcription. The stored `effectiveZ` is recomputed by Note 2 at 0.85 PF; no calc reads it since #219. `tests/table9Book258.test.ts` pins every R and XL.
-3. **Measure who else moves.** `shortCircuit.ts` (stable module, code untouched) reads R and XL. Downstream fault currents drop 0–6%, for example 1000 kcmil Cu in steel, 50 ft from 65 kA: 37,675 → 35,398 A. That is accurate to the book but less conservative for AIC, so the PR states it up front for the PE.
+3. **Measure who else moves.** `shortCircuit.ts` (stable module) reads R and XL. With the book's higher steel XL, its `× 1.5 for steel` pushed steel fault currents further down: 1000 kcmil Cu in steel, 50 ft from 65 kA, 37,675 → 35,398 A. Measuring that exposed #276: the book's steel column already includes the steel effect, so the factor counted it twice. The PR was held as a draft until the owner approved removing it (2026-11-20), then both landed in one merge: 41,158 A, and every steel case is higher than before. See [the #276 note](2026-11-20-short-circuit-steel-double-count.md).
 
 ## Verification
 

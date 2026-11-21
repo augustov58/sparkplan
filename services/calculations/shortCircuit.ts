@@ -97,9 +97,9 @@ export function calculateDownstreamFaultCurrent(
 ): ShortCircuitResult {
   const { length, conductorSize, material, conduitType, voltage, phase } = conductorRun;
 
-  // Get conductor impedance data from NEC Chapter 9 Table 9
-  // Note: Table 9 only has PVC data, so we'll use PVC as baseline
-  // and adjust for steel conduit magnetic effects if needed
+  // Get conductor impedance data from NEC Chapter 9 Table 9. Its steel- and
+  // aluminum-conduit columns already include the raceway's effect on R and XL,
+  // so the row is used as is (#276).
   let conductorData = getConductorImpedance(conductorSize, material, conduitType);
 
   // Fallback to PVC if Steel/Aluminum not in table
@@ -139,15 +139,9 @@ export function calculateDownstreamFaultCurrent(
   const resistanceOhmsPerFoot = conductorData.resistanceOhmsPerKFt / 1000;
   const conductorResistance = resistanceOhmsPerFoot * length;
 
-  // Calculate reactance based on conduit type
-  // Steel conduit has higher reactance due to magnetic effects
+  // Reactance from the row's own conduit column (steel's is higher in Table 9)
   const reactanceOhmsPerFoot = conductorData.reactanceXLOhmsPerKFt / 1000;
-  let conductorReactance = reactanceOhmsPerFoot * length;
-
-  // For steel conduit, increase reactance by ~50% due to magnetic effects
-  if (conduitType === 'Steel') {
-    conductorReactance *= 1.5;
-  }
+  const conductorReactance = reactanceOhmsPerFoot * length;
 
   const conductorImpedance = Math.sqrt(
     conductorResistance ** 2 + conductorReactance ** 2
@@ -231,9 +225,9 @@ export function calculateServiceFaultCurrent(
   let totalImpedance = (servicePhase === 3 ? serviceVoltage / Math.sqrt(3) : serviceVoltage) / transformerFaultCurrent;
 
   if (serviceConductor) {
-    // Get conductor impedance data from NEC Chapter 9 Table 9
-    // Note: Table 9 only has PVC data, so we'll use PVC as baseline
-    // and adjust for steel conduit magnetic effects if needed
+    // Get conductor impedance data from NEC Chapter 9 Table 9. Its steel- and
+    // aluminum-conduit columns already include the raceway's effect on R and XL,
+    // so the row is used as is (#276).
     let conductorData = getConductorImpedance(
       serviceConductor.conductorSize,
       serviceConductor.material,
@@ -259,15 +253,9 @@ export function calculateServiceFaultCurrent(
       const resistanceOhmsPerFoot = conductorData.resistanceOhmsPerKFt / 1000;
       const conductorResistance = resistanceOhmsPerFoot * serviceConductor.length;
 
-      // Calculate reactance based on conduit type
-      // Steel conduit has higher reactance due to magnetic effects
+      // Reactance from the row's own conduit column (steel's is higher in Table 9)
       const reactanceOhmsPerFoot = conductorData.reactanceXLOhmsPerKFt / 1000;
-      let conductorReactance = reactanceOhmsPerFoot * serviceConductor.length;
-
-      // For steel conduit, increase reactance by ~50% due to magnetic effects
-      if (serviceConductor.conduitType === 'Steel') {
-        conductorReactance *= 1.5;
-      }
+      const conductorReactance = reactanceOhmsPerFoot * serviceConductor.length;
 
       const singleConductorImpedance = Math.sqrt(
         conductorResistance ** 2 + conductorReactance ** 2
