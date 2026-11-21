@@ -505,6 +505,8 @@ export interface Feeder {
   num_current_carrying: number;
   is_service_entrance: boolean; // TRUE for the synthetic UTIL→MDP run; sources are NULL
   sets_in_parallel: number;     // Parallel conductor sets per phase (>=1)
+  /** #283: 'load' (Calculated Load) or 'capacity' (Panel Max Capacity); null = sized before the column existed (read as load). */
+  sizing_basis?: 'load' | 'capacity' | null;
 
   // Calculated results (cached for display)
   total_load_va?: number;
@@ -536,6 +538,8 @@ export interface FeederCalculationInput {
   max_voltage_drop_percent?: number;
   temperature_rating?: 60 | 75 | 90; // Conductor insulation temperature rating
   sets_in_parallel?: number; // NEC 310.10(G) - parallel conductors per phase (default 1)
+  /** #283: the feeder's breaker. Omitted → the next standard size at or above the design current. */
+  ocpd_amps?: number;
   // Transformer-specific parameters (for feeders feeding transformers)
   transformer_kva?: number; // If feeding a transformer, use this for sizing per NEC 450.3(B)
   transformer_primary_voltage?: number;
@@ -554,6 +558,8 @@ export interface FeederCalculationResult {
   voltage_drop_volts: number;
   meets_voltage_drop: boolean;
   sets_in_parallel: number; // Effective parallel count used (>=1). May exceed input when auto-bumped.
+  /** #283: the feeder breaker the conductors are protected by (240.4) and the EGC is sized from (250.122). */
+  ocpd_amps: number;
   warnings: string[];
   necReferences: string[];
 }

@@ -7,6 +7,7 @@
 import { sizeConductor } from './conductorSizing';
 import { calculateVoltageDropAC } from './voltageDrop';
 import { getEgcSize } from '../../data/nec/table-250-122';
+import { minimumProtectedAmpacity } from '../../data/nec/table-310-16';
 import { getNextStandardBreakerSize } from '../../data/nec/standard-breakers';
 import type { FeederCalculationInput, FeederCalculationResult } from '../../types';
 
@@ -138,12 +139,19 @@ export function calculateFeederSizing(
   const sizingFailed = (size: string) => size === 'N/A';
   const needsBump = (size: string) => sizingFailed(size) || exceedsCap(size);
 
+  // #283 (owner ruling 2026-11-21): the feeder has its own breaker — given
+  // (edited, the panel's main for "Panel Max Capacity", a transformer's primary)
+  // or the next standard size at or above the design current. The conductors
+  // carry the design load AND are protected by that breaker (240.4 incl. (B)).
+  const breaker_size = input.ocpd_amps ?? getNextStandardBreakerSize(design_current_amps);
+  const sizingAmps = Math.max(design_current_amps, minimumProtectedAmpacity(breaker_size));
+
   const userRequestedSets = Math.max(1, Math.floor(input.sets_in_parallel ?? 1));
   let parallelSets = userRequestedSets;
   let perConductorAmps = design_current_amps / parallelSets;
 
   let phaseConductor = sizeConductor(
-    perConductorAmps,
+    sizingAmps / parallelSets,
     settingsForSizing,
     input.ambient_temperature_c,
     input.num_current_carrying, // per-raceway, not multiplied by parallelSets
@@ -156,7 +164,7 @@ export function calculateFeederSizing(
     parallelSets += 1;
     perConductorAmps = design_current_amps / parallelSets;
     phaseConductor = sizeConductor(
-      perConductorAmps,
+      sizingAmps / parallelSets,
       settingsForSizing,
       input.ambient_temperature_c,
       input.num_current_carrying,
@@ -235,9 +243,11 @@ export function calculateFeederSizing(
     );
   }
 
-  // STEP 6: Size EGC per NEC 250.122 (using already implemented calculateEgcSize)
-  const breaker_size = getNextStandardBreakerSize(design_current_amps);
-  const egc_size = phaseConductor.egcSize; // Already calculated in sizeConductor
+  // STEP 6: EGC per NEC Table 250.122 from the feeder's breaker (#283)
+  const egc_size = getEgcSize(breaker_size, input.conductor_material);
+  if (minimumProtectedAmpacity(breaker_size) > design_current_amps) {
+    necReferences.push('NEC 240.4 - Conductors protected by the feeder breaker');
+  }
 
   necReferences.push('NEC 250.122 - Equipment Grounding Conductor Sizing');
 
@@ -267,6 +277,7 @@ export function calculateFeederSizing(
     voltage_drop_volts: vdResult.voltageDropVolts,
     meets_voltage_drop: meets_vd,
     sets_in_parallel: parallelSets,
+    ocpd_amps: breaker_size,
     warnings,
     necReferences
   };

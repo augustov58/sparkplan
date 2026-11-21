@@ -1208,6 +1208,7 @@ export const generatePermitPacket = async (data: PermitPacketData): Promise<void
       occupancy: occupancyType,
       necEdition: resolvedNecEdition,
       dwelling: packetFeederLoadRules(data).dwelling,
+      feeders: data.feeders,
     });
 
   // ---- Panel schedules (band 300) — one builder per panel ----

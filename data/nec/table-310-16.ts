@@ -204,11 +204,14 @@ export function conductorCodeLegal(opts: {
   loadAmps?: number;
   continuous?: boolean;
   multiOutletReceptacle?: boolean;
+  /** Conductors in parallel per phase (310.10(G)); their ampacities add. */
+  sets?: number;
 }): ConductorLegality {
   const parsed = parseConductor(opts.conductor);
   const material = parsed?.material ?? opts.material;
   const size = parsed?.size ?? opts.conductor;
   const { breakerAmps, loadAmps, continuous = false, multiOutletReceptacle = false } = opts;
+  const sets = Math.max(1, Math.floor(opts.sets ?? 1));
   const requiredA = loadAmps !== undefined ? loadAmps * (continuous ? 1.25 : 1) : 0;
   const terminationC = terminationTempC(breakerAmps);
   const necReferences = ['NEC 110.14(C)(1)', 'NEC 240.4', 'NEC Table 310.16'];
@@ -216,7 +219,7 @@ export function conductorCodeLegal(opts: {
 
   const evaluate = (temp: 60 | 75, conductorSize: string = size) => {
     const size = conductorSize;
-    const ampacity = getAmpacity(size, material, temp);
+    const ampacity = getAmpacity(size, material, temp) * sets;
     const reasons: string[] = [];
     if (!ampacity) return { ok: false, ampacity, reasons: [`${size} ${material} is not in NEC Table 310.16`] };
     if (requiredA > ampacity) {
@@ -257,4 +260,16 @@ export function conductorCodeLegal(opts: {
     reasons: atTermination.reasons,
     necReferences,
   };
+}
+
+/**
+ * NEC 240.4 / 240.4(B): the smallest total ampacity a breaker protects. At or
+ * below 800 A, any ampacity above the standard rating just below the breaker
+ * (240.4(B): the breaker is then the next standard rating above it); above
+ * 800 A, the breaker itself (240.4(C)).
+ */
+export function minimumProtectedAmpacity(breakerAmps: number): number {
+  if (breakerAmps > 800) return breakerAmps;
+  const below = [...STANDARD_BREAKER_SIZES].reverse().find((r) => r < breakerAmps);
+  return below !== undefined ? below + 0.1 : breakerAmps;
 }

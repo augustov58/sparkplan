@@ -278,6 +278,7 @@ const makeCalcErrorResult = (message: string): FeederCalculationResult => ({
   voltage_drop_volts: 0,
   meets_voltage_drop: false,
   sets_in_parallel: 1,
+  ocpd_amps: 0,
   warnings: [`Calculation failed: ${message}`],
   necReferences: [],
 });
