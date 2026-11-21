@@ -761,7 +761,9 @@ export const FeederManager: React.FC<FeederManagerProps> = ({
                     <li key={sf.feederId} className="text-sm text-[#2d3b2d] flex items-center gap-2">
                       <span className="font-medium">{sf.feederName}:</span>
                       <span>
-                        {sf.designChanged
+                        {sf.breakerReasons && sf.breakerReasons.length > 0
+                          ? sf.breakerReasons.join('; ')
+                          : sf.designChanged
                           ? `Design load ${(sf.cachedDesignVA / 1000).toFixed(1)} → ${(sf.currentDesignVA / 1000).toFixed(1)} kVA`
                           : sf.vdChanged && sf.cachedVdPercent !== undefined && sf.currentVdPercent !== undefined
                           ? `Voltage drop ${sf.cachedVdPercent.toFixed(2)}% → ${sf.currentVdPercent.toFixed(2)}%`
@@ -1414,6 +1416,7 @@ interface FeederCardProps {
     vdChanged?: boolean;
     cachedVdPercent?: number;
     currentVdPercent?: number;
+    breakerReasons?: string[];
     message: string;
   };
   cumulativeVdPercent: number | null;          // chain total at destination panel
@@ -1463,7 +1466,9 @@ const FeederCard: React.FC<FeederCardProps> = ({
           <div className="flex items-center gap-1.5">
             <AlertTriangle className="w-3.5 h-3.5 text-[#3d6b3d]" />
             <span className="text-amber-800">
-              {staleStatus.designChanged
+              {staleStatus.breakerReasons && staleStatus.breakerReasons.length > 0
+                ? staleStatus.breakerReasons.join('; ')
+                : staleStatus.designChanged
                 ? `Design load: ${(staleStatus.cachedDesignVA / 1000).toFixed(1)} → ${(staleStatus.currentDesignVA / 1000).toFixed(1)} kVA`
                 : staleStatus.vdChanged && staleStatus.cachedVdPercent !== undefined && staleStatus.currentVdPercent !== undefined
                 ? `Voltage drop: ${staleStatus.cachedVdPercent.toFixed(2)}% → ${staleStatus.currentVdPercent.toFixed(2)}%`
