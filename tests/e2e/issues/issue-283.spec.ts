@@ -43,6 +43,7 @@ test('#283 the feeder breaker: default, edited, Outdated, capacity basis kept', 
   await page.addInitScript(() => localStorage.setItem('welcomeModalDismissed', 'true'));
   const project = await openProject(page);
   const main = page.locator('main');
+  let failure: unknown;
   try {
     // 1–2: the default breaker, then Recalculate
     await page.goto(`${project}/feeders`);
@@ -75,11 +76,17 @@ test('#283 the feeder breaker: default, edited, Outdated, capacity basis kept', 
     await main.locator('button[title="Recalculate"]').first().click();
     await page.waitForTimeout(2_000);
     await expect.poll(() => cardText(page)).toMatch(/Breaker: 100 A EGC: 8 AWG .*Load: 24\.0 kVA/); // main: back to load-based
-  } finally {
-    // 7: restore the fixture
+  } catch (e) {
+    failure = e;
+  }
+  // 7: restore the fixture; report the first failure, not a failed restore (main has no breaker field)
+  try {
     await page.goto(`${project}/feeders`);
     await saveFeeder(page, 'Calculated Load', '');
+  } catch (e) {
+    if (!failure) throw e;
   }
+  if (failure) throw failure;
   await expect.poll(() => cardText(page)).toMatch(/Phase: 10 AWG .*Breaker: 25 A EGC: 10 AWG .*Load: 5\.4 kVA/);
   await expect(main.getByText('Outdated')).toHaveCount(0);
 });
