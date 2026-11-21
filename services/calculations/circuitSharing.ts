@@ -11,7 +11,7 @@
  * - SplitVolt (~$350)
  *
  * NEC References:
- * - NEC 625.42 - Electric Vehicle Branch Circuit
+ * - NEC 625.41 - EV branch circuit at 125 % of the charger rating
  * - NEC 220.87 - Determining Existing Loads
  * - NEC 210.23 - Permissible Loads (outlet devices)
  */
@@ -274,7 +274,7 @@ export function calculateCircuitSharing(input: CircuitSharingInput): CircuitShar
     },
 
     necReferences: [
-      'NEC 625.42 - Electric Vehicle Branch Circuit',
+      'NEC 625.41 - EV branch circuit at 125 % of the charger rating',
       'NEC 220.87 - Determining Existing Loads',
       'NEC 210.23 - Permissible Loads'
     ],

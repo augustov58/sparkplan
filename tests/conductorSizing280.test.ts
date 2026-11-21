@@ -101,3 +101,19 @@ describe('#280 Circuit Sharing and the multifamily generator', () => {
     expect(heat(19.2)['Water Heater']).toBe('25 10 AWG Cu');
   });
 });
+
+describe('#280 verifier findings', () => {
+  it('a bare gauge ("8", "6", "1", "#4", "250") reads as AWG / kcmil, not "not in the table"', async () => {
+    expect(conductorCodeLegal({ conductor: '6', material: 'Cu', breakerAmps: 60, loadAmps: 44 }).legal).toBe(true);
+    expect(conductorCodeLegal({ conductor: '1', material: 'Cu', breakerAmps: 150 }).legal).toBe(true);
+    expect(conductorCodeLegal({ conductor: '#8', material: 'Cu', breakerAmps: 60 }).ampacityA).toBe(40);
+    expect(conductorCodeLegal({ conductor: '250', material: 'Cu', breakerAmps: 250 }).ampacityA).toBe(255);
+    const r = await executeTool('check_conductor_sizing', { conductor_size: '6', breaker_amps: 60, load_amps: 44 }, ctx([]));
+    expect(r.data!.compliant).toBe(true);
+  });
+  it('the minimum is the smallest legal size (240.4(B) included), never contradicting the verdict', () => {
+    expect(conductorCodeLegal({ conductor: '6 AWG', material: 'Cu', breakerAmps: 60, loadAmps: 44 }).minimumSize).toBe('6 AWG');
+    expect(conductorCodeLegal({ conductor: '8 AWG', material: 'Cu', breakerAmps: 60, loadAmps: 48, continuous: true }).minimumSize).toBe('4 AWG');
+    expect(conductorCodeLegal({ conductor: '8 AWG', material: 'Cu', breakerAmps: 60 }).minimumSize).toBe('6 AWG');
+  });
+});

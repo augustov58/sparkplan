@@ -164,10 +164,12 @@ export function conductorForBreaker(breakerAmps: number, material: 'Cu' | 'Al'):
 
 /** "6 AWG", "#6 AWG Cu", "500 kcmil Al" → the table's size and the material it names, if any. */
 export function parseConductor(text: string): { size: string; material?: 'Cu' | 'Al' } | null {
-  const m = text.match(/(\d+\/0|\d+)\s*(AWG|kcmil)/i);
+  // A bare number ("8", "#6", "1/0", "250") is a gauge: AWG up to 4/0, kcmil from 250
+  const m = text.match(/(\d+\/0|\d+)\s*(AWG|kcmil|MCM)?/i);
   if (!m) return null;
+  const unit = m[2] ? (m[2].toLowerCase() === 'awg' ? 'AWG' : 'kcmil') : (Number(m[1]) >= 250 ? 'kcmil' : 'AWG');
   const material = /\bal\b|alum/i.test(text) ? 'Al' : /\bcu\b|copper/i.test(text) ? 'Cu' : undefined;
-  return { size: `${m[1]} ${m[2]!.toLowerCase() === 'kcmil' ? 'kcmil' : 'AWG'}`, material };
+  return { size: `${m[1]} ${unit}`, material };
 }
 
 export interface ConductorLegality {
@@ -212,7 +214,8 @@ export function conductorCodeLegal(opts: {
   const necReferences = ['NEC 110.14(C)(1)', 'NEC 240.4', 'NEC Table 310.16'];
   if (loadAmps !== undefined) necReferences.push('NEC 210.19(A)(1)');
 
-  const evaluate = (temp: 60 | 75) => {
+  const evaluate = (temp: 60 | 75, conductorSize: string = size) => {
+    const size = conductorSize;
     const ampacity = getAmpacity(size, material, temp);
     const reasons: string[] = [];
     if (!ampacity) return { ok: false, ampacity, reasons: [`${size} ${material} is not in NEC Table 310.16`] };
@@ -240,12 +243,17 @@ export function conductorCodeLegal(opts: {
 
   const atTermination = evaluate(terminationC);
   const at75 = terminationC === 60 && !atTermination.ok ? evaluate(75) : null;
+  // The smallest size that passes the same checks (240.4(B) included), so the
+  // minimum never contradicts the verdict
+  const minimum = TABLE_310_16
+    .filter((e) => e.material === material)
+    .find((e) => evaluate(terminationC, e.size).ok);
   return {
     legal: atTermination.ok,
     legalWith75CTerminals: !!at75?.ok,
     terminationC,
     ampacityA: atTermination.ampacity,
-    minimumSize: conductorForBreaker(Math.max(breakerAmps, requiredA), material),
+    minimumSize: minimum?.size ?? null,
     reasons: atTermination.reasons,
     necReferences,
   };
