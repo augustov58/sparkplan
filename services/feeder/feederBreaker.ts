@@ -112,3 +112,23 @@ export function feederBreakerReasons(feeder: FeederBreakerFeeder, breakerAmps: n
   }
   return reasons;
 }
+
+/**
+ * The breaker to size a feeder against when re-computing it from stored data
+ * (the packet's voltage-drop page, the Copilot): a transformer's primary
+ * breaker; the stored feeder breaker; for "Panel Max Capacity" the panel's
+ * main breaker; otherwise undefined, so `calculateFeederSizing` takes the next
+ * standard size at or above the design current it computes.
+ */
+export function feederOcpdForSizing(args: {
+  panel?: FeederBreakerPanel | null;
+  feeder?: FeederBreakerFeeder | null;
+  transformer?: { primary_breaker_amps?: number | null } | null;
+}): number | undefined {
+  const { panel, feeder, transformer } = args;
+  if (transformer || feeder?.destination_transformer_id) return transformer?.primary_breaker_amps || undefined;
+  if (!panel) return undefined;
+  if (panel.feeder_breaker_amps) return panel.feeder_breaker_amps;
+  if (feederSizingBasis(feeder) === 'capacity') return panel.main_breaker_amps || panel.bus_rating || undefined;
+  return undefined;
+}

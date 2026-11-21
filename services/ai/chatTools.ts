@@ -18,6 +18,7 @@ import { computeFeederLoadVA, feederDesignLoadSplit } from '@/services/feeder/fe
 import { CONTINUOUS_LOAD_FACTOR, isContinuousServiceLoad } from '@/data/nec/continuous-load';
 import { conductorForBreaker, conductorCodeLegal, conductor75COption } from '@/data/nec/table-310-16';
 import { getNextStandardBreakerSize } from '@/data/nec/standard-breakers';
+import { feederOcpdForSizing } from '@/services/feeder/feederBreaker';
 import { EVSE_CONTINUOUS_FACTOR, isEvseDescription } from '@/data/nec/evse-load';
 import { calculateFeederSizing } from '@/services/calculations/feederSizing';
 import {
@@ -545,6 +546,11 @@ Returns the feeder's voltage drop percentage if already calculated in the projec
           num_current_carrying: rawFeeder!.num_current_carrying || 4,
           sets_in_parallel: rawFeeder!.sets_in_parallel ?? 1,
           max_voltage_drop_percent: 3.0,
+          // #283: sized against the feeder's own breaker, as Feeder Sizing does
+          ocpd_amps: feederOcpdForSizing({
+            panel: context.rawPanels!.find(p => p.id === rawFeeder!.destination_panel_id) as never,
+            feeder: rawFeeder as never,
+          }),
         };
 
         const calc = calculateFeederSizing(input);
