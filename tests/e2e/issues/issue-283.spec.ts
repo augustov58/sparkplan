@@ -66,7 +66,7 @@ test('#283 the feeder breaker: default, edited, Outdated, capacity basis kept', 
     await expect(main.getByText('Design current 22.3 A exceeds the 20 A feeder breaker').first()).toBeVisible();
     await page.goto(`${project}/inspector`);
     await main.getByRole('button', { name: /Run Inspection/ }).first().click();
-    await expect(main.getByText('Feeder Not Protected by Its Breaker').first()).toBeVisible({ timeout: 20_000 });
+    await expect(main.getByText('Feeder Breaker Smaller Than Its Design Load').first()).toBeVisible({ timeout: 20_000 });
 
     // 6: Panel Max Capacity — the panel main, kept by Recalculate
     await page.goto(`${project}/feeders`);

@@ -751,7 +751,7 @@ export const FeederManager: React.FC<FeederManagerProps> = ({
               <AlertTriangle className="w-5 h-5 text-[#3d6b3d] mt-0.5" />
               <div>
                 <h4 className="font-semibold text-amber-800">
-                  {staleFeeders.length} Feeder{staleFeeders.length > 1 ? 's' : ''} Need Recalculation
+                  {staleFeeders.length} Feeder{staleFeeders.length > 1 ? 's Need' : ' Needs'} Recalculation
                 </h4>
                 <p className="text-sm text-[#2d3b2d] mt-1">
                   Their stored sizing no longer matches the current load or sizing rule. Click the refresh button to update.

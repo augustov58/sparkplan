@@ -608,18 +608,25 @@ function checkFeederProtection(feeder: Feeder, panels: Panel[]): InspectionIssue
   const destPanel = panels.find(p => p.id === feeder.destination_panel_id);
   if (!destPanel || !feeder.phase_conductor_size) return null;
   const breakerAmps = feederBreakerAmps({ panel: destPanel, feeder });
-  const reasons = feederBreakerReasons(feeder, breakerAmps, feederDesignCurrentA(feeder.design_load_va ?? 0, destPanel));
+  const designA = feederDesignCurrentA(feeder.design_load_va ?? 0, destPanel);
+  const reasons = feederBreakerReasons(feeder, breakerAmps, designA);
   if (reasons.length === 0) return null;
+  // Two defects, two rules: a breaker smaller than the design load is NEC
+  // 215.3 (rating ≥ non-continuous + 125 % continuous); a conductor the
+  // breaker doesn't protect is NEC 240.4.
+  const unprotected = reasons.some(r => r.includes('is not protected'));
   return {
     id: generateId(),
     category: 'feeder',
     severity: 'critical',
-    necArticle: 'NEC 240.4',
-    title: 'Feeder Not Protected by Its Breaker',
+    necArticle: unprotected ? 'NEC 240.4' : 'NEC 215.3',
+    title: unprotected ? 'Feeder Conductor Not Protected by Its Breaker' : 'Feeder Breaker Smaller Than Its Design Load',
     description: `Feeder "${feeder.name}": ${reasons.join('; ')}.`,
     location: feeder.name,
-    currentValue: `${feeder.phase_conductor_size} on ${breakerAmps} A`,
-    requiredValue: 'Conductor protected by the feeder breaker (240.4)',
+    currentValue: `${feeder.phase_conductor_size} on ${breakerAmps} A; design ${designA.toFixed(1)} A`,
+    requiredValue: unprotected
+      ? 'Conductor protected by the feeder breaker (240.4)'
+      : 'Breaker at least the design current (215.3)',
     recommendation: 'Recalculate the feeder in Feeder Sizing, or change its breaker.',
     autoFixable: false,
   };
@@ -947,7 +954,7 @@ export function runInspection(data: ProjectInspectionData): InspectionResult {
     const protectionIssue = checkFeederProtection(feeder, data.panels);
     if (protectionIssue) {
       issues.push(protectionIssue);
-      necArticlesReferenced.add('NEC 240.4');
+      necArticlesReferenced.add(protectionIssue.necArticle);
     }
 
     // Feeder EGC
