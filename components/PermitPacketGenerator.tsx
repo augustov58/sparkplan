@@ -9,7 +9,7 @@ import { generatePermitPacket, generateLightweightPermitPacket, type PermitPacke
 import { AttachmentUploadCard } from './AttachmentUploadCard';
 import { useProjectAttachments, downloadAttachmentBytes, type ArtifactType, type CoverMode } from '../hooks/useProjectAttachments';
 import { summarizeCalculationRefs, type NEC22087NarrativeData, type NEC22087Method } from '../services/pdfExport/PermitPacketDocuments';
-import { buildSingleFamilyDwellingContext, deriveNarrativeOccupancy } from '../lib/projectSettings';
+import { buildSingleFamilyDwellingContext, deriveNarrativeOccupancy, dwellingAggregateOptions } from '../lib/projectSettings';
 import { EMPTY_DEMAND_SPLIT, mfEvCalculationFromSettings, projectDemandSplit, stableJson, type ProjectDemandSplit } from '../lib/storedCalcs';
 import {
   BAND_CALCULATIONS,
@@ -998,6 +998,8 @@ export const PermitPacketGenerator: React.FC<PermitPacketGeneratorProps> = ({ pr
         jurisdiction: jurisdiction,
         // NEC 220.84 multifamily Optional Method context (undefined for non-MF projects)
         multiFamilyContext,
+        // The app's multifamily flag for the dwelling panel rules (#179, #217)
+        dwellingMultiFamily: dwellingAggregateOptions(currentProject).multiFamily,
         // NEC 220.82 / 220.83 single-family Optional Method context — routes the
         // Load Calculation Summary PDF page to the Dwelling Calculator's method
         // so the AHJ-facing demand matches what the in-app Calc + Panel Summary

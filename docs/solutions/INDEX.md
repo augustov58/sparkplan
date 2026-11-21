@@ -4,6 +4,7 @@ One note per hard problem, written by the model that solved it via the `extract-
 Each entry: `- [title](file.md) — reusable rule`.
 
 <!-- Newest first -->
+- [A single-family subpanel's feeder ran the per-type cascade](2026-11-20-sf-subpanel-part-iii.md) — reusing a whole-dwelling walk on a part: decide each floor/allowance; choose a fixture where old and new rules disagree
 - [The two EV tools sized the same circuit from different ampacity columns](2026-11-20-ev-conductor-60c.md) — name a code rule once in data/nec and grep its old spellings; a smaller-conductor option must also pass 240.4(D); check a result field is rendered
 - [Short circuit counted steel conduit twice](2026-11-20-short-circuit-steel-double-count.md) — before applying a factor, check the table doesn't already have a column for that condition; verify a comment's claim about the data
 - [Table 9 reactances low; aluminum conduit missing](2026-11-18-table-9-book-values.md) — cross-check OCR book values two ways (metric × 0.3048); quantify every consumer of shared NEC data (short circuit) before merging

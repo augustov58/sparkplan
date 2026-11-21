@@ -164,7 +164,10 @@ The unit's feeder and the MDP's feed-thru row are the same number (PE ruling
 `calculateDwellingUnitPanelLoad` and a multifamily house panel to the
 non-dwelling Part III rules (also its 220.84(B) row at the MDP). Pass
 `dwellingAggregateOptions(project)` with every aggregate of a project's panels.
-Single-family subpanels keep the per-type cascade until #217 is ruled.
+A single-family subpanel's feeder (PE ruling 2026-11-20, #217) = Part III over
+its own circuits (`calculateSingleFamilySubpanelLoad`): only the small-appliance
+circuits on it (no 2-circuit minimum), receptacles at their VA in the 220.42
+tiers. The 3 VA/ft² allowance and the 2-circuit minimum stay on the service calc.
 
 ### Two Dwelling Units — Part III / 220.85 (PE ruling 2026-10-27, #127)
 ```

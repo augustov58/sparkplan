@@ -98,13 +98,13 @@ import { isEvseDescription, type NecEdition } from '../../data/nec/evse-load';
  * (#179): a unit panel takes its page's method, a multifamily house panel the
  * non-dwelling Part III rules.
  */
-function packetFeederLoadRules(data: PermitPacketData): FeederLoadRules {
+export function packetFeederLoadRules(data: PermitPacketData): FeederLoadRules {
   return {
     occupancy: data.projectType === 'Residential'
       ? 'dwelling'
       : data.projectType === 'Industrial' ? 'industrial' : 'commercial',
     dwelling: {
-      multiFamily: !!data.multiFamilyContext,
+      multiFamily: data.dwellingMultiFamily ?? !!data.multiFamilyContext,
       existingBuilding: (data.serviceModificationType ?? 'existing') !== 'new-service',
     },
   };
@@ -168,6 +168,13 @@ export interface PermitPacketData {
    * the standard NEC 220 cascade.
    */
   multiFamilyContext?: MultiFamilyContext;
+  /**
+   * The project's own multifamily flag (`dwellingAggregateOptions(project)`),
+   * so the packet's panel and feeder aggregates take the same dwelling panel
+   * rules as the app (#179, #217). `multiFamilyContext` is absent on a
+   * multifamily project without a unit count; that's the fallback.
+   */
+  dwellingMultiFamily?: boolean;
   /**
    * NEC 220.82 / 220.83 single-family-dwelling context for the MDP
    * load-calculation summary. When provided AND the project is a

@@ -3,8 +3,9 @@
  * (its feeder, the MDP's feed-thru row) is the unit page's own calculation
  * (`calculateDwellingUnitPanelLoad`, #155), and a multifamily house panel takes
  * the non-dwelling Part III rules, at its own level and in the MDP's 220.84
- * total (220.84(B)). EV panels and single-family subpanels (#217) keep the
- * per-type cascade. Values: the hand calculation in the issue's Acceptance
+ * total (220.84(B)). Multifamily EV panels keep the per-type cascade;
+ * single-family subpanels take Part III over their own circuits (#217,
+ * tests/sfSubpanel217.test.ts). Values: the hand calculation in the issue's Acceptance
  * section ("QA MF feeders": the Multi-Family generator's own circuits).
  */
 import { describe, it, expect } from 'vitest';
@@ -104,14 +105,23 @@ describe('a unit panel aggregates as its page does (#179)', () => {
   });
 });
 
+/**
+ * The same house circuits as a single-family subpanel (#217): general 7,200 L
+ * + 1,600 R + the 5,000 VA laundry circuit at its VA (1,500 + 3,500 above the
+ * 220.52(B) minimum) = 13,800 → 3,000 + 35% × 10,800 = 6,780; elevator 4,000;
+ * fire alarm 500 (2 fastened appliances, no 220.53); 25% × 4,000 = 1,000.
+ */
+const GUEST_HOUSE_217 = 6_780 + 4_000 + 500 + 1_000;
+
 describe('a multifamily house panel takes the non-dwelling Part III rules (#179, 220.84(B))', () => {
   it('House Panel: 19,300 VA (lighting 100%, elevator 125%), not 16,570 (dwelling lighting tiers)', () => {
     const r = agg('house');
     // 7,200 L + 1,600 R + 4,000 × 1.25 + 5,500 O
     expect(r.totalDemandVA).toBe(19_300);
     expect(r.demandBreakdown.find(b => b.loadType === 'Lighting')).toMatchObject({ connectedVA: 7_200, demandVA: 7_200 });
-    // without the multifamily flag (a single-family "Guest House" panel) it is not a house panel
-    expect(agg('house', circuits, { multiFamily: false, existingBuilding: false }).totalDemandVA).toBe(16_570);
+    // without the multifamily flag (a single-family "Guest House" panel) it is not a house
+    // panel: a single-family subpanel, Part III over its own circuits (#217)
+    expect(agg('house', circuits, { multiFamily: false, existingBuilding: false }).totalDemandVA).toBe(GUEST_HOUSE_217);
   });
 
   it('the MDP\'s 220.84 total takes the house load at its Part III demand', () => {
@@ -162,11 +172,12 @@ describe('unchanged (#179 guardrails)', () => {
     expect(r.totalDemandVA).toBe(3_350 + 20_000);
   });
 
-  it('a single-family subpanel keeps the per-type cascade (#217 pending)', () => {
+  it('a single-family subpanel takes Part III over its own circuits (#217, PE ruling 2026-11-20)', () => {
     const sub = panel({ id: 'sub', name: 'Garage Subpanel' });
     const cs = [circuit('sub', 'Lighting', 'L', 1_500), circuit('sub', 'Receptacles', 'R', 1_800), circuit('sub', 'Pool Pump', 'M', 1_800)];
     const r = calculateAggregatedLoad('sub', [mdp, sub], cs, [], 'dwelling', undefined, '2020', { multiFamily: false, existingBuilding: false });
-    expect(r.totalDemandVA).toBe(1_500 + 1_800 + 2_250);
+    // (1,500 + 1,800) → 3,000 + 35% × 300 = 3,105; + 1,800 + 25% × 1,800 (was the cascade's 5,550)
+    expect(r.totalDemandVA).toBe(5_355);
   });
 
   it('commercial projects ignore the dwelling options', () => {
