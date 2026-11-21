@@ -58,6 +58,7 @@ function feederRow(overrides: Partial<Feeder> = {}): Feeder {
     conductor_material: 'Cu',
     distance_ft: 50,
     sets_in_parallel: 1,
+    sizing_basis: null,
     phase_conductor_size: '2',
     neutral_conductor_size: '2',
     egc_size: '8',
