@@ -40,7 +40,9 @@ async function removeSpecRows(page: Page, projectUrl: string) {
     await page.goto(`${projectUrl}/short-circuit`);
     await expect(main.getByText(/calculations? saved/)).toBeVisible({ timeout: 15_000 });
     const card = main.locator('button[title="Delete calculation"]').first().locator('xpath=ancestor::div[contains(@class,"rounded-lg")][1]');
-    await card.getByText('Show Details').click();
+    // The card may keep the expanded state of the card it replaced
+    const toggle = card.getByText(/(Show|Hide) Details/);
+    if ((await toggle.innerText()).includes('Show')) await toggle.click();
     if (!(await card.innerText()).includes(SPEC_NOTE)) return;
     await card.locator('button[title="Delete calculation"]').click();
     await page.getByRole('button', { name: /^Delete/ }).last().click();
@@ -115,7 +117,11 @@ test('#278 saved short-circuit results are recomputed; a row that cannot be is f
     await modal.getByRole('button', { name: 'Save Calculation' }).click();
     await expect(modal).toBeHidden({ timeout: 15_000 });
 
+    // A fresh load (the rows come back from the database), entered from the dashboard
+    await page.goto('/');
     await page.reload();
+    await page.getByText(PROJECT_NAME, { exact: true }).first().click();
+    await page.waitForURL(/#\/project\/[^/]+/);
     await page.goto(`${projectUrl}/short-circuit`);
     await expect(main.getByText('3 calculations saved')).toBeVisible({ timeout: 15_000 });
     const after = await main.innerText();
