@@ -19,7 +19,7 @@
  */
 import { getNextStandardBreakerSize } from '../../data/nec/standard-breakers';
 import { getEgcSize } from '../../data/nec/table-250-122';
-import { conductorCodeLegal } from '../../data/nec/table-310-16';
+import { conductorCodeLegal, parseConductor } from '../../data/nec/table-310-16';
 
 export type FeederSizingBasis = 'load' | 'capacity';
 
@@ -87,7 +87,8 @@ export function feederBreakerAmps(args: {
 
 /** Table 250.122 EGC for the feeder's breaker. */
 export function feederEgcSize(breakerAmps: number, material: 'Cu' | 'Al'): string {
-  return getEgcSize(breakerAmps, material);
+  const raw = getEgcSize(breakerAmps, material);
+  return parseConductor(raw)?.size ?? raw;
 }
 
 /**

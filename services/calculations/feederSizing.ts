@@ -7,7 +7,7 @@
 import { sizeConductor } from './conductorSizing';
 import { calculateVoltageDropAC } from './voltageDrop';
 import { getEgcSize } from '../../data/nec/table-250-122';
-import { minimumProtectedAmpacity } from '../../data/nec/table-310-16';
+import { minimumProtectedAmpacity, parseConductor } from '../../data/nec/table-310-16';
 import { getNextStandardBreakerSize } from '../../data/nec/standard-breakers';
 import type { FeederCalculationInput, FeederCalculationResult } from '../../types';
 
@@ -244,7 +244,9 @@ export function calculateFeederSizing(
   }
 
   // STEP 6: EGC per NEC Table 250.122 from the feeder's breaker (#283)
-  const egc_size = getEgcSize(breaker_size, input.conductor_material);
+  // Table 250.122 stores bare sizes ("10", "250"); print them as the other sizes are
+  const egcRaw = getEgcSize(breaker_size, input.conductor_material);
+  const egc_size = parseConductor(egcRaw)?.size ?? egcRaw;
   if (minimumProtectedAmpacity(breaker_size) > design_current_amps) {
     necReferences.push('NEC 240.4 - Conductors protected by the feeder breaker');
   }
