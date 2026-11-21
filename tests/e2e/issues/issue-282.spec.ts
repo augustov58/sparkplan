@@ -52,6 +52,12 @@ async function panelSummary(page: Page, project: string, panel: string) {
   return { main, summary, general: main.locator('tr', { hasText: 'General lighting + small appliance + laundry' }).first() };
 }
 
+/** CONN. LOAD (kVA), DEMAND FACTOR, DEMAND LOAD (kVA) of a load-table row. */
+async function expectRow(row: ReturnType<Page['locator']>, values: [string, string, string]) {
+  await expect.poll(async () => (await row.locator('td').allInnerTexts()).map(t => t.trim()).slice(1, 4), { timeout: 20_000 })
+    .toEqual(values);
+}
+
 test('#282 whole dwellings take small-appliance and laundry circuits at the larger of their VA or 1,500 VA', async ({ page }) => {
   test.setTimeout(180_000);
   await page.addInitScript(() => localStorage.setItem('welcomeModalDismissed', 'true'));
@@ -59,21 +65,21 @@ test('#282 whole dwellings take small-appliance and laundry circuits at the larg
   try {
     // A1 / B1: generated circuits, unchanged
     let p = await panelSummary(page, 'QA Dwelling generate', 'Main Panel');
-    await expect(p.general).toContainText(/11\.70\s+0\.52\s+6\.04/);
+    await expectRow(p.general, ['11.70', '0.52', '6.04']);
     await expect(p.summary).toContainText(/DWELLING DEMAND[\s\S]*29\.6 KVA[\s\S]*123\.2 A/i);
     p = await panelSummary(page, 'QA MF feeders', 'Unit 101 Panel');
-    await expect(p.general).toContainText(/7\.50\s+0\.61\s+4\.58/);
+    await expectRow(p.general, ['7.50', '0.61', '4.58']);
     await expect(p.summary).toContainText(/DIRECT DEMAND LOAD[\s\S]*29\.7 KVA[\s\S]*123\.8 A/i);
 
     for (const e of EDITS) await setCircuitVA(page, e, e.va);
 
     // A2: new house on Part III — 13,100 / 6,535 VA; 30,060 VA (main: 11.70 / 6.04; 29.6)
     p = await panelSummary(page, 'QA Dwelling generate', 'Main Panel');
-    await expect(p.general).toContainText(/13\.10\s+0\.50\s+6\.54/);
+    await expectRow(p.general, ['13.10', '0.50', '6.54']);
     await expect(p.summary).toContainText(/DWELLING DEMAND[\s\S]*30\.1 KVA[\s\S]*125\.3 A/i);
     // B2: unit panel — 8,400 / 4,890 VA; 30,015 VA (main: 7.50 / 4.58; 29.7)
     p = await panelSummary(page, 'QA MF feeders', 'Unit 101 Panel');
-    await expect(p.general).toContainText(/8\.40\s+0\.58\s+4\.89/);
+    await expectRow(p.general, ['8.40', '0.58', '4.89']);
     await expect(p.summary).toContainText(/DIRECT DEMAND LOAD[\s\S]*30\.0 KVA[\s\S]*125\.1 A/i);
     // B3: the MDP's feed-thru row is the unit's number (#179)
     await p.main.getByText('MDP').first().click();
