@@ -4,6 +4,14 @@ All notable changes to SparkPlan.
 
 ---
 
+## 2026-11-21: Dwellings count a small-appliance or laundry circuit at its own VA when it is above 1,500 VA (#282)
+
+- **A whole dwelling's NEC 220 Part III calculation now counts each small-appliance and laundry circuit at the larger of its VA or 1,500 VA** (NEC 220.52(A)/(B): "not less than 1500 volt-amperes for each"). It used a flat 1,500 VA per circuit. This covers a new single-family house on the standard calculation, a multifamily dwelling-unit panel and a two-unit building. Example: a 2,400 ft² house with one small-appliance circuit at 2,400 VA and the laundry at 2,000 VA goes from 29.6 to 30.1 kVA.
+- Projects made by the Dwelling Load Calculator, the multifamily generator and the templates don't change: their circuits are 1,500 VA. A row written as two circuits ("Small Appliance Circuits - 2 @ 1,500 VA", 3,000 VA) still counts as 3,000 VA.
+- Single-family subpanels keep the handling from the previous release. The Optional Methods (existing houses, "10 kVA / 40%", the multifamily NEC 220.84 total) are unchanged while that question is open (#291).
+
+---
+
 ## 2026-11-21: Saved short-circuit calculations follow the current calculator (#278)
 
 - **Saved short-circuit results are recalculated whenever they're shown.** The permit packet (Available Fault Current and Short Circuit pages), the Short Circuit page and its PDFs, the Copilot and Pre-Inspection now use the current calculator with each calculation's saved inputs. Calculations saved before this month's short-circuit fixes (#258, #276, #279) used to print their old values. Example: a panel calculation saved as 8,402 A / 14 kA now reads 8,542 A / 10 kA.

@@ -4,6 +4,7 @@ One note per hard problem, written by the model that solved it via the `extract-
 Each entry: `- [title](file.md) — reusable rule`.
 
 <!-- Newest first -->
+- [Whole dwellings took small-appliance / laundry circuits at a flat 1,500 VA](2026-11-21-small-appliance-laundry-va.md) — "not less than X for each" is a per-item floor; check template data in the database; decide what rows mean when they disagree with a count
 - [Saved short-circuit results printed as saved](2026-11-21-short-circuit-recompute-on-read.md) — save every input the calc takes; recompute where rows enter the app (the data hook); flag what can't be reproduced, never default it, and don't feed it to a new calc
 - [Required AIC carried a 1.25× "safety factor per NEC 110.9"](2026-11-21-short-circuit-aic-no-margin.md) — build page fixtures from the calculator's own output (units!); remove a printed field from the type so tsc finds every reader; assert PDF text, not blob size
 - [A single-family subpanel's feeder ran the per-type cascade](2026-11-20-sf-subpanel-part-iii.md) — reusing a whole-dwelling walk on a part: decide each floor/allowance; choose a fixture where old and new rules disagree
