@@ -1,4 +1,5 @@
 import { AmpacityEntry } from '../../types/nec-types';
+import { STANDARD_BREAKER_SIZES } from './standard-breakers';
 
 /**
  * NEC Table 310.16 - Allowable Ampacities of Insulated Conductors
@@ -147,4 +148,105 @@ export function conductor75COption(circuitAmps: number, material: 'Cu' | 'Al'): 
   const at60 = TABLE_310_16.find(e => allowed(e) && e.temp60C >= circuitAmps);
   const at75 = TABLE_310_16.find(e => allowed(e) && e.temp75C >= circuitAmps);
   return at75 && at75.size !== at60?.size ? at75.size : null;
+}
+
+/**
+ * The conductor for a circuit's breaker (PE ruling 2026-11-20, #271; owner
+ * ruling 2026-11-21, #280): the smallest Table 310.16 size whose ampacity at
+ * `terminationTempC(breaker)` is at least the breaker — 60 °C for a circuit of
+ * 100 A or less (branch circuit or feeder), 75 °C above. At 60 °C the 240.4(D)
+ * small-conductor limits are met by the column itself. Null when the table has
+ * no conductor large enough (never a silent "largest row").
+ */
+export function conductorForBreaker(breakerAmps: number, material: 'Cu' | 'Al'): string | null {
+  return findConductorByAmpacity(breakerAmps, material, terminationTempC(breakerAmps))?.size ?? null;
+}
+
+/** "6 AWG", "#6 AWG Cu", "500 kcmil Al" → the table's size and the material it names, if any. */
+export function parseConductor(text: string): { size: string; material?: 'Cu' | 'Al' } | null {
+  const m = text.match(/(\d+\/0|\d+)\s*(AWG|kcmil)/i);
+  if (!m) return null;
+  const material = /\bal\b|alum/i.test(text) ? 'Al' : /\bcu\b|copper/i.test(text) ? 'Cu' : undefined;
+  return { size: `${m[1]} ${m[2]!.toLowerCase() === 'kcmil' ? 'kcmil' : 'AWG'}`, material };
+}
+
+export interface ConductorLegality {
+  /** Legal at the circuit's termination temperature (60 °C ≤ 100 A, 75 °C above; 110.14(C)(1)). */
+  legal: boolean;
+  /** Not legal at 60 °C but legal at 75 °C: allowed only when the terminations are listed for 75 °C (110.14(C)(1)(a)(3)). */
+  legalWith75CTerminals: boolean;
+  terminationC: 60 | 75;
+  /** Ampacity at `terminationC`. */
+  ampacityA: number;
+  /** The conductor `conductorForBreaker` gives this circuit (rated for the breaker and the load). */
+  minimumSize: string | null;
+  reasons: string[];
+  necReferences: string[];
+}
+
+/**
+ * Is a conductor code-legal on its breaker (owner ruling 2026-11-21, #280)?
+ * Not "ampacity ≥ breaker", but:
+ * - 110.14(C)(1): the ampacity at the termination temperature (`terminationTempC`);
+ * - 210.19(A)(1): at least the non-continuous load plus 125 % of the continuous load;
+ * - 240.4: the breaker protects the conductor — ampacity ≥ breaker, or 240.4(B):
+ *   the ampacity isn't a standard rating, the breaker is the next standard rating
+ *   above it, ≤ 800 A, and the circuit isn't a multi-outlet receptacle branch
+ *   circuit for cord-and-plug-connected portable loads;
+ * - 240.4(D): 14 / 12 / 10 AWG (and Al 12 / 10 AWG) breaker limits.
+ */
+export function conductorCodeLegal(opts: {
+  conductor: string;
+  material: 'Cu' | 'Al';
+  breakerAmps: number;
+  loadAmps?: number;
+  continuous?: boolean;
+  multiOutletReceptacle?: boolean;
+}): ConductorLegality {
+  const parsed = parseConductor(opts.conductor);
+  const material = parsed?.material ?? opts.material;
+  const size = parsed?.size ?? opts.conductor;
+  const { breakerAmps, loadAmps, continuous = false, multiOutletReceptacle = false } = opts;
+  const requiredA = loadAmps !== undefined ? loadAmps * (continuous ? 1.25 : 1) : 0;
+  const terminationC = terminationTempC(breakerAmps);
+  const necReferences = ['NEC 110.14(C)(1)', 'NEC 240.4', 'NEC Table 310.16'];
+  if (loadAmps !== undefined) necReferences.push('NEC 210.19(A)(1)');
+
+  const evaluate = (temp: 60 | 75) => {
+    const ampacity = getAmpacity(size, material, temp);
+    const reasons: string[] = [];
+    if (!ampacity) return { ok: false, ampacity, reasons: [`${size} ${material} is not in NEC Table 310.16`] };
+    if (requiredA > ampacity) {
+      reasons.push(`NEC 210.19(A)(1): ${ampacity} A at ${temp} °C is below the ${Math.round(requiredA * 10) / 10} A load${continuous ? ' (125 % of a continuous load)' : ''}`);
+    }
+    const smallMax = SMALL_CONDUCTOR_MAX_OCPD[material][size];
+    if (smallMax !== undefined && breakerAmps > smallMax) {
+      reasons.push(`NEC 240.4(D): ${size} ${material} may have at most a ${smallMax} A breaker`);
+    }
+    if (ampacity < breakerAmps) {
+      const nextAbove = STANDARD_BREAKER_SIZES.find((r) => r >= ampacity);
+      const nextSizeUp = !STANDARD_BREAKER_SIZES.includes(ampacity) && nextAbove === breakerAmps && breakerAmps <= 800;
+      if (!nextSizeUp || multiOutletReceptacle) {
+        reasons.push(
+          `NEC 240.4: ${ampacity} A at ${temp} °C is not protected by a ${breakerAmps} A breaker` +
+          (nextSizeUp && multiOutletReceptacle
+            ? ' (240.4(B) excludes multi-outlet receptacle circuits for cord-and-plug loads)'
+            : ` (240.4(B) allows only the next standard rating above ${ampacity} A, ${nextAbove ?? '—'} A)`),
+        );
+      }
+    }
+    return { ok: reasons.length === 0, ampacity, reasons };
+  };
+
+  const atTermination = evaluate(terminationC);
+  const at75 = terminationC === 60 && !atTermination.ok ? evaluate(75) : null;
+  return {
+    legal: atTermination.ok,
+    legalWith75CTerminals: !!at75?.ok,
+    terminationC,
+    ampacityA: atTermination.ampacity,
+    minimumSize: conductorForBreaker(Math.max(breakerAmps, requiredA), material),
+    reasons: atTermination.reasons,
+    necReferences,
+  };
 }

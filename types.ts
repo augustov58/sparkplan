@@ -803,7 +803,9 @@ export interface CircuitSharingResult {
   installationNotes: string[];
   circuitRequirements: {
     circuitAmps: number;           // Required circuit size
-    wireSize: string;              // Required wire gauge
+    wireSize: string;
+    /** #280: the smaller conductor allowed when both terminations are listed for 75 °C (circuits of 100 A or less). */
+    wireSize75COption?: string;              // Required wire gauge
     breakerType: string;           // Single-pole, double-pole, GFCI
   };
 

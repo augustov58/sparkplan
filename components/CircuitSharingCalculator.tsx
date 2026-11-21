@@ -461,6 +461,11 @@ export const CircuitSharingCalculator: React.FC<CircuitSharingCalculatorProps> =
               <div>
                 <span className="text-gray-500">Wire Size:</span>
                 <div className="font-bold text-gray-900">{result.circuitRequirements.wireSize}</div>
+                {result.circuitRequirements.wireSize75COption && (
+                  <div className="text-xs text-gray-500">
+                    60 °C (NEC 110.14(C)(1)(a)); {result.circuitRequirements.wireSize75COption}
+                  </div>
+                )}
               </div>
               <div>
                 <span className="text-gray-500">Breaker:</span>

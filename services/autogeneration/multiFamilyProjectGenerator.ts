@@ -17,6 +17,7 @@
  * @module services/autogeneration/multiFamilyProjectGenerator
  */
 
+import { conductorForBreaker as tableConductorForBreaker } from '../../data/nec/table-310-16';
 import type { Database } from '@/lib/database.types';
 import type { MultiFamilyEVResult, EVCapacityScenario, CommonAreaLoadItem } from '@/services/calculations/multiFamilyEV';
 import { calculateCommonAreaLoads } from '@/services/calculations/multiFamilyEV';
@@ -479,20 +480,13 @@ const CATEGORY_CIRCUIT_MAP: Record<string, { description: string; pole: 1 | 2 | 
 /**
  * Select conductor size based on breaker amps per NEC 310.
  */
+/**
+ * The unit / house panel conductor for a breaker (owner ruling 2026-11-21, #280):
+ * Table 310.16 at terminationTempC — 60 °C up to 100 A, 75 °C above (#271).
+ */
 function conductorForBreaker(breakerAmps: number): string {
-  if (breakerAmps <= 15) return '14 AWG Cu';
-  if (breakerAmps <= 20) return '12 AWG Cu';
-  if (breakerAmps <= 30) return '10 AWG Cu';
-  if (breakerAmps <= 40) return '8 AWG Cu';
-  if (breakerAmps <= 55) return '6 AWG Cu';
-  if (breakerAmps <= 70) return '4 AWG Cu';
-  if (breakerAmps <= 85) return '3 AWG Cu';
-  if (breakerAmps <= 100) return '2 AWG Cu';
-  if (breakerAmps <= 115) return '1 AWG Cu';
-  if (breakerAmps <= 130) return '1/0 AWG Cu';
-  if (breakerAmps <= 150) return '2/0 AWG Cu';
-  if (breakerAmps <= 175) return '3/0 AWG Cu';
-  return '4/0 AWG Cu';
+  const size = tableConductorForBreaker(breakerAmps, 'Cu');
+  return size ? `${size} Cu` : 'TBD (size per the Conductor Sizing tool)';
 }
 
 function generateHousePanel(
