@@ -7,6 +7,7 @@ import React from 'react';
 import { Document, Page, View, StyleSheet } from '@react-pdf/renderer';
 import { Text } from './PdfText';
 import type { ShortCircuitCalculation } from '../../lib/database.types';
+import { SHORT_CIRCUIT_OUTDATED } from '../../lib/storedCalcs';
 import {
   BrandBar,
   Footer as BrandFooter,
@@ -184,6 +185,8 @@ interface ShortCircuitResult {
     compliant: boolean;
     message: string;
   };
+  /** #278: set when the saved row couldn't be recomputed; the values are as saved. */
+  outdated?: string;
 }
 
 interface CalcProps {
@@ -241,6 +244,15 @@ export const ShortCircuitCalculationPages: React.FC<CalcProps> = ({
             </Text>
           </View>
         </View>
+
+        {results.outdated && (
+          <View style={[styles.complianceBox, styles.complianceBoxFail]}>
+            <Text style={styles.complianceTitle}>{`${SHORT_CIRCUIT_OUTDATED.toUpperCase()}`}</Text>
+            <Text style={styles.complianceText}>
+              {`${results.outdated}. The values on this page are as saved; run the short-circuit calculation again.`}
+            </Text>
+          </View>
+        )}
 
         {/* Input Parameters */}
         <View style={styles.section}>
@@ -471,6 +483,8 @@ interface TableRowData {
   requiredAicKa: number;
   compliant: boolean;
   necArticle: string;
+  /** #278: couldn't be recomputed; printed as saved, marked. */
+  outdated: boolean;
 }
 
 function buildRow(calc: ShortCircuitCalculation): TableRowData {
@@ -508,6 +522,7 @@ function buildRow(calc: ShortCircuitCalculation): TableRowData {
     requiredAicKa: results.requiredAIC,
     compliant: results.compliance.compliant,
     necArticle: results.compliance.necArticle,
+    outdated: !!results.outdated,
   };
 }
 
@@ -532,8 +547,9 @@ export const ShortCircuitTablePages: React.FC<TablePagesProps> = ({
 }) => {
   const rows = calculations.map(buildRow);
   const total = rows.length;
-  const compliant = rows.filter((r) => r.compliant).length;
-  const nonCompliant = total - compliant;
+  const outdated = rows.filter((r) => r.outdated).length;
+  const compliant = rows.filter((r) => r.compliant && !r.outdated).length;
+  const nonCompliant = total - compliant - outdated;
   const maxFault = rows.reduce((m, r) => Math.max(m, r.faultCurrentKa), 0);
   const avgFault = total > 0 ? rows.reduce((s, r) => s + r.faultCurrentKa, 0) / total : 0;
   const maxRequiredAic = rows.reduce((m, r) => Math.max(m, r.requiredAicKa), 0);
@@ -568,6 +584,12 @@ export const ShortCircuitTablePages: React.FC<TablePagesProps> = ({
             {nonCompliant} ({total > 0 ? ((nonCompliant / total) * 100).toFixed(0) : 0}%)
           </Text>
         </View>
+        {outdated > 0 && (
+          <View style={tableStyles.summaryRow}>
+            <Text style={tableStyles.summaryLabel}>{`${SHORT_CIRCUIT_OUTDATED}:`}</Text>
+            <Text style={[tableStyles.summaryValue, tableStyles.nonCompliantText]}>{outdated}</Text>
+          </View>
+        )}
         <View style={tableStyles.summaryRow}>
           <Text style={tableStyles.summaryLabel}>Maximum Fault Current:</Text>
           <Text style={tableStyles.summaryValue}>{maxFault.toFixed(1)} kA</Text>
@@ -625,10 +647,10 @@ export const ShortCircuitTablePages: React.FC<TablePagesProps> = ({
                   style={[
                     tableStyles.colCompliance,
                     tableStyles.cellCenter,
-                    row.compliant ? tableStyles.compliantText : tableStyles.nonCompliantText,
+                    row.compliant && !row.outdated ? tableStyles.compliantText : tableStyles.nonCompliantText,
                   ]}
                 >
-                  {row.compliant ? 'Compliant' : 'Review'}
+                  {row.outdated ? SHORT_CIRCUIT_OUTDATED : row.compliant ? 'Compliant' : 'Review'}
                 </Text>
               </View>
             ))}
@@ -636,7 +658,15 @@ export const ShortCircuitTablePages: React.FC<TablePagesProps> = ({
         )}
       </View>
 
-      {nonCompliant === 0 && rows.length > 0 && (
+      {outdated > 0 && (
+        <View style={tableStyles.infoBox}>
+          <Text style={tableStyles.infoText}>
+            {`${SHORT_CIRCUIT_OUTDATED}: ${outdated === 1 ? 'one calculation was' : `${outdated} calculations were`} saved in a way the current calculator can't reproduce exactly (for example, before the number of conductor sets in parallel was recorded). ${outdated === 1 ? 'Its values are' : 'Their values are'} shown as saved; run the short-circuit calculation again.`}
+          </Text>
+        </View>
+      )}
+
+      {nonCompliant === 0 && outdated === 0 && rows.length > 0 && (
         <View style={tableStyles.infoBox}>
           <Text style={tableStyles.infoText}>
             All panels meet NEC 110.9 interrupting rating requirements. Equipment AIC ratings must be

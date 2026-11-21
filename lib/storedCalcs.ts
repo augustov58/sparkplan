@@ -31,6 +31,12 @@ import {
   type MultiFamilyEVResult,
 } from '../services/calculations/multiFamilyEV';
 import type { NecEdition } from '../data/nec/evse-load';
+import {
+  calculateDownstreamFaultCurrent,
+  calculateServiceFaultCurrent,
+  estimateUtilityTransformer,
+  type ShortCircuitResult,
+} from '../services/calculations/shortCircuit';
 
 export const DEFAULT_APPLIANCES: ResidentialAppliances = {
   range: { enabled: false, kw: 12, type: 'electric' },
@@ -554,4 +560,103 @@ export function mfEvCalculationFromSettings(
   } catch {
     return { result: calc.result, buildingName: calc.buildingName, recomputed: false };
   }
+}
+
+// ---------------------------------------------------------------------------
+// #278: saved short-circuit results
+// ---------------------------------------------------------------------------
+//
+// A saved short-circuit row keeps its `results` from the formula of the day it
+// was saved (#258, #276 and #279 changed it since). Readers recompute it from
+// the row's saved inputs through the calculator's own functions (owner ruling
+// 2026-11-21). A row that can't be recomputed exactly — a service conductor
+// saved before the number of sets in parallel was recorded — keeps its stored
+// values and is flagged `outdated`; it is never recomputed with a guessed 1 set.
+// `useShortCircuitCalculations` applies this to every row it returns, so the
+// packet, the Short Circuit page, the Copilot and Pre-Inspection all read it.
+
+type ShortCircuitRow = Database['public']['Tables']['short_circuit_calculations']['Row'];
+
+/** What `results` holds after `recomputeShortCircuitRow`. */
+export interface StoredShortCircuitResults extends Partial<ShortCircuitResult> {
+  /** Conductor sets in parallel the calculation was saved with (recorded since #278). */
+  setsInParallel?: number;
+  /** Why the row couldn't be recomputed; its stored values are shown, flagged. */
+  outdated?: string;
+}
+
+export const SHORT_CIRCUIT_OUTDATED = 'Outdated, re-run';
+
+const CONDUIT_TYPES = ['Steel', 'PVC', 'Aluminum'] as const;
+const MATERIALS = ['Cu', 'Al'] as const;
+
+/** The saved results of a row, with `outdated` set when it couldn't be recomputed. */
+export function shortCircuitResultsOf(row: Pick<ShortCircuitRow, 'results'>): StoredShortCircuitResults {
+  return ((row.results ?? {}) as unknown) as StoredShortCircuitResults;
+}
+
+export function recomputeShortCircuitRow(row: ShortCircuitRow): ShortCircuitRow {
+  const stored = shortCircuitResultsOf(row);
+  const sets = Number.isInteger(stored.setsInParallel) && (stored.setsInParallel ?? 0) >= 1
+    ? stored.setsInParallel
+    : undefined;
+  const outdated = (reason: string): ShortCircuitRow =>
+    ({ ...row, results: { ...stored, outdated: reason } as unknown as ShortCircuitRow['results'] });
+  const recomputed = (r: ShortCircuitResult): ShortCircuitRow =>
+    ({ ...row, results: { ...r, ...(sets ? { setsInParallel: sets } : {}) } as unknown as ShortCircuitRow['results'] });
+
+  if (row.calculation_type === 'service') {
+    const voltage = row.service_voltage;
+    const phase = row.service_phase;
+    const impedance = row.transformer_impedance;
+    if (!voltage || (phase !== 1 && phase !== 3) || !impedance || (!row.transformer_kva && !row.service_amps)) {
+      return outdated('Saved without its service inputs');
+    }
+    const transformer = row.transformer_kva
+      ? { kva: row.transformer_kva, primaryVoltage: phase === 3 ? 12470 : 7200, secondaryVoltage: voltage, impedance }
+      : estimateUtilityTransformer(row.service_amps as number, voltage, phase, impedance);
+    if (row.service_conductor_length == null) {
+      return recomputed(calculateServiceFaultCurrent(transformer, voltage, phase));
+    }
+    const material = MATERIALS.find((m) => m === row.service_conductor_material);
+    const conduitType = CONDUIT_TYPES.find((c) => c === row.service_conduit_type);
+    if (!row.service_conductor_size || !material || !conduitType) {
+      return outdated('Saved without its service conductor');
+    }
+    if (!sets) {
+      return outdated('Saved before the number of conductor sets in parallel was recorded');
+    }
+    return recomputed(calculateServiceFaultCurrent(transformer, voltage, phase, {
+      length: row.service_conductor_length,
+      conductorSize: row.service_conductor_size,
+      material,
+      conduitType,
+      setsInParallel: sets,
+    }));
+  }
+
+  if (row.calculation_type === 'panel') {
+    const material = MATERIALS.find((m) => m === row.feeder_material);
+    const conduitType = CONDUIT_TYPES.find((c) => c === row.feeder_conduit_type);
+    const phase = row.feeder_phase;
+    if (
+      !row.source_fault_current || row.feeder_length == null || !row.feeder_conductor_size ||
+      !material || !conduitType || !row.feeder_voltage || (phase !== 1 && phase !== 3)
+    ) {
+      return outdated('Saved without its feeder inputs');
+    }
+    return recomputed(calculateDownstreamFaultCurrent(
+      {
+        length: row.feeder_length,
+        conductorSize: row.feeder_conductor_size,
+        material,
+        conduitType,
+        voltage: row.feeder_voltage,
+        phase,
+      },
+      row.source_fault_current,
+    ));
+  }
+
+  return outdated(`Unknown calculation type "${row.calculation_type}"`);
 }

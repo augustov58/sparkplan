@@ -8,6 +8,7 @@ import { useProjects } from '../hooks/useProjects';
 import { exportSingleCalculation, exportSystemReport } from '../services/pdfExport/shortCircuitPDF';
 import { ShortCircuitProjectCalculator } from './ShortCircuitProjectCalculator';
 import { detectStaleCalculations } from '../services/calculations/shortCircuitHierarchy';
+import { SHORT_CIRCUIT_OUTDATED } from '../lib/storedCalcs';
 
 interface ShortCircuitResult {
   faultCurrent: number;
@@ -23,6 +24,8 @@ interface ShortCircuitResult {
     compliant: boolean;
     message: string;
   };
+  /** #278: set when the saved row couldn't be recomputed; the values are as saved. */
+  outdated?: string;
 }
 
 export const ShortCircuitResults: React.FC = () => {
@@ -231,7 +234,16 @@ const CalculationCard: React.FC<CalculationCardProps> = ({ calculation, panel, p
   };
 
   return (
-    <div className={`bg-white border rounded-lg shadow-sm hover:shadow-md transition-shadow ${staleInfo ? 'border-amber-300' : 'border-gray-100'}`}>
+    <div className={`bg-white border rounded-lg shadow-sm hover:shadow-md transition-shadow ${staleInfo || results.outdated ? 'border-amber-300' : 'border-gray-100'}`}>
+      {results.outdated && (
+        <div className="bg-amber-50 border-b border-amber-200 px-3 py-2 text-xs text-amber-900 flex items-start gap-2 rounded-t-lg">
+          <RefreshCw className="w-3.5 h-3.5 mt-0.5 shrink-0" />
+          <div>
+            <span className="font-semibold">{SHORT_CIRCUIT_OUTDATED}.</span>{' '}
+            {results.outdated}. The values below are as saved; run the calculation again and save it.
+          </div>
+        </div>
+      )}
       {staleInfo && (
         <div className="bg-amber-50 border-b border-amber-200 px-3 py-2 text-xs text-amber-900 flex items-start gap-2 rounded-t-lg">
           <RefreshCw className="w-3.5 h-3.5 mt-0.5 shrink-0" />

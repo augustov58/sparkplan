@@ -22,6 +22,7 @@ import { applyCodeCycleList } from '../../data/ahj/codeCycle';
 import { calculateAllCumulativeVoltageDrops } from '../calculations/cumulativeVoltageDrop';
 import type { NecEdition } from '../../data/nec/evse-load';
 import { article220Citations } from '../../data/nec/article220-citations';
+import { SHORT_CIRCUIT_OUTDATED } from '../../lib/storedCalcs';
 import {
   BrandBar,
   Footer as BrandFooter,
@@ -2984,6 +2985,8 @@ interface ShortCircuitResultsBlock {
     necArticle?: string;
     message?: string;
   };
+  /** #278: set when the saved row couldn't be recomputed; the values are as saved. */
+  outdated?: string;
 }
 
 export interface AvailableFaultCurrentInput {
@@ -3153,6 +3156,17 @@ export const AvailableFaultCurrentPage: React.FC<AvailableFaultCurrentPageProps>
           </View>
         </View>
       </View>
+
+      {r.outdated && (
+        <View style={themeStyles.warningBox} wrap={false}>
+          <Text style={{ fontSize: 9, fontFamily: 'Helvetica-Bold', marginBottom: 2, color: '#78350f' }}>
+            {SHORT_CIRCUIT_OUTDATED.toUpperCase()}
+          </Text>
+          <Text style={themeStyles.warningText}>
+            {`${r.outdated}. The values on this page are as saved; run the short-circuit calculation again.`}
+          </Text>
+        </View>
+      )}
 
       {/* Verdict */}
       <View

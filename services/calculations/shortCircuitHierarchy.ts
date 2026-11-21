@@ -68,8 +68,20 @@ interface ResolveDeps {
 
 const FALLBACK_FAULT_CURRENT_A = 10_000;
 
+/**
+ * #278: a save flagged Outdated (it couldn't be recomputed with the current
+ * calculator) is no source for a new calculation; the chain is incomplete
+ * until it is re-run.
+ */
+function isOutdated(calc: ShortCircuitCalculation | undefined): boolean {
+  return !!(calc?.results as { outdated?: string } | null | undefined)?.outdated;
+}
+
+const OUTDATED_SERVICE_WARNING = 'The saved service-entrance calc is Outdated, re-run it.';
+
 function getServiceCalcIf(calculations: ShortCircuitCalculation[]): number | null {
   const svc = calculations.find((c) => c.calculation_type === 'service' && !c.panel_id);
+  if (isOutdated(svc)) return null;
   const raw = (svc?.results as any)?.faultCurrent;
   return typeof raw === 'number' && raw > 0 ? raw : null;
 }
@@ -87,6 +99,7 @@ function resolveServiceLevelIf(
 ): { value: number; isComplete: boolean; warning: string | null } {
   const svc = getServiceCalcIf(calculations);
   if (svc !== null) return { value: svc, isComplete: true, warning: null };
+  const outdated = isOutdated(calculations.find((c) => c.calculation_type === 'service' && !c.panel_id));
   if (
     project.utility_available_fault_current_a &&
     project.utility_available_fault_current_a > 0
@@ -94,13 +107,17 @@ function resolveServiceLevelIf(
     return {
       value: project.utility_available_fault_current_a,
       isComplete: false,
-      warning: 'Service-entrance calc not yet saved. Using project utility AFC.',
+      warning: outdated
+        ? `${OUTDATED_SERVICE_WARNING} Using project utility AFC.`
+        : 'Service-entrance calc not yet saved. Using project utility AFC.',
     };
   }
   return {
     value: FALLBACK_FAULT_CURRENT_A,
     isComplete: false,
-    warning: 'No service-entrance calc and no project utility AFC. Result uses a 10 kA default.',
+    warning: outdated
+      ? `${OUTDATED_SERVICE_WARNING} No project utility AFC. Result uses a 10 kA default.`
+      : 'No service-entrance calc and no project utility AFC. Result uses a 10 kA default.',
   };
 }
 
@@ -109,6 +126,7 @@ function getPanelCalcIf(
   calculations: ShortCircuitCalculation[],
 ): number | null {
   const calc = calculations.find((c) => c.panel_id === panelId);
+  if (isOutdated(calc)) return null;
   const raw = (calc?.results as any)?.faultCurrent;
   return typeof raw === 'number' && raw > 0 ? raw : null;
 }

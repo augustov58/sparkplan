@@ -967,8 +967,9 @@ const ShortCircuitCalculator: React.FC<ShortCircuitCalculatorProps> = ({ project
         feeder_conduit_type: mode === 'panel' ? 'Steel' : null,
         feeder_voltage: mode === 'panel' ? feederVoltage : null,
         feeder_phase: mode === 'panel' ? feederPhase : null,
-        // Results
-        results: result as any,
+        // Results, with the sets in parallel so readers can recompute the row (#278).
+        // The Downstream Panel mode is one set.
+        results: { ...result, setsInParallel: mode === 'service' ? serviceSetsInParallel : 1 } as any,
         notes: saveNotes || null,
       });
 
