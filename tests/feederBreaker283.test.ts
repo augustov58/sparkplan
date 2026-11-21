@@ -91,3 +91,19 @@ describe('#283 calculateFeederSizing against the breaker', () => {
     expect(feederBreakerReasons({ ...feeder, phase_conductor_size: r.phase_conductor_size }, 100, 100)).toEqual([]);
   });
 });
+
+import { feederRowsFor } from '../services/pdfExport/feederRows';
+
+describe('#283 the packet / export feeder row reads the same breaker', () => {
+  const base = { bus_rating: 100, main_breaker_amps: 100, voltage: 240, phase: 1, num_spaces: 42, project_id: 'p', fed_from_transformer_id: null };
+  const main = { ...base, id: 'm', name: 'Main', is_main: true, fed_from: null, fed_from_type: 'service', fed_from_circuit_number: null, bus_rating: 200, main_breaker_amps: 200 } as never;
+  const sub = { ...base, id: 's', name: 'Sub', is_main: false, fed_from: 'm', fed_from_type: 'panel', fed_from_circuit_number: 7, feeder_breaker_amps: null } as never;
+  const ctx = (feeders?: unknown[]) => ({ panels: [main, sub], circuits: [], transformers: [], occupancy: 'dwelling' as const, necEdition: '2020' as const, feeders: feeders as never });
+  it('breaker-fed sub with a 5,355 VA load-based feeder → 25 A (was the sub main, 100 A)', () => {
+    const rows = feederRowsFor(main, [], ctx([{ destination_panel_id: 's', design_load_va: 5355, sizing_basis: 'load' }]));
+    expect(rows.map(r => r.breaker_amps)).toEqual([25]);
+  });
+  it('no feeder drawn → the sub main, as before', () => {
+    expect(feederRowsFor(main, [], ctx()).map(r => r.breaker_amps)).toEqual([100]);
+  });
+});
