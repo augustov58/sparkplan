@@ -183,7 +183,7 @@ function getTypicalConductorForOcpd(ocpdRating: number, material: 'Cu' | 'Al'): 
  * @param numConductors - Number of current-carrying conductors in raceway (default 3 for 3-phase)
  * @param isContinuous - Whether load is continuous (>3 hours)
  * @param ocpdRating - Optional OCPD rating for EGC sizing (if not provided, uses requiredAmpacity)
- * @param terminalsRated75C - True if equipment terminals are listed for 75°C per NEC 110.14(C)(1)(a)(2).
+ * @param terminalsRated75C - True if equipment terminals are listed for 75°C per NEC 110.14(C)(1)(a)(3).
  *   When true, allows 75°C column for circuits ≤100A with small conductors instead of 60°C.
  * @returns Conductor sizing result with all corrections including EGC
  *

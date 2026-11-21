@@ -218,6 +218,12 @@ Size to setpoint, not full connected load. EVEMS allows service capacity reducti
 The setpoint limits the feeder AND the service: every aggregate at or above the
 EV panel (MDP included) takes its chargers at the setpoint (#210).
 
+### EV Branch Conductors (PE ruling 2026-11-20, #271)
+EV circuits ≤ 100 A: Table 310.16 at 60 °C (110.14(C)(1)(a)), with a note for
+the smaller 75 °C size when terminals are listed for it; above 100 A, 75 °C.
+Both EV tools read `data/nec/table-310-16.ts::terminationTempC` /
+`conductor75COption` (the option never goes below 240.4(D)).
+
 ---
 
 ## Architecture Patterns

@@ -4,6 +4,14 @@ All notable changes to SparkPlan.
 
 ---
 
+## 2026-11-20: EV circuits up to 100 A size their conductors at 60 °C in both EV tools (#271)
+
+- **The EV Panel Builder now gives the same conductor as the EV Charging calculator.** For EV circuits of 100 A or less, both use the 60 °C column of the NEC ampacity table (NEC 110.14(C)(1)(a)): a 48 A charger on a 60 A breaker gets 4 AWG copper (the builder gave 6 AWG), an 80 A charger on a 100 A breaker gets 1 AWG (was 3 AWG). Larger circuits, such as DC fast chargers, are unchanged (75 °C).
+- **Both tools note the 75 °C option.** When the charger and breaker terminals are listed for 75 °C, the smaller conductor is allowed, for example 6 AWG copper on the 60 A circuit. The builder shows the breaker and conductor in "This will create".
+- Panels created before this change keep the conductor they were created with.
+
+---
+
 ## 2026-11-20: Voltage drop and short circuit use the NEC's Table 9 values for every conductor and conduit (#258, #276)
 
 - **Voltage drop was understated in steel conduit, for small conductors, and for large conductors in PVC.** The conductor reactance values were below the code table's: 12 AWG in PVC was 0.042 ohm/1000 ft against 0.054, and steel conduit used the PVC values. All values now come from the NEC (Chapter 9, Table 9). Large conductors in steel conduit show 12–17% more voltage drop than before, and in PVC 6–7% more. 8 AWG–4/0 in PVC is unchanged.

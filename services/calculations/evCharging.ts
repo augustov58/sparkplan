@@ -5,7 +5,7 @@
  */
 
 import { getNextStandardBreakerSize } from '../../data/nec/standard-breakers';
-import { findConductorByAmpacity } from '../../data/nec/table-310-16';
+import { findConductorByAmpacity, terminationTempC, conductor75COption } from '../../data/nec/table-310-16';
 import { getEvseLoadVA, type NecEdition } from '../../data/nec/evse-load';
 
 /**
@@ -67,8 +67,10 @@ export interface EVChargingResult {
   // Individual circuit sizing
   circuitBreakerAmps: number;
   conductorSize: string;
+  /** ≤ 100 A: the smaller conductor allowed with 75 °C-listed terminals, else null (#271) */
+  conductor75COption: string | null;
   egcSize: string;
-  
+
   // Total system load
   totalConnectedLoad_kVA: number;
   /** Article 220 load: chargers × getEvseLoadVA at 100% (no EVSE demand factor exists) */
@@ -121,6 +123,15 @@ export function calculateEVCharging(input: EVChargingInput): EVChargingResult {
   }
   if (!conductor.size) {
     warnings.push(`CRITICAL: No conductor arrangement in Table 310.16 found for ${circuitBreakerAmps} A; size this circuit by engineering design.`);
+  }
+  // #271 (PE ruling 2026-11-20): ≤ 100 A sizes at 60 °C, with the 75 °C option noted
+  const option75 = conductor75COption(circuitBreakerAmps, input.conductorMaterial);
+  if (option75) {
+    necReferences.push('NEC 110.14(C)(1)(a) - 60 °C terminations for circuits of 100 A or less');
+    notes.push(
+      `Conductor sized at 60 °C. ${option75} ${input.conductorMaterial} is allowed if the charger ` +
+      `and breaker terminals are both listed for 75 °C (NEC 110.14(C)(1)(a)(3)).`
+    );
   }
   const egcSize = getEGCSizeForBreaker(circuitBreakerAmps, input.conductorMaterial);
 
@@ -185,6 +196,7 @@ export function calculateEVCharging(input: EVChargingInput): EVChargingResult {
   return {
     circuitBreakerAmps,
     conductorSize,
+    conductor75COption: option75,
     egcSize,
     totalConnectedLoad_kVA: Math.round(totalConnectedLoad_kVA * 100) / 100,
     necLoad_kVA: Math.round(necLoad_kVA * 100) / 100,
@@ -236,7 +248,7 @@ function getEGCSizeForBreaker(breakerAmps: number, material: 'Cu' | 'Al'): strin
  * 1/0 up and stopped at 500 kcmil (a 600 A breaker got 380 A of copper).
  */
 export function sizeEvConductor(amps: number, material: 'Cu' | 'Al'): { size: string; sets: number } {
-  const single = findConductorByAmpacity(amps, material, amps <= 100 ? 60 : 75);
+  const single = findConductorByAmpacity(amps, material, terminationTempC(amps));
   if (single) return { size: single.size, sets: 1 };
   for (let sets = 2; sets <= 10; sets++) {
     // Each set ≥ amps / sets; past 545 A (Cu) that is ≥ 300 kcmil, above 1/0
