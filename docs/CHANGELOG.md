@@ -4,6 +4,16 @@ All notable changes to SparkPlan.
 
 ---
 
+## 2026-11-21: A feeder has its own breaker (#283)
+
+- **Every feeder now has its own breaker.** It defaults to the next standard size at or above the feeder's design current ("Calculated Load"), or the destination panel's main breaker ("Panel Max Capacity"). You can change it on the feeder form. It is shown on the feeder card and on the panel schedule's feeder row, and it is saved when the feeder is sized.
+- **The conductors carry the design load and are protected by that breaker** (NEC 240.4, including the "next size up" rule), and **the ground wire is sized from it** (NEC 250.122). Example: a 5.4 kVA pool subpanel feeder gets a 25 A breaker, 10 AWG copper and a 10 AWG ground (the ground was 8 AWG, sized from the panel's 100 A main). Change the breaker to 60 A and the conductors become 4 AWG.
+- A feeder is marked **Outdated** when its conductors aren't protected by its breaker or its design current is above it; Inspector Mode flags it too.
+- **Recalculate keeps each feeder's sizing basis.** A feeder sized for "Panel Max Capacity" no longer turns into a load-based one when recalculated. Feeders sized for "Panel Max Capacity" before this release read as load-based until you size them again.
+- A feeder to a transformer keeps the transformer's primary breaker.
+
+---
+
 ## 2026-11-21: The Copilot, Circuit Sharing and the multifamily generator size conductors like the EV tools (#280)
 
 - **One conductor rule everywhere a circuit is sized**: the breaker is the next standard size at or above the load, at 125 % for a continuous load such as an EV charger; the conductor comes from the NEC ampacity table at 60 °C for circuits of 100 A or less and 75 °C above, with the smaller 75 °C size noted for terminals listed for it.

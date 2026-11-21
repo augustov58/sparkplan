@@ -4,6 +4,7 @@ One note per hard problem, written by the model that solved it via the `extract-
 Each entry: `- [title](file.md) — reusable rule`.
 
 <!-- Newest first -->
+- [A feeder had no breaker of its own](2026-11-21-feeder-own-breaker.md) — replace per-reader fallback chains with a stored value + one function; put a protection constraint into the sizing input; tsc right after a column change
 - [Four tools sized branch conductors from their own lists](2026-11-21-conductor-sizing-one-rule.md) — sweep and count every sizing path first; 240.4(B) needs all three conditions in both columns; chain commits behind the checks
 - [Whole dwellings took small-appliance / laundry circuits at a flat 1,500 VA](2026-11-21-small-appliance-laundry-va.md) — "not less than X for each" is a per-item floor; check template data in the database; decide what rows mean when they disagree with a count
 - [Saved short-circuit results printed as saved](2026-11-21-short-circuit-recompute-on-read.md) — save every input the calc takes; recompute where rows enter the app (the data hook); flag what can't be reproduced, never default it, and don't feed it to a new calc
