@@ -17,7 +17,6 @@ interface ShortCircuitResult {
     conductorImpedance: number;
     totalImpedance: number;
     faultCurrentAtPoint: number;
-    safetyFactor: number;
   };
   compliance: {
     necArticle: string;
@@ -366,9 +365,6 @@ const CalculationCard: React.FC<CalculationCardProps> = ({ calculation, panel, p
 
                 <span className="text-gray-500">Total Z:</span>
                 <span className="font-mono">{results.details.totalImpedance.toFixed(4)} Ω</span>
-
-                <span className="text-gray-500">Safety Factor:</span>
-                <span className="font-mono">{results.details.safetyFactor}×</span>
               </div>
             </div>
 

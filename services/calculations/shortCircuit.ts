@@ -15,6 +15,20 @@ import { getConductorImpedance } from '../../data/nec/table-chapter9-table9';
  */
 export const STANDARD_AIC_RATINGS = [10, 14, 22, 25, 42, 65, 100, 200]; // kA
 
+/**
+ * Required interrupting rating per NEC 110.9: at least the current available
+ * at the line terminals, so the first standard rating at or above the
+ * calculated available fault current. No margin is added — 110.9 has none
+ * (owner ruling 2026-11-21, #279). Above the largest standard rating the
+ * point needs engineering analysis, so it is not compliant.
+ */
+function requiredAicFor(availableFaultA: number): { requiredAIC: number; withinStandardRatings: boolean } {
+  const availableKA = availableFaultA / 1000;
+  const rating = STANDARD_AIC_RATINGS.find((r) => r >= availableKA);
+  const largest = STANDARD_AIC_RATINGS[STANDARD_AIC_RATINGS.length - 1] ?? 200;
+  return { requiredAIC: rating ?? largest, withinStandardRatings: rating !== undefined };
+}
+
 export interface TransformerData {
   kva: number;
   primaryVoltage: number;
@@ -40,7 +54,6 @@ export interface ShortCircuitResult {
     conductorImpedance: number; // ohms
     totalImpedance: number; // ohms
     faultCurrentAtPoint: number;
-    safetyFactor: number;
   };
   /** NEC compliance */
   compliance: {
@@ -116,7 +129,6 @@ export function calculateDownstreamFaultCurrent(
         conductorImpedance: 0,
         totalImpedance: 0,
         faultCurrentAtPoint: 0,
-        safetyFactor: 1.25,
       },
       compliance: {
         necArticle: 'NEC 110.9',
@@ -161,19 +173,13 @@ export function calculateDownstreamFaultCurrent(
     ? (voltage / Math.sqrt(3)) / totalImpedance
     : voltage / totalImpedance;
 
-  // Apply safety factor (typically 1.25 per NEC 110.9)
-  const safetyFactor = 1.25;
-  const faultCurrentWithSafety = faultCurrentAtPoint * safetyFactor;
-
-  // Find required AIC rating (next standard size above calculated fault current)
-  const faultCurrentKA = faultCurrentWithSafety / 1000;
-  const requiredAIC = STANDARD_AIC_RATINGS.find((rating) => rating >= faultCurrentKA) || 200;
+  const { requiredAIC, withinStandardRatings } = requiredAicFor(faultCurrentAtPoint);
 
   // NEC 110.9 compliance check
   const compliance = {
     necArticle: 'NEC 110.9 - Interrupting Rating',
-    compliant: requiredAIC <= 200, // Maximum commonly available
-    message: requiredAIC <= 200
+    compliant: withinStandardRatings,
+    message: withinStandardRatings
       ? `Equipment interrupting rating shall be sufficient for the current available. Use ${requiredAIC} kA AIC rated breakers or higher`
       : `Available fault current exceeds 200 kA - requires special engineering analysis or current-limiting devices`
   };
@@ -186,7 +192,6 @@ export function calculateDownstreamFaultCurrent(
       conductorImpedance: totalConductorImpedance,
       totalImpedance,
       faultCurrentAtPoint,
-      safetyFactor
     },
     compliance
   };
@@ -280,18 +285,12 @@ export function calculateServiceFaultCurrent(
     }
   }
 
-  // Apply safety factor
-  const safetyFactor = 1.25;
-  const faultCurrentWithSafety = faultCurrentAtServicePanel * safetyFactor;
-
-  // Find required AIC
-  const faultCurrentKA = faultCurrentWithSafety / 1000;
-  const requiredAIC = STANDARD_AIC_RATINGS.find((rating) => rating >= faultCurrentKA) || 200;
+  const { requiredAIC, withinStandardRatings } = requiredAicFor(faultCurrentAtServicePanel);
 
   const compliance = {
     necArticle: 'NEC 110.9 - Interrupting Rating',
-    compliant: requiredAIC <= 200,
-    message: requiredAIC <= 200
+    compliant: withinStandardRatings,
+    message: withinStandardRatings
       ? `Equipment interrupting rating shall be sufficient for the current available. Use ${requiredAIC} kA AIC rated breakers or higher (next standard tier: ${STANDARD_AIC_RATINGS.find(r => r >= requiredAIC)} kA)`
       : `Available fault current exceeds 200 kA - requires engineering analysis and possible current-limiting devices (fuses, reactors, or utility coordination)`
   };
@@ -304,7 +303,6 @@ export function calculateServiceFaultCurrent(
       conductorImpedance,
       totalImpedance,
       faultCurrentAtPoint: faultCurrentAtServicePanel,
-      safetyFactor
     },
     compliance
   };
@@ -386,7 +384,6 @@ export function calculateDownstreamTransformerFaultCurrent(
         conductorImpedance: 0,
         totalImpedance: 0,
         faultCurrentAtPoint: 0,
-        safetyFactor: 1.25,
       },
       compliance: {
         necArticle: 'NEC 110.9',
@@ -401,10 +398,7 @@ export function calculateDownstreamTransformerFaultCurrent(
   const M = 1 / (1 + f);
   const secondaryFaultCurrent = (primaryVoltage / secondaryVoltage) * M * primaryFaultCurrent;
 
-  const safetyFactor = 1.25;
-  const faultCurrentWithSafety = secondaryFaultCurrent * safetyFactor;
-  const faultCurrentKA = faultCurrentWithSafety / 1000;
-  const requiredAIC = STANDARD_AIC_RATINGS.find((rating) => rating >= faultCurrentKA) || 200;
+  const { requiredAIC, withinStandardRatings } = requiredAicFor(secondaryFaultCurrent);
 
   return {
     faultCurrent: secondaryFaultCurrent,
@@ -414,13 +408,12 @@ export function calculateDownstreamTransformerFaultCurrent(
       conductorImpedance: 0, // The transformer itself is the impedance — no separate conductor in this segment
       totalImpedance: (secondaryVoltage / phaseMultiplier) / secondaryFaultCurrent,
       faultCurrentAtPoint: secondaryFaultCurrent,
-      safetyFactor,
     },
     compliance: {
       necArticle: 'NEC 110.9 - Interrupting Rating',
-      compliant: requiredAIC <= 200,
+      compliant: withinStandardRatings,
       message:
-        requiredAIC <= 200
+        withinStandardRatings
           ? `Equipment interrupting rating shall be sufficient for the current available. Use ${requiredAIC} kA AIC rated breakers or higher`
           : 'Available fault current exceeds 200 kA — requires engineering analysis',
     },

@@ -188,6 +188,8 @@ Incorrect value causes 40-50% underestimation of fault currents.
 Conduit type: R and XL from Chapter 9 Table 9's own column (PVC /
 aluminum / steel), no extra factor — the steel column already includes
 the steel effect (owner-approved 2026-11-20, #276).
+Required AIC (110.9): the first standard rating ≥ the available fault
+current, no margin (owner ruling 2026-11-21, #279). requiredAIC is kA.
 ```
 Implementation: `services/calculations/shortCircuit.ts`
 
@@ -431,6 +433,7 @@ Real mistakes made in this repo, each paired with the rule that prevents recurre
 | Voltage drop read a stored Table 9 effective-Z column 10–20% below the row's own R/XL (Note 2) and used 1× on three-phase, understating E-102 (#219) | VD Ze = R·PF + XL·sin θ from the row (`voltageDrop.ts::effectiveImpedance`); line-to-line VD takes 2 (1Φ) or √3 (3Φ). The "1×, not 1.732×" rule is short-circuit only. A formula change flags stored results "Outdated". |
 | Article 220 printed fixed section numbers: the 2023 "Table 220.42(A)" on 2020 projects, the 2020 "Table 220.42" on 2023 projects, and "Table 220.12" for the dwelling 3 VA/ft² (220.14(J) in 2020) (#237) | Renumbered sections come from `data/nec/article220-citations.ts::article220Citations(edition)`, with the edition required. Never find a calc row by its citation string. |
 | Short circuit multiplied steel-conduit XL by 1.5 on top of Table 9's steel column, under a comment claiming "Table 9 only has PVC data"; steel fault currents were 4–12% low (#276) | Before applying a factor for a condition, check the table doesn't already have a column for it. Check a comment's claim about the data against the data. |
+| Short circuit multiplied the fault current by 1.25 before picking the AIC, citing NEC 110.9 (no such factor); the packet's fault-current page printed the kA rating as "14 A", hidden because its fixtures stored the rating in amps (#279) | Find a factor in the cited section before applying it. Build a page's test fixture from the calculator's output, in its units, and assert the page's text, not that a PDF rendered. |
 | Docs updated with stale "Last Updated" dates; completed features left as "NEXT UP" | Every doc touch updates its date to today; every shipped feature flips its ROADMAP status in the same PR. |
 
 ---

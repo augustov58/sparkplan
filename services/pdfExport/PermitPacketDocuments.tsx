@@ -2978,7 +2978,6 @@ interface ShortCircuitResultsBlock {
     conductorImpedance?: number;
     totalImpedance?: number;
     faultCurrentAtPoint?: number;
-    safetyFactor?: number;
   };
   compliance?: {
     compliant?: boolean;
@@ -3037,6 +3036,7 @@ export const AvailableFaultCurrentPage: React.FC<AvailableFaultCurrentPageProps>
 }) => {
   const r = input.results ?? {};
   const calculatedFaultA = r.faultCurrent ?? r.details?.faultCurrentAtPoint ?? null;
+  // A standard interrupting rating in kA, as the calculator returns it (NEC 110.9).
   const requiredAIC = r.requiredAIC ?? null;
   const sourceFaultA = input.sourceFaultCurrent ?? r.details?.sourceFaultCurrent ?? null;
   const compliant = r.compliance?.compliant ?? null;
@@ -3077,16 +3077,8 @@ export const AvailableFaultCurrentPage: React.FC<AvailableFaultCurrentPageProps>
         <View style={themeStyles.summaryCard}>
           <Text style={themeStyles.summaryLabel}>Min Required AIC</Text>
           <Text style={themeStyles.summaryValue}>
-            {requiredAIC !== null && requiredAIC !== undefined
-              ? requiredAIC >= 1000
-                ? (requiredAIC / 1000).toFixed(2)
-                : Math.round(requiredAIC).toString()
-              : '—'}
-            <Text style={themeStyles.summaryUnit}>
-              {requiredAIC !== null && requiredAIC !== undefined && requiredAIC >= 1000
-                ? 'kA'
-                : 'A'}
-            </Text>
+            {requiredAIC !== null ? requiredAIC : '—'}
+            {requiredAIC !== null && <Text style={themeStyles.summaryUnit}>kA</Text>}
           </Text>
           <Text style={themeStyles.summarySub}>NEC 110.9 / 110.10</Text>
         </View>
@@ -3153,16 +3145,10 @@ export const AvailableFaultCurrentPage: React.FC<AvailableFaultCurrentPageProps>
             <Text style={[themeStyles.td, { width: '50%', fontFamily: 'Helvetica-Bold' }]}>Available fault current at service main</Text>
             <Text style={[themeStyles.td, { width: '50%', fontFamily: 'Helvetica-Bold' }]}>{fmtAmps(calculatedFaultA)}</Text>
           </View>
-          {r.details?.safetyFactor !== undefined && r.details.safetyFactor !== null && (
-            <View style={themeStyles.tableRow}>
-              <Text style={[themeStyles.td, { width: '50%' }]}>Safety factor applied</Text>
-              <Text style={[themeStyles.td, { width: '50%' }]}>{r.details.safetyFactor}x</Text>
-            </View>
-          )}
           <View style={themeStyles.tableRowAlt}>
             <Text style={[themeStyles.td, { width: '50%', fontFamily: 'Helvetica-Bold' }]}>Minimum required AIC rating</Text>
             <Text style={[themeStyles.td, { width: '50%', fontFamily: 'Helvetica-Bold' }]}>
-              {fmtAmps(requiredAIC)}
+              {requiredAIC !== null ? `${requiredAIC} kA` : '—'}
             </Text>
           </View>
         </View>

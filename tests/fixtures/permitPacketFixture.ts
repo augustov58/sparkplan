@@ -198,13 +198,12 @@ const shortCircuitCalculation: any = {
   notes: null,
   results: {
     faultCurrent: 22100,
-    requiredAIC: 22100,
+    requiredAIC: 25,
     details: {
       sourceFaultCurrent: 25000,
       conductorImpedance: 0.003,
       totalImpedance: 0.012,
       faultCurrentAtPoint: 22100,
-      safetyFactor: 1.25,
     },
     compliance: {
       necArticle: 'NEC 110.9',

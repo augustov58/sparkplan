@@ -4,6 +4,16 @@ All notable changes to SparkPlan.
 
 ---
 
+## 2026-11-21: Short circuit asks for the interrupting rating NEC 110.9 requires, with no added margin (#279)
+
+- **The required AIC is now the first standard rating at or above the available fault current.** It used to multiply the fault current by 1.25 first, citing NEC 110.9, which has no such factor. Example: 8,632 A at a 500 kVA / 480 V service now needs 10 kA (was 14 kA). The fault current itself is unchanged.
+- The "Safety Factor" row is gone from the Short Circuit tool, the saved calculations, the short-circuit PDF and the permit packet.
+- The packet's Available Fault Current page printed the required rating in amps ("14 A"). It now prints kA.
+- A point above 200 kA is now flagged for engineering review instead of "compliant at 200 kA".
+- Calculations saved before this change keep their old rating until they're recalculated.
+
+---
+
 ## 2026-11-20: A single-family subpanel's feeder uses the dwelling calculation, over its own circuits (#217)
 
 - **The feeder load of a subpanel in a single-family house now follows NEC 220 Part III (the dwelling calculation),** as the house's service already does. It counts the subpanel's own circuits:
