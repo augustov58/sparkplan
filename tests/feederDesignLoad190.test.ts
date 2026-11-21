@@ -145,10 +145,15 @@ describe('stale check: a stored design load the rule no longer gives (#190)', ()
     expect(s.currentDesignVA).toBe(37_800);
   });
 
-  it('never flags a capacity-based feeder', () => {
+  it('never flags a feeder stored as capacity-based for load changes (#283: the stored basis, not a 5% guess)', () => {
     // 200 A × 240 V = 48,000 VA stored as the load
-    const s = checkFeederLoadStatus(feeder({ total_load_va: 48_000, design_load_va: 48_000 }), circuits, panels, 5, design);
+    const s = checkFeederLoadStatus(feeder({ total_load_va: 48_000, design_load_va: 48_000, sizing_basis: 'capacity' } as never), circuits, panels, 5, design);
     expect(s.isStale).toBe(false);
+  });
+
+  it('a load near the panel capacity no longer marks a feeder capacity-based (#283)', () => {
+    const s = checkFeederLoadStatus(feeder({ total_load_va: 48_000, design_load_va: 48_000 }), circuits, panels, 5, design);
+    expect(s.isStale).toBe(true);
   });
 
   it('keeps the old behaviour when no design context is given', () => {

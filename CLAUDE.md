@@ -92,6 +92,13 @@ CRITICAL: only `calculated` skips the 1.25× multiplier.
 - OTHER TOOLS (#193): Inspector Mode, the Copilot and the EV Panel Builder
   read lib/storedCalcs.ts::scheduleServiceCheck (the same check, in service
   amps vs the rating). Never a connected × 0.8 or breaker-sum rule.
+- FEEDER BREAKER (owner ruling 2026-11-21, #283): a feeder has its own
+  breaker, stored in the destination panel's feeder_breaker_amps (editable);
+  default = next standard size ≥ design current ("Calculated Load") or the
+  panel main ("Panel Max Capacity", feeders.sizing_basis). Conductors carry
+  the design load and are protected by it (240.4 incl. (B)); EGC from it
+  (Table 250.122). Transformer feeders keep the primary breaker. Every reader
+  calls services/feeder/feederBreaker.ts — never main || feeder || bus.
 - PANEL BUS (#225, 408.30): each panel's design load (feederDesignLoadVA;
   the MDP's = the service check) vs its bus, in its own phase —
   lib/storedCalcs.ts::panelDesignAmps (Inspector Mode, the Copilot).
@@ -449,6 +456,7 @@ Real mistakes made in this repo, each paired with the rule that prevents recurre
 | Short-circuit results printed as saved, so #258/#276/#279 reached a project only on re-save; the service save never stored its sets in parallel, so old rows couldn't be recomputed (#278) | Save every input the calc function takes (diff the save payload against its parameters). Recompute stored results where rows enter the app (the data hook). A value that can't be reproduced is flagged, never defaulted, and never feeds a new calculation. |
 | Whole dwellings took small-appliance and laundry circuits at a flat 1,500 VA though 220.52 says "not less than 1500 … for each"; the first fix turned a 3,000 VA row standing for two circuits into 4,500 (#282) | A "not less than X for each" is a per-item floor. Before a per-row rule, decide what a row means when rows and the count disagree; run the existing template-shaped tests before writing new ones. |
 | Four tools kept private conductor lists after #271 unified the EV tools (4 AWG on every breaker > 50 A, 2 AWG on 100 A, checks against the load at 75 °C); writing the acceptance, 240.4(B) was misapplied twice (#280) | Sweep and count every path that picks or checks a conductor before fixing one. For 240.4(B), check all three conditions (ampacity not a standard rating, breaker = the next one, ≤ 800 A) in both termination columns. |
+| A feeder's conductors were sized to the load but its EGC to the panel's main breaker; six readers each guessed the feeder's OCPD with their own fallback, Recalculate always went load-based, and the stale check guessed "capacity-based" from a load within 5 % of the rating (#283) | When readers each derive "the" value with their own fallback chain, store the value and route every reader through one function (`feederBreaker.ts`). Never infer a mode from a number that happens to match it — store the mode. |
 | Docs updated with stale "Last Updated" dates; completed features left as "NEXT UP" | Every doc touch updates its date to today; every shipped feature flips its ROADMAP status in the same PR. |
 
 ---

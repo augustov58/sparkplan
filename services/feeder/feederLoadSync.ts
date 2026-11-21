@@ -21,6 +21,7 @@ import {
 } from '@/services/calculations/upstreamLoadAggregation';
 import { CONTINUOUS_LOAD_FACTOR } from '@/data/nec/continuous-load';
 import { calculateVoltageDropAC } from '@/services/calculations/voltageDrop';
+import { feederBreakerAmps, feederBreakerReasons, feederDesignCurrentA, feederSizingBasis } from '@/services/feeder/feederBreaker';
 import type { NecEdition } from '@/data/nec/evse-load';
 
 type Circuit = Database['public']['Tables']['circuits']['Row'];
@@ -51,6 +52,8 @@ export interface FeederLoadStatus {
   vdChanged?: boolean;
   cachedVdPercent?: number;
   currentVdPercent?: number;
+  /** #283: why the feeder is Outdated against its breaker (240.4 / design current); empty when consistent. */
+  breakerReasons?: string[];
   message: string;
 }
 
@@ -118,37 +121,38 @@ export function checkFeederLoadStatus(
     };
   }
 
-  // Check if this feeder was likely sized based on panel capacity (not load)
-  // A capacity-based feeder will have total_load_va close to panel's max VA capacity
-  if (panels) {
-    const destPanel = panels.find(p => p.id === feeder.destination_panel_id);
-    if (destPanel) {
-      const panelCapacityAmps = destPanel.main_breaker_amps || destPanel.bus_rating;
-      const panelCapacityVA = destPanel.phase === 3
-        ? panelCapacityAmps * destPanel.voltage * Math.sqrt(3)
-        : panelCapacityAmps * destPanel.voltage;
-      
-      // If cached load is within 5% of panel capacity, assume it was capacity-based
-      const cachedLoad = feeder.total_load_va || 0;
-      const capacityDiff = Math.abs(cachedLoad - panelCapacityVA) / panelCapacityVA;
-      
-      if (capacityDiff < 0.05) {
-        return {
-          feederId: feeder.id,
-          feederName: feeder.name,
-          destinationPanelId: feeder.destination_panel_id,
-          isStale: false, // Capacity-based feeders are never stale
-          currentConnectedVA: 0,
-          cachedConnectedVA: cachedLoad,
-          loadDifferenceVA: 0,
-          loadDifferencePercent: 0,
-          designChanged: false,
-          cachedDesignVA: 0,
-          currentDesignVA: 0,
-          message: 'Feeder sized for panel max capacity - not affected by load changes',
-        };
-      }
-    }
+  // #283: the feeder's own breaker. Outdated when its stored conductor isn't
+  // protected by it (240.4 incl. (B)) or the design current exceeds it.
+  const destPanel = panels?.find(p => p.id === feeder.destination_panel_id);
+  const breakerReasons = destPanel
+    ? feederBreakerReasons(
+        feeder,
+        feederBreakerAmps({ panel: destPanel, feeder }),
+        feederDesignCurrentA(feeder.design_load_va || 0, destPanel),
+      )
+    : [];
+
+  // A feeder sized for the panel's max capacity isn't affected by load changes.
+  // Its basis is stored (feeders.sizing_basis), not guessed from its load (#283).
+  if (feederSizingBasis(feeder) === 'capacity') {
+    const outdated = breakerReasons.length > 0;
+    return {
+      feederId: feeder.id,
+      feederName: feeder.name,
+      destinationPanelId: feeder.destination_panel_id,
+      isStale: outdated,
+      currentConnectedVA: 0,
+      cachedConnectedVA: feeder.total_load_va || 0,
+      loadDifferenceVA: 0,
+      loadDifferencePercent: 0,
+      designChanged: false,
+      cachedDesignVA: 0,
+      currentDesignVA: 0,
+      breakerReasons,
+      message: outdated
+        ? `${breakerReasons.join('; ')} - recalculation recommended`
+        : 'Feeder sized for panel max capacity - not affected by load changes',
+    };
   }
 
   const currentConnected = calculatePanelCurrentConnectedLoad(feeder.destination_panel_id, circuits);
@@ -190,10 +194,12 @@ export function checkFeederLoadStatus(
   const vdChanged = currentVdPercent !== undefined && typeof cachedVdPercent === 'number'
     && Math.abs(currentVdPercent - cachedVdPercent) > VD_STALE_PERCENT_POINTS;
 
-  const isStale = percentDiff > thresholdPercent || designChanged || vdChanged;
+  const isStale = percentDiff > thresholdPercent || designChanged || vdChanged || breakerReasons.length > 0;
 
   let message = '';
-  if (vdChanged && !designChanged && percentDiff <= thresholdPercent) {
+  if (breakerReasons.length > 0) {
+    message = `${breakerReasons.join('; ')} - recalculation recommended`;
+  } else if (vdChanged && !designChanged && percentDiff <= thresholdPercent) {
     message = `Voltage drop ${cachedVdPercent!.toFixed(2)}% → ${currentVdPercent!.toFixed(2)}% - recalculation recommended`;
   } else if (designChanged && percentDiff <= thresholdPercent) {
     message = `Design load ${(cachedDesignVA / 1000).toFixed(1)} → ${(currentDesignVA / 1000).toFixed(1)} kVA - recalculation recommended`;
@@ -217,6 +223,7 @@ export function checkFeederLoadStatus(
     loadDifferenceVA: difference,
     loadDifferencePercent: Math.round(percentDiff * 10) / 10,
     designChanged,
+    breakerReasons,
     cachedDesignVA,
     currentDesignVA: Math.round(currentDesignVA),
     vdChanged,

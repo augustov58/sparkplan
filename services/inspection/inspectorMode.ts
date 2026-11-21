@@ -22,6 +22,7 @@
 
 import type { Database } from '@/lib/database.types';
 import { isEVEMSMarkerCircuit } from '@/services/calculations/upstreamLoadAggregation';
+import { feederBreakerAmps, feederBreakerReasons, feederDesignCurrentA } from '@/services/feeder/feederBreaker';
 
 type Panel = Database['public']['Tables']['panels']['Row'];
 type Circuit = Database['public']['Tables']['circuits']['Row'];
@@ -562,7 +563,8 @@ function checkFeederEgc(feeder: Feeder, panels: Panel[]): InspectionIssue | null
   const destPanel = panels.find(p => p.id === feeder.destination_panel_id);
   if (!destPanel) return null;
   
-  const ocpdAmps = destPanel.main_breaker_amps || destPanel.feeder_breaker_amps || destPanel.bus_rating;
+  // #283: the feeder's own breaker (one helper for every reader)
+  const ocpdAmps = feederBreakerAmps({ panel: destPanel, feeder }) ?? destPanel.bus_rating;
   const requiredEgc = getRequiredEgcSize(ocpdAmps, feeder.conductor_material as 'Cu' | 'Al');
   
   if (!feeder.egc_size) {
@@ -596,6 +598,38 @@ function checkFeederEgc(feeder: Feeder, panels: Panel[]): InspectionIssue | null
   }
   
   return null;
+}
+
+/**
+ * Feeder conductor protection (#283): the phase conductors must be protected by
+ * the feeder's breaker (NEC 240.4, incl. (B)) and carry the design current.
+ */
+function checkFeederProtection(feeder: Feeder, panels: Panel[]): InspectionIssue | null {
+  const destPanel = panels.find(p => p.id === feeder.destination_panel_id);
+  if (!destPanel || !feeder.phase_conductor_size) return null;
+  const breakerAmps = feederBreakerAmps({ panel: destPanel, feeder });
+  const designA = feederDesignCurrentA(feeder.design_load_va ?? 0, destPanel);
+  const reasons = feederBreakerReasons(feeder, breakerAmps, designA);
+  if (reasons.length === 0) return null;
+  // Two defects, two rules: a breaker smaller than the design load is NEC
+  // 215.3 (rating ≥ non-continuous + 125 % continuous); a conductor the
+  // breaker doesn't protect is NEC 240.4.
+  const unprotected = reasons.some(r => r.includes('is not protected'));
+  return {
+    id: generateId(),
+    category: 'feeder',
+    severity: 'critical',
+    necArticle: unprotected ? 'NEC 240.4' : 'NEC 215.3',
+    title: unprotected ? 'Feeder Conductor Not Protected by Its Breaker' : 'Feeder Breaker Smaller Than Its Design Load',
+    description: `Feeder "${feeder.name}": ${reasons.join('; ')}.`,
+    location: feeder.name,
+    currentValue: `${feeder.phase_conductor_size} on ${breakerAmps} A; design ${designA.toFixed(1)} A`,
+    requiredValue: unprotected
+      ? 'Conductor protected by the feeder breaker (240.4)'
+      : 'Breaker at least the design current (215.3)',
+    recommendation: 'Recalculate the feeder in Feeder Sizing, or change its breaker.',
+    autoFixable: false,
+  };
 }
 
 /**
@@ -916,6 +950,13 @@ export function runInspection(data: ProjectInspectionData): InspectionResult {
       });
     }
     
+    // Feeder conductor protected by its breaker (#283)
+    const protectionIssue = checkFeederProtection(feeder, data.panels);
+    if (protectionIssue) {
+      issues.push(protectionIssue);
+      necArticlesReferenced.add(protectionIssue.necArticle);
+    }
+
     // Feeder EGC
     const feederEgcIssue = checkFeederEgc(feeder, data.panels);
     if (feederEgcIssue) {

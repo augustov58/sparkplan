@@ -1,7 +1,7 @@
 # Database Architecture
 ## SparkPlan Application
 
-**Last Updated**: 2026-10-13
+**Last Updated**: 2026-11-21
 **Database**: Supabase PostgreSQL 15
 **Schema Version**: 2.3
 **Location**: `/supabase/schema.sql` and migration files
@@ -505,7 +505,7 @@ demand_factor NUMERIC DEFAULT 1.0
 
 #### Other Tables
 
-**`feeders`** - Feeder conductors between panels/transformers
+**`feeders`** - Feeder conductors between panels/transformers. **(#283, 2026-11-21)** Adds nullable `sizing_basis text CHECK (sizing_basis IN ('load','capacity'))` — "Calculated Load" or "Panel Max Capacity", so Recalculate keeps each feeder's basis (NULL = sized before the column; read as load). The feeder's breaker lives on the destination panel (`panels.feeder_breaker_amps`), read through `services/feeder/feederBreaker.ts`. Migration `20261121_feeders_sizing_basis.sql`.
 **`grounding_details`** - Grounding electrode system data
 **`inspection_items`** - Pre-inspection checklist items
 **`issues`** - Code compliance issues tracking. **(Phase 3.6)** Adds nullable `permit_inspection_id UUID REFERENCES permit_inspections(id) ON DELETE SET NULL` so a failed inspection's corrections can be tracked as `issues` rows linked back to the inspection.

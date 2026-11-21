@@ -14,6 +14,7 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { Cable, Plus, Trash2, Edit2, Save, X, AlertTriangle, CheckCircle, RefreshCw, Info, Download } from 'lucide-react';
 import { useFeeders } from '../hooks/useFeeders';
 import { usePanels } from '../hooks/usePanels';
+import { feederBreakerAmps, feederSizingBasis } from '../services/feeder/feederBreaker';
 import { useTransformers } from '../hooks/useTransformers';
 import { useCircuits } from '../hooks/useCircuits';
 import { useProjects } from '../hooks/useProjects';
@@ -44,7 +45,7 @@ export const FeederManager: React.FC<FeederManagerProps> = ({
   occupancyType: occupancyTypeProp,
 }) => {
   const { feeders, loading, error, createFeeder, updateFeeder, deleteFeeder } = useFeeders(projectId);
-  const { panels } = usePanels(projectId);
+  const { panels, updatePanel } = usePanels(projectId);
   const { transformers } = useTransformers(projectId);
   const { circuits } = useCircuits(projectId);
   // EVSE loads in feeder demand follow the project's NEC edition (220.57 floor).
@@ -83,6 +84,8 @@ export const FeederManager: React.FC<FeederManagerProps> = ({
   
   // ISSUE FIX: Add sizing basis option - 'load' uses calculated panel load, 'capacity' uses panel max capacity
   const [sizingBasis, setSizingBasis] = useState<'load' | 'capacity'>('load');
+  // #283: the feeder's own breaker; blank = the default for the sizing basis
+  const [breakerInput, setBreakerInput] = useState<string>('');
 
   // Advanced calculation options
   const [showAdvancedOptions, setShowAdvancedOptions] = useState(false);
@@ -217,16 +220,9 @@ export const FeederManager: React.FC<FeederManagerProps> = ({
     };
   };
 
-  // Recalculate a stale feeder (always uses current load, not capacity)
+  // Recalculate a feeder on its own stored basis (#283: feeders.sizing_basis)
   const handleRecalculateFeeder = async (feeder: Feeder) => {
-    // For recalculation, we need to update the existing feeder, not create new
-    // Temporarily set editingId, recalculate, then clear it
-    const previousEditingId = editingId;
-    const previousSizingBasis = sizingBasis;
-    
-    // Force load-based sizing for recalculation (since stale warning only applies to load-based)
-    setSizingBasis('load');
-    
+    const basis = feederSizingBasis(feeder);
     try {
       // Safety check: ensure panels and transformers are arrays
       if (!Array.isArray(panels) || panels.length === 0) {
@@ -268,17 +264,27 @@ export const FeederManager: React.FC<FeederManagerProps> = ({
         return;
       }
 
-      // Calculate loads (only for panels, not transformers)
-      const loads = destPanel
-        ? calculatePanelLoads(feeder.destination_panel_id!)
-        : { totalVA: 0, continuousVA: 0, noncontinuousVA: 0 };
+      // Calculate loads (only for panels, not transformers). "Panel Max
+      // Capacity" sizes for the panel's main breaker, all non-continuous.
+      let loads = { totalVA: 0, continuousVA: 0, noncontinuousVA: 0 };
+      if (destPanel && basis === 'capacity') {
+        const amps = destPanel.main_breaker_amps || destPanel.bus_rating;
+        const capacityVA = destPanel.phase === 3 ? amps * destPanel.voltage * Math.sqrt(3) : amps * destPanel.voltage;
+        loads = { totalVA: capacityVA, continuousVA: 0, noncontinuousVA: capacityVA };
+      } else if (destPanel) {
+        loads = calculatePanelLoads(feeder.destination_panel_id!);
+      }
 
       // Determine source voltage and phase (from panel OR transformer secondary)
       const sourceVoltage = sourceTransformer?.secondary_voltage || sourcePanel?.voltage || 480;
       const sourcePhase = sourceTransformer?.secondary_phase || sourcePanel?.phase || 3;
 
-      // Calculate feeder sizing
-      const result = calculateFeederSizing({
+      // #283: the breaker — a transformer's primary breaker; else the stored
+      // feeder breaker (kept unless the design current now exceeds it), else
+      // the default for the basis (load: next standard size ≥ design current;
+      // capacity: the panel's main breaker).
+      const sizingInput = (ocpd_amps?: number) => calculateFeederSizing({
+        ocpd_amps,
         source_voltage: sourceVoltage,
         source_phase: sourcePhase,
         destination_voltage: destPanel?.voltage || destTransformer?.secondary_voltage || sourceVoltage,
@@ -302,23 +308,18 @@ export const FeederManager: React.FC<FeederManagerProps> = ({
           transformer_primary_phase: destTransformer.primary_phase as 1 | 3
         })
       });
-
-      // Get EGC based on OCPD (panel or transformer primary breaker)
-      const ocpdAmps = destPanel
-        ? (destPanel.main_breaker_amps || destPanel.feeder_breaker_amps || destPanel.bus_rating)
-        : (destTransformer?.primary_breaker_amps || 0);
-      const egcTable = [
-        { maxOCPD: 15, cu: '14 AWG' }, { maxOCPD: 20, cu: '12 AWG' },
-        { maxOCPD: 30, cu: '10 AWG' }, { maxOCPD: 40, cu: '10 AWG' },
-        { maxOCPD: 60, cu: '10 AWG' }, { maxOCPD: 100, cu: '8 AWG' },
-        { maxOCPD: 200, cu: '6 AWG' }, { maxOCPD: 300, cu: '4 AWG' },
-        { maxOCPD: 400, cu: '3 AWG' }, { maxOCPD: 500, cu: '2 AWG' },
-        { maxOCPD: 600, cu: '1 AWG' }, { maxOCPD: 800, cu: '1/0 AWG' },
-        { maxOCPD: 1000, cu: '2/0 AWG' }, { maxOCPD: 1200, cu: '3/0 AWG' },
-        { maxOCPD: 1600, cu: '4/0 AWG' }, { maxOCPD: 2000, cu: '250 kcmil' },
-      ];
-      const egcEntry = egcTable.find(row => ocpdAmps <= row.maxOCPD);
-      const egcSize = egcEntry?.cu || result.egc_size;
+      const storedBreaker = destPanel?.feeder_breaker_amps || undefined;
+      let result;
+      if (destTransformer) {
+        result = sizingInput(destTransformer.primary_breaker_amps || undefined);
+      } else if (basis === 'capacity') {
+        result = sizingInput(storedBreaker ?? (destPanel ? (destPanel.main_breaker_amps || destPanel.bus_rating) : undefined));
+      } else {
+        const atDefault = sizingInput(undefined);
+        result = storedBreaker && storedBreaker >= atDefault.design_current_amps ? sizingInput(storedBreaker) : atDefault;
+      }
+      // EGC from the feeder's breaker (Table 250.122), computed by the sizing
+      const egcSize = result.egc_size;
       
       // Update feeder
       await updateFeeder(feeder.id, {
@@ -332,14 +333,15 @@ export const FeederManager: React.FC<FeederManagerProps> = ({
         neutral_conductor_size: result.neutral_conductor_size,
         egc_size: egcSize,
         conduit_size: result.recommended_conduit_size,
-        voltage_drop_percent: result.voltage_drop_percent
+        voltage_drop_percent: result.voltage_drop_percent,
+        sizing_basis: basis,
       });
-      
+      // The feeder's breaker is written when it is sized (#283)
+      if (destPanel && destPanel.feeder_breaker_amps !== result.ocpd_amps) {
+        await updatePanel(destPanel.id, { feeder_breaker_amps: result.ocpd_amps });
+      }
     } catch (err) {
       console.error('Failed to recalculate feeder:', err);
-    } finally {
-      // Restore previous state
-      setSizingBasis(previousSizingBasis);
     }
   };
 
@@ -397,6 +399,7 @@ export const FeederManager: React.FC<FeederManagerProps> = ({
         is_service_entrance: true,
         // Persist effective parallel count — may have been auto-bumped by the calc for large services
         sets_in_parallel: result.sets_in_parallel,
+        sizing_basis: sizingBasis,
         source_panel_id: null,
         source_transformer_id: null,
         project_id: projectId,
@@ -568,8 +571,20 @@ export const FeederManager: React.FC<FeederManagerProps> = ({
         }
       }
 
+      // #283: the feeder's breaker — a transformer's primary breaker; else the
+      // one entered on the form; else the default for the basis (capacity: the
+      // panel's main breaker; load: next standard size ≥ design current, chosen
+      // by calculateFeederSizing).
+      const enteredBreaker = Number(breakerInput) > 0 ? Number(breakerInput) : undefined;
+      const ocpdAmpsForSizing = destTransformer
+        ? (destTransformer.primary_breaker_amps || undefined)
+        : enteredBreaker ?? (sizingBasis === 'capacity' && destPanel
+            ? (destPanel.main_breaker_amps || destPanel.bus_rating)
+            : undefined);
+
       // Calculate feeder sizing
       const result = calculateFeederSizing({
+        ocpd_amps: ocpdAmpsForSizing,
         source_voltage: sourceVoltage,
         source_phase: sourcePhase,
         destination_voltage: destVoltage,
@@ -595,30 +610,8 @@ export const FeederManager: React.FC<FeederManagerProps> = ({
         })
       });
 
-      // ISSUE FIX: EGC should be based on the OCPD protecting the downstream panel or transformer
-      // per NEC 250.122 - use panel's main breaker or feeder breaker amps, or transformer primary breaker
-      let egcSize = result.egc_size;
-      const ocpdAmps = destPanel
-        ? (destPanel.main_breaker_amps || destPanel.feeder_breaker_amps || destPanel.bus_rating)
-        : (destTransformer?.primary_breaker_amps || 0);
-
-      if (ocpdAmps > 0) {
-        // Import EGC lookup from our inspection service logic
-        const egcTable = [
-          { maxOCPD: 15, cu: '14 AWG' }, { maxOCPD: 20, cu: '12 AWG' },
-          { maxOCPD: 30, cu: '10 AWG' }, { maxOCPD: 40, cu: '10 AWG' },
-          { maxOCPD: 60, cu: '10 AWG' }, { maxOCPD: 100, cu: '8 AWG' },
-          { maxOCPD: 200, cu: '6 AWG' }, { maxOCPD: 300, cu: '4 AWG' },
-          { maxOCPD: 400, cu: '3 AWG' }, { maxOCPD: 500, cu: '2 AWG' },
-          { maxOCPD: 600, cu: '1 AWG' }, { maxOCPD: 800, cu: '1/0 AWG' },
-          { maxOCPD: 1000, cu: '2/0 AWG' }, { maxOCPD: 1200, cu: '3/0 AWG' },
-          { maxOCPD: 1600, cu: '4/0 AWG' }, { maxOCPD: 2000, cu: '250 kcmil' },
-        ];
-        const egcEntry = egcTable.find(row => ocpdAmps <= row.maxOCPD);
-        if (egcEntry) {
-          egcSize = egcEntry.cu;
-        }
-      }
+      // EGC from the feeder's breaker (Table 250.122), computed by the sizing (#283)
+      const egcSize = result.egc_size;
 
       // Update feeder with calculation results
       const updatedFeeder = {
@@ -635,11 +628,17 @@ export const FeederManager: React.FC<FeederManagerProps> = ({
         is_service_entrance: false, // service-entrance path returned earlier
         // Persist effective parallel count — may have been auto-bumped by the calc for large feeders
         sets_in_parallel: result.sets_in_parallel,
+        sizing_basis: sizingBasis,
       };
 
+      // The feeder's breaker is written when it is sized (#283)
+      if (destPanel && destPanel.feeder_breaker_amps !== result.ocpd_amps) {
+        await updatePanel(destPanel.id, { feeder_breaker_amps: result.ocpd_amps });
+      }
       if (editingId) {
         await updateFeeder(editingId, updatedFeeder);
         setEditingId(null);
+        resetForm();
       } else {
         await createFeeder({
           ...updatedFeeder,
@@ -669,6 +668,8 @@ export const FeederManager: React.FC<FeederManagerProps> = ({
     });
     setSourceType('panel');
     setDestinationType('panel');
+    setSizingBasis('load');
+    setBreakerInput('');
   };
 
   const handleEdit = (feeder: Feeder) => {
@@ -681,6 +682,10 @@ export const FeederManager: React.FC<FeederManagerProps> = ({
         : 'transformer'
     );
     setDestinationType(feeder.destination_panel_id ? 'panel' : 'transformer');
+    // #283: the feeder's stored basis and breaker
+    setSizingBasis(feederSizingBasis(feeder));
+    const destPanelForEdit = panels.find(p => p.id === feeder.destination_panel_id);
+    setBreakerInput(destPanelForEdit?.feeder_breaker_amps ? String(destPanelForEdit.feeder_breaker_amps) : '');
     setEditingId(feeder.id);
     setShowCreateForm(false);
   };
@@ -746,7 +751,7 @@ export const FeederManager: React.FC<FeederManagerProps> = ({
               <AlertTriangle className="w-5 h-5 text-[#3d6b3d] mt-0.5" />
               <div>
                 <h4 className="font-semibold text-amber-800">
-                  {staleFeeders.length} Feeder{staleFeeders.length > 1 ? 's' : ''} Need Recalculation
+                  {staleFeeders.length} Feeder{staleFeeders.length > 1 ? 's Need' : ' Needs'} Recalculation
                 </h4>
                 <p className="text-sm text-[#2d3b2d] mt-1">
                   Their stored sizing no longer matches the current load or sizing rule. Click the refresh button to update.
@@ -756,7 +761,9 @@ export const FeederManager: React.FC<FeederManagerProps> = ({
                     <li key={sf.feederId} className="text-sm text-[#2d3b2d] flex items-center gap-2">
                       <span className="font-medium">{sf.feederName}:</span>
                       <span>
-                        {sf.designChanged
+                        {sf.breakerReasons && sf.breakerReasons.length > 0
+                          ? sf.breakerReasons.join('; ')
+                          : sf.designChanged
                           ? `Design load ${(sf.cachedDesignVA / 1000).toFixed(1)} → ${(sf.currentDesignVA / 1000).toFixed(1)} kVA`
                           : sf.vdChanged && sf.cachedVdPercent !== undefined && sf.currentVdPercent !== undefined
                           ? `Voltage drop ${sf.cachedVdPercent.toFixed(2)}% → ${sf.currentVdPercent.toFixed(2)}%`
@@ -1194,6 +1201,27 @@ export const FeederManager: React.FC<FeederManagerProps> = ({
               </p>
             </div>
 
+            {/* Feeder breaker (#283) */}
+            {destinationType === 'panel' && sourceType !== 'service' && (
+              <div>
+                <label className="block text-xs font-semibold text-gray-500 mb-1 uppercase tracking-wider">
+                  Feeder Breaker (A)
+                </label>
+                <input
+                  type="number"
+                  min={15}
+                  aria-label="Feeder breaker (A)"
+                  value={breakerInput}
+                  placeholder={sizingBasis === 'capacity' ? "Panel's main breaker" : 'Next standard size ≥ design current'}
+                  onChange={e => setBreakerInput(e.target.value)}
+                  className="w-full border-gray-200 rounded-md focus:border-[#2d3b2d] focus:ring-[#2d3b2d]/20 text-sm py-2"
+                />
+                <p className="text-xs text-gray-500 mt-1">
+                  The breaker protecting this feeder. Conductors carry the design load and are protected by it (NEC 240.4); the EGC is sized from it (NEC 250.122). Blank = the default.
+                </p>
+              </div>
+            )}
+
             {/* Sets in Parallel (NEC 310.10(G)) */}
             <div>
               <label className="block text-xs font-semibold text-gray-500 mb-1 uppercase tracking-wider">
@@ -1388,6 +1416,7 @@ interface FeederCardProps {
     vdChanged?: boolean;
     cachedVdPercent?: number;
     currentVdPercent?: number;
+    breakerReasons?: string[];
     message: string;
   };
   cumulativeVdPercent: number | null;          // chain total at destination panel
@@ -1437,7 +1466,9 @@ const FeederCard: React.FC<FeederCardProps> = ({
           <div className="flex items-center gap-1.5">
             <AlertTriangle className="w-3.5 h-3.5 text-[#3d6b3d]" />
             <span className="text-amber-800">
-              {staleStatus.designChanged
+              {staleStatus.breakerReasons && staleStatus.breakerReasons.length > 0
+                ? staleStatus.breakerReasons.join('; ')
+                : staleStatus.designChanged
                 ? `Design load: ${(staleStatus.cachedDesignVA / 1000).toFixed(1)} → ${(staleStatus.currentDesignVA / 1000).toFixed(1)} kVA`
                 : staleStatus.vdChanged && staleStatus.cachedVdPercent !== undefined && staleStatus.currentVdPercent !== undefined
                 ? `Voltage drop: ${staleStatus.cachedVdPercent.toFixed(2)}% → ${staleStatus.currentVdPercent.toFixed(2)}%`
@@ -1511,6 +1542,15 @@ const FeederCard: React.FC<FeederCardProps> = ({
             <span className="text-gray-500">Neutral:</span>
             <span className="font-semibold text-gray-900">{feeder.neutral_conductor_size}</span>
           </div>
+          {(() => {
+            const breakerA = feederBreakerAmps({ panel: destPanel, feeder, transformer: destTransformer });
+            return breakerA ? (
+              <div className="flex items-center gap-1">
+                <span className="text-gray-500">Breaker:</span>
+                <span className="font-semibold text-gray-900">{breakerA} A</span>
+              </div>
+            ) : null;
+          })()}
           <div className="flex items-center gap-1">
             <span className="text-green-700">EGC:</span>
             <span className="font-semibold text-green-800">{feeder.egc_size}</span>

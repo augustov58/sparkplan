@@ -15,9 +15,12 @@ import type { Panel, Circuit, Transformer } from '../../lib/database.types';
 import { calculateAggregatedLoad, type DwellingAggregateOptions } from '../calculations/upstreamLoadAggregation';
 import type { NecEdition } from '../../data/nec/evse-load';
 import { SYNTH_FEEDER_PREFIX, SYNTH_LUG_PREFIX } from './PanelScheduleDocuments';
+import { feederBreakerAmps, type FeederBreakerFeeder } from '../feeder/feederBreaker';
 
 export interface FeederRowContext {
   panels: Panel[];
+  /** The project's feeders: a feeder's breaker comes from `feederBreakerAmps` (#283). */
+  feeders?: FeederBreakerFeeder[];
   circuits: Circuit[];
   transformers: Transformer[];
   occupancy: 'dwelling' | 'commercial' | 'industrial';
@@ -65,7 +68,7 @@ export function feederRowsFor(panel: Panel, existing: Circuit[], ctx: FeederRowC
         lugFed ? 0 : fedFromSlot,
         `→ PANEL ${dp.name}`,
         dp.phase === 3 ? 3 : 2,
-        dp.feeder_breaker_amps || dp.main_breaker_amps || 100,
+        feederBreakerAmps({ panel: dp, feeder: ctx.feeders?.find(f => f.destination_panel_id === dp.id) }) ?? 100,
         demandVA(dp.id),
         'O',
       )];

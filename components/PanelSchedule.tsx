@@ -13,6 +13,8 @@ import type { ExtractedCircuit } from '@/services/panelOcrService';
 import { usePanels } from '../hooks/usePanels';
 import { useCircuits } from '../hooks/useCircuits';
 import { useTransformers } from '../hooks/useTransformers';
+import { useFeeders } from '../hooks/useFeeders';
+import { feederBreakerAmps } from '../services/feeder/feederBreaker';
 import { useProjectNecEdition } from '../hooks/useProjectNecEdition';
 import { article220Citations } from '../data/nec/article220-citations';
 import { exportPanelSchedulePDF, exportAllPanelsPDF } from '../services/pdfExport/panelSchedulePDF';
@@ -66,6 +68,7 @@ export const PanelSchedule: React.FC<PanelScheduleProps> = ({ project }) => {
   const { panels, updatePanel } = usePanels(project.id);
   const { circuits, createCircuit, updateCircuit, deleteCircuit } = useCircuits(project.id);
   const { transformers } = useTransformers(project.id);
+  const { feeders: projectFeeders } = useFeeders(project.id);
 
   const [selectedPanelId, setSelectedPanelId] = useState<string | null>(null);
   // Which rules a dwelling project's unit / house panels take in every aggregate (#179)
@@ -184,7 +187,8 @@ export const PanelSchedule: React.FC<PanelScheduleProps> = ({ project }) => {
         type: 'panel',
         name: `→ PANEL ${panel.name}`,
         loadVA: panelLoad.totalDemandVA,
-        breakerAmps: panel.feeder_breaker_amps || panel.main_breaker_amps || 100,
+        // #283: the feeder's own breaker (stored, else its default)
+        breakerAmps: feederBreakerAmps({ panel, feeder: projectFeeders.find(f => f.destination_panel_id === panel.id) }) ?? 100,
         pole: panel.phase === 3 ? 3 : 2,
         circuitNumber: null, // Could be assigned if panel stores feeder circuit number
         targetId: panel.id,
@@ -591,7 +595,7 @@ export const PanelSchedule: React.FC<PanelScheduleProps> = ({ project }) => {
     panels.forEach(panel => {
       const direct = circuits.filter(c => c.panel_id === panel.id);
       circuitsByPanel.set(panel.id, [...direct, ...feederRowsFor(panel, direct, {
-        panels, circuits, transformers, occupancy: occupancyForCalc, necEdition,
+        panels, circuits, transformers, occupancy: occupancyForCalc, necEdition, feeders: projectFeeders,
         dwelling: dwellingOptions, includeTransformers: true,
       })]);
     });

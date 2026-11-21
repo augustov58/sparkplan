@@ -1234,6 +1234,7 @@ function makeFeeder(overrides: Partial<Feeder> & Pick<Feeder, 'id' | 'name'>): F
     phase_conductor_size: null,
     project_id: PROJECT_ID,
     sets_in_parallel: 1,
+    sizing_basis: null,
     source_panel_id: null,
     source_transformer_id: null,
     total_load_va: null,

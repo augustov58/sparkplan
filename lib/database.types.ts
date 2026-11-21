@@ -580,6 +580,7 @@ export type Database = {
           phase_conductor_size: string | null
           project_id: string
           sets_in_parallel: number
+          sizing_basis: string | null
           source_panel_id: string | null
           source_transformer_id: string | null
           total_load_va: number | null
@@ -607,6 +608,7 @@ export type Database = {
           phase_conductor_size?: string | null
           project_id: string
           sets_in_parallel?: number
+          sizing_basis?: string | null
           source_panel_id?: string | null
           source_transformer_id?: string | null
           total_load_va?: number | null
@@ -634,6 +636,7 @@ export type Database = {
           phase_conductor_size?: string | null
           project_id?: string
           sets_in_parallel?: number
+          sizing_basis?: string | null
           source_panel_id?: string | null
           source_transformer_id?: string | null
           total_load_va?: number | null

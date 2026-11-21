@@ -7,6 +7,7 @@
  * @module services/pdfExport/VoltageDropDocuments
  */
 
+import { feederOcpdForSizing } from '../feeder/feederBreaker';
 import React from 'react';
 import {
   Document,
@@ -278,6 +279,7 @@ const makeCalcErrorResult = (message: string): FeederCalculationResult => ({
   voltage_drop_volts: 0,
   meets_voltage_drop: false,
   sets_in_parallel: 1,
+  ocpd_amps: 0,
   warnings: [`Calculation failed: ${message}`],
   necReferences: [],
 });
@@ -380,6 +382,12 @@ function buildBaseFeederRow(
         num_current_carrying: feeder.num_current_carrying || 4,
         sets_in_parallel: feeder.sets_in_parallel ?? 1,
         max_voltage_drop_percent: 3.0,
+        // #283: sized against the feeder's own breaker, as Feeder Sizing does
+        ocpd_amps: feederOcpdForSizing({
+          panel: panels.find(p => p.id === feeder.destination_panel_id),
+          feeder: feeder as never,
+          transformer: transformers?.find(t => t.id === feeder.destination_transformer_id),
+        }),
       };
 
       const calculation = calculateFeederSizing(input);
