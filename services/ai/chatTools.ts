@@ -16,6 +16,9 @@ import { isExistingConstructionProject } from '@/lib/projectSettings';
 import { notifyDataRefresh } from '@/lib/dataRefreshEvents';
 import { computeFeederLoadVA, feederDesignLoadSplit } from '@/services/feeder/feederLoadSync';
 import { CONTINUOUS_LOAD_FACTOR, isContinuousServiceLoad } from '@/data/nec/continuous-load';
+import { conductorForBreaker, conductorCodeLegal, conductor75COption } from '@/data/nec/table-310-16';
+import { getNextStandardBreakerSize } from '@/data/nec/standard-breakers';
+import { EVSE_CONTINUOUS_FACTOR, isEvseDescription } from '@/data/nec/evse-load';
 import { calculateFeederSizing } from '@/services/calculations/feederSizing';
 import {
   calculateAllCumulativeVoltageDrops,
@@ -195,72 +198,6 @@ function calculatePanelLoad(panel: typeof CHAT_TOOLS[0] extends ChatTool ? Param
   return panelCircuits.reduce((sum, c) => sum + c.loadWatts, 0);
 }
 
-/**
- * Get conductor ampacity from NEC Table 310.16 (simplified)
- */
-function getAmpacityFromTable310_16(size: string, material: 'Cu' | 'Al', tempRating: 60 | 75 | 90): number {
-  // Simplified Table 310.16 for copper at 75°C
-  const ampacityTable: Record<string, number> = {
-    '14': 15,
-    '12': 20,
-    '10': 30,
-    '8': 50,
-    '6': 65,
-    '4': 85,
-    '3': 100,
-    '2': 115,
-    '1': 130,
-    '1/0': 150,
-    '2/0': 175,
-    '3/0': 200,
-    '4/0': 230,
-    '250': 255,
-    '300': 285,
-    '350': 310,
-    '400': 335,
-    '500': 380,
-  };
-
-  // Extract AWG/kcmil from size string
-  const sizeMatch = size.match(/(\d+\/?\d*)/);
-  const sizeNum = sizeMatch?.[1] ?? '12';
-
-  return ampacityTable[sizeNum as keyof typeof ampacityTable] || 20;
-}
-
-/**
- * Get minimum conductor size for a given ampacity
- */
-function getMinimumConductorSize(amps: number, material: 'Cu' | 'Al', tempRating: 60 | 75 | 90): string {
-  const sizes = [
-    { size: '14 AWG', amps: 15 },
-    { size: '12 AWG', amps: 20 },
-    { size: '10 AWG', amps: 30 },
-    { size: '8 AWG', amps: 50 },
-    { size: '6 AWG', amps: 65 },
-    { size: '4 AWG', amps: 85 },
-    { size: '3 AWG', amps: 100 },
-    { size: '2 AWG', amps: 115 },
-    { size: '1 AWG', amps: 130 },
-    { size: '1/0 AWG', amps: 150 },
-    { size: '2/0 AWG', amps: 175 },
-    { size: '3/0 AWG', amps: 200 },
-    { size: '4/0 AWG', amps: 230 },
-    { size: '250 kcmil', amps: 255 },
-    { size: '300 kcmil', amps: 285 },
-    { size: '350 kcmil', amps: 310 },
-    { size: '400 kcmil', amps: 335 },
-    { size: '500 kcmil', amps: 380 },
-  ];
-
-  for (const entry of sizes) {
-    if (entry.amps >= amps) {
-      return entry.size;
-    }
-  }
-
-  return '500 kcmil';
-}
 
 /**
  * Get next standard service size
@@ -378,12 +315,8 @@ const LOAD_TEMPLATES = {
 type LoadTemplateKey = keyof typeof LOAD_TEMPLATES;
 
 function wireSizeForBreaker(amps: number): string {
-  if (amps <= 15) return '14 AWG';
-  if (amps <= 20) return '12 AWG';
-  if (amps <= 30) return '10 AWG';
-  if (amps <= 40) return '8 AWG';
-  if (amps <= 50) return '6 AWG';
-  return '4 AWG';
+  // #271 / #280: Table 310.16 at terminationTempC (60 °C up to 100 A, 75 °C above)
+  return conductorForBreaker(amps, 'Cu') ?? 'size per the Conductor Sizing tool';
 }
 
 /**
@@ -838,7 +771,7 @@ Returns the feeder's voltage drop percentage if already calculated in the projec
   // -------------------------------------------------------------------------
   {
     name: 'check_conductor_sizing',
-    description: 'Verify if a conductor is properly sized per NEC Table 310.16',
+    description: 'Check whether a circuit conductor is code-legal on its breaker: NEC Table 310.16 at the termination temperature (60 °C for circuits of 100 A or less, 75 °C above), 210.19(A)(1) and 240.4 including the 240.4(B) next-size-up rule. Give the circuit, or conductor_size + breaker_amps (+ load_amps).',
     parameters: {
       type: 'object',
       properties: {
@@ -847,43 +780,64 @@ Returns the feeder's voltage drop percentage if already calculated in the projec
         panel_name: { type: 'string', description: 'Panel name' },
         load_amps: { type: 'number', description: 'Load in amps (if not using circuit data)' },
         conductor_size: { type: 'string', description: 'Conductor size (e.g., "12 AWG")' },
+        breaker_amps: { type: 'number', description: 'Breaker protecting the conductor (if not using circuit data). The check is against the breaker, not only the load.' },
+        continuous: { type: 'boolean', description: 'true for a continuous load (an EV charger always is, NEC 625.42): the load counts at 125 % (210.19(A)(1)).' },
       },
     },
     execute: async (params, context) => {
       let loadAmps = params.load_amps as number | undefined;
       let conductorSize = params.conductor_size as string | undefined;
+      let breakerAmps = params.breaker_amps as number | undefined;
+      let description = '';
+      let loadTypeCode = '';
 
       // Try to get from circuit if not provided
-      if (!loadAmps || !conductorSize) {
-        const found = findCircuit(params as any, context.projectContext);
-        if (found) {
-          const { circuit, panel } = found;
-          loadAmps = loadAmps || circuit.loadWatts / (panel.voltage || 120);
-          conductorSize = conductorSize || circuit.conductorSize;
-        }
+      const found = findCircuit(params as any, context.projectContext);
+      if (found) {
+        const { circuit, panel } = found;
+        loadAmps = loadAmps ?? circuit.loadWatts / (panel.voltage || 120);
+        conductorSize = conductorSize || circuit.conductorSize;
+        breakerAmps = breakerAmps ?? circuit.breakerAmps;
+        description = circuit.description ?? '';
+        loadTypeCode = ((circuit as { loadType?: string }).loadType ?? '').toUpperCase();
       }
 
-      if (!loadAmps || !conductorSize) {
-        return { success: false, error: 'Please provide load_amps and conductor_size, or specify a valid circuit.' };
+      if (!conductorSize || !breakerAmps) {
+        return { success: false, error: 'Please provide conductor_size and breaker_amps (and load_amps), or specify a valid circuit.' };
       }
 
-      const ampacity = getAmpacityFromTable310_16(conductorSize, 'Cu', 75);
-      const compliant = ampacity >= loadAmps;
-      const minimumSize = getMinimumConductorSize(loadAmps, 'Cu', 75);
+      // #280 (owner ruling 2026-11-21): code-legal, not "ampacity ≥ breaker" —
+      // 110.14(C)(1) termination column, 210.19(A)(1), 240.4 incl. (B) and (D).
+      const continuous = (params.continuous as boolean | undefined) ?? isEvseDescription(description);
+      const check = conductorCodeLegal({
+        conductor: conductorSize,
+        material: 'Cu',
+        breakerAmps,
+        loadAmps,
+        continuous,
+        multiOutletReceptacle: loadTypeCode === 'R' || /receptacle/i.test(description),
+      });
+      const option75 = conductor75COption(breakerAmps, 'Cu');
 
       return {
         success: true,
         data: {
           conductorSize,
-          loadAmps: Math.round(loadAmps * 10) / 10,
-          ampacity,
-          compliant,
-          utilizationPercent: Math.round((loadAmps / ampacity) * 100),
-          minimumRequiredSize: minimumSize,
-          necReference: 'NEC Table 310.16 - Allowable Ampacities (75°C Cu)',
-          recommendation: !compliant
-            ? `Conductor undersized. ${conductorSize} has ${ampacity}A capacity but load is ${Math.round(loadAmps)}A. Upgrade to ${minimumSize} minimum.`
-            : `Conductor properly sized. ${conductorSize} (${ampacity}A) is adequate for ${Math.round(loadAmps)}A load.`,
+          breakerAmps,
+          loadAmps: loadAmps !== undefined ? Math.round(loadAmps * 10) / 10 : undefined,
+          terminationTempC: check.terminationC,
+          ampacity: check.ampacityA,
+          compliant: check.legal,
+          compliantOnlyWith75CTerminals: check.legalWith75CTerminals,
+          minimumRequiredSize: check.minimumSize,
+          minimumWith75CTerminals: option75,
+          reasons: check.reasons,
+          necReferences: check.necReferences,
+          recommendation: check.legal
+            ? `${conductorSize} is code-legal on the ${breakerAmps} A breaker (${check.ampacityA} A at ${check.terminationC} °C).`
+            : check.legalWith75CTerminals
+              ? `${conductorSize} is legal on the ${breakerAmps} A breaker only if both terminations are listed for 75 °C (NEC 110.14(C)(1)(a)(3)). Otherwise the minimum is ${check.minimumSize}.`
+              : `${conductorSize} is not code-legal on the ${breakerAmps} A breaker: ${check.reasons.join('; ')}. Minimum: ${check.minimumSize}${option75 ? ` (${option75} if both terminations are listed for 75 °C)` : ''}.`,
         },
       };
     },
@@ -1058,12 +1012,20 @@ Returns the feeder's voltage drop percentage if already calculated in the projec
             });
           }
 
-          // Check conductor sizing
-          const ampacity = getAmpacityFromTable310_16(circuit.conductorSize, 'Cu', 75);
-          if (ampacity < breakerAmps) {
+          // Check conductor sizing (#280): code-legal on its breaker — the
+          // termination column (110.14(C)(1)) and 240.4 including (B) and (D)
+          const check = conductorCodeLegal({
+            conductor: circuit.conductorSize,
+            material: 'Cu',
+            breakerAmps,
+            multiOutletReceptacle: /receptacle/i.test(circuit.description ?? ''),
+          });
+          if (!check.legal) {
             issues.push({
-              severity: 'critical',
-              description: `Circuit ${circuit.circuitNumber} conductor ${circuit.conductorSize} (${ampacity}A) undersized for ${breakerAmps}A breaker`,
+              severity: check.legalWith75CTerminals ? 'warning' : 'critical',
+              description: check.legalWith75CTerminals
+                ? `Circuit ${circuit.circuitNumber} conductor ${circuit.conductorSize} on a ${breakerAmps}A breaker is legal only if its terminations are listed for 75 °C (minimum ${check.minimumSize} otherwise)`
+                : `Circuit ${circuit.circuitNumber} conductor ${circuit.conductorSize} (${check.ampacityA}A at ${check.terminationC} °C) is not protected by its ${breakerAmps}A breaker; minimum ${check.minimumSize}`,
               necReference: 'NEC 240.4',
             });
           }
@@ -1363,8 +1325,9 @@ Examples:
           enum: ['lighting', 'receptacle', 'motor', 'hvac', 'ac', 'water_heater', 'kitchen', 'other'],
         },
         circuit_number: { type: 'number', description: 'BASE slot for the breaker (1-N). For multi-pole breakers, only pass the FIRST slot — the tool expands the footprint as baseSlot, baseSlot+2, baseSlot+4 because odd slots are on the left side and even on the right (NEMA convention). Example: 3-pole at slots 37/39/41 → circuit_number=37, poles=3. Omit to auto-pick the next free slot.' },
-        breaker_amps: { type: 'number', description: 'Breaker size in amps. Overrides load_type default.' },
+        breaker_amps: { type: 'number', description: 'Breaker size in amps. Overrides load_type default. For a continuous load such as an EV charger, give load_amps instead and let the tool size the breaker at 125 % (NEC 625.41).' },
         load_watts: { type: 'number', description: 'Circuit load in watts. Overrides load_type default.' },
+        load_amps: { type: 'number', description: 'Load current in amps, e.g. an EV charger rated 48 A. With no breaker_amps, the breaker is the next standard size at or above the load, at 125 % for a continuous load (an EV charger, NEC 625.41/625.42).' },
         poles: { type: 'number', description: 'Number of poles (1, 2, or 3). Overrides load_type default.' },
         wire_size: { type: 'string', description: 'Conductor size (e.g., "12 AWG"). Auto-sized from breaker if omitted.' },
         is_proposed: {
@@ -1383,6 +1346,7 @@ Examples:
         circuit_number,
         breaker_amps,
         load_watts,
+        load_amps,
         poles,
         wire_size,
         is_proposed,
@@ -1393,6 +1357,7 @@ Examples:
         circuit_number?: number;
         breaker_amps?: number;
         load_watts?: number;
+        load_amps?: number;
         poles?: number;
         wire_size?: string;
         is_proposed?: boolean;
@@ -1409,12 +1374,19 @@ Examples:
         load_type ?? (breaker_amps == null && !description ? 'other' : 'other');
       const template = LOAD_TEMPLATES[templateKey];
 
-      const finalBreakerAmps = breaker_amps ?? template.breaker;
-      const finalPoles = poles ?? template.pole;
-      const finalLoadVA = load_watts ?? template.loadVA;
+      // #280 (owner ruling 2026-11-21): a breaker sized from a load is the next
+      // standard size at or above it, at 125 % for a continuous load — an EV
+      // charger (625.41/625.42); the conductor is rated for that breaker at
+      // terminationTempC (#271).
+      const continuous = isEvseDescription(description);
+      const finalBreakerAmps = breaker_amps ?? (load_amps != null
+        ? getNextStandardBreakerSize(load_amps * (continuous ? EVSE_CONTINUOUS_FACTOR : 1))
+        : template.breaker);
+      const finalPoles = poles ?? (continuous ? 2 : template.pole);
       const finalDescription = description ?? template.description;
       const finalLoadTypeCode = template.loadTypeCode;
       const finalWireSize = wire_size ?? wireSizeForBreaker(finalBreakerAmps);
+      const wire75COption = wire_size ? null : conductor75COption(finalBreakerAmps, 'Cu');
 
       // Find the panel
       const panel = context.projectContext.panels.find(
@@ -1426,6 +1398,10 @@ Examples:
           error: `Panel "${panel_name}" not found. Available panels: ${context.projectContext.panels.map(p => p.name).join(', ')}`,
         };
       }
+      const circuitVoltage = finalPoles >= 3 ? panel.voltage * Math.sqrt(3)
+        : finalPoles === 2 ? panel.voltage
+        : panel.voltage / (panel.phase === 3 ? Math.sqrt(3) : 2);
+      const finalLoadVA = load_watts ?? (load_amps != null ? Math.round(load_amps * circuitVoltage) : template.loadVA);
 
       // Get panel ID from database
       const { data: dbPanel, error: dbErr } = await supabase
@@ -1551,6 +1527,9 @@ Examples:
             panelName: panel.name,
             breakerAmps: finalBreakerAmps,
             conductorSize: finalWireSize,
+            ...(wire75COption
+              ? { conductorNote: `Sized at 60 °C (NEC 110.14(C)(1)(a), circuits of 100 A or less); ${wire75COption} Cu is allowed when both terminations are listed for 75 °C.` }
+              : {}),
             poles: finalPoles,
             loadVA: finalLoadVA,
             loadType: finalLoadTypeCode,

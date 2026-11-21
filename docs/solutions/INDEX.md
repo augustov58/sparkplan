@@ -4,6 +4,7 @@ One note per hard problem, written by the model that solved it via the `extract-
 Each entry: `- [title](file.md) — reusable rule`.
 
 <!-- Newest first -->
+- [Four tools sized branch conductors from their own lists](2026-11-21-conductor-sizing-one-rule.md) — sweep and count every sizing path first; 240.4(B) needs all three conditions in both columns; chain commits behind the checks
 - [Whole dwellings took small-appliance / laundry circuits at a flat 1,500 VA](2026-11-21-small-appliance-laundry-va.md) — "not less than X for each" is a per-item floor; check template data in the database; decide what rows mean when they disagree with a count
 - [Saved short-circuit results printed as saved](2026-11-21-short-circuit-recompute-on-read.md) — save every input the calc takes; recompute where rows enter the app (the data hook); flag what can't be reproduced, never default it, and don't feed it to a new calc
 - [Required AIC carried a 1.25× "safety factor per NEC 110.9"](2026-11-21-short-circuit-aic-no-margin.md) — build page fixtures from the calculator's own output (units!); remove a printed field from the type so tsc finds every reader; assert PDF text, not blob size

@@ -11,11 +11,14 @@
  * - SplitVolt (~$350)
  *
  * NEC References:
- * - NEC 625.42 - Electric Vehicle Branch Circuit
+ * - NEC 625.41 - EV branch circuit at 125 % of the charger rating
  * - NEC 220.87 - Determining Existing Loads
  * - NEC 210.23 - Permissible Loads (outlet devices)
  */
 
+import { getNextStandardBreakerSize } from '../../data/nec/standard-breakers';
+import { conductorForBreaker, conductor75COption } from '../../data/nec/table-310-16';
+import { EVSE_CONTINUOUS_FACTOR } from '../../data/nec/evse-load';
 import type {
   CircuitSharingInput,
   CircuitSharingResult,
@@ -143,12 +146,6 @@ const SERVICE_UPGRADE_COSTS: ServiceUpgradeCostEstimate[] = [
 // Wire Size Lookup
 // ============================================================================
 
-const WIRE_SIZE_BY_AMPS: Record<number, string> = {
-  30: '#10 AWG Cu',
-  40: '#8 AWG Cu',
-  50: '#6 AWG Cu',
-  60: '#4 AWG Cu'
-};
 
 // ============================================================================
 // Main Calculation Function
@@ -166,7 +163,12 @@ export function calculateCircuitSharing(input: CircuitSharingInput): CircuitShar
   } = input;
 
   // Determine required circuit size (max of EV charger and shared device)
-  const requiredCircuitAmps = Math.max(proposedEVChargerAmps, existingCircuitAmps);
+  // #280 (owner ruling 2026-11-21): the EV branch circuit is the next standard
+  // size at or above 125 % of the charger (continuous load, NEC 625.41/625.42).
+  const requiredCircuitAmps = Math.max(
+    getNextStandardBreakerSize(proposedEVChargerAmps * EVSE_CONTINUOUS_FACTOR),
+    existingCircuitAmps,
+  );
 
   // Find compatible devices
   const compatibleDevices = CIRCUIT_SHARING_DEVICES.filter(device =>
@@ -245,7 +247,11 @@ export function calculateCircuitSharing(input: CircuitSharingInput): CircuitShar
     installationNotes: recommendedDevice?.installationNotes || [],
     circuitRequirements: {
       circuitAmps: requiredCircuitAmps,
-      wireSize: WIRE_SIZE_BY_AMPS[requiredCircuitAmps] || '#8 AWG Cu',
+      // Rated for the breaker at terminationTempC (#271): 60 °C up to 100 A
+      wireSize: `#${conductorForBreaker(requiredCircuitAmps, 'Cu') ?? 'size per the Conductor Sizing tool'} Cu`,
+      ...(conductor75COption(requiredCircuitAmps, 'Cu')
+        ? { wireSize75COption: `#${conductor75COption(requiredCircuitAmps, 'Cu')} Cu with 75 °C-listed terminations` }
+        : {}),
       breakerType: `${requiredCircuitAmps}A 2-pole breaker`
     },
 
@@ -268,7 +274,7 @@ export function calculateCircuitSharing(input: CircuitSharingInput): CircuitShar
     },
 
     necReferences: [
-      'NEC 625.42 - Electric Vehicle Branch Circuit',
+      'NEC 625.41 - EV branch circuit at 125 % of the charger rating',
       'NEC 220.87 - Determining Existing Loads',
       'NEC 210.23 - Permissible Loads'
     ],
@@ -431,8 +437,10 @@ function generateWarnings(
     warnings.push('HVAC sharing may cause frequent charging pauses during extreme weather');
   }
 
-  if (input.proposedEVChargerAmps > 40 && input.existingCircuitAmps < 50) {
-    warnings.push('Consider upgrading circuit to 50A to maximize EV charging speed');
+  // #280: the charger's circuit is 125 % of its rating (NEC 625.41/625.42)
+  const evCircuitAmps = getNextStandardBreakerSize(input.proposedEVChargerAmps * EVSE_CONTINUOUS_FACTOR);
+  if (input.existingCircuitAmps < evCircuitAmps) {
+    warnings.push(`A ${input.proposedEVChargerAmps} A charger needs a ${evCircuitAmps} A circuit (125 %, NEC 625.41); the existing ${input.existingCircuitAmps} A circuit would have to be upgraded`);
   }
 
   if (input.evChargingSchedule !== 'overnight') {

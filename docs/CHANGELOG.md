@@ -4,6 +4,16 @@ All notable changes to SparkPlan.
 
 ---
 
+## 2026-11-21: The Copilot, Circuit Sharing and the multifamily generator size conductors like the EV tools (#280)
+
+- **One conductor rule everywhere a circuit is sized**: the breaker is the next standard size at or above the load, at 125 % for a continuous load such as an EV charger; the conductor comes from the NEC ampacity table at 60 °C for circuits of 100 A or less and 75 °C above, with the smaller 75 °C size noted for terminals listed for it.
+  - **Copilot "add a circuit"**: an 80 A EV charger now gets a 100 A breaker and 1 AWG copper (was 4 AWG).
+  - **Circuit Sharing**: a 48 A charger needs a 60 A circuit with 4 AWG copper (was 48 A and 8 AWG).
+  - **Multifamily generator**: a 100 A circuit gets 1 AWG copper (was 2 AWG); circuits above 100 A use the 75 °C column.
+- **The Copilot's conductor checks pass anything the code allows** on the circuit's breaker, including the "next size up" rule (NEC 240.4(B)): 6 AWG on a 60 A breaker is fine; 8 AWG on a 60 A EV circuit is not (minimum 4 AWG). A conductor that is legal only with 75 °C-rated terminals is flagged as such.
+
+---
+
 ## 2026-11-21: Dwellings count a small-appliance or laundry circuit at its own VA when it is above 1,500 VA (#282)
 
 - **A whole dwelling's NEC 220 Part III calculation now counts each small-appliance and laundry circuit at the larger of its VA or 1,500 VA** (NEC 220.52(A)/(B): "not less than 1500 volt-amperes for each"). It used a flat 1,500 VA per circuit. This covers a new single-family house on the standard calculation, a multifamily dwelling-unit panel and a two-unit building. Example: a 2,400 ft² house with one small-appliance circuit at 2,400 VA and the laundry at 2,000 VA goes from 29.6 to 30.1 kVA.
