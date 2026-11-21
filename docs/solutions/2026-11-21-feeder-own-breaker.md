@@ -13,6 +13,8 @@
 
 - `getEgcSize` returns bare sizes ("10", "250"); the first build printed "EGC: 10". Formatted through `parseConductor`.
 - The stale banner and card printed "5,100 VA → 5,100 VA (0%)" for a breaker problem; they now print the breaker reason.
+- **Caught by the verifier:** Inspector Mode titled a 20 A breaker under a 22.3 A load "Feeder Not Protected by Its Breaker" (240.4) — but 10 AWG on 20 A *is* protected; the defect is a breaker below the design load (215.3). My acceptance row had the same wrong title. The finding now names the rule by its reason: 215.3 "Feeder Breaker Smaller Than Its Design Load", or 240.4 "Feeder Conductor Not Protected by Its Breaker". Lesson: "the breaker and the conductor disagree" is two defects with two rules; title each by the reason that fired.
+- Also from the verifier, filed for a ruling (#296, pre-existing): `sizeConductor` applies the 310.15(C)(1) adjustment to the 110.14(C) termination column as well, so 100 A with 4 current-carrying conductors sizes 1/0 instead of 1 AWG (errs large).
 
 ## Not done / side effects
 
