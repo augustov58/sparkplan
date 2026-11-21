@@ -7,7 +7,7 @@
  */
 import { describe, it, expect } from 'vitest';
 import { generateCustomEVPanel, EV_PANEL_TEMPLATES, type ChargerTypeOption } from '../data/ev-panel-templates';
-import { findConductorByAmpacity } from '../data/nec/table-310-16';
+import { findConductorByAmpacity, terminationTempC } from '../data/nec/table-310-16';
 
 const chargers = (chargerType: ChargerTypeOption) =>
   generateCustomEVPanel({
@@ -29,15 +29,16 @@ describe('#249 DC fast charger circuit sizing', () => {
     for (const type of ['Level 2 (48A)', 'Level 2 (80A)', 'DC Fast Charge (150kW)'] as ChargerTypeOption[]) {
       for (const c of chargers(type)) {
         expect(c.breakerAmps).toBeGreaterThanOrEqual(c.evChargerAmps! * 1.25);
-        const rated = findConductorByAmpacity(c.breakerAmps, 'Cu', 75)!;
+        // 110.14(C)(1) column: 60 °C up to 100 A, 75 °C above (#271)
+        const rated = findConductorByAmpacity(c.breakerAmps, 'Cu', terminationTempC(c.breakerAmps))!;
         expect(c.conductorSize).toBe(`${rated.size} Cu`);
       }
     }
   });
 
-  it('Level 2 sizes are unchanged (60 A / 6 AWG, 100 A / 3 AWG)', () => {
-    expect(chargers('Level 2 (48A)')[0]).toMatchObject({ breakerAmps: 60, conductorSize: '6 AWG Cu' });
-    expect(chargers('Level 2 (80A)')[0]).toMatchObject({ breakerAmps: 100, conductorSize: '3 AWG Cu' });
+  it('Level 2 sizes at 60 °C (#271): 60 A / 4 AWG, 100 A / 1 AWG', () => {
+    expect(chargers('Level 2 (48A)')[0]).toMatchObject({ breakerAmps: 60, conductorSize: '4 AWG Cu' });   // 6 AWG is 55 A at 60 °C
+    expect(chargers('Level 2 (80A)')[0]).toMatchObject({ breakerAmps: 100, conductorSize: '1 AWG Cu' });  // 2 AWG is 95 A
   });
 
   it('the premade "2× DC Fast Chargers" template matches the builder', () => {

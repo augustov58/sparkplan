@@ -112,3 +112,39 @@ export function findConductorByAmpacity(
 
   return null; // No conductor large enough
 }
+
+/**
+ * NEC 110.14(C)(1): the Table 310.16 column a circuit's conductor is rated
+ * from. 60 °C for a circuit of 100 A or less (14–1 AWG), 75 °C above. A
+ * circuit of 100 A or less may use 75 °C only when its terminals are listed
+ * for it (110.14(C)(1)(a)(3)): EV branch circuits take 60 °C and note that
+ * option (PE ruling 2026-11-20, #271).
+ */
+export function terminationTempC(circuitAmps: number): 60 | 75 {
+  return circuitAmps <= 100 ? 60 : 75;
+}
+
+/**
+ * NEC 240.4(D)(4)–(8) (same values in 2020 and 2023, book-checked): the
+ * largest overcurrent protection a small conductor may have, whatever its
+ * Table 310.16 ampacity (14 AWG Cu is 20 A at 75 °C but takes 15 A at most).
+ */
+const SMALL_CONDUCTOR_MAX_OCPD: Record<'Cu' | 'Al', Record<string, number>> = {
+  Cu: { '14 AWG': 15, '12 AWG': 20, '10 AWG': 30 },
+  Al: { '12 AWG': 15, '10 AWG': 25 },
+};
+
+/**
+ * The smaller conductor a circuit of 100 A or less may use when its terminals
+ * are listed for 75 °C (110.14(C)(1)(a)(3)), or null when there is none: the
+ * 75 °C column gives the same size, or the circuit is above 100 A (already
+ * 75 °C). Never below the 240.4(D) limit for the circuit's breaker.
+ */
+export function conductor75COption(circuitAmps: number, material: 'Cu' | 'Al'): string | null {
+  if (circuitAmps > 100) return null;
+  const allowed = (e: AmpacityEntry) =>
+    e.material === material && (SMALL_CONDUCTOR_MAX_OCPD[material][e.size] ?? Infinity) >= circuitAmps;
+  const at60 = TABLE_310_16.find(e => allowed(e) && e.temp60C >= circuitAmps);
+  const at75 = TABLE_310_16.find(e => allowed(e) && e.temp75C >= circuitAmps);
+  return at75 && at75.size !== at60?.size ? at75.size : null;
+}

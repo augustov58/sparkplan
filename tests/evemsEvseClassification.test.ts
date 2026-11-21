@@ -30,18 +30,18 @@ describe('#139 generated chargers use the calculator rating', () => {
       config: { chargerType: 'Level 2 (48A)', chargerAmps: amps, numberOfChargers: 2, useEVEMS: false, includeSpare: false, includeLighting: false },
     }).circuits.filter(c => c.isEvCharger);
 
-  it('40 A charger → 50 A breaker, 8 AWG Cu, 9,600 VA', () => {
+  it('40 A charger → 50 A breaker, 6 AWG Cu (60 °C, #271), 9,600 VA', () => {
     const [c] = chargers(40);
     expect(c!.breakerAmps).toBe(50);
-    expect(c!.conductorSize).toBe('8 AWG Cu');
+    expect(c!.conductorSize).toBe('6 AWG Cu'); // 8 AWG is 40 A at 60 °C
     expect(c!.loadVA).toBe(9_600);
     expect(c!.description).toContain('Level 2 (40A)');
   });
 
-  it('48 A still matches the old preset (60 A, 6 AWG, 11,520 VA)', () => {
+  it('48 A still matches the preset (60 A, 4 AWG at 60 °C (#271), 11,520 VA)', () => {
     const [c] = chargers(48);
     expect(c!.breakerAmps).toBe(60);
-    expect(c!.conductorSize).toBe('6 AWG Cu');
+    expect(c!.conductorSize).toBe('4 AWG Cu');
     expect(c!.loadVA).toBe(11_520);
   });
 });

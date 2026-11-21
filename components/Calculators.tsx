@@ -1663,6 +1663,13 @@ const EVChargingCalculator: React.FC<{ project?: Project }> = ({ project }) => {
                   <span className="text-[#666]">EGC Size:</span>
                   <span className="font-bold">{result.egcSize}</span>
                 </div>
+                {/* #271 (PE ruling 2026-11-20): ≤ 100 A at 60 °C, the 75 °C option noted */}
+                {result.conductor75COption && (
+                  <p className="text-xs text-[#666] mt-2" data-testid="ev-calc-conductor-note">
+                    Conductor sized at 60 °C (NEC 110.14(C)(1)(a), circuits of 100 A or less). {result.conductor75COption}{' '}
+                    {material} is allowed if the charger and breaker terminals are both listed for 75 °C (110.14(C)(1)(a)(3)).
+                  </p>
+                )}
               </div>
 
               {/* System Load */}

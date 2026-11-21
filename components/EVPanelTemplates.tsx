@@ -13,6 +13,7 @@ import { useProjectNecEdition } from '../hooks/useProjectNecEdition';
 import { scheduleServiceCheck, panelDesignAmps } from '../lib/storedCalcs';
 import { dwellingAggregateOptions } from '../lib/projectSettings';
 import { calculateAggregatedLoad, isEVEMSMarkerCircuit } from '../services/calculations/upstreamLoadAggregation';
+import { conductor75COption } from '../data/nec/table-310-16';
 import { showToast, toastMessages } from '../lib/toast';
 import type { Database } from '../lib/database.types';
 import type { Project } from '../types';
@@ -103,6 +104,10 @@ export const EVPanelTemplates: React.FC<EVPanelTemplatesProps> = ({ project }) =
       config: { ...config, evemsSetpointVA: simultaneousChargers * perChargerVA },
     });
   }, [project.id, chargerType, numberOfChargers, useEVEMS, simultaneousChargers, includeSpare, includeLighting, customPanelName]);
+
+  // The EV branch circuit Create adds, and its 75 °C option (#271)
+  const evCircuit = builderTemplate.circuits.find(c => c.isEvCharger);
+  const evConductor75C = evCircuit ? conductor75COption(evCircuit.breakerAmps, 'Cu') : null;
 
   const toCircuitRow = (c: (typeof builderTemplate.circuits)[number], panelId: string) =>
     templateCircuitRow(c, panelId, project.id);
@@ -478,6 +483,14 @@ export const EVPanelTemplates: React.FC<EVPanelTemplatesProps> = ({ project }) =
                 <Check className="w-4 h-4 text-green-600 flex-shrink-0 mt-0.5" />
                 <span>
                   <strong>{numberOfChargers} EV Circuit{numberOfChargers === 1 ? '' : 's'}:</strong> {chargerType} charger{numberOfChargers === 1 ? '' : 's'}
+                  {evCircuit && <>, each on a {evCircuit.breakerAmps}A breaker with {evCircuit.conductorSize}</>}
+                  {/* #271 (PE ruling 2026-11-20): ≤ 100 A at 60 °C, the 75 °C option noted */}
+                  {evCircuit && evConductor75C && (
+                    <span className="block text-xs text-gray-600 mt-1" data-testid="ev-builder-conductor-note">
+                      Conductors sized at 60 °C (NEC 110.14(C)(1)(a), circuits of 100 A or less). {evConductor75C} Cu is
+                      allowed if the charger and breaker terminals are both listed for 75 °C (110.14(C)(1)(a)(3)).
+                    </span>
+                  )}
                 </span>
               </li>
               {useEVEMS && (

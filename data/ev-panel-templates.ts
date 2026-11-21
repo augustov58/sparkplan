@@ -14,7 +14,7 @@
 import type { Panel } from '../types';
 import { nanoid } from 'nanoid';
 import { getNextStandardBreakerSize } from './nec/standard-breakers';
-import { findConductorByAmpacity } from './nec/table-310-16';
+import { findConductorByAmpacity, terminationTempC } from './nec/table-310-16';
 
 // Template-time circuit shape — camelCase, distinct from the snake_case
 // DB Circuit row type. These templates are display fixtures; the
@@ -126,7 +126,7 @@ export const EV_PANEL_TEMPLATE_4X_LEVEL2: EVPanelTemplate = {
       poles: 2,
       voltage: 240,
       description: 'EV Charger #1 - Level 2 (48A continuous)',
-      conductorSize: '6 AWG Cu',
+      conductorSize: '4 AWG Cu',
       conductorType: 'THHN',
       loadVA: 11520,
       isEvCharger: true,
@@ -138,7 +138,7 @@ export const EV_PANEL_TEMPLATE_4X_LEVEL2: EVPanelTemplate = {
       poles: 2,
       voltage: 240,
       description: 'EV Charger #2 - Level 2 (48A continuous)',
-      conductorSize: '6 AWG Cu',
+      conductorSize: '4 AWG Cu',
       conductorType: 'THHN',
       loadVA: 11520,
       isEvCharger: true,
@@ -150,7 +150,7 @@ export const EV_PANEL_TEMPLATE_4X_LEVEL2: EVPanelTemplate = {
       poles: 2,
       voltage: 240,
       description: 'EV Charger #3 - Level 2 (48A continuous)',
-      conductorSize: '6 AWG Cu',
+      conductorSize: '4 AWG Cu',
       conductorType: 'THHN',
       loadVA: 11520,
       isEvCharger: true,
@@ -162,7 +162,7 @@ export const EV_PANEL_TEMPLATE_4X_LEVEL2: EVPanelTemplate = {
       poles: 2,
       voltage: 240,
       description: 'EV Charger #4 - Level 2 (48A continuous)',
-      conductorSize: '6 AWG Cu',
+      conductorSize: '4 AWG Cu',
       conductorType: 'THHN',
       loadVA: 11520,
       isEvCharger: true,
@@ -212,7 +212,7 @@ export const EV_PANEL_TEMPLATE_8X_LEVEL2_EVEMS: EVPanelTemplate = {
       poles: 2,
       voltage: 240,
       description: 'EV Charger #1 - Level 2 (48A, EVEMS managed)',
-      conductorSize: '6 AWG Cu',
+      conductorSize: '4 AWG Cu',
       conductorType: 'THHN',
       loadVA: 11520,
       isEvCharger: true,
@@ -224,7 +224,7 @@ export const EV_PANEL_TEMPLATE_8X_LEVEL2_EVEMS: EVPanelTemplate = {
       poles: 2,
       voltage: 240,
       description: 'EV Charger #2 - Level 2 (48A, EVEMS managed)',
-      conductorSize: '6 AWG Cu',
+      conductorSize: '4 AWG Cu',
       conductorType: 'THHN',
       loadVA: 11520,
       isEvCharger: true,
@@ -236,7 +236,7 @@ export const EV_PANEL_TEMPLATE_8X_LEVEL2_EVEMS: EVPanelTemplate = {
       poles: 2,
       voltage: 240,
       description: 'EV Charger #3 - Level 2 (48A, EVEMS managed)',
-      conductorSize: '6 AWG Cu',
+      conductorSize: '4 AWG Cu',
       conductorType: 'THHN',
       loadVA: 11520,
       isEvCharger: true,
@@ -248,7 +248,7 @@ export const EV_PANEL_TEMPLATE_8X_LEVEL2_EVEMS: EVPanelTemplate = {
       poles: 2,
       voltage: 240,
       description: 'EV Charger #4 - Level 2 (48A, EVEMS managed)',
-      conductorSize: '6 AWG Cu',
+      conductorSize: '4 AWG Cu',
       conductorType: 'THHN',
       loadVA: 11520,
       isEvCharger: true,
@@ -260,7 +260,7 @@ export const EV_PANEL_TEMPLATE_8X_LEVEL2_EVEMS: EVPanelTemplate = {
       poles: 2,
       voltage: 240,
       description: 'EV Charger #5 - Level 2 (48A, EVEMS managed)',
-      conductorSize: '6 AWG Cu',
+      conductorSize: '4 AWG Cu',
       conductorType: 'THHN',
       loadVA: 11520,
       isEvCharger: true,
@@ -272,7 +272,7 @@ export const EV_PANEL_TEMPLATE_8X_LEVEL2_EVEMS: EVPanelTemplate = {
       poles: 2,
       voltage: 240,
       description: 'EV Charger #6 - Level 2 (48A, EVEMS managed)',
-      conductorSize: '6 AWG Cu',
+      conductorSize: '4 AWG Cu',
       conductorType: 'THHN',
       loadVA: 11520,
       isEvCharger: true,
@@ -284,7 +284,7 @@ export const EV_PANEL_TEMPLATE_8X_LEVEL2_EVEMS: EVPanelTemplate = {
       poles: 2,
       voltage: 240,
       description: 'EV Charger #7 - Level 2 (48A, EVEMS managed)',
-      conductorSize: '6 AWG Cu',
+      conductorSize: '4 AWG Cu',
       conductorType: 'THHN',
       loadVA: 11520,
       isEvCharger: true,
@@ -296,7 +296,7 @@ export const EV_PANEL_TEMPLATE_8X_LEVEL2_EVEMS: EVPanelTemplate = {
       poles: 2,
       voltage: 240,
       description: 'EV Charger #8 - Level 2 (48A, EVEMS managed)',
-      conductorSize: '6 AWG Cu',
+      conductorSize: '4 AWG Cu',
       conductorType: 'THHN',
       loadVA: 11520,
       isEvCharger: true,
@@ -492,8 +492,9 @@ export interface CustomEVPanelConfig {
    * preset's amps / breaker / conductor / load so the generated panel
    * matches the calculator (#139 — every charger ≤ 48 A used to become the
    * 48 A / 60 A / 11,520 VA preset). Breaker = next standard size ≥ 125% of
-   * the rating (NEC 625.41, 240.6(A)); conductor ampacity ≥ the breaker at
-   * 75 °C (same basis as the presets).
+   * the rating (NEC 625.41, 240.6(A)); conductor ampacity ≥ the breaker in
+   * the 110.14(C)(1) column: 60 °C up to 100 A, 75 °C above (PE ruling
+   * 2026-11-20, #271; same basis as the presets).
    */
   chargerAmps?: number;
   includeSpare: boolean;
@@ -539,7 +540,7 @@ export function generateCustomEVPanel(input: CustomEVPanelInput): ApplyTemplateO
       voltage = 240;
       phase = 1;
       breakerSize = 60;  // 125% of 48A = 60A
-      conductorSize = '6 AWG Cu';
+      conductorSize = '4 AWG Cu';  // 70 A at 60 °C (#271; 6 AWG is 55 A)
       loadVA = 11520;  // 48A × 240V
       break;
     case 'Level 2 (80A)':
@@ -548,7 +549,7 @@ export function generateCustomEVPanel(input: CustomEVPanelInput): ApplyTemplateO
       voltage = 240;
       phase = 1;
       breakerSize = 100;  // 125% of 80A = 100A
-      conductorSize = '3 AWG Cu';
+      conductorSize = '1 AWG Cu';  // 110 A at 60 °C (#271; 2 AWG is 95 A)
       loadVA = 19200;  // 80A × 240V
       break;
     case 'DC Fast Charge (150kW)': {
@@ -562,7 +563,7 @@ export function generateCustomEVPanel(input: CustomEVPanelInput): ApplyTemplateO
       // fixed 225 A / 3/0 (200 A) sat below 125% of the charger's current.
       chargerAmps = Math.round((loadVA / (voltage * Math.sqrt(3))) * 10) / 10;
       breakerSize = getNextStandardBreakerSize(chargerAmps * 1.25);
-      const conductor = findConductorByAmpacity(breakerSize, 'Cu', 75);
+      const conductor = findConductorByAmpacity(breakerSize, 'Cu', terminationTempC(breakerSize));
       conductorSize = conductor ? `${conductor.size} Cu` : '250 kcmil Cu';
       break;
     }
@@ -576,7 +577,7 @@ export function generateCustomEVPanel(input: CustomEVPanelInput): ApplyTemplateO
     loadVA = chargerAmps * voltage;
     chargerKW = loadVA / 1000;
     breakerSize = getNextStandardBreakerSize(chargerAmps * 1.25);
-    const conductor = findConductorByAmpacity(breakerSize, 'Cu', 75);
+    const conductor = findConductorByAmpacity(breakerSize, 'Cu', terminationTempC(breakerSize));
     conductorSize = conductor ? `${conductor.size} Cu` : conductorSize;
     chargerLabel = `Level 2 (${chargerAmps}A)`;
   }
