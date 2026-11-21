@@ -480,6 +480,14 @@ export interface DwellingStandardInput {
   laundryCircuit: boolean;
   /** 220.52(B) laundry circuits when more than one (a two-unit service); overrides `laundryCircuit`. */
   laundryCircuits?: number;
+  /**
+   * The small-appliance and laundry circuits listed on the panel, VA per
+   * circuit: 220.52(A)/(B) take "not less than 1500 volt-amperes for each",
+   * so each counts at the larger of its VA or 1,500 (owner ruling 2026-11-21,
+   * #282). See `circuits220_52VA` for fewer listed than counted.
+   */
+  smallApplianceCircuitVA?: number[];
+  laundryCircuitVA?: number[];
   items: DwellingLoadItem[];
   necEdition?: NecEdition;
 }
@@ -493,6 +501,22 @@ export interface DwellingStandardResult {
 }
 
 export const LARGEST_MOTOR_CATEGORY = 'Largest Motor (25%)';
+
+/**
+ * 220.52(A)/(B) load of `counted` small-appliance or laundry circuits, given
+ * the ones listed on the panel (VA per circuit; owner ruling 2026-11-21, #282):
+ * - none listed: 1,500 VA each;
+ * - at least as many listed as counted: 1,500 VA each, plus each listed
+ *   circuit's VA above 1,500 (each at the larger of its VA or 1,500);
+ * - fewer listed than counted: the listed rows hold every counted circuit (one
+ *   3,000 VA row for two circuits), so the larger of their VA or 1,500 each.
+ */
+export function circuits220_52VA(counted: number, listed: number[] | undefined, perCircuitVA: number): number {
+  const base = counted * perCircuitVA;
+  if (!listed || listed.length === 0) return base;
+  if (listed.length < counted) return Math.max(base, listed.reduce((sum, va) => sum + va, 0));
+  return base + listed.reduce((sum, va) => sum + Math.max(0, va - perCircuitVA), 0);
+}
 
 /**
  * NEC 220 Part III standard method for one dwelling unit (PE ruling
@@ -517,9 +541,11 @@ export function calculateDwellingStandardLoad(input: DwellingStandardInput): Dwe
   if (smallApplianceCircuits < minimumSmallAppliance) {
     warnings.push('Minimum 2 small appliance circuits required per NEC 210.11(C)(1)');
   }
-  const smallApplianceVA = effectiveSmallAppliance * SMALL_APPLIANCE_VA_PER_CIRCUIT;
+  const smallApplianceVA = circuits220_52VA(effectiveSmallAppliance, input.smallApplianceCircuitVA, SMALL_APPLIANCE_VA_PER_CIRCUIT);
+  const smallApplianceAbove = smallApplianceVA > effectiveSmallAppliance * SMALL_APPLIANCE_VA_PER_CIRCUIT;
   const laundryCount = input.laundryCircuits ?? (laundryCircuit ? 1 : 0);
-  const laundryVA = laundryCount * LAUNDRY_CIRCUIT_VA;
+  const laundryVA = circuits220_52VA(laundryCount, input.laundryCircuitVA, LAUNDRY_CIRCUIT_VA);
+  const laundryAbove = laundryVA > laundryCount * LAUNDRY_CIRCUIT_VA;
   const generalVA = lightingVA + smallApplianceVA + laundryVA;
   const generalDemandVA = applyTieredDemand(generalVA, LIGHTING_DEMAND_TABLE);
 
@@ -528,12 +554,18 @@ export function calculateDwellingStandardLoad(input: DwellingStandardInput): Dwe
     connectedVA: lightingVA, demandVA: 0, demandFactor: 0, necReference: `NEC ${article220Citations(necEdition).dwellingUnitLoad}`,
   });
   breakdown.push({
-    category: 'Small Appliance Circuits', description: `${effectiveSmallAppliance} circuits @ 1,500 VA each`,
+    category: 'Small Appliance Circuits',
+    description: smallApplianceAbove
+      ? `${effectiveSmallAppliance} circuits, each at the larger of its VA or 1,500 VA`
+      : `${effectiveSmallAppliance} circuits @ 1,500 VA each`,
     connectedVA: smallApplianceVA, demandVA: 0, demandFactor: 0, necReference: 'NEC 220.52(A)',
   });
   if (laundryCount > 0) {
     breakdown.push({
-      category: 'Laundry Circuit', description: `${laundryCount} circuit${laundryCount > 1 ? 's' : ''} @ 1,500 VA`,
+      category: 'Laundry Circuit',
+      description: laundryAbove
+        ? `${laundryCount} circuit${laundryCount > 1 ? 's' : ''}, each at the larger of its VA or 1,500 VA`
+        : `${laundryCount} circuit${laundryCount > 1 ? 's' : ''} @ 1,500 VA`,
       connectedVA: laundryVA, demandVA: 0, demandFactor: 0, necReference: 'NEC 220.52(B)',
     });
   }
@@ -2063,14 +2095,16 @@ export function dwellingLoadsFromCircuits(circuits: PanelDemandCircuit[], necEdi
   /**
    * Small-appliance and laundry circuits' VA above the 1,500 VA each counts in
    * the walk, summed circuit by circuit (220.52(A)/(B): "not less than 1500
-   * volt-amperes for each"). A subpanel counts it (#282, pending).
+   * volt-amperes for each"). The sum of the two fields below; the subpanel
+   * adds it to its general load (#217, kept by #282 (4a)).
    */
   aboveMinimumVA: number;
 } {
   let lightingVA = 0;
   let receptacleVA = 0;
   let refrigeratorVA = 0;
-  let aboveMinimumVA = 0;
+  const smallApplianceCircuitVA: number[] = [];
+  const laundryCircuitVA: number[] = [];
   let smallApplianceCircuits = 0;
   let laundryCircuits = 0;
   const items: DwellingLoadItem[] = [];
@@ -2081,14 +2115,17 @@ export function dwellingLoadsFromCircuits(circuits: PanelDemandCircuit[], necEdi
     const desc = description.toLowerCase();
     const type = dwellingLoadType((c.load_type ?? 'O').toUpperCase(), desc);
     if (type === 'L') { lightingVA += watts; continue; }
+    // A row written as "N @ …" stands for N circuits sharing its VA (the
+    // sample template's "Small Appliance Circuits - 2 @ 1,500 VA", 3,000 W).
+    const circuitsInRow = Math.max(1, Number(desc.match(/(\d+)\s*@/)?.[1] ?? 1));
     if (SMALL_APPLIANCE_PATTERN.test(desc)) {
-      smallApplianceCircuits++;
-      aboveMinimumVA += Math.max(0, watts - SMALL_APPLIANCE_VA_PER_CIRCUIT);
+      smallApplianceCircuits += circuitsInRow;
+      for (let i = 0; i < circuitsInRow; i++) smallApplianceCircuitVA.push(watts / circuitsInRow);
       continue;
     }
     if (LAUNDRY_PATTERN.test(desc) && type !== 'D') {
-      laundryCircuits++;
-      aboveMinimumVA += Math.max(0, watts - LAUNDRY_CIRCUIT_VA);
+      laundryCircuits += circuitsInRow;
+      for (let i = 0; i < circuitsInRow; i++) laundryCircuitVA.push(watts / circuitsInRow);
       continue;
     }
     if (REFRIGERATOR_PATTERN.test(desc)) { refrigeratorVA += watts; continue; }
@@ -2113,7 +2150,11 @@ export function dwellingLoadsFromCircuits(circuits: PanelDemandCircuit[], necEdi
     lightingVA,
     receptacleVA,
     refrigeratorVA,
-    aboveMinimumVA,
+    aboveMinimumVA:
+      smallApplianceCircuitVA.reduce((sum, va) => sum + Math.max(0, va - SMALL_APPLIANCE_VA_PER_CIRCUIT), 0) +
+      laundryCircuitVA.reduce((sum, va) => sum + Math.max(0, va - LAUNDRY_CIRCUIT_VA), 0),
+    smallApplianceCircuitVA,
+    laundryCircuitVA,
     lightingDescription: 'Lighting circuits (3 VA/sq ft)',
     smallApplianceCircuits,
     laundryCircuit: laundryCircuits > 0,
@@ -2179,11 +2220,15 @@ export function calculateSingleFamilySubpanelLoad(opts: {
 }): DwellingPanelLoadSummary {
   const { circuits, necEdition = '2020' } = opts;
   // Its "no general lighting → 3 VA/ft² missing" warning is for a whole dwelling; not carried here
-  const { receptacleVA, refrigeratorVA, aboveMinimumVA, ...loads } = dwellingLoadsFromCircuits(circuits, necEdition);
-  // Not ruled (#282, pending): rather than leave load out, a refrigerator
-  // circuit counts at its VA (the 220.52(A) Exception is a whole-dwelling
-  // small-appliance rule), and a small-appliance or laundry circuit above
-  // 1,500 VA at its own VA (220.52(A)/(B): "not less than 1500 ... for each").
+  const {
+    receptacleVA, refrigeratorVA, aboveMinimumVA,
+    smallApplianceCircuitVA: _sa, laundryCircuitVA: _laundry, // counted in aboveMinimumVA below
+    ...loads
+  } = dwellingLoadsFromCircuits(circuits, necEdition);
+  // Owner ruling 2026-11-21, #282 (4a): a refrigerator circuit counts at its
+  // VA (the 220.52(A) Exception is a whole-dwelling small-appliance rule), and
+  // a small-appliance or laundry circuit above 1,500 VA at its own VA
+  // (220.52(A)/(B): "not less than 1500 ... for each"), in the general load.
   const result = calculateDwellingStandardLoad({
     ...loads,
     lightingVA: loads.lightingVA + receptacleVA + refrigeratorVA + aboveMinimumVA,
@@ -2256,16 +2301,23 @@ export function calculateSingleFamilyPanelLoad(opts: {
     return dwellingSummaryFromOptionalMethod(calculateDwellingPanelDemand(rest));
   }
   // Lighting, receptacle, small-appliance and laundry circuits are covered by
-  // the 220.12 / 220.52 allowances below, not counted per circuit.
-  const loads = dwellingLoadsFromCircuits(rest.circuits.filter(c => {
+  // the 220.12 / 220.52 allowances below, not counted per circuit — except a
+  // small-appliance or laundry circuit's VA above 1,500, which 220.52(A)/(B)
+  // count ("not less than 1500 ... for each"; owner ruling 2026-11-21, #282).
+  const is220_52 = (c: PanelDemandCircuit) => {
     const desc = (c.description ?? '').toLowerCase();
-    return !SMALL_APPLIANCE_PATTERN.test(desc) && !(LAUNDRY_PATTERN.test(desc) && (c.load_type ?? '').toUpperCase() !== 'D');
-  }), rest.necEdition ?? '2020');
+    return SMALL_APPLIANCE_PATTERN.test(desc) || (LAUNDRY_PATTERN.test(desc) && (c.load_type ?? '').toUpperCase() !== 'D');
+  };
+  const edition = rest.necEdition ?? '2020';
+  const loads = dwellingLoadsFromCircuits(rest.circuits.filter(c => !is220_52(c)), edition);
+  const circuits220_52 = dwellingLoadsFromCircuits(rest.circuits.filter(is220_52), edition);
   const result = calculateDwellingStandardLoad({
     lightingVA: rest.squareFootage * LIGHTING_LOAD_VA_PER_SQFT,
     lightingDescription: `${rest.squareFootage} sq ft @ 3 VA/sq ft`,
     smallApplianceCircuits: rest.smallApplianceCircuits,
     laundryCircuit: rest.laundryCircuit,
+    smallApplianceCircuitVA: circuits220_52.smallApplianceCircuitVA,
+    laundryCircuitVA: rest.laundryCircuit ? circuits220_52.laundryCircuitVA : [],
     items: loads.items,
     necEdition: rest.necEdition,
   });
@@ -2402,6 +2454,9 @@ export function calculateTwoUnitDwellingLoad(opts: {
     smallApplianceCircuits: units.reduce((sum, u) => sum + u.smallApplianceCircuits, 0),
     laundryCircuit: units.some(u => u.laundryCircuit),
     laundryCircuits: units.reduce((sum, u) => sum + (u.laundryCircuits ?? (u.laundryCircuit ? 1 : 0)), 0),
+    // 220.52(A)/(B): each circuit at the larger of its VA or 1,500 (#282)
+    smallApplianceCircuitVA: units.flatMap(u => u.smallApplianceCircuitVA ?? []),
+    laundryCircuitVA: units.flatMap(u => u.laundryCircuitVA ?? []),
     // Unit labels go on the description: categories stay the ones
     // calculateNeutralLoad matches for 240 V-only loads.
     items: units.flatMap(u => u.items.map(item => (labelled
