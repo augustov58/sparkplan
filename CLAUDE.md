@@ -168,6 +168,10 @@ A single-family subpanel's feeder (PE ruling 2026-11-20, #217) = Part III over
 its own circuits (`calculateSingleFamilySubpanelLoad`): only the small-appliance
 circuits on it (no 2-circuit minimum), receptacles at their VA in the 220.42
 tiers. The 3 VA/ft² allowance and the 2-circuit minimum stay on the service calc.
+Whole dwellings on Part III take each small-appliance and laundry circuit at the
+larger of its VA or 1,500 VA (220.52(A)/(B); owner ruling 2026-11-21, #282) via
+`circuits220_52VA`; fewer rows than counted circuits hold all of them ("2 @ 1,500
+VA" = two circuits). The Optional Methods keep 1,500 per circuit (#291 open).
 
 ### Two Dwelling Units — Part III / 220.85 (PE ruling 2026-10-27, #127)
 ```
@@ -439,6 +443,7 @@ Real mistakes made in this repo, each paired with the rule that prevents recurre
 | Short circuit multiplied steel-conduit XL by 1.5 on top of Table 9's steel column, under a comment claiming "Table 9 only has PVC data"; steel fault currents were 4–12% low (#276) | Before applying a factor for a condition, check the table doesn't already have a column for it. Check a comment's claim about the data against the data. |
 | Short circuit multiplied the fault current by 1.25 before picking the AIC, citing NEC 110.9 (no such factor); the packet's fault-current page printed the kA rating as "14 A", hidden because its fixtures stored the rating in amps (#279) | Find a factor in the cited section before applying it. Build a page's test fixture from the calculator's output, in its units, and assert the page's text, not that a PDF rendered. |
 | Short-circuit results printed as saved, so #258/#276/#279 reached a project only on re-save; the service save never stored its sets in parallel, so old rows couldn't be recomputed (#278) | Save every input the calc function takes (diff the save payload against its parameters). Recompute stored results where rows enter the app (the data hook). A value that can't be reproduced is flagged, never defaulted, and never feeds a new calculation. |
+| Whole dwellings took small-appliance and laundry circuits at a flat 1,500 VA though 220.52 says "not less than 1500 … for each"; the first fix turned a 3,000 VA row standing for two circuits into 4,500 (#282) | A "not less than X for each" is a per-item floor. Before a per-row rule, decide what a row means when rows and the count disagree; run the existing template-shaped tests before writing new ones. |
 | Docs updated with stale "Last Updated" dates; completed features left as "NEXT UP" | Every doc touch updates its date to today; every shipped feature flips its ROADMAP status in the same PR. |
 
 ---
