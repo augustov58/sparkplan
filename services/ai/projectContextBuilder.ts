@@ -144,6 +144,8 @@ interface ShortCircuitSummary {
   compliance?: string;
   /** ISO timestamp — lets the chatbot say "this was calculated 3 days ago". */
   updatedAt?: string;
+  /** #278: why the saved row couldn't be recomputed (its values are as saved). */
+  outdated?: string;
 }
 
 /**
@@ -459,10 +461,13 @@ ${transformers.length > 0 ? `Transformers: ${transformers.length}` : ''}${permit
   let shortCircuits: ShortCircuitSummary[] | undefined;
   if (shortCircuitCalculations && shortCircuitCalculations.length > 0) {
     shortCircuits = shortCircuitCalculations.map((calc) => {
+      // Rows come recomputed from useShortCircuitCalculations (#278); `outdated`
+      // marks one that couldn't be.
       const results = (calc.results ?? {}) as {
         faultCurrent?: number;
         requiredAIC?: number;
         compliance?: { message?: string };
+        outdated?: string;
       };
       const panel = calc.panel_id
         ? panels.find((p) => p.id === calc.panel_id)
@@ -481,6 +486,7 @@ ${transformers.length > 0 ? `Transformers: ${transformers.length}` : ''}${permit
             : undefined,
         compliance: results.compliance?.message,
         updatedAt: calc.updated_at,
+        outdated: results.outdated,
       };
     });
   }
@@ -646,6 +652,9 @@ export function formatContextForAI(context: ProjectContext): string {
       if (sc.sourceFaultCurrentA !== undefined) {
         const srcKa = (sc.sourceFaultCurrentA / 1000).toFixed(1);
         prompt += `, calculated from ${srcKa} kA upstream`;
+      }
+      if (sc.outdated) {
+        prompt += ` — OUTDATED, re-run (${sc.outdated}; these are the values as saved, not current)`;
       }
       prompt += `\n`;
       if (sc.compliance) {

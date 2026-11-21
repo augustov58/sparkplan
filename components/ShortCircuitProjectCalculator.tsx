@@ -261,7 +261,8 @@ export const ShortCircuitProjectCalculator: React.FC<Props> = ({
         feeder_conduit_type: mode === 'panel' ? feederConduit : null,
         feeder_voltage: mode === 'panel' ? feederVoltage : null,
         feeder_phase: mode === 'panel' ? feederPhase : null,
-        results: result as any,
+        // The sets in parallel, so readers can recompute the row (#278).
+        results: { ...result, setsInParallel: mode === 'service' ? svcSets : feederSets } as any,
         notes: notes || null,
       });
       setOpen(false);

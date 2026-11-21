@@ -8,11 +8,12 @@
  * @module hooks/useShortCircuitCalculations
  */
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { supabase } from '@/lib/supabase';
 import type { ShortCircuitCalculation, ShortCircuitCalculationInsert, ShortCircuitCalculationUpdate } from '@/lib/database.types';
 
 import { useFetchGuard } from '@/lib/fetchGuard';
+import { recomputeShortCircuitRow } from '@/lib/storedCalcs';
 /**
  * Return type for useShortCircuitCalculations hook
  */
@@ -240,19 +241,23 @@ export function useShortCircuitCalculations(projectId: string | undefined): UseS
     }
   };
 
+  // #278: every reader gets results recomputed from the saved inputs with the
+  // current calculator, or flagged `outdated` when a row can't be recomputed.
+  const recomputed = useMemo(() => calculations.map(recomputeShortCircuitRow), [calculations]);
+
   const getCalculationsByPanel = (panelId: string): ShortCircuitCalculation[] => {
-    return calculations.filter(c => c.panel_id === panelId);
+    return recomputed.filter(c => c.panel_id === panelId);
   };
 
   const getServiceCalculation = (): ShortCircuitCalculation | null => {
-    return calculations.find(c => c.calculation_type === 'service' && c.panel_id === null) || null;
+    return recomputed.find(c => c.calculation_type === 'service' && c.panel_id === null) || null;
   };
 
   guard.refetch = fetchCalculations;
 
 
   return {
-    calculations,
+    calculations: recomputed,
     loading,
     error,
     createCalculation: guard.wrap(createCalculation),

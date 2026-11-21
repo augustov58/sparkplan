@@ -190,7 +190,11 @@ aluminum / steel), no extra factor — the steel column already includes
 the steel effect (owner-approved 2026-11-20, #276).
 Required AIC (110.9): the first standard rating ≥ the available fault
 current, no margin (owner ruling 2026-11-21, #279). requiredAIC is kA.
+Saved results: recomputed on read from the saved inputs (owner ruling
+2026-11-21, #278). A row that can't be recomputed exactly is flagged
+"Outdated, re-run" — never filled with a guessed 1 set.
 ```
+Implementation: `lib/storedCalcs.ts::recomputeShortCircuitRow`, applied to every row by `hooks/useShortCircuitCalculations.ts`. Saves record `results.setsInParallel` (no column). An outdated row is not a source in `shortCircuitHierarchy.ts`.
 Implementation: `services/calculations/shortCircuit.ts`
 
 ### EVSE Load — edition-specific (NEC 2020 vs 2023)
@@ -434,6 +438,7 @@ Real mistakes made in this repo, each paired with the rule that prevents recurre
 | Article 220 printed fixed section numbers: the 2023 "Table 220.42(A)" on 2020 projects, the 2020 "Table 220.42" on 2023 projects, and "Table 220.12" for the dwelling 3 VA/ft² (220.14(J) in 2020) (#237) | Renumbered sections come from `data/nec/article220-citations.ts::article220Citations(edition)`, with the edition required. Never find a calc row by its citation string. |
 | Short circuit multiplied steel-conduit XL by 1.5 on top of Table 9's steel column, under a comment claiming "Table 9 only has PVC data"; steel fault currents were 4–12% low (#276) | Before applying a factor for a condition, check the table doesn't already have a column for it. Check a comment's claim about the data against the data. |
 | Short circuit multiplied the fault current by 1.25 before picking the AIC, citing NEC 110.9 (no such factor); the packet's fault-current page printed the kA rating as "14 A", hidden because its fixtures stored the rating in amps (#279) | Find a factor in the cited section before applying it. Build a page's test fixture from the calculator's output, in its units, and assert the page's text, not that a PDF rendered. |
+| Short-circuit results printed as saved, so #258/#276/#279 reached a project only on re-save; the service save never stored its sets in parallel, so old rows couldn't be recomputed (#278) | Save every input the calc function takes (diff the save payload against its parameters). Recompute stored results where rows enter the app (the data hook). A value that can't be reproduced is flagged, never defaulted, and never feeds a new calculation. |
 | Docs updated with stale "Last Updated" dates; completed features left as "NEXT UP" | Every doc touch updates its date to today; every shipped feature flips its ROADMAP status in the same PR. |
 
 ---

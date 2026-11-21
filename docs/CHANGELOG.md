@@ -4,6 +4,14 @@ All notable changes to SparkPlan.
 
 ---
 
+## 2026-11-21: Saved short-circuit calculations follow the current calculator (#278)
+
+- **Saved short-circuit results are recalculated whenever they're shown.** The permit packet (Available Fault Current and Short Circuit pages), the Short Circuit page and its PDFs, the Copilot and Pre-Inspection now use the current calculator with each calculation's saved inputs. Calculations saved before this month's short-circuit fixes (#258, #276, #279) used to print their old values. Example: a panel calculation saved as 8,402 A / 14 kA now reads 8,542 A / 10 kA.
+- **New calculations save the number of conductor sets in parallel**, so they can always be recalculated exactly.
+- **Service calculations saved before this change are marked "Outdated, re-run".** They didn't save the sets in parallel, so they can't be recalculated exactly. They keep their saved values, marked in the app and on the packet, until you run the calculation again and save it. A panel calculation can't use an outdated service calculation as its source.
+
+---
+
 ## 2026-11-21: Short circuit asks for the interrupting rating NEC 110.9 requires, with no added margin (#279)
 
 - **The required AIC is now the first standard rating at or above the available fault current.** It used to multiply the fault current by 1.25 first, citing NEC 110.9, which has no such factor. Example: 8,632 A at a 500 kVA / 480 V service now needs 10 kA (was 14 kA). The fault current itself is unchanged.
