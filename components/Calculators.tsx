@@ -1298,9 +1298,6 @@ const ShortCircuitCalculator: React.FC<ShortCircuitCalculatorProps> = ({ project
 
                 <span className="text-[#888]">Total Z:</span>
                 <span className="font-mono text-right">{result.details.totalImpedance.toFixed(4)} Ω</span>
-
-                <span className="text-[#888]">Safety Factor:</span>
-                <span className="font-mono text-right">{result.details.safetyFactor}×</span>
               </div>
 
               <div className="text-[#888] mt-3 pt-3 border-t border-[#e8e6e3] text-xs">

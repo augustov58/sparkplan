@@ -33,7 +33,6 @@ const baseInput: AvailableFaultCurrentInput = {
       conductorImpedance: 0.012,
       totalImpedance: 0.0156,
       faultCurrentAtPoint: 18500,
-      safetyFactor: 1.25,
     },
     compliance: {
       compliant: true,
@@ -102,7 +101,6 @@ describe('AvailableFaultCurrentPage (Sprint 2A H9)', () => {
           sourceFaultCurrent: 65000,
           totalImpedance: 0.0048,
           faultCurrentAtPoint: 58000,
-          safetyFactor: 1.25,
         },
         compliance: {
           compliant: true,

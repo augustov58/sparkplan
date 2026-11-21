@@ -178,7 +178,6 @@ interface ShortCircuitResult {
     conductorImpedance?: number;
     totalImpedance: number;
     faultCurrentAtPoint: number;
-    safetyFactor: number;
   };
   compliance: {
     necArticle: string;
@@ -344,10 +343,6 @@ export const ShortCircuitCalculationPages: React.FC<CalcProps> = ({
               <Text style={styles.tableCellValue}>
                 {results.details.faultCurrentAtPoint.toLocaleString()} A
               </Text>
-            </View>
-            <View style={styles.tableRow}>
-              <Text style={styles.tableCellLabel}>Safety Factor Applied:</Text>
-              <Text style={styles.tableCellValue}>{results.details.safetyFactor}×</Text>
             </View>
           </View>
         </View>
@@ -665,9 +660,6 @@ export const ShortCircuitTablePages: React.FC<TablePagesProps> = ({
             </Text>
             <Text style={tableStyles.necReference}>
               • NEC Chapter 9 Table 9 - AC Resistance and Reactance for conductor impedance derivation
-            </Text>
-            <Text style={tableStyles.necReference}>
-              • Safety factor of 1.25× applied to calculated fault currents per industry practice
             </Text>
             <Text style={tableStyles.necReference}>
               • Source fault current taken from utility-provided available fault current (see Available Fault Current sheet)

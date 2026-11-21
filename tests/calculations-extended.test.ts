@@ -140,7 +140,8 @@ describe('Short Circuit (NEC 110.9)', () => {
       expect(result.faultCurrent).toBeGreaterThan(0);
       expect(result.requiredAIC).toBeGreaterThan(0);
       expect(result.compliance.necArticle).toBe('NEC 110.9 - Interrupting Rating');
-      expect(result.details.safetyFactor).toBe(1.25);
+      // 75,000 ÷ 240 ÷ 0.025 = 12,500 A → first standard rating ≥ 12.5 kA (#279)
+      expect(result.requiredAIC).toBe(14);
     });
 
     it('should reduce fault current when service conductor is provided', () => {
@@ -231,7 +232,7 @@ describe('Short Circuit (NEC 110.9)', () => {
       const result = calculateDownstreamTransformerFaultCurrent(xfmr, 32_937, 3);
       expect(result.compliance.necArticle).toContain('110.9');
       expect([10, 14, 22, 25, 42, 65, 100, 200]).toContain(result.requiredAIC);
-      expect(result.details.safetyFactor).toBe(1.25);
+      expect(result.requiredAIC).toBe(42); // 32,842 A → first standard rating ≥ 32.8 kA
     });
   });
 
