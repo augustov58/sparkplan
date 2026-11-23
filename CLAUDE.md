@@ -256,6 +256,11 @@ Every circuit, branch or feeder (owner ruling 2026-11-21, #280): breaker = next
 standard size ≥ 125 % of a continuous load; conductor = `conductorForBreaker`;
 a check = `conductorCodeLegal` (110.14(C)(1), 210.19(A)(1), 240.4 incl. (B)/(D)),
 never "ampacity ≥ breaker". The Copilot, Circuit Sharing and the MF generator use them.
+Ampacity adjustment at terminations (owner ruling 2026-11-22, #296, KEEP):
+`conductorSizing.ts::sizeConductor` applies the 310.15(B)(1)/(C)(1) factors to
+the 110.14(C) termination column too — conservative (100 A, 4 current-carrying
+→ 1/0, not 1 AWG). Do not change it to "lesser of adjusted insulation and
+unadjusted termination ampacity" without a new ruling.
 
 ---
 
