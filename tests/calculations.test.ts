@@ -9,7 +9,6 @@ import { describe, it, expect } from 'vitest';
 import {
   calculateLoad,
   sizeConductor,
-  sizeBreaker,
   calculateVoltageDropAC,
   calculateFeederSizing,
   calculateCumulativeVoltageDrop,
@@ -256,30 +255,6 @@ describe('Conductor Sizing (NEC Article 310)', () => {
   it('should keep 14 AWG for loads within 15A OCPD limit', () => {
     const result = sizeConductor(15, settings, 30, 3, false);
     expect(result.conductorSize).toBe('14 AWG');
-  });
-});
-
-describe('Breaker Sizing (NEC Article 240)', () => {
-  const settings: ProjectSettings = {
-    serviceVoltage: 240,
-    servicePhase: 1,
-    occupancyType: 'dwelling',
-    conductorMaterial: 'Cu',
-    temperatureRating: 75
-  };
-
-  it('should size breaker with 125% continuous load factor', () => {
-    const result = sizeBreaker(40, settings, true);
-
-    expect(result.requiredMinimumBreaker).toBe(50); // 40A * 1.25
-    expect(result.breakerSize).toBeGreaterThanOrEqual(50);
-  });
-
-  it('should select next standard breaker size', () => {
-    const result = sizeBreaker(67, settings, true);
-
-    // 67A * 1.25 = 83.75A, next standard size is 90A or 100A
-    expect([90, 100]).toContain(result.breakerSize);
   });
 });
 

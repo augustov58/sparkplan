@@ -8,7 +8,6 @@ export * from './loadCalculation';
 export * from './conductorSizing';
 export * from './arcFlash';
 export * from './evemsLoadManagement';
-export * from './breakerSizing';
 export * from './voltageDrop';
 export * from './cumulativeVoltageDrop';
 export * from './feederSizing';
