@@ -368,7 +368,7 @@ export const UL_LISTINGS = {
 // ============================================================================
 
 /**
- * Standard Available Interrupting Current (AIC) Ratings in kA
+ * Standard Ampere Interrupting Capacity (AIC) ratings in kA (equipment interrupting rating, NEC 110.9)
  *
  * @remarks
  * Per NEC 110.9, equipment must have adequate interrupting rating for

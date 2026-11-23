@@ -1241,7 +1241,7 @@ export interface PanelEquipmentSpecs {
   /** UL listing information per NEC 110.3(B) (e.g., 'UL 67 - Panelboards') */
   ul_listing?: string;
 
-  /** Available Interrupting Current rating in kA per NEC 110.9
+  /** Ampere Interrupting Capacity (AIC): the equipment interrupting rating in kA, NEC 110.9
    * Standard values: 10, 14, 22, 25, 42, 65, 100, 200 kA
    */
   aic_rating?: number;

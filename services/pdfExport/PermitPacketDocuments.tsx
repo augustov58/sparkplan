@@ -1604,7 +1604,7 @@ const RiserPageBody: React.FC<RiserPageBodyProps> = ({
         {`Utility service \u2022 Meter stack (multi-family) \u2022 Panel / MDP \u2022 Transformer`}
       </Text>
       <Text style={{ fontSize: 8, marginBottom: 2 }}>
-        {`MLO = Main Lug Only (no main breaker) \u2022 AIC = Available Interrupting Current`}
+        {`MLO = Main Lug Only (no main breaker) \u2022 AIC = Ampere Interrupting Capacity (equipment interrupting rating, NEC 110.9)`}
       </Text>
       <Text style={{ fontSize: 8 }}>
         Feeder labels show conductor size, length and voltage drop (the design load in kVA when no voltage drop is computed). Per-node AIC ratings shown for compliance with NEC 110.9 / 110.10.
