@@ -4,6 +4,13 @@ All notable changes to SparkPlan.
 
 ---
 
+## 2026-11-22: One service short-circuit calculation per project (#285)
+
+- **Saving a service-entrance short-circuit calculation now replaces the previous one.** Each save from Tools → Short Circuit used to add another, and the packet's short-circuit table printed all of them, including ones the app no longer showed. Its summary took "Highest Required AIC" from them too: a project re-run at 10 kA could still print 14 kA.
+- The Short Circuit page, the Available Fault Current page and the packet's short-circuit table now show the same single service calculation. Projects that already hold several show the newest everywhere; the older ones are removed the next time the service is saved.
+
+---
+
 ## 2026-11-22: Short circuit counts a feeder's parallel sets (#286)
 
 - **The fault current at a panel now accounts for the feeder's conductor sets in parallel.** Two sets halve the feeder's impedance, so more fault current reaches the panel. The calculation used one set whatever the form said, which understated it. Example: 1,000 kVA, 480 V service (20,344 A at the MDP), then 100 ft of 4/0 copper in steel, 2 sets, to DP-1: **15,679 A, 22 kA required** (was 12,755 A and 14 kA). The service calculation already counted its sets.

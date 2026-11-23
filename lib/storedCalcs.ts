@@ -595,6 +595,24 @@ export function shortCircuitResultsOf(row: Pick<ShortCircuitRow, 'results'>): St
   return ((row.results ?? {}) as unknown) as StoredShortCircuitResults;
 }
 
+/** A project's service-entrance row (the service itself, not a panel's transformer secondary). */
+const isServiceEntranceRow = (row: Pick<ShortCircuitRow, 'calculation_type' | 'panel_id'>) =>
+  row.calculation_type === 'service' && !row.panel_id;
+
+/**
+ * #285 (owner ruling 2026-11-22, a): one service short-circuit calculation per
+ * project. The rows every reader sees: all panel rows and only the newest
+ * service-entrance row, so the Short Circuit page, E-102 and the packet's
+ * short-circuit table show the same set. Older service rows (saved before a
+ * save replaced them) stay in the table but are no longer read.
+ */
+export function currentShortCircuitRows<T extends Pick<ShortCircuitRow, 'calculation_type' | 'panel_id' | 'created_at'>>(rows: T[]): T[] {
+  const newestService = rows
+    .filter(isServiceEntranceRow)
+    .reduce<T | undefined>((newest, r) => (!newest || r.created_at > newest.created_at ? r : newest), undefined);
+  return rows.filter(r => !isServiceEntranceRow(r) || r === newestService);
+}
+
 export function recomputeShortCircuitRow(row: ShortCircuitRow): ShortCircuitRow {
   const stored = shortCircuitResultsOf(row);
   const sets = Number.isInteger(stored.setsInParallel) && (stored.setsInParallel ?? 0) >= 1
