@@ -154,9 +154,9 @@ export const commercialTemplates: ProjectTemplate[] = [
         location: 'Electrical Room',
         is_main: true,
         circuits: [
-          // Lighting (277V)
-          { circuit_number: 1, description: 'Sales Floor Lighting Zone 1', breaker_amps: 20, pole: 1, load_watts: 3000, conductor_size: '12 AWG', egc_size: '12 AWG' },
-          { circuit_number: 3, description: 'Sales Floor Lighting Zone 2', breaker_amps: 20, pole: 1, load_watts: 3000, conductor_size: '12 AWG', egc_size: '12 AWG' },
+          // Lighting (120 V on this 208Y/120 panel; 16 A, 80 % of the 20 A breaker, #294)
+          { circuit_number: 1, description: 'Sales Floor Lighting Zone 1', breaker_amps: 20, pole: 1, load_watts: 1920, conductor_size: '12 AWG', egc_size: '12 AWG' },
+          { circuit_number: 3, description: 'Sales Floor Lighting Zone 2', breaker_amps: 20, pole: 1, load_watts: 1920, conductor_size: '12 AWG', egc_size: '12 AWG' },
           { circuit_number: 5, description: 'Back Room Lighting', breaker_amps: 20, pole: 1, load_watts: 1500, conductor_size: '12 AWG', egc_size: '12 AWG' },
           { circuit_number: 7, description: 'Exterior Signage', breaker_amps: 20, pole: 1, load_watts: 2000, conductor_size: '12 AWG', egc_size: '12 AWG' },
 
@@ -197,9 +197,10 @@ export const commercialTemplates: ProjectTemplate[] = [
         location: 'Electrical Room',
         is_main: true,
         circuits: [
-          // Main feeders
-          { circuit_number: 1, description: 'Transformer 1 (75 kVA)', breaker_amps: 100, pole: 3, load_watts: 75000, conductor_size: '3 AWG', egc_size: '8 AWG' },
-          { circuit_number: 4, description: 'Chiller (100A)', breaker_amps: 100, pole: 3, load_watts: 80000, conductor_size: '3 AWG', egc_size: '8 AWG' },
+          // Main feeders. Loads within what the breaker serves continuously (÷ 1.25) and
+          // conductors per Table 310.16 at 60 °C for ≤ 100 A (#280, #294); the transformer at its rating.
+          { circuit_number: 1, description: 'Transformer 1 (75 kVA)', breaker_amps: 100, pole: 3, load_watts: 75000, conductor_size: '1 AWG', egc_size: '8 AWG' },
+          { circuit_number: 4, description: 'Chiller (100A)', breaker_amps: 100, pole: 3, load_watts: 66500, conductor_size: '1 AWG', egc_size: '8 AWG' },
           { circuit_number: 7, description: 'Elevator (50A)', breaker_amps: 50, pole: 3, load_watts: 40000, conductor_size: '6 AWG', egc_size: '10 AWG' },
         ]
       }
@@ -230,15 +231,16 @@ export const industrialTemplates: ProjectTemplate[] = [
         location: 'Electrical Room',
         is_main: true,
         circuits: [
-          // Machinery (480V 3-phase)
-          { circuit_number: 1, description: 'CNC Mill (60A)', breaker_amps: 60, pole: 3, load_watts: 48000, conductor_size: '6 AWG', egc_size: '10 AWG' },
-          { circuit_number: 4, description: 'CNC Lathe (60A)', breaker_amps: 60, pole: 3, load_watts: 48000, conductor_size: '6 AWG', egc_size: '10 AWG' },
-          { circuit_number: 7, description: 'Compressor (100A)', breaker_amps: 100, pole: 3, load_watts: 80000, conductor_size: '3 AWG', egc_size: '8 AWG' },
+          // Machinery (480V 3-phase). Loads within what the breaker serves continuously
+          // (÷ 1.25); conductors per Table 310.16 at 60 °C for ≤ 100 A, 240.4(B) (#280, #294).
+          { circuit_number: 1, description: 'CNC Mill (60A)', breaker_amps: 60, pole: 3, load_watts: 39900, conductor_size: '6 AWG', egc_size: '10 AWG' },
+          { circuit_number: 4, description: 'CNC Lathe (60A)', breaker_amps: 60, pole: 3, load_watts: 39900, conductor_size: '6 AWG', egc_size: '10 AWG' },
+          { circuit_number: 7, description: 'Compressor (100A)', breaker_amps: 100, pole: 3, load_watts: 66500, conductor_size: '1 AWG', egc_size: '8 AWG' },
           { circuit_number: 10, description: 'Welding Receptacle (50A)', breaker_amps: 50, pole: 3, load_watts: 40000, conductor_size: '6 AWG', egc_size: '10 AWG' },
 
           // Support systems
           { circuit_number: 13, description: 'Transformer for 208V Panel', breaker_amps: 150, pole: 3, load_watts: 120000, conductor_size: '1/0 AWG', egc_size: '6 AWG' },
-          { circuit_number: 16, description: 'HVAC Unit (80A)', breaker_amps: 80, pole: 3, load_watts: 64000, conductor_size: '4 AWG', egc_size: '8 AWG' },
+          { circuit_number: 16, description: 'HVAC Unit (80A)', breaker_amps: 80, pole: 3, load_watts: 53200, conductor_size: '3 AWG', egc_size: '8 AWG' },
         ]
       }
     ]
