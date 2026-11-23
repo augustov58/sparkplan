@@ -50,7 +50,7 @@ describe('#294 every template circuit carries its load and is legal on its break
   });
 
   it('the loads sit at or under the breaker ÷ 1.25: 100 A → 80.0 A, 80 A → 64.0 A, 60 A → 48.0 A, 20 A → 16.0 A', () => {
-    const office = all.find((t) => t.name === 'Office Building (5000 sq ft)')!.panels[0];
+    const office = all.find((t) => t.name === 'Office Building (5000 sq ft)')!.panels[0]!;
     expect(amps(office, 3, 66500)).toBeCloseTo(79.99, 2);
     expect(amps(office, 3, 53200)).toBeCloseTo(63.99, 2);
     expect(amps(office, 3, 39900)).toBeCloseTo(47.99, 2);

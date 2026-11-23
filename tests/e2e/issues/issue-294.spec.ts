@@ -69,7 +69,7 @@ test('#294 template circuits carry their load on a legal conductor', async ({ pa
       await page.goto(`${projectUrl}/panel`);
       await expect(main.locator('tr').first()).toBeVisible({ timeout: 20_000 });
       await expect.poll(async () => (await main.locator('tr').allInnerTexts()).map((r) => r.replace(/\s+/g, ' ')).join('\n'), { timeout: 20_000 })
-        .toMatch(t.rows[0]);
+        .toMatch(t.rows[0]!);
       const rows = (await main.locator('tr').allInnerTexts()).map((r) => r.replace(/\s+/g, ' ')).join('\n');
       for (const row of t.rows) expect(rows).toMatch(row);
 
