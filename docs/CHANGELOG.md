@@ -4,6 +4,12 @@ All notable changes to SparkPlan.
 
 ---
 
+## 2026-11-22: Removed an unused breaker-sizing module (#293)
+
+- Deleted `services/calculations/breakerSizing.ts`. Nothing in the app used it, and its conductor check didn't follow the #280 rule: it passed 8 AWG on a 50 A breaker and rejected the 240.4(B) "next size up". Conductor checks go through `conductorCodeLegal`. No user-facing change.
+
+---
+
 ## 2026-11-22: The riser legend defines AIC correctly (#287)
 
 - The packet's riser diagram legend defined **AIC as "Available Interrupting Current"**. AIC is the equipment's interrupting rating; the available fault current is what it is compared against (NEC 110.9). It now reads **"AIC = Ampere Interrupting Capacity (equipment interrupting rating, NEC 110.9)"**. No calculation changes.
