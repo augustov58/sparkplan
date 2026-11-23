@@ -3008,6 +3008,8 @@ export interface AvailableFaultCurrentInput {
   serviceConductorMaterial: string | null;
   /** Service conductor length (ft). */
   serviceConductorLength: number | null;
+  /** Service conductor sets in parallel (recorded with saves since #278; printed since #289). */
+  serviceConductorSets?: number | null;
   /** Calculated short-circuit result block from `services/calculations/shortCircuit.ts`. */
   results: ShortCircuitResultsBlock | null;
   /** Free-text notes from the calc (utility data source, assumptions). */
@@ -3061,7 +3063,7 @@ export const AvailableFaultCurrentPage: React.FC<AvailableFaultCurrentPageProps>
           <Text style={themeStyles.summaryLabel}>Service Rating</Text>
           <Text style={themeStyles.summaryValue}>
             {input.serviceAmps ?? '—'}
-            <Text style={themeStyles.summaryUnit}>A</Text>
+            <Text style={themeStyles.summaryUnit}> A</Text>
           </Text>
           <Text style={themeStyles.summarySub}>
             {`${input.serviceVoltage ?? '—'}V ${input.servicePhase ? phaseLabel(input.servicePhase) : ''}`}
@@ -3081,7 +3083,7 @@ export const AvailableFaultCurrentPage: React.FC<AvailableFaultCurrentPageProps>
           <Text style={themeStyles.summaryLabel}>Min Required AIC</Text>
           <Text style={themeStyles.summaryValue}>
             {requiredAIC !== null ? requiredAIC : '—'}
-            {requiredAIC !== null && <Text style={themeStyles.summaryUnit}>kA</Text>}
+            {requiredAIC !== null && <Text style={themeStyles.summaryUnit}> kA</Text>}
           </Text>
           <Text style={themeStyles.summarySub}>NEC 110.9 / 110.10</Text>
         </View>
@@ -3107,7 +3109,7 @@ export const AvailableFaultCurrentPage: React.FC<AvailableFaultCurrentPageProps>
             <Text style={themeStyles.projectLabel}>Service Conductor</Text>
             <Text style={themeStyles.projectValue}>
               {input.serviceConductorSize
-                ? `${input.serviceConductorSize}${input.serviceConductorMaterial ? ` ${input.serviceConductorMaterial}` : ''}`
+                ? `${(input.serviceConductorSets ?? 1) > 1 ? `${input.serviceConductorSets} × ` : ''}${input.serviceConductorSize}${input.serviceConductorMaterial ? ` ${input.serviceConductorMaterial}` : ''}`
                 : '—'}
             </Text>
           </View>

@@ -209,6 +209,8 @@ panel (owner OK 2026-11-22, #286); a panel row saved before its sets
 were recorded is Outdated too.
 One service calculation per project (owner ruling 2026-11-22, #285): a
 new service save replaces the previous; readers see only the newest.
+Stale (upstream changed) rows are marked on the packet as in the app
+(detectStaleCalculations, #289); conductors print with "N ×" sets.
 ```
 Implementation: `lib/storedCalcs.ts::recomputeShortCircuitRow`, applied to every row by `hooks/useShortCircuitCalculations.ts`. Saves record `results.setsInParallel` (no column). An outdated row is not a source in `shortCircuitHierarchy.ts`.
 Implementation: `services/calculations/shortCircuit.ts`
@@ -464,6 +466,7 @@ Real mistakes made in this repo, each paired with the rule that prevents recurre
 | A feeder's conductors were sized to the load but its EGC to the panel's main breaker; six readers each guessed the feeder's OCPD with their own fallback, Recalculate always went load-based, and the stale check guessed "capacity-based" from a load within 5 % of the rating (#283) | When readers each derive "the" value with their own fallback chain, store the value and route every reader through one function (`feederBreaker.ts`). Never infer a mode from a number that happens to match it — store the mode. |
 | The downstream short-circuit calc ignored the feeder's sets in parallel though the form showed them (2-set feeder: 13,386 A / 14 kA printed, 16,645 A / 22 kA actual); the Short Circuit page also cast the camelCase project to a column-named type, so every prefill was 240 V 1φ (#286) | A form field that never reaches the calc is a bug: diff a form's inputs against the function's parameters. Never cast between the frontend and DB shapes of a row (`as never`); map the fields the consumer reads. |
 | The Short Circuit page and E-102 read the newest service row, but the packet's short-circuit table printed every row, so superseded service calculations printed on the AHJ packet and set its "Highest Required AIC" (#285) | Rows filtered out of one view must be filtered for every view: filter where the rows enter the app (the data hook), not in each page. |
+| The packet printed a panel short-circuit row as "Compliant" while the app flagged it Stale, and no surface printed the sets in parallel that change the result (#289) | A mark the app shows must reach the printed document from the same function with the same inputs. Print every input that changes a result next to it. |
 | Docs updated with stale "Last Updated" dates; completed features left as "NEXT UP" | Every doc touch updates its date to today; every shipped feature flips its ROADMAP status in the same PR. |
 
 ---

@@ -7,7 +7,7 @@ import React from 'react';
 import { Document, Page, View, StyleSheet } from '@react-pdf/renderer';
 import { Text } from './PdfText';
 import type { ShortCircuitCalculation } from '../../lib/database.types';
-import { SHORT_CIRCUIT_OUTDATED } from '../../lib/storedCalcs';
+import { SHORT_CIRCUIT_OUTDATED, SHORT_CIRCUIT_STALE, shortCircuitConductorText } from '../../lib/storedCalcs';
 import {
   BrandBar,
   Footer as BrandFooter,
@@ -283,7 +283,7 @@ export const ShortCircuitCalculationPages: React.FC<CalcProps> = ({
                     <View style={styles.tableRow}>
                       <Text style={styles.tableCellLabel}>Service Conductor:</Text>
                       <Text style={styles.tableCellValue}>
-                        {calculation.service_conductor_size} {calculation.service_conductor_material}
+                        {shortCircuitConductorText(calculation)}
                       </Text>
                     </View>
                     <View style={styles.tableRow}>
@@ -308,7 +308,7 @@ export const ShortCircuitCalculationPages: React.FC<CalcProps> = ({
                 <View style={styles.tableRow}>
                   <Text style={styles.tableCellLabel}>Feeder Conductor:</Text>
                   <Text style={styles.tableCellValue}>
-                    {calculation.feeder_conductor_size} {calculation.feeder_material}
+                    {shortCircuitConductorText(calculation)}
                   </Text>
                 </View>
                 <View style={styles.tableRow}>
@@ -485,9 +485,11 @@ interface TableRowData {
   necArticle: string;
   /** #278: couldn't be recomputed; printed as saved, marked. */
   outdated: boolean;
+  /** #289: its saved source differs from the current upstream (the app's "Stale"); why. */
+  staleReason: string | null;
 }
 
-function buildRow(calc: ShortCircuitCalculation): TableRowData {
+function buildRow(calc: ShortCircuitCalculation, stale?: StaleMap): TableRowData {
   const results = calc.results as unknown as ShortCircuitResult;
   const isService = calc.calculation_type === 'service';
 
@@ -497,13 +499,10 @@ function buildRow(calc: ShortCircuitCalculation): TableRowData {
   const legacyPanelName = (calc as { panel_name?: string | null }).panel_name;
   const panelLabel = calc.location_name || legacyPanelName || (isService ? 'Service Main' : 'Panel');
 
-  const feederLabel = isService
-    ? (calc.service_conductor_size
-        ? `${calc.service_conductor_size} ${calc.service_conductor_material ?? ''} · ${calc.service_conductor_length ?? 0} ft`
-        : 'Service main')
-    : (calc.feeder_conductor_size
-        ? `${calc.feeder_conductor_size} ${calc.feeder_material ?? ''} · ${calc.feeder_length ?? 0} ft`
-        : 'Feeder');
+  const conductor = shortCircuitConductorText(calc);
+  const feederLabel = conductor
+    ? `${conductor} · ${(isService ? calc.service_conductor_length : calc.feeder_length) ?? 0} ft`
+    : (isService ? 'Service main' : 'Feeder');
 
   const voltage = isService ? calc.service_voltage : calc.feeder_voltage;
   const phase = isService ? calc.service_phase : calc.feeder_phase;
@@ -523,7 +522,23 @@ function buildRow(calc: ShortCircuitCalculation): TableRowData {
     compliant: results.compliance.compliant,
     necArticle: results.compliance.necArticle,
     outdated: !!results.outdated,
+    staleReason: stale?.get(calc.id)?.reason ?? null,
   };
+}
+
+/** `detectStaleCalculations` output, keyed by calculation id (#289). */
+type StaleMap = Map<string, { reason: string }>;
+
+/** Where the service fault current came from, for the references line (#289). */
+function sourceReference(calculations: ShortCircuitCalculation[]): string {
+  const svc = calculations.find((c) => c.calculation_type === 'service' && !c.panel_id);
+  if (!svc) return 'Source fault current at each panel as listed in the Source If column';
+  const z = svc.transformer_impedance != null ? `, ${svc.transformer_impedance} % Z` : '';
+  const transformer = svc.transformer_kva
+    ? `the utility transformer (${svc.transformer_kva} kVA${z})`
+    : `a utility transformer estimated from the ${svc.service_amps ?? '—'} A service${z ? ` (${z.slice(2)})` : ''}`;
+  const path = svc.service_conductor_size ? ' through the service conductors' : ' at its secondary';
+  return `Service fault current calculated from ${transformer}${path} (see Available Fault Current sheet)`;
 }
 
 interface TablePagesProps {
@@ -534,6 +549,8 @@ interface TablePagesProps {
   contractorLicense?: string;
   sheetId?: string;
   includeNECReferences?: boolean;
+  /** Panel rows whose upstream changed since they were saved (`detectStaleCalculations`, #289). */
+  stale?: StaleMap;
 }
 
 export const ShortCircuitTablePages: React.FC<TablePagesProps> = ({
@@ -544,12 +561,14 @@ export const ShortCircuitTablePages: React.FC<TablePagesProps> = ({
   contractorLicense,
   sheetId,
   includeNECReferences = true,
+  stale,
 }) => {
-  const rows = calculations.map(buildRow);
+  const rows = calculations.map((c) => buildRow(c, stale));
   const total = rows.length;
   const outdated = rows.filter((r) => r.outdated).length;
-  const compliant = rows.filter((r) => r.compliant && !r.outdated).length;
-  const nonCompliant = total - compliant - outdated;
+  const staleRows = rows.filter((r) => !r.outdated && r.staleReason);
+  const compliant = rows.filter((r) => r.compliant && !r.outdated && !r.staleReason).length;
+  const nonCompliant = total - compliant - outdated - staleRows.length;
   const maxFault = rows.reduce((m, r) => Math.max(m, r.faultCurrentKa), 0);
   const avgFault = total > 0 ? rows.reduce((s, r) => s + r.faultCurrentKa, 0) / total : 0;
   const maxRequiredAic = rows.reduce((m, r) => Math.max(m, r.requiredAicKa), 0);
@@ -588,6 +607,12 @@ export const ShortCircuitTablePages: React.FC<TablePagesProps> = ({
           <View style={tableStyles.summaryRow}>
             <Text style={tableStyles.summaryLabel}>{`${SHORT_CIRCUIT_OUTDATED}:`}</Text>
             <Text style={[tableStyles.summaryValue, tableStyles.nonCompliantText]}>{outdated}</Text>
+          </View>
+        )}
+        {staleRows.length > 0 && (
+          <View style={tableStyles.summaryRow}>
+            <Text style={tableStyles.summaryLabel}>{`${SHORT_CIRCUIT_STALE}:`}</Text>
+            <Text style={[tableStyles.summaryValue, tableStyles.nonCompliantText]}>{staleRows.length}</Text>
           </View>
         )}
         <View style={tableStyles.summaryRow}>
@@ -647,10 +672,10 @@ export const ShortCircuitTablePages: React.FC<TablePagesProps> = ({
                   style={[
                     tableStyles.colCompliance,
                     tableStyles.cellCenter,
-                    row.compliant && !row.outdated ? tableStyles.compliantText : tableStyles.nonCompliantText,
+                    row.compliant && !row.outdated && !row.staleReason ? tableStyles.compliantText : tableStyles.nonCompliantText,
                   ]}
                 >
-                  {row.outdated ? SHORT_CIRCUIT_OUTDATED : row.compliant ? 'Compliant' : 'Review'}
+                  {row.outdated ? SHORT_CIRCUIT_OUTDATED : row.staleReason ? SHORT_CIRCUIT_STALE : row.compliant ? 'Compliant' : 'Review'}
                 </Text>
               </View>
             ))}
@@ -666,7 +691,15 @@ export const ShortCircuitTablePages: React.FC<TablePagesProps> = ({
         </View>
       )}
 
-      {nonCompliant === 0 && outdated === 0 && rows.length > 0 && (
+      {staleRows.length > 0 && (
+        <View style={tableStyles.infoBox}>
+          <Text style={tableStyles.infoText}>
+            {`${SHORT_CIRCUIT_STALE}: the upstream fault current changed after ${staleRows.length === 1 ? 'this calculation was' : 'these calculations were'} saved (${staleRows.map((r) => `${r.panelLabel}: ${r.staleReason!.replace(/^Upstream chain changed: /, '')}`).join('; ')}). ${staleRows.length === 1 ? 'Its values are' : 'Their values are'} as saved; run the calculation again with the current upstream value.`}
+          </Text>
+        </View>
+      )}
+
+      {nonCompliant === 0 && outdated === 0 && staleRows.length === 0 && rows.length > 0 && (
         <View style={tableStyles.infoBox}>
           <Text style={tableStyles.infoText}>
             All panels meet NEC 110.9 interrupting rating requirements. Equipment AIC ratings must be
@@ -692,7 +725,7 @@ export const ShortCircuitTablePages: React.FC<TablePagesProps> = ({
               • NEC Chapter 9 Table 9 - AC Resistance and Reactance for conductor impedance derivation
             </Text>
             <Text style={tableStyles.necReference}>
-              • Source fault current taken from utility-provided available fault current (see Available Fault Current sheet)
+              {`• ${sourceReference(calculations)}`}
             </Text>
           </View>
         </View>

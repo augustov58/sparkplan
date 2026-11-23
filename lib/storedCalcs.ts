@@ -595,6 +595,25 @@ export function shortCircuitResultsOf(row: Pick<ShortCircuitRow, 'results'>): St
   return ((row.results ?? {}) as unknown) as StoredShortCircuitResults;
 }
 
+/**
+ * A saved row's conductor as printed everywhere ("2 × 500 kcmil Cu"), with its
+ * sets in parallel when more than one (#289): the sets change the result, so a
+ * reviewer needs them to reproduce it. Null when the row has no conductor.
+ */
+export function shortCircuitConductorText(
+  row: Pick<ShortCircuitRow, 'calculation_type' | 'service_conductor_size' | 'service_conductor_material' | 'feeder_conductor_size' | 'feeder_material' | 'results'>,
+): string | null {
+  const service = row.calculation_type === 'service';
+  const size = service ? row.service_conductor_size : row.feeder_conductor_size;
+  if (!size) return null;
+  const material = (service ? row.service_conductor_material : row.feeder_material) ?? '';
+  const sets = shortCircuitResultsOf(row).setsInParallel ?? 1;
+  return `${sets > 1 ? `${sets} × ` : ''}${size} ${material}`.trim();
+}
+
+/** "Stale, re-run": a panel row whose saved source differs from the current upstream (#289). */
+export const SHORT_CIRCUIT_STALE = 'Stale, re-run';
+
 /** A project's service-entrance row (the service itself, not a panel's transformer secondary). */
 const isServiceEntranceRow = (row: Pick<ShortCircuitRow, 'calculation_type' | 'panel_id'>) =>
   row.calculation_type === 'service' && !row.panel_id;

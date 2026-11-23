@@ -50,6 +50,7 @@ import { EquipmentSpecsPages } from './EquipmentSpecsDocuments';
 import { VoltageDropPages, type FeederLoadRules } from './VoltageDropDocuments';
 import { JurisdictionRequirementsPages } from './JurisdictionDocuments';
 import { ShortCircuitTablePages } from './ShortCircuitDocuments';
+import { detectStaleCalculations } from '../calculations/shortCircuitHierarchy';
 import { ArcFlashPages } from './ArcFlashDocuments';
 import { GroundingPlanPages } from './GroundingPlanDocuments';
 import { MultiFamilyEVPages } from './MultiFamilyEVDocuments';
@@ -142,6 +143,8 @@ export interface PermitPacketData {
   jurisdiction?: Jurisdiction; // Full jurisdiction object for PDF generation
   // Tier 2: Additional calculations and plans
   shortCircuitCalculations?: ShortCircuitCalculation[]; // Short circuit analysis results
+  /** Utility-provided available fault current (A), a short-circuit source when no service calc exists. */
+  utilityAvailableFaultCurrentA?: number | null;
   arcFlashData?: {  // Arc flash analysis data
     equipmentName: string;
     equipmentType: string;
@@ -805,6 +808,7 @@ export const generatePermitPacket = async (data: PermitPacketData): Promise<void
         serviceConductorSize: serviceCalc.service_conductor_size,
         serviceConductorMaterial: serviceCalc.service_conductor_material,
         serviceConductorLength: serviceCalc.service_conductor_length,
+        serviceConductorSets: (serviceCalc.results as { setsInParallel?: number } | null)?.setsInParallel ?? null,
         // The `results` column is typed `Json` in the DB; the IEEE-141 engine
         // writes a structured block whose shape lines up with
         // ShortCircuitResultsBlock. Cast through `unknown` so the typecheck
@@ -843,6 +847,17 @@ export const generatePermitPacket = async (data: PermitPacketData): Promise<void
       render: (sheetIds) => (
         <ShortCircuitTablePages
           calculations={data.shortCircuitCalculations ?? []}
+          // #289: mark rows the Short Circuit page marks "Stale" (same function, same inputs)
+          stale={detectStaleCalculations({
+            project: {
+              service_voltage: data.serviceVoltage,
+              service_phase: data.servicePhase,
+              utility_available_fault_current_a: data.utilityAvailableFaultCurrentA ?? null,
+            },
+            panels: data.panels,
+            transformers: data.transformers ?? [],
+            calculations: data.shortCircuitCalculations ?? [],
+          })}
           projectName={data.projectName}
           projectAddress={data.projectAddress}
           {...contractor}

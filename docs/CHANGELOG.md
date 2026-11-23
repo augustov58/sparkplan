@@ -4,6 +4,14 @@ All notable changes to SparkPlan.
 
 ---
 
+## 2026-11-22: The packet marks stale short-circuit rows and prints parallel sets (#289)
+
+- **The packet's short-circuit table now marks a panel calculation whose upstream changed** ("Stale, re-run"), the same rows the Short Circuit page marks "Stale". It used to print them as "Compliant". The summary counts them separately, and a note gives the old and new upstream values (for example "DP-1: was 20,344 A, now 20,069 A").
+- **The number of conductor sets in parallel prints wherever the conductor does**: the Short Circuit cards, a calculation's own PDF, the Available Fault Current page and the packet table ("3 × 500 kcmil Cu · 20 ft"). The sets change the result, so a reviewer needs them to check it.
+- The table's references say where the service fault current came from (the utility transformer entered, or one estimated from the service rating). They always said "utility-provided" before. The Available Fault Current page's header prints "22 kA" and "1200 A" with a space.
+
+---
+
 ## 2026-11-22: One service short-circuit calculation per project (#285)
 
 - **Saving a service-entrance short-circuit calculation now replaces the previous one.** Each save from Tools → Short Circuit used to add another, and the packet's short-circuit table printed all of them, including ones the app no longer showed. Its summary took "Highest Required AIC" from them too: a project re-run at 10 kA could still print 14 kA.

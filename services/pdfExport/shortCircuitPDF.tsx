@@ -59,7 +59,9 @@ export const exportSingleCalculation = async (
 export const exportSystemReport = async (
   calculations: ShortCircuitCalculation[],
   projectName: string,
-  projectAddress: string
+  projectAddress: string,
+  /** Rows the Short Circuit page marks "Stale" (#289), marked the same way. */
+  stale?: Map<string, { reason: string }>,
 ) => {
   try {
     if (!calculations || calculations.length === 0) {
@@ -70,6 +72,7 @@ export const exportSystemReport = async (
       <Document>
         <ShortCircuitTablePages
           calculations={calculations}
+          stale={stale}
           projectName={projectName}
           projectAddress={projectAddress}
           includeNECReferences={true}
