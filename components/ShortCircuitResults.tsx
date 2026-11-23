@@ -8,7 +8,7 @@ import { useProjects } from '../hooks/useProjects';
 import { exportSingleCalculation, exportSystemReport } from '../services/pdfExport/shortCircuitPDF';
 import { ShortCircuitProjectCalculator, type ShortCircuitProject } from './ShortCircuitProjectCalculator';
 import { detectStaleCalculations } from '../services/calculations/shortCircuitHierarchy';
-import { SHORT_CIRCUIT_OUTDATED } from '../lib/storedCalcs';
+import { SHORT_CIRCUIT_OUTDATED, shortCircuitConductorText } from '../lib/storedCalcs';
 
 interface ShortCircuitResult {
   faultCurrent: number;
@@ -80,7 +80,8 @@ export const ShortCircuitResults: React.FC = () => {
       await exportSystemReport(
         calculations,
         project.name,
-        project.address || ''
+        project.address || '',
+        staleMap,
       );
     } catch (error) {
       console.error('Error exporting system report:', error);
@@ -352,7 +353,7 @@ const CalculationCard: React.FC<CalculationCardProps> = ({ calculation, panel, p
                     {calculation.service_conductor_length && (
                       <>
                         <span className="text-gray-500">Conductor:</span>
-                        <span className="font-mono">{calculation.service_conductor_size} {calculation.service_conductor_material}, {calculation.service_conductor_length} ft</span>
+                        <span className="font-mono">{shortCircuitConductorText(calculation)}, {calculation.service_conductor_length} ft</span>
                       </>
                     )}
                   </>
@@ -362,7 +363,7 @@ const CalculationCard: React.FC<CalculationCardProps> = ({ calculation, panel, p
                     <span className="font-mono">{calculation.source_fault_current?.toLocaleString()} A</span>
 
                     <span className="text-gray-500">Feeder:</span>
-                    <span className="font-mono">{calculation.feeder_conductor_size} {calculation.feeder_material}, {calculation.feeder_length} ft</span>
+                    <span className="font-mono">{shortCircuitConductorText(calculation)}, {calculation.feeder_length} ft</span>
 
                     <span className="text-gray-500">System:</span>
                     <span className="font-mono">{calculation.feeder_voltage}V, {calculation.feeder_phase}φ</span>

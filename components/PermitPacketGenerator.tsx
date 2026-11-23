@@ -986,6 +986,7 @@ export const PermitPacketGenerator: React.FC<PermitPacketGeneratorProps> = ({ pr
         serviceConductorRouting: serviceConductorRouting.trim() || undefined,
         // Tier 2: Additional calculations and plans
         shortCircuitCalculations: shortCircuitCalculations || [],
+        utilityAvailableFaultCurrentA: currentProject.utilityAvailableFaultCurrentA ?? null,
         groundingSystem: grounding || undefined,
         // Note: arcFlashData would come from a dedicated arc flash calculation
         // For now, we'll leave it undefined until user runs arc flash calculator
