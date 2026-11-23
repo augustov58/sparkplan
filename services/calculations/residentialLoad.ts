@@ -2165,6 +2165,26 @@ export function dwellingLoadsFromCircuits(circuits: PanelDemandCircuit[], necEdi
 }
 
 /**
+ * The Optional Methods take each small-appliance and laundry circuit at a flat
+ * 1,500 VA — "1500 volt-amperes for each" (220.82(B)(1), 220.83, 220.84(C)(2)),
+ * an allowance per circuit, not the circuit's own VA (owner ruling 2026-11-22,
+ * #291). Part III's 220.52 "not less than 1500" keeps the larger (#282).
+ * From a dwelling's circuits: the VA they hold above 1,500 each (left out) and
+ * below it (added), recognised as `dwellingLoadsFromCircuits` does.
+ */
+export function optionalMethodAllowanceDelta(circuits: PanelDemandCircuit[]): { excessVA: number; shortfallVA: number } {
+  const { smallApplianceCircuitVA = [], laundryCircuitVA = [] } = dwellingLoadsFromCircuits(circuits, '2020');
+  const each = [
+    ...smallApplianceCircuitVA.map(va => va - SMALL_APPLIANCE_VA_PER_CIRCUIT),
+    ...laundryCircuitVA.map(va => va - LAUNDRY_CIRCUIT_VA),
+  ];
+  return {
+    excessVA: each.reduce((sum, d) => sum + Math.max(0, d), 0),
+    shortfallVA: each.reduce((sum, d) => sum + Math.max(0, -d), 0),
+  };
+}
+
+/**
  * Load Summary for a dwelling unit panel inside a multifamily building (PE
  * ruling 2026-10-26, #155): NEC 220 Part III by default; NEC 220.83 when the
  * building is existing and this panel has proposed circuits (the permit adds
