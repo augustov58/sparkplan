@@ -43,6 +43,8 @@ export interface ConductorRun {
   conduitType: 'Steel' | 'PVC' | 'Aluminum';
   voltage: number;
   phase: 1 | 3;
+  /** Conductor sets in parallel per phase (default 1); the run's impedance is divided by it (#286). */
+  setsInParallel?: number;
 }
 
 export interface ShortCircuitResult {
@@ -155,9 +157,12 @@ export function calculateDownstreamFaultCurrent(
   const reactanceOhmsPerFoot = conductorData.reactanceXLOhmsPerKFt / 1000;
   const conductorReactance = reactanceOhmsPerFoot * length;
 
+  // N identical sets in parallel: Z / N, as the service path does (#286;
+  // owner OK 2026-11-22). Ignoring the sets understated the fault current.
+  const sets = Math.max(1, conductorRun.setsInParallel ?? 1);
   const conductorImpedance = Math.sqrt(
     conductorResistance ** 2 + conductorReactance ** 2
-  );
+  ) / sets;
 
   // Adjust for phase configuration
   // Single-phase: 2× impedance (out-and-back through hot + neutral)

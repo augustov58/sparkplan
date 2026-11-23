@@ -53,6 +53,10 @@ const legacyPanel: any = {
   },
 };
 
+// The same LP-1 save, made after #278 recorded the feeder's sets (one). Since
+// #286 a panel row without them is Outdated (tests/shortCircuitParallel286.test.ts).
+const savedPanel: any = { ...legacyPanel, results: { ...legacyPanel.results, setsInParallel: 1 } };
+
 describe('#278 recomputeShortCircuitRow', () => {
   it('a service conductor saved without its sets in parallel is Outdated and keeps its stored values', () => {
     const r = shortCircuitResultsOf(recomputeShortCircuitRow(legacyService));
@@ -62,7 +66,7 @@ describe('#278 recomputeShortCircuitRow', () => {
   });
 
   it('a panel row is recomputed from its saved inputs: 8,402 A / 14 kA → 8,542 A / 10 kA', () => {
-    const r = shortCircuitResultsOf(recomputeShortCircuitRow(legacyPanel));
+    const r = shortCircuitResultsOf(recomputeShortCircuitRow(savedPanel));
     expect(r.outdated).toBeUndefined();
     expect(r.faultCurrent).toBeCloseTo(8542.3, 0);
     expect(r.requiredAIC).toBe(10);
@@ -97,7 +101,7 @@ describe('#278 recomputeShortCircuitRow', () => {
   });
 
   it('is idempotent', () => {
-    for (const row of [legacyService, legacyPanel]) {
+    for (const row of [legacyService, legacyPanel, savedPanel]) {
       const once = recomputeShortCircuitRow(row);
       expect(recomputeShortCircuitRow(once)).toEqual(once);
     }
@@ -119,7 +123,7 @@ describe('#278 an Outdated save is no source for a new calculation', () => {
 });
 
 describe('#278 readers print recomputed values and mark Outdated rows', () => {
-  const calcs = [legacyService, legacyPanel].map(recomputeShortCircuitRow);
+  const calcs = [legacyService, savedPanel].map(recomputeShortCircuitRow);
 
   it('Copilot / Pre-Inspection context: LP-1 8.5 kA / 10 kA; the service marked OUTDATED', () => {
     const ctx = buildProjectContext('p', 'QA SC saved', 'Commercial', 480, 3, [mdp, lp1], [], [], [],
