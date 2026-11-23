@@ -4,6 +4,7 @@ One note per hard problem, written by the model that solved it via the `extract-
 Each entry: `- [title](file.md) — reusable rule`.
 
 <!-- Newest first -->
+- [The packet hid stale short-circuit rows and parallel sets](2026-11-22-short-circuit-stale-and-sets-on-packet.md) — a mark in the app must reach the printed document from the same function and inputs; print every input that changes the result
 - [Superseded service short-circuit rows printed on the packet](2026-11-22-one-service-short-circuit-row.md) — filter rows where they enter the app (the data hook), not per page; replace = insert then delete; check which specs write to fixtures a new rule deletes from
 - [The panel short-circuit calc ignored the feeder's parallel sets](2026-11-22-short-circuit-parallel-sets.md) — diff a form's fields against the calc's parameters; never `as never` between row shapes; a new calc input makes old saves Outdated (update the specs that asserted them)
 - [A feeder had no breaker of its own](2026-11-21-feeder-own-breaker.md) — replace per-reader fallback chains with a stored value + one function; put a protection constraint into the sizing input; tsc right after a column change

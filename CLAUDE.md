@@ -209,6 +209,8 @@ panel (owner OK 2026-11-22, #286); a panel row saved before its sets
 were recorded is Outdated too.
 One service calculation per project (owner ruling 2026-11-22, #285): a
 new service save replaces the previous; readers see only the newest.
+Stale (upstream changed) rows are marked on the packet as in the app
+(detectStaleCalculations, #289); conductors print with "N ×" sets.
 ```
 Implementation: `lib/storedCalcs.ts::recomputeShortCircuitRow`, applied to every row by `hooks/useShortCircuitCalculations.ts`. Saves record `results.setsInParallel` (no column). An outdated row is not a source in `shortCircuitHierarchy.ts`.
 Implementation: `services/calculations/shortCircuit.ts`
