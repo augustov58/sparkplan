@@ -178,7 +178,9 @@ tiers. The 3 VA/ft² allowance and the 2-circuit minimum stay on the service cal
 Whole dwellings on Part III take each small-appliance and laundry circuit at the
 larger of its VA or 1,500 VA (220.52(A)/(B); owner ruling 2026-11-21, #282) via
 `circuits220_52VA`; fewer rows than counted circuits hold all of them ("2 @ 1,500
-VA" = two circuits). The Optional Methods keep 1,500 per circuit (#291 open).
+VA" = two circuits). The Optional Methods (220.82, 220.83, 220.84) take a
+flat 1,500 per circuit, whatever VA is typed (owner ruling 2026-11-22, #291):
+the MDP's 220.84 total via `optionalMethodAllowanceDelta`.
 
 ### Two Dwelling Units — Part III / 220.85 (PE ruling 2026-10-27, #127)
 ```
@@ -468,6 +470,7 @@ Real mistakes made in this repo, each paired with the rule that prevents recurre
 | The Short Circuit page and E-102 read the newest service row, but the packet's short-circuit table printed every row, so superseded service calculations printed on the AHJ packet and set its "Highest Required AIC" (#285) | Rows filtered out of one view must be filtered for every view: filter where the rows enter the app (the data hook), not in each page. |
 | The packet printed a panel short-circuit row as "Compliant" while the app flagged it Stale, and no surface printed the sets in parallel that change the result (#289) | A mark the app shows must reach the printed document from the same function with the same inputs. Print every input that changes a result next to it. |
 | Panel templates stored loads near breaker × V × √3, so 8 of 51 circuits had a conductor smaller than their own load (a 100 A chiller at 96 A on 3 AWG); the #280 sweep checked conductor vs breaker only (#294) | Check a conductor against its load and its breaker (`conductorCodeLegal` with `loadAmps`); `tests/templateConductors294.test.ts` checks every template circuit. |
+| The MDP's 220.84 total summed the unit circuits' typed VA, while 220.82/220.83 and the Multifamily calculator took a flat 1,500 per small-appliance/laundry circuit (#291) | "X VA for each" in an Optional Method is an allowance, not a floor; "not less than X" (Part III) is a floor. Read which one the cited section says, and make every path that cites it agree. |
 | Docs updated with stale "Last Updated" dates; completed features left as "NEXT UP" | Every doc touch updates its date to today; every shipped feature flips its ROADMAP status in the same PR. |
 
 ---

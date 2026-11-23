@@ -4,6 +4,7 @@ One note per hard problem, written by the model that solved it via the `extract-
 Each entry: `- [title](file.md) — reusable rule`.
 
 <!-- Newest first -->
+- [The multifamily 220.84 total summed typed small-appliance VA](2026-11-22-optional-methods-flat-1500.md) — "X for each" (Optional Methods) is an allowance, "not less than X" (Part III) a floor; reuse the shared classifier; a base that differs from its circuits needs its own row
 - [Template circuits had conductors smaller than their own load](2026-11-22-template-circuits-carry-their-load.md) — check conductors against load and breaker; rule out the plain defect before an NEC question; verify e2e cleanup in the database (optimistic UI hides cancelled deletes)
 - [The packet hid stale short-circuit rows and parallel sets](2026-11-22-short-circuit-stale-and-sets-on-packet.md) — a mark in the app must reach the printed document from the same function and inputs; print every input that changes the result
 - [Superseded service short-circuit rows printed on the packet](2026-11-22-one-service-short-circuit-row.md) — filter rows where they enter the app (the data hook), not per page; replace = insert then delete; check which specs write to fixtures a new rule deletes from

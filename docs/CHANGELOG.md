@@ -4,6 +4,14 @@ All notable changes to SparkPlan.
 
 ---
 
+## 2026-11-22: The multifamily 220.84 total counts small-appliance and laundry circuits at 1,500 VA each (#291)
+
+- **The NEC 220.84 calculation for a multifamily service now counts each unit's small-appliance and laundry circuits at 1,500 VA each**, whatever VA is entered on the circuit. That is the Optional Methods' allowance: "1500 volt-amperes for each" (220.82(B)(1), 220.83, 220.84(C)(2)). It used to add up the circuits' entered VA, so a kitchen circuit entered at 2,400 VA added 405 VA of demand in a 3-unit building, and one entered at 1,200 VA counted less than the code's 1,500.
+- The MDP's demand table shows the difference on its own row ("above 1,500 VA each (omitted)" or "raised to 1,500 VA each"), so the columns still add up.
+- The single-family Optional Methods (220.82, 220.83) and the Multifamily calculator already used 1,500 VA per circuit. The standard calculation (NEC 220 Part III) keeps the larger of the circuit's VA or 1,500 VA (#282).
+
+---
+
 ## 2026-11-22: Panel templates: circuits carry their own load (#294)
 
 - **Eight circuits in the panel templates had a conductor smaller than their own load.** The templates set loads close to the breaker rating: a 100 A chiller at 96 A on 3 AWG, rated 85 A at the 60 °C terminals; 3,000 W of lighting on a 120 V, 20 A circuit, which is 25 A. They now carry what their breaker serves as a continuous load: 80 A on a 100 A breaker, 64 A on 80 A, 48 A on 60 A, 1,920 W on a 20 A lighting circuit. The 75 kVA transformer stays at its rating. The 100 A circuits now get 1 AWG copper and the 80 A one 3 AWG. Affected templates: Office Building, Small Workshop, Retail Store.
