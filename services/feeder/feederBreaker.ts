@@ -23,6 +23,21 @@ import { conductorCodeLegal, parseConductor } from '../../data/nec/table-310-16'
 
 export type FeederSizingBasis = 'load' | 'capacity';
 
+/**
+ * "Panel Max Capacity" design load: the panel's main breaker (else its bus) ×
+ * V, × √3 on three-phase, all non-continuous. One function for Feeder Sizing
+ * and the readers that re-size a feeder live (the packet's voltage-drop page,
+ * the Copilot), so a capacity feeder prints the same everywhere (#299).
+ */
+export function feederCapacityVA(
+  panel: { main_breaker_amps?: number | null; bus_rating?: number | null },
+  voltage: number,
+  phase: number,
+): number {
+  const amps = panel.main_breaker_amps || panel.bus_rating || 0;
+  return phase === 3 ? amps * voltage * Math.sqrt(3) : amps * voltage;
+}
+
 export interface FeederBreakerPanel {
   voltage: number;
   phase: number;
@@ -99,8 +114,11 @@ export function feederEgcSize(breakerAmps: number, material: 'Cu' | 'Al'): strin
 export function feederBreakerReasons(feeder: FeederBreakerFeeder, breakerAmps: number | null, designCurrentA: number): string[] {
   const reasons: string[] = [];
   if (!breakerAmps || !feeder.phase_conductor_size) return reasons;
-  if (designCurrentA > breakerAmps) {
-    reasons.push(`Design current ${designCurrentA.toFixed(1)} A exceeds the ${breakerAmps} A feeder breaker`);
+  // At its printed precision (0.1 A): a "Panel Max Capacity" 3Φ design load,
+  // main × V × √3, reads back as 400.000… A and must not "exceed" 400 A (#299).
+  const designA = Math.round(designCurrentA * 10) / 10;
+  if (designA > breakerAmps) {
+    reasons.push(`Design current ${designA.toFixed(1)} A exceeds the ${breakerAmps} A feeder breaker`);
   }
   const material = feeder.conductor_material === 'Al' ? 'Al' : 'Cu';
   const sets = Math.max(1, feeder.sets_in_parallel ?? 1);
