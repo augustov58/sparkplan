@@ -645,6 +645,11 @@ export function recomputeShortCircuitRow(row: ShortCircuitRow): ShortCircuitRow 
     ) {
       return outdated('Saved without its feeder inputs');
     }
+    // Since #286 the feeder's sets in parallel change the result; a panel row
+    // saved before they were recorded can't be recomputed exactly.
+    if (!sets) {
+      return outdated('Saved before the number of conductor sets in parallel was recorded');
+    }
     return recomputed(calculateDownstreamFaultCurrent(
       {
         length: row.feeder_length,
@@ -653,6 +658,7 @@ export function recomputeShortCircuitRow(row: ShortCircuitRow): ShortCircuitRow 
         conduitType,
         voltage: row.feeder_voltage,
         phase,
+        setsInParallel: sets,
       },
       row.source_fault_current,
     ));

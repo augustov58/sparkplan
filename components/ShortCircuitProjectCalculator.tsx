@@ -26,6 +26,12 @@ import { resolveUpstreamSourceIf, type UpstreamSourceResolution } from '../servi
 import type { Database, ShortCircuitCalculationInsert } from '../lib/database.types';
 
 type Project = Database['public']['Tables']['projects']['Row'];
+/** The project fields the Short Circuit page reads, by their column names. */
+export type ShortCircuitProject = Pick<
+  Project,
+  | 'id' | 'service_amps' | 'service_voltage' | 'service_phase'
+  | 'utility_transformer_kva' | 'utility_transformer_impedance_pct' | 'utility_available_fault_current_a'
+>;
 type Panel = Database['public']['Tables']['panels']['Row'];
 type Transformer = Database['public']['Tables']['transformers']['Row'];
 type Feeder = Database['public']['Tables']['feeders']['Row'];
@@ -50,7 +56,7 @@ export interface PanelFormState {
 // rendering the React tree.
 export function derivePanelFormState(
   panel: Panel,
-  project: Pick<Project, 'service_voltage' | 'service_phase'>,
+  project: Pick<ShortCircuitProject, 'service_voltage' | 'service_phase'>,
   feeder: Feeder | undefined,
 ): PanelFormState {
   return {
@@ -60,12 +66,13 @@ export function derivePanelFormState(
     feederConduit: normalizeConduit(feeder?.conduit_type),
     feederSets: feeder?.sets_in_parallel ?? 1,
     feederVoltage: panel.voltage || project.service_voltage || 240,
-    feederPhase: (project.service_phase ?? 1) === 3 ? 3 : 1,
+    // The panel's own phase, like its voltage; the project's only as a fallback.
+    feederPhase: (panel.phase ?? project.service_phase ?? 1) === 3 ? 3 : 1,
   };
 }
 
 interface Props {
-  project: Project;
+  project: ShortCircuitProject;
   panels: Panel[];
   transformers: Transformer[];
   existingCalculations: ShortCircuitCalculation[];
@@ -218,6 +225,7 @@ export const ShortCircuitProjectCalculator: React.FC<Props> = ({
           conduitType: feederConduit,
           voltage: feederVoltage,
           phase: feederPhase,
+          setsInParallel: feederSets,
         },
         sourceFaultCurrent,
       );

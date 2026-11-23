@@ -6,7 +6,7 @@ import { usePanels } from '../hooks/usePanels';
 import { useTransformers } from '../hooks/useTransformers';
 import { useProjects } from '../hooks/useProjects';
 import { exportSingleCalculation, exportSystemReport } from '../services/pdfExport/shortCircuitPDF';
-import { ShortCircuitProjectCalculator } from './ShortCircuitProjectCalculator';
+import { ShortCircuitProjectCalculator, type ShortCircuitProject } from './ShortCircuitProjectCalculator';
 import { detectStaleCalculations } from '../services/calculations/shortCircuitHierarchy';
 import { SHORT_CIRCUIT_OUTDATED } from '../lib/storedCalcs';
 
@@ -41,21 +41,32 @@ export const ShortCircuitResults: React.FC = () => {
   const serviceCalculation = calculations.find(c => c.calculation_type === 'service' && !c.panel_id);
   const panelCalculations = calculations.filter(c => c.calculation_type === 'panel' || c.panel_id);
 
+  // The calculator and the hierarchy read the project by its column names;
+  // `useProjects` returns the camelCase frontend Project, so map it here. A
+  // cast used to hand them undefined fields: every service prefill was 240 V
+  // 1φ and the utility's available fault current was never a source (#286).
+  const scProject: ShortCircuitProject | undefined = useMemo(() => project && ({
+    id: project.id,
+    service_amps: project.serviceAmps ?? null,
+    service_voltage: project.serviceVoltage,
+    service_phase: project.servicePhase,
+    utility_transformer_kva: project.utilityTransformerKva ?? null,
+    utility_transformer_impedance_pct: project.utilityTransformerImpedancePct ?? null,
+    utility_available_fault_current_a: project.utilityAvailableFaultCurrentA ?? null,
+  }), [project]);
+
   // Stale-detection: any saved panel calc whose stored source_fault_current
   // disagrees with the currently-resolvable upstream value (because the
-  // upstream calc was changed since this one was saved). detectStaleCalculations
-  // accepts a Pick of the DB row but only reads service_voltage / service_phase
-  // / utility_available_fault_current_a — the frontend Project is compatible
-  // via camelCase aliases; cast at the boundary.
+  // upstream calc was changed since this one was saved).
   const staleMap = useMemo(() => {
-    if (!project) return new Map();
+    if (!scProject) return new Map();
     return detectStaleCalculations({
-      project: project as never,
+      project: scProject,
       panels,
       transformers,
       calculations,
     });
-  }, [project, panels, transformers, calculations]);
+  }, [scProject, panels, transformers, calculations]);
 
   const handleDelete = async (id: string) => {
     await deleteCalculation(id);
@@ -118,11 +129,10 @@ export const ShortCircuitResults: React.FC = () => {
         </div>
       )}
 
-      {/* Project-aware calculator (inline). Same DB-row-vs-frontend-Project
-          mismatch as the stale-map call above; cast at the prop boundary. */}
-      {project && (
+      {/* Project-aware calculator (inline), given the mapped project. */}
+      {scProject && (
         <ShortCircuitProjectCalculator
-          project={project as never}
+          project={scProject}
           panels={panels}
           transformers={transformers}
           existingCalculations={calculations}
