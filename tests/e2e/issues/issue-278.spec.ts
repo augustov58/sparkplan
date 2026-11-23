@@ -9,6 +9,8 @@ import { join } from 'path';
  * service conductor saved before the sets in parallel were recorded) is
  * flagged "Outdated, re-run" and keeps its stored values. New saves record
  * the sets. Expected values: the issue's Acceptance section (hand-calculated).
+ * Since #286 the panel calc takes the feeder's sets, so LP-1 (saved before
+ * they were recorded) is Outdated too; #286's spec covers a recomputed panel row.
  *
  * QA project "QA SC saved" (tests/e2e/fixtures.md) holds two rows written
  * with the pre-#258/#276/#279 results: Service Entrance 8,275 A / 14 kA and
@@ -72,8 +74,10 @@ test('#278 saved short-circuit results are recomputed; a row that cannot be is f
     const lp1Card = text.slice(text.indexOf('Panel Calculations'));
     expect(svcCard).toContain('Outdated, re-run.');                  // 1 — main: no flag
     expect(svcCard).toMatch(/Fault:\s*8\.3 kA\s*\(8,275\.\d+ A\)\s*AIC:\s*14 kA/); // stored, not recomputed
-    expect(lp1Card).toMatch(/Fault:\s*8\.5 kA\s*\(8,542\.\d+ A\)\s*AIC:\s*10 kA/); // 2 — main: 8,402 A / 14 kA
-    expect(lp1Card).not.toContain('Outdated');
+    // 2 — since #286 the panel calc takes the feeder's sets, which this row
+    // (saved before they were recorded) lacks: Outdated, stored values kept.
+    expect(lp1Card).toContain('Outdated, re-run.');
+    expect(lp1Card).toMatch(/Fault:\s*8\.4 kA\s*\(8,401\.\d+ A\)\s*AIC:\s*14 kA/);
     await page.screenshot({ path: join(OUT, 'short-circuit-page.png'), fullPage: true });
 
     // Step 3: LP-1's PDF (the last card's export button)
@@ -82,8 +86,8 @@ test('#278 saved short-circuit results are recomputed; a row that cannot be is f
     const [dl] = await Promise.all([page.waitForEvent('download', { timeout: 30_000 }), exportButtons.last().click()]);
     await dl.saveAs(lp1Pdf);
     const lp1Text = execFileSync('pdftotext', ['-layout', lp1Pdf, '-'], { encoding: 'utf8' });
-    expect(lp1Text).toMatch(/Fault Current at Point:\s+8,542\.\d+ A/);
-    expect(lp1Text).toMatch(/REQUIRED AIC RATING[\s\S]{0,200}\b10 kA/);
+    expect(lp1Text).toMatch(/Fault Current at Point:\s+8,401\.\d+ A/);
+    expect(lp1Text).toContain('OUTDATED');
 
     // Steps 4–5: the packet
     const pages = await packetPages(page, projectUrl, 'packet-legacy.pdf');
@@ -91,9 +95,9 @@ test('#278 saved short-circuit results are recomputed; a row that cannot be is f
     expect(afc).toMatch(/Available fault current at service main\s+8\.28 kA/);
     expect(afc).toContain('OUTDATED, RE-RUN');                       // 4 — main: no notice
     const e103 = pages.find(p => p.includes('Per-Panel Short Circuit Analysis'))!;
-    expect(e103).toMatch(/LP-1\s+Panel\s+10,000[^\n]*\s8\.5\s+10\s+Compliant/); // 5 — main: 8.4 / 14
+    expect(e103).toMatch(/LP-1\s+Panel\s+10,000[^\n]*\s8\.4\s+14\s+Outdated,/); // 5 — Outdated since #286
     expect(e103).toMatch(/Service Entrance\s+Service[^\n]*\s8\.3\s+14\s+Outdated,/);
-    expect(e103).toMatch(/Outdated, re-run:\s+1/);
+    expect(e103).toMatch(/Outdated, re-run:\s+2/);
 
     // Step 7: a new save records its 2 sets and reads back recomputed with them
     await page.goto(`${projectUrl}/tools`);
