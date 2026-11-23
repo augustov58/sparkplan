@@ -13,7 +13,7 @@ import { supabase } from '@/lib/supabase';
 import type { ShortCircuitCalculation, ShortCircuitCalculationInsert, ShortCircuitCalculationUpdate } from '@/lib/database.types';
 
 import { useFetchGuard } from '@/lib/fetchGuard';
-import { recomputeShortCircuitRow } from '@/lib/storedCalcs';
+import { currentShortCircuitRows, recomputeShortCircuitRow } from '@/lib/storedCalcs';
 /**
  * Return type for useShortCircuitCalculations hook
  */
@@ -186,9 +186,27 @@ export function useShortCircuitCalculations(projectId: string | undefined): UseS
 
       if (error) throw error;
 
+      // #285 (owner ruling 2026-11-22, a): a project has one service
+      // calculation — a new one replaces the previous ones (after the insert
+      // succeeded, so a failed save never loses the old row).
+      const replacesService = data?.calculation_type === 'service' && !data.panel_id;
+      if (replacesService) {
+        const { error: deleteError } = await supabase
+          .from('short_circuit_calculations')
+          .delete()
+          .eq('project_id', data.project_id)
+          .eq('calculation_type', 'service')
+          .is('panel_id', null)
+          .neq('id', data.id);
+        if (deleteError) throw deleteError;
+      }
+
       // Optimistically update local state immediately
       if (data) {
-        setCalculations(prev => [data, ...prev]);
+        setCalculations(prev => [
+          data,
+          ...(replacesService ? prev.filter(c => !(c.calculation_type === 'service' && !c.panel_id)) : prev),
+        ]);
       }
 
       return data;
@@ -243,7 +261,11 @@ export function useShortCircuitCalculations(projectId: string | undefined): UseS
 
   // #278: every reader gets results recomputed from the saved inputs with the
   // current calculator, or flagged `outdated` when a row can't be recomputed.
-  const recomputed = useMemo(() => calculations.map(recomputeShortCircuitRow), [calculations]);
+  // #285: only the newest service row is read, so every reader shows one.
+  const recomputed = useMemo(
+    () => currentShortCircuitRows(calculations).map(recomputeShortCircuitRow),
+    [calculations],
+  );
 
   const getCalculationsByPanel = (panelId: string): ShortCircuitCalculation[] => {
     return recomputed.filter(c => c.panel_id === panelId);
