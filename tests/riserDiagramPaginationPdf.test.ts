@@ -31,7 +31,7 @@ const mkPanel = (overrides: Partial<any> = {}): any => ({
   bus_rating: 200,
   main_breaker_amps: null,
   is_main: false,
-  aic_rating: 10000,
+  aic_rating: 10,
   fed_from: null,
   fed_from_type: 'meter_stack',
   fed_from_transformer_id: null,
@@ -79,7 +79,7 @@ const buildMultifamilyFixture = (numUnits: number) => {
     bus_rating: 100,
     main_breaker_amps: 100,
     fed_from_meter_stack_id: stackId,
-    aic_rating: 22000,
+    aic_rating: 22,
   });
 
   // 14 unit panels, each fed via its own meter position
@@ -90,7 +90,7 @@ const buildMultifamilyFixture = (numUnits: number) => {
       bus_rating: 200,
       main_breaker_amps: 200,
       fed_from_meter_stack_id: stackId,
-      aic_rating: 10000,
+      aic_rating: 10,
     })
   );
 
@@ -142,7 +142,7 @@ describe('RiserDiagram (Sprint 2A PR 4 — M6 + H9 overlay)', () => {
       main_breaker_amps: 400,
       is_main: true,
       fed_from_type: 'service',
-      aic_rating: 65000,
+      aic_rating: 65,
     });
     const doc = React.createElement(
       Document,
