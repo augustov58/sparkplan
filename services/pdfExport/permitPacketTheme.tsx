@@ -30,22 +30,24 @@ export const PHASE = 'Ø';
 export const phaseLabel = (phase: number | string): string => `${phase}${PHASE}`;
 
 /**
- * Format a panel/equipment AIC rating (stored in raw amps) for display in
- * kA. Returns `undefined` when no rating is set so call sites can decide
+ * Format a panel/equipment AIC rating for display. `panels.aic_rating` is
+ * stored in kA (#313, owner ruling 2026-11-23): the Equipment Specs form saves
+ * 42 for "42 kA", and the manufacturer templates and equipmentValidation.ts use
+ * kA too. Returns `undefined` when no rating is set so call sites can decide
  * whether to render a placeholder ("—") or omit the field entirely.
  *
- *   22000 → "22 kA"
- *   65000 → "65 kA"
- *    9500 → "9.5 kA"
+ *   42  → "42 kA"
+ *   10  → "10 kA"
+ *   9.5 → "9.5 kA"
  *
- * Use this everywhere instead of inline `${aic_rating} kA` (which would
- * incorrectly label raw amps as kA — the bug fixed in PR #40 review).
+ * Never divide by 1,000: PR #40 did, and every form-saved rating printed
+ * "0.0 kA" (its fixtures stored amps).
  */
 export const formatAicKa = (
   aicRating: number | null | undefined,
 ): string | undefined => {
   if (aicRating == null || aicRating <= 0) return undefined;
-  const ka = aicRating / 1000;
+  const ka = aicRating;
   const display = ka >= 10 ? `${Math.round(ka)}` : ka.toFixed(1);
   return `${display} kA`;
 };

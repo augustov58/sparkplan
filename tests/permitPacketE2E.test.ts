@@ -116,7 +116,7 @@ const mkPanel = (overrides: Partial<any> = {}): any => ({
   bus_rating: 400,
   main_breaker_amps: 400,
   is_main: true,
-  aic_rating: 65000,
+  aic_rating: 65,
   location: 'Electrical Room 101',
   manufacturer: 'Square D',
   model_number: 'I-Line',
@@ -155,7 +155,7 @@ const panels: any[] = [
     feeder_conductor_size: '4/0',
     feeder_length: 120,
     location: 'Unit 1 Electrical Closet',
-    aic_rating: 22000,
+    aic_rating: 22,
   }),
 ];
 
@@ -689,7 +689,7 @@ describe('Permit packet: NEC 220.83 existing dwelling — proposed loads on PDF'
     bus_rating: 125,
     main_breaker_amps: 125,
     is_main: true,
-    aic_rating: 10000,
+    aic_rating: 10,
     num_spaces: 30,
     location: 'Garage North Wall',
     manufacturer: 'Square D',
@@ -1079,7 +1079,7 @@ describe('Permit packet: Commercial Existing 220.87 scenarios (visual proof)', (
     main_breaker_amps: 400,
     is_main: false,
     is_proposed: true, // ← the new equipment-level flag from this PR
-    aic_rating: 22000,
+    aic_rating: 22,
     location: 'Parking Garage Level 1 (new)',
     manufacturer: 'Square D',
     model_number: 'NQOD',

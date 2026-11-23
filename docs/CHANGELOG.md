@@ -4,6 +4,12 @@ All notable changes to SparkPlan.
 
 ---
 
+## 2026-11-23: Equipment AIC ratings print in kA (#313)
+
+- **An AIC rating entered on a panel printed as "0.0 kA"** on the packet's riser (E-201), the Equipment Specs sheet and the in-app one-line diagram. The rating is saved in kA (42 for "42 kA"), but those three places divided it by 1,000. They now print it as saved: **"AIC 42 kA"**. No calculation changes.
+
+---
+
 ## 2026-11-22: "Panel Max Capacity" feeders on three-phase panels no longer read Outdated (#299)
 
 - **Fixes a regression from #283:** every three-phase feeder sized for "Panel Max Capacity" was marked **Outdated**, with "Design current 400.0 A exceeds the 400 A feeder breaker" and a "Recalculate" banner. Its design current (main × V × √3) came back a fraction of an amp over the main from rounding. The check now compares at 0.1 A, the precision it prints.

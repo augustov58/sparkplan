@@ -2123,7 +2123,7 @@ export const OneLineDiagram: React.FC<OneLineDiagramProps> = ({ project, updateP
               fill="#7c2d12"
             >
               {(() => {
-                const ka = panel.aic_rating / 1000;
+                const ka = panel.aic_rating; // stored in kA (#313)
                 return `AIC ${ka >= 10 ? Math.round(ka) : ka.toFixed(1)}kA`;
               })()}
             </text>

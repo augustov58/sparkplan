@@ -95,7 +95,7 @@ describe('#140: the checklist reads the pages that were built', () => {
   it('the same job with EV chargers and AIC ratings', async () => {
     captured.length = 0;
     await generatePermitPacket(cafe({
-      panels: [panel({ aic_rating: 22000 })],
+      panels: [panel({ aic_rating: 22 })],
       circuits: [circuit(1, 'Espresso machine', 3000), circuit(3, 'EV Charger - Level 2', 7680)],
     }));
     const { packet, ctx, result } = captured.at(-1)!;

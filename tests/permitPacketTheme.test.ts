@@ -11,15 +11,20 @@ import { describe, it, expect } from 'vitest';
 import { formatAicKa, phaseLabel, PHASE } from '../services/pdfExport/permitPacketTheme';
 
 describe('formatAicKa', () => {
-  it('formats raw amps as kA, rounding ≥10 kA to integer', () => {
-    expect(formatAicKa(22000)).toBe('22 kA');
-    expect(formatAicKa(65000)).toBe('65 kA');
-    expect(formatAicKa(100000)).toBe('100 kA');
+  // #313 (owner ruling 2026-11-23): panels.aic_rating is stored in kA — the
+  // Equipment Specs form saves 42 for 42 kA, the manufacturer templates and the
+  // validator use kA, and the production rows hold 10 and 42.
+  it('prints the stored kA rating, rounding ≥10 kA to an integer', () => {
+    expect(formatAicKa(42)).toBe('42 kA');
+    expect(formatAicKa(10)).toBe('10 kA');
+    expect(formatAicKa(22)).toBe('22 kA');
+    expect(formatAicKa(65)).toBe('65 kA');
+    expect(formatAicKa(200)).toBe('200 kA');
   });
 
   it('keeps one decimal under 10 kA', () => {
-    expect(formatAicKa(9500)).toBe('9.5 kA');
-    expect(formatAicKa(5000)).toBe('5.0 kA');
+    expect(formatAicKa(9.5)).toBe('9.5 kA');
+    expect(formatAicKa(5)).toBe('5.0 kA');
   });
 
   it('returns undefined for missing or non-positive ratings (so call sites can decide)', () => {
@@ -29,11 +34,9 @@ describe('formatAicKa', () => {
     expect(formatAicKa(-100)).toBeUndefined();
   });
 
-  it('regression: never inline-concatenates raw amps with " kA"', () => {
-    // The pre-fix bug was `${aic_rating} kA` rendering "65000 kA". Guarantee
-    // we always divide by 1000 before applying the kA suffix.
-    expect(formatAicKa(65000)).not.toBe('65000 kA');
-    expect(formatAicKa(22000)).not.toBe('22000 kA');
+  it('regression #313: a form-saved 42 kA never prints as 0.0 kA', () => {
+    expect(formatAicKa(42)).not.toBe('0.0 kA');
+    expect(formatAicKa(10)).not.toBe('0.0 kA');
   });
 });
 

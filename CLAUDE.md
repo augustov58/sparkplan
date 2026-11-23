@@ -215,6 +215,9 @@ One service calculation per project (owner ruling 2026-11-22, #285): a
 new service save replaces the previous; readers see only the newest.
 Stale (upstream changed) rows are marked on the packet as in the app
 (detectStaleCalculations, #289); conductors print with "N ×" sets.
+Equipment AIC rating (owner ruling 2026-11-23, #313): panels.aic_rating
+is stored in kA (the form saves 42 for 42 kA). Readers print it as is
+(formatAicKa, the OneLineDiagram chip) — never ÷ 1,000.
 ```
 Implementation: `lib/storedCalcs.ts::recomputeShortCircuitRow`, applied to every row by `hooks/useShortCircuitCalculations.ts`. Saves record `results.setsInParallel` (no column). An outdated row is not a source in `shortCircuitHierarchy.ts`.
 Implementation: `services/calculations/shortCircuit.ts`
@@ -479,6 +482,7 @@ Real mistakes made in this repo, each paired with the rule that prevents recurre
 | Panel templates stored loads near breaker × V × √3, so 8 of 51 circuits had a conductor smaller than their own load (a 100 A chiller at 96 A on 3 AWG); the #280 sweep checked conductor vs breaker only (#294) | Check a conductor against its load and its breaker (`conductorCodeLegal` with `loadAmps`); `tests/templateConductors294.test.ts` checks every template circuit. |
 | The MDP's 220.84 total summed the unit circuits' typed VA, while 220.82/220.83 and the Multifamily calculator took a flat 1,500 per small-appliance/laundry circuit (#291) | "X VA for each" in an Optional Method is an allowance, not a floor; "not less than X" (Part III) is a floor. Read which one the cited section says, and make every path that cites it agree. |
 | #283's breaker check compared a 3Φ "Panel Max Capacity" design current (main × V × √3, 400.000… A) raw with the 400 A main, so every such feeder read Outdated; the live re-sizers ignored the sizing basis (E-102 printed 4/0 AWG at 0.0 A for a 2 × 250 kcmil feeder) (#299) | Compare a derived quantity at the precision it prints. A stored mode (sizing basis) must reach every reader that re-derives the value, not only the page that stores it. Test 3Φ when √3 is in the formula. |
+| The packet and the one-line divided the equipment AIC rating by 1,000, but the form saves kA: every entered rating printed "0.0 kA". The tests stored amps (22000), so they passed (#313) | A stored unit is what the writers save and the data holds; list the writers and query the stored values before changing a reader. Fixtures take the writer's output in its units (tests/aicRatingKa313.test.ts). |
 | Docs updated with stale "Last Updated" dates; completed features left as "NEXT UP" | Every doc touch updates its date to today; every shipped feature flips its ROADMAP status in the same PR. |
 
 ---
