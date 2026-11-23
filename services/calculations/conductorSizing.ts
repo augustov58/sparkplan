@@ -293,6 +293,10 @@ export function sizeConductor(
   // Only need to check if insulation rating exceeds terminationTemp
   if (settings.temperatureRating > terminationTemp) {
     const ampacityAtTermTemp = conductor[`temp${terminationTemp}C` as 'temp60C' | 'temp75C'] as number;
+    // The correction/adjustment factors apply to the termination column too —
+    // conservative, kept by owner ruling 2026-11-22 (#296): 100 A with 4
+    // current-carrying conductors sizes 1/0, not 1 AWG. Don't relax it to the
+    // "lesser of adjusted insulation / unadjusted termination" reading without a new ruling.
     const adjustedAmpacityAtTermTemp = ampacityAtTermTemp * combinedDerating;
 
     if (adjustedAmpacityAtTermTemp < requiredAmpacity) {

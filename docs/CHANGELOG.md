@@ -4,6 +4,12 @@ All notable changes to SparkPlan.
 
 ---
 
+## 2026-11-22: Conductor sizing keeps derating the termination column (#296)
+
+- No change in behavior. Conductor Sizing and Feeder Sizing apply the ambient and bundling factors to the 60 °C / 75 °C terminal limit as well as to the wire's own rating, which errs larger: a 100 A feeder with 4 current-carrying conductors gets 1/0 AWG, not 1 AWG. The owner ruled to keep this, and the ruling is now recorded next to the rule.
+
+---
+
 ## 2026-11-22: Removed an unused breaker-sizing module (#293)
 
 - Deleted `services/calculations/breakerSizing.ts`. Nothing in the app used it, and its conductor check didn't follow the #280 rule: it passed 8 AWG on a 50 A breaker and rejected the 240.4(B) "next size up". Conductor checks go through `conductorCodeLegal`. No user-facing change.
