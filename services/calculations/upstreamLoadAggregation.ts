@@ -31,6 +31,7 @@ import {
   calculateTwoUnitDwellingLoad,
   dwellingLoadsFromCircuits,
   isDwellingUnitPanel,
+  optionalMethodAllowanceDelta,
   twoUnitOptionalRow,
   type TwoUnitDwellingResult,
   type TwoUnitDwellingUnit,
@@ -100,6 +101,12 @@ export interface MultiFamilyContext {
    * house-panel row.
    */
   housePanelIds?: string[];
+  /**
+   * #291 (owner ruling 2026-11-22): 220.84(C)(2) takes each dwelling-unit
+   * small-appliance and laundry circuit at 1,500 VA. The dwelling circuits'
+   * VA above that (left out of the base) and below it (added).
+   */
+  smallApplianceLaundry?: { excessVA: number; shortfallVA: number };
 }
 
 /**
@@ -1008,8 +1015,14 @@ export function calculateAggregatedLoad(
     const climateNameplateVA = loads.heating + loads.cooling;
     const climateDemandVA = Math.max(loads.heating, loads.cooling);
     const climateReductionVA = Math.max(0, climateNameplateVA - climateDemandVA);
-    const dwellingDemandBaseVA = Math.max(0, dwellingConnectedVA - climateReductionVA);
-    const dwellingDemandVA = Math.round(dwellingDemandBaseVA * demandFactor);
+    // 220.84(C)(2), #291: small-appliance and laundry circuits at 1,500 VA
+    // each — VA above that is left out (its own row at 0%, so the columns
+    // still sum, #160), and a circuit below it is raised (its own row).
+    const saExcessVA = multiFamilyContext.smallApplianceLaundry?.excessVA ?? 0;
+    const saShortfallVA = multiFamilyContext.smallApplianceLaundry?.shortfallVA ?? 0;
+    const dwellingDemandBaseVA = Math.max(0, dwellingConnectedVA - climateReductionVA - saExcessVA);
+    const saShortfallDemandVA = Math.round(saShortfallVA * demandFactor);
+    const dwellingDemandVA = Math.round(dwellingDemandBaseVA * demandFactor) + saShortfallDemandVA;
     // 220.84(B): house loads per Part III, non-dwelling rules (#179)
     const houseDemandVA = multiFamilyContext.housePanelDemandVA ?? housePanelLoadVA;
     const totalDemandVA = dwellingDemandVA + houseDemandVA + evDemandVA;
@@ -1017,7 +1030,7 @@ export function calculateAggregatedLoad(
     const demandBreakdown: DemandCalculation[] = [{
       loadType: `Multi-Family Dwelling (${multiFamilyContext.dwellingUnits} units)`,
       connectedVA: dwellingDemandBaseVA,
-      demandVA: dwellingDemandVA,
+      demandVA: dwellingDemandVA - saShortfallDemandVA,
       demandFactor,
       necReference: `NEC 220.84 Table (${multiFamilyContext.dwellingUnits} units @ ${(demandFactor * 100).toFixed(0)}%)`,
     }];
@@ -1038,6 +1051,26 @@ export function calculateAggregatedLoad(
       necRefs.push('NEC 220.60 (Non-Coincident Loads)');
       necRefs.push('NEC 220.84(C)(5) (Larger of A/C or Electric Space Heating)');
     }
+
+    if (saExcessVA > 0) {
+      demandBreakdown.push({
+        loadType: 'Small-appliance / laundry circuits above 1,500 VA each (omitted)',
+        connectedVA: saExcessVA,
+        demandVA: 0,
+        demandFactor: 0,
+        necReference: 'NEC 220.84(C)(2) (1,500 VA for each small-appliance and laundry circuit)',
+      });
+    }
+    if (saShortfallVA > 0) {
+      demandBreakdown.push({
+        loadType: 'Small-appliance / laundry circuits raised to 1,500 VA each',
+        connectedVA: saShortfallVA,
+        demandVA: saShortfallDemandVA,
+        demandFactor,
+        necReference: 'NEC 220.84(C)(2) (1,500 VA for each small-appliance and laundry circuit)',
+      });
+    }
+    if (saExcessVA > 0 || saShortfallVA > 0) necRefs.push('NEC 220.84(C)(2) (Small-Appliance and Laundry Circuits)');
 
     if (housePanelLoadVA > 0) {
       demandBreakdown.push({
@@ -1812,8 +1845,17 @@ export function buildMultiFamilyContext(
     housePanelDemandVA += result.totalDemandVA;
   }
 
+  // #291: the dwelling base's small-appliance / laundry circuits at 1,500 VA
+  // each — every circuit under the MDP outside the EV and house panels.
+  const excluded = new Set([...evPanels, ...housePanels].flatMap(p => [...collectDownstreamPanelIds(p.id, panels, transformers)]));
+  const dwellingIds = collectDownstreamPanelIds(panel.id, panels, transformers);
+  const allowance = optionalMethodAllowanceDelta(
+    circuits.filter(c => !!c.panel_id && dwellingIds.has(c.panel_id) && !excluded.has(c.panel_id) && !isEVEMSMarkerCircuit(c)),
+  );
+
   return {
     dwellingUnits: totalUnits,
+    smallApplianceLaundry: allowance.excessVA > 0 || allowance.shortfallVA > 0 ? allowance : undefined,
     evLoadVA: evLoadVA > 0 ? evLoadVA : undefined,
     evDemandVA: evLoadVA > 0 && evDemandVA !== evLoadVA ? evDemandVA : undefined,
     housePanelLoadVA: housePanelLoadVA > 0 ? housePanelLoadVA : undefined,
