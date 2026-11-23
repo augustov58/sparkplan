@@ -4,6 +4,12 @@ All notable changes to SparkPlan.
 
 ---
 
+## 2026-11-22: The riser legend defines AIC correctly (#287)
+
+- The packet's riser diagram legend defined **AIC as "Available Interrupting Current"**. AIC is the equipment's interrupting rating; the available fault current is what it is compared against (NEC 110.9). It now reads **"AIC = Ampere Interrupting Capacity (equipment interrupting rating, NEC 110.9)"**. No calculation changes.
+
+---
+
 ## 2026-11-22: The multifamily 220.84 total counts small-appliance and laundry circuits at 1,500 VA each (#291)
 
 - **The NEC 220.84 calculation for a multifamily service now counts each unit's small-appliance and laundry circuits at 1,500 VA each**, whatever VA is entered on the circuit. That is the Optional Methods' allowance: "1500 volt-amperes for each" (220.82(B)(1), 220.83, 220.84(C)(2)). It used to add up the circuits' entered VA, so a kitchen circuit entered at 2,400 VA added 405 VA of demand in a 3-unit building, and one entered at 1,200 VA counted less than the code's 1,500.
