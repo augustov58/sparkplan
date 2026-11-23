@@ -10,7 +10,7 @@
 import { getConductorImpedance } from '../../data/nec/table-chapter9-table9';
 
 /**
- * Standard Available Interrupting Capacity (AIC) ratings for circuit breakers
+ * Standard Ampere Interrupting Capacity (AIC) ratings for circuit breakers (interrupting rating, NEC 110.9)
  * Common ratings: 10kA, 14kA, 22kA, 25kA, 42kA, 65kA, 100kA, 200kA
  */
 export const STANDARD_AIC_RATINGS = [10, 14, 22, 25, 42, 65, 100, 200]; // kA

@@ -2,7 +2,7 @@
  * Equipment Validation Service
  *
  * Validates electrical equipment specifications against NEC requirements,
- * particularly AIC (Available Interrupting Current) ratings per NEC 110.9.
+ * particularly AIC (Ampere Interrupting Capacity, the equipment interrupting rating) per NEC 110.9.
  *
  * @module services/validation/equipmentValidation
  */
