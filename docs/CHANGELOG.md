@@ -4,6 +4,13 @@ All notable changes to SparkPlan.
 
 ---
 
+## 2026-11-22: Panel templates: circuits carry their own load (#294)
+
+- **Eight circuits in the panel templates had a conductor smaller than their own load.** The templates set loads close to the breaker rating: a 100 A chiller at 96 A on 3 AWG, rated 85 A at the 60 °C terminals; 3,000 W of lighting on a 120 V, 20 A circuit, which is 25 A. They now carry what their breaker serves as a continuous load: 80 A on a 100 A breaker, 64 A on 80 A, 48 A on 60 A, 1,920 W on a 20 A lighting circuit. The 75 kVA transformer stays at its rating. The 100 A circuits now get 1 AWG copper and the 80 A one 3 AWG. Affected templates: Office Building, Small Workshop, Retail Store.
+- Only new projects created from these templates change; existing projects keep their circuits.
+
+---
+
 ## 2026-11-22: The packet marks stale short-circuit rows and prints parallel sets (#289)
 
 - **The packet's short-circuit table now marks a panel calculation whose upstream changed** ("Stale, re-run"), the same rows the Short Circuit page marks "Stale". It used to print them as "Compliant". The summary counts them separately, and a note gives the old and new upstream values (for example "DP-1: was 20,344 A, now 20,069 A").
