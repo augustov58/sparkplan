@@ -4,6 +4,14 @@ All notable changes to SparkPlan.
 
 ---
 
+## 2026-11-22: Short circuit counts a feeder's parallel sets (#286)
+
+- **The fault current at a panel now accounts for the feeder's conductor sets in parallel.** Two sets halve the feeder's impedance, so more fault current reaches the panel. The calculation used one set whatever the form said, which understated it. Example: 1,000 kVA, 480 V service (20,344 A at the MDP), then 100 ft of 4/0 copper in steel, 2 sets, to DP-1: **15,679 A, 22 kA required** (was 12,755 A and 14 kA). The service calculation already counted its sets.
+- A panel calculation saved before its sets were recorded now reads **"Outdated, re-run"** with its saved values, as service calculations do since #278. Re-run it to update it.
+- **The Short Circuit page fills in the project's own service.** It filled in 240 V single-phase and a 2.5 % transformer for every project; it now uses the project's voltage, phase and transformer, and a panel calculation takes the panel's own phase.
+
+---
+
 ## 2026-11-21: A feeder has its own breaker (#283)
 
 - **Every feeder now has its own breaker.** It defaults to the next standard size at or above the feeder's design current ("Calculated Load"), or the destination panel's main breaker ("Panel Max Capacity"). You can change it on the feeder form. It is shown on the feeder card and on the panel schedule's feeder row, and it is saved when the feeder is sized.

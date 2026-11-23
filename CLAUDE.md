@@ -204,6 +204,9 @@ current, no margin (owner ruling 2026-11-21, #279). requiredAIC is kA.
 Saved results: recomputed on read from the saved inputs (owner ruling
 2026-11-21, #278). A row that can't be recomputed exactly is flagged
 "Outdated, re-run" — never filled with a guessed 1 set.
+Parallel sets: the run's impedance ÷ its sets, service AND downstream
+panel (owner OK 2026-11-22, #286); a panel row saved before its sets
+were recorded is Outdated too.
 ```
 Implementation: `lib/storedCalcs.ts::recomputeShortCircuitRow`, applied to every row by `hooks/useShortCircuitCalculations.ts`. Saves record `results.setsInParallel` (no column). An outdated row is not a source in `shortCircuitHierarchy.ts`.
 Implementation: `services/calculations/shortCircuit.ts`
@@ -457,6 +460,7 @@ Real mistakes made in this repo, each paired with the rule that prevents recurre
 | Whole dwellings took small-appliance and laundry circuits at a flat 1,500 VA though 220.52 says "not less than 1500 … for each"; the first fix turned a 3,000 VA row standing for two circuits into 4,500 (#282) | A "not less than X for each" is a per-item floor. Before a per-row rule, decide what a row means when rows and the count disagree; run the existing template-shaped tests before writing new ones. |
 | Four tools kept private conductor lists after #271 unified the EV tools (4 AWG on every breaker > 50 A, 2 AWG on 100 A, checks against the load at 75 °C); writing the acceptance, 240.4(B) was misapplied twice (#280) | Sweep and count every path that picks or checks a conductor before fixing one. For 240.4(B), check all three conditions (ampacity not a standard rating, breaker = the next one, ≤ 800 A) in both termination columns. |
 | A feeder's conductors were sized to the load but its EGC to the panel's main breaker; six readers each guessed the feeder's OCPD with their own fallback, Recalculate always went load-based, and the stale check guessed "capacity-based" from a load within 5 % of the rating (#283) | When readers each derive "the" value with their own fallback chain, store the value and route every reader through one function (`feederBreaker.ts`). Never infer a mode from a number that happens to match it — store the mode. |
+| The downstream short-circuit calc ignored the feeder's sets in parallel though the form showed them (2-set feeder: 13,386 A / 14 kA printed, 16,645 A / 22 kA actual); the Short Circuit page also cast the camelCase project to a column-named type, so every prefill was 240 V 1φ (#286) | A form field that never reaches the calc is a bug: diff a form's inputs against the function's parameters. Never cast between the frontend and DB shapes of a row (`as never`); map the fields the consumer reads. |
 | Docs updated with stale "Last Updated" dates; completed features left as "NEXT UP" | Every doc touch updates its date to today; every shipped feature flips its ROADMAP status in the same PR. |
 
 ---
