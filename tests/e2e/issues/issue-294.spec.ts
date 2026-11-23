@@ -34,15 +34,18 @@ const TEMPLATES = [
 async function deleteProjects(page: Page, name: string) {
   const main = page.locator('main');
   await page.goto('/');
-  await expect(main.getByRole('button', { name: 'Create New NEC Project' })).toBeVisible({ timeout: 15_000 });
-  for (let i = 0; i < 3; i++) {
+  // The project list loads after the page: wait for a known QA project before counting
+  await expect(main.locator('h3', { hasText: 'QA Short circuit' }).first()).toBeVisible({ timeout: 20_000 });
+  for (let i = 0; i < 5; i++) {
     const heading = main.locator('h3').filter({ hasText: new RegExp(`^${name.replace(/[()/]/g, '\\$&')}$`) });
     if (!(await heading.count())) return;
-    const before = await heading.count();
     const card = heading.first().locator('xpath=ancestor::div[contains(@class,"rounded-xl")][1]');
     await card.hover();
+    // The card leaves the list before the delete reaches the database; wait for
+    // the request, or the next navigation cancels it and the project stays.
+    const deleted = page.waitForResponse((r) => r.url().includes('/rest/v1/projects') && r.request().method() === 'DELETE');
     await card.locator('button[title="Delete project"]').click();
-    await expect(heading).toHaveCount(before - 1, { timeout: 15_000 });
+    expect((await deleted).ok()).toBe(true);
   }
 }
 
