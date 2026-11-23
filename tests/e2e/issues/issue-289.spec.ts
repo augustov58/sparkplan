@@ -105,7 +105,8 @@ test('#289 stale short-circuit rows are marked on the packet; the sets print eve
     // 4: the service re-saved with 2 sets → DP-1 stale in the app
     await saveService(page, projectUrl, '2');
     const staleText = await shortCircuitText(page, projectUrl);
-    expect(staleText).toContain('was 20,344 A, now 20,069 A');
+    expect(staleText).toContain('Stale — upstream chain changed: was 20,344 A, now 20,069 A');
+    expect(staleText).toMatch(/AIC: 22 kA Stale, re-run/); // the card's status, as on the packet (was "Compliant")
 
     // 5: and on the packet
     const pages2 = await packetPages(page, projectUrl, 'packet-stale.pdf');

@@ -8,7 +8,7 @@ import { useProjects } from '../hooks/useProjects';
 import { exportSingleCalculation, exportSystemReport } from '../services/pdfExport/shortCircuitPDF';
 import { ShortCircuitProjectCalculator, type ShortCircuitProject } from './ShortCircuitProjectCalculator';
 import { detectStaleCalculations } from '../services/calculations/shortCircuitHierarchy';
-import { SHORT_CIRCUIT_OUTDATED, shortCircuitConductorText } from '../lib/storedCalcs';
+import { SHORT_CIRCUIT_OUTDATED, SHORT_CIRCUIT_STALE, shortCircuitConductorText } from '../lib/storedCalcs';
 
 interface ShortCircuitResult {
   faultCurrent: number;
@@ -259,8 +259,8 @@ const CalculationCard: React.FC<CalculationCardProps> = ({ calculation, panel, p
         <div className="bg-amber-50 border-b border-amber-200 px-3 py-2 text-xs text-amber-900 flex items-start gap-2 rounded-t-lg">
           <RefreshCw className="w-3.5 h-3.5 mt-0.5 shrink-0" />
           <div>
-            <span className="font-semibold">Stale — upstream chain changed.</span>{' '}
-            {staleInfo.reason}. Delete this calc and re-add it to pick up the new source value.
+            <span className="font-semibold">Stale — upstream chain changed:</span>{' '}
+            {staleInfo.reason.replace(/^Upstream chain changed: /, '')}. Delete this calc and re-add it to pick up the new source value.
           </div>
         </div>
       )}
@@ -309,14 +309,15 @@ const CalculationCard: React.FC<CalculationCardProps> = ({ calculation, panel, p
             <span className="text-gray-500">AIC:</span>
             <span className="font-semibold text-orange-700">{results.requiredAIC} kA</span>
           </div>
-          <div className={`flex items-center gap-1 ${results.compliance.compliant ? 'text-green-700' : 'text-red-700'}`}>
-            {results.compliance.compliant ? (
+          {/* #289: the status the packet prints — a stale or outdated row is not "Compliant" */}
+          <div className={`flex items-center gap-1 ${results.outdated || staleInfo ? 'text-amber-700' : results.compliance.compliant ? 'text-green-700' : 'text-red-700'}`}>
+            {results.compliance.compliant && !results.outdated && !staleInfo ? (
               <CheckCircle className="w-3.5 h-3.5" />
             ) : (
               <AlertTriangle className="w-3.5 h-3.5" />
             )}
             <span className="font-medium">
-              {results.compliance.compliant ? 'Compliant' : 'Review'}
+              {results.outdated ? SHORT_CIRCUIT_OUTDATED : staleInfo ? SHORT_CIRCUIT_STALE : results.compliance.compliant ? 'Compliant' : 'Review'}
             </span>
             <span className="text-gray-400">({results.compliance.necArticle})</span>
           </div>
