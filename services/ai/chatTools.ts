@@ -18,7 +18,7 @@ import { computeFeederLoadVA, feederDesignLoadSplit } from '@/services/feeder/fe
 import { CONTINUOUS_LOAD_FACTOR, isContinuousServiceLoad } from '@/data/nec/continuous-load';
 import { conductorForBreaker, conductorCodeLegal, conductor75COption } from '@/data/nec/table-310-16';
 import { getNextStandardBreakerSize } from '@/data/nec/standard-breakers';
-import { feederOcpdForSizing } from '@/services/feeder/feederBreaker';
+import { feederCapacityVA, feederOcpdForSizing, feederSizingBasis } from '@/services/feeder/feederBreaker';
 import { EVSE_CONTINUOUS_FACTOR, isEvseDescription } from '@/data/nec/evse-load';
 import { calculateFeederSizing } from '@/services/calculations/feederSizing';
 import {
@@ -510,7 +510,11 @@ Returns the feeder's voltage drop percentage if already calculated in the projec
         const voltage = sourcePanel?.voltage || 120;
         const phase = (sourcePanel?.phase || 1) as 1 | 3;
 
-        liveLoadVA = computeFeederLoadVA(
+        // #299: a "Panel Max Capacity" feeder is sized for its panel's main, as on Feeder Sizing
+        const capacityPanel = feederSizingBasis(rawFeeder as never) === 'capacity'
+          ? context.rawPanels!.find(p => p.id === rawFeeder!.destination_panel_id)
+          : undefined;
+        liveLoadVA = capacityPanel ? feederCapacityVA(capacityPanel, capacityPanel.voltage, capacityPanel.phase) : computeFeederLoadVA(
           rawFeeder!,
           context.rawPanels!,
           context.rawCircuits!,
@@ -524,7 +528,7 @@ Returns the feeder's voltage drop percentage if already calculated in the projec
         );
 
         // #190: the same design load and feeder conditions as E-103
-        const split = feederDesignLoadSplit(
+        const split = capacityPanel ? { continuousVA: 0, noncontinuousVA: liveLoadVA } : feederDesignLoadSplit(
           [rawFeeder!.destination_panel_id],
           liveLoadVA,
           context.rawPanels!,

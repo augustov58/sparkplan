@@ -99,6 +99,8 @@ CRITICAL: only `calculated` skips the 1.25× multiplier.
   the design load and are protected by it (240.4 incl. (B)); EGC from it
   (Table 250.122). Transformer feeders keep the primary breaker. Every reader
   calls services/feeder/feederBreaker.ts — never main || feeder || bus.
+  A capacity feeder's load is feederCapacityVA (Feeder Sizing, the packet's
+  voltage-drop page, the Copilot); compare design current at 0.1 A (#299).
 - PANEL BUS (#225, 408.30): each panel's design load (feederDesignLoadVA;
   the MDP's = the service check) vs its bus, in its own phase —
   lib/storedCalcs.ts::panelDesignAmps (Inspector Mode, the Copilot).
@@ -476,6 +478,7 @@ Real mistakes made in this repo, each paired with the rule that prevents recurre
 | The packet printed a panel short-circuit row as "Compliant" while the app flagged it Stale, and no surface printed the sets in parallel that change the result (#289) | A mark the app shows must reach the printed document from the same function with the same inputs. Print every input that changes a result next to it. |
 | Panel templates stored loads near breaker × V × √3, so 8 of 51 circuits had a conductor smaller than their own load (a 100 A chiller at 96 A on 3 AWG); the #280 sweep checked conductor vs breaker only (#294) | Check a conductor against its load and its breaker (`conductorCodeLegal` with `loadAmps`); `tests/templateConductors294.test.ts` checks every template circuit. |
 | The MDP's 220.84 total summed the unit circuits' typed VA, while 220.82/220.83 and the Multifamily calculator took a flat 1,500 per small-appliance/laundry circuit (#291) | "X VA for each" in an Optional Method is an allowance, not a floor; "not less than X" (Part III) is a floor. Read which one the cited section says, and make every path that cites it agree. |
+| #283's breaker check compared a 3Φ "Panel Max Capacity" design current (main × V × √3, 400.000… A) raw with the 400 A main, so every such feeder read Outdated; the live re-sizers ignored the sizing basis (E-102 printed 4/0 AWG at 0.0 A for a 2 × 250 kcmil feeder) (#299) | Compare a derived quantity at the precision it prints. A stored mode (sizing basis) must reach every reader that re-derives the value, not only the page that stores it. Test 3Φ when √3 is in the formula. |
 | Docs updated with stale "Last Updated" dates; completed features left as "NEXT UP" | Every doc touch updates its date to today; every shipped feature flips its ROADMAP status in the same PR. |
 
 ---

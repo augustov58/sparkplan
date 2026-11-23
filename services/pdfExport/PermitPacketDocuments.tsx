@@ -841,7 +841,7 @@ export const EquipmentSchedule: React.FC<EquipmentScheduleProps> = ({
                   <Text style={tdCol('20%')}>{feeder.name}</Text>
                   <Text style={tdCol('25%')}>{sourcePanel?.name || 'Unknown'}</Text>
                   <Text style={tdCol('25%')}>{destination}</Text>
-                  <Text style={tdCol('15%')}>{feeder.phase_conductor_size || 'N/A'}</Text>
+                  <Text style={tdCol('15%')}>{feeder.phase_conductor_size ? `${(feeder.sets_in_parallel ?? 1) > 1 ? `${feeder.sets_in_parallel}× ` : ''}${feeder.phase_conductor_size}` : 'N/A'}</Text>
                   <Text style={tdCol('15%')}>{loadCell}</Text>
                 </View>
               );

@@ -14,7 +14,7 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { Cable, Plus, Trash2, Edit2, Save, X, AlertTriangle, CheckCircle, RefreshCw, Info, Download } from 'lucide-react';
 import { useFeeders } from '../hooks/useFeeders';
 import { usePanels } from '../hooks/usePanels';
-import { feederBreakerAmps, feederSizingBasis } from '../services/feeder/feederBreaker';
+import { feederBreakerAmps, feederCapacityVA, feederSizingBasis } from '../services/feeder/feederBreaker';
 import { useTransformers } from '../hooks/useTransformers';
 import { useCircuits } from '../hooks/useCircuits';
 import { useProjects } from '../hooks/useProjects';
@@ -268,8 +268,7 @@ export const FeederManager: React.FC<FeederManagerProps> = ({
       // Capacity" sizes for the panel's main breaker, all non-continuous.
       let loads = { totalVA: 0, continuousVA: 0, noncontinuousVA: 0 };
       if (destPanel && basis === 'capacity') {
-        const amps = destPanel.main_breaker_amps || destPanel.bus_rating;
-        const capacityVA = destPanel.phase === 3 ? amps * destPanel.voltage * Math.sqrt(3) : amps * destPanel.voltage;
+        const capacityVA = feederCapacityVA(destPanel, destPanel.voltage, destPanel.phase);
         loads = { totalVA: capacityVA, continuousVA: 0, noncontinuousVA: capacityVA };
       } else if (destPanel) {
         loads = calculatePanelLoads(feeder.destination_panel_id!);
@@ -371,8 +370,7 @@ export const FeederManager: React.FC<FeederManagerProps> = ({
       // panel-feeder logic at lines ~422-460 below, just resolved against MDP.
       let loads: { totalVA: number; continuousVA: number; noncontinuousVA: number };
       if (sizingBasis === 'capacity') {
-        const amps = mdp.main_breaker_amps || mdp.bus_rating || 0;
-        const capacityVA = phase === 3 ? amps * voltage * Math.sqrt(3) : amps * voltage;
+        const capacityVA = feederCapacityVA(mdp, voltage, phase);
         loads = { totalVA: capacityVA, continuousVA: 0, noncontinuousVA: capacityVA };
       } else {
         loads = calculatePanelLoads(mdp.id);
@@ -494,12 +492,8 @@ export const FeederManager: React.FC<FeederManagerProps> = ({
         // The panel's main breaker is the limiting factor - it can never deliver more than its rating.
         // Treating all capacity as "noncontinuous" ensures the feeder matches the panel's capacity exactly.
         if (destPanel) {
-          // Use panel's maximum capacity (main breaker or bus rating)
-          const panelCapacityAmps = destPanel.main_breaker_amps || destPanel.bus_rating;
-          // Calculate VA from capacity: VA = A × V × √3 (for 3-phase) or VA = A × V (single-phase)
-          const capacityVA = destPhase === 3
-            ? panelCapacityAmps * destVoltage * Math.sqrt(3)
-            : panelCapacityAmps * destVoltage;
+          // Use panel's maximum capacity (main breaker or bus rating) × V (× √3 on 3Φ)
+          const capacityVA = feederCapacityVA(destPanel, destVoltage, destPhase);
 
           // Treat all as noncontinuous - no 125% multiplier applied
           // The feeder is sized to match the panel's maximum rated capacity
@@ -815,7 +809,7 @@ export const FeederManager: React.FC<FeederManagerProps> = ({
               <Info className="w-3 h-3" />
               Voltage drop export requires at least one feeder with length and calculated load.
               {' '}({feeders.filter(f => f.distance_ft && f.distance_ft > 0).length} of {feeders.length} have length,
-              {' '}{feeders.filter(f => computeFeederLoadVA(f, panels, circuits, transformers, necEdition) > 0).length} of {feeders.length} have load)
+              {' '}{feeders.filter(f => feederSizingBasis(f as never) === 'capacity' || computeFeederLoadVA(f, panels, circuits, transformers, necEdition) > 0).length} of {feeders.length} have load)
             </p>
           )}
         </div>
@@ -1595,7 +1589,8 @@ const FeederCard: React.FC<FeederCardProps> = ({
         const ratingA = destPanel.main_breaker_amps || destPanel.feeder_breaker_amps || destPanel.bus_rating;
         const volts = destPanel.voltage;
         if (!ratingA || !volts) return null;
-        const designA = feeder.design_load_va / (destPanel.phase === 3 ? Math.sqrt(3) * volts : volts);
+        // At its printed precision, so a capacity design load (main × V × √3) isn't "above" its own main (#299)
+        const designA = Math.round(feeder.design_load_va / (destPanel.phase === 3 ? Math.sqrt(3) * volts : volts) * 10) / 10;
         if (designA <= ratingA) return null;
         return (
           <div className="flex items-center gap-1.5 px-2 py-1.5 rounded text-xs bg-red-50 border border-red-200 mb-2">

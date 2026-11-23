@@ -4,6 +4,14 @@ All notable changes to SparkPlan.
 
 ---
 
+## 2026-11-22: "Panel Max Capacity" feeders on three-phase panels no longer read Outdated (#299)
+
+- **Fixes a regression from #283:** every three-phase feeder sized for "Panel Max Capacity" was marked **Outdated**, with "Design current 400.0 A exceeds the 400 A feeder breaker" and a "Recalculate" banner. Its design current (main × V × √3) came back a fraction of an amp over the main from rounding. The check now compares at 0.1 A, the precision it prints.
+- **The packet's voltage-drop page now sizes a "Panel Max Capacity" feeder for the panel's capacity**, as Feeder Sizing does. It used to size it for the circuits on the panel: an empty 400 A panel printed 4/0 AWG at 0.0 A and 0.00 % voltage drop, while the riser printed 2 × 250 kcmil at 0.47 %. The Copilot's voltage-drop answer uses the same load.
+- The equipment schedule prints a feeder's parallel sets ("2× 250 kcmil"), as the riser does. The voltage-drop export now counts a capacity feeder as having load, so the export button is enabled.
+
+---
+
 ## 2026-11-22: Conductor sizing keeps derating the termination column (#296)
 
 - No change in behavior. Conductor Sizing and Feeder Sizing apply the ambient and bundling factors to the 60 °C / 75 °C terminal limit as well as to the wire's own rating, which errs larger: a 100 A feeder with 4 current-carrying conductors gets 1/0 AWG, not 1 AWG. The owner ruled to keep this, and the ruling is now recorded next to the rule.

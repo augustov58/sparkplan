@@ -7,7 +7,7 @@
  * @module services/pdfExport/VoltageDropDocuments
  */
 
-import { feederOcpdForSizing } from '../feeder/feederBreaker';
+import { feederCapacityVA, feederOcpdForSizing, feederSizingBasis } from '../feeder/feederBreaker';
 import React from 'react';
 import {
   Document,
@@ -352,7 +352,14 @@ function buildBaseFeederRow(
       // (non-null fields) but feeder here is the wider DB Row; cast at
       // the boundary — the runtime only reads stable fields that both
       // shapes share.
-      const liveLoadVA = circuits
+      // #299: a "Panel Max Capacity" feeder is sized for its panel's main, as on
+      // Feeder Sizing — not for the circuits (0 VA on an empty panel)
+      const capacityPanel = feederSizingBasis(feeder as never) === 'capacity'
+        ? panels.find(p => p.id === feeder.destination_panel_id)
+        : undefined;
+      const liveLoadVA = capacityPanel
+        ? feederCapacityVA(capacityPanel, capacityPanel.voltage, capacityPanel.phase)
+        : circuits
         ? computeFeederLoadVA(feeder as never, panels, circuits, transformers, necEdition, feederLoad?.occupancy, feederLoad?.dwelling)
         : (feeder.total_load_va || 0);
 
@@ -362,7 +369,9 @@ function buildBaseFeederRow(
       const rootPanelIds = feeder.destination_panel_id
         ? [feeder.destination_panel_id]
         : panels.filter(p => p.fed_from_transformer_id === feeder.destination_transformer_id).map(p => p.id);
-      const split = circuits
+      const split = capacityPanel
+        ? { continuousVA: 0, noncontinuousVA: liveLoadVA }
+        : circuits
         ? feederDesignLoadSplit(rootPanelIds, liveLoadVA, panels, circuits, transformers, necEdition ?? '2020')
         : { continuousVA: 0, noncontinuousVA: liveLoadVA };
 
@@ -544,7 +553,7 @@ const VoltageDropTable: React.FC<{ feederData: FeederVoltageDropData[] }> = ({ f
             {`${data.feeder?.distance_ft || 0} ft`}
           </Text>
           <Text style={styles.col4}>
-            {`${data.calculation.phase_conductor_size || 'N/A'} ${data.feeder?.conductor_material || 'Cu'}`}
+            {`${(data.calculation.sets_in_parallel ?? 1) > 1 ? `${data.calculation.sets_in_parallel}× ` : ''}${data.calculation.phase_conductor_size || 'N/A'} ${data.feeder?.conductor_material || 'Cu'}`}
           </Text>
           <Text style={[styles.col5, styles.cellCenter]}>
             {`${(data.calculation.design_current_amps || 0).toFixed(1)} A`}

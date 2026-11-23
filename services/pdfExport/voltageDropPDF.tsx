@@ -10,6 +10,7 @@
 import { pdf } from '@react-pdf/renderer';
 import { VoltageDropDocument, type FeederLoadRules } from './VoltageDropDocuments';
 import { computeFeederLoadVA } from '../feeder/feederLoadSync';
+import { feederCapacityVA, feederSizingBasis } from '../feeder/feederBreaker';
 import type { NecEdition } from '../../data/nec/evse-load';
 import type { Database } from '../../lib/database.types';
 
@@ -31,6 +32,11 @@ function resolveFeederLoadVA(
   circuits?: Circuit[],
   transformers?: Transformer[],
 ): number {
+  // #299: a "Panel Max Capacity" feeder carries its panel's capacity, as on Feeder Sizing
+  const capacityPanel = feederSizingBasis(feeder as never) === 'capacity'
+    ? panels?.find(p => p.id === feeder.destination_panel_id)
+    : undefined;
+  if (capacityPanel) return feederCapacityVA(capacityPanel, capacityPanel.voltage, capacityPanel.phase);
   if (panels && circuits && transformers) {
     return computeFeederLoadVA(feeder as never, panels, circuits, transformers);
   }
