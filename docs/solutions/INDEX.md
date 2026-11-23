@@ -4,6 +4,7 @@ One note per hard problem, written by the model that solved it via the `extract-
 Each entry: `- [title](file.md) — reusable rule`.
 
 <!-- Newest first -->
+- [3-phase capacity feeders read Outdated; live re-sizers ignored the basis](2026-11-22-capacity-feeder-rounding-and-basis.md) — compare at printed precision; test 3Φ when √3 is in the formula; a stored mode must reach every reader that re-derives
 - [The multifamily 220.84 total summed typed small-appliance VA](2026-11-22-optional-methods-flat-1500.md) — "X for each" (Optional Methods) is an allowance, "not less than X" (Part III) a floor; reuse the shared classifier; a base that differs from its circuits needs its own row
 - [Template circuits had conductors smaller than their own load](2026-11-22-template-circuits-carry-their-load.md) — check conductors against load and breaker; rule out the plain defect before an NEC question; verify e2e cleanup in the database (optimistic UI hides cancelled deletes)
 - [The packet hid stale short-circuit rows and parallel sets](2026-11-22-short-circuit-stale-and-sets-on-packet.md) — a mark in the app must reach the printed document from the same function and inputs; print every input that changes the result
