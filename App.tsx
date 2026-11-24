@@ -53,6 +53,9 @@ import { nanoid } from 'nanoid';
 import { useAuthContext } from './components/Auth/AuthProvider';
 import { Login } from './components/Auth/Login';
 import { Signup } from './components/Auth/Signup';
+import { ResetPassword } from './components/Auth/ResetPassword';
+import { UpdatePassword } from './components/Auth/UpdatePassword';
+import { authLinkAtLoad } from './lib/supabase';
 import { ProtectedRoute } from './components/Auth/ProtectedRoute';
 import { useProjects } from './hooks/useProjects';
 import { ErrorBoundary, FeatureErrorBoundary } from './components/ErrorBoundary';
@@ -960,7 +963,29 @@ const NecAssistant = () => {
 
 function AppContent() {
   const navigate = useNavigate();
-  const { user, loading, signOut } = useAuthContext();
+  const { user, loading, signOut, passwordRecovery } = useAuthContext();
+
+  // Email links land on the root with their parameters in the hash (#330).
+  // A recovery link signs the user in: send them to set a new password.
+  // An expired or used link: the sign-in page explains it (was a blank page).
+  // Each redirect fires once: `navigate` changes with every path, and
+  // re-running would pull the user back from wherever they go next.
+  const recoveryRouted = useRef(false);
+  useEffect(() => {
+    if (!passwordRecovery) { recoveryRouted.current = false; return; }
+    if (user && !recoveryRouted.current) {
+      recoveryRouted.current = true;
+      navigate('/update-password', { replace: true });
+    }
+  }, [passwordRecovery, user, navigate]);
+  const authLinkHandled = useRef(false);
+  useEffect(() => {
+    if (authLinkHandled.current) return;
+    authLinkHandled.current = true;
+    if (authLinkAtLoad.kind === 'error') {
+      navigate('/login', { replace: true, state: { authLinkError: authLinkAtLoad.description } });
+    }
+  }, [navigate]);
   const { projects, loading: projectsLoading, createProject, updateProject: updateProjectDB, deleteProject, error: projectsError } = useProjects();
 
   // Template selector state
@@ -1176,6 +1201,15 @@ function AppContent() {
         } />
         <Route path="/signup" element={
           user ? <Navigate to="/" replace /> : <Signup onSuccess={() => {}} />
+        } />
+        {/* Password reset (#330): request a link; the link signs the user in and
+            AppContent routes them to /update-password. Not a change-password screen:
+            without a recovery link, a signed-in user goes to the dashboard. */}
+        <Route path="/reset-password" element={
+          user ? <Navigate to="/" replace /> : <ResetPassword />
+        } />
+        <Route path="/update-password" element={
+          !user ? <Navigate to="/login" replace /> : passwordRecovery ? <UpdatePassword /> : <Navigate to="/" replace />
         } />
 
         {/* Public Founding Contractors application — anyone can apply, no auth */}

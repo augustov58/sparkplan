@@ -4,6 +4,14 @@ All notable changes to SparkPlan.
 
 ---
 
+## 2026-11-24: Password reset works (#330)
+
+- **Forgot your password?** now opens a page that sends a reset link to your email. It used to open a blank page.
+- The link in that email opens **Set a new password**. Before, it signed you in and left you on the dashboard with no way to change the password.
+- An expired or already-used email link (password reset or sign-up confirmation) now opens the sign-in page with an explanation, instead of a blank page.
+
+---
+
 ## 2026-11-24: Promo codes can only be redeemed by a signed-in user, for their own account (#335)
 
 - Redeeming a promo code now requires being signed in, and the code is applied to the signed-in account only. Before, the redeem function could be called with the app's public key for any account, and the list of active codes could be read the same way.

@@ -145,17 +145,20 @@ export const loginSchema = z.object({
 
 export type LoginFormData = z.infer<typeof loginSchema>;
 
+/** The rules for a password a user chooses: sign-up and a reset (#330). */
+const newPasswordRule = z.string()
+  .min(8, 'Password must be at least 8 characters')
+  .max(100, 'Password too long')
+  .regex(/[A-Z]/, 'Password must contain at least one uppercase letter')
+  .regex(/[a-z]/, 'Password must contain at least one lowercase letter')
+  .regex(/[0-9]/, 'Password must contain at least one number');
+
 export const signupSchema = z.object({
   email: z.string()
     .min(1, 'Email is required')
     .email('Invalid email address')
     .max(255, 'Email too long'),
-  password: z.string()
-    .min(8, 'Password must be at least 8 characters')
-    .max(100, 'Password too long')
-    .regex(/[A-Z]/, 'Password must contain at least one uppercase letter')
-    .regex(/[a-z]/, 'Password must contain at least one lowercase letter')
-    .regex(/[0-9]/, 'Password must contain at least one number'),
+  password: newPasswordRule,
   confirmPassword: z.string(),
 }).refine((data) => data.password === data.confirmPassword, {
   message: "Passwords don't match",
@@ -163,6 +166,25 @@ export const signupSchema = z.object({
 });
 
 export type SignupFormData = z.infer<typeof signupSchema>;
+
+export const resetPasswordSchema = z.object({
+  email: z.string()
+    .min(1, 'Email is required')
+    .email('Invalid email address')
+    .max(255, 'Email too long'),
+});
+
+export type ResetPasswordFormData = z.infer<typeof resetPasswordSchema>;
+
+export const updatePasswordSchema = z.object({
+  password: newPasswordRule,
+  confirmPassword: z.string(),
+}).refine((data) => data.password === data.confirmPassword, {
+  message: "Passwords don't match",
+  path: ["confirmPassword"],
+});
+
+export type UpdatePasswordFormData = z.infer<typeof updatePasswordSchema>;
 
 /**
  * Inspection Item Validation

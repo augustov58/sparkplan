@@ -5,6 +5,7 @@
 
 import { createClient } from '@supabase/supabase-js';
 import type { Database } from './database.types';
+import { readAuthLink, type AuthLink } from './authLinks';
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
@@ -15,6 +16,10 @@ if (!supabaseUrl || !supabaseAnonKey) {
     'Required: VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY'
   );
 }
+
+/** The email link this page was opened from, read before the client below clears it (#330). */
+export const authLinkAtLoad: AuthLink =
+  typeof window === 'undefined' ? { kind: 'none' } : readAuthLink(window.location.hash);
 
 export const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey, {
   auth: {
