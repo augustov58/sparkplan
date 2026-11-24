@@ -819,20 +819,39 @@ function calculateRangeDemand(rangeLoads: number[], occupancyType: OccupancyType
 }
 
 /**
+ * Citations for the 100 % rows (owner rulings 2026-11-24, #206). The section
+ * numbers are the same in NEC 2020 and 2023, so they don't go through
+ * article220Citations.
+ * - Water heaters: 220.14(A), a specific appliance at its rating. 220.51 is
+ *   fixed electric space heating, never water heaters.
+ * - Heating with nothing omitted: 220.51.
+ * - Cooling with nothing omitted: 220.14(C) sends motor-outlet loads to 440.6
+ *   (the #205 basis for the HVAC row).
+ */
+export const WATER_HEATER_CITATION = 'NEC 220.14(A) (Specific Appliances or Loads)';
+export const HEATING_CITATION = 'NEC 220.51 (Fixed Electric Space Heating)';
+export const COOLING_CITATION = 'NEC 220.14(C), 440.6(A) (Air-Conditioning)';
+
+/**
  * NEC 220.60 - Noncoincident Loads (Heating vs Cooling)
- * Use larger of heating or cooling, not both
+ * Use larger of heating or cooling, not both. 220.60 is cited only when a
+ * load is actually omitted (> 0 VA); otherwise the row cites the section that
+ * sets the load it keeps (#206).
  */
 function calculateHvacDemand(heatingVA: number, coolingVA: number): DemandCalculation {
   const largerLoad = Math.max(heatingVA, coolingVA);
   const omittedLoad = Math.min(heatingVA, coolingVA);
-  const loadType = heatingVA >= coolingVA ? 'Heating (larger)' : 'Cooling (larger)';
-  
+  const heatingLarger = heatingVA >= coolingVA;
+  const loadType = heatingLarger ? 'Heating (larger)' : 'Cooling (larger)';
+
   return {
     loadType: `HVAC - ${loadType}`,
     connectedVA: heatingVA + coolingVA,
     demandVA: largerLoad,
     demandFactor: (heatingVA + coolingVA) > 0 ? largerLoad / (heatingVA + coolingVA) : 0,
-    necReference: `NEC 220.60 (Omit ${(omittedLoad/1000).toFixed(1)}kVA ${heatingVA >= coolingVA ? 'cooling' : 'heating'})`,
+    necReference: omittedLoad > 0
+      ? `NEC 220.60 (Omit ${(omittedLoad/1000).toFixed(1)}kVA ${heatingLarger ? 'cooling' : 'heating'})`
+      : heatingLarger ? HEATING_CITATION : COOLING_CITATION,
   };
 }
 
@@ -897,7 +916,7 @@ function applyDemandFactors(
       connectedVA: loads.waterHeater,
       demandVA: loads.waterHeater,
       demandFactor: 1.0,
-      necReference: 'NEC 220.51 (Fixed Appliances)',
+      necReference: WATER_HEATER_CITATION,
     });
     totalDemandVA += loads.waterHeater;
   }
@@ -931,7 +950,7 @@ function applyDemandFactors(
   }
   
   // Every applied section, including rows that don't push their own
-  // reference above (e.g. 220.14 "Other", 220.51 water heater) — #127.
+  // reference above (e.g. 220.14 "Other", 220.14(A) water heater) — #127.
   return {
     demandBreakdown,
     totalDemandVA: Math.round(totalDemandVA),
