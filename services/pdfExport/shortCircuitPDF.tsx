@@ -7,6 +7,7 @@
 import { Document, pdf } from '@react-pdf/renderer';
 import type { ShortCircuitCalculation } from '../../lib/database.types';
 import { ShortCircuitCalculationDocument, ShortCircuitTablePages } from './ShortCircuitDocuments';
+import { localDateStamp } from '../../lib/localDate';
 
 /**
  * Export a single short circuit calculation to PDF
@@ -31,7 +32,7 @@ export const exportSingleCalculation = async (
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
-    const fileName = `ShortCircuit_${calculation.location_name.replace(/[^a-z0-9]/gi, '_')}_${new Date().toISOString().split('T')[0]}.pdf`;
+    const fileName = `ShortCircuit_${calculation.location_name.replace(/[^a-z0-9]/gi, '_')}_${localDateStamp()}.pdf`;
     link.download = fileName;
 
     // Trigger download
@@ -87,7 +88,7 @@ export const exportSystemReport = async (
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
-    const fileName = `ShortCircuit_Analysis_${projectName.replace(/[^a-z0-9]/gi, '_')}_${new Date().toISOString().split('T')[0]}.pdf`;
+    const fileName = `ShortCircuit_Analysis_${projectName.replace(/[^a-z0-9]/gi, '_')}_${localDateStamp()}.pdf`;
     link.download = fileName;
 
     // Trigger download

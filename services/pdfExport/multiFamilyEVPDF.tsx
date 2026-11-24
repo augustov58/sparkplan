@@ -7,6 +7,7 @@
 import { pdf } from '@react-pdf/renderer';
 import { MultiFamilyEVDocument } from './MultiFamilyEVDocuments';
 import type { MultiFamilyEVResult } from '../calculations/multiFamilyEV';
+import { localDateStamp } from '../../lib/localDate';
 
 /**
  * Export Multi-Family EV Analysis to PDF
@@ -36,7 +37,7 @@ export const exportMultiFamilyEVAnalysis = async (
     const safeBuildingName = buildingName
       ? buildingName.replace(/[^a-z0-9]/gi, '_')
       : 'Building';
-    const dateStr = new Date().toISOString().split('T')[0];
+    const dateStr = localDateStamp();
     const fileName = `MultiFamilyEV_${safeBuildingName}_${dateStr}.pdf`;
     link.download = fileName;
 

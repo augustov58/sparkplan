@@ -19,6 +19,7 @@ import { useTimeEntries, type TimeEntryInput } from '@/hooks/useTimeEntries';
 import { useProjectBillingSettings } from '@/hooks/useProjectBillingSettings';
 import { sumTimeEntries, formatHours } from '@/services/billing/billingMath';
 import type { Database } from '@/lib/database.types';
+import { localMonthStamp } from '../../lib/localDate';
 
 type TimeEntry = Database['public']['Tables']['time_entries']['Row'];
 
@@ -32,7 +33,7 @@ function monthKey(isoDate: string): string {
 }
 
 function currentMonthKey(): string {
-  return new Date().toISOString().slice(0, 7);
+  return localMonthStamp();
 }
 
 export const TimeEntriesTab: React.FC<TimeEntriesTabProps> = ({ projectId }) => {

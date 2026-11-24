@@ -19,6 +19,7 @@ import {
   computeMaterialBillingAmount,
   formatUSD,
 } from '@/services/billing/billingMath';
+import { localDateStamp } from '../../lib/localDate';
 
 type MaterialEntry = Database['public']['Tables']['material_entries']['Row'];
 type Settings = Database['public']['Tables']['project_billing_settings']['Row'] | null;
@@ -32,7 +33,7 @@ interface MaterialEntryEditorProps {
 }
 
 function todayISO(): string {
-  return new Date().toISOString().slice(0, 10);
+  return localDateStamp();
 }
 
 export const MaterialEntryEditor: React.FC<MaterialEntryEditorProps> = ({

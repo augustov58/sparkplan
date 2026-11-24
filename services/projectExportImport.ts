@@ -6,6 +6,7 @@
 import { supabase } from '../lib/supabase';
 import { ProjectType, ProjectStatus, type Project } from '../types';
 import type { Database } from '../lib/database.types';
+import { localDateStamp } from '../lib/localDate';
 
 type Panel = Database['public']['Tables']['panels']['Row'];
 type Circuit = Database['public']['Tables']['circuits']['Row'];
@@ -189,7 +190,7 @@ export async function exportProjectToJSON(projectId: string, projectName: string
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
-    link.download = `${projectName.replace(/[^a-z0-9]/gi, '_')}_${new Date().toISOString().split('T')[0]}.json`;
+    link.download = `${projectName.replace(/[^a-z0-9]/gi, '_')}_${localDateStamp()}.json`;
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);

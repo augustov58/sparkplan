@@ -31,6 +31,7 @@ import {
   formatAicKa,
   themeStyles,
 } from './permitPacketTheme';
+import { localDateStamp } from '../../lib/localDate';
 
 type MeterStack = Database['public']['Tables']['meter_stacks']['Row'];
 type MeterDB = Database['public']['Tables']['meters']['Row'];
@@ -595,7 +596,7 @@ interface RevisionLogPageProps {
   sheetId?: string;
 }
 
-const todayIso = (): string => new Date().toISOString().split('T')[0] ?? '';
+const todayIso = (): string => localDateStamp();
 
 export const RevisionLogPage: React.FC<RevisionLogPageProps> = ({
   projectName,

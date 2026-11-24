@@ -9,6 +9,7 @@
 
 import { pdf } from '@react-pdf/renderer';
 import { EquipmentSpecsDocument } from './EquipmentSpecsDocuments';
+import { localDateStamp } from '../../lib/localDate';
 
 // ============================================================================
 // TYPES (matching database schema + equipment specs)
@@ -114,7 +115,7 @@ export async function exportEquipmentSpecs(
 
     // Generate filename: Equipment_Specs_ProjectName_YYYY-MM-DD.pdf
     const sanitizedProjectName = projectName.replace(/[^a-z0-9]/gi, '_');
-    const dateStr = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
+    const dateStr = localDateStamp(); // YYYY-MM-DD
     link.download = `Equipment_Specs_${sanitizedProjectName}_${dateStr}.pdf`;
 
     // Trigger download

@@ -14,6 +14,8 @@
  * Pure functions only. No DB. No side effects.
  */
 
+import { localDateStamp } from '../../lib/localDate';
+
 export type InvoiceStatus =
   | 'draft'
   | 'sent'
@@ -83,7 +85,7 @@ export function deriveInvoiceStatus(
 
   const pastDue =
     dueDate !== null && dueDate !== undefined && dueDate.length === 10
-      ? dueDate < today.toISOString().slice(0, 10)
+      ? dueDate < localDateStamp(today)
       : false;
 
   if (paidAmount > 0) {
