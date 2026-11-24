@@ -1253,6 +1253,12 @@ CREATE TRIGGER update_projects_updated_at
 
 ---
 
+### Promo codes (`redeem_promo_code`, 2026-11-24)
+
+- `public.redeem_promo_code(p_code text, p_user_id uuid) RETURNS json`: `SECURITY DEFINER`, `search_path = ''`. The account is `auth.uid()`; `p_user_id` must equal it (kept so the client and generated types don't change). Executable by `authenticated` and `service_role` only.
+- `promo_codes` has RLS with only the service-role policy: no client can read the codes. The app reads them only through the function. `promo_code_redemptions` and `subscriptions`: users SELECT their own rows; writes go through the function or the service role.
+- Migration: `supabase/migrations/20261124_promo_code_redeem_own_account.sql`. Before it, the function and a "view active promo codes" policy for everyone existed only in prod.
+
 ## Indexes and Performance
 
 ### Existing Indexes

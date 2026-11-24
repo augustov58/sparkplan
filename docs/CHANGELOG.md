@@ -4,6 +4,13 @@ All notable changes to SparkPlan.
 
 ---
 
+## 2026-11-24: Promo codes can only be redeemed by a signed-in user, for their own account (#335)
+
+- Redeeming a promo code now requires being signed in, and the code is applied to the signed-in account only. Before, the redeem function could be called with the app's public key for any account, and the list of active codes could be read the same way.
+- Nothing changes for a user redeeming a code on the Pricing page. Checked before the fix: no code had ever been redeemed.
+
+---
+
 ## 2026-11-24: Commercial Load Calculator: the HVAC row asks for the nameplate RLA (#205)
 
 - The HVAC row's current input is now **RLA (A)**, the rated-load current from the unit's nameplate (NEC 440.6(A)). It was labelled "MCA (Amps)", but the calculator always used the value as the unit's load. MCA is a wire-sizing value that already includes 125 % of the largest motor, so entering it overstated the load, and "Continuous" added 125 % on top.

@@ -4,6 +4,7 @@ One note per hard problem, written by the model that solved it via the `extract-
 Each entry: `- [title](file.md) — reusable rule`.
 
 <!-- Newest first -->
+- [Promo codes: listable and redeemable for any account with the public key](2026-11-24-promo-code-security-definer.md) — a SECURITY DEFINER function takes the user from auth.uid(), never an argument, and revokes anon; check the RLS policies beside it; database objects live in migrations, not the SQL editor
 - [The HVAC row asked for MCA but used it as the load](2026-11-24-hvac-rla-not-mca.md) — a load input asks for the value the load is (RLA), not a sizing value; one citation constant feeds app, PDF and CSV; keep a stored field name when only its meaning changes
 - [The aggregate cited 220.51 for water heaters and 220.60 when nothing was omitted](2026-11-24-aggregate-citations.md) — a citation names the section that sets the printed value, by its real title; an "omit" section prints only when something is omitted; read a ruling's edges (the cooling-only case) before coding it
 - [Lists never updated live; packet cosmetics](2026-11-24-realtime-publication-and-packet-cosmetics.md) — check the database side of a subscription (pg_publication_tables); test a date mismatch with a time zone, not a fake clock (a fake time past the token expiry signs the page out)
