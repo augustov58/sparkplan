@@ -109,7 +109,7 @@ describe('#301 a service row estimated from other amps is Stale', () => {
     expect(e102).toContain('STALE, RE-RUN');
     expect(e102).toContain('estimated from a 200 A service');
 
-    const e103 = textOf(React.createElement(ShortCircuitTablePages, { calculations: [row], stale, projectName: 'QA Short circuit' } as any));
+    const e103 = textOf(React.createElement(ShortCircuitTablePages, { calculations: [row], stale, panels: [mdp], projectName: 'QA Short circuit' } as any));
     expect(e103).toMatch(/Stale, re-run:\s+1/);
     expect(e103).toContain("Service Entrance: Service rating changed: the utility transformer was estimated from a 200 A service");
     expect(e103).not.toContain('upstream fault current changed');

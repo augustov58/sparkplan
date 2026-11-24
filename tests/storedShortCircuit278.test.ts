@@ -138,7 +138,7 @@ describe('#278 readers print recomputed values and mark Outdated rows', () => {
     const text = textOf(AvailableFaultCurrentPage({
       projectName: 'P',
       input: {
-        serviceAmps: 200, serviceVoltage: 480, servicePhase: 3, sourceFaultCurrent: null, transformerKVA: 500,
+        equipmentAic: [], serviceAmps: 200, serviceVoltage: 480, servicePhase: 3, sourceFaultCurrent: null, transformerKVA: 500,
         transformerImpedance: 5.75, serviceConductorSize: '500 kcmil', serviceConductorMaterial: 'Cu',
         serviceConductorLength: 100, results: svc.results as any,
       },
@@ -148,9 +148,9 @@ describe('#278 readers print recomputed values and mark Outdated rows', () => {
   });
 
   it('short-circuit table: the Outdated row is marked, LP-1 prints 8.5 kA / 10 kA', () => {
-    const text = textOf(ShortCircuitTablePages({ calculations: calcs, projectName: 'P' }) as React.ReactElement);
+    const text = textOf(ShortCircuitTablePages({ calculations: calcs, panels: [], projectName: 'P' }) as React.ReactElement);
     expect(text).toMatch(/Service Entrance\s+Service[\s\S]*?8\.3\s+14\s+Outdated, re-run/);
-    expect(text).toMatch(/LP-1\s+Panel[\s\S]*?8\.5\s+10\s+Compliant/);
+    expect(text).toMatch(/LP-1\s+Panel[\s\S]*?8\.5\s+10\s+Required (≥|>=) 10 kA/); // #307: no rating entered
     expect(text).not.toMatch(/All panels meet NEC 110\.9/);
   });
 

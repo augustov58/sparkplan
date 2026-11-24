@@ -82,6 +82,7 @@ export const ShortCircuitResults: React.FC = () => {
         project.name,
         project.address || '',
         staleMap,
+        panels,
       );
     } catch (error) {
       console.error('Error exporting system report:', error);

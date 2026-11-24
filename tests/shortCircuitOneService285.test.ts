@@ -54,9 +54,9 @@ describe('#285 currentShortCircuitRows', () => {
   it('the packet table prints one Service Entrance row: 750 kVA → 11.9 kA / 14 kA, Total Panels 1', () => {
     // 750 kVA: I_xfmr = 15,688.9 A, Zs 0.017664 + Zc 0.005608 → 11,908 A → 14 kA
     const rows = currentShortCircuitRows([newer, older]).map(recomputeShortCircuitRow);
-    const text = textOf(ShortCircuitTablePages({ calculations: rows, projectName: 'QA Short circuit' }) as React.ReactElement);
+    const text = textOf(ShortCircuitTablePages({ calculations: rows, panels: [], projectName: 'QA Short circuit' }) as React.ReactElement);
     expect(text.match(/Service Entrance/g)).toHaveLength(1);
-    expect(text).toMatch(/11\.9\s+14\s+Compliant/);
+    expect(text).toMatch(/11\.9\s+14\s+Required (≥|>=) 14 kA/); // #307: no rating entered
     expect(text).not.toMatch(/8\.6\s+10/);
     expect(text).toMatch(/Total Panels:\s+1\b/);
     expect(text).toMatch(/Highest Required AIC:\s+14\s+kA/);

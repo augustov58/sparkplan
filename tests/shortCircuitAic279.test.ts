@@ -90,7 +90,7 @@ describe('#279 short-circuit pages print the rating in kA and no safety factor',
     const text = textOf(AvailableFaultCurrentPage({
       projectName: 'P',
       input: {
-        serviceAmps: 200, serviceVoltage: 480, servicePhase: 3, sourceFaultCurrent: null,
+        equipmentAic: [], serviceAmps: 200, serviceVoltage: 480, servicePhase: 3, sourceFaultCurrent: null,
         transformerKVA: 500, transformerImpedance: 5.75, serviceConductorSize: '500 kcmil',
         serviceConductorMaterial: 'Cu', serviceConductorLength: 100, results: legacyResults,
       },
@@ -102,7 +102,7 @@ describe('#279 short-circuit pages print the rating in kA and no safety factor',
   });
 
   it('short-circuit table page: no "Safety factor of 1.25×" reference', () => {
-    const text = textOf(ShortCircuitTablePages({ calculations: [savedCalc], projectName: 'P', includeNECReferences: true }) as React.ReactElement);
+    const text = textOf(ShortCircuitTablePages({ calculations: [savedCalc], panels: [], projectName: 'P', includeNECReferences: true }) as React.ReactElement);
     expect(text).toContain('NEC 110.9 - Interrupting Rating');
     expect(text).not.toMatch(/safety factor/i);
   });

@@ -4,6 +4,14 @@ All notable changes to SparkPlan.
 
 ---
 
+## 2026-11-23: The packet no longer claims equipment AIC ratings were checked when none are entered (#307)
+
+- **E-102** used to say the equipment ratings "are confirmed against the value above" even when none were entered. With no rating entered, it now says so and gives the minimum standard rating. With ratings entered, it compares each one with the fault current at its own point (e.g. "MDP 42 kA >= 8.6 kA, OK").
+- **E-103 status per row:** "OK (42 >= 8.6 kA)", "Under-rated", or "Required >= 10 kA" when no rating is entered, instead of "Compliant". Outdated and Stale marks still come first, and the summary counts follow. Its "All panels meet NEC 110.9" line now appears only when every row has a rating that passes. Source If prints whole amps ("10,459").
+- **E-201's legend** reads "AIC shown where an equipment rating is entered."
+
+---
+
 ## 2026-11-23: The standard AIC ratings stay as they are (#311)
 
 - No change in behavior. The required interrupting rating is picked from 10, 14, 22, 25, 42, 65, 100 and 200 kA. 18 kA and 35 kA are not in the list, so an available fault current of 15.7 kA requires 22 kA. The owner ruled to keep the list, and the ruling is now recorded next to it.
