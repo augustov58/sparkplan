@@ -4,6 +4,7 @@ One note per hard problem, written by the model that solved it via the `extract-
 Each entry: `- [title](file.md) — reusable rule`.
 
 <!-- Newest first -->
+- [Material Take-Off counted one wire per circuit and guessed conduit](2026-11-23-takeoff-conductors-and-raceway-fill.md) — move take-off math into a pure function tested on the templates' data; size raceway from its conductors (Chapter 9), never a percentage guess
 - [The packet "confirmed" AIC ratings nobody entered](2026-11-23-aic-wording-compare-at-the-point.md) — a status word must name what was compared; with nothing entered print the requirement; when a ruling's example conflicts with its rule, follow the rule and trace the number
 - [E-102 printed the calculator's 200 A as the service rating; estimated transformers went stale silently](2026-11-23-service-rating-and-estimated-transformer-stale.md) — define "the" value once and route every reader (prefills too) through it; make a must-supply field required; re-run the spec on main after changing its restore
 - [AIC ratings printed "0.0 kA": saved in kA, formatted as amps](2026-11-23-aic-rating-stored-in-ka.md) — a stored unit is what the writers save and the data holds; list writers and query values before changing a reader; fixtures take the writer's output

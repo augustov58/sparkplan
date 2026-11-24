@@ -4,6 +4,15 @@ All notable changes to SparkPlan.
 
 ---
 
+## 2026-11-23: Material Take-Off counts every conductor and sizes conduit to its wire (#304)
+
+- **Wire:** each circuit now counts its conductors, one per pole plus a neutral on 1-pole circuits, instead of one wire per circuit. A Retail store's 12 AWG went from 500 ft to 1,000 ft; an office's 1 AWG feeders from 100 ft to 300 ft. Still ~50 ft per circuit.
+- **Conduit:** each circuit's EMT is sized from NEC Chapter 9 at 40 % fill, its ground wire included, and totalled by trade size: an office chiller's 3 × 1 AWG + 8 AWG gets 1-1/4". It replaces a fixed 3/4" plus an extra 30 % of 1". Still ~10 ft per circuit.
+- **Retail Store template:** its three lighting circuits are created as lighting (L), so the load calculation shows them on their own row. The total is unchanged. Exterior Signage stays a non-lighting, continuous load.
+- **Template descriptions** match what they create (Office: no "step-down transformer"; Workshop: no "lighting"). The take-off says "1 circuit", not "1 circuits".
+
+---
+
 ## 2026-11-23: The packet no longer claims equipment AIC ratings were checked when none are entered (#307)
 
 - **E-102** used to say the equipment ratings "are confirmed against the value above" even when none were entered. With no rating entered, it now says so and gives the minimum standard rating. With ratings entered, it compares each one with the fault current at its own point (e.g. "MDP 42 kA >= 8.6 kA, OK").
