@@ -4,6 +4,14 @@ All notable changes to SparkPlan.
 
 ---
 
+## 2026-11-24: Load calculations cite the right NEC sections for water heaters and HVAC (#206)
+
+- **Water heaters** now cite NEC 220.14(A) (Specific Appliances or Loads) instead of "220.51 (Fixed Appliances)". 220.51 covers fixed electric space heating, not water heaters.
+- **Heating with no cooling** cites NEC 220.51 (Fixed Electric Space Heating), and **cooling with no heating** cites NEC 220.14(C), 440.6(A). Before, both printed "220.60 (Omit 0.0kVA …)" though nothing was omitted. 220.60 still prints when a heating or cooling load is actually left out.
+- No numbers change. These citations show in the Panel Schedule's demand table, the panel schedule PDF and the packet's load pages (E-101).
+
+---
+
 ## 2026-11-24: Packet and one-line polish; lists update live (#315)
 
 - **E-202** prints the main breaker with its unit ("800A"), like the bus rating. Main-lug panels still read "MLO".

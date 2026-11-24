@@ -32,13 +32,15 @@ const circuits = [
 ];
 
 describe('#127 item 1 — necReferences lists every applied section', () => {
-  it('includes rows that previously appeared only in the breakdown (220.14 Other, 220.51 water heater)', () => {
+  it('includes rows that previously appeared only in the breakdown (220.14 Other, 220.14(A) water heater)', () => {
     const agg = calculateAggregatedLoad('mdp', [mdp], circuits, [], 'dwelling');
     for (const row of agg.demandBreakdown) {
       expect(agg.necReferences).toContain(row.necReference);
     }
     expect(agg.necReferences.some(r => r.includes('220.14'))).toBe(true);
-    expect(agg.necReferences.some(r => r.includes('220.51'))).toBe(true);
+    // #206 (owner ruling 2026-11-24): a water heater cites 220.14(A); 220.51 is fixed electric space heating
+    expect(agg.necReferences).toContain('NEC 220.14(A) (Specific Appliances or Loads)');
+    expect(agg.necReferences.join(' ')).not.toContain('Fixed Appliances');
   });
 });
 

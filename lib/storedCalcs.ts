@@ -214,7 +214,7 @@ export function projectDemandSplit(
     existingAdderKVA,
     proposedAdderKVA,
     // Union with the per-row references: the top-level list omits some
-    // applied sections (e.g. 220.14 "Other", 220.51 water heater).
+    // applied sections (e.g. 220.14 "Other", 220.14(A) water heater).
     necReferences: [...agg.necReferences, ...agg.demandBreakdown.map(r => r.necReference)],
   };
 }
