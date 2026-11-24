@@ -38,6 +38,24 @@ export interface TakeoffLine {
   notes?: string;
 }
 
+/**
+ * Outlet and junction boxes, estimated from the 1-pole circuits only (owner
+ * ruling 2026-11-24, #321): ~60 % of them get an outlet box (receptacles,
+ * switches) and ~20 % a junction box. Feeder and equipment circuits (2- and
+ * 3-pole) get none, so a panel of them lists no boxes.
+ */
+export const OUTLET_BOXES_PER_1_POLE_CIRCUIT = 0.6;
+export const JUNCTION_BOXES_PER_1_POLE_CIRCUIT = 0.2;
+
+export function boxEstimate(circuits: ReadonlyArray<{ pole: number }>): { onePoleCircuits: number; outletBoxes: number; junctionBoxes: number } {
+  const onePoleCircuits = circuits.filter((c) => c.pole === 1).length;
+  return {
+    onePoleCircuits,
+    outletBoxes: Math.floor(onePoleCircuits * OUTLET_BOXES_PER_1_POLE_CIRCUIT),
+    junctionBoxes: Math.floor(onePoleCircuits * JUNCTION_BOXES_PER_1_POLE_CIRCUIT),
+  };
+}
+
 /** Conductors pulled for a circuit, EGC not counted (#304): the poles, plus a neutral on 1-pole. */
 export function conductorsPerCircuit(pole: number): number {
   return pole === 1 ? 2 : pole;

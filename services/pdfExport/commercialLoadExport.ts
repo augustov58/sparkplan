@@ -19,6 +19,7 @@ import React from 'react';
 import { CommercialLoadDocument, type CommercialLoadDocumentProps } from './CommercialLoadDocument';
 import { OCCUPANCY_LABELS, LIGHTING_UNIT_LOAD } from '../calculations/commercialLoad';
 import { article220Citations } from '../../data/nec/article220-citations';
+import { csvRow } from '../../lib/csv';
 
 export type CommercialLoadExportInput = CommercialLoadDocumentProps;
 
@@ -64,27 +65,6 @@ export async function exportCommercialLoadPDF(
 }
 
 // ==================== CSV EXPORT ====================
-
-/**
- * Escape a single CSV field per RFC 4180:
- *   - If the field contains a comma, quote, CR, or LF → wrap in double quotes
- *     and double any internal double quotes.
- *   - Otherwise return as-is.
- * Numbers are stringified; null/undefined become empty strings.
- */
-function csvEscape(value: string | number | boolean | null | undefined): string {
-  if (value === null || value === undefined) return '';
-  const s = String(value);
-  if (/[",\r\n]/.test(s)) {
-    return `"${s.replace(/"/g, '""')}"`;
-  }
-  return s;
-}
-
-/** Build a CSV row from an array of fields. */
-function csvRow(fields: Array<string | number | boolean | null | undefined>): string {
-  return fields.map(csvEscape).join(',');
-}
 
 /**
  * Build the multi-section CSV content as a single string.

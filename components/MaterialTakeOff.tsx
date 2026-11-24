@@ -9,7 +9,8 @@ import { Download, Package, FileText, DollarSign, CheckCircle } from 'lucide-rea
 import { Project } from '../types';
 import { usePanels } from '../hooks/usePanels';
 import { useCircuits } from '../hooks/useCircuits';
-import { branchWiringTakeoff } from '../services/calculations/racewayFill';
+import { branchWiringTakeoff, boxEstimate } from '../services/calculations/racewayFill';
+import { csvRow } from '../lib/csv';
 
 interface MaterialItem {
   category: string;
@@ -84,23 +85,29 @@ export const MaterialTakeOff: React.FC<MaterialTakeOffProps> = ({ project }) => 
     // 1-pole); each circuit's raceway sized at 40 % fill per NEC Chapter 9
     items.push(...branchWiringTakeoff(circuits, includeConduit).items);
 
-    // Boxes and fittings (if enabled)
+    // Boxes and fittings (if enabled). Boxes come from the 1-pole circuits
+    // only; feeder and equipment circuits list none (#321).
     if (includeBoxes) {
-      items.push({
-        category: 'Boxes & Fittings',
-        description: 'Single-Gang Outlet Box',
-        quantity: Math.floor(circuits.length * 0.6), // 60% of circuits
-        unit: 'ea',
-        notes: 'Receptacle and switch boxes'
-      });
+      const boxes = boxEstimate(circuits);
+      if (boxes.outletBoxes > 0) {
+        items.push({
+          category: 'Boxes & Fittings',
+          description: 'Single-Gang Outlet Box',
+          quantity: boxes.outletBoxes, // ~60% of 1-pole circuits
+          unit: 'ea',
+          notes: 'Receptacle and switch boxes'
+        });
+      }
 
-      items.push({
-        category: 'Boxes & Fittings',
-        description: 'Junction Box (4" Square)',
-        quantity: Math.floor(circuits.length * 0.2), // 20% of circuits
-        unit: 'ea',
-        notes: 'Splices and transitions'
-      });
+      if (boxes.junctionBoxes > 0) {
+        items.push({
+          category: 'Boxes & Fittings',
+          description: 'Junction Box (4" Square)',
+          quantity: boxes.junctionBoxes, // ~20% of 1-pole circuits
+          unit: 'ea',
+          notes: 'Splices and transitions'
+        });
+      }
     }
 
     if (includeFittings) {
@@ -181,10 +188,8 @@ export const MaterialTakeOff: React.FC<MaterialTakeOffProps> = ({ project }) => 
       item.notes || ''
     ]);
 
-    const csvContent = [
-      headers.join(','),
-      ...rows.map(row => row.map(cell => `"${cell}"`).join(','))
-    ].join('\n');
+    // RFC 4180: a quote inside a cell is doubled, so 3/4" stays in one cell (#321)
+    const csvContent = [csvRow(headers), ...rows.map(csvRow)].join('\n');
 
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement('a');
