@@ -24,6 +24,9 @@ export default defineConfig({
     {
       name: 'setup',
       testMatch: /auth\.setup\.ts/,
+      // The setup may type the QA password: no trace (it logs fill() values),
+      // screenshot or video for it (#328).
+      use: { trace: 'off', screenshot: 'off', video: 'off' },
     },
     {
       name: 'chromium',

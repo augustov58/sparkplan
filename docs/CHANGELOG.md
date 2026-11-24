@@ -4,6 +4,12 @@ All notable changes to SparkPlan.
 
 ---
 
+## 2026-11-24: The test sign-in never writes the QA password to disk (#328)
+
+- No change in behavior. When the saved test session had expired and the QA account was signed in again, a failed attempt saved the typed password in Playwright's failure files. The test sign-in now records nothing that could hold it, empties the field before anything is saved, and reports the page's own message ("Invalid login credentials").
+
+---
+
 ## 2026-11-24: Material Take-Off: the CSV opens cleanly; boxes only for branch circuits (#321)
 
 - **Export CSV** now escapes quotes inside a cell, so sizes like `3/4"` and `5/8" x 8ft` stay in one cell when the file opens in a spreadsheet. Before, those rows split into extra columns. The Commercial Load Calculator's CSV uses the same writer, with no change to its output.
