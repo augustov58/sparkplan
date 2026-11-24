@@ -28,7 +28,11 @@
  */
 
 import type { Database } from '../../lib/database.types';
-import { calculateDownstreamTransformerFaultCurrent } from './shortCircuit';
+import {
+  calculateDownstreamTransformerFaultCurrent,
+  calculateServiceFaultCurrent,
+  estimateUtilityTransformer,
+} from './shortCircuit';
 
 type Panel = Database['public']['Tables']['panels']['Row'];
 type Transformer = Database['public']['Tables']['transformers']['Row'];
@@ -60,7 +64,7 @@ interface ResolveDeps {
   project: Pick<
     Project,
     'service_voltage' | 'service_phase' | 'utility_available_fault_current_a'
-  >;
+  > & Partial<Pick<Project, 'service_amps'>>;
   panels: Panel[];
   transformers: Transformer[];
   calculations: ShortCircuitCalculation[];
@@ -303,12 +307,63 @@ export function resolveUpstreamSourceIf(
 }
 
 /**
- * Detect which saved panel calcs are stale because their stored source If
- * disagrees with the currently-resolvable upstream value.
+ * The project's service rating (#301, owner ruling 2026-11-23): the project's
+ * service amps, else the MDP's main breaker. E-102 prints it, both Short
+ * Circuit calculators prefill it, and a service row whose utility transformer
+ * was estimated from other amps is Stale. `null` when neither is recorded.
+ */
+export function projectServiceRatingAmps(
+  project: { service_amps?: number | null },
+  panels: ReadonlyArray<{ is_main?: boolean | null; main_breaker_amps?: number | null }>,
+): number | null {
+  if (project.service_amps && project.service_amps > 0) return project.service_amps;
+  const main = panels.find((p) => p.is_main)?.main_breaker_amps;
+  return main && main > 0 ? main : null;
+}
+
+const SERVICE_CONDUITS = ['Steel', 'PVC', 'Aluminum'] as const;
+
+/**
+ * #301: the service row's fault current with its utility transformer
+ * estimated from `serviceAmps` instead (same conductors, sets, %Z).
+ * `null` when the row lacks an input (it is then Outdated, #278).
+ */
+function serviceFaultAt(calc: ShortCircuitCalculation, serviceAmps: number): number | null {
+  const phase = calc.service_phase;
+  if (!calc.service_voltage || (phase !== 1 && phase !== 3) || !calc.transformer_impedance) return null;
+  const transformer = estimateUtilityTransformer(serviceAmps, calc.service_voltage, phase, calc.transformer_impedance);
+  if (calc.service_conductor_length == null) {
+    return calculateServiceFaultCurrent(transformer, calc.service_voltage, phase).faultCurrent;
+  }
+  const conduitType = SERVICE_CONDUITS.find((c) => c === calc.service_conduit_type);
+  const material = calc.service_conductor_material === 'Cu' || calc.service_conductor_material === 'Al'
+    ? calc.service_conductor_material
+    : undefined;
+  const sets = (calc.results as { setsInParallel?: number } | null)?.setsInParallel;
+  if (!calc.service_conductor_size || !conduitType || !material || !sets) return null;
+  return calculateServiceFaultCurrent(transformer, calc.service_voltage, phase, {
+    length: calc.service_conductor_length,
+    conductorSize: calc.service_conductor_size,
+    material,
+    conduitType,
+    setsInParallel: sets,
+  }).faultCurrent;
+}
+
+/** The first word of a service-row stale reason (the app and packet word it apart from panel rows). */
+export const SERVICE_RATING_CHANGED = 'Service rating changed';
+
+/**
+ * Detect which saved calcs are stale.
  *
- * Tolerance: 1 amp. Anything smaller is rounding noise from the calc engine.
+ * - Panel rows: their stored source If disagrees with the currently-resolvable
+ *   upstream value. Tolerance: 1 amp (rounding noise from the calc engine).
+ * - The service row (#301): its utility transformer was estimated (no kVA
+ *   entered) from service amps that differ from the project's rating
+ *   (`projectServiceRatingAmps`). A row with a kVA entered is never stale on
+ *   this rule: the service amps don't enter its result.
  *
- * Returns a map of `panel_calc.id → reason`. A calc not in the map is fresh.
+ * Returns a map of `calc.id → reason`. A calc not in the map is fresh.
  */
 export function detectStaleCalculations(
   deps: ResolveDeps,
@@ -317,6 +372,21 @@ export function detectStaleCalculations(
   const panelCalcs = deps.calculations.filter(
     (c) => c.calculation_type === 'panel' || (c.calculation_type === 'service' && c.panel_id),
   );
+
+  const rating = projectServiceRatingAmps(deps.project, deps.panels);
+  for (const calc of deps.calculations) {
+    if (calc.calculation_type !== 'service' || calc.panel_id) continue;
+    if (calc.transformer_kva && calc.transformer_kva > 0) continue;
+    if (rating === null || !calc.service_amps || calc.service_amps === rating) continue;
+    const storedIf = (calc.results as { faultCurrent?: number } | null)?.faultCurrent ?? NaN;
+    const expectedIf = serviceFaultAt(calc, rating) ?? NaN;
+    stale.set(calc.id, {
+      storedIf,
+      expectedIf,
+      reason: `${SERVICE_RATING_CHANGED}: the utility transformer was estimated from a ${calc.service_amps.toLocaleString()} A service; the project's service rating is ${rating.toLocaleString()} A`
+        + (Number.isFinite(expectedIf) ? ` (${Math.round(expectedIf).toLocaleString()} A at the service main)` : ''),
+    });
+  }
 
   for (const calc of panelCalcs) {
     if (!calc.panel_id || typeof calc.source_fault_current !== 'number') continue;

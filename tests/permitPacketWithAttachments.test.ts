@@ -85,6 +85,7 @@ const baseData = (): PermitPacketData => ({
   projectType: 'Residential',
   serviceVoltage: 240,
   servicePhase: 1,
+  projectServiceAmps: null,
   panels: [mkPanel({ name: 'MDP', is_main: true, voltage: 240, phase: 1 })],
   circuits: [],
   feeders: [],

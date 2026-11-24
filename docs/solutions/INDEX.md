@@ -4,6 +4,7 @@ One note per hard problem, written by the model that solved it via the `extract-
 Each entry: `- [title](file.md) — reusable rule`.
 
 <!-- Newest first -->
+- [E-102 printed the calculator's 200 A as the service rating; estimated transformers went stale silently](2026-11-23-service-rating-and-estimated-transformer-stale.md) — define "the" value once and route every reader (prefills too) through it; make a must-supply field required; re-run the spec on main after changing its restore
 - [AIC ratings printed "0.0 kA": saved in kA, formatted as amps](2026-11-23-aic-rating-stored-in-ka.md) — a stored unit is what the writers save and the data holds; list writers and query values before changing a reader; fixtures take the writer's output
 - [3-phase capacity feeders read Outdated; live re-sizers ignored the basis](2026-11-22-capacity-feeder-rounding-and-basis.md) — compare at printed precision; test 3Φ when √3 is in the formula; a stored mode must reach every reader that re-derives
 - [The multifamily 220.84 total summed typed small-appliance VA](2026-11-22-optional-methods-flat-1500.md) — "X for each" (Optional Methods) is an allowance, "not less than X" (Part III) a floor; reuse the shared classifier; a base that differs from its circuits needs its own row

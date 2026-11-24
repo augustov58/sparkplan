@@ -14,7 +14,7 @@
  *   feeder geometry from the feeders table (destination_panel_id === panel.id).
  */
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { Plus, X, Save, Zap } from 'lucide-react';
 import {
   calculateServiceFaultCurrent,
@@ -22,7 +22,7 @@ import {
   estimateUtilityTransformer,
 } from '../services/calculations/shortCircuit';
 import { useFeeders } from '../hooks/useFeeders';
-import { resolveUpstreamSourceIf, type UpstreamSourceResolution } from '../services/calculations/shortCircuitHierarchy';
+import { projectServiceRatingAmps, resolveUpstreamSourceIf, type UpstreamSourceResolution } from '../services/calculations/shortCircuitHierarchy';
 import type { Database, ShortCircuitCalculationInsert } from '../lib/database.types';
 
 type Project = Database['public']['Tables']['projects']['Row'];
@@ -134,7 +134,15 @@ export const ShortCircuitProjectCalculator: React.FC<Props> = ({
   );
 
   // -- Service mode state, seeded from the project row ----------------------
-  const [serviceAmps, setServiceAmps] = useState(project.service_amps ?? 200);
+  // Service amps = the project's rating (#301): its service amps, else the MDP
+  // main. The panels can load after the form mounts, so take the rating once
+  // it is known unless the user has typed a value.
+  const ratingAmps = projectServiceRatingAmps(project, panels);
+  const [serviceAmps, setServiceAmps] = useState(ratingAmps ?? 200);
+  const serviceAmpsTouched = useRef(false);
+  useEffect(() => {
+    if (!serviceAmpsTouched.current && ratingAmps !== null) setServiceAmps(ratingAmps);
+  }, [ratingAmps]);
   const [serviceVoltage, setServiceVoltage] = useState(project.service_voltage ?? 240);
   const [servicePhase, setServicePhase] = useState<1 | 3>(
     (project.service_phase ?? 1) === 3 ? 3 : 1,
@@ -350,7 +358,7 @@ export const ShortCircuitProjectCalculator: React.FC<Props> = ({
         <div className="space-y-3">
           {mode === 'service' ? (
             <ServiceForm
-              serviceAmps={serviceAmps} setServiceAmps={setServiceAmps}
+              serviceAmps={serviceAmps} setServiceAmps={(n) => { serviceAmpsTouched.current = true; setServiceAmps(n); }}
               serviceVoltage={serviceVoltage} setServiceVoltage={setServiceVoltage}
               servicePhase={servicePhase} setServicePhase={setServicePhase}
               transformerKVA={transformerKVA} setTransformerKVA={setTransformerKVA}

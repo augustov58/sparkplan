@@ -218,6 +218,10 @@ Stale (upstream changed) rows are marked on the packet as in the app
 Equipment AIC rating (owner ruling 2026-11-23, #313): panels.aic_rating
 is stored in kA (the form saves 42 for 42 kA). Readers print it as is
 (formatAicKa, the OneLineDiagram chip) — never ÷ 1,000.
+Service rating (owner ruling 2026-11-23, #301): the project's service
+amps, else the MDP main (projectServiceRatingAmps). E-102 prints it; both
+calculators prefill it. A service row with no transformer kVA (estimated
+from its amps) whose amps differ from it is Stale (detectStaleCalculations).
 ```
 Implementation: `lib/storedCalcs.ts::recomputeShortCircuitRow`, applied to every row by `hooks/useShortCircuitCalculations.ts`. Saves record `results.setsInParallel` (no column). An outdated row is not a source in `shortCircuitHierarchy.ts`.
 Implementation: `services/calculations/shortCircuit.ts`
@@ -483,6 +487,7 @@ Real mistakes made in this repo, each paired with the rule that prevents recurre
 | The MDP's 220.84 total summed the unit circuits' typed VA, while 220.82/220.83 and the Multifamily calculator took a flat 1,500 per small-appliance/laundry circuit (#291) | "X VA for each" in an Optional Method is an allowance, not a floor; "not less than X" (Part III) is a floor. Read which one the cited section says, and make every path that cites it agree. |
 | #283's breaker check compared a 3Φ "Panel Max Capacity" design current (main × V × √3, 400.000… A) raw with the 400 A main, so every such feeder read Outdated; the live re-sizers ignored the sizing basis (E-102 printed 4/0 AWG at 0.0 A for a 2 × 250 kcmil feeder) (#299) | Compare a derived quantity at the precision it prints. A stored mode (sizing basis) must reach every reader that re-derives the value, not only the page that stores it. Test 3Φ when √3 is in the formula. |
 | The packet and the one-line divided the equipment AIC rating by 1,000, but the form saves kA: every entered rating printed "0.0 kA". The tests stored amps (22000), so they passed (#313) | A stored unit is what the writers save and the data holds; list the writers and query the stored values before changing a reader. Fixtures take the writer's output in its units (tests/aicRatingKa313.test.ts). |
+| E-102 printed the calculator's Service Amps field (default 200 A) as the service rating; the Tools calculator ignored the project and the page fell back to 200, so an 800 A service's estimated transformer was sized at 225 kVA (#301) | Define a project quantity once (`projectServiceRatingAmps`) and route every reader through it, form prefills included. A calc input that also labels the printed result is a second reader of the project, not the source of truth. |
 | Docs updated with stale "Last Updated" dates; completed features left as "NEXT UP" | Every doc touch updates its date to today; every shipped feature flips its ROADMAP status in the same PR. |
 
 ---
