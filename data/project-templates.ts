@@ -14,6 +14,8 @@ export interface CircuitTemplate {
   load_watts: number;
   conductor_size: string;
   egc_size?: string;
+  /** Load type code; omitted → stored as null, which every reader treats as 'O'. Lighting circuits are 'L' (#304). */
+  load_type?: 'L';
 }
 
 export interface PanelTemplate {
@@ -155,9 +157,10 @@ export const commercialTemplates: ProjectTemplate[] = [
         is_main: true,
         circuits: [
           // Lighting (120 V on this 208Y/120 panel; 16 A, 80 % of the 20 A breaker, #294)
-          { circuit_number: 1, description: 'Sales Floor Lighting Zone 1', breaker_amps: 20, pole: 1, load_watts: 1920, conductor_size: '12 AWG', egc_size: '12 AWG' },
-          { circuit_number: 3, description: 'Sales Floor Lighting Zone 2', breaker_amps: 20, pole: 1, load_watts: 1920, conductor_size: '12 AWG', egc_size: '12 AWG' },
-          { circuit_number: 5, description: 'Back Room Lighting', breaker_amps: 20, pole: 1, load_watts: 1500, conductor_size: '12 AWG', egc_size: '12 AWG' },
+          { circuit_number: 1, description: 'Sales Floor Lighting Zone 1', breaker_amps: 20, pole: 1, load_watts: 1920, conductor_size: '12 AWG', egc_size: '12 AWG', load_type: 'L' },
+          { circuit_number: 3, description: 'Sales Floor Lighting Zone 2', breaker_amps: 20, pole: 1, load_watts: 1920, conductor_size: '12 AWG', egc_size: '12 AWG', load_type: 'L' },
+          { circuit_number: 5, description: 'Back Room Lighting', breaker_amps: 20, pole: 1, load_watts: 1500, conductor_size: '12 AWG', egc_size: '12 AWG', load_type: 'L' },
+          // A sign is 220.14(F), not general lighting: it stays 'O', continuous by its description (#304)
           { circuit_number: 7, description: 'Exterior Signage', breaker_amps: 20, pole: 1, load_watts: 2000, conductor_size: '12 AWG', egc_size: '12 AWG' },
 
           // Receptacles (120V)
@@ -181,7 +184,7 @@ export const commercialTemplates: ProjectTemplate[] = [
   {
     id: 'commercial-office',
     name: 'Office Building (5000 sq ft)',
-    description: '480V 3-phase service with step-down transformer',
+    description: '480V 3-phase service: 75 kVA transformer, chiller and elevator circuits',
     type: ProjectType.COMMERCIAL,
     serviceVoltage: 480,
     servicePhase: 3,
@@ -215,7 +218,7 @@ export const industrialTemplates: ProjectTemplate[] = [
   {
     id: 'industrial-workshop',
     name: 'Small Workshop/Light Manufacturing',
-    description: '480V 3-phase, machinery circuits, lighting, welding',
+    description: '480V 3-phase, machinery, welding, HVAC and a 208V transformer circuit',
     type: ProjectType.INDUSTRIAL,
     serviceVoltage: 480,
     servicePhase: 3,

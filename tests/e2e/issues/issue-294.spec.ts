@@ -22,11 +22,11 @@ const TEMPLATES = [
     tab: 'Industrial', name: 'Small Workshop/Light Manufacturing',
     rows: [/CNC Mill \(60A\) O 13\.30 13\.30 13\.30 60 3/, /3 60 13\.30 13\.30 13\.30 O CNC Lathe/, /Compressor \(100A\) O 22\.17 22\.17 22\.17 100 3/,
       /3 80 17\.73 17\.73 17\.73 O HVAC Unit \(80A\)/, /Transformer for 208V Panel O 40\.00 40\.00 40\.00 150 3/],
-    wire: [/Copper Wire 6 AWG \d+ ft 3 circuits/, /Copper Wire 1 AWG \d+ ft 1 circuits/, /Copper Wire 3 AWG \d+ ft 1 circuits/, /Copper Wire 1\/0 AWG \d+ ft 1 circuits/],
+    wire: [/Copper Wire 6 AWG \d+ ft 3 circuits/, /Copper Wire 1 AWG \d+ ft 1 circuit,/, /Copper Wire 3 AWG \d+ ft 1 circuit,/, /Copper Wire 1\/0 AWG \d+ ft 1 circuit,/], // #304: "1 circuit"
   },
   {
     tab: 'Commercial', name: 'Retail Store (2500 sq ft)',
-    rows: [/Sales Floor Lighting Zone 1 O 1\.92 20 1/, /Sales Floor Lighting Zone 2 O 1\.92 20 1/, /20 2\.40 O Cash Register Area/], // main: 3.00
+    rows: [/Sales Floor Lighting Zone 1 L 1\.92 20 1/, /Sales Floor Lighting Zone 2 L 1\.92 20 1/, /20 2\.40 O Cash Register Area/], // main: 3.00; lighting L since #304
     wire: [/Copper Wire 12 AWG \d+ ft 10 circuits/],
   },
 ];

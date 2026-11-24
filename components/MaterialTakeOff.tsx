@@ -9,6 +9,7 @@ import { Download, Package, FileText, DollarSign, CheckCircle } from 'lucide-rea
 import { Project } from '../types';
 import { usePanels } from '../hooks/usePanels';
 import { useCircuits } from '../hooks/useCircuits';
+import { branchWiringTakeoff } from '../services/calculations/racewayFill';
 
 interface MaterialItem {
   category: string;
@@ -79,69 +80,9 @@ export const MaterialTakeOff: React.FC<MaterialTakeOffProps> = ({ project }) => 
       });
     });
 
-    // Wire/Cable - aggregate by conductor size
-    const wireCounts: Record<string, number> = {};
-    circuits.forEach((circuit) => {
-      if (circuit.conductor_size) {
-        wireCounts[circuit.conductor_size] = (wireCounts[circuit.conductor_size] || 0) + 1;
-      }
-    });
-
-    Object.entries(wireCounts).forEach(([size, count]) => {
-      // Estimate 50 feet average per circuit
-      const totalFeet = count * 50;
-      items.push({
-        category: 'Wire & Cable',
-        description: 'THHN/THWN Copper Wire',
-        quantity: Math.ceil(totalFeet / 100) * 100, // Round up to nearest 100'
-        unit: 'ft',
-        size: size,
-        notes: `${count} circuits @ ~50ft avg`
-      });
-    });
-
-    // Equipment Grounding Conductors
-    const egcCounts: Record<string, number> = {};
-    circuits.forEach((circuit) => {
-      if (circuit.egc_size) {
-        egcCounts[circuit.egc_size] = (egcCounts[circuit.egc_size] || 0) + 1;
-      }
-    });
-
-    Object.entries(egcCounts).forEach(([size, count]) => {
-      const totalFeet = count * 50;
-      items.push({
-        category: 'Wire & Cable',
-        description: 'Bare or Green Equipment Grounding Conductor',
-        quantity: Math.ceil(totalFeet / 100) * 100,
-        unit: 'ft',
-        size: size,
-        notes: `${count} circuits @ ~50ft avg`
-      });
-    });
-
-    // Conduit (if enabled)
-    if (includeConduit) {
-      // Estimate: 1 circuit per 10 feet of conduit for general use
-      const estimatedConduitFeet = circuits.length * 10;
-      items.push({
-        category: 'Conduit',
-        description: 'EMT Conduit',
-        quantity: Math.ceil(estimatedConduitFeet / 10), // 10' sticks
-        unit: 'sticks',
-        size: '3/4"',
-        notes: `Estimated ${estimatedConduitFeet} ft total`
-      });
-
-      items.push({
-        category: 'Conduit',
-        description: 'EMT Conduit',
-        quantity: Math.ceil(estimatedConduitFeet * 0.3 / 10), // 30% use 1" conduit
-        unit: 'sticks',
-        size: '1"',
-        notes: 'For larger wire sizes'
-      });
-    }
+    // Wire, EGC and EMT per circuit (#304): conductors = poles (+ a neutral on
+    // 1-pole); each circuit's raceway sized at 40 % fill per NEC Chapter 9
+    items.push(...branchWiringTakeoff(circuits, includeConduit).items);
 
     // Boxes and fittings (if enabled)
     if (includeBoxes) {

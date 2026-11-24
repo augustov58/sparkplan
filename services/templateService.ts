@@ -57,6 +57,7 @@ export async function applyTemplate(
         load_watts: circuitTemplate.load_watts,
         conductor_size: circuitTemplate.conductor_size,
         egc_size: circuitTemplate.egc_size || null,
+        ...(circuitTemplate.load_type ? { load_type: circuitTemplate.load_type } : {}),
       }));
 
       if (circuitInserts.length > 0) {

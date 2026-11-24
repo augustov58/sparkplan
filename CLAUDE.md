@@ -232,6 +232,12 @@ panelAtShortCircuitPoint; the MDP's point = the service main, as #279):
 "OK (r ≥ If kA)" / "Under-rated" / "Required ≥ N kA". Never "confirmed" or
 "Compliant" without an entered rating.
 ```
+
+### Material Take-Off (owner ruling 2026-11-23, #304)
+Wire per circuit = poles, + 1 neutral on 1-pole; conduit per circuit from
+Chapter 9 at 40 % fill, EGC included (Table 5 THHN, Table 4 EMT), totalled
+by trade size; ~50 ft wire / ~10 ft raceway per circuit (estimates kept).
+Implementation: `services/calculations/racewayFill.ts::branchWiringTakeoff`.
 Implementation: `lib/storedCalcs.ts::recomputeShortCircuitRow`, applied to every row by `hooks/useShortCircuitCalculations.ts`. Saves record `results.setsInParallel` (no column). An outdated row is not a source in `shortCircuitHierarchy.ts`.
 Implementation: `services/calculations/shortCircuit.ts`
 
@@ -498,6 +504,7 @@ Real mistakes made in this repo, each paired with the rule that prevents recurre
 | The packet and the one-line divided the equipment AIC rating by 1,000, but the form saves kA: every entered rating printed "0.0 kA". The tests stored amps (22000), so they passed (#313) | A stored unit is what the writers save and the data holds; list the writers and query the stored values before changing a reader. Fixtures take the writer's output in its units (tests/aicRatingKa313.test.ts). |
 | E-102 printed the calculator's Service Amps field (default 200 A) as the service rating; the Tools calculator ignored the project and the page fell back to 200, so an 800 A service's estimated transformer was sized at 225 kVA (#301) | Define a project quantity once (`projectServiceRatingAmps`) and route every reader through it, form prefills included. A calc input that also labels the printed result is a second reader of the project, not the source of truth. |
 | E-102 said equipment ratings "are confirmed against the value above" and E-103 printed "Compliant" / "All panels meet NEC 110.9" with no rating entered anywhere (#307) | A printed status names what was compared. With nothing entered, print the requirement ("Required ≥ N kA"), never a verdict. Compare a rating with its own point's fault current (`aicStatus`). |
+| The Material Take-Off counted one conductor per circuit and sized conduit as "3/4\" plus 30 % of 1\"", so 3-pole feeders were a third of their wire and 1 AWG got 3/4\" EMT (#304) | Size a raceway from the conductors in it (Chapter 9, EGC included); count conductors per pole. Take-off math lives in a pure function tested on the templates' own data. |
 | Docs updated with stale "Last Updated" dates; completed features left as "NEXT UP" | Every doc touch updates its date to today; every shipped feature flips its ROADMAP status in the same PR. |
 
 ---
