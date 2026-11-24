@@ -11,6 +11,7 @@ import { usePanels } from '../hooks/usePanels';
 import { useCircuits } from '../hooks/useCircuits';
 import { branchWiringTakeoff, boxEstimate } from '../services/calculations/racewayFill';
 import { csvRow } from '../lib/csv';
+import { localDateStamp } from '../lib/localDate';
 
 interface MaterialItem {
   category: string;
@@ -194,7 +195,7 @@ export const MaterialTakeOff: React.FC<MaterialTakeOffProps> = ({ project }) => 
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement('a');
     link.href = URL.createObjectURL(blob);
-    link.download = `${project.name.replace(/[^a-z0-9]/gi, '_')}_Material_TakeOff_${new Date().toISOString().split('T')[0]}.csv`;
+    link.download = `${project.name.replace(/[^a-z0-9]/gi, '_')}_Material_TakeOff_${localDateStamp()}.csv`;
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);

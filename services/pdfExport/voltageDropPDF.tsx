@@ -13,6 +13,7 @@ import { computeFeederLoadVA } from '../feeder/feederLoadSync';
 import { feederCapacityVA, feederSizingBasis } from '../feeder/feederBreaker';
 import type { NecEdition } from '../../data/nec/evse-load';
 import type { Database } from '../../lib/database.types';
+import { localDateStamp } from '../../lib/localDate';
 
 // Type aliases from database schema
 type Feeder = Database['public']['Tables']['feeders']['Row'];
@@ -117,7 +118,7 @@ export async function exportVoltageDropReport(
 
     // Generate filename: Voltage_Drop_Report_ProjectName_YYYY-MM-DD.pdf
     const sanitizedProjectName = projectName.replace(/[^a-z0-9]/gi, '_');
-    const dateStr = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
+    const dateStr = localDateStamp(); // YYYY-MM-DD
     link.download = `Voltage_Drop_Report_${sanitizedProjectName}_${dateStr}.pdf`;
 
     // Trigger download

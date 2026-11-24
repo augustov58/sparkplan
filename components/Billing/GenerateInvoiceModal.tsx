@@ -22,6 +22,7 @@ import { useTimeEntries } from '@/hooks/useTimeEntries';
 import { useMaterialEntries } from '@/hooks/useMaterialEntries';
 import { useProjectBillingSettings } from '@/hooks/useProjectBillingSettings';
 import { useInvoices } from '@/hooks/useInvoices';
+import { localDateStamp, localMonthStamp } from '../../lib/localDate';
 
 interface GenerateInvoiceModalProps {
   projectId: string;
@@ -34,15 +35,14 @@ interface GenerateInvoiceModalProps {
 }
 
 function startOfMonthISO(): string {
-  const d = new Date();
-  return `${d.toISOString().slice(0, 7)}-01`;
+  return `${localMonthStamp()}-01`;
 }
 
 function endOfMonthISO(): string {
   const d = new Date();
   // Day 0 of next month = last day of current month
   const last = new Date(d.getFullYear(), d.getMonth() + 1, 0);
-  return last.toISOString().slice(0, 10);
+  return localDateStamp(last);
 }
 
 function addDaysISO(iso: string, days: number): string {
@@ -63,7 +63,7 @@ export const GenerateInvoiceModal: React.FC<GenerateInvoiceModalProps> = ({
   const { settings } = useProjectBillingSettings(projectId);
   const { generateInvoice } = useInvoices(projectId);
 
-  const defaultInvoiceDate = new Date().toISOString().slice(0, 10);
+  const defaultInvoiceDate = localDateStamp();
   const defaultDueDate = settings?.payment_terms_days
     ? addDaysISO(defaultInvoiceDate, settings.payment_terms_days)
     : null;

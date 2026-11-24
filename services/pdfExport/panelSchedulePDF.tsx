@@ -9,6 +9,7 @@ import { pdf } from '@react-pdf/renderer';
 import type { Panel, Circuit } from '../../lib/database.types';
 import type { NecEdition } from '../../data/nec/evse-load';
 import { PanelScheduleDocument, MultiPanelDocument, type PanelSchedulePDFProps } from './PanelScheduleDocuments';
+import { localDateStamp } from '../../lib/localDate';
 
 /** Dwelling inputs for the Load Summary (see PanelSchedulePDFProps). */
 export interface PanelScheduleDwellingOptions {
@@ -65,7 +66,7 @@ export const exportPanelSchedulePDF = async (
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
-    const fileName = `${panel.name.replace(/[^a-z0-9]/gi, '_')}_Schedule_${new Date().toISOString().split('T')[0]}.pdf`;
+    const fileName = `${panel.name.replace(/[^a-z0-9]/gi, '_')}_Schedule_${localDateStamp()}.pdf`;
     link.download = fileName;
 
     // Trigger download
@@ -140,7 +141,7 @@ export const exportAllPanelsPDF = async (
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
-    const fileName = `All_Panels_${projectName.replace(/[^a-z0-9]/gi, '_')}_${new Date().toISOString().split('T')[0]}.pdf`;
+    const fileName = `All_Panels_${projectName.replace(/[^a-z0-9]/gi, '_')}_${localDateStamp()}.pdf`;
     link.download = fileName;
 
     // Trigger download

@@ -20,6 +20,7 @@ import {
 } from '@/lib/validation-schemas';
 import type { Database } from '@/lib/database.types';
 import { computeTimeEntryBillable, formatUSD } from '@/services/billing/billingMath';
+import { localDateStamp } from '../../lib/localDate';
 
 type TimeEntry = Database['public']['Tables']['time_entries']['Row'];
 type Settings = Database['public']['Tables']['project_billing_settings']['Row'] | null;
@@ -34,7 +35,7 @@ interface TimeEntryEditorProps {
 }
 
 function todayISO(): string {
-  return new Date().toISOString().slice(0, 10);
+  return localDateStamp();
 }
 
 export const TimeEntryEditor: React.FC<TimeEntryEditorProps> = ({

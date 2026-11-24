@@ -4,6 +4,16 @@ All notable changes to SparkPlan.
 
 ---
 
+## 2026-11-24: Dates follow your time zone, not UTC (#327)
+
+- In the evening (from 7 PM in Florida), several places used tomorrow's date. They now use your local day:
+  - the permit packet's Revision Log, which printed tomorrow's date next to a footer that said "Generated" today;
+  - an invoice due today, which showed as **Overdue** that evening;
+  - the default dates for a new invoice, time entry, material entry and payment, and the month the Time and Materials tabs open on;
+  - the dates in downloaded file names (panel schedules, one-line diagram, short circuit, voltage drop, equipment specs, multifamily EV, commercial load CSV, material take-off, project export).
+
+---
+
 ## 2026-11-24: Password reset works (#330)
 
 - **Forgot your password?** now opens a page that sends a reset link to your email. It used to open a blank page.

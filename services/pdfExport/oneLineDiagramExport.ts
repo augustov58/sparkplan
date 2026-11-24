@@ -3,6 +3,8 @@
  * Exports the electrical one-line diagram as PDF or SVG
  */
 
+import { localDateStamp } from '../../lib/localDate';
+
 /**
  * Export the one-line diagram SVG as a downloadable SVG file
  */
@@ -40,7 +42,7 @@ export const exportDiagramAsSVG = (
   // Trigger download
   const link = document.createElement('a');
   link.href = url;
-  link.download = `${projectName.replace(/[^a-z0-9]/gi, '_')}_One_Line_Diagram_${new Date().toISOString().split('T')[0]}.svg`;
+  link.download = `${projectName.replace(/[^a-z0-9]/gi, '_')}_One_Line_Diagram_${localDateStamp()}.svg`;
   document.body.appendChild(link);
   link.click();
   document.body.removeChild(link);
@@ -116,7 +118,7 @@ export const exportDiagramAsPNG = async (
           const pngUrl = URL.createObjectURL(blob);
           const link = document.createElement('a');
           link.href = pngUrl;
-          link.download = `${projectName.replace(/[^a-z0-9]/gi, '_')}_One_Line_Diagram_${new Date().toISOString().split('T')[0]}.png`;
+          link.download = `${projectName.replace(/[^a-z0-9]/gi, '_')}_One_Line_Diagram_${localDateStamp()}.png`;
           document.body.appendChild(link);
           link.click();
           document.body.removeChild(link);

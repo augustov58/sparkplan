@@ -17,6 +17,7 @@ import {
 import { useProjectBillingSettings } from '@/hooks/useProjectBillingSettings';
 import { sumMaterialEntries, formatUSD } from '@/services/billing/billingMath';
 import type { Database } from '@/lib/database.types';
+import { localMonthStamp } from '../../lib/localDate';
 
 type MaterialEntry = Database['public']['Tables']['material_entries']['Row'];
 
@@ -28,7 +29,7 @@ function monthKey(isoDate: string): string {
   return isoDate.slice(0, 7);
 }
 function currentMonthKey(): string {
-  return new Date().toISOString().slice(0, 7);
+  return localMonthStamp();
 }
 
 export const MaterialEntriesTab: React.FC<MaterialEntriesTabProps> = ({ projectId }) => {

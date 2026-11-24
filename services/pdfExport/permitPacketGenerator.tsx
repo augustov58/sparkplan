@@ -93,6 +93,7 @@ import type {
 import { manifestTextForEdition, resolveNecEdition } from '../../data/ahj/codeCycle';
 import { ahjEquipmentFlags, serviceScope } from '../../data/ahj/checks';
 import { isEvseDescription, type NecEdition } from '../../data/nec/evse-load';
+import { localDateStamp } from '../../lib/localDate';
 
 /**
  * The occupancy and dwelling panel rules every feeder and panel aggregate in
@@ -474,15 +475,8 @@ const summarizeStack = (err: unknown, lines = 6): string => {
  * together first, and on failure bisect by re-rendering each Page in
  * isolation so the error message can point at the exact offender.
  */
-/**
- * The packet filename's date, YYYY-MM-DD in the user's local time zone: the
- * same day the pages print ("Generated November 23, 2026"). toISOString() is
- * UTC, so an evening packet in Florida was named for the next day (#315).
- */
-export function localDateStamp(d: Date = new Date()): string {
-  const pad = (n: number) => String(n).padStart(2, '0');
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
-}
+/** The packet filename's date: the local day, as the pages print it (#315; now in lib/localDate.ts, #327). */
+export { localDateStamp };
 
 export const generatePermitPacket = async (data: PermitPacketData): Promise<void> => {
   console.log('[permit-packet] start', {

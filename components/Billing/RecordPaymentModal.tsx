@@ -13,6 +13,7 @@ import { Button } from '../ui/Button';
 import { paymentSchema, type PaymentFormData } from '@/lib/validation-schemas';
 import { formatUSD } from '@/services/billing/billingMath';
 import type { Database } from '@/lib/database.types';
+import { localDateStamp } from '../../lib/localDate';
 
 type Invoice = Database['public']['Tables']['invoices']['Row'];
 
@@ -23,7 +24,7 @@ interface RecordPaymentModalProps {
 }
 
 function todayISO(): string {
-  return new Date().toISOString().slice(0, 10);
+  return localDateStamp();
 }
 
 export const RecordPaymentModal: React.FC<RecordPaymentModalProps> = ({

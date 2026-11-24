@@ -20,6 +20,7 @@ import { CommercialLoadDocument, type CommercialLoadDocumentProps } from './Comm
 import { OCCUPANCY_LABELS, LIGHTING_UNIT_LOAD } from '../calculations/commercialLoad';
 import { article220Citations } from '../../data/nec/article220-citations';
 import { csvRow } from '../../lib/csv';
+import { localDateStamp } from '../../lib/localDate';
 
 export type CommercialLoadExportInput = CommercialLoadDocumentProps;
 
@@ -49,7 +50,7 @@ function slugify(name: string): string {
 function dateStamp(): string {
   // ISO string always has T separator → split[0] is always defined; fallback
   // is for noUncheckedIndexedAccess only.
-  return new Date().toISOString().split('T')[0] ?? '';
+  return localDateStamp();
 }
 
 // ==================== PDF EXPORT ====================
