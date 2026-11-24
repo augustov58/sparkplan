@@ -55,9 +55,31 @@ setup('authenticate', async ({ browser }) => {
     const emailField = page.getByLabel(/email/i).first();
     await emailField.waitFor({ state: 'visible', timeout: 15_000 });
     await emailField.fill(qaEmail);
-    await page.getByLabel(/password/i).first().fill(password);
-    await page.getByRole('button', { name: /sign in/i }).click();
-    await expect(page.getByText(/sign in/i)).toBeHidden({ timeout: 20_000 });
+    // #328: the password must never reach disk. A failure writes the page's
+    // accessibility snapshot (textbox values included) to error-context.md,
+    // so the field is emptied right after the attempt and on every path. The
+    // setup project also runs without trace, screenshot or video (config).
+    const passwordField = page.getByLabel(/password/i).first();
+    const heading = page.getByRole('heading', { name: /sign in to your account/i });
+    const pageError = page.getByText(/invalid login credentials|email not confirmed|too many requests|rate limit/i).first();
+    let failure: string | null = null;
+    try {
+      await passwordField.fill(password);
+      await page.getByRole('button', { name: /^sign in$/i }).click();
+      await Promise.race([
+        heading.waitFor({ state: 'hidden', timeout: 20_000 }),
+        pageError.waitFor({ state: 'visible', timeout: 20_000 }),
+      ]).catch(() => {});
+      if (await heading.isVisible()) {
+        failure = (await pageError.textContent().catch(() => null))?.trim() || 'still on the sign-in page after 20 s';
+      }
+    } finally {
+      if (await passwordField.isVisible().catch(() => false)) await passwordField.fill('').catch(() => {});
+    }
+    if (failure) {
+      await context.close();
+      throw new Error(`Sign-in failed: ${failure}. Nothing was saved; the password is not stored.`);
+    }
     await page.waitForLoadState('networkidle');
     email = await signedInEmail(page);
   }
