@@ -432,13 +432,13 @@ const tableStyles = StyleSheet.create({
     borderBottomColor: '#e5e7eb',
   },
   // Columns sum to 100%
-  colPanel:      { width: '15%' },
+  colPanel:      { width: '14%' },
   colType:       { width: '7%'  },
   colSourceIf:   { width: '10%' },
-  colFeeder:     { width: '16%' },
+  colFeeder:     { width: '15%' },
   colVoltage:    { width: '8%'  },
-  colImpedance:  { width: '9%'  },
-  colFault:      { width: '10%' },
+  colImpedance:  { width: '10%' },
+  colFault:      { width: '11%' },
   colAic:        { width: '8%'  },
   // #307: holds "Required >= 10 kA" / "OK (42 >= 8.6 kA)" on one line
   colCompliance: { width: '17%' },
