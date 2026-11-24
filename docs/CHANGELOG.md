@@ -4,6 +4,15 @@ All notable changes to SparkPlan.
 
 ---
 
+## 2026-11-24: Commercial Load Calculator: the HVAC row asks for the nameplate RLA (#205)
+
+- The HVAC row's current input is now **RLA (A)**, the rated-load current from the unit's nameplate (NEC 440.6(A)). It was labelled "MCA (Amps)", but the calculator always used the value as the unit's load. MCA is a wire-sizing value that already includes 125 % of the largest motor, so entering it overstated the load, and "Continuous" added 125 % on top.
+- RLA × voltage (× √3 on three-phase) is the load at 100 %. "Continuous" still adds 125 % in service sizing only.
+- The app, the PDF report and the CSV now cite **NEC 220.14(C), 440.6(A)**. The PDF used to cite 440.22, which is breaker sizing. The PDF and CSV column is now "RLA (A)".
+- No numbers change for the same input (42 A at 208 V three-phase is 15.1 kVA, and 18.9 kVA for service sizing when continuous). Saved calculations load as before.
+
+---
+
 ## 2026-11-24: Load calculations cite the right NEC sections for water heaters and HVAC (#206)
 
 - **Water heaters** now cite NEC 220.14(A) (Specific Appliances or Loads) instead of "220.51 (Fixed Appliances)". 220.51 covers fixed electric space heating, not water heaters.

@@ -172,7 +172,7 @@ export function buildCommercialLoadCSV(input: CommercialLoadExportInput): string
     lines.push('# HVAC LOADS (INPUTS)');
     lines.push(csvRow([
       'Description',
-      'MCA/FLA (A)',
+      'RLA (A)',
       'Voltage (V)',
       'Phase',
       'Continuous',

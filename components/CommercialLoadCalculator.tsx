@@ -13,6 +13,7 @@ import {
   STANDARD_OCPD_SIZES,
   STANDARD_SERVICE_BUS_RATINGS,
   formatVA_to_kVA,
+  HVAC_CITATION,
 } from '../services/calculations/commercialLoad';
 import { calculateFeederSizing } from '../services/calculations/feederSizing';
 import type { FeederCalculationInput, FeederCalculationResult, Project } from '../types';
@@ -582,7 +583,7 @@ export const CommercialLoadCalculator: React.FC<CommercialLoadCalculatorProps> =
           {/* HVAC Loads */}
           <div className="bg-white border border-gray-200 rounded-lg p-4">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="font-semibold text-gray-900">HVAC Equipment (NEC 220.14(C))</h3>
+              <h3 className="font-semibold text-gray-900">HVAC Equipment ({HVAC_CITATION})</h3>
               <button
                 onClick={addHVACLoad}
                 className="flex items-center gap-1 px-3 py-1.5 bg-blue-600 text-white text-sm font-medium rounded-md hover:bg-blue-700 shadow-sm transition-all"
@@ -613,7 +614,7 @@ export const CommercialLoadCalculator: React.FC<CommercialLoadCalculatorProps> =
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                     <div>
-                      <label className="block text-xs text-gray-600 mb-1">MCA (Amps)</label>
+                      <label className="block text-xs text-gray-600 mb-1" title="Rated-load current from the nameplate (NEC 440.6(A)); not MCA">RLA (A)</label>
                       <NumberInput
                         value={hvac.nameplateFLA}
                         onChange={(val) => updateHVACLoad(index, { nameplateFLA: val })}
