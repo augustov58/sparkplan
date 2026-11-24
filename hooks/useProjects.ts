@@ -11,6 +11,7 @@ import { useAuthContext } from '@/components/Auth/AuthProvider';
 import { dbProjectToFrontend, frontendProjectToDbInsert, frontendProjectToDbUpdate } from '@/lib/typeAdapters';
 import { showToast, toastMessages } from '@/lib/toast';
 
+import { isProjectsListLoading } from '../lib/projectRoute';
 import { useFetchGuard } from '@/lib/fetchGuard';
 type DbProject = Database['public']['Tables']['projects']['Row'];
 
@@ -56,6 +57,10 @@ function useProjectsState(): UseProjectsReturn {
   // A refetch that overlaps a local write must not undo it (#234)
   const guard = useFetchGuard();
   const [loading, setLoading] = useState(true);
+  // #297: the user the list was last fetched for. Until it matches the signed-in
+  // user, the list is still loading — read at render time, because a child's
+  // <Navigate> effect runs before this hook's effect could set `loading` again.
+  const [fetchedForUserId, setFetchedForUserId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   // Latest list, updated synchronously by patchProject so back-to-back
   // patches (two timers firing before a re-render) build on each other.
@@ -116,6 +121,7 @@ function useProjectsState(): UseProjectsReturn {
       setError(err instanceof Error ? err.message : 'Failed to fetch projects');
     } finally {
       setLoading(false);
+      setFetchedForUserId(user.id); // loaded (or failed) for this user
     }
   };
 
@@ -218,7 +224,7 @@ function useProjectsState(): UseProjectsReturn {
 
   return {
     projects,
-    loading,
+    loading: isProjectsListLoading(loading, user?.id, fetchedForUserId),
     error,
     createProject: guard.wrap(createProject),
     updateProject: guard.wrap(updateProject),
