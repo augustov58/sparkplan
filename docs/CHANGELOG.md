@@ -4,6 +4,12 @@ All notable changes to SparkPlan.
 
 ---
 
+## 2026-11-23: Reloading a project page keeps you on it (#297)
+
+- Reloading the browser on any project page used to send you to the dashboard. The page now waits for the project list to load and stays where it was. An unknown or deleted project still goes to the dashboard, and a session refresh no longer has any visible effect.
+
+---
+
 ## 2026-11-23: Material Take-Off counts every conductor and sizes conduit to its wire (#304)
 
 - **Wire:** each circuit now counts its conductors, one per pole plus a neutral on 1-pole circuits, instead of one wire per circuit. A Retail store's 12 AWG went from 500 ft to 1,000 ft; an office's 1 AWG feeders from 100 ft to 300 ft. Still ~50 ft per circuit.

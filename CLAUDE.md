@@ -297,6 +297,9 @@ A realtime event refetches the whole list, so a fetch that started before a loca
 ### Database Types
 Use `Database['public']['Tables'][table]['Row']` pattern for types. The `types.ts` file has separate interfaces that may not match DB exactly.
 
+### Project routes (#297)
+`ProjectWrapper` renders when it has the project, waits (spinner) while `useProjects().loading` (true until the list is fetched for the signed-in user, read at render time: `lib/projectRoute.ts`), and redirects to the dashboard only when a loaded list lacks the project.
+
 ### Panel Hierarchy (Discriminated Union)
 ```typescript
 fed_from_type: 'service' | 'panel' | 'transformer' | 'meter_stack'  // Discriminator
@@ -505,6 +508,7 @@ Real mistakes made in this repo, each paired with the rule that prevents recurre
 | E-102 printed the calculator's Service Amps field (default 200 A) as the service rating; the Tools calculator ignored the project and the page fell back to 200, so an 800 A service's estimated transformer was sized at 225 kVA (#301) | Define a project quantity once (`projectServiceRatingAmps`) and route every reader through it, form prefills included. A calc input that also labels the printed result is a second reader of the project, not the source of truth. |
 | E-102 said equipment ratings "are confirmed against the value above" and E-103 printed "Compliant" / "All panels meet NEC 110.9" with no rating entered anywhere (#307) | A printed status names what was compared. With nothing entered, print the requirement ("Required ≥ N kA"), never a verdict. Compare a rating with its own point's fault current (`aicStatus`). |
 | The Material Take-Off counted one conductor per circuit and sized conduit as "3/4\" plus 30 % of 1\"", so 3-pole feeders were a third of their wire and 1 AWG got 3/4\" EMT (#304) | Size a raceway from the conductors in it (Chapter 9, EGC included); count conductors per pole. Take-off math lives in a pure function tested on the templates' own data. |
+| `ProjectWrapper` redirected whenever the project was missing from the list, so a reload on any project page landed on the dashboard: the list hook ran once with no user (`[]`, loading false) and the first render with the user redirected before the fetch (#297) | A redirect-on-missing guard needs a loading signal that is correct during render (child effects run before the parent's). Test route guards with a reload, not only in-app navigation. |
 | Docs updated with stale "Last Updated" dates; completed features left as "NEXT UP" | Every doc touch updates its date to today; every shipped feature flips its ROADMAP status in the same PR. |
 
 ---

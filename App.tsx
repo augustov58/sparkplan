@@ -6,6 +6,7 @@ import { Dashboard } from './components/Dashboard';
 import { ProjectSetup } from './components/ProjectSetup';
 import { LandingPage } from './components/LandingPage';
 import { LoadingSpinner } from './components/LoadingSpinner';
+import { projectRouteState } from './lib/projectRoute';
 
 // Lazy load heavy components for better performance
 const LoadCalculator = lazy(() => import('./components/LoadCalculator').then(m => ({ default: m.LoadCalculator })));
@@ -87,11 +88,15 @@ const UtilityInterconnectionWrapper = ({ project }: { project: Project }) => {
     );
 };
 
-const ProjectWrapper = ({ projects, updateProject, deleteProject, onSignOut }: { projects: Project[], updateProject: (p: Project) => void, deleteProject: (id: string) => void, onSignOut: () => void }) => {
+const ProjectWrapper = ({ projects, projectsLoading, updateProject, deleteProject, onSignOut }: { projects: Project[], projectsLoading: boolean, updateProject: (p: Project) => void, deleteProject: (id: string) => void, onSignOut: () => void }) => {
     const { id } = useParams();
     const project = projects.find(p => p.id === id);
 
-    if (!project) return <Navigate to="/" />;
+    // #297: redirect only when a loaded list lacks the project. While the list
+    // (or the session behind it) is loading — e.g. right after a reload — wait.
+    const state = projectRouteState(!!project, projectsLoading);
+    if (state === 'wait') return <LoadingSpinner />;
+    if (state === 'redirect' || !project) return <Navigate to="/" />;
 
     return (
         <Layout title={project.name} showBack onSignOut={onSignOut} projectType={project.type}>
@@ -956,7 +961,7 @@ const NecAssistant = () => {
 function AppContent() {
   const navigate = useNavigate();
   const { user, loading, signOut } = useAuthContext();
-  const { projects, createProject, updateProject: updateProjectDB, deleteProject, error: projectsError } = useProjects();
+  const { projects, loading: projectsLoading, createProject, updateProject: updateProjectDB, deleteProject, error: projectsError } = useProjects();
 
   // Template selector state
   const [showTemplateSelector, setShowTemplateSelector] = useState(false);
@@ -1198,6 +1203,7 @@ function AppContent() {
           <ProtectedRoute>
             <ProjectWrapper
               projects={projects}
+              projectsLoading={projectsLoading}
               updateProject={updateProject}
               deleteProject={handleDeleteProject}
               onSignOut={handleSignOut}

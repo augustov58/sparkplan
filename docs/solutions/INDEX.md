@@ -4,6 +4,7 @@ One note per hard problem, written by the model that solved it via the `extract-
 Each entry: `- [title](file.md) — reusable rule`.
 
 <!-- Newest first -->
+- [A reload on a project page landed on the dashboard](2026-11-23-project-route-waits-for-its-list.md) — a redirect-on-missing guard must tell "missing" from "not loaded yet", from state correct at render time (child effects run before parent effects); test guards with a reload
 - [Material Take-Off counted one wire per circuit and guessed conduit](2026-11-23-takeoff-conductors-and-raceway-fill.md) — move take-off math into a pure function tested on the templates' data; size raceway from its conductors (Chapter 9), never a percentage guess
 - [The packet "confirmed" AIC ratings nobody entered](2026-11-23-aic-wording-compare-at-the-point.md) — a status word must name what was compared; with nothing entered print the requirement; when a ruling's example conflicts with its rule, follow the rule and trace the number
 - [E-102 printed the calculator's 200 A as the service rating; estimated transformers went stale silently](2026-11-23-service-rating-and-estimated-transformer-stale.md) — define "the" value once and route every reader (prefills too) through it; make a must-supply field required; re-run the spec on main after changing its restore
