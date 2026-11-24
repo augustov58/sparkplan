@@ -156,7 +156,7 @@ test('#301 E-102 prints the project rating; an estimate from other amps is Stale
     expect(p7.e102).toMatch(/MIN REQUIRED AIC 800 A 4\.71 kA 4\.30 kA 10 kA/);
     expect(p7.e102).toContain('STALE, RE-RUN Service rating changed: the utility transformer was estimated from a 200 A service');
     expect(p7.e103).toMatch(/Stale, re-run: 1/);
-    expect(p7.e103).toMatch(/Service Entrance Service 4,706\.\d+ 500 kcmil Cu · 100 ft 480V 3Ø 0\.0645 4\.3 10 Stale, re-run/);
+    expect(p7.e103).toMatch(/Service Entrance Service 4,707 500 kcmil Cu · 100 ft 480V 3Ø 0\.0645 4\.3 10 Stale, re-run/); // #307: whole-amp Source If
 
     // 8: re-run with the prefilled 800 A → 11,908 A / 14 kA (source 15,689 A), not Stale
     await openToolsService(page, projectUrl);

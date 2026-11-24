@@ -97,8 +97,8 @@ test('#289 stale short-circuit rows are marked on the packet; the sets print eve
     expect(afc).toMatch(/\b22 kA/);
     expect(afc).not.toMatch(/22kA/);
     const table = pages.find(p => p.includes('Per-Panel Short Circuit Analysis'))!;
-    expect(table).toMatch(/Service Entrance\s+Service\s+[\d,.]+\s+3 × 500 kcmil Cu · 20 ft[^\n]*\s20\.3\s+22\s+Compliant/);
-    expect(table).toMatch(/DP-1\s+Panel\s+20,344\.\d+\s+2 × 4\/0 AWG Cu · 100 ft[^\n]*\s15\.7\s+22\s+Compliant/);
+    expect(table).toMatch(/Service Entrance\s+Service\s+[\d,]+\s+3 × 500 kcmil Cu · 20 ft[^\n]*\s20\.3\s+22\s+Required >= 22 kA/); // #307
+    expect(table).toMatch(/DP-1\s+Panel\s+20,344\s+2 × 4\/0 AWG Cu · 100 ft[^\n]*\s15\.7\s+22\s+Required >= 22 kA/); // #307
     expect(table).toMatch(/Service fault current calculated from the utility transformer \(1000 kVA, 5\.75 % Z\)/);
     expect(table).not.toMatch(/utility-provided/);
 
@@ -111,10 +111,10 @@ test('#289 stale short-circuit rows are marked on the packet; the sets print eve
     // 5: and on the packet
     const pages2 = await packetPages(page, projectUrl, 'packet-stale.pdf');
     const table2 = pages2.find(p => p.includes('Per-Panel Short Circuit Analysis'))!;
-    expect(table2).toMatch(/DP-1\s+Panel\s+20,344\.\d+\s+2 × 4\/0 AWG Cu · 100 ft[^\n]*\s15\.7\s+22\s+Stale, re-run/); // main: Compliant
+    expect(table2).toMatch(/DP-1\s+Panel\s+20,344\s+2 × 4\/0 AWG Cu · 100 ft[^\n]*\s15\.7\s+22\s+Stale, re-run/); // main: Compliant
     expect(table2).toMatch(/Stale, re-run:\s+1/);
     expect(table2).toMatch(/DP-1: was 20,344 A, now 20,069 A/);
-    expect(table2).toMatch(/Service Entrance\s+Service\s+[\d,.]+\s+2 × 500 kcmil Cu · 20 ft[^\n]*\s20\.1\s+22\s+Compliant/);
+    expect(table2).toMatch(/Service Entrance\s+Service\s+[\d,]+\s+2 × 500 kcmil Cu · 20 ft[^\n]*\s20\.1\s+22\s+Required >= 22 kA/); // #307
   } catch (e) {
     failure = e;
   }
