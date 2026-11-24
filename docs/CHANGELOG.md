@@ -4,6 +4,13 @@ All notable changes to SparkPlan.
 
 ---
 
+## 2026-11-24: Equipment Specifications can clear a saved value, and no longer loops on open (#314)
+
+- **Clearing a field now clears it.** Choosing "Select AIC rating..." (or emptying the manufacturer, model, NEMA type, UL listing or notes) and saving used to keep the old value: the form sent the emptied AIC rating as "nothing", and the save skipped it. A contractor who picked the wrong AIC rating couldn't remove it, and the packet kept printing it. Emptied fields are now saved as empty, and the one-line, E-201, the Equipment Specs sheet and the short-circuit table follow. With no rating, the table shows "Required >= 10 kA" again.
+- **Opening the form no longer loops.** It used to log "Maximum update depth exceeded" every time it opened.
+
+---
+
 ## 2026-11-24: End-to-end specs read a page after its data has loaded (#317)
 
 - No change in behavior. Three regression specs read a page's text once after a heading appeared and could catch it before its data loaded. The multifamily MDP spec read "TOTAL DEMAND 0.0 kVA" in one run. They now wait for the values they check, through one shared reader. A new spec holds the panel and circuit responses back 3 s to prove it.
