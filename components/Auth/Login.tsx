@@ -3,11 +3,11 @@
  * Email/password authentication form with Supabase
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useAuthContext } from './AuthProvider';
-import { Link } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import { loginSchema, type LoginFormData } from '../../lib/validation';
 import { AlertCircle, CheckCircle } from 'lucide-react';
 
@@ -20,25 +20,14 @@ export function Login({ onSuccess }: LoginProps) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Detect Supabase error_description in the URL hash.
-  // When a confirmation link is expired or already consumed (common with corporate
-  // email scanners like Office 365 Safe Links), Supabase 303-redirects the user to:
-  //   {emailRedirectTo}#error=unauthorized_client&error_description=Email+link+is+invalid+or+has+expired
-  // We catch this and show a friendly message instead of leaving the user confused.
-  const [linkExpiredNotice, setLinkExpiredNotice] = useState(false);
-
-  useEffect(() => {
-    const hash = window.location.hash;
-    if (hash.includes('error_description=')) {
-      const params = new URLSearchParams(hash.replace(/^#/, ''));
-      const desc = params.get('error_description') || '';
-      if (desc.toLowerCase().includes('expired') || desc.toLowerCase().includes('invalid')) {
-        setLinkExpiredNotice(true);
-      }
-      // Clean the hash so refreshing doesn't re-show the notice
-      window.history.replaceState(null, '', window.location.pathname);
-    }
-  }, []);
+  // When an email link (sign-up confirmation or password reset) is expired or
+  // already used (common with corporate scanners like Office 365 Safe Links),
+  // Supabase redirects to {app}/#error=…&error_description=…. AppContent reads
+  // that before the router does and sends the user here with the description
+  // in the route state (#330; before, that hash was a blank page).
+  const location = useLocation();
+  const linkExpiredNotice =
+    typeof (location.state as { authLinkError?: unknown } | null)?.authLinkError === 'string';
 
   const {
     register,
@@ -77,10 +66,14 @@ export function Login({ onSuccess }: LoginProps) {
             <div className="bg-[#e8f5e8] border border-[#b8dab8] text-[#2d5a2d] px-4 py-3 rounded-lg text-sm mb-4 flex items-start gap-2">
               <CheckCircle className="w-4 h-4 mt-0.5 flex-shrink-0" />
               <div>
-                <p className="font-semibold mb-1">Your email is already confirmed</p>
+                <p className="font-semibold mb-1">This email link has expired or was already used</p>
                 <p className="text-xs text-[#3d6b3d]">
-                  The confirmation link was already used (this is common with corporate email
-                  security scanners). Your account is active — just sign in with your password below.
+                  Confirming a new account? It's probably confirmed already (corporate email
+                  scanners often open links first): sign in with your password below. Resetting
+                  your password?{' '}
+                  <Link to="/reset-password" className="font-semibold underline">
+                    Request a new reset link
+                  </Link>.
                 </p>
               </div>
             </div>

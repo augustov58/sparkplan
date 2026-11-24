@@ -5,7 +5,7 @@
 
 import { useState, useEffect } from 'react';
 import { User, Session, AuthError } from '@supabase/supabase-js';
-import { supabase } from '@/lib/supabase';
+import { supabase, authLinkAtLoad } from '@/lib/supabase';
 
 export interface UseAuthReturn {
   user: User | null;
@@ -15,12 +15,16 @@ export interface UseAuthReturn {
   signUp: (email: string, password: string, fullName?: string) => Promise<{ error: AuthError | null }>;
   signOut: () => Promise<void>;
   resetPassword: (email: string) => Promise<{ error: AuthError | null }>;
+  /** True after a password recovery link signed the user in, until they set a new password (#330). */
+  passwordRecovery: boolean;
+  updatePassword: (password: string) => Promise<{ error: AuthError | null }>;
 }
 
 export function useAuth(): UseAuthReturn {
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
+  const [passwordRecovery, setPasswordRecovery] = useState(authLinkAtLoad.kind === 'recovery');
 
   useEffect(() => {
     // Get initial session
@@ -33,7 +37,9 @@ export function useAuth(): UseAuthReturn {
     // Listen for auth changes
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
+    } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === 'PASSWORD_RECOVERY') setPasswordRecovery(true);
+      if (event === 'SIGNED_OUT') setPasswordRecovery(false);
       setSession(session);
       setUser(session?.user ?? null);
       setLoading(false);
@@ -69,7 +75,17 @@ export function useAuth(): UseAuthReturn {
   };
 
   const resetPassword = async (email: string) => {
-    const { error } = await supabase.auth.resetPasswordForEmail(email);
+    // The app's root, no route: a hash route here would hide the tokens from auth-js
+    // (it would read "#/x#access_token=…"). The PASSWORD_RECOVERY event routes the user.
+    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: window.location.origin + window.location.pathname,
+    });
+    return { error };
+  };
+
+  const updatePassword = async (password: string) => {
+    const { error } = await supabase.auth.updateUser({ password });
+    if (!error) setPasswordRecovery(false);
     return { error };
   };
 
@@ -81,5 +97,7 @@ export function useAuth(): UseAuthReturn {
     signUp,
     signOut,
     resetPassword,
+    passwordRecovery,
+    updatePassword,
   };
 }

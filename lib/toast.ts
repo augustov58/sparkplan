@@ -178,6 +178,7 @@ export const toastMessages = {
     signedIn: 'Welcome back!',
     signedOut: 'Signed out successfully',
     signUp: 'Account created! Welcome to SparkPlan',
+    passwordUpdated: 'Password updated',
     error: 'Authentication failed',
   },
 
