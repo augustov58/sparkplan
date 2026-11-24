@@ -11,6 +11,7 @@ import { describe, it, expect } from 'vitest';
 import { calculateAggregatedLoad } from '../services/calculations/upstreamLoadAggregation';
 import type { Database } from '../lib/database.types';
 import type { NecEdition } from '../data/nec/evse-load';
+import { shortCitation } from '../services/pdfExport/PanelScheduleDocuments';
 
 type Panel = Database['public']['Tables']['panels']['Row'];
 type Circuit = Database['public']['Tables']['circuits']['Row'];
@@ -79,5 +80,22 @@ describe('#206 the aggregate cites the section that sets each 100 % load', () =>
     expect(row(r, 'Water Heater')!.necReference).toBe('NEC 220.14(A) (Specific Appliances or Loads)');
     expect(row(r, 'HVAC')!.necReference).toBe('NEC 220.51 (Fixed Electric Space Heating)');
     expect(r.totalDemandVA).toBe(21_300);
+  });
+});
+
+describe('#206 the panel schedule PDF keeps subsection letters in its NEC column (E-301)', () => {
+  it('drops the title, keeps (A) / (C) and the 440.6(A) reference', () => {
+    expect(shortCitation('NEC 220.14(A) (Specific Appliances or Loads)')).toBe('220.14(A)'); // main: 220.14
+    expect(shortCitation('NEC 220.14(C), 440.6(A) (Air-Conditioning)')).toBe('220.14(C), 440.6(A)'); // main: 220.14
+    expect(shortCitation('NEC 220.51 (Fixed Electric Space Heating)')).toBe('220.51');
+    expect(shortCitation('NEC 220.60 (Omit 3.0kVA cooling)')).toBe('220.60');
+  });
+
+  it('other rows print as before, or keep subsections main cut off', () => {
+    expect(shortCitation('Table 220.42 (All others)')).toBe('Table 220.42');
+    expect(shortCitation('NEC 220.44')).toBe('220.44');
+    expect(shortCitation('NEC 625.42 (EVEMS — feeder demand clamped to setpoint)')).toBe('625.42');
+    expect(shortCitation('NEC 220.84(C)(5) (larger of A/C or electric heat) + 220.60 (non-coincident)'))
+      .toBe('220.84(C)(5) + 220.60'); // main: 220.84
   });
 });

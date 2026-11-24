@@ -8,7 +8,8 @@ All notable changes to SparkPlan.
 
 - **Water heaters** now cite NEC 220.14(A) (Specific Appliances or Loads) instead of "220.51 (Fixed Appliances)". 220.51 covers fixed electric space heating, not water heaters.
 - **Heating with no cooling** cites NEC 220.51 (Fixed Electric Space Heating), and **cooling with no heating** cites NEC 220.14(C), 440.6(A). Before, both printed "220.60 (Omit 0.0kVA …)" though nothing was omitted. 220.60 still prints when a heating or cooling load is actually left out.
-- No numbers change. These citations show in the Panel Schedule's demand table, the panel schedule PDF and the packet's load pages (E-101).
+- **The panel schedule page (E-301) and the panel schedule PDF keep subsection letters** in their narrow NEC column: "220.14(A)" and "220.14(C), 440.6(A)". Before, every citation was cut at its first parenthesis, so both printed "220.14". Only the section titles are dropped there.
+- No numbers change. These citations show in the Panel Schedule's demand table, the panel schedule PDF and the packet's load pages (E-101, E-301).
 
 ---
 

@@ -28,6 +28,18 @@ import {
 import { lineToNeutralVoltage } from '../../lib/electricalDisplay';
 import { isEvseDescription, type NecEdition } from '../../data/nec/evse-load';
 
+/**
+ * A breakdown row's citation for the narrow NEC column: "NEC " and each
+ * section's title dropped, subsection letters kept (#206). A title is a
+ * parenthetical after a space; "(A)" right after a number is a subsection.
+ * "NEC 220.14(A) (Specific Appliances or Loads)" → "220.14(A)";
+ * "NEC 220.14(C), 440.6(A) (Air-Conditioning)" → "220.14(C), 440.6(A)".
+ * It cut at the first "(", so both printed "220.14".
+ */
+export function shortCitation(necReference: string): string {
+  return necReference.replace(/^NEC\s+/, '').replace(/\s+\([^)]*\)/g, '').trim();
+}
+
 // Helvetica + Helvetica-Bold are built-in PDF standard fonts in react-pdf —
 // calling Font.register() on them corrupts the font cache and causes
 // "Cannot read properties of null (reading 'props')" at render time.
@@ -939,7 +951,7 @@ export const PanelSchedulePages: React.FC<PanelSchedulePDFProps> = ({
                         {isEvemsReductionRow(b) ? '—' : `${(b.demandFactor * 100).toFixed(0)}%`}
                       </Text>
                       <Text style={styles.breakdownColNec}>
-                        {b.necReference.replace(/^NEC\s+/, '').replace(/\s*\(.*$/, '')}
+                        {shortCitation(b.necReference)}
                       </Text>
                     </View>
                   ))}
@@ -1365,7 +1377,7 @@ export const MultiPanelDocument: React.FC<MultiPanelDocumentProps> = ({
                               {isEvemsReductionRow(b) ? '—' : `${(b.demandFactor * 100).toFixed(0)}%`}
                             </Text>
                             <Text style={styles.breakdownColNec}>
-                              {b.necReference.replace(/^NEC\s+/, '').replace(/\s*\(.*$/, '')}
+                              {shortCitation(b.necReference)}
                             </Text>
                           </View>
                         ))}

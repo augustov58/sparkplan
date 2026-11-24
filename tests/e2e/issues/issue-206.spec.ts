@@ -113,8 +113,13 @@ test('#206 NEC 2023: the same citations in the app and on the packet', async ({ 
   await generate.click();
   const pdf = join(OUT, 'packet-2023.pdf');
   await (await download).saveAs(pdf);
-  const text = execFileSync('pdftotext', ['-layout', pdf, '-'], { encoding: 'utf8' }).replace(/\s+/g, ' ');
+  const pages = execFileSync('pdftotext', ['-layout', pdf, '-'], { encoding: 'utf8' }).split('\f');
+  const text = pages.join(' ').replace(/\s+/g, ' ');
   expect(text).toContain('220.14(A)');
+  // E-301's narrow NEC column keeps the subsection (main cut at the first "(": "220.14")
+  const e301 = (pages.find(p => /PANEL SCHEDULE - MDP/i.test(p) && p.includes('Water Heater')) ?? '').replace(/\s+/g, ' ');
+  expect(e301).toMatch(/Water Heater 4\.5 kVA 4\.5 kVA 100% 220\.14\(A\)/);
+  expect(e301).toMatch(/HVAC - Heating \(larger\) 12\.0 kVA 12\.0 kVA 100% 220\.51/);
   expect(text).toContain('220.51 (Fixed Electric Space Heating)');
   expect(text).not.toContain('Fixed Appliances'); // main
   expect(text).not.toContain('Omit 0.0'); // main
