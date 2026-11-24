@@ -14,7 +14,7 @@ export interface CircuitTemplate {
   load_watts: number;
   conductor_size: string;
   egc_size?: string;
-  /** Load type code; omitted → the column default ('O'). Lighting circuits are 'L' (#304). */
+  /** Load type code; omitted → stored as null, which every reader treats as 'O'. Lighting circuits are 'L' (#304). */
   load_type?: 'L';
 }
 

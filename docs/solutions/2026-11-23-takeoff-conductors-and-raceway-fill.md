@@ -8,7 +8,7 @@
 2. **Pure module for testability:** `services/calculations/racewayFill.ts` (`conductorsPerCircuit`, `emtTradeSizeForCircuit`, `branchWiringTakeoff`). The component spreads its lines. The tests assert the three templates' take-offs against the hand calc in the issue, built from `data/project-templates.ts` itself.
 3. **Data, not new tables:** THHN areas from `data/nec/chapter9-conductor-dimensions.ts` (Table 5), EMT 40 % areas from `chapter9-conduit-dimensions.ts` (Table 4). Checked against the ruling's example: 3 × 0.1562 + 0.0366 = 0.5052 in² → 1-1/4″ (1″ holds 0.346).
 4. **Never guess a size:** a conductor not in the table lands in a "TBD" conduit line with a warning (advisory, not blocking).
-5. **Template load codes:** `CircuitTemplate.load_type?: 'L'`, passed through by `templateService.ts` only when set (the column default stays 'O'). E-101 total unchanged (40.44 kVA); a 5.34 kVA lighting row splits out of "Other".
+5. **Template load codes:** `CircuitTemplate.load_type?: 'L'`, passed through by `templateService.ts` only when set (other rows stay null, read as 'O'). E-101 total unchanged (40.44 kVA); a 5.34 kVA lighting row splits out of "Other".
 6. **Older specs:** `issue-294.spec.ts` asserted "1 circuits" and the Retail lighting at 'O'. It now asserts "1 circuit," and 'L'.
 
 ## Judgment calls
