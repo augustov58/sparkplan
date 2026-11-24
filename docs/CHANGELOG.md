@@ -4,6 +4,12 @@ All notable changes to SparkPlan.
 
 ---
 
+## 2026-11-23: The standard AIC ratings stay as they are (#311)
+
+- No change in behavior. The required interrupting rating is picked from 10, 14, 22, 25, 42, 65, 100 and 200 kA. 18 kA and 35 kA are not in the list, so an available fault current of 15.7 kA requires 22 kA. The owner ruled to keep the list, and the ruling is now recorded next to it.
+
+---
+
 ## 2026-11-23: The packet prints the project's service rating; an estimate from other amps is Stale (#301)
 
 - **E-102 "Service Rating" printed the short-circuit calculator's input** (it defaulted to 200 A) instead of the project's service. It now prints the project's rating: its service amps, else the MDP main breaker (800 A on an 800 A service).

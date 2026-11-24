@@ -12,6 +12,12 @@ import { getConductorImpedance } from '../../data/nec/table-chapter9-table9';
 /**
  * Standard Ampere Interrupting Capacity (AIC) ratings for circuit breakers (interrupting rating, NEC 110.9)
  * Common ratings: 10kA, 14kA, 22kA, 25kA, 42kA, 65kA, 100kA, 200kA
+ *
+ * Owner ruling 2026-11-23 (#311, option a): KEEP this list as is. 18 kA and
+ * 35 kA are deliberately not in it, though some molded-case breakers carry
+ * them. The required AIC is the first rating here ≥ the available fault
+ * current (#279), so 15.7 kA requires 22 kA. Do not add tiers without a new
+ * ruling. The copy in data/manufacturerTemplates.ts must match.
  */
 export const STANDARD_AIC_RATINGS = [10, 14, 22, 25, 42, 65, 100, 200]; // kA
 
