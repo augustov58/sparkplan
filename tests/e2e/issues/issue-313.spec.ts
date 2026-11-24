@@ -1,4 +1,5 @@
-import { test, expect, type Page } from '@playwright/test';
+import { test, expect } from '@playwright/test';
+import { restoreMdpAicEmpty, saveMdpAicThroughForm } from './mdpAic';
 import { execFileSync } from 'child_process';
 import { mkdirSync } from 'fs';
 import { join } from 'path';
@@ -10,28 +11,12 @@ import { join } from 'path';
  *
  * QA project "QA Short circuit" (tests/e2e/fixtures.md). The spec sets the
  * MDP's AIC rating to 42 kA through the form and always puts it back to empty
- * through the app's Supabase client in the QA session: choosing "Select AIC
- * rating..." in the form does not clear a saved rating (#314).
+ * through the form ("Select AIC rating...", which clears it since #314).
  */
 
 const PROJECT = 'QA Short circuit';
 const OUT = 'tests/e2e/__output__/screenshots/issue-313';
 mkdirSync(OUT, { recursive: true });
-
-async function clearMdpAic(page: Page) {
-  const rows = await page.evaluate(async (project) => {
-    // @ts-expect-error — served by the Vite dev server
-    const { supabase } = await import('/lib/supabase.ts');
-    const { data: { user } } = await supabase.auth.getUser();
-    if (user?.email !== 'augustovalbuena+qa@gmail.com') throw new Error('not the QA account');
-    const { data: proj } = await supabase.from('projects').select('id').eq('name', project).single();
-    const { data, error } = await supabase.from('panels').update({ aic_rating: null })
-      .eq('project_id', proj.id).eq('name', 'MDP').select('id');
-    if (error) throw new Error(error.message);
-    return data.length;
-  }, PROJECT);
-  expect(rows, 'MDP AIC rating restored to empty').toBe(1);
-}
 
 test('#313 a 42 kA AIC rating prints as 42 kA on E-201, Equipment Specs and the one-line', async ({ page }) => {
   test.setTimeout(240_000);
@@ -45,16 +30,7 @@ test('#313 a 42 kA AIC rating prints as 42 kA on E-201, Equipment Specs and the 
 
   try {
     // 1: MDP → Equipment Specifications → AIC Rating 42 kA → Save Changes
-    await page.goto(base + '/circuits');
-    const edit = page.locator('[title="Edit panel"]').first();
-    await edit.waitFor({ state: 'attached', timeout: 20_000 });
-    await edit.click({ force: true }); // the edit icon shows on hover
-    await page.getByRole('button', { name: /Equipment Specifications \(Optional\)/ }).click();
-    const aic = page.locator('select').filter({ has: page.locator('option', { hasText: 'Select AIC rating...' }) });
-    await aic.selectOption('42');
-    const saved = page.waitForResponse(r => r.url().includes('/rest/v1/panels') && r.request().method() === 'PATCH');
-    await page.getByRole('button', { name: /Save Changes/ }).click();
-    expect((await saved).ok()).toBe(true);
+    await saveMdpAicThroughForm(page, base, '42');
 
     // 2: in-app one-line chip
     await page.goto(base + '/diagram');
@@ -80,6 +56,6 @@ test('#313 a 42 kA AIC rating prints as 42 kA on E-201, Equipment Specs and the 
     expect(pages.join('\f')).not.toContain('0.0 kA');
   } finally {
     // 4: restore the fixture (#307 relies on no rating entered)
-    await clearMdpAic(page);
+    await restoreMdpAicEmpty(page, base, PROJECT);
   }
 });

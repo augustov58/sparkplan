@@ -7,7 +7,7 @@
  * @module components/EquipmentSpecForm
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   PANEL_MANUFACTURERS,
   NEMA_ENCLOSURE_TYPES,
@@ -20,6 +20,51 @@ import {
   type PanelModel
 } from '@/data/manufacturerTemplates';
 import type { PanelEquipmentSpecs, TransformerEquipmentSpecs } from '@/types';
+
+/** A spec update the form emits; `null` clears a saved value (#314). */
+export type SpecUpdate<T> = { [K in keyof T]?: T[K] | null };
+
+/**
+ * #314: an emptied field is sent as null so the PATCH clears the column.
+ * `undefined` is dropped from the request body (the column kept its old
+ * value) and '' stored an empty string.
+ */
+function orNull<T>(value: T | '' | null | undefined): T | null {
+  return value === '' || value === undefined || value === null ? null : value;
+}
+
+/** The panel columns the form saves, from its field state. */
+export function panelSpecsUpdate(f: {
+  manufacturer: string; modelNumber: string; nemaType: string; ulListing: string;
+  aicRating: number | null | undefined; seriesRating: boolean; notes: string;
+}): SpecUpdate<PanelEquipmentSpecs> {
+  return {
+    manufacturer: orNull(f.manufacturer),
+    model_number: orNull(f.modelNumber),
+    nema_enclosure_type: orNull(f.nemaType),
+    ul_listing: orNull(f.ulListing),
+    aic_rating: orNull(f.aicRating),
+    series_rating: f.seriesRating,
+    notes: orNull(f.notes),
+  };
+}
+
+/** The transformer columns the form saves, from its field state. */
+export function transformerSpecsUpdate(f: {
+  manufacturer: string; modelNumber: string; windingType: string; impedancePercent: number | null | undefined;
+  coolingType: string; ulListing: string; temperatureRise: number | null | undefined; notes: string;
+}): SpecUpdate<TransformerEquipmentSpecs> & { manufacturer?: string | null; model_number?: string | null } {
+  return {
+    manufacturer: orNull(f.manufacturer),
+    model_number: orNull(f.modelNumber),
+    winding_type: orNull(f.windingType),
+    impedance_percent: orNull(f.impedancePercent),
+    cooling_type: orNull(f.coolingType),
+    ul_listing: orNull(f.ulListing),
+    temperature_rise: orNull(f.temperatureRise),
+    notes: orNull(f.notes),
+  };
+}
 
 interface EquipmentSpecFormProps {
   /** Equipment type */
@@ -37,8 +82,8 @@ interface EquipmentSpecFormProps {
   /** Bus rating in amps (used for template filtering) */
   busRating?: number;
 
-  /** Callback when form data changes */
-  onChange: (updates: Partial<PanelEquipmentSpecs | TransformerEquipmentSpecs>) => void;
+  /** Callback when form data changes; an emptied field is null (#314) */
+  onChange: (updates: SpecUpdate<PanelEquipmentSpecs> | SpecUpdate<TransformerEquipmentSpecs>) => void;
 
   /** Show calculated fault current for AIC validation (panels only) */
   faultCurrentKA?: number;
@@ -80,7 +125,7 @@ export function EquipmentSpecForm({
   const [nemaType, setNemaType] = useState<string>(
     (currentData as PanelEquipmentSpecs).nema_enclosure_type || ''
   );
-  const [aicRating, setAicRating] = useState<number | undefined>(
+  const [aicRating, setAicRating] = useState<number | null | undefined>(
     (currentData as PanelEquipmentSpecs).aic_rating
   );
   const [seriesRating, setSeriesRating] = useState<boolean>(
@@ -147,33 +192,25 @@ export function EquipmentSpecForm({
     }
   };
 
+  // The parent passes a new onChange on every render. Read it from a ref so
+  // the emit effect runs only when a field changes; with onChange in its
+  // dependencies it re-ran after every render and set new state each time
+  // ("Maximum update depth exceeded", #314).
+  const onChangeRef = useRef(onChange);
+  useEffect(() => {
+    onChangeRef.current = onChange;
+  });
+
   // Emit changes to parent
   useEffect(() => {
-    if (type === 'panel') {
-      onChange({
-        manufacturer,
-        model_number: modelNumber,
-        nema_enclosure_type: nemaType,
-        ul_listing: ulListing,
-        aic_rating: aicRating,
-        series_rating: seriesRating,
-        notes
-      } as PanelEquipmentSpecs);
-    } else {
-      onChange({
-        manufacturer,
-        model_number: modelNumber,
-        winding_type: windingType,
-        impedance_percent: impedancePercent,
-        cooling_type: coolingType,
-        ul_listing: ulListing,
-        temperature_rise: temperatureRise,
-        notes
-      } as TransformerEquipmentSpecs);
-    }
+    onChangeRef.current(type === 'panel'
+      ? panelSpecsUpdate({ manufacturer, modelNumber, nemaType, ulListing, aicRating, seriesRating, notes })
+      : transformerSpecsUpdate({
+          manufacturer, modelNumber, windingType, impedancePercent, coolingType, ulListing, temperatureRise, notes,
+        }));
   }, [
     manufacturer, modelNumber, nemaType, ulListing, aicRating, seriesRating,
-    windingType, impedancePercent, coolingType, temperatureRise, notes, type, onChange
+    windingType, impedancePercent, coolingType, temperatureRise, notes, type
   ]);
 
   // AIC validation status
