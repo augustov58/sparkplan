@@ -3,7 +3,7 @@ import { mkdirSync } from 'fs';
 import { join } from 'path';
 
 /**
- * Promo codes (found 2026-11-24, readiness check): redeem_promo_code takes the
+ * #335 (found 2026-11-24, readiness check): redeem_promo_code takes the
  * account from the caller's session (auth.uid()), only signed-in users can call
  * it, and nobody can list the codes. Before: the anon key could SELECT the
  * active codes and redeem one onto any account id.
@@ -15,7 +15,7 @@ import { join } from 'path';
 const QA_EMAIL = 'augustovalbuena+qa@gmail.com';
 const BOGUS = 'QA-NO-SUCH-CODE-0000';
 const OTHER_ACCOUNT = '00000000-0000-4000-8000-000000000000'; // any id that isn't the QA account's
-const OUT = 'tests/e2e/__output__/screenshots/promo-code-auth';
+const OUT = 'tests/e2e/__output__/screenshots/issue-335';
 mkdirSync(OUT, { recursive: true });
 
 type Call = { rows?: number; data?: unknown; code?: string | null };

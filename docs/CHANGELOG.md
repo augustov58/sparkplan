@@ -4,7 +4,7 @@ All notable changes to SparkPlan.
 
 ---
 
-## 2026-11-24: Promo codes can only be redeemed by a signed-in user, for their own account
+## 2026-11-24: Promo codes can only be redeemed by a signed-in user, for their own account (#335)
 
 - Redeeming a promo code now requires being signed in, and the code is applied to the signed-in account only. Before, the redeem function could be called with the app's public key for any account, and the list of active codes could be read the same way.
 - Nothing changes for a user redeeming a code on the Pricing page. Checked before the fix: no code had ever been redeemed.
