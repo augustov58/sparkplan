@@ -4,6 +4,7 @@ One note per hard problem, written by the model that solved it via the `extract-
 Each entry: `- [title](file.md) — reusable rule`.
 
 <!-- Newest first -->
+- [Take-off CSV split 3/4" cells; boxes on feeder-only panels](2026-11-24-takeoff-csv-and-boxes.md) — grep for an existing formatter before writing one and move it to lib/ (check the import graph); an estimate per circuit names the circuits it applies to
 - [Equipment Specs couldn't clear a saved AIC rating and looped on open](2026-11-24-equipment-specs-clear-and-loop.md) — to clear a column send null (undefined vanishes from the PATCH body); read the request body, the optimistic UI hides it; keep a parent callback in a ref, not in effect deps
 - [An e2e spec read the MDP page before its circuits loaded](2026-11-24-e2e-read-after-data-loads.md) — before reading page text once, wait for text that proves the asserted data loaded (`mainTextWhen`); a heading or count proves only its own data; reproduce a flake by holding the response back
 - [A reload on a project page landed on the dashboard](2026-11-23-project-route-waits-for-its-list.md) — a redirect-on-missing guard must tell "missing" from "not loaded yet", from state correct at render time (child effects run before parent effects); test guards with a reload

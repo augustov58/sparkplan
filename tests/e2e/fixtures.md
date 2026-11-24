@@ -7,7 +7,8 @@ delete these freely; never point a spec at the owner's account.
 Add a row when a scenario needs a project none of these covers. No row IDs or
 stored settings values here (public repo).
 
-`issue-317.spec.ts` reads "QA MF feeders", "QA SC parallel" and "QA Short circuit"
+`issue-321.spec.ts` creates, reads and deletes Retail, Office and Workshop template projects
+(as `issue-294` / `issue-304` do). `issue-317.spec.ts` reads "QA MF feeders", "QA SC parallel" and "QA Short circuit"
 with their panel or circuit responses held back; it writes nothing.
 
 Last updated: 2026-11-24

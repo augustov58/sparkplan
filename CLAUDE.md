@@ -238,6 +238,9 @@ Wire per circuit = poles, + 1 neutral on 1-pole; conduit per circuit from
 Chapter 9 at 40 % fill, EGC included (Table 5 THHN, Table 4 EMT), totalled
 by trade size; ~50 ft wire / ~10 ft raceway per circuit (estimates kept).
 Implementation: `services/calculations/racewayFill.ts::branchWiringTakeoff`.
+Boxes (owner ruling 2026-11-24, #321): outlet (60 %) and junction (20 %) boxes from the 1-pole
+circuits only, rounded down; a count of 0 prints no row (`racewayFill.ts::boxEstimate`). Every CSV
+export writes its cells through `lib/csv.ts::csvRow` (RFC 4180: 3/4" stays in one cell).
 Implementation: `lib/storedCalcs.ts::recomputeShortCircuitRow`, applied to every row by `hooks/useShortCircuitCalculations.ts`. Saves record `results.setsInParallel` (no column). An outdated row is not a source in `shortCircuitHierarchy.ts`.
 Implementation: `services/calculations/shortCircuit.ts`
 
@@ -511,6 +514,7 @@ Real mistakes made in this repo, each paired with the rule that prevents recurre
 | `ProjectWrapper` redirected whenever the project was missing from the list, so a reload on any project page landed on the dashboard: the list hook ran once with no user (`[]`, loading false) and the first render with the user redirected before the fetch (#297) | A redirect-on-missing guard needs a loading signal that is correct during render (child effects run before the parent's). Test route guards with a reload, not only in-app navigation. |
 | `issue-291.spec.ts` waited for the MDP's "DEMAND BY LOAD TYPE" heading, which renders at 0 circuits, read the page once and got "TOTAL DEMAND 0.0 kVA"; two more specs read before the panels loaded (the Stale banner, the 800 A prefill) (#317) | A spec reads page text once the text that proves its data loaded is there (`tests/e2e/issues/pageText.ts::mainTextWhen`). Reproduce a flake by holding the response back, then sweep every one-time read in the folder. |
 | The Equipment Specs form emitted an emptied AIC rating as `undefined`, which `JSON.stringify` drops from the PATCH, so "Select AIC rating..." never cleared a saved 42 kA (the optimistic update hid it); its emit effect listed the parent's inline `onChange` and looped ("Maximum update depth exceeded") (#314) | Clear a column by sending `null`, never `undefined` or `''`; check the request body, not the optimistic UI. A child effect that calls a parent callback reads it from a ref. |
+| The Material Take-Off wrapped CSV cells in quotes without doubling the quotes inside them (`3/4"` broke the row), while the commercial export already had a correct private `csvEscape`; outlet and junction boxes were a share of every circuit, so feeder-only panels listed outlet boxes (#321) | Before writing a formatter, grep for one (`csvEscape`); move it to `lib/` instead of copying it, and check the import doesn't pull a heavy module (react-pdf) into the page. An estimate per circuit says which circuits it applies to. |
 | Docs updated with stale "Last Updated" dates; completed features left as "NEXT UP" | Every doc touch updates its date to today; every shipped feature flips its ROADMAP status in the same PR. |
 
 ---

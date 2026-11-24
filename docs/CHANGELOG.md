@@ -4,6 +4,13 @@ All notable changes to SparkPlan.
 
 ---
 
+## 2026-11-24: Material Take-Off: the CSV opens cleanly; boxes only for branch circuits (#321)
+
+- **Export CSV** now escapes quotes inside a cell, so sizes like `3/4"` and `5/8" x 8ft` stay in one cell when the file opens in a spreadsheet. Before, those rows split into extra columns. The Commercial Load Calculator's CSV uses the same writer, with no change to its output.
+- **Outlet and junction boxes** are estimated from 1-pole circuits only: about 60 % get an outlet box and 20 % a junction box. Feeder and equipment circuits get none, so a Retail Store lists 6 outlet boxes and 2 junction boxes (was 7 and 2). The Office and Workshop take-offs, which have only feeder and equipment circuits, list none (were 1 and 0, and 3 and 1). Couplings, connectors and wire nuts are unchanged.
+
+---
+
 ## 2026-11-24: Equipment Specifications can clear a saved value, and no longer loops on open (#314)
 
 - **Clearing a field now clears it.** Choosing "Select AIC rating..." (or emptying the manufacturer, model, NEMA type, UL listing or notes) and saving used to keep the old value: the form sent the emptied AIC rating as "nothing", and the save skipped it. A contractor who picked the wrong AIC rating couldn't remove it, and the packet kept printing it. Emptied fields are now saved as empty, and the one-line, E-201, the Equipment Specs sheet and the short-circuit table follow. With no rating, the table shows "Required >= 10 kA" again.
