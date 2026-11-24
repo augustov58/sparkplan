@@ -4,6 +4,12 @@ All notable changes to SparkPlan.
 
 ---
 
+## 2026-11-24: End-to-end specs read a page after its data has loaded (#317)
+
+- No change in behavior. Three regression specs read a page's text once after a heading appeared and could catch it before its data loaded. The multifamily MDP spec read "TOTAL DEMAND 0.0 kVA" in one run. They now wait for the values they check, through one shared reader. A new spec holds the panel and circuit responses back 3 s to prove it.
+
+---
+
 ## 2026-11-23: Reloading a project page keeps you on it (#297)
 
 - Reloading the browser on any project page used to send you to the dashboard. The page now waits for the project list to load and stays where it was. An unknown or deleted project still goes to the dashboard, and a session refresh no longer has any visible effect.

@@ -1,4 +1,5 @@
 import { test, expect, type Page } from '@playwright/test';
+import { mainTextWhen } from './pageText';
 import { execFileSync } from 'child_process';
 import { mkdirSync } from 'fs';
 import { join } from 'path';
@@ -55,14 +56,19 @@ async function packetPages(page: Page, projectUrl: string, name: string): Promis
   return execFileSync('pdftotext', ['-layout', pdf, '-'], { encoding: 'utf8' }).split('\f');
 }
 
-async function shortCircuitText(page: Page, projectUrl: string) {
+/**
+ * The cards' text once DP-1's panel has loaded ("(400A, 480V)" comes from the
+ * panels, which the Stale check needs; the count shows before them, #317) and
+ * the page shows `ready`.
+ */
+async function shortCircuitText(page: Page, projectUrl: string, ready: Array<string | RegExp> = []) {
   const main = page.locator('main');
   await page.goto(`${projectUrl}/short-circuit`);
   await expect(main.getByText('2 calculations saved')).toBeVisible({ timeout: 15_000 });
   for (let i = 0; i < 4 && await main.getByText(/Show Details/).count(); i++) {
     await main.getByText(/Show Details/).first().click();
   }
-  return (await main.innerText()).replace(/\s+/g, ' ');
+  return mainTextWhen(page, ['DP-1 (400A, 480V)', ...ready]);
 }
 
 test('#289 stale short-circuit rows are marked on the packet; the sets print everywhere', async ({ page }) => {
@@ -104,7 +110,7 @@ test('#289 stale short-circuit rows are marked on the packet; the sets print eve
 
     // 4: the service re-saved with 2 sets → DP-1 stale in the app
     await saveService(page, projectUrl, '2');
-    const staleText = await shortCircuitText(page, projectUrl);
+    const staleText = await shortCircuitText(page, projectUrl, ['Stale — upstream chain changed']);
     expect(staleText).toContain('Stale — upstream chain changed: was 20,344 A, now 20,069 A');
     expect(staleText).toMatch(/AIC: 22 kA Stale, re-run/); // the card's status, as on the packet (was "Compliant")
 
