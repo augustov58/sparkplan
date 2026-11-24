@@ -9,7 +9,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { useAuthContext } from './AuthProvider';
 import { Link, useLocation } from 'react-router-dom';
 import { loginSchema, type LoginFormData } from '../../lib/validation';
-import { AlertCircle, CheckCircle } from 'lucide-react';
+import { AlertCircle } from 'lucide-react';
 
 interface LoginProps {
   onSuccess?: () => void;
@@ -63,11 +63,11 @@ export function Login({ onSuccess }: LoginProps) {
           </div>
 
           {linkExpiredNotice && (
-            <div className="bg-[#e8f5e8] border border-[#b8dab8] text-[#2d5a2d] px-4 py-3 rounded-lg text-sm mb-4 flex items-start gap-2">
-              <CheckCircle className="w-4 h-4 mt-0.5 flex-shrink-0" />
+            <div className="bg-amber-50 border border-amber-200 text-amber-900 px-4 py-3 rounded-lg text-sm mb-4 flex items-start gap-2">
+              <AlertCircle className="w-4 h-4 mt-0.5 flex-shrink-0" />
               <div>
                 <p className="font-semibold mb-1">This email link has expired or was already used</p>
-                <p className="text-xs text-[#3d6b3d]">
+                <p className="text-xs text-amber-800">
                   Confirming a new account? It's probably confirmed already (corporate email
                   scanners often open links first): sign in with your password below. Resetting
                   your password?{' '}

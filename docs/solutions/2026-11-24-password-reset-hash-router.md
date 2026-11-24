@@ -15,6 +15,7 @@
 - `useAuth`: `passwordRecovery` starts from `authLinkAtLoad` and is set on `PASSWORD_RECOVERY`, cleared on `SIGNED_OUT` and after `updateUser`. `resetPassword` passes `redirectTo: origin + pathname`. New `updatePassword`.
 - `AppContent`: a recovery with a user → `/update-password`; an error link → `/login` with the description in route state. `/update-password` renders only during a recovery (signed in otherwise → dashboard; signed out → sign-in), so it is not a change-password screen.
 - The new password uses sign-up's rule (one `newPasswordRule` in `lib/validation.ts`).
+- The recovery flag is kept in `sessionStorage` for the tab (the verifier found a reload of `/update-password` lost the form) and cleared on sign-out, on a load with no session, and after the update.
 
 ## Trap
 The first version of both redirects ran in `useEffect(…, [navigate])`. In react-router v6, `useNavigate()` returns a new function when the path changes, so the effect re-ran after every navigation: "Request a new reset link" bounced back to the sign-in page, and a recovering user could never leave the form. Each redirect now fires once (a `useRef`).

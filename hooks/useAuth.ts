@@ -20,15 +20,37 @@ export interface UseAuthReturn {
   updatePassword: (password: string) => Promise<{ error: AuthError | null }>;
 }
 
+// The recovery state survives a reload of the tab (verifier, #330): without it, a
+// reload of /update-password left the user signed in with no way to set the password.
+const RECOVERY_KEY = 'sparkplan.passwordRecovery';
+function readRecoveryFlag(): boolean {
+  try { return sessionStorage.getItem(RECOVERY_KEY) === '1'; } catch { return false; }
+}
+function writeRecoveryFlag(on: boolean): void {
+  try {
+    if (on) sessionStorage.setItem(RECOVERY_KEY, '1');
+    else sessionStorage.removeItem(RECOVERY_KEY);
+  } catch { /* storage blocked: the flag lives in memory only */ }
+}
+
 export function useAuth(): UseAuthReturn {
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
-  const [passwordRecovery, setPasswordRecovery] = useState(authLinkAtLoad.kind === 'recovery');
+  const [passwordRecovery, setPasswordRecoveryState] = useState(() => {
+    const on = authLinkAtLoad.kind === 'recovery' || readRecoveryFlag();
+    if (on) writeRecoveryFlag(true);
+    return on;
+  });
+  const setPasswordRecovery = (on: boolean) => {
+    writeRecoveryFlag(on);
+    setPasswordRecoveryState(on);
+  };
 
   useEffect(() => {
     // Get initial session
     supabase.auth.getSession().then(({ data: { session } }) => {
+      if (!session) setPasswordRecovery(false); // a stale flag must not catch a later normal sign-in
       setSession(session);
       setUser(session?.user ?? null);
       setLoading(false);

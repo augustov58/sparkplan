@@ -61,6 +61,9 @@ test.describe('signed out', () => {
     await page.goto(RECOVERY_LINK);
     await expect(page).toHaveURL(/#\/update-password$/, { timeout: 15_000 }); // main: the dashboard
     await expect(page.getByRole('heading', { name: 'Set a new password' })).toBeVisible();
+    await page.reload(); // the form survives a reload of the tab
+    await expect(page).toHaveURL(/#\/update-password$/, { timeout: 15_000 });
+    await expect(page.getByRole('heading', { name: 'Set a new password' })).toBeVisible();
     const update = page.getByRole('button', { name: 'Update password' });
 
     await page.getByLabel('New password', { exact: true }).fill('NewPassw0rd');
