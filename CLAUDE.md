@@ -205,6 +205,10 @@ aluminum / steel), no extra factor — the steel column already includes
 the steel effect (owner-approved 2026-11-20, #276).
 Required AIC (110.9): the first standard rating ≥ the available fault
 current, no margin (owner ruling 2026-11-21, #279). requiredAIC is kA.
+Standard ratings (owner ruling 2026-11-23, #311, KEEP): 10, 14, 22, 25,
+42, 65, 100, 200 kA (STANDARD_AIC_RATINGS, shortCircuit.ts and its copy in
+data/manufacturerTemplates.ts). No 18 or 35 kA: 15.7 kA requires 22 kA.
+Do not add tiers without a new ruling.
 Saved results: recomputed on read from the saved inputs (owner ruling
 2026-11-21, #278). A row that can't be recomputed exactly is flagged
 "Outdated, re-run" — never filled with a guessed 1 set.

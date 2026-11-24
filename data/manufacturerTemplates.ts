@@ -375,6 +375,10 @@ export const UL_LISTINGS = {
  * the maximum available fault current at its line terminals.
  *
  * These are industry-standard AIC ratings. Actual equipment ratings vary.
+ *
+ * Owner ruling 2026-11-23 (#311, option a): KEEP this list as is (no 18 or
+ * 35 kA). It must match services/calculations/shortCircuit.ts, which picks
+ * the required AIC from it. Do not add tiers without a new ruling.
  */
 export const STANDARD_AIC_RATINGS = [10, 14, 22, 25, 42, 65, 100, 200]; // kA
 
