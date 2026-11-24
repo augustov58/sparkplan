@@ -99,7 +99,9 @@ async function restoreOnScPage(page: Page, projectUrl: string) {
   const add = main.getByRole('button', { name: 'Add Short Circuit Calculation' });
   if (await add.isVisible()) await add.click();
   await main.getByRole('button', { name: 'Service Entrance' }).first().click();
-  await expect(field(page, 'Service Amps')).not.toHaveValue('');
+  // The rating comes from the panels (the MDP main), which load after the form
+  // seeds 200; wait for it before reading (#317). main: 200
+  await expect(field(page, 'Service Amps')).toHaveValue('800', { timeout: 15_000 });
   const prefillAmps = await field(page, 'Service Amps').inputValue();
   // The fixture as it was found: 200 A typed in the amps field beside the
   // utility's 500 kVA (the amps don't enter a result with a kVA, so it is not

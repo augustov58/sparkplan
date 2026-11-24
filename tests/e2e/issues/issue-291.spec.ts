@@ -1,4 +1,5 @@
 import { test, expect, type Page } from '@playwright/test';
+import { mainTextWhen } from './pageText';
 
 /**
  * #291 (owner ruling 2026-11-22, a): the multifamily 220.84 total (MDP) takes
@@ -30,8 +31,12 @@ async function setUnit101VA(page: Page, description: string, va: number) {
   expect(n, `Unit 101 → ${description}`).toBe(1);
 }
 
-/** The MDP's "Demand by load type" text, read fresh from the database. */
-async function mdpDemand(page: Page) {
+/**
+ * The MDP's "Demand by load type" text, read fresh from the database once it
+ * shows `expected`. The heading renders before the circuits load (#317: a
+ * one-time read got "TOTAL DEMAND 0.0 kVA"), so it polls for the values.
+ */
+async function mdpDemand(page: Page, expected: string[]) {
   await page.goto('/');
   await page.reload();
   const card = page.getByText(PROJECT, { exact: true }).first();
@@ -39,9 +44,7 @@ async function mdpDemand(page: Page) {
   await card.click();
   await page.waitForURL(/#\/project\/[^/]+/);
   await page.goto(page.url().replace(/(#\/project\/[^/?]+).*/, '$1') + '/panel');
-  const main = page.locator('main');
-  await expect(main.getByText('DEMAND BY LOAD TYPE', { exact: false }).first()).toBeVisible({ timeout: 20_000 });
-  return (await main.innerText()).replace(/\s+/g, ' ');
+  return mainTextWhen(page, expected);
 }
 
 test('#291 the multifamily 220.84 total takes small-appliance / laundry circuits at 1,500 VA each', async ({ page }) => {
@@ -51,24 +54,27 @@ test('#291 the multifamily 220.84 total takes small-appliance / laundry circuits
   let failure: unknown;
   try {
     // baseline
-    let t = await mdpDemand(page);
-    expect(t).toContain('TOTAL DEMAND 68.6 kVA');
-    expect(t).toContain('Multi-Family Dwelling (3 units) 109.5 kVA → 49.3 kVA (45%)');
+    await mdpDemand(page, [
+      'TOTAL DEMAND 68.6 kVA',
+      'Multi-Family Dwelling (3 units) 109.5 kVA → 49.3 kVA (45%)',
+    ]);
 
     // 1: a small-appliance circuit at 2,400 VA → unchanged; 900 VA omitted (main: 110.4 → 49.7; 69.0 kVA)
     await setUnit101VA(page, 'Kitchen Small Appliance #1', 2400);
-    t = await mdpDemand(page);
-    expect(t).toContain('TOTAL DEMAND 68.6 kVA');
-    expect(t).toContain('Multi-Family Dwelling (3 units) 109.5 kVA → 49.3 kVA (45%)');
-    expect(t).toContain('Small-appliance / laundry circuits above 1,500 VA each (omitted) 0.9 kVA → 0.0 kVA (0%)');
+    await mdpDemand(page, [
+      'TOTAL DEMAND 68.6 kVA',
+      'Multi-Family Dwelling (3 units) 109.5 kVA → 49.3 kVA (45%)',
+      'Small-appliance / laundry circuits above 1,500 VA each (omitted) 0.9 kVA → 0.0 kVA (0%)',
+    ]);
 
     // 2: laundry at 1,200 VA → raised to 1,500 (main: 109.2 → 49.1; 68.4 kVA)
     await setUnit101VA(page, 'Kitchen Small Appliance #1', 1500);
     await setUnit101VA(page, 'Laundry', 1200);
-    t = await mdpDemand(page);
-    expect(t).toContain('TOTAL DEMAND 68.6 kVA');
-    expect(t).toContain('Multi-Family Dwelling (3 units) 109.2 kVA → 49.1 kVA (45%)');
-    expect(t).toContain('Small-appliance / laundry circuits raised to 1,500 VA each 0.3 kVA → 0.1 kVA (45%)');
+    await mdpDemand(page, [
+      'TOTAL DEMAND 68.6 kVA',
+      'Multi-Family Dwelling (3 units) 109.2 kVA → 49.1 kVA (45%)',
+      'Small-appliance / laundry circuits raised to 1,500 VA each 0.3 kVA → 0.1 kVA (45%)',
+    ]);
   } catch (e) {
     failure = e;
   }
@@ -80,7 +86,6 @@ test('#291 the multifamily 220.84 total takes small-appliance / laundry circuits
     if (!failure) throw e;
   }
   if (failure) throw failure;
-  const t = await mdpDemand(page);
-  expect(t).toContain('TOTAL DEMAND 68.6 kVA');
+  const t = await mdpDemand(page, ['TOTAL DEMAND 68.6 kVA', 'Multi-Family Dwelling (3 units) 109.5 kVA → 49.3 kVA (45%)']);
   expect(t).not.toContain('1,500 VA each');
 });

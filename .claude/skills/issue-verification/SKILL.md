@@ -55,3 +55,4 @@ What stays with the owner: NEC interpretations (Escalation Rule 1), Stable Modul
 - **Verifier told the answer.** Giving the verifier your numbers or the diff turns it into a confirmation. It gets the Acceptance section only.
 - **Wrong account.** One write to the owner's account from a spec or the MCP browser is a prod incident. The email check is not optional.
 - **Spec asserts the implementation.** Assert what the user sees (text on the page), not internal state or saved jsonb.
+- **Spec reads before the data loads.** A heading or a count renders before every data hook returns (the MDP's demand table shows at 0 circuits). Read page text through `tests/e2e/issues/pageText.ts::mainTextWhen(page, ready)` with text that proves the asserted data is there, never `innerText()` once after a heading (#317). A negative check only means something after that gate.
