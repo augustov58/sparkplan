@@ -971,6 +971,7 @@ export const PermitPacketGenerator: React.FC<PermitPacketGeneratorProps> = ({ pr
         serviceModificationType: currentProject.settings?.service_modification_type,
         serviceVoltage: currentProject.serviceVoltage,
         servicePhase: currentProject.servicePhase,
+        projectServiceAmps: currentProject.serviceAmps ?? null,
         panels,
         circuits,
         feeders: feeders as any,

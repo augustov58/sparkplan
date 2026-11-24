@@ -8,6 +8,7 @@ import { Document, Page, View, StyleSheet } from '@react-pdf/renderer';
 import { Text } from './PdfText';
 import type { ShortCircuitCalculation } from '../../lib/database.types';
 import { SHORT_CIRCUIT_OUTDATED, SHORT_CIRCUIT_STALE, shortCircuitConductorText } from '../../lib/storedCalcs';
+import { SERVICE_RATING_CHANGED } from '../calculations/shortCircuitHierarchy';
 import {
   BrandBar,
   Footer as BrandFooter,
@@ -567,6 +568,9 @@ export const ShortCircuitTablePages: React.FC<TablePagesProps> = ({
   const total = rows.length;
   const outdated = rows.filter((r) => r.outdated).length;
   const staleRows = rows.filter((r) => !r.outdated && r.staleReason);
+  // #301: a service row is Stale because the project's rating changed, not its upstream
+  const staleService = staleRows.filter((r) => r.staleReason!.startsWith(SERVICE_RATING_CHANGED));
+  const staleUpstream = staleRows.filter((r) => !r.staleReason!.startsWith(SERVICE_RATING_CHANGED));
   const compliant = rows.filter((r) => r.compliant && !r.outdated && !r.staleReason).length;
   const nonCompliant = total - compliant - outdated - staleRows.length;
   const maxFault = rows.reduce((m, r) => Math.max(m, r.faultCurrentKa), 0);
@@ -691,13 +695,21 @@ export const ShortCircuitTablePages: React.FC<TablePagesProps> = ({
         </View>
       )}
 
-      {staleRows.length > 0 && (
+      {staleUpstream.length > 0 && (
         <View style={tableStyles.infoBox}>
           <Text style={tableStyles.infoText}>
-            {`${SHORT_CIRCUIT_STALE}: the upstream fault current changed after ${staleRows.length === 1 ? 'this calculation was' : 'these calculations were'} saved (${staleRows.map((r) => `${r.panelLabel}: ${r.staleReason!.replace(/^Upstream chain changed: /, '')}`).join('; ')}). ${staleRows.length === 1 ? 'Its values are' : 'Their values are'} as saved; run the calculation again with the current upstream value.`}
+            {`${SHORT_CIRCUIT_STALE}: the upstream fault current changed after ${staleUpstream.length === 1 ? 'this calculation was' : 'these calculations were'} saved (${staleUpstream.map((r) => `${r.panelLabel}: ${r.staleReason!.replace(/^Upstream chain changed: /, '')}`).join('; ')}). ${staleUpstream.length === 1 ? 'Its values are' : 'Their values are'} as saved; run the calculation again with the current upstream value.`}
           </Text>
         </View>
       )}
+
+      {staleService.map((r) => (
+        <View key={r.panelLabel} style={tableStyles.infoBox}>
+          <Text style={tableStyles.infoText}>
+            {`${SHORT_CIRCUIT_STALE}: ${r.panelLabel}: ${r.staleReason}. Its values are as saved; run the service calculation again with the project's service rating.`}
+          </Text>
+        </View>
+      ))}
 
       {nonCompliant === 0 && outdated === 0 && staleRows.length === 0 && rows.length > 0 && (
         <View style={tableStyles.infoBox}>

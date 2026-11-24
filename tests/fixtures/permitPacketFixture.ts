@@ -321,6 +321,7 @@ export const fullPacket: PermitPacketData = {
   projectType: 'Commercial',
   serviceVoltage: 480,
   servicePhase: 3,
+  projectServiceAmps: null,
   panels,
   circuits,
   feeders,

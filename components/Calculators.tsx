@@ -16,6 +16,7 @@ import {
   estimateUtilityTransformer,
   STANDARD_AIC_RATINGS
 } from '../services/calculations/shortCircuit';
+import { projectServiceRatingAmps } from '../services/calculations/shortCircuitHierarchy';
 import {
   calculateEVCharging,
   EVChargingInput,
@@ -286,7 +287,7 @@ export const Calculators: React.FC<CalculatorsProps> = ({ projectId }) => {
           {/* Starter-tier */}
           {activeTab === 'short-circuit' && (
             <FeatureGate feature="short-circuit-basic">
-              <ShortCircuitCalculator projectId={projectId} />
+              <ShortCircuitCalculator projectId={projectId} project={project} />
             </FeatureGate>
           )}
 
@@ -838,9 +839,11 @@ const ConduitFillCalculator: React.FC = () => {
 
 interface ShortCircuitCalculatorProps {
   projectId?: string;
+  /** #301: the service inputs prefill from the project, as the Short Circuit page does (#286). */
+  project?: Project;
 }
 
-const ShortCircuitCalculator: React.FC<ShortCircuitCalculatorProps> = ({ projectId }) => {
+const ShortCircuitCalculator: React.FC<ShortCircuitCalculatorProps> = ({ projectId, project }) => {
   // Project ID now passed as prop instead of using useParams
 
   // Hooks for save functionality
@@ -855,20 +858,32 @@ const ShortCircuitCalculator: React.FC<ShortCircuitCalculatorProps> = ({ project
 
   const [mode, setMode] = useState<'service' | 'panel'>('service');
 
-  // Service calculation inputs
-  const [serviceAmps, setServiceAmps] = useState(200);
-  const [serviceVoltage, setServiceVoltage] = useState(240);
-  const [servicePhase, setServicePhase] = useState<1 | 3>(1);
-  const [transformerKVA, setTransformerKVA] = useState<number | null>(null);
-  const [transformerImpedance, setTransformerImpedance] = useState(2.5);
+  // Service calculation inputs, prefilled from the project (#301): its rating
+  // (service amps, else the MDP main), voltage, phase and utility transformer.
+  const projectImpedancePct = project?.utilityTransformerImpedancePct ?? null;
+  const ratingAmps = projectServiceRatingAmps({ service_amps: project?.serviceAmps ?? null }, panels);
+  const [serviceAmps, setServiceAmps] = useState(ratingAmps ?? 200);
+  const [serviceVoltage, setServiceVoltage] = useState(project?.serviceVoltage ?? 240);
+  const [servicePhase, setServicePhase] = useState<1 | 3>(project?.servicePhase === 3 ? 3 : 1);
+  const [transformerKVA, setTransformerKVA] = useState<number | null>(project?.utilityTransformerKva ?? null);
+  const [transformerImpedance, setTransformerImpedance] = useState(
+    projectImpedancePct ?? (project?.servicePhase === 3 ? 5.75 : 2.5),
+  );
+
+  // The panels load after the form mounts: take the MDP main once it is
+  // known, unless the user has typed a value.
+  const serviceAmpsTouched = React.useRef(false);
+  React.useEffect(() => {
+    if (!serviceAmpsTouched.current && ratingAmps !== null) setServiceAmps(ratingAmps);
+  }, [ratingAmps]);
 
   // Update transformer impedance default when phase changes (if transformer kVA is not manually set)
   React.useEffect(() => {
     if (transformerKVA === null) {
       // Only auto-update if using auto-estimate (no manual kVA)
-      setTransformerImpedance(servicePhase === 3 ? 5.75 : 2.5);
+      setTransformerImpedance(projectImpedancePct ?? (servicePhase === 3 ? 5.75 : 2.5));
     }
-  }, [servicePhase, transformerKVA]);
+  }, [servicePhase, transformerKVA, projectImpedancePct]);
 
   // Service conductor parameters (transformer to service panel)
   const [serviceConductorLength, setServiceConductorLength] = useState(50);
@@ -1026,7 +1041,7 @@ const ShortCircuitCalculator: React.FC<ShortCircuitCalculatorProps> = ({ project
                   <label className="label-xs">Service Amps</label>
                   <NumberInput
                     value={serviceAmps}
-                    onChange={setServiceAmps}
+                    onChange={(n) => { serviceAmpsTouched.current = true; setServiceAmps(n); }}
                     className="input-std"
                   />
                 </div>

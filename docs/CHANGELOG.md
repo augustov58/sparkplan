@@ -4,6 +4,14 @@ All notable changes to SparkPlan.
 
 ---
 
+## 2026-11-23: The packet prints the project's service rating; an estimate from other amps is Stale (#301)
+
+- **E-102 "Service Rating" printed the short-circuit calculator's input** (it defaulted to 200 A) instead of the project's service. It now prints the project's rating: its service amps, else the MDP main breaker (800 A on an 800 A service).
+- **Tools → Short Circuit prefills from the project** (service rating, voltage, phase, utility transformer), as the project's Short Circuit page does. It used to start at 200 A, 240 V, single phase. The Short Circuit page also prefills the MDP main when the project has no service amps.
+- **A service calculation whose utility transformer was estimated from other amps than the project's rating is marked "Stale, re-run"** on the Short Circuit page, E-102 and E-103. Without a transformer kVA, the service amps size the estimated transformer: 200 A gives 4,297 A at the main, against 11,908 A for 800 A.
+
+---
+
 ## 2026-11-23: Equipment AIC ratings print in kA (#313)
 
 - **An AIC rating entered on a panel printed as "0.0 kA"** on the packet's riser (E-201), the Equipment Specs sheet and the in-app one-line diagram. The rating is saved in kA (42 for "42 kA"), but those three places divided it by 1,000. They now print it as saved: **"AIC 42 kA"**. No calculation changes.

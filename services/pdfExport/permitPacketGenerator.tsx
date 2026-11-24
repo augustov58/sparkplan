@@ -50,7 +50,7 @@ import { EquipmentSpecsPages } from './EquipmentSpecsDocuments';
 import { VoltageDropPages, type FeederLoadRules } from './VoltageDropDocuments';
 import { JurisdictionRequirementsPages } from './JurisdictionDocuments';
 import { ShortCircuitTablePages } from './ShortCircuitDocuments';
-import { detectStaleCalculations } from '../calculations/shortCircuitHierarchy';
+import { detectStaleCalculations, projectServiceRatingAmps } from '../calculations/shortCircuitHierarchy';
 import { ArcFlashPages } from './ArcFlashDocuments';
 import { GroundingPlanPages } from './GroundingPlanDocuments';
 import { MultiFamilyEVPages } from './MultiFamilyEVDocuments';
@@ -99,6 +99,55 @@ import { isEvseDescription, type NecEdition } from '../../data/nec/evse-load';
  * (#179): a unit panel takes its page's method, a multifamily house panel the
  * non-dwelling Part III rules.
  */
+/**
+ * #289/#301: the rows the Short Circuit page marks "Stale", from the same
+ * function with the same inputs (the project's service amps included, so an
+ * estimated service row with other amps is Stale on E-102 and E-103).
+ */
+export function packetShortCircuitStale(data: PermitPacketData) {
+  return detectStaleCalculations({
+    project: {
+      service_amps: data.projectServiceAmps,
+      service_voltage: data.serviceVoltage,
+      service_phase: data.servicePhase,
+      utility_available_fault_current_a: data.utilityAvailableFaultCurrentA ?? null,
+    },
+    panels: data.panels,
+    transformers: data.transformers ?? [],
+    calculations: data.shortCircuitCalculations ?? [],
+  });
+}
+
+/**
+ * E-102's input. "Service Rating" is the project's rating (its service amps,
+ * else the MDP main; owner ruling 2026-11-23, #301), never the calculator's
+ * Service Amps field; the row's own values print as saved, with its Stale mark.
+ */
+export function availableFaultCurrentInputFor(
+  data: PermitPacketData,
+  serviceCalc: ShortCircuitCalculation,
+): AvailableFaultCurrentInput {
+  return {
+    serviceAmps: projectServiceRatingAmps({ service_amps: data.projectServiceAmps }, data.panels),
+    serviceVoltage: serviceCalc.service_voltage,
+    servicePhase: serviceCalc.service_phase,
+    sourceFaultCurrent: serviceCalc.source_fault_current,
+    transformerKVA: serviceCalc.transformer_kva,
+    transformerImpedance: serviceCalc.transformer_impedance,
+    serviceConductorSize: serviceCalc.service_conductor_size,
+    serviceConductorMaterial: serviceCalc.service_conductor_material,
+    serviceConductorLength: serviceCalc.service_conductor_length,
+    serviceConductorSets: (serviceCalc.results as { setsInParallel?: number } | null)?.setsInParallel ?? null,
+    // The `results` column is typed `Json` in the DB; the IEEE-141 engine
+    // writes a structured block whose shape lines up with
+    // ShortCircuitResultsBlock. Cast through `unknown` so the typecheck
+    // doesn't over-constrain consumers of the raw Json column.
+    results: (serviceCalc.results as unknown as AvailableFaultCurrentInput['results']) ?? null,
+    notes: serviceCalc.notes,
+    staleReason: packetShortCircuitStale(data).get(serviceCalc.id)?.reason ?? null,
+  };
+}
+
 export function packetFeederLoadRules(data: PermitPacketData): FeederLoadRules {
   return {
     occupancy: data.projectType === 'Residential'
@@ -125,6 +174,8 @@ export interface PermitPacketData {
   serviceModificationType?: 'existing' | 'service-upgrade' | 'new-service';
   serviceVoltage: number;
   servicePhase: 1 | 3;
+  /** The project's service amps column (null when not recorded); E-102 prints the project's rating from it, else the MDP main (#301). */
+  projectServiceAmps: number | null;
   panels: Panel[];
   circuits: Circuit[];
   feeders: Feeder[];
@@ -798,24 +849,7 @@ export const generatePermitPacket = async (data: PermitPacketData): Promise<void
       c => c.calculation_type === 'service',
     );
     if (serviceCalc) {
-      const input: AvailableFaultCurrentInput = {
-        serviceAmps: serviceCalc.service_amps,
-        serviceVoltage: serviceCalc.service_voltage,
-        servicePhase: serviceCalc.service_phase,
-        sourceFaultCurrent: serviceCalc.source_fault_current,
-        transformerKVA: serviceCalc.transformer_kva,
-        transformerImpedance: serviceCalc.transformer_impedance,
-        serviceConductorSize: serviceCalc.service_conductor_size,
-        serviceConductorMaterial: serviceCalc.service_conductor_material,
-        serviceConductorLength: serviceCalc.service_conductor_length,
-        serviceConductorSets: (serviceCalc.results as { setsInParallel?: number } | null)?.setsInParallel ?? null,
-        // The `results` column is typed `Json` in the DB; the IEEE-141 engine
-        // writes a structured block whose shape lines up with
-        // ShortCircuitResultsBlock. Cast through `unknown` so the typecheck
-        // doesn't over-constrain consumers of the raw Json column.
-        results: (serviceCalc.results as unknown as AvailableFaultCurrentInput['results']) ?? null,
-        notes: serviceCalc.notes,
-      };
+      const input = availableFaultCurrentInputFor(data, serviceCalc);
       builders.push({
         name: 'AvailableFaultCurrent',
         kind: 'availableFaultCurrent',
@@ -848,16 +882,7 @@ export const generatePermitPacket = async (data: PermitPacketData): Promise<void
         <ShortCircuitTablePages
           calculations={data.shortCircuitCalculations ?? []}
           // #289: mark rows the Short Circuit page marks "Stale" (same function, same inputs)
-          stale={detectStaleCalculations({
-            project: {
-              service_voltage: data.serviceVoltage,
-              service_phase: data.servicePhase,
-              utility_available_fault_current_a: data.utilityAvailableFaultCurrentA ?? null,
-            },
-            panels: data.panels,
-            transformers: data.transformers ?? [],
-            calculations: data.shortCircuitCalculations ?? [],
-          })}
+          stale={packetShortCircuitStale(data)}
           projectName={data.projectName}
           projectAddress={data.projectAddress}
           {...contractor}

@@ -22,7 +22,7 @@ import { applyCodeCycleList } from '../../data/ahj/codeCycle';
 import { calculateAllCumulativeVoltageDrops } from '../calculations/cumulativeVoltageDrop';
 import type { NecEdition } from '../../data/nec/evse-load';
 import { article220Citations } from '../../data/nec/article220-citations';
-import { SHORT_CIRCUIT_OUTDATED } from '../../lib/storedCalcs';
+import { SHORT_CIRCUIT_OUTDATED, SHORT_CIRCUIT_STALE } from '../../lib/storedCalcs';
 import {
   BrandBar,
   Footer as BrandFooter,
@@ -3014,6 +3014,8 @@ export interface AvailableFaultCurrentInput {
   results: ShortCircuitResultsBlock | null;
   /** Free-text notes from the calc (utility data source, assumptions). */
   notes?: string | null;
+  /** #301: the app's "Stale" reason for this row (`detectStaleCalculations`); values print as saved. */
+  staleReason?: string | null;
 }
 
 interface AvailableFaultCurrentPageProps {
@@ -3166,6 +3168,18 @@ export const AvailableFaultCurrentPage: React.FC<AvailableFaultCurrentPageProps>
           </Text>
           <Text style={themeStyles.warningText}>
             {`${r.outdated}. The values on this page are as saved; run the short-circuit calculation again.`}
+          </Text>
+        </View>
+      )}
+
+      {/* #301: an estimated utility transformer sized from other amps than the project's rating */}
+      {!r.outdated && input.staleReason && (
+        <View style={themeStyles.warningBox} wrap={false}>
+          <Text style={{ fontSize: 9, fontFamily: 'Helvetica-Bold', marginBottom: 2, color: '#78350f' }}>
+            {SHORT_CIRCUIT_STALE.toUpperCase()}
+          </Text>
+          <Text style={themeStyles.warningText}>
+            {`${input.staleReason}. The values on this page are as saved; run the service calculation again with the project's service rating.`}
           </Text>
         </View>
       )}

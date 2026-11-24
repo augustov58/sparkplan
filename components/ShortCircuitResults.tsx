@@ -7,7 +7,7 @@ import { useTransformers } from '../hooks/useTransformers';
 import { useProjects } from '../hooks/useProjects';
 import { exportSingleCalculation, exportSystemReport } from '../services/pdfExport/shortCircuitPDF';
 import { ShortCircuitProjectCalculator, type ShortCircuitProject } from './ShortCircuitProjectCalculator';
-import { detectStaleCalculations } from '../services/calculations/shortCircuitHierarchy';
+import { detectStaleCalculations, SERVICE_RATING_CHANGED } from '../services/calculations/shortCircuitHierarchy';
 import { SHORT_CIRCUIT_OUTDATED, SHORT_CIRCUIT_STALE, shortCircuitConductorText } from '../lib/storedCalcs';
 
 interface ShortCircuitResult {
@@ -152,6 +152,7 @@ export const ShortCircuitResults: React.FC = () => {
             calculation={serviceCalculation}
             projectName={project?.name || ''}
             projectAddress={project?.address}
+            staleInfo={staleMap.get(serviceCalculation.id)}
             onDelete={() => setDeleteConfirmId(serviceCalculation.id)}
           />
         </div>
@@ -259,8 +260,18 @@ const CalculationCard: React.FC<CalculationCardProps> = ({ calculation, panel, p
         <div className="bg-amber-50 border-b border-amber-200 px-3 py-2 text-xs text-amber-900 flex items-start gap-2 rounded-t-lg">
           <RefreshCw className="w-3.5 h-3.5 mt-0.5 shrink-0" />
           <div>
-            <span className="font-semibold">Stale — upstream chain changed:</span>{' '}
-            {staleInfo.reason.replace(/^Upstream chain changed: /, '')}. Delete this calc and re-add it to pick up the new source value.
+            {staleInfo.reason.startsWith(SERVICE_RATING_CHANGED) ? (
+              <>
+                {/* #301: the utility transformer was estimated from other amps than the project's rating */}
+                <span className="font-semibold">Stale — service rating changed:</span>{' '}
+                {staleInfo.reason.slice(SERVICE_RATING_CHANGED.length + 2)}. Delete this calc and run the service entrance again with the project's service rating.
+              </>
+            ) : (
+              <>
+                <span className="font-semibold">Stale — upstream chain changed:</span>{' '}
+                {staleInfo.reason.replace(/^Upstream chain changed: /, '')}. Delete this calc and re-add it to pick up the new source value.
+              </>
+            )}
           </div>
         </div>
       )}
