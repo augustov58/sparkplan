@@ -81,9 +81,22 @@ export interface CommercialLoadInput {
   necEdition: NecEdition;
 }
 
+/**
+ * The HVAC row's citation (owner ruling 2026-11-24, #205): the nameplate
+ * rated-load current (440.6(A)) is the motor-outlet load of 220.14(C). The
+ * app, the PDF and the CSV all print this.
+ */
+export const HVAC_CITATION = 'NEC 220.14(C), 440.6(A)';
+
 export interface HVACLoad {
   description: string;
-  nameplateFLA: number; // MCA (Minimum Circuit Ampacity) per NEC 440.22
+  /**
+   * Nameplate rated-load current (RLA), A, per NEC 440.6(A): the Article 220
+   * load at 100 % (#205; it was asked as MCA, a conductor-sizing value that
+   * already holds 125 % of the largest motor). The field keeps its old name
+   * so saved inputs still load.
+   */
+  nameplateFLA: number;
   voltage: number;
   phase: 1 | 3;
   isContinuous: boolean; // 125% in service sizing if continuous (>3 hours)
@@ -384,7 +397,7 @@ export function calculateCommercialLoad(input: CommercialLoadInput): CommercialL
       isContinuous: hvacIsContinuous,
       serviceSizingLoad_VA: hvacServiceSizing_VA,
       nonContinuousSizing_VA: hvacIsContinuous ? hvacNonContinuous_VA : undefined,
-      necReference: 'NEC 220.14(C), 440.6',
+      necReference: HVAC_CITATION,
     });
 
     if (hvacIsContinuous) {

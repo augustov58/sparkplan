@@ -206,6 +206,16 @@ row). "220.60 (Omit …)" only when a heating or cooling load is omitted
 ```
 Implementation: `upstreamLoadAggregation.ts` (`WATER_HEATER_CITATION`, `HEATING_CITATION`, `COOLING_CITATION`, `calculateHvacDemand`).
 
+### Commercial Load Calculator HVAC (owner ruling 2026-11-24, #205)
+```
+The HVAC row asks for the nameplate rated-load current (RLA, A) per
+440.6(A): RLA × V (× √3 on 3Φ) is the Article 220 load at 100 %.
+"Continuous" adds the 125 % in service sizing only (#195). Never MCA as the
+load (it already holds 125 % of the largest motor, 440.33). App, PDF and
+CSV cite "NEC 220.14(C), 440.6(A)" (HVAC_CITATION). The stored field keeps
+its name, nameplateFLA, so saved inputs load.
+```
+
 ### Short Circuit Analysis
 ```
 CRITICAL: 3-phase impedance multiplier is 1× (not 1.732×).
@@ -529,6 +539,7 @@ Real mistakes made in this repo, each paired with the rule that prevents recurre
 | The Material Take-Off wrapped CSV cells in quotes without doubling the quotes inside them (`3/4"` broke the row), while the commercial export already had a correct private `csvEscape`; outlet and junction boxes were a share of every circuit, so feeder-only panels listed outlet boxes (#321) | Before writing a formatter, grep for one (`csvEscape`); move it to `lib/` instead of copying it, and check the import doesn't pull a heavy module (react-pdf) into the page. An estimate per circuit says which circuits it applies to. |
 | Every list hook subscribed to realtime, but 23 of its tables (panels, circuits, feeders, projects…) were never in the `supabase_realtime` publication, so no event fired and the #234 race guard defended against events that didn't arrive (#315). Also: E-201 printed "MDP (MDP)", E-202 a main breaker without its unit, and the packet's filename used the UTC day | Check the database side of a client subscription (`pg_publication_tables`), not only the hook code. Format a number with its unit at every cell that prints it. A user-facing "today" is the local day (`localDateStamp`), never `toISOString()`; the remaining UTC sites are #327. |
 | The Part III aggregate cited "NEC 220.51 (Fixed Appliances)" for water heaters (220.51 is fixed electric space heating, and that's not its title) and "220.60 (Omit 0.0kVA cooling)" when nothing was omitted (#206) | A citation names the section that sets the value printed beside it, by its real title; a section about omitting prints only when something is omitted. Check the title in the code book (Obsidian NEC 2023) before writing it. Shorten a citation by dropping its title (a parenthetical after a space), never at the first "(": that cut "220.14(A)" to "220.14" on E-301 (`shortCitation`). Assert a packet citation per page. |
+| The Commercial Load Calculator labelled the HVAC current "MCA (Amps)" and used it as the load (MCA already holds 125 % of the largest motor, and "Continuous" added 125 % again), citing 440.6 in the app and 440.22 (OCPD sizing) in the PDF (#205) | A load input asks for the value the load is (RLA, 440.6(A)), not a conductor-sizing value. One citation constant feeds the app, the PDF and the CSV (`HVAC_CITATION`); grep all three when a citation changes. |
 | Docs updated with stale "Last Updated" dates; completed features left as "NEXT UP" | Every doc touch updates its date to today; every shipped feature flips its ROADMAP status in the same PR. |
 
 ---

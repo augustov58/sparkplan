@@ -24,7 +24,7 @@ import type {
   SpecialLoad,
   OccupancyType,
 } from '../calculations/commercialLoad';
-import { OCCUPANCY_LABELS, LIGHTING_UNIT_LOAD } from '../calculations/commercialLoad';
+import { OCCUPANCY_LABELS, LIGHTING_UNIT_LOAD, HVAC_CITATION } from '../calculations/commercialLoad';
 import { article220Citations } from '../../data/nec/article220-citations';
 
 // Helvetica + Helvetica-Bold are built-in standard PDF fonts; do not register.
@@ -634,11 +634,11 @@ export const CommercialLoadDocument: React.FC<CommercialLoadDocumentProps> = (pr
         {/* HVAC */}
         {hvacLoads.length > 0 && (
           <>
-            <Text style={styles.subSectionTitle}>HVAC Equipment (NEC 220.14(C), 440.22)</Text>
+            <Text style={styles.subSectionTitle}>HVAC Equipment ({HVAC_CITATION})</Text>
             <View style={styles.table}>
               <View style={styles.tableHeaderRow}>
                 <Text style={[styles.th, { width: '40%' }]}>Description</Text>
-                <Text style={[styles.th, { width: '20%', textAlign: 'right' }]}>MCA/FLA (A)</Text>
+                <Text style={[styles.th, { width: '20%', textAlign: 'right' }]}>RLA (A)</Text>
                 <Text style={[styles.th, { width: '15%', textAlign: 'right' }]}>Voltage</Text>
                 <Text style={[styles.th, { width: '10%', textAlign: 'center' }]}>Phase</Text>
                 <Text style={[styles.th, { width: '15%', textAlign: 'center' }]}>Continuous</Text>
