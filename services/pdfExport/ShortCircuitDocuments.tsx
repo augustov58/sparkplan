@@ -9,6 +9,7 @@ import { Text } from './PdfText';
 import type { ShortCircuitCalculation } from '../../lib/database.types';
 import { SHORT_CIRCUIT_OUTDATED, SHORT_CIRCUIT_STALE, shortCircuitConductorText } from '../../lib/storedCalcs';
 import { SERVICE_RATING_CHANGED } from '../calculations/shortCircuitHierarchy';
+import { aicStatus, panelAtShortCircuitPoint, type AicStatusKind } from './permitPacketTheme';
 import {
   BrandBar,
   Footer as BrandFooter,
@@ -431,15 +432,16 @@ const tableStyles = StyleSheet.create({
     borderBottomColor: '#e5e7eb',
   },
   // Columns sum to 100%
-  colPanel:      { width: '18%' },
-  colType:       { width: '8%'  },
+  colPanel:      { width: '14%' },
+  colType:       { width: '7%'  },
   colSourceIf:   { width: '10%' },
   colFeeder:     { width: '16%' },
-  colVoltage:    { width: '9%'  },
-  colImpedance:  { width: '9%'  },
-  colFault:      { width: '10%' },
-  colAic:        { width: '9%'  },
-  colCompliance: { width: '11%' },
+  colVoltage:    { width: '8%'  },
+  colImpedance:  { width: '10%' },
+  colFault:      { width: '11%' },
+  colAic:        { width: '8%'  },
+  // #307: holds "Required >= 10 kA" / "OK (42 >= 8.6 kA)" on one line
+  colCompliance: { width: '16%' },
   cellCenter: { textAlign: 'center', fontSize: 8 },
   cellLeft:   { fontSize: 8 },
   compliantText:    { color: '#059669', fontFamily: 'Helvetica-Bold' },
@@ -488,9 +490,14 @@ interface TableRowData {
   outdated: boolean;
   /** #289: its saved source differs from the current upstream (the app's "Stale"); why. */
   staleReason: string | null;
+  /** #307: the NEC 110.9 status of the equipment at this point (rating entered or not). */
+  aic: { kind: AicStatusKind; text: string };
 }
 
-function buildRow(calc: ShortCircuitCalculation, stale?: StaleMap): TableRowData {
+/** A panel's entered interrupting rating (kA, #313) for the E-103 status (#307). */
+type RatedPanel = { id: string; name?: string; is_main?: boolean | null; aic_rating?: number | null };
+
+function buildRow(calc: ShortCircuitCalculation, panels: ReadonlyArray<RatedPanel>, stale?: StaleMap): TableRowData {
   const results = calc.results as unknown as ShortCircuitResult;
   const isService = calc.calculation_type === 'service';
 
@@ -524,6 +531,12 @@ function buildRow(calc: ShortCircuitCalculation, stale?: StaleMap): TableRowData
     necArticle: results.compliance.necArticle,
     outdated: !!results.outdated,
     staleReason: stale?.get(calc.id)?.reason ?? null,
+    aic: aicStatus(
+      panelAtShortCircuitPoint(calc, panels)?.aic_rating,
+      results.faultCurrent,
+      results.requiredAIC,
+      results.compliance.compliant,
+    ),
   };
 }
 
@@ -552,6 +565,8 @@ interface TablePagesProps {
   includeNECReferences?: boolean;
   /** Panel rows whose upstream changed since they were saved (`detectStaleCalculations`, #289). */
   stale?: StaleMap;
+  /** The project's panels: each row's status compares the entered rating at its point (#307). */
+  panels: ReadonlyArray<RatedPanel>;
 }
 
 export const ShortCircuitTablePages: React.FC<TablePagesProps> = ({
@@ -563,16 +578,22 @@ export const ShortCircuitTablePages: React.FC<TablePagesProps> = ({
   sheetId,
   includeNECReferences = true,
   stale,
+  panels,
 }) => {
-  const rows = calculations.map((c) => buildRow(c, stale));
+  const rows = calculations.map((c) => buildRow(c, panels, stale));
   const total = rows.length;
   const outdated = rows.filter((r) => r.outdated).length;
   const staleRows = rows.filter((r) => !r.outdated && r.staleReason);
   // #301: a service row is Stale because the project's rating changed, not its upstream
   const staleService = staleRows.filter((r) => r.staleReason!.startsWith(SERVICE_RATING_CHANGED));
   const staleUpstream = staleRows.filter((r) => !r.staleReason!.startsWith(SERVICE_RATING_CHANGED));
-  const compliant = rows.filter((r) => r.compliant && !r.outdated && !r.staleReason).length;
-  const nonCompliant = total - compliant - outdated - staleRows.length;
+  // #307: the counts follow the row statuses; Outdated and Stale come first
+  const current = rows.filter((r) => !r.outdated && !r.staleReason);
+  const okCount = current.filter((r) => r.aic.kind === 'ok').length;
+  const underCount = current.filter((r) => r.aic.kind === 'under').length;
+  const notEntered = current.filter((r) => r.aic.kind === 'required').length;
+  const reviewCount = current.filter((r) => r.aic.kind === 'review').length;
+  const pct = (n: number) => `${n} (${total > 0 ? ((n / total) * 100).toFixed(0) : 0}%)`;
   const maxFault = rows.reduce((m, r) => Math.max(m, r.faultCurrentKa), 0);
   const avgFault = total > 0 ? rows.reduce((s, r) => s + r.faultCurrentKa, 0) / total : 0;
   const maxRequiredAic = rows.reduce((m, r) => Math.max(m, r.requiredAicKa), 0);
@@ -596,17 +617,23 @@ export const ShortCircuitTablePages: React.FC<TablePagesProps> = ({
           <Text style={tableStyles.summaryValue}>{total}</Text>
         </View>
         <View style={tableStyles.summaryRow}>
-          <Text style={tableStyles.summaryLabel}>{`Compliant (NEC 110.9):`}</Text>
-          <Text style={[tableStyles.summaryValue, tableStyles.compliantText]}>
-            {compliant} ({total > 0 ? ((compliant / total) * 100).toFixed(0) : 0}%)
-          </Text>
+          <Text style={tableStyles.summaryLabel}>Rating entered, OK (NEC 110.9):</Text>
+          <Text style={[tableStyles.summaryValue, tableStyles.compliantText]}>{pct(okCount)}</Text>
         </View>
         <View style={tableStyles.summaryRow}>
-          <Text style={tableStyles.summaryLabel}>Requires Review:</Text>
-          <Text style={[tableStyles.summaryValue, nonCompliant > 0 ? tableStyles.nonCompliantText : {}]}>
-            {nonCompliant} ({total > 0 ? ((nonCompliant / total) * 100).toFixed(0) : 0}%)
-          </Text>
+          <Text style={tableStyles.summaryLabel}>Under-rated:</Text>
+          <Text style={[tableStyles.summaryValue, underCount > 0 ? tableStyles.nonCompliantText : {}]}>{pct(underCount)}</Text>
         </View>
+        <View style={tableStyles.summaryRow}>
+          <Text style={tableStyles.summaryLabel}>Rating not entered:</Text>
+          <Text style={tableStyles.summaryValue}>{pct(notEntered)}</Text>
+        </View>
+        {reviewCount > 0 && (
+          <View style={tableStyles.summaryRow}>
+            <Text style={tableStyles.summaryLabel}>Above the standard ratings (review):</Text>
+            <Text style={[tableStyles.summaryValue, tableStyles.nonCompliantText]}>{pct(reviewCount)}</Text>
+          </View>
+        )}
         {outdated > 0 && (
           <View style={tableStyles.summaryRow}>
             <Text style={tableStyles.summaryLabel}>{`${SHORT_CIRCUIT_OUTDATED}:`}</Text>
@@ -659,7 +686,7 @@ export const ShortCircuitTablePages: React.FC<TablePagesProps> = ({
                 <Text style={[tableStyles.colPanel, tableStyles.cellLeft]}>{row.panelLabel}</Text>
                 <Text style={[tableStyles.colType, tableStyles.cellCenter]}>{row.typeLabel}</Text>
                 <Text style={[tableStyles.colSourceIf, tableStyles.cellCenter]}>
-                  {row.sourceIf.toLocaleString()}
+                  {Math.round(row.sourceIf).toLocaleString('en-US')}
                 </Text>
                 <Text style={[tableStyles.colFeeder, tableStyles.cellLeft]}>{row.feederLabel}</Text>
                 <Text style={[tableStyles.colVoltage, tableStyles.cellCenter]}>{row.voltageLabel}</Text>
@@ -676,10 +703,12 @@ export const ShortCircuitTablePages: React.FC<TablePagesProps> = ({
                   style={[
                     tableStyles.colCompliance,
                     tableStyles.cellCenter,
-                    row.compliant && !row.outdated && !row.staleReason ? tableStyles.compliantText : tableStyles.nonCompliantText,
+                    row.aic.kind === 'ok' && !row.outdated && !row.staleReason
+                      ? tableStyles.compliantText
+                      : row.aic.kind === 'required' && !row.outdated && !row.staleReason ? {} : tableStyles.nonCompliantText,
                   ]}
                 >
-                  {row.outdated ? SHORT_CIRCUIT_OUTDATED : row.staleReason ? SHORT_CIRCUIT_STALE : row.compliant ? 'Compliant' : 'Review'}
+                  {row.outdated ? SHORT_CIRCUIT_OUTDATED : row.staleReason ? SHORT_CIRCUIT_STALE : row.aic.text}
                 </Text>
               </View>
             ))}
@@ -711,11 +740,19 @@ export const ShortCircuitTablePages: React.FC<TablePagesProps> = ({
         </View>
       ))}
 
-      {nonCompliant === 0 && outdated === 0 && staleRows.length === 0 && rows.length > 0 && (
+      {/* #307: no claim of compliance without an entered rating to compare */}
+      {notEntered > 0 && (
         <View style={tableStyles.infoBox}>
           <Text style={tableStyles.infoText}>
-            All panels meet NEC 110.9 interrupting rating requirements. Equipment AIC ratings must be
-            greater than or equal to the calculated fault current at each point.
+            {`Equipment interrupting ratings are not entered for ${notEntered === 1 ? 'one point' : `${notEntered} points`}. Each device's interrupting rating shall be at least the available fault current at its line-side terminals (NEC 110.9); the Req. AIC column gives the minimum standard rating.`}
+          </Text>
+        </View>
+      )}
+
+      {rows.length > 0 && okCount === total && (
+        <View style={tableStyles.infoBox}>
+          <Text style={tableStyles.infoText}>
+            Every entered equipment interrupting rating is at least the fault current at its point (NEC 110.9).
           </Text>
         </View>
       )}

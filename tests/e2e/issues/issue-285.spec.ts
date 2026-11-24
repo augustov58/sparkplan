@@ -81,7 +81,7 @@ test('#285 one service short-circuit calculation: a new save replaces it everywh
     expect(afc).toMatch(/Minimum required AIC rating\s+14 kA/);
     const table = pages.find(p => p.includes('Per-Panel Short Circuit Analysis'))!;
     expect(table.match(/^\s*Service Entrance\s+Service/gm)).toHaveLength(1); // main: 2 rows
-    expect(table).toMatch(/Service Entrance\s+Service[^\n]*\s11\.9\s+14\s+Compliant/);
+    expect(table).toMatch(/Service Entrance\s+Service[^\n]*\s11\.9\s+14\s+Required >= 14 kA/); // #307: no rating entered
     expect(table).toMatch(/Total Panels:\s+1\b/);
     expect(table).toMatch(/Highest Required AIC:\s+14 kA/);
   } catch (e) {

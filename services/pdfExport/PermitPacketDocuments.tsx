@@ -1607,7 +1607,7 @@ const RiserPageBody: React.FC<RiserPageBodyProps> = ({
         {`MLO = Main Lug Only (no main breaker) \u2022 AIC = Ampere Interrupting Capacity (equipment interrupting rating, NEC 110.9)`}
       </Text>
       <Text style={{ fontSize: 8 }}>
-        Feeder labels show conductor size, length and voltage drop (the design load in kVA when no voltage drop is computed). Per-node AIC ratings shown for compliance with NEC 110.9 / 110.10.
+        Feeder labels show conductor size, length and voltage drop (the design load in kVA when no voltage drop is computed). AIC shown where an equipment rating is entered.
       </Text>
 
       <BrandFooter
@@ -3016,6 +3016,12 @@ export interface AvailableFaultCurrentInput {
   notes?: string | null;
   /** #301: the app's "Stale" reason for this row (`detectStaleCalculations`); values print as saved. */
   staleReason?: string | null;
+  /**
+   * #307: every entered equipment interrupting rating (kA, #313) with the
+   * fault current at its own point (null when no calculation covers it).
+   * Empty → the page says the ratings are not entered.
+   */
+  equipmentAic: Array<{ name: string; ratingKa: number; faultCurrentA: number | null }>;
 }
 
 interface AvailableFaultCurrentPageProps {
@@ -3033,6 +3039,30 @@ const fmtAmps = (a: number | undefined | null): string => {
   return `${Math.round(a).toLocaleString()} A`;
 };
 
+/**
+ * #307 (owner ruling 2026-11-23): E-102's closing note. With no rating
+ * entered it states the requirement; with ratings it compares each one with
+ * the fault current at its own point. It never says "confirmed" without a
+ * comparison.
+ */
+export function interruptingRatingNote(
+  equipment: AvailableFaultCurrentInput['equipmentAic'],
+  minimumRatingKa: number | null,
+): string {
+  if (equipment.length === 0) {
+    return 'Equipment interrupting ratings are not entered. Each device\'s interrupting rating shall be at least the available fault current at its line-side terminals (NEC 110.9)'
+      + (minimumRatingKa != null ? `; minimum standard rating ${minimumRatingKa} kA.` : '.');
+  }
+  const lines = equipment.map((e) => {
+    if (e.faultCurrentA == null) return `${e.name} ${e.ratingKa} kA, no fault current calculated at its point`;
+    const faultKa = e.faultCurrentA / 1000;
+    return e.ratingKa >= faultKa
+      ? `${e.name} ${e.ratingKa} kA ≥ ${faultKa.toFixed(1)} kA, OK`
+      : `${e.name} ${e.ratingKa} kA < ${faultKa.toFixed(1)} kA, under-rated`;
+  });
+  return `Each device's interrupting rating shall be at least the available fault current at its line-side terminals (NEC 110.9). Entered ratings compared with the fault current at each point: ${lines.join('; ')}.`;
+}
+
 export const AvailableFaultCurrentPage: React.FC<AvailableFaultCurrentPageProps> = ({
   projectName,
   projectAddress,
@@ -3047,6 +3077,9 @@ export const AvailableFaultCurrentPage: React.FC<AvailableFaultCurrentPageProps>
   const requiredAIC = r.requiredAIC ?? null;
   const sourceFaultA = input.sourceFaultCurrent ?? r.details?.sourceFaultCurrent ?? null;
   const compliant = r.compliance?.compliant ?? null;
+  const underRated = input.equipmentAic.some(
+    (e) => e.faultCurrentA != null && e.ratingKa < e.faultCurrentA / 1000,
+  );
 
   return (
     <Page size="LETTER" style={themeStyles.page}>
@@ -3186,7 +3219,7 @@ export const AvailableFaultCurrentPage: React.FC<AvailableFaultCurrentPageProps>
 
       {/* Verdict */}
       <View
-        style={compliant === false ? themeStyles.warningBox : themeStyles.noteBox}
+        style={compliant === false || underRated ? themeStyles.warningBox : themeStyles.noteBox}
         wrap={false}
       >
         <Text
@@ -3194,15 +3227,15 @@ export const AvailableFaultCurrentPage: React.FC<AvailableFaultCurrentPageProps>
             fontSize: 9,
             fontFamily: 'Helvetica-Bold',
             marginBottom: 2,
-            color: compliant === false ? '#78350f' : '#1e3a8a',
+            color: compliant === false || underRated ? '#78350f' : '#1e3a8a',
           }}
         >
           NEC 110.9 + 110.10 — INTERRUPTING RATING
         </Text>
-        <Text style={compliant === false ? themeStyles.warningText : themeStyles.noteText}>
+        <Text style={compliant === false || underRated ? themeStyles.warningText : themeStyles.noteText}>
           {compliant === false
             ? `Equipment AIC ratings on the Equipment Specs sheet must equal or exceed the available fault current at every connection point. One or more devices in this packet do NOT meet that threshold and must be upsized or series-rated per NEC 240.86.`
-            : `All equipment installed under this permit shall have an interrupting rating equal to or greater than the available fault current at its line-side terminals (NEC 110.9). Equipment AIC ratings shown on the Equipment Specs sheet are confirmed against the value above.`}
+            : interruptingRatingNote(input.equipmentAic, requiredAIC)}
         </Text>
       </View>
 

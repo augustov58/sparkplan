@@ -52,6 +52,46 @@ export const formatAicKa = (
   return `${display} kA`;
 };
 
+/**
+ * #307 (owner ruling 2026-11-23): an equipment interrupting rating's NEC 110.9
+ * status against the fault current at its own point (its line-side
+ * terminals). Never "compliant" without an entered rating to compare.
+ *
+ *   rating 42, 8,632 A  → { kind: 'ok',       text: 'OK (42 ≥ 8.6 kA)' }
+ *   rating 10, 11,908 A → { kind: 'under',    text: 'Under-rated' }
+ *   no rating, req 10   → { kind: 'required', text: 'Required ≥ 10 kA' }
+ *   no rating, > 200 kA → { kind: 'review',   text: 'Review' } (no standard rating covers it)
+ */
+export type AicStatusKind = 'ok' | 'under' | 'required' | 'review';
+export function aicStatus(
+  ratingKa: number | null | undefined,
+  faultCurrentA: number,
+  requiredAicKa: number,
+  withinStandardRatings = true,
+): { kind: AicStatusKind; text: string } {
+  const faultKa = faultCurrentA / 1000;
+  if (ratingKa != null && ratingKa > 0) {
+    return ratingKa >= faultKa
+      ? { kind: 'ok', text: `OK (${ratingKa} ≥ ${faultKa.toFixed(1)} kA)` }
+      : { kind: 'under', text: 'Under-rated' };
+  }
+  return withinStandardRatings
+    ? { kind: 'required', text: `Required ≥ ${requiredAicKa} kA` }
+    : { kind: 'review', text: 'Review' };
+}
+
+/**
+ * The equipment at a short-circuit row's point: the service row (no panel)
+ * is the MDP's line side; a panel row is its panel's.
+ */
+export function panelAtShortCircuitPoint<P extends { id: string; is_main?: boolean | null }>(
+  calc: { calculation_type: string; panel_id: string | null },
+  panels: ReadonlyArray<P>,
+): P | undefined {
+  if (calc.panel_id) return panels.find((p) => p.id === calc.panel_id);
+  return calc.calculation_type === 'service' ? panels.find((p) => p.is_main) : undefined;
+}
+
 // ==================== HELPERS ====================
 
 export const todayStr = (): string =>

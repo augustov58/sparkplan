@@ -59,7 +59,7 @@ describe('#289 the packet table', () => {
     const calcs = [service(3), dp1].map(recomputeShortCircuitRow);
     const stale = detectStaleCalculations({ project, panels: [mdp, dp1Panel], transformers: [], calculations: calcs });
     expect(stale.size).toBe(0);
-    const text = textOf(ShortCircuitTablePages({ calculations: calcs, stale, projectName: 'P' }) as React.ReactElement);
+    const text = textOf(ShortCircuitTablePages({ calculations: calcs, stale, panels: [mdp, dp1Panel], projectName: 'P' }) as React.ReactElement);
     expect(text).toMatch(/3 × 500 kcmil Cu · 20 ft/);
     expect(text).toMatch(/2 × 4\/0 AWG Cu · 100 ft/);
     expect(text).toMatch(/Service fault current calculated from the utility transformer \(1000 kVA, 5\.75 % Z\) through the service conductors/);
@@ -71,11 +71,11 @@ describe('#289 the packet table', () => {
     const calcs = [service(2), dp1].map(recomputeShortCircuitRow);
     const stale = detectStaleCalculations({ project, panels: [mdp, dp1Panel], transformers: [], calculations: calcs });
     expect(stale.get('dp1calc')?.reason).toBe('Upstream chain changed: was 20,344 A, now 20,069 A');
-    const text = textOf(ShortCircuitTablePages({ calculations: calcs, stale, projectName: 'P' }) as React.ReactElement);
+    const text = textOf(ShortCircuitTablePages({ calculations: calcs, stale, panels: [mdp, dp1Panel], projectName: 'P' }) as React.ReactElement);
     expect(text).toMatch(/DP-1[\s\S]*?2 × 4\/0 AWG Cu · 100 ft[\s\S]*?Stale, re-run/);
     expect(text).toMatch(/Stale, re-run:\s+1/);
     expect(text).toMatch(/DP-1: was 20,344 A, now 20,069 A/);
-    expect(text).toMatch(/Compliant \(NEC 110\.9\):\s+1/);
+    expect(text).toMatch(/Rating not entered:\s+1 \(50%\)/); // #307: the service row, no rating entered
     expect(text).not.toMatch(/All panels meet NEC 110\.9/);
     expect(text).toMatch(/2 × 500 kcmil Cu · 20 ft/);
   });
@@ -92,7 +92,7 @@ describe('#289 the other surfaces print the sets', () => {
     const text = textOf(AvailableFaultCurrentPage({
       projectName: 'P',
       input: {
-        serviceAmps: 1200, serviceVoltage: 480, servicePhase: 3, sourceFaultCurrent: null, transformerKVA: 1000,
+        equipmentAic: [], serviceAmps: 1200, serviceVoltage: 480, servicePhase: 3, sourceFaultCurrent: null, transformerKVA: 1000,
         transformerImpedance: 5.75, serviceConductorSize: '500 kcmil', serviceConductorMaterial: 'Cu',
         serviceConductorLength: 20, serviceConductorSets: 3, results: svc.results as any,
       },

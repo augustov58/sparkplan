@@ -61,7 +61,9 @@ export const exportSystemReport = async (
   projectName: string,
   projectAddress: string,
   /** Rows the Short Circuit page marks "Stale" (#289), marked the same way. */
-  stale?: Map<string, { reason: string }>,
+  stale: Map<string, { reason: string }> | undefined,
+  /** The project's panels: each row's NEC 110.9 status compares the entered rating at its point (#307). */
+  panels: ReadonlyArray<{ id: string; name?: string; is_main?: boolean | null; aic_rating?: number | null }>,
 ) => {
   try {
     if (!calculations || calculations.length === 0) {
@@ -73,6 +75,7 @@ export const exportSystemReport = async (
         <ShortCircuitTablePages
           calculations={calculations}
           stale={stale}
+          panels={panels}
           projectName={projectName}
           projectAddress={projectAddress}
           includeNECReferences={true}

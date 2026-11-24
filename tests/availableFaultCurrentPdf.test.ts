@@ -17,6 +17,7 @@ import {
 
 const baseInput: AvailableFaultCurrentInput = {
   serviceAmps: 1000,
+  equipmentAic: [],
   serviceVoltage: 240,
   servicePhase: 1,
   sourceFaultCurrent: 22000,
@@ -124,6 +125,7 @@ describe('AvailableFaultCurrentPage (Sprint 2A H9)', () => {
   it('renders gracefully when results block is empty / partial', async () => {
     const minimal: AvailableFaultCurrentInput = {
       serviceAmps: 200,
+      equipmentAic: [],
       serviceVoltage: 240,
       servicePhase: 1,
       sourceFaultCurrent: null,

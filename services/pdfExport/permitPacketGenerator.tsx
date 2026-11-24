@@ -50,6 +50,7 @@ import { EquipmentSpecsPages } from './EquipmentSpecsDocuments';
 import { VoltageDropPages, type FeederLoadRules } from './VoltageDropDocuments';
 import { JurisdictionRequirementsPages } from './JurisdictionDocuments';
 import { ShortCircuitTablePages } from './ShortCircuitDocuments';
+import { panelAtShortCircuitPoint } from './permitPacketTheme';
 import { detectStaleCalculations, projectServiceRatingAmps } from '../calculations/shortCircuitHierarchy';
 import { ArcFlashPages } from './ArcFlashDocuments';
 import { GroundingPlanPages } from './GroundingPlanDocuments';
@@ -145,6 +146,16 @@ export function availableFaultCurrentInputFor(
     results: (serviceCalc.results as unknown as AvailableFaultCurrentInput['results']) ?? null,
     notes: serviceCalc.notes,
     staleReason: packetShortCircuitStale(data).get(serviceCalc.id)?.reason ?? null,
+    // #307: each entered rating with the fault current at its own point
+    equipmentAic: data.panels
+      .filter((p) => (p.aic_rating ?? 0) > 0)
+      .map((p) => {
+        const point = (data.shortCircuitCalculations ?? []).find(
+          (c) => panelAtShortCircuitPoint(c, data.panels)?.id === p.id,
+        );
+        const faultCurrentA = (point?.results as { faultCurrent?: number } | null)?.faultCurrent;
+        return { name: p.name, ratingKa: p.aic_rating as number, faultCurrentA: typeof faultCurrentA === 'number' ? faultCurrentA : null };
+      }),
   };
 }
 
@@ -881,6 +892,7 @@ export const generatePermitPacket = async (data: PermitPacketData): Promise<void
       render: (sheetIds) => (
         <ShortCircuitTablePages
           calculations={data.shortCircuitCalculations ?? []}
+          panels={data.panels}
           // #289: mark rows the Short Circuit page marks "Stale" (same function, same inputs)
           stale={packetShortCircuitStale(data)}
           projectName={data.projectName}

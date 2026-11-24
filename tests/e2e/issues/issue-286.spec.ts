@@ -103,5 +103,5 @@ test('#286 a feeder\'s sets in parallel reach the panel short-circuit calculatio
   await (await download).saveAs(pdf);
   const pages = execFileSync('pdftotext', ['-layout', pdf, '-'], { encoding: 'utf8' }).split('\f');
   const table = pages.find(p => p.includes('Per-Panel Short Circuit Analysis'))!;
-  expect(table).toMatch(/DP-1\s+Panel\s+20,344\.\d+[^\n]*\s15\.7\s+22\s+Compliant/);
+  expect(table).toMatch(/DP-1\s+Panel\s+20,344\s[^\n]*\s15\.7\s+22\s+Required >= 22 kA/); // #307: whole-amp Source If, no rating entered
 });

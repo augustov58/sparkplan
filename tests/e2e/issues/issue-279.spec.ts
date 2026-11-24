@@ -104,6 +104,6 @@ test('#279 required AIC is the next standard rating at or above the available fa
   expect(e103, 'short-circuit table page').toBeTruthy();
   const rows = e103.split('\n').filter(l => /^\s*Service Entrance\s+Service\s/.test(l));
   expect(rows.length, 'service rows on the short-circuit table').toBeGreaterThan(0);
-  for (const row of rows) expect(row).toMatch(/\s8\.6\s+10\s+Compliant/); // 7 — main: 14
+  for (const row of rows) expect(row).toMatch(/\s8\.6\s+10\s+Required >= 10 kA/); // 7 — main: 14; #307: no rating entered
   expect(e103).toMatch(/Highest Required AIC:\s+10 kA/);
 });
