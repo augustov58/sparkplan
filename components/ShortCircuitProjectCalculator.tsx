@@ -373,6 +373,7 @@ export const ShortCircuitProjectCalculator: React.FC<Props> = ({
           ) : (
             <PanelForm
               availablePanels={availablePanels}
+              hasDownstreamPanels={panels.some((p) => !p.is_main)}
               selectedPanelId={selectedPanelId}
               onPanelSelect={handlePanelSelect}
               sourceFaultCurrent={sourceFaultCurrent}
@@ -509,6 +510,8 @@ const ServiceForm: React.FC<ServiceFormProps> = (p) => (
 
 interface PanelFormProps {
   availablePanels: Panel[];
+  /** Any panel besides the MDP (#315: with none, the list isn't "all calculated") */
+  hasDownstreamPanels: boolean;
   selectedPanelId: string;
   onPanelSelect: (id: string) => void;
   sourceFaultCurrent: number;
@@ -536,7 +539,7 @@ const PanelForm: React.FC<PanelFormProps> = (p) => (
       <select value={p.selectedPanelId} onChange={(e) => p.onPanelSelect(e.target.value)} className={p.inputClass}>
         <option value="">— Select a panel —</option>
         {p.availablePanels.length === 0 && (
-          <option disabled>(all panels already calculated)</option>
+          <option disabled>{p.hasDownstreamPanels ? '(all panels already calculated)' : '(no downstream panels)'}</option>
         )}
         {p.availablePanels.map((panel) => (
           <option key={panel.id} value={panel.id}>

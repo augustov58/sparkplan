@@ -1,7 +1,7 @@
 # Database Architecture
 ## SparkPlan Application
 
-**Last Updated**: 2026-11-21
+**Last Updated**: 2026-11-24
 **Database**: Supabase PostgreSQL 15
 **Schema Version**: 2.3
 **Location**: `/supabase/schema.sql` and migration files
@@ -1301,6 +1301,10 @@ SELECT * FROM panels WHERE fed_from = 'mdp-id';
 - Query by project_id: ~2ms
 - Hierarchy traversal (5 levels): ~8ms
 - Full project load: ~15ms
+
+### Realtime publication (#315, 2026-11-24)
+
+The list hooks subscribe to `postgres_changes`, but until 2026-11-24 the `supabase_realtime` publication held only 11 tables (agent tables, estimates, meters, photos, support). The 23 others the app subscribes to (`panels`, `circuits`, `feeders`, `projects`, `transformers`, `short_circuit_calculations`, and the billing, permit, inspection and site tables) never sent an event, so an update made in another tab or device showed only after a reload. Migration `20261124_realtime_list_tables.sql` adds them idempotently; it was applied to prod with the owner's yes, and the publication now has 34 tables. Every one has RLS with policies, and Realtime applies RLS per subscriber. **A new table a hook subscribes to must be added to `supabase_realtime` in its own migration.**
 
 ---
 

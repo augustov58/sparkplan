@@ -730,7 +730,7 @@ export const EquipmentSchedule: React.FC<EquipmentScheduleProps> = ({
               <Text style={tdCol('15%')}>{mainPanel.voltage}V</Text>
               <Text style={tdCol('10%')}>{phaseLabel(mainPanel.phase)}</Text>
               <Text style={tdCol('15%')}>{mainPanel.bus_rating}A</Text>
-              <Text style={tdCol('15%')}>{mainPanel.main_breaker_amps || 'MLO'}</Text>
+              <Text style={tdCol('15%')}>{mainPanel.main_breaker_amps ? `${mainPanel.main_breaker_amps}A` : 'MLO'}</Text>
               <Text style={tdCol('25%')}>{mainPanel.location || 'N/A'}</Text>
             </View>
           </View>
@@ -762,7 +762,7 @@ export const EquipmentSchedule: React.FC<EquipmentScheduleProps> = ({
                 <Text style={tdCol('15%')}>{panel.voltage}V</Text>
                 <Text style={tdCol('10%')}>{phaseLabel(panel.phase)}</Text>
                 <Text style={tdCol('15%')}>{panel.bus_rating}A</Text>
-                <Text style={tdCol('15%')}>{panel.main_breaker_amps || 'MLO'}</Text>
+                <Text style={tdCol('15%')}>{panel.main_breaker_amps ? `${panel.main_breaker_amps}A` : 'MLO'}</Text>
                 <Text style={tdCol('25%')}>{panel.location || 'N/A'}</Text>
               </View>
             ))}
@@ -940,7 +940,8 @@ const buildPanelSubtree = (
   const node: RiserNode = {
     id: panel.id,
     kind: 'panel',
-    line1: panel.name + (panel.is_main ? ' (MDP)' : ''),
+    // #315: "MDP (MDP)" when the main panel is named MDP; append only when the name doesn't say it
+    line1: panel.name + (panel.is_main && !/\bMDP\b/i.test(panel.name) ? ' (MDP)' : ''),
     line2: `${panel.voltage}V ${phaseLabel(panel.phase)} \u2022 ${panel.bus_rating}A bus`,
     line3,
     // Sprint 2A PR 4 (H9 AIC overlay): per Orlando new-service item #4, every
@@ -1394,8 +1395,8 @@ const buildRiserDraw = (node: RiserNode, draw: RiserDraw): void => {
     });
   }
   if (node.line4) {
-    // Sprint 2A PR 4 (H9): AIC overlay — small, monospace-looking accent so
-    // it reads as a rating chip rather than continuation prose.
+    // Sprint 2A PR 4 (H9): AIC overlay. The node's normal dark text: it is
+    // the equipment rating, not a warning (#315; was dark red #7c2d12).
     draw.labels.push({
       key: `l4-${node.id}`,
       x,
@@ -1404,7 +1405,6 @@ const buildRiserDraw = (node: RiserNode, draw: RiserDraw): void => {
       content: node.line4,
       fontSize: 7.5,
       bold: true,
-      color: '#7c2d12', // dark amber, matches AIC tagging on the AIC page
       align: 'center',
     });
   }

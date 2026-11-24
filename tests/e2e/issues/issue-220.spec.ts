@@ -37,8 +37,10 @@ test('#220 the multifamily riser has the MDP between the meter stack and the pan
 
   // 1 — the MDP sits between the stack and the panels (was missing)
   const at = (s: string) => riser.indexOf(s);
-  expect(at('QA MF feeders MDP (MDP)')).toBeGreaterThan(at('CT Cabinet'));
-  expect(at('Unit 101 Panel')).toBeGreaterThan(at('QA MF feeders MDP (MDP)'));
+  // #315: the name says MDP, so the title adds no " (MDP)"
+  expect(riser).not.toContain('QA MF feeders MDP (MDP)');
+  expect(at('QA MF feeders MDP')).toBeGreaterThan(at('CT Cabinet'));
+  expect(at('Unit 101 Panel')).toBeGreaterThan(at('QA MF feeders MDP'));
   // 2 — the MDP → panel feeders are labelled
   // VD from Table 9 Note 2 effective Z since #219 (the feeders were recalculated)
   expect(riser).toContain('2/0 AWG Cu • 50 ft • VD 0.56%');

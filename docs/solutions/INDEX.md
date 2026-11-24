@@ -4,6 +4,7 @@ One note per hard problem, written by the model that solved it via the `extract-
 Each entry: `- [title](file.md) — reusable rule`.
 
 <!-- Newest first -->
+- [Lists never updated live; packet cosmetics](2026-11-24-realtime-publication-and-packet-cosmetics.md) — check the database side of a subscription (pg_publication_tables); test a date mismatch with a time zone, not a fake clock (a fake time past the token expiry signs the page out)
 - [A failed test sign-in wrote the QA password to disk](2026-11-24-e2e-signin-secret-on-disk.md) — a Playwright failure snapshot records textbox values and traces log fill() args: no artifacts on a project that types a secret, empty the field on every path; never fake the clock in a signed-in context
 - [Take-off CSV split 3/4" cells; boxes on feeder-only panels](2026-11-24-takeoff-csv-and-boxes.md) — grep for an existing formatter before writing one and move it to lib/ (check the import graph); an estimate per circuit names the circuits it applies to
 - [Equipment Specs couldn't clear a saved AIC rating and looped on open](2026-11-24-equipment-specs-clear-and-loop.md) — to clear a column send null (undefined vanishes from the PATCH body); read the request body, the optimistic UI hides it; keep a parent callback in a ref, not in effect deps

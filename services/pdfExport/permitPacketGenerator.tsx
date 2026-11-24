@@ -474,6 +474,16 @@ const summarizeStack = (err: unknown, lines = 6): string => {
  * together first, and on failure bisect by re-rendering each Page in
  * isolation so the error message can point at the exact offender.
  */
+/**
+ * The packet filename's date, YYYY-MM-DD in the user's local time zone: the
+ * same day the pages print ("Generated November 23, 2026"). toISOString() is
+ * UTC, so an evening packet in Florida was named for the next day (#315).
+ */
+export function localDateStamp(d: Date = new Date()): string {
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+}
+
 export const generatePermitPacket = async (data: PermitPacketData): Promise<void> => {
   console.log('[permit-packet] start', {
     projectName: data.projectName,
@@ -1429,7 +1439,7 @@ export const generatePermitPacket = async (data: PermitPacketData): Promise<void
   console.log('[permit-packet] pages assembled:', pages.length, pages.map(p => p.name));
   console.log('[permit-packet] sheet IDs:', builders.map((b, i) => `${b.name} → ${(allocatedIds[i] ?? []).join(', ') || '(none)'}`));
 
-  const fileName = `Permit_Packet_${data.projectName.replace(/[^a-z0-9]/gi, '_')}_${new Date().toISOString().split('T')[0]}.pdf`;
+  const fileName = `Permit_Packet_${data.projectName.replace(/[^a-z0-9]/gi, '_')}_${localDateStamp()}.pdf`;
 
   // First attempt: render the complete packet together.
   try {
@@ -1846,7 +1856,7 @@ export const generateLightweightPermitPacket = async (data: PermitPacketData): P
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
-    const fileName = `Permit_Packet_Lightweight_${data.projectName.replace(/[^a-z0-9]/gi, '_')}_${new Date().toISOString().split('T')[0]}.pdf`;
+    const fileName = `Permit_Packet_Lightweight_${data.projectName.replace(/[^a-z0-9]/gi, '_')}_${localDateStamp()}.pdf`;
     link.download = fileName;
 
     document.body.appendChild(link);

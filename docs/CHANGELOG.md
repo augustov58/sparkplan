@@ -4,6 +4,14 @@ All notable changes to SparkPlan.
 
 ---
 
+## 2026-11-24: Packet and one-line polish; lists update live (#315)
+
+- **E-202** prints the main breaker with its unit ("800A"), like the bus rating. Main-lug panels still read "MLO".
+- **E-201** no longer prints "MDP (MDP)". A main panel's title adds "(MDP)" only when its name doesn't already say MDP, so "Main Panel" still reads "Main Panel (MDP)". The node's "AIC 42 kA" line prints in the node's normal dark text instead of dark red: it is the equipment rating, not a warning.
+- **One-line diagram:** the "AIC 42kA" chip sits just below the panel instead of on its bottom border.
+- **Short Circuit page:** with no panels besides the MDP, the Downstream Panel list says "(no downstream panels)" instead of "(all panels already calculated)".
+- **The packet's file name uses your local date,** the same day the pages print. An evening packet in Florida used to be named for the next day.
+- **Panels, circuits, feeders, projects and the other lists now update live.** A change made in another tab or on another device shows without a reload. These tables had never been switched on for live updates.
 ## 2026-11-24: The test sign-in never writes the QA password to disk (#328)
 
 - No change in behavior. When the saved test session had expired and the QA account was signed in again, a failed attempt saved the typed password in Playwright's failure files. The test sign-in now records nothing that could hold it, empties the field before anything is saved, and reports the page's own message ("Invalid login credentials").
