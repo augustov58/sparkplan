@@ -117,7 +117,7 @@ test('#343 3 RFIs: Extract from PDF fills the RFI from the PDF', async ({ page }
 
 test('#343 6 a LaTeX answer shows as plain text, prices untouched', async ({ page }) => {
   // The verifier's 2026-11-25 answer: Gemini 3 wrote LaTeX despite the instruction
-  const answer = 'Line current:\n\n$$\\text{Current (I)} = \\frac{\\text{Apparent Power (S)}}{\\text{Line-to-Line Voltage (V)} \\times \\sqrt{3}}$$\n\nEstimated cost: $5,700–$14,000.';
+  const answer = 'Line current:\n\n$$\\text{Current (I)} = \\frac{\\text{Apparent Power (S)}}{\\text{Line-to-Line Voltage (V)} \\times \\sqrt{3}}$$\n\nEstimated cost: $5,700–$14,000; markup is $\\$588.00$.';
   await page.route(PROXY, async route => {
     if (route.request().method() === 'OPTIONS') return route.fulfill({ status: 200, headers: CORS });
     return route.fulfill({ headers: CORS, json: { response: answer } });
@@ -130,6 +130,6 @@ test('#343 6 a LaTeX answer shows as plain text, prices untouched', async ({ pag
 
   const shown = page.locator('.prose').filter({ hasText: 'Line current:' }).last();
   await expect(shown).toContainText('Current (I) = (Apparent Power (S)) / (Line-to-Line Voltage (V) × √3)', { timeout: 30_000 });
-  await expect(shown).toContainText('Estimated cost: $5,700–$14,000.');
+  await expect(shown).toContainText('Estimated cost: $5,700–$14,000; markup is $588.00.');
   await expect(shown).not.toContainText('\\frac'); // main: the LaTeX printed raw
 });

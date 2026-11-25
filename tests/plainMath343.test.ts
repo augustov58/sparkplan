@@ -85,6 +85,11 @@ describe('#343 plainMath turns LaTeX into plain text', () => {
     expect(plainMath(plain)).toBe(plain);
   });
 
+  it('inline math holding escaped dollars (the fourth verifier\'s cost answer)', () => {
+    expect(plainMath('the subtotal is $\\$2,625.00 + \\$1,295.00 = \\$3,920.00$; markup is $\\$588.00$; plus $\\$183.75$ material tax yields $4,691.75.'))
+      .toBe('the subtotal is $2,625.00 + $1,295.00 = $3,920.00; markup is $588.00; plus $183.75 material tax yields $4,691.75.');
+  });
+
   it('a price before inline math on the same line', () => {
     expect(plainMath('Costs $5,700; the load is $16{,}640\\text{ VA}$.')).toBe('Costs $5,700; the load is 16,640 VA.');
   });

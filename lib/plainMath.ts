@@ -77,6 +77,7 @@ export function plainMath(markdown: string): string {
     .replace(/\$\$([\s\S]+?)\$\$/g, convert)
     .replace(/\\\[([\s\S]+?)\\\]/g, convert)
     .replace(/\\\(([\s\S]+?)\\\)/g, convert)
-    .replace(/\$(?=\S)([^$\n]*?\S)\$(?!\d)/g, (whole: string, tex: string) =>
+    // Escaped characters stay inside the span: "$\$588.00$" is math holding a price
+    .replace(/\$(?=\S)((?:[^$\n\\]|\\.)*?(?:[^\s$\\]|\\.))\$(?!\d)/g, (whole: string, tex: string) =>
       /[\\{}_^]/.test(tex) || !/^\d/.test(tex) ? plainLatex(tex) : whole);
 }
