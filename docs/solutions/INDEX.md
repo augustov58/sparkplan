@@ -4,6 +4,7 @@ One note per hard problem, written by the model that solved it via the `extract-
 Each entry: `- [title](file.md) — reusable rule`.
 
 <!-- Newest first -->
+- [The Copilot's Gemini proxy would break on Gemini 3](2026-11-25-gemini3-copilot-proxy.md) — before switching a model, send the app's real payloads through the deployed path to the new model and tabulate the statuses, then read answers for formatting the UI can't render; a tool parameter that holds objects declares their properties
 - [The AI agents took every service as 240 V single-phase](2026-11-25-backend-column-names.md) — `row.get('key') or default` hides a wrong column name; when one turns up, sweep every key read against the schema and leave a CI test that does it
 - [The AI backend crashed on every deploy for 4½ months](2026-11-24-backend-unpinned-deps-crash.md) — a dependency file a platform installs on every deploy pins exact versions; "success then failure" seconds apart = a crash at start: reproduce the build from the file; read the provider's deprecation table before choosing a model; a placeholder key proves the request builds
 - [The e2e QA session died mid-run, and every death cost the owner a sign-in](2026-11-24-e2e-session-renewed-each-run.md) — under refresh-token rotation, one owner renews a shared saved session before the consumers start, and they finish inside the token's life; a dead session is a bug to trace, never routine re-sign-in

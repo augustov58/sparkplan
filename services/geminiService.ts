@@ -7,11 +7,15 @@
 import { supabase } from '@/lib/supabase';
 import { LoadItem, Project, GroundingDetail } from "../types";
 
+// The chat renders Markdown, not LaTeX; Gemini 3 writes math as LaTeX unless told (#343)
+const PLAIN_MATH_RULE = 'FORMATTING: the chat cannot display LaTeX. Write every formula as plain text with Unicode symbols, e.g. "200 A × 208 V × √3 = 72,051 VA". Never use $ or $$ math delimiters, or commands such as \\text, \\times, \\sqrt, \\frac, \\mathbf.';
+
 const NEC_SYSTEM_INSTRUCTION = `
 You are a Senior Electrical Engineer and Master Electrician specializing in the National Electrical Code (NEC).
 Your goal is to assist users in designing safe, compliant electrical systems.
 Always reference specific NEC articles (using the project's NEC edition from the project context; with no project, Florida's: NEC 2020 through 2026-12-30, NEC 2023 from 2026-12-31).
 Be concise, technical, and professional.
+${PLAIN_MATH_RULE}
 
 VOLTAGE DROP:
 - Per-segment VD on a single feeder vs. cumulative VD+ from the nearest source down to a panel.
@@ -185,6 +189,7 @@ IMPORTANT: You have access to the user's current project data. When answering qu
 
 Always reference specific NEC articles (using the project's NEC edition from the project context; with no project, Florida's: NEC 2020 through 2026-12-30, NEC 2023 from 2026-12-31).
 Be concise, technical, and professional.
+${PLAIN_MATH_RULE}
   `;
 
   const prompt = `
@@ -607,6 +612,7 @@ function buildAgenticSystemInstruction(
   return `
 You are a Senior Electrical Engineer and NEC compliance AI copilot with access to calculation tools.
 You can execute real calculations and checks on the user's project data.
+${PLAIN_MATH_RULE}
 
 AVAILABLE TOOLS:
 

@@ -428,7 +428,7 @@ When renaming across the codebase, grep for ALL variations: exact match, partial
 5. Add NEC article references in comments and in result `necReferences` array
 
 ### Adding AI Features
-**System 1 (Quick Q&A)**: `services/geminiService.ts` → `callGeminiProxy()`. The Edge Function `gemini-proxy` picks the model (`payload.ts::GEMINI_MODEL`, `gemini-3.8-flash`); callers never name one. Gemini 3: no temperature/topP/topK, `thinkingLevel` not `thinkingBudget`, a tool result goes back as role `user` after the model's own call part (`modelPart`, thought signature) (#343). CI doesn't deploy functions: deploy by hand after a merge.
+**System 1 (Quick Q&A)**: `services/geminiService.ts` → `callGeminiProxy()`. The Edge Function `gemini-proxy` picks the model (`payload.ts::GEMINI_MODEL`, `gemini-3.8-flash`); callers never name one. Gemini 3: no temperature/topP/topK, `thinkingLevel` not `thinkingBudget`, a tool result goes back as role `user` after the model's own call part (`modelPart`, thought signature); the chat renders Markdown, not LaTeX, so every chat instruction carries `PLAIN_MATH_RULE` (#343). CI doesn't deploy functions: deploy by hand after a merge.
 **System 2 (Complex Analysis)**: `/backend/agents/` → Pydantic AI with approval workflow. Model `google:gemini-3.8-flash`; `backend/requirements.txt` pins exact versions (pydantic-ai 1.x): bump one on purpose and check a clean install starts (`GET /health`) (#334).
 
 ### Database Changes
