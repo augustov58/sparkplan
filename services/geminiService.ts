@@ -44,7 +44,6 @@ async function callGeminiProxy(prompt: string, systemInstruction?: string): Prom
       body: {
         prompt,
         systemInstruction: systemInstruction || NEC_SYSTEM_INSTRUCTION,
-        model: 'gemini-2.5-flash'
       }
     });
 
@@ -372,6 +371,8 @@ interface FunctionCall {
 interface GeminiWithToolsResponse {
   response?: string;
   functionCall?: FunctionCall;
+  /** The model's function-call part, sent back unchanged with the tool result (Gemini 3 thought signature, #343). */
+  modelPart?: Record<string, unknown>;
 }
 
 /**
@@ -393,7 +394,6 @@ async function callGeminiProxyWithTools(
       body: {
         prompt,
         systemInstruction,
-        model: 'gemini-2.5-flash',
         tools,
       }
     });
@@ -405,7 +405,7 @@ async function callGeminiProxyWithTools(
 
     // Check if response contains a function call
     if (response.data?.functionCall) {
-      return { functionCall: response.data.functionCall };
+      return { functionCall: response.data.functionCall, modelPart: response.data.modelPart };
     }
 
     return { response: response.data?.response || "No response generated." };
@@ -422,7 +422,8 @@ async function callGeminiProxyWithToolResult(
   originalPrompt: string,
   systemInstruction: string,
   toolName: string,
-  toolResult: unknown
+  toolResult: unknown,
+  modelPart?: Record<string, unknown>
 ): Promise<string> {
   try {
     const { data: { session } } = await supabase.auth.getSession();
@@ -435,10 +436,10 @@ async function callGeminiProxyWithToolResult(
       body: {
         prompt: originalPrompt,
         systemInstruction,
-        model: 'gemini-2.5-flash',
         toolResult: {
           toolName,
           result: toolResult,
+          modelPart,
         },
       }
     });
@@ -536,7 +537,8 @@ export const askNecAssistantWithTools = async (
       question,
       systemInstruction,
       name,
-      toolResult.data || { error: toolResult.error }
+      toolResult.data || { error: toolResult.error },
+      initialResponse.modelPart
     );
 
     return {

@@ -1,7 +1,7 @@
 # Security Architecture
 ## SparkPlan Application
 
-**Last Updated**: 2026-05-16
+**Last Updated**: 2026-11-25
 **Security Status**: ✅ **PRODUCTION-READY** (All critical security measures implemented)
 **For**: Developers, Security Auditors, LLMs
 
@@ -78,7 +78,6 @@ async function callGeminiProxy(prompt: string, systemInstruction?: string): Prom
     body: {
       prompt,
       systemInstruction: systemInstruction || NEC_SYSTEM_INSTRUCTION,
-      model: 'gemini-2.0-flash-exp'
     }
   });
 
@@ -103,15 +102,15 @@ serve(async (req) => {
       throw new Error('Gemini API key not configured');
     }
 
-    // Parse request body
-    const { prompt, systemInstruction, model = 'gemini-2.0-flash-exp' } = await req.json();
+    // Parse request body (the model is the proxy's own, GEMINI_MODEL in payload.ts; callers can't pick one, #343)
+    const { prompt, systemInstruction } = await req.json();
 
     if (!prompt) {
       throw new Error('Prompt is required');
     }
 
     // Call Gemini API (server-side only)
-    const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${geminiApiKey}`;
+    const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${geminiApiKey}`;
 
     const geminiPayload = {
       contents: [{

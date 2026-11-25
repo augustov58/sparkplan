@@ -9,9 +9,11 @@ stored settings values here (public repo).
 
 `issue-321.spec.ts` creates, reads and deletes Retail, Office and Workshop template projects
 (as `issue-294` / `issue-304` do). `issue-317.spec.ts` reads "QA MF feeders", "QA SC parallel" and "QA Short circuit"
-with their panel or circuit responses held back; it writes nothing.
+with their panel or circuit responses held back; it writes nothing. `issue-343.spec.ts` and `issue-345.spec.ts`
+open "QA Commercial calc" and write nothing: the Copilot's proxy and backend replies are stubbed, except #343's
+steps 2–3 (two small live proxy calls, and an RFI extracted from a generated PDF but not saved).
 
-Last updated: 2026-11-24
+Last updated: 2026-11-25
 
 | Project name | Scenario | Key setup |
 |---|---|---|

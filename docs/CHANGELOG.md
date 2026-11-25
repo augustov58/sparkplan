@@ -4,6 +4,14 @@ All notable changes to SparkPlan.
 
 ---
 
+## 2026-11-25: The Copilot moves to Gemini 3.8 Flash; RFI PDF extraction works again (#343, #345)
+
+- The Copilot, RFI PDF extraction and panel photo import now run on Gemini 3.8 Flash. Google retires the model they used on December 1, 2026 and reroutes it to a Gemini 3 model, where every Copilot answer that uses a tool (panel loads, voltage drop, change impact…) and every panel photo import would have failed.
+- "Extract from PDF" on the RFIs page asked for an AI model Google had shut down, so it always failed. It now fills the RFI from the PDF.
+- Asking the Copilot what adding loads would do (e.g. "adding 2 EV chargers at 40 A") now returns the change-impact analysis instead of asking you for voltage and poles.
+
+---
+
 ## 2026-11-25: AI analyses use the project's real service (#346)
 
 - Change impact analysis and inspection predictions took every project's service as 240 V single-phase, so a 208 V or 480 V three-phase service looked a third to two-thirds smaller than it is and could be reported as needing an upgrade. They now use the service voltage and phase stored on the project, and the service rating the rest of the app uses (the project's service amps, else the main panel's breaker).

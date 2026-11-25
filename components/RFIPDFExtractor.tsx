@@ -171,7 +171,6 @@ VALIDATION RULES:
 
 Analyze the attached PDF document now.`,
           pdfData: base64Data, // Send PDF separately
-          model: 'gemini-2.0-flash-exp'
         }
       });
 
