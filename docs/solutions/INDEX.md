@@ -4,6 +4,7 @@ One note per hard problem, written by the model that solved it via the `extract-
 Each entry: `- [title](file.md) — reusable rule`.
 
 <!-- Newest first -->
+- [The e2e QA session died mid-run, and every death cost the owner a sign-in](2026-11-24-e2e-session-renewed-each-run.md) — under refresh-token rotation, one owner renews a shared saved session before the consumers start, and they finish inside the token's life; a dead session is a bug to trace, never routine re-sign-in
 - [Evening dates were tomorrow's: "today" taken as the UTC day](2026-11-24-local-date-not-utc.md) — sweep every `toISOString()` and sort instants from dates; a user's "today" is `lib/localDate.ts`; leave UTC-consistent arithmetic and round trips alone (match the writer); a source test pins the remaining sites
 - [Password reset: a blank page, then a link that never asked for a password](2026-11-24-password-reset-hash-router.md) — Supabase email links land on the app root with parameters in the hash; read the hash once at module load, route on PASSWORD_RECOVERY, never put a hash route in redirectTo; a redirect effect keyed on `navigate` fires once (ref)
 - [Promo codes: listable and redeemable for any account with the public key](2026-11-24-promo-code-security-definer.md) — a SECURITY DEFINER function takes the user from auth.uid(), never an argument, and revokes anon; check the RLS policies beside it; database objects live in migrations, not the SQL editor
