@@ -4,6 +4,12 @@ All notable changes to SparkPlan.
 
 ---
 
+## 2026-11-24: The test session stays signed in between runs (#339)
+
+- No change in behavior. The automated tests no longer lose their saved QA session partway through a run, which meant signing the QA account in again by hand. Each run now renews the session once at the start, so it outlasts the run and the next run renews it again.
+
+---
+
 ## 2026-11-24: Dates follow your time zone, not UTC (#327)
 
 - In the evening (from 7 PM in Florida), several places used tomorrow's date. They now use your local day:

@@ -1,5 +1,6 @@
 import { test as setup, expect, type Page } from '@playwright/test';
-import { existsSync } from 'fs';
+import { existsSync, readFileSync, writeFileSync } from 'fs';
+import { loadEnv } from 'vite';
 
 /**
  * Signs the e2e specs in as the QA account — never the owner's account.
@@ -8,13 +9,41 @@ import { existsSync } from 'fs';
  * the QA account (issue-verification skill). Every run checks that the
  * session belongs to E2E_QA_EMAIL and fails otherwise.
  *
- * The password is never stored: a saved session (tests/e2e/.auth/user.json,
- * gitignored) is reused and written back after the app refreshes its tokens,
- * so Supabase's refresh-token rotation keeps it alive. Sign in again only when
- * it has died: E2E_USER_PASSWORD from the environment, set for that one run.
+ * The password is never stored. The saved session (tests/e2e/.auth/user.json,
+ * gitignored) is renewed with its refresh token once, here, at the start of
+ * every run (#339): the run starts with a full hour of access token, so no
+ * test refreshes it, and the refresh token on disk stays unspent for the next
+ * run. Supabase rotates refresh tokens and revokes the session when a spent
+ * one is reused, which is what tests refreshing the same saved token did.
+ * Sign in again only when the session has died: E2E_USER_PASSWORD from the
+ * environment, set for that one run.
  */
 
 const AUTH_FILE = 'tests/e2e/.auth/user.json';
+
+type StorageItem = { name: string; value: string };
+
+/** Renews the saved session in AUTH_FILE; returns why it couldn't, or null. */
+async function renewSavedSession(): Promise<string | null> {
+  const state = JSON.parse(readFileSync(AUTH_FILE, 'utf8'));
+  const item: StorageItem | undefined = (state.origins ?? [])
+    .flatMap((o: { localStorage?: StorageItem[] }) => o.localStorage ?? [])
+    .find((i: StorageItem) => /^sb-.*-auth-token$/.test(i.name));
+  if (!item) return 'no session in the saved file';
+  const { VITE_SUPABASE_URL: url, VITE_SUPABASE_ANON_KEY: anonKey } = loadEnv('development', process.cwd(), 'VITE_SUPABASE_');
+  if (!url || !anonKey) throw new Error('auth.setup needs VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY (.env.local), as the dev server does.');
+  const res = await fetch(`${url}/auth/v1/token?grant_type=refresh_token`, {
+    method: 'POST',
+    headers: { apikey: anonKey, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ refresh_token: JSON.parse(item.value)?.refresh_token }),
+  });
+  const session = await res.json().catch(() => ({}));
+  if (!res.ok || !session.access_token) return session.msg ?? session.error_description ?? `HTTP ${res.status}`;
+  // Saved before anything else: the old refresh token is now spent.
+  item.value = JSON.stringify({ ...session, expires_at: session.expires_at ?? Math.floor(Date.now() / 1000) + session.expires_in });
+  writeFileSync(AUTH_FILE, JSON.stringify(state, null, 2));
+  return null;
+}
 
 const signedInEmail = (page: Page) =>
   page.evaluate(() => {
@@ -36,7 +65,9 @@ setup('authenticate', async ({ browser }) => {
     throw new Error('auth.setup needs E2E_QA_EMAIL (the QA account; see .claude/skills/issue-verification/SKILL.md).');
   }
 
-  const reuse = existsSync(AUTH_FILE) && !process.env.E2E_FORCE_REAUTH;
+  let reuse = existsSync(AUTH_FILE) && !process.env.E2E_FORCE_REAUTH;
+  const dead = reuse ? await renewSavedSession() : null;
+  if (dead) reuse = false;
   const context = await browser.newContext(reuse ? { storageState: AUTH_FILE } : {});
   const page = await context.newPage();
   await page.goto('/');
@@ -47,7 +78,8 @@ setup('authenticate', async ({ browser }) => {
     const password = process.env.E2E_USER_PASSWORD;
     if (!password) {
       throw new Error(
-        'The saved QA session is gone. Sign in once from your own terminal (the password is never written to disk):\n' +
+        `The saved QA session is gone${dead ? ` (Supabase: ${dead})` : ''}. Sign in once` +
+          ' from your own terminal (the password is never written to disk):\n' +
           '  read -rs E2E_USER_PASSWORD && export E2E_USER_PASSWORD && npx playwright test --project=setup; unset E2E_USER_PASSWORD',
       );
     }

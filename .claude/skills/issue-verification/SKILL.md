@@ -13,7 +13,7 @@ What stays with the owner: NEC interpretations (Escalation Rule 1), Stable Modul
 
 - **QA account only.** The local app (`npm run dev`, localhost:3000) talks to **prod** Supabase. Writes inside the QA account (`E2E_QA_EMAIL`) are pre-authorized for this loop: create, edit and delete QA projects, Save to Packet, calculator saves. Writes to any other account, and schema/SQL changes, still need a yes.
 - **Interactive driving:** the `playwright-qa` MCP server (own browser profile, signed in as the QA account). Before the first write in a session, read the signed-in email (sidebar, or `localStorage` `sb-*-auth-token` → `user.email`). Not the QA email → stop and say so. Never sign the profile out.
-- **Specs:** `npx playwright test` — `auth.setup.ts` reuses the saved QA session and fails on any other account. A dead session needs the owner's one-line sign-in (the error prints it); never ask for the password in chat or a `!` command.
+- **Specs:** `npx playwright test` — `auth.setup.ts` renews the saved QA session once at the start of every run (#339) and fails on any other account. A run must finish inside the token's 60 minutes, so no test refreshes it. A dead session is a bug: find what spent the token (the error prints Supabase's reason) before asking for the owner's one-line sign-in; never ask for the password in chat or a `!` command.
 - **QA projects:** named fixtures in the QA account, listed in `tests/e2e/fixtures.md`. Use one that covers the scenario; add a project (and a line in that file) when none does.
 
 ## The loop
