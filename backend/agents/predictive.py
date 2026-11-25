@@ -19,6 +19,7 @@ from tools.database import (
 from supabase import Client
 from typing import Dict, Any, List
 import logging
+import math
 
 logger = logging.getLogger(__name__)
 
@@ -90,7 +91,7 @@ async def add_project_context(ctx: RunContext[Dict[str, Any]]) -> str:
 
 **Project:** {project.get('name', 'Unnamed')}
 **Type:** {project.get('type', 'Unknown')}
-**Phase:** {project.get('project_phase', 'Design')}
+**Status:** {project.get('status') or 'Unknown'}
 
 ### Service
 - **Size:** {service_util.get('service_size', 200)}A @ {service_util.get('voltage', 240)}V, {service_util.get('phases', 1)}-Phase
@@ -100,7 +101,7 @@ async def add_project_context(ctx: RunContext[Dict[str, Any]]) -> str:
 {chr(10).join([f"- {p.get('name')}: {p.get('bus_rating', 0)}A panel, {panel_circuit_counts.get(p.get('name'), 0)} circuits" for p in panels]) if panels else "No panels configured"}
 
 ### Feeders ({len(feeders)})
-{chr(10).join([f"- {f.get('name')}: {f.get('conductor_size')} {f.get('conductor_material', 'Cu')}, {f.get('length_feet', 0)}ft, {f.get('voltage_drop_percent', 0):.2f}% Vdrop" for f in feeders[:5]]) if feeders else "No feeders configured"}
+{chr(10).join([f"- {feeder.get('name')}: {feeder.get('phase_conductor_size')} {feeder.get('conductor_material', 'Cu')}, {feeder.get('distance_ft') or 0}ft, {feeder.get('voltage_drop_percent') or 0:.2f}% Vdrop" for feeder in feeders[:5]]) if feeders else "No feeders configured"}
 
 ### Grounding System
 - **GEC:** {grounding.get('grounding_electrode_conductor', 'Not specified') if grounding else 'Not configured'}
@@ -142,15 +143,15 @@ async def check_panel_compliance(
     circuit_count = len(circuits)
 
     # Calculate total load
-    total_load_va = sum(c.get('load_va', 0) for c in circuits)
+    total_load_va = sum(c.get('load_watts') or 0 for c in circuits)
 
     # Get panel capacity
     bus_rating = panel.get('bus_rating', 200)
     voltage = panel.get('voltage', 240)
-    phases = panel.get('phases', 1)
+    phases = panel.get('phase') or 1
 
     if phases == 3:
-        capacity_va = bus_rating * voltage * 1.732
+        capacity_va = bus_rating * voltage * math.sqrt(3)
     else:
         capacity_va = bus_rating * voltage
 

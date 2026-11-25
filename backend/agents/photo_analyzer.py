@@ -7,7 +7,7 @@ This is a UNIQUE capability that competitors don't have.
 
 from pydantic_ai import Agent, RunContext, BinaryContent
 from models.schemas import PhotoAnalysis, NecViolation, Equipment
-from tools.database import get_project_data, get_all_panels, resolve_nec_edition
+from tools.database import get_project_data, get_all_panels, resolve_nec_edition, describe_service
 from supabase import Client
 from typing import Dict, Any
 import logging
@@ -81,7 +81,7 @@ async def add_project_context(ctx: RunContext[Dict[str, Any]]) -> str:
 
 **Project:** {project.get('name', 'Unnamed')}
 **Type:** {project.get('type', 'Unknown')} Installation
-**Service:** {project.get('service_size', 200)}A, {project.get('voltage', 240)}V, {project.get('phases', 1)}-Phase
+**Service:** {describe_service(project)}
 **NEC Edition:** {nec_edition}
 
 **Panels in System:**

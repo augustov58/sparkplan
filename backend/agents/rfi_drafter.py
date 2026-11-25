@@ -11,7 +11,8 @@ from tools.database import (
     get_project_data,
     get_recent_rfis,
     get_all_issues,
-    get_all_panels
+    get_all_panels,
+    describe_service
 )
 from supabase import Client
 from typing import Dict, Any, List
@@ -78,7 +79,7 @@ async def add_project_context(ctx: RunContext[Dict[str, Any]]) -> str:
 
 **Project:** {project.get('name', 'Unnamed')}
 **Type:** {project.get('type', 'Unknown')}
-**Service:** {project.get('service_size', 200)}A, {project.get('voltage', 240)}V, {project.get('phases', 1)}-Phase
+**Service:** {describe_service(project)}
 **Status:** Active
 
 **Recent RFIs ({len(recent_rfis)}):**
@@ -116,11 +117,11 @@ async def get_panel_info(ctx: RunContext[Dict[str, Any]], panel_name: str) -> Di
 
     return {
         "name": panel.get('name'),
-        "type": panel.get('panel_type'),
+        "type": "Main (MDP)" if panel.get('is_main') else "Subpanel",
         "rating": f"{panel.get('bus_rating', 0)}A",
         "voltage": f"{panel.get('voltage', 240)}V",
-        "phases": panel.get('phases', 1),
-        "main_breaker": f"{panel.get('main_breaker_rating', 0)}A",
+        "phases": panel.get('phase') or 1,
+        "main_breaker": f"{panel.get('main_breaker_amps')}A" if panel.get('main_breaker_amps') else "not set",
         "location": panel.get('location', 'Not specified')
     }
 
