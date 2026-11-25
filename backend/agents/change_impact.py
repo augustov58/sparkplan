@@ -34,7 +34,7 @@ logger = logging.getLogger(__name__)
 
 # Create Pydantic AI agent
 change_impact_agent = Agent(
-    'gemini-2.0-flash-exp',
+    'google:gemini-3.8-flash',
     output_type=ChangeImpact,
     system_prompt="""You are an expert electrical engineer specializing in NEC compliance and electrical system design.
 

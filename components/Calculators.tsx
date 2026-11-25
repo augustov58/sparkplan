@@ -2305,7 +2305,7 @@ const ChangeImpactAnalyzer: React.FC<ChangeImpactAnalyzerProps> = ({ projectId }
       }, 5000);
     } catch (error: any) {
       console.error('Change impact analysis error:', error);
-      alert(`Failed to analyze change impact: ${error.message || 'Unknown error'}\n\nMake sure the Python backend is running at http://localhost:8000`);
+      alert(`Failed to analyze change impact: ${error.message || 'Unknown error'}`);
     } finally {
       setAnalyzing(false);
     }

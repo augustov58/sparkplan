@@ -1,18 +1,24 @@
-# Core dependencies
-fastapi>=0.104.0
-uvicorn[standard]>=0.24.0
-python-dotenv>=1.0.0
+# Pinned (#334): an unpinned install picked up pydantic-ai 2.0 (2026-06-23),
+# which rejects the agents' model names, and the backend crashed at import.
+# Change versions on purpose, then check a clean install starts (GET /health).
 
-# Pydantic AI - only install what we need (Gemini support)
-pydantic-ai-slim[google]>=0.0.13
-pydantic>=2.10.0
-pydantic-settings>=2.1.0
+# Core dependencies
+fastapi==0.127.0
+uvicorn[standard]==0.40.0
+python-dotenv==1.2.1
+
+# Pydantic AI - only install what we need (Gemini support).
+# Stays on the maintained 1.x line; 2.x changes the API the agents use.
+pydantic-ai-slim[google]==1.107.10
+google-genai==1.70.0
+pydantic==2.12.5
+pydantic-settings==2.12.0
 
 # Supabase
-supabase>=2.22.0
+supabase==2.27.0
 
 # Image processing
-pillow>=10.1.0
+pillow==12.0.0
 
 # File uploads
-python-multipart>=0.0.6
+python-multipart==0.0.21

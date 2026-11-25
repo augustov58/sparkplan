@@ -544,7 +544,7 @@ export const SiteVisitManager: React.FC<SiteVisitManagerProps> = ({ project }) =
                             );
                           } catch (error: any) {
                             console.error('Photo analysis error:', error);
-                            alert(`Failed to analyze photos: ${error.message || 'Unknown error'}\n\nMake sure the Python backend is running at http://localhost:8000`);
+                            alert(`Failed to analyze photos: ${error.message || 'Unknown error'}`);
                           } finally {
                             setAnalyzingPhotos(false);
                           }

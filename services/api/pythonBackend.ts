@@ -10,6 +10,13 @@ import type { AgentAction } from '../../types';
 const API_URL = import.meta.env.VITE_PYTHON_API_URL || 'http://localhost:8000';
 
 /**
+ * Shown when the backend can't be reached, or an error comes back without the
+ * backend's own `detail` (a platform page such as Railway's 502 "Application
+ * failed to respond"), instead of the raw response (#334).
+ */
+export const AI_SERVICE_UNAVAILABLE = 'The AI service is unavailable right now. Please try again in a few minutes.';
+
+/**
  * Get authenticated user's JWT token for backend auth
  */
 async function getAuthToken(): Promise<string> {
@@ -29,7 +36,7 @@ async function apiRequest<T>(
 ): Promise<T> {
   const token = await getAuthToken();
 
-  const response = await fetch(`${API_URL}${endpoint}`, {
+  const response = await backendFetch(`${API_URL}${endpoint}`, {
     ...options,
     headers: {
       'Content-Type': 'application/json',
@@ -38,15 +45,29 @@ async function apiRequest<T>(
     },
   });
 
-  if (!response.ok) {
-    const error = await response.json().catch(() => ({ detail: 'Unknown error' }));
-    const message = typeof error.detail === 'string'
-      ? error.detail
-      : JSON.stringify(error.detail || error);
-    throw new Error(message || `API error: ${response.status}`);
+  return response.json();
+}
+
+/**
+ * fetch for the backend: throws the backend's own `detail`, or
+ * AI_SERVICE_UNAVAILABLE when it can't be reached or didn't answer itself
+ */
+async function backendFetch(url: string, init: RequestInit): Promise<Response> {
+  let response: Response;
+  try {
+    response = await fetch(url, init);
+  } catch {
+    throw new Error(AI_SERVICE_UNAVAILABLE);
   }
 
-  return response.json();
+  if (!response.ok) {
+    const error = await response.json().catch(() => null);
+    if (typeof error?.detail === 'string') throw new Error(error.detail);
+    if (error?.detail) throw new Error(JSON.stringify(error.detail));
+    throw new Error(AI_SERVICE_UNAVAILABLE);
+  }
+
+  return response;
 }
 
 /**
@@ -117,7 +138,7 @@ export async function analyzePhoto(
     formData.append('description', description);
   }
 
-  const response = await fetch(`${API_URL}/api/agent-actions/analyze-photo`, {
+  const response = await backendFetch(`${API_URL}/api/agent-actions/analyze-photo`, {
     method: 'POST',
     headers: {
       'Authorization': `Bearer ${token}`,
@@ -125,14 +146,6 @@ export async function analyzePhoto(
     },
     body: formData,
   });
-
-  if (!response.ok) {
-    const error = await response.json().catch(() => ({ detail: 'Unknown error' }));
-    const message = typeof error.detail === 'string'
-      ? error.detail
-      : JSON.stringify(error.detail || error);
-    throw new Error(message || `API error: ${response.status}`);
-  }
 
   return response.json();
 }

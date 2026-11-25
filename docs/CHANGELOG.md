@@ -4,6 +4,13 @@ All notable changes to SparkPlan.
 
 ---
 
+## 2026-11-24: The AI backend starts again (#334)
+
+- The AI features that run on SparkPlan's backend (change impact analysis, AI-drafted RFIs, site-visit photo analysis, and the Copilot's change-impact, RFI and inspection-prediction tools) had been unavailable since July: a library update made the backend crash on start. Its libraries are now pinned, and its agents use Gemini 3.8 Flash.
+- When the AI service can't be reached, these features now say so in plain words ("The AI service is unavailable right now…") instead of a raw error and a developer hint.
+
+---
+
 ## 2026-11-24: The test session stays signed in between runs (#339)
 
 - No change in behavior. The automated tests no longer lose their saved QA session partway through a run, which meant signing the QA account in again by hand. Each run now renews the session once at the start, so it outlasts the run and the next run renews it again.

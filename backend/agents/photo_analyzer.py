@@ -18,7 +18,7 @@ logger = logging.getLogger(__name__)
 
 # Create Pydantic AI agent with multimodal support
 photo_analyzer_agent = Agent(
-    'gemini-2.0-flash-exp',
+    'google:gemini-3.8-flash',
     output_type=PhotoAnalysis,
     system_prompt="""You are an expert electrical inspector with deep knowledge of the National Electrical Code (NEC).
 

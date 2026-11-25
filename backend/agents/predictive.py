@@ -24,7 +24,7 @@ logger = logging.getLogger(__name__)
 
 # Create Pydantic AI agent
 predictive_inspector_agent = Agent(
-    'gemini-2.0-flash-exp',
+    'google:gemini-3.8-flash',
     output_type=InspectionPrediction,
     system_prompt="""You are a seasoned electrical inspector with 20+ years of experience conducting NEC compliance inspections.
 

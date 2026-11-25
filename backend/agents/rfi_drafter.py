@@ -21,7 +21,7 @@ logger = logging.getLogger(__name__)
 
 # Create Pydantic AI agent
 rfi_drafter_agent = Agent(
-    'gemini-2.0-flash-exp',
+    'google:gemini-3.8-flash',
     output_type=RFIDraft,
     system_prompt="""You are a professional electrical project coordinator specializing in RFI (Request for Information) documentation.
 

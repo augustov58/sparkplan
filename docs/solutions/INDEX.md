@@ -4,6 +4,7 @@ One note per hard problem, written by the model that solved it via the `extract-
 Each entry: `- [title](file.md) — reusable rule`.
 
 <!-- Newest first -->
+- [The AI backend crashed on every deploy for 4½ months](2026-11-24-backend-unpinned-deps-crash.md) — a dependency file a platform installs on every deploy pins exact versions; "success then failure" seconds apart = a crash at start: reproduce the build from the file; read the provider's deprecation table before choosing a model; a placeholder key proves the request builds
 - [The e2e QA session died mid-run, and every death cost the owner a sign-in](2026-11-24-e2e-session-renewed-each-run.md) — under refresh-token rotation, one owner renews a shared saved session before the consumers start, and they finish inside the token's life; a dead session is a bug to trace, never routine re-sign-in
 - [Evening dates were tomorrow's: "today" taken as the UTC day](2026-11-24-local-date-not-utc.md) — sweep every `toISOString()` and sort instants from dates; a user's "today" is `lib/localDate.ts`; leave UTC-consistent arithmetic and round trips alone (match the writer); a source test pins the remaining sites
 - [Password reset: a blank page, then a link that never asked for a password](2026-11-24-password-reset-hash-router.md) — Supabase email links land on the app root with parameters in the hash; read the hash once at module load, route on PASSWORD_RECOVERY, never put a hash route in redirectTo; a redirect effect keyed on `navigate` fires once (ref)
