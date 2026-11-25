@@ -4,6 +4,13 @@ All notable changes to SparkPlan.
 
 ---
 
+## 2026-11-25: AI analyses use the project's real service (#346)
+
+- Change impact analysis and inspection predictions took every project's service as 240 V single-phase, so a 208 V or 480 V three-phase service looked a third to two-thirds smaller than it is and could be reported as needing an upgrade. They now use the service voltage and phase stored on the project, and the service rating the rest of the app uses (the project's service amps, else the main panel's breaker).
+- AI-drafted RFIs, photo analysis and the AI's panel and feeder details now state the project's actual service, panel phase, main breaker, feeder conductor and length, instead of defaults.
+
+---
+
 ## 2026-11-24: The AI backend starts again (#334)
 
 - The AI features that run on SparkPlan's backend (change impact analysis, AI-drafted RFIs, site-visit photo analysis, and the Copilot's change-impact, RFI and inspection-prediction tools) had been unavailable since July: a library update made the backend crash on start. Its libraries are now pinned, and its agents use Gemini 3.8 Flash.

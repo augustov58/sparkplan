@@ -166,13 +166,13 @@ async def get_panels_data(ctx: RunContext[Dict[str, Any]]) -> List[Dict[str, Any
 
     # Simplify panel data for AI
     return [{
-        "name": p.get('name'),
-        "rating": f"{p.get('bus_rating', 0)}A",
-        "voltage": f"{p.get('voltage', 240)}V",
-        "phases": p.get('phases', 1),
-        "main_breaker": f"{p.get('main_breaker_rating', 0)}A",
-        "type": p.get('panel_type', 'Unknown')
-    } for p in panels]
+        "name": panel.get('name'),
+        "rating": f"{panel.get('bus_rating', 0)}A",
+        "voltage": f"{panel.get('voltage', 240)}V",
+        "phases": panel.get('phase') or 1,
+        "main_breaker": f"{panel.get('main_breaker_amps')}A" if panel.get('main_breaker_amps') else "not set",
+        "type": "Main (MDP)" if panel.get('is_main') else "Subpanel"
+    } for panel in panels]
 
 
 @change_impact_agent.tool
@@ -189,13 +189,12 @@ async def get_feeders_data(ctx: RunContext[Dict[str, Any]]) -> List[Dict[str, An
     feeders = await get_all_feeders(supabase, project_id)
 
     return [{
-        "name": f.get('name'),
-        "conductor_size": f.get('conductor_size'),
-        "material": f.get('conductor_material', 'Cu'),
-        "length": f.get('length_feet', 0),
-        "ampacity": f.get('ampacity', 0),
-        "voltage_drop": f.get('voltage_drop_percent', 0)
-    } for f in feeders]
+        "name": feeder.get('name'),
+        "conductor_size": feeder.get('phase_conductor_size'),
+        "material": feeder.get('conductor_material', 'Cu'),
+        "length": feeder.get('distance_ft', 0),
+        "voltage_drop": feeder.get('voltage_drop_percent', 0)
+    } for feeder in feeders]
 
 
 @change_impact_agent.tool

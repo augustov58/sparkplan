@@ -9,6 +9,7 @@ from typing import List, Optional, Dict, Any
 from datetime import date, datetime
 from zoneinfo import ZoneInfo
 import logging
+import math
 
 logger = logging.getLogger(__name__)
 
@@ -185,13 +186,15 @@ async def get_service_utilization(supabase: Client, project_id: str) -> Dict[str
         if not project:
             return {"error": "Project not found"}
 
-        # Note: Database field is 'service_amps', not 'service_size'
-        service_size = project.get('service_amps') or project.get('service_size') or 200
-        voltage = project.get('voltage') or 240
-        phases = project.get('phases') or 1
-
         # Get all panels
         panels = await get_all_panels(supabase, project_id)
+
+        # Columns: service_amps, service_voltage, service_phase. Until #346 this
+        # read 'voltage' / 'phases', which don't exist: every service was 240 V 1Φ.
+        rating = service_rating_amps(project, panels)
+        service_size = rating or 200  # no rating anywhere: a 200 A assumption, flagged
+        voltage = project.get('service_voltage') or 240
+        phases = project.get('service_phase') or 1
 
         # Calculate total load
         total_load_va = 0
@@ -201,7 +204,7 @@ async def get_service_utilization(supabase: Client, project_id: str) -> Dict[str
 
         # Calculate service capacity in VA
         if phases == 3:
-            service_capacity_va = service_size * voltage * 1.732  # sqrt(3)
+            service_capacity_va = service_size * voltage * math.sqrt(3)
         else:
             service_capacity_va = service_size * voltage
 
@@ -209,6 +212,7 @@ async def get_service_utilization(supabase: Client, project_id: str) -> Dict[str
 
         return {
             "service_size": service_size,
+            "service_size_assumed": rating is None,
             "voltage": voltage,
             "phases": phases,
             "service_capacity_va": service_capacity_va,
@@ -262,8 +266,8 @@ async def get_panel_utilization(supabase: Client, panel_id: str) -> Dict[str, An
 
         bus_rating = panel.get('bus_rating') or 200
         voltage = panel.get('voltage') or 240
-        phases = panel.get('phase') or panel.get('phases') or 1
-        max_spaces = panel.get('spaces') or 42
+        phases = panel.get('phase') or 1
+        max_spaces = panel.get('num_spaces') or 42
 
         # Calculate load - circuits use load_watts
         total_load_va = sum(c.get('load_va') or c.get('load_watts') or 0 for c in circuits)
@@ -271,12 +275,12 @@ async def get_panel_utilization(supabase: Client, panel_id: str) -> Dict[str, An
 
         # Calculate capacity
         if phases == 3:
-            capacity_va = bus_rating * voltage * 1.732
+            capacity_va = bus_rating * voltage * math.sqrt(3)
         else:
             capacity_va = bus_rating * voltage
 
         capacity_amps = bus_rating
-        current_load_amps = total_load_va / voltage if voltage > 0 else 0
+        current_load_amps = _line_amps(total_load_va, voltage, phases)
         available_amps = capacity_amps - current_load_amps
         utilization_percent = (total_load_va / capacity_va * 100) if capacity_va > 0 else 0
 
@@ -328,13 +332,15 @@ async def check_service_capacity(
 
         service_size = service_util.get('service_size', 200)
         voltage = service_util.get('voltage', 240)
+        phases = service_util.get('phases', 1)
         current_load_va = service_util.get('total_load_va', 0)
-        current_load_amps = current_load_va / voltage if voltage > 0 else 0
+        current_load_amps = _line_amps(current_load_va, voltage, phases)
 
-        # Calculate new totals
+        # Calculate new totals. A proposed load's amps are taken as single-phase
+        # at the service voltage (the request carries no voltage per load).
         additional_load_va = additional_load_amps * voltage
         new_total_va = current_load_va + additional_load_va
-        new_total_amps = current_load_amps + additional_load_amps
+        new_total_amps = _line_amps(new_total_va, voltage, phases)
 
         # Calculate capacity
         capacity_va = service_util.get('service_capacity_va', service_size * voltage)
@@ -368,6 +374,31 @@ async def check_service_capacity(
     except Exception as e:
         logger.error(f"Error checking service capacity: {e}")
         return {"error": str(e), "can_proceed": False}
+
+
+def _line_amps(load_va: float, voltage: float, phases: int) -> float:
+    """Line current of a load in VA: VA ÷ V on 1Φ, VA ÷ (V × √3) on 3Φ (#346)."""
+    if not voltage:
+        return 0
+    return load_va / (voltage * math.sqrt(3)) if phases == 3 else load_va / voltage
+
+
+def service_rating_amps(project: Dict[str, Any], panels: List[Dict[str, Any]]) -> Optional[float]:
+    """The service rating as the app defines it (#301, projectServiceRatingAmps):
+    the project's service amps, else the MDP's main breaker; None when neither is set."""
+    if (project.get('service_amps') or 0) > 0:
+        return project.get('service_amps')
+    main = next((panel.get('main_breaker_amps') for panel in panels if panel.get('is_main')), None)
+    return main if main and main > 0 else None
+
+
+def describe_service(project: Dict[str, Any], panels: Optional[List[Dict[str, Any]]] = None) -> str:
+    """The project's service as stored, for agent prompts; '?' where a value is empty (#346)."""
+    return (
+        f"{service_rating_amps(project, panels or []) or '?'}A, "
+        f"{project.get('service_voltage') or '?'}V, "
+        f"{project.get('service_phase') or '?'}-Phase"
+    )
 
 
 def _get_recommended_service_size(required_amps: float) -> int:
