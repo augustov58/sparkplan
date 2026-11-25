@@ -6,7 +6,7 @@ All notable changes to SparkPlan.
 
 ## 2026-11-25: AI analyses use the project's real service (#346)
 
-- Change impact analysis and inspection predictions took every project's service as 240 V single-phase, so a 208 V or 480 V three-phase service looked a third to two-thirds smaller than it is and could be reported as needing an upgrade. They now use the service voltage and phase stored on the project.
+- Change impact analysis and inspection predictions took every project's service as 240 V single-phase, so a 208 V or 480 V three-phase service looked a third to two-thirds smaller than it is and could be reported as needing an upgrade. They now use the service voltage and phase stored on the project, and the service rating the rest of the app uses (the project's service amps, else the main panel's breaker).
 - AI-drafted RFIs, photo analysis and the AI's panel and feeder details now state the project's actual service, panel phase, main breaker, feeder conductor and length, instead of defaults.
 
 ---

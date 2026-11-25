@@ -81,7 +81,7 @@ async def add_project_context(ctx: RunContext[Dict[str, Any]]) -> str:
 
 **Project:** {project.get('name', 'Unnamed')}
 **Type:** {project.get('type', 'Unknown')} Installation
-**Service:** {describe_service(project)}
+**Service:** {describe_service(project, panels)}
 **NEC Edition:** {nec_edition}
 
 **Panels in System:**

@@ -94,7 +94,7 @@ async def add_project_context(ctx: RunContext[Dict[str, Any]]) -> str:
 **Status:** {project.get('status') or 'Unknown'}
 
 ### Service
-- **Size:** {service_util.get('service_size', 200)}A @ {service_util.get('voltage', 240)}V, {service_util.get('phases', 1)}-Phase
+- **Size:** {service_util.get('service_size', 200)}A{' (assumed: no service rating or MDP main breaker set)' if service_util.get('service_size_assumed') else ''} @ {service_util.get('voltage', 240)}V, {service_util.get('phases', 1)}-Phase
 - **Utilization:** {service_util.get('utilization_percent', 0):.1f}% ({service_util.get('total_load_va', 0):.0f} VA / {service_util.get('service_capacity_va', 0):.0f} VA)
 
 ### Panels ({len(panels)})

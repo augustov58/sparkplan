@@ -186,14 +186,15 @@ async def get_service_utilization(supabase: Client, project_id: str) -> Dict[str
         if not project:
             return {"error": "Project not found"}
 
-        # Columns: service_amps, service_voltage, service_phase. Until #346 this
-        # read 'voltage' / 'phases', which don't exist: every service was 240 V 1Φ.
-        service_size = project.get('service_amps') or 200
-        voltage = project.get('service_voltage') or 240
-        phases = project.get('service_phase') or 1
-
         # Get all panels
         panels = await get_all_panels(supabase, project_id)
+
+        # Columns: service_amps, service_voltage, service_phase. Until #346 this
+        # read 'voltage' / 'phases', which don't exist: every service was 240 V 1Φ.
+        rating = service_rating_amps(project, panels)
+        service_size = rating or 200  # no rating anywhere: a 200 A assumption, flagged
+        voltage = project.get('service_voltage') or 240
+        phases = project.get('service_phase') or 1
 
         # Calculate total load
         total_load_va = 0
@@ -211,6 +212,7 @@ async def get_service_utilization(supabase: Client, project_id: str) -> Dict[str
 
         return {
             "service_size": service_size,
+            "service_size_assumed": rating is None,
             "voltage": voltage,
             "phases": phases,
             "service_capacity_va": service_capacity_va,
@@ -381,10 +383,19 @@ def _line_amps(load_va: float, voltage: float, phases: int) -> float:
     return load_va / (voltage * math.sqrt(3)) if phases == 3 else load_va / voltage
 
 
-def describe_service(project: Dict[str, Any]) -> str:
-    """The project's service as stored, for agent prompts; '?' where a column is empty (#346)."""
+def service_rating_amps(project: Dict[str, Any], panels: List[Dict[str, Any]]) -> Optional[float]:
+    """The service rating as the app defines it (#301, projectServiceRatingAmps):
+    the project's service amps, else the MDP's main breaker; None when neither is set."""
+    if (project.get('service_amps') or 0) > 0:
+        return project.get('service_amps')
+    main = next((panel.get('main_breaker_amps') for panel in panels if panel.get('is_main')), None)
+    return main if main and main > 0 else None
+
+
+def describe_service(project: Dict[str, Any], panels: Optional[List[Dict[str, Any]]] = None) -> str:
+    """The project's service as stored, for agent prompts; '?' where a value is empty (#346)."""
     return (
-        f"{project.get('service_amps') or '?'}A, "
+        f"{service_rating_amps(project, panels or []) or '?'}A, "
         f"{project.get('service_voltage') or '?'}V, "
         f"{project.get('service_phase') or '?'}-Phase"
     )

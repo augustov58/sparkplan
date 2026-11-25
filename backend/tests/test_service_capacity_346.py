@@ -15,13 +15,15 @@ import pytest
 from tools import database as db
 
 
-def _service(project, panel_loads_va, additional_amps=None):
+def _service(project, panel_loads_va, additional_amps=None, panels=None):
     """get_service_utilization / check_service_capacity on a stored project row."""
+    rows = panels or [{} for _ in panel_loads_va]
+
     async def get_project_data(_supabase, _project_id):
         return project
 
     async def get_all_panels(_supabase, _project_id):
-        return [{"id": str(i)} for i in range(len(panel_loads_va))]
+        return [{**row, "id": str(i)} for i, row in enumerate(rows)]
 
     async def calculate_total_panel_load(_supabase, panel_id):
         return panel_loads_va[int(panel_id)]
@@ -86,3 +88,19 @@ def test_panel_utilization_reads_num_spaces_and_3phase_amps():
     assert result["total_spaces"] == 30                       # main: 42 (read 'spaces')
     assert round(result["capacity_va"]) == 81_060              # 225 x 208 x sqrt 3
     assert result["current_load_amps"] == 99.9                 # 36,000 / (208 x sqrt 3); main: 173.1
+
+
+def test_service_rating_falls_back_to_the_mdp_main_as_the_app_does():
+    # #301 projectServiceRatingAmps: service_amps, else the MDP's main breaker
+    project = {"service_amps": None, "service_voltage": 208, "service_phase": 3}
+    mdp = {"is_main": True, "main_breaker_amps": 400}
+    result = _service(project, [0], panels=[mdp])
+    assert (result["service_size"], result["service_size_assumed"]) == (400, False)   # main: 200
+    assert round(result["service_capacity_va"] / 1000, 1) == 144.1
+    assert db.describe_service(project, [mdp]) == "400A, 208V, 3-Phase"
+
+
+def test_no_rating_anywhere_is_a_flagged_200a_assumption():
+    project = {"service_amps": None, "service_voltage": 208, "service_phase": 3}
+    result = _service(project, [0], panels=[{"is_main": True, "main_breaker_amps": None}])
+    assert (result["service_size"], result["service_size_assumed"]) == (200, True)

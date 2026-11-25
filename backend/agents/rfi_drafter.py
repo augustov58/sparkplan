@@ -74,12 +74,15 @@ async def add_project_context(ctx: RunContext[Dict[str, Any]]) -> str:
     # Get open issues
     issues = await get_all_issues(supabase, project_id)
 
+    # Panels: the service rating falls back to the MDP's main breaker (#301)
+    panels = await get_all_panels(supabase, project_id)
+
     context = f"""
 ## Current Project Context
 
 **Project:** {project.get('name', 'Unnamed')}
 **Type:** {project.get('type', 'Unknown')}
-**Service:** {describe_service(project)}
+**Service:** {describe_service(project, panels)}
 **Status:** Active
 
 **Recent RFIs ({len(recent_rfis)}):**
