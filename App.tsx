@@ -49,6 +49,7 @@ import { useShortCircuitCalculations } from './hooks/useShortCircuitCalculations
 import { Send, MessageSquare, Info, Copy, Check, User, Sparkles, Maximize2, Minimize2, Trash2, Square, RotateCw, Lock, ChevronDown, ChevronRight } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import { plainMath } from './lib/plainMath';
 import { nanoid } from 'nanoid';
 import { useAuthContext } from './components/Auth/AuthProvider';
 import { Login } from './components/Auth/Login';
@@ -787,7 +788,7 @@ const NecAssistant = () => {
                                                         ),
                                                     }}
                                                 >
-                                                    {linkNecReferences(msg.text)}
+                                                    {linkNecReferences(plainMath(msg.text))}
                                                 </ReactMarkdown>
                                             </div>
                                         ) : (
@@ -796,7 +797,7 @@ const NecAssistant = () => {
 
                                         {msg.role === 'ai' && (
                                             <button
-                                                onClick={() => handleCopy(msg.text, idx)}
+                                                onClick={() => handleCopy(plainMath(msg.text), idx)}
                                                 className={`absolute top-2 right-2 transition-all p-1.5 rounded ${
                                                     copiedIndex === idx
                                                         ? 'opacity-100 bg-[var(--color-success-bg)] text-[var(--color-success)]'

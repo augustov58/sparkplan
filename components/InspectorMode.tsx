@@ -54,6 +54,7 @@ import {
   IssueSeverity
 } from '../services/inspection/inspectorMode';
 import { askNecAssistant } from '../services/geminiService';
+import { plainMath } from '../lib/plainMath';
 
 interface InspectorModeProps {
   projectId: string;
@@ -554,7 +555,7 @@ export const InspectorMode: React.FC<InspectorModeProps> = ({
                 <div className="flex-1">
                   <h4 className="font-medium text-gray-900 mb-2">AI Explanation</h4>
                   <div className="prose prose-sm text-gray-700 whitespace-pre-wrap">
-                    {aiExplanation}
+                    {plainMath(aiExplanation)}
                   </div>
                   <button
                     onClick={() => setAiExplanation(null)}

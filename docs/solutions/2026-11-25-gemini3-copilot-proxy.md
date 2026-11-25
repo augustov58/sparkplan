@@ -7,13 +7,13 @@
 2. **Make the request shape testable.** The payload building moved to `gemini-proxy/payload.ts` (pure, no Deno), which `tests/geminiProxyPayload343.test.ts` imports; `tsconfig` already type-checks `supabase/functions`.
 3. **Replay what the model sent.** The proxy returns the model's function-call part (`modelPart`: `functionCall` with its `id`, plus `thoughtSignature`); the client sends it back unchanged with the tool result; the response goes as role `user` with the call's `id`. A client from before the change gets the documented stand-in signature, so stale tabs keep working.
 4. **Test the new function before merge without touching users:** deploy it as a separate function (`gemini-proxy-343`), route the QA browser's `**/functions/v1/gemini-proxy` to it (`context.route` + `route.continue({ url })`), run every acceptance step and the verifier there.
-5. **Read the answers, not only the statuses.** The first 200s on Gemini 3 printed raw LaTeX (`$\sqrt{3}$`): the chat renders Markdown only. A rule in every chat instruction (`PLAIN_MATH_RULE`, naming the forbidden syntax) fixed it; a vague "no LaTeX" left one `$$…$$` block.
+5. **Read the answers, not only the statuses.** The first 200s on Gemini 3 printed raw LaTeX (`$\sqrt{3}$`): the chat renders Markdown only. A rule in every chat instruction (`PLAIN_MATH_RULE`) cut it down, but the independent verifier still got LaTeX in 1 of 4 answers: an instruction is not a guarantee. `lib/plainMath.ts` converts math spans to plain text where the chat and Inspector Mode display AI text (and what Copy copies); `$…$` only when it holds a command, so prices stay.
 
 ## Judgment calls
 - One model, set in the proxy: callers no longer name one. This also closed a cost hole (any signed-in user could pick any Gemini model on the owner's key); the proxy still has no rate limit (noted, not fixed).
-- No math rendering (`remark-math` + KaTeX): new dependencies for a prompt-solvable problem.
+- Plain text, not math rendering (`remark-math` + KaTeX): new dependencies and bundle weight, when the formulas the Copilot writes (`\text`, `\times`, `\sqrt`, `\frac`) read fine as plain text.
 - `agent_actions.model_version` still defaults to `'gemini-2.0-flash-exp'` (nothing reads it; changing the default is a prod migration). Left, noted in the issue.
 - The Copilot's `check_panel_capacity` tool presents "80 % of the bus" as an NEC continuous limit on connected load: pre-existing, contradicts #193/#225, filed separately.
 
 ## Reusable rule
-Before switching an LLM model, send the app's real payloads (plain, tools, tool result, every generation option) through the deployed path to the new model and tabulate the statuses, then read a few answers for formatting the UI can't render. A tool parameter that holds objects declares their properties, and `execute` maps what arrives to the backend's shape.
+Before switching an LLM model, send the app's real payloads (plain, tools, tool result, every generation option) through the deployed path to the new model and tabulate the statuses, then read a few answers for formatting the UI can't render, and enforce a display format in code, not only in the prompt. A tool parameter that holds objects declares their properties, and `execute` maps what arrives to the backend's shape.
