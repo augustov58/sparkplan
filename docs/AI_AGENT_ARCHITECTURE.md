@@ -564,7 +564,7 @@ class ChangeImpact(BaseModel):
 
 # 2. Create agent with output type
 change_impact_agent = Agent(
-    'gemini-2.0-flash-exp',
+    'google:gemini-3.8-flash',
     output_type=ChangeImpact,  # Forces this structure
     system_prompt="You are an expert electrical engineer..."
 )

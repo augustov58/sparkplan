@@ -74,6 +74,8 @@ pip install -r requirements.txt
 uvicorn main:app --host 0.0.0.0 --port $PORT
 ```
 
+**Healthcheck Path** (Settings → Deploy): `/health`. Railway then keeps the running deploy when a new one crashes at startup; without it, the first deploy that crashed (2026-07-09) replaced the working one, and the backend stayed down until November 2026 (#334).
+
 ### Step 4: Add Environment Variables
 In Railway Dashboard → Variables:
 - Click "New Variable"
@@ -88,7 +90,7 @@ In Railway Dashboard → Variables:
 ### Step 6: Verify Deployment
 ```bash
 curl https://your-app.railway.app/health
-# Should return: {"status":"healthy","message":"SparkPlan AI Backend is running"}
+# Should return: {"status":"healthy","environment":"…","services":{"supabase":"connected","gemini":"configured"}}
 ```
 
 ---

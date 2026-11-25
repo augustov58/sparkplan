@@ -283,7 +283,7 @@ export const RFIManager: React.FC<RFIManagerProps> = ({ project }) => {
                       setCreationMode('manual');
                     } catch (error: any) {
                       console.error('AI RFI drafting error:', error);
-                      alert(`Failed to draft RFI: ${error.message || 'Unknown error'}\n\nMake sure the Python backend is running at http://localhost:8000`);
+                      alert(`Failed to draft RFI: ${error.message || 'Unknown error'}`);
                     } finally {
                       setAiDrafting(false);
                     }
