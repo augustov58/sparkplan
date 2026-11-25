@@ -227,25 +227,23 @@ export async function extractCircuitsFromPhoto(
     // defaults so the model is constrained to emit valid JSON:
     //   - responseMimeType=application/json + responseSchema → no markdown fences,
     //     no narrative preamble, schema-validated structure.
-    //   - temperature 0.1 → near-deterministic extraction (proxy default 0.7 is
-    //     calibrated for chat, not OCR).
     //   - maxOutputTokens 16384 → 42-circuit panels with full descriptions can
     //     exceed the proxy's 8192 default once formatting is included.
-    //   - thinkingBudget 0 → gemini-2.5-flash is a thinking model; disabling
-    //     thinking for OCR (a perception task, not reasoning) frees the entire
-    //     token budget for the actual JSON answer and prevents mid-object
-    //     truncation.
+    //   - thinkingLevel 'low' → the least thinking gemini-3.8-flash allows (it
+    //     has no off switch: Google lists 'minimal' as an error, and the old
+    //     thinkingBudget 0 got a 400 from gemini-3.5-flash-lite, #343). OCR is
+    //     perception, not reasoning; thinking tokens count against
+    //     maxOutputTokens, so less thinking leaves the budget to the JSON.
+    //     Gemini 3 takes no temperature (#343).
     const response = await supabase.functions.invoke('gemini-proxy', {
       body: {
         prompt,
         imageData: imageBase64,
         imageMimeType,
-        model: 'gemini-2.5-flash',
         responseMimeType: 'application/json',
         responseSchema: EXTRACTION_SCHEMA,
-        temperature: 0.1,
         maxOutputTokens: 16384,
-        thinkingBudget: 0,
+        thinkingLevel: 'low',
       },
     });
 

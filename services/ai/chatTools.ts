@@ -67,7 +67,11 @@ export interface ToolParameter {
   type: 'string' | 'number' | 'boolean' | 'array';
   description: string;
   enum?: string[];
-  items?: { type: string };
+  items?: {
+    type: string;
+    properties?: Record<string, { type: string; description?: string }>;
+    required?: string[];
+  };
 }
 
 // ============================================================================
@@ -1141,7 +1145,16 @@ Returns detailed analysis including cost estimates and recommendations.`,
         loads: {
           type: 'array',
           description: 'Array of proposed loads with type, amps, and quantity',
-          items: { type: 'object' },
+          // Declared field by field: with bare objects Gemini named them itself (load_type) and the backend answered 422 (#345)
+          items: {
+            type: 'object',
+            properties: {
+              type: { type: 'string', description: 'Kind of load, e.g. ev_charger, heat_pump, hvac' },
+              amps: { type: 'number', description: 'Current of one unit, in amps' },
+              quantity: { type: 'integer', description: 'Number of units (default 1)' },
+            },
+            required: ['type', 'amps'],
+          },
         },
       },
       required: ['change_description'],
@@ -1149,17 +1162,28 @@ Returns detailed analysis including cost estimates and recommendations.`,
     execute: async (params, context) => {
       const { change_description, loads } = params as {
         change_description: string;
-        loads?: Array<{ type: string; amps: number; quantity: number }>;
+        loads?: Array<Record<string, unknown>>;
       };
 
       if (!context.projectId) {
         return { success: false, error: 'No project selected. Please open a project first.' };
       }
 
-      try {
-        // Parse loads from description if not provided
-        const proposedLoads = loads || [];
+      // The backend's ProposedLoad shape; accept `load_type` too, in case the model still improvises (#345)
+      const proposedLoads: Array<{ type: string; amps: number; quantity: number }> = [];
+      for (const [i, load] of (loads || []).entries()) {
+        const type = load.type ?? load.load_type;
+        const amps = Number(load.amps);
+        if (typeof type !== 'string' || !type || !(amps > 0)) {
+          return {
+            success: false,
+            error: `Load ${i + 1} needs a type and its amps (got type ${type ? `"${type}"` : 'missing'}, amps ${load.amps ?? 'missing'}).`,
+          };
+        }
+        proposedLoads.push({ type, amps, quantity: Number(load.quantity ?? 1) || 1 });
+      }
 
+      try {
         const result = await analyzeChangeImpact(
           context.projectId,
           change_description,
@@ -1180,7 +1204,8 @@ Returns detailed analysis including cost estimates and recommendations.`,
       } catch (error) {
         return {
           success: false,
-          error: `Failed to analyze change impact: ${error instanceof Error ? error.message : 'Unknown error'}`,
+          error: `Failed to analyze change impact: ${error instanceof Error ? error.message : 'Unknown error'} `
+            + 'This is a SparkPlan error, not missing information: tell the user the analysis failed; do not ask them for more details.',
         };
       }
     },

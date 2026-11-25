@@ -11,41 +11,11 @@ declare const Deno: any;
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 // @ts-ignore: Deno URL import resolved at runtime
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2"
+import { buildGeminiPayload, geminiUrl, readGeminiResponse, type GeminiRequest } from "./payload.ts"
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-}
-
-interface GeminiRequest {
-  prompt: string
-  systemInstruction?: string
-  model?: string
-  pdfData?: string // Base64 encoded PDF
-  imageData?: string // Base64 encoded image
-  imageMimeType?: string // e.g. image/jpeg, image/png, image/webp
-  tools?: ToolDefinition[] // Function calling tools
-  toolResult?: { // Result from a tool call to continue conversation
-    toolName: string
-    result: any
-  }
-  // Optional generationConfig overrides. When omitted, proxy defaults apply
-  // (temperature 0.7, maxOutputTokens 8192, free-text response).
-  responseMimeType?: string // e.g. "application/json" to force structured output
-  responseSchema?: Record<string, any> // OpenAPI-style schema; used with responseMimeType=application/json
-  temperature?: number
-  maxOutputTokens?: number
-  thinkingBudget?: number // gemini-2.5-flash only: 0 disables thinking, frees output budget
-}
-
-interface ToolDefinition {
-  name: string
-  description: string
-  parameters: {
-    type: string
-    properties: Record<string, any>
-    required?: string[]
-  }
 }
 
 serve(async (req: Request) => {
@@ -88,126 +58,16 @@ serve(async (req: Request) => {
       throw new Error('Gemini API key not configured')
     }
 
-    // Parse request body
-    const {
-      prompt,
-      systemInstruction,
-      model = 'gemini-2.5-flash',
-      pdfData,
-      imageData,
-      imageMimeType,
-      tools,
-      toolResult,
-      responseMimeType,
-      responseSchema,
-      temperature,
-      maxOutputTokens,
-      thinkingBudget,
-    }: GeminiRequest = await req.json()
+    // Parse request body. The model is the proxy's own (payload.ts); a `model` field is ignored (#343).
+    const request: GeminiRequest = await req.json()
 
-    if (!prompt) {
+    if (!request.prompt) {
       throw new Error('Prompt is required')
     }
 
-    // Call Gemini API
-    const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${geminiApiKey}`
+    const geminiPayload = buildGeminiPayload(request)
 
-    // Build input parts array for multimodal input
-    const inputParts: any[] = [{ text: prompt }]
-
-    // Add PDF if provided
-    if (pdfData) {
-      inputParts.push({
-        inline_data: {
-          mime_type: "application/pdf",
-          data: pdfData
-        }
-      })
-    }
-
-    // Add image if provided
-    if (imageData) {
-      inputParts.push({
-        inline_data: {
-          mime_type: imageMimeType || "image/jpeg",
-          data: imageData
-        }
-      })
-    }
-
-    // Build contents array - handle tool result continuation
-    let contents: any[] = []
-    if (toolResult) {
-      // This is a continuation after a tool call
-      contents = [
-        { role: 'user', parts: [{ text: prompt }] },
-        {
-          role: 'model',
-          parts: [{
-            functionCall: {
-              name: toolResult.toolName,
-              args: {}
-            }
-          }]
-        },
-        {
-          role: 'function',
-          parts: [{
-            functionResponse: {
-              name: toolResult.toolName,
-              response: toolResult.result
-            }
-          }]
-        }
-      ]
-    } else {
-      contents = [{ parts: inputParts }]
-    }
-
-    const generationConfig: Record<string, any> = {
-      temperature: typeof temperature === 'number' ? temperature : 0.7,
-      topK: 40,
-      topP: 0.95,
-      maxOutputTokens: typeof maxOutputTokens === 'number' ? maxOutputTokens : 8192,
-    }
-    if (responseMimeType) {
-      generationConfig.responseMimeType = responseMimeType
-      if (responseSchema) {
-        generationConfig.responseSchema = responseSchema
-      }
-    }
-    // gemini-2.5-flash supports thinkingConfig; older models ignore it.
-    if (typeof thinkingBudget === 'number') {
-      generationConfig.thinkingConfig = { thinkingBudget }
-    }
-
-    const geminiPayload: any = {
-      contents,
-      ...(systemInstruction && {
-        systemInstruction: {
-          parts: [{ text: systemInstruction }]
-        }
-      }),
-      generationConfig,
-    }
-
-    // Add function calling tools if provided
-    if (tools && tools.length > 0) {
-      geminiPayload.tools = [{
-        functionDeclarations: tools.map(tool => ({
-          name: tool.name,
-          description: tool.description,
-          parameters: tool.parameters
-        }))
-      }]
-      geminiPayload.toolConfig = {
-        functionCallingConfig: {
-          mode: 'AUTO' // Let Gemini decide when to call tools
-        }
-      }
-    }
-
-    const geminiResponse = await fetch(geminiUrl, {
+    const geminiResponse = await fetch(geminiUrl(geminiApiKey), {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -246,33 +106,9 @@ serve(async (req: Request) => {
 
     const data = await geminiResponse.json()
 
-    // Check for function call response
-    const candidate = data.candidates?.[0]
-    const responseParts = candidate?.content?.parts || []
-
-    // Check if the response contains a function call
-    const functionCallPart = responseParts.find((part: any) => part.functionCall)
-    if (functionCallPart) {
-      // Return the function call for the client to execute
-      return new Response(
-        JSON.stringify({
-          functionCall: {
-            name: functionCallPart.functionCall.name,
-            args: functionCallPart.functionCall.args || {}
-          }
-        }),
-        {
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          status: 200,
-        }
-      )
-    }
-
-    // Extract response text
-    const responseText = responseParts.find((part: any) => part.text)?.text || 'No response generated'
-
+    // A function call (returned with its part, for the continuation) or the text
     return new Response(
-      JSON.stringify({ response: responseText }),
+      JSON.stringify(readGeminiResponse(data)),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         status: 200,

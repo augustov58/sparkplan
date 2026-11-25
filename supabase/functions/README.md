@@ -45,9 +45,15 @@ supabase functions deploy gemini-proxy
 ```json
 {
   "prompt": "Your prompt here",
-  "systemInstruction": "Optional system instruction",
-  "model": "gemini-2.0-flash-exp" (optional, defaults to this)
+  "systemInstruction": "Optional system instruction"
 }
+```
+
+The model is the proxy's own (`GEMINI_MODEL` in `gemini-proxy/payload.ts`, `gemini-3.8-flash`); a `model` field is ignored (#343). Optional: `pdfData`, `imageData` + `imageMimeType`, `tools`, `toolResult` (`{ toolName, result, modelPart }`: send back the `modelPart` the proxy returned with the function call; Gemini 3 needs its thought signature), `responseMimeType` + `responseSchema`, `maxOutputTokens` (default 8192), `thinkingLevel` (`low` / `medium` / `high`). Gemini 3 takes no `temperature` / `topP` / `topK`.
+
+CI doesn't deploy functions: after a change, `supabase functions deploy gemini-proxy --project-ref <ref>` (JWT verification stays on).
+
+```json
 ```
 
 **Response:**
