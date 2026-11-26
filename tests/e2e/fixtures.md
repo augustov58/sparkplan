@@ -11,7 +11,8 @@ stored settings values here (public repo).
 (as `issue-294` / `issue-304` do). `issue-317.spec.ts` reads "QA MF feeders", "QA SC parallel" and "QA Short circuit"
 with their panel or circuit responses held back; it writes nothing. `issue-343.spec.ts` and `issue-345.spec.ts`
 open "QA Commercial calc" and write nothing: the Copilot's proxy and backend replies are stubbed, except #343's
-steps 2–3 (two small live proxy calls, and an RFI extracted from a generated PDF but not saved).
+steps 2–3 (two small live proxy calls, and an RFI extracted from a generated PDF but not saved). `issue-349.spec.ts` reads
+"QA Commercial panel" (its MDP's design load, 21,300 VA → 59.1 A) with Gemini's tool call stubbed; it writes nothing.
 
 Last updated: 2026-11-25
 

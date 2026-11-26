@@ -4,6 +4,14 @@ All notable changes to SparkPlan.
 
 ---
 
+## 2026-11-25: The Copilot checks panel capacity against the full bus rating (#349)
+
+- Asking the Copilot whether a panel can take more load now compares the panel's design load (the same one Inspector Mode uses) with its bus rating, per NEC 408.30. It no longer calls 80 % of the bus an NEC limit, so a panel at 59 A of 200 A reads 29.6 %, not 37 %.
+- A proposed EV charger, sign or show window counts at 125 %, as on the service check; other loads at 100 %.
+- The Copilot's project summary reports each panel's utilization the same way.
+
+---
+
 ## 2026-11-25: The Copilot moves to Gemini 3.8 Flash; RFI PDF extraction works again (#343, #345)
 
 - The Copilot, RFI PDF extraction and panel photo import now run on Gemini 3.8 Flash. Google retires the model they used on December 1, 2026 and reroutes it to a Gemini 3 model, where every Copilot answer that uses a tool (panel loads, voltage drop, change impact…) and every panel photo import would have failed.
