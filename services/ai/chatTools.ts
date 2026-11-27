@@ -732,13 +732,14 @@ Returns the feeder's voltage drop percentage if already calculated in the projec
   // -------------------------------------------------------------------------
   {
     name: 'check_panel_capacity',
-    description: 'Check if a panel can accommodate additional load. Returns current utilization and available capacity.',
+    description: 'Check if a panel can take additional load: its design load (NEC 220 demand + 25% of continuous loads) plus the proposed load against the bus rating (NEC 408.30). Returns the design load, utilization and the amps still available.',
     parameters: {
       type: 'object',
       properties: {
         panel_id: { type: 'string', description: 'Panel UUID' },
         panel_name: { type: 'string', description: 'Panel name (e.g., "Panel A", "MDP")' },
-        additional_load_watts: { type: 'number', description: 'Proposed additional load in watts' },
+        additional_load_watts: { type: 'number', description: 'Proposed additional load in VA (watts)' },
+        additional_load_description: { type: 'string', description: 'What the proposed load is (e.g. "EV charger", "sign", "water heater"). EV chargers, signs and show windows are continuous and count at 125% (NEC 230.42(A)(1)); other loads at 100%.' },
       },
     },
     execute: async (params, context) => {
@@ -747,34 +748,51 @@ Returns the feeder's voltage drop percentage if already calculated in the projec
         return { success: false, error: 'Panel not found. Please specify a valid panel name.' };
       }
 
-      const currentLoad = panel.totalLoadVA;
-      const panelCapacityVA = panel.busRating * panel.voltage * (panel.phase === 3 ? 1.732 : 1);
-      const maxContinuousLoad = panelCapacityVA * 0.8; // 80% rule for continuous loads
-      const availableCapacity = maxContinuousLoad - currentLoad;
-      const additionalLoad = (params.additional_load_watts as number) || 0;
-      const canAccommodate = additionalLoad <= availableCapacity;
+      // #349 (owner ruling 2026-11-25): the bus check Inspector Mode makes (#225,
+      // NEC 408.30), the panel's design load against its full bus rating. A
+      // proposed load counts as loads on the schedule do: 100%, plus 25% when
+      // it's on the service check's continuous list (#190, #192). No 80% rule:
+      // the 125% for continuous loads is already in the design load.
+      const bus = panel.busRating;
+      if (panel.designAmps === undefined || !(bus > 0) || !(panel.voltage > 0)) {
+        return {
+          success: false,
+          error: `${panel.name}'s design load isn't available (the panel needs circuits, a voltage and a bus rating), so its capacity can't be checked.`,
+        };
+      }
+      const round1 = (x: number) => Math.round(x * 10) / 10;
+      const additionalVA = Number(params.additional_load_watts) || 0;
+      const continuous = isContinuousServiceLoad((params.additional_load_description as string) || '');
+      const divisor = panel.phase === 3 ? panel.voltage * Math.sqrt(3) : panel.voltage;
+      const additionalAmps = (additionalVA * (continuous ? CONTINUOUS_LOAD_FACTOR : 1)) / divisor;
+      const designAmps = round1(panel.designAmps);
+      const projectedAmps = round1(panel.designAmps + additionalAmps);
+      const canAccommodate = projectedAmps <= bus;
+      const pct = (amps: number) => round1((amps / bus) * 100);
 
       return {
         success: true,
         data: {
           panelName: panel.name,
-          busRating: panel.busRating,
+          busRating: bus,
           voltage: panel.voltage,
           phase: panel.phase,
-          currentLoadVA: currentLoad,
-          panelCapacityVA: Math.round(panelCapacityVA),
-          maxContinuousLoadVA: Math.round(maxContinuousLoad),
-          currentUtilization: Math.round((currentLoad / maxContinuousLoad) * 100),
-          availableCapacityVA: Math.round(availableCapacity),
-          additionalLoadVA: additionalLoad,
+          basis: 'Design load (NEC 220 demand + 25% of continuous loads: EV charging, signs, show windows) against the full bus rating, NEC 408.30, the check Inspector Mode makes. The 125% for continuous loads is already in the design load: compare it with the full bus rating, with no further reduction.',
+          designLoadAmps: designAmps,
+          utilizationPercent: pct(panel.designAmps),
+          availableAmps: round1(bus - panel.designAmps),
+          additionalLoadVA: additionalVA,
+          additionalLoadContinuous: continuous,
+          additionalLoadAmps: round1(additionalAmps),
+          projectedLoadAmps: projectedAmps,
+          projectedUtilizationPercent: pct(projectedAmps),
           canAccommodate,
-          projectedUtilization: Math.round(((currentLoad + additionalLoad) / maxContinuousLoad) * 100),
-          necReference: 'NEC 408.30 - Overcurrent Protection of Panelboards',
+          necReference: continuous ? 'NEC 408.30 (bus), NEC 230.42(A)(1) (continuous load at 125%)' : 'NEC 408.30 (bus)',
           recommendation: !canAccommodate
-            ? `Panel cannot accommodate ${additionalLoad}W. Available: ${Math.round(availableCapacity)}W. Consider upgrading panel or redistributing loads.`
-            : additionalLoad > 0
-            ? `Panel can accommodate the additional ${additionalLoad}W load.`
-            : `Panel has ${Math.round(availableCapacity)}W available capacity.`,
+            ? `${panel.name} can't take it: ${projectedAmps} A on its ${bus} A bus (NEC 408.30). Consider a larger panel, moving loads, or load management (EVEMS, NEC 625.42).`
+            : additionalVA > 0
+              ? `${panel.name} can take the additional ${additionalVA} VA${continuous ? ' (continuous, at 125%)' : ''}: ${projectedAmps} A of its ${bus} A bus (${pct(projectedAmps)}%).`
+              : `${panel.name}'s design load is ${designAmps} A of its ${bus} A bus (${pct(panel.designAmps)}%); ${round1(bus - panel.designAmps)} A available.`,
         },
       };
     },
@@ -987,11 +1005,10 @@ Returns the feeder's voltage drop percentage if already calculated in the projec
         for (const panel of pc.panels) {
           // #225: NEC 408.30 — the bus against the panel's design load (demand
           // + 25% of continuous loads; the MDP's = the service check), as
-          // Inspector Mode. Without project data: connected VA vs 80% of the
-          // bus, a rough estimate.
-          const utilization = panel.designAmps !== undefined && panel.busRating > 0
-            ? (panel.designAmps / panel.busRating) * 100
-            : (panel.totalLoadVA / (panel.busRating * panel.voltage * (panel.phase === 3 ? 1.732 : 1) * 0.8)) * 100;
+          // Inspector Mode. No design load: no verdict (#349; the old fallback
+          // compared connected VA with 80% of the bus).
+          if (panel.designAmps === undefined || !(panel.busRating > 0)) continue;
+          const utilization = (panel.designAmps / panel.busRating) * 100;
 
           if (utilization > 100) {
             issues.push({
@@ -1113,7 +1130,8 @@ Returns the feeder's voltage drop percentage if already calculated in the projec
             busRating: p.busRating,
             circuits: p.circuitCount,
             loadVA: p.totalLoadVA,
-            utilization: Math.round((p.totalLoadVA / (p.busRating * p.voltage * (p.phase === 3 ? 1.732 : 1) * 0.8)) * 100),
+            // Design amps vs the bus, % (#225, #349); null without a design load
+            utilization: p.designAmps !== undefined && p.busRating > 0 ? Math.round((p.designAmps / p.busRating) * 1000) / 10 : null,
           })),
         },
       };
